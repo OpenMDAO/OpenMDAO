@@ -80,9 +80,8 @@ class Test(unittest.TestCase):
     def test_connections(self):
         root = self.p.root
 
-        print root.variable_connections_found
-        self.assertEqual(root.variable_connections_found[0][0], 0)
-        self.assertEqual(root.variable_connections_found[0][1], 0)
+        self.assertEqual(root.variable_connections_indices[0][0], 0)
+        self.assertEqual(root.variable_connections_indices[0][1], 0)
 
 
 if __name__ == '__main__':

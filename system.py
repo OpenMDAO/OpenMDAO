@@ -3,14 +3,76 @@ import numpy
 
 
 
-class LoadBalance(object):
+class LoadBalancing(object):
+
+    def __init__(self, parallel=False, weights=None):
+        self.parallel = parallel
+        self.weights = weights
 
     def __call__(self, nsub, comm, proc_range):
         ''' Assigns subsystems and a sub-comm to the current processor '''
-        if comm.size == 1:
+        # This is a serial group - all procs get all subsystems
+        if not self.parallel:
             isubs = range(nsub)
             sub_comm = comm
-            sub_proc_range = [0, 1]
+            sub_proc_range = [proc_range[0], proc_range[1]]
+        # This is a parallel group
+        else:
+            iproc = comm.rank
+            nproc = comm.size
+
+            # TODO: improve this algorithm - maybe Fortran/C
+            # TODO: maybe combine the 2 cases below
+            if nproc >= nsub:
+                # Define the normalized weights for all subsystems
+                if self.weights is not None and len(self.weights) == nsub:
+                    weights = 1.0 * self.weights / numpy.sum(self.weights)
+                else:
+                    weights = numpy.ones(nsub) / nsub
+
+                # Next-one-up algorithm to assign procs to subsystems
+                num_procs = numpy.ones(nsub, int)
+                pctg_procs = numpy.zeros(nsubs)
+                for ind in xrange(nproc - nsubs):
+                    pctg_procs[:] = 1.0 * num_procs / numpy.sum(num_procs)
+                    num_procs[numpy.argmax(weights - pctg_procs)] += 1
+
+                # Compute the coloring
+                color = numpy.zeros(nproc, int)
+                start, end = 0, 0
+                for isub in xrange(nsubs):
+                    end += num_procs[isub]
+                    color[start:end] = isub
+                    start += num_procs[isub]
+
+                isub = color[iproc]
+                iproc1 = proc_range[0] + numpy.sum(num_procs[:isub])
+                iproc2 = proc_range[0] + numpy.sum(num_procs[:isub+1])
+                # Result
+                isubs = [isub]
+                sub_comm = comm.Split(isub)
+                sub_proc_range = [iproc1, iproc2]
+            else:
+                # TODO: improve this algorithm - maybe Fortran/C
+                bool_unused_sub = numpy.ones(nsub, bool)
+                isubs_list = [[] for ind in xrange(nproc)]
+                proc_load = numpy.zeros(nproc)
+                # Assign the slowest subsystem to the most free processor
+                for ind in xrange(nsub):
+                    iproc = numpy.argmin(proc_load)
+                    isub = numpy.argmax(weights[bool_unused_sub])
+
+                    bool_unused_sub[isub] = False
+                    isubs_list[iproc].append(isub)
+                    proc_load[iproc] += weights[isub]
+
+                iproc1 = proc_range[0] + iproc
+                iproc2 = proc_range[0] + iproc + 1
+                # Result
+                isubs = isubs_list[iproc]
+                sub_comm = comm.Split(iproc)
+                sub_proc_range = [iproc1, iproc2]
+
         return isubs, sub_comm, sub_proc_range
 
 
@@ -25,7 +87,7 @@ class System(object):
         self.sys_assembler = None
 
         self.mpi_comm = None
-        self.mpi_load_balance = LoadBalance()
+        self.mpi_load_balancing = LoadBalancing()
         self.mpi_proc_range = None
 
         self.subsystems_allprocs = []
@@ -34,7 +96,7 @@ class System(object):
         self.variable_names = {'input': [], 'output': []}
         self.variable_maps = {'input': {}, 'output': {}}
         self.variable_connections = {}
-        self.variable_connections_found = []
+        self.variable_connections_indices = []
         self.variable_range = {'input': [0,0], 'output': [0,0]}
 
         self.variable_myproc_metadata = {'input': [], 'output': []}
@@ -48,6 +110,7 @@ class System(object):
         self.solvers_linear = None
 
     def get_subsystem(self, name):
+        ''' Returns the system called name in the current namespace '''
         if name == self.sys_name:
             # If this system's name matches, target found
             return self
@@ -77,8 +140,8 @@ class System(object):
 
         nsub = len(self.subsystems_allprocs)
         if nsub > 0:
-            # If this is a group, call the load balance algorithm
-            tmp = self.mpi_load_balance(nsub, comm, proc_range)
+            # If this is a group, call the load balancing algorithm
+            tmp = self.mpi_load_balancing(nsub, comm, proc_range)
             sub_inds, sub_comm, sub_proc_range = tmp
 
             # Define local subsystems and perform recursion
@@ -123,12 +186,13 @@ class System(object):
                         names = self.variable_names[typ]
                     else:
                         names = []
-                    self.variable_names[typ] = self.mpi_comm.allgather(names)
-                    # TODO: check if this is OK
+                    raw = self.mpi_comm.allgather(names)
+                    self.variable_names[typ] = []
+                    for names in raw:
+                        self.variable_names[typ].extend(names)
 
     def setup_variable_indices(self, index, recursion=True):
         ''' Defines the variable indices (local) and range (global) '''
-
         # Define the global variable range for the system
         for typ in ['input', 'output']:
             size = len(self.variable_names[typ])
@@ -179,14 +243,22 @@ class System(object):
             index[typ] = self.variable_range[typ][1]
 
     def setup_connections(self):
-        ''' Recursively assemble a list of input-output connections '''
+        ''' Recursively assembles a list of input-output connections '''
+
+        # Perform recursion and assemble pairs from subsystems
         pairs = []
         for subsys in self.subsystems_myproc:
+            subsys.setup_connections()
             if subsys.mpi_comm.rank == 0:
-                pairs.extend(subsys.variable_connections_found)
+                pairs.extend(subsys.variable_connections_indices)
+        # Do an allgather to gather from root procs of all subsystems
         if self.mpi_comm.size > 1:
-            pairs = self.mpi_comm.allgather(pairs)
+            pairs_raw = self.mpi_comm.allgather(pairs)
+            pairs = []
+            for pairs0 in pairs_raw:
+                pairs.extend(pairs0)
 
+        # Loop through user-defined connections
         for ip_name in self.variable_connections:
             op_name = self.variable_connections[ip_name]
 
@@ -201,7 +273,7 @@ class System(object):
             else:
                 print 'Invalid connection in %s' % self.sys_name
 
-        self.variable_connections_found = pairs
+        self.variable_connections_indices = pairs
 
     def utils_compute_maps(self, typ):
         ''' Defines variable maps based on promotes and renames lists '''
@@ -210,7 +282,10 @@ class System(object):
 
         # All input/output names are given the same names in the parent system
         promotes_all = 'promotes_all_%ss' % typ
-        if promotes_all in kwargs and kwargs[promotes_all]:
+        if 'promotes_all' in kwargs and kwargs['promotes_all']:
+            for name in self.variable_names[typ]:
+                maps[name] = name
+        elif promotes_all in kwargs and kwargs[promotes_all]:
             for name in self.variable_names[typ]:
                 maps[name] = name
         else:
@@ -241,6 +316,7 @@ class System(object):
         pass
 
 
+
 class Group(System):
 
     def __init__(self, name, *args, **kwargs):
@@ -256,19 +332,20 @@ class Group(System):
         pass
 
     def add_subsystem(self, subsys):
-        ''' Add subsystem '''
+        ''' Adds subsystem '''
         self.subsystems_allprocs.append(subsys)
 
     def connect(self, op_name, ip_name):
-        ''' Connect output op_name to input ip_name in this namespace '''
+        ''' Connects output op_name to input ip_name in this namespace '''
         self.variable_connections[ip_name] = op_name
+
 
 
 class Component(System):
 
     DEFAULTS = {
         'indices': [0],
-        'shape': (1,),
+        'shape': [1],
         'units': '',
         'value': 1.0,
         'scale': 1.0,
@@ -278,7 +355,7 @@ class Component(System):
     }
 
     def add_input(self, name, **kwargs):
-        ''' Add an input variable to the component '''
+        ''' Adds an input variable to the component '''
         metadata = self.DEFAULTS.copy()
         metadata.update(kwargs)
         metadata['indices'] = numpy.array(metadata['indices'])
@@ -286,7 +363,7 @@ class Component(System):
         self.variable_names['input'].append(name)
 
     def add_output(self, name, **kwargs):
-        ''' Add an output variable to the component '''
+        ''' Adds an output variable to the component '''
         metadata = self.DEFAULTS.copy()
         metadata.update(kwargs)
         self.variable_myproc_metadata['output'].append(metadata)

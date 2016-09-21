@@ -17,13 +17,18 @@ class Problem(object):
 
     def __init__(self, root, comm=None, Assembler=None, Vector=None):
         if comm is None:
-            comm = Comm()
+            try:
+                from mpi4py import MPI
+                comm = MPI.COMM_WORLD
+            except:
+                comm = Comm()
         if Assembler is None:
             Assembler = BaseAssembler
 
         self.root = root
         self.comm = comm
         self.assembler = Assembler(comm)
+        self.vectors = {}
         self.Vector = Vector
 
     def setup(self):
@@ -40,5 +45,19 @@ class Problem(object):
         variable_metadata = root.variable_myproc_metadata
         variable_indices = root.variable_myproc_indices
         assembler.setup_variables(sizes, variable_metadata, variable_indices)
+
+        connections = root.variable_connections_indices
+        variable_names = root.variable_names
+        assembler.setup_connections(connections, variable_names)
+
+        input_metadata = root.variable_myproc_metadata['input']
+        assembler.setup_input_indices(input_metadata)
+
+        return self
+
+    def setup_vector(self, name, Vector):
+        for name in ['']:
+            vec_ip = self.Vector(name, comm, assembler.var_sizes['input'])
+            vec_op = self.Vector(name, comm, assembler.var_sizes['output'])
 
         return self
