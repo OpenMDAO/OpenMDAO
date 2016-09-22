@@ -24,33 +24,37 @@ class BaseAssembler(Assembler):
         nproc = self.comm.size
 
         for typ in ['input', 'output']:
-            nvar_all = sizes[typ]
-            var_count = []
-            self.variable_sizes[typ] = []
-            self.variable_set_IDs[typ] = {}
-            self.variable_set_indices[typ] = -numpy.ones((nvar_all, 2), int)
-
             nvar = len(variable_metadata[typ])
+            nvar_all = sizes[typ]
+
+            # Compile list of set names on current processor
             unique_set_names = {}
             for ivar in xrange(nvar):
                 var = variable_metadata[typ][ivar]
                 set_name = var['var_set']
                 unique_set_names[set_name] = None
+            names = unique_set_names.keys()
 
+            # Do an allgather of the list of set names - non-unique
+            raw = self.comm.allgather(names)
+            unique_set_names = []
+            for names in raw:
+                unique_set_names.extend(names)
 
+            # Compute variable_set_IDs
+            self.variable_set_IDs[typ] = {}
+            for name in unique_set_names:
+                if name not in self.variable_set_IDs[typ]:
+                    nset = len(self.variable_set_IDs[typ])
+                    self.variable_set_IDs[typ][name] = nset
 
-
+            # Compute variable_set_indices and var_count
+            var_count = numpy.zeros(len(self.variable_set_IDs[typ]), int)
+            self.variable_set_indices[typ] = -numpy.ones((nvar_all, 2), int)
             for ivar in xrange(nvar):
                 var = variable_metadata[typ][ivar]
                 set_name = var['var_set']
 
-                # If we have found a new set, add to variable_set_IDs
-                if set_name not in self.variable_set_IDs[typ]:
-                    nset = len(self.variable_set_IDs[typ])
-                    self.variable_set_IDs[typ][set_name] = nset
-                    var_count.append(0)
-
-                # Update variable_set_indices, and var_count
                 iset = self.variable_set_IDs[typ][set_name]
                 ivar_set = var_count[iset]
                 ivar_all = variable_indices[typ][ivar]
@@ -58,7 +62,8 @@ class BaseAssembler(Assembler):
                 self.variable_set_indices[typ][ivar_all, 1] = ivar_set
                 var_count[iset] += 1
 
-            # Using var_count, create the sizes arrays
+            # Allocate the size arrays using var_count
+            self.variable_sizes[typ] = []
             for iset in xrange(len(self.variable_set_IDs[typ])):
                 size = var_count[iset]
                 array = numpy.zeros((nproc, size), int)
@@ -88,8 +93,7 @@ class BaseAssembler(Assembler):
             for typ in ['input']:
                 nset = len(self.variable_sizes[typ])
                 for iset in xrange(nset):
-                    mysizes = self.variable_sizes[typ][iset][iproc, :]
-                    self.comm.Allgather(mysizes, self.variable_sizes[typ][iset])
+                    self.comm.Allgather(array[iproc, :], array)
 
     def setup_connections(self, connections, variable_names):
         ''' Identifies implicit connections, combines with explicit ones '''

@@ -15,7 +15,7 @@ class Comp1(Component):
         self.add_input('v2')
         self.add_input('v3')
         self.add_input('v4')
-        self.add_output('v1')
+        self.add_output('v1', var_set=1)
 
 
 class Comp2(Component):
@@ -24,7 +24,7 @@ class Comp2(Component):
         self.add_input('v1')
         self.add_input('v3')
         self.add_input('v4')
-        self.add_output('v2')
+        self.add_output('v2', var_set=2)
 
 
 class Comp3(Component):
@@ -33,7 +33,7 @@ class Comp3(Component):
         self.add_input('v1')
         self.add_input('v2')
         self.add_input('v4')
-        self.add_output('v3')
+        self.add_output('v3', var_set=3)
 
 
 class Comp4(Component):
@@ -42,7 +42,7 @@ class Comp4(Component):
         self.add_input('v1')
         self.add_input('v2')
         self.add_input('v3')
-        self.add_output('v4')
+        self.add_output('v4', var_set=4)
 
 
 class GroupG(Group):
