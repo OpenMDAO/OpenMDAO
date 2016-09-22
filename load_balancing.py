@@ -42,15 +42,15 @@ class BaseLoadBalancing(LoadBalancing):
 
             # Next-one-up algorithm to assign procs to subsystems
             num_procs = numpy.ones(nsub, int)
-            pctg_procs = numpy.zeros(nsubs)
-            for ind in xrange(nproc - nsubs):
+            pctg_procs = numpy.zeros(nsub)
+            for ind in xrange(nproc - nsub):
                 pctg_procs[:] = 1.0 * num_procs / numpy.sum(num_procs)
                 num_procs[numpy.argmax(weights - pctg_procs)] += 1
 
             # Compute the coloring
             color = numpy.zeros(nproc, int)
             start, end = 0, 0
-            for isub in xrange(nsubs):
+            for isub in xrange(nsub):
                 end += num_procs[isub]
                 color[start:end] = isub
                 start += num_procs[isub]

@@ -1,5 +1,8 @@
 from __future__ import division
+
 from assembler import BaseAssembler
+from vector import BaseVector
+
 
 
 class Comm(object):
@@ -24,11 +27,12 @@ class Problem(object):
                 comm = Comm()
         if Assembler is None:
             Assembler = BaseAssembler
+        if Vector is None:
+            Vector = BaseVector
 
         self.root = root
         self.comm = comm
         self.assembler = Assembler(comm)
-        self.vectors = {}
         self.Vector = Vector
 
     def setup(self):
@@ -53,11 +57,26 @@ class Problem(object):
         input_metadata = root.variable_myproc_metadata['input']
         assembler.setup_input_indices(input_metadata)
 
+        self.setup_vector('', self.Vector)
+
         return self
 
     def setup_vector(self, name, Vector):
-        for name in ['']:
-            vec_ip = self.Vector(name, comm, assembler.var_sizes['input'])
-            vec_op = self.Vector(name, comm, assembler.var_sizes['output'])
+        root = self.root
+        assembler = self.assembler
 
-        return self
+        vectors = {}
+        for key in ['input', 'output', 'residual']:
+            if key is 'residual':
+                typ = 'output'
+            else:
+                typ = key
+
+            nvar_all = len(root.variable_names[typ])
+            vec = Vector(name, self.comm, root.mpi_proc_range,
+                         root.variable_range[typ],
+                         root.variable_names[typ],
+                         assembler.variable_sizes[typ],
+                         assembler.variable_set_indices[typ])
+            vectors[key] = vec
+        self.root.setup_vector(name, vectors)

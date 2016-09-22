@@ -58,11 +58,36 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         self.p = Problem(GroupG('G')).setup()
+        self.p.root.mpi_load_balancing.parallel = True
+
+    def assertEqualArrays(self, a, b):
+        self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
 
     def test_variable_names(self):
         root = self.p.root
         names = root.variable_names['output']
         self.assertEqual(names, ['v1', 'v2', 'v3', 'v4'])
+
+    def test_variable_set_IDs(self):
+        set_IDs = self.p.assembler.variable_set_IDs['output']
+        self.assertEqual(set_IDs[1], 0)
+        self.assertEqual(set_IDs[2], 1)
+        self.assertEqual(set_IDs[3], 2)
+        self.assertEqual(set_IDs[4], 3)
+
+    def test_variable_set_indices(self):
+        set_indices = self.p.assembler.variable_set_indices['output']
+        array = numpy.array([[0,0],[1,0],[2,0],[3,0]])
+        self.assertEqualArrays(set_indices, array)
+
+    def test_vectors(self):
+        root = self.p.root
+        rank = root.mpi_comm.rank
+        #print rank, self.p.assembler.variable_sizes['output'][0]
+        if rank == 0:
+            for key in ['v1', 'v2', 'v3', 'v4']:
+                print key, root.outputs[key]
+
 
 
 if __name__ == '__main__':

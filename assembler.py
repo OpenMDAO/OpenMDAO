@@ -18,6 +18,7 @@ class Assembler(object):
         self.input_indices_meta = None
 
 
+
 class BaseAssembler(Assembler):
 
     def setup_variables(self, sizes, variable_metadata, variable_indices):
@@ -27,39 +28,38 @@ class BaseAssembler(Assembler):
             nvar = len(variable_metadata[typ])
             nvar_all = sizes[typ]
 
-            # Compile list of set names on current processor
-            unique_set_names = {}
+            # Locally determine var_set for each var
+            local_set_dict = {}
             for ivar in xrange(nvar):
                 var = variable_metadata[typ][ivar]
-                set_name = var['var_set']
-                unique_set_names[set_name] = None
-            names = unique_set_names.keys()
+                ivar_all = variable_indices[typ][ivar]
+                local_set_dict[ivar_all] = var['var_set']
 
-            # Do an allgather of the list of set names - non-unique
-            raw = self.comm.allgather(names)
-            unique_set_names = []
-            for names in raw:
-                unique_set_names.extend(names)
+            # Broadcast ivar_all-iset pairs to all procs
+            local_set_dicts_list = self.comm.allgather(local_set_dict)
+            global_set_dict = {}
+            for local_set_dict in local_set_dicts_list:
+                global_set_dict.update(local_set_dict)
 
-            # Compute variable_set_IDs
-            self.variable_set_IDs[typ] = {}
-            for name in unique_set_names:
-                if name not in self.variable_set_IDs[typ]:
+            # Compute set_name to ID maps
+            unique_list = list(set(global_set_dict.values()))
+            for set_name in unique_list:
+                if set_name not in self.variable_set_IDs[typ]:
                     nset = len(self.variable_set_IDs[typ])
-                    self.variable_set_IDs[typ][name] = nset
+                    self.variable_set_IDs[typ][set_name] = nset
 
             # Compute variable_set_indices and var_count
             var_count = numpy.zeros(len(self.variable_set_IDs[typ]), int)
             self.variable_set_indices[typ] = -numpy.ones((nvar_all, 2), int)
-            for ivar in xrange(nvar):
-                var = variable_metadata[typ][ivar]
-                set_name = var['var_set']
+            for ivar_all in global_set_dict:
+                set_name = global_set_dict[ivar_all]
 
                 iset = self.variable_set_IDs[typ][set_name]
                 ivar_set = var_count[iset]
-                ivar_all = variable_indices[typ][ivar]
+
                 self.variable_set_indices[typ][ivar_all, 0] = iset
                 self.variable_set_indices[typ][ivar_all, 1] = ivar_set
+
                 var_count[iset] += 1
 
             # Allocate the size arrays using var_count
@@ -90,9 +90,10 @@ class BaseAssembler(Assembler):
 
         # Do an allgather on the sizes arrays
         if self.comm.size > 1:
-            for typ in ['input']:
+            for typ in ['input', 'output']:
                 nset = len(self.variable_sizes[typ])
                 for iset in xrange(nset):
+                    array = self.variable_sizes[typ][iset]
                     self.comm.Allgather(array[iproc, :], array)
 
     def setup_connections(self, connections, variable_names):

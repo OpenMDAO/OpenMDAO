@@ -31,8 +31,12 @@ class System(object):
         self.variable_myproc_indices = {'input': None, 'output': None}
 
         self.vector_names = []
-        self.vector_list = {'input': None, 'output': None}
+        self.vector_list = {'input': [], 'output': [], 'residual': []}
         self.vector_transfers = []
+
+        self.inputs = None
+        self.outputs = None
+        self.residuals = None
 
         self.solvers_nonlinear = None
         self.solvers_linear = None
@@ -202,6 +206,31 @@ class System(object):
                 print 'Invalid connection in %s' % self.sys_name
 
         self.variable_connections_indices = pairs
+
+    def setup_vector(self, name, vectors):
+        self.vector_names.append(name)
+
+        for key in ['input', 'output', 'residual']:
+            self.vector_list[key].append(vectors[key])
+        self.vector_transfers.append(None)
+
+        if name == '':
+            self.inputs = vectors['input']
+            self.outputs = vectors['output']
+            self.residuals = vectors['residual']
+
+        for subsys in self.subsystems_myproc:
+            sub_comm = subsys.mpi_comm
+            p_range = subsys.mpi_proc_range
+
+            sub_vectors = {}
+            for key in ['input', 'output', 'residual']:
+                typ = 'output' if key is 'residual' else key
+                v_range = subsys.variable_range[typ]
+                vec = vectors[key].create_subvector(sub_comm, p_range, v_range)
+                sub_vectors[key] = vec
+
+            subsys.setup_vector(name, sub_vectors)
 
     def utils_compute_maps(self, typ):
         ''' Defines variable maps based on promotes and renames lists '''
