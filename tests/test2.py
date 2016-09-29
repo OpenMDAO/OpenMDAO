@@ -2,14 +2,13 @@ from __future__ import division
 import numpy
 import unittest
 
-from system import Component, Group
-from problem import Problem
+from Blue.API import Problem, IndepVarComponent, ExplicitComponent, Group
 
 # Systems: R > C1, C2, C3, C4
 # Variables: v1, v2, v3, v4; all depend on each other
 
 
-class Comp1(Component):
+class Comp1(ExplicitComponent):
 
     def initialize_variables(self, comm):
         self.add_input('v2')
@@ -18,7 +17,7 @@ class Comp1(Component):
         self.add_output('v1', var_set=1)
 
 
-class Comp2(Component):
+class Comp2(ExplicitComponent):
 
     def initialize_variables(self, comm):
         self.add_input('v1')
@@ -27,7 +26,7 @@ class Comp2(Component):
         self.add_output('v2', var_set=2)
 
 
-class Comp3(Component):
+class Comp3(ExplicitComponent):
 
     def initialize_variables(self, comm):
         self.add_input('v1')
@@ -36,7 +35,7 @@ class Comp3(Component):
         self.add_output('v3', var_set=3)
 
 
-class Comp4(Component):
+class Comp4(ExplicitComponent):
 
     def initialize_variables(self, comm):
         self.add_input('v1')
@@ -57,15 +56,17 @@ class GroupG(Group):
 class Test(unittest.TestCase):
 
     def setUp(self):
-        self.p = Problem(GroupG('G')).setup()
-        self.p.root.mpi_load_balancing.parallel = True
+        group = GroupG('G')
+        group.add_subsystems()
+        self.p = Problem(group).setup()
+        self.p.root.mpi_proc_allocator.parallel = True
 
     def assertEqualArrays(self, a, b):
         self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
 
-    def test_variable_names(self):
+    def test_variable_allprocs_names(self):
         root = self.p.root
-        names = root.variable_names['output']
+        names = root.variable_allprocs_names['output']
         self.assertEqual(names, ['v1', 'v2', 'v3', 'v4'])
 
     def test_variable_set_IDs(self):
@@ -87,6 +88,39 @@ class Test(unittest.TestCase):
         if rank == 0:
             for key in ['v1', 'v2', 'v3', 'v4']:
                 print key, root.outputs[key]
+
+    def test_transfer(self):
+        root = self.p.root
+
+        if root.mpi_comm.size == 1:
+            comp1 = root.get_subsystem('G.C1')
+            comp2 = root.get_subsystem('G.C2')
+            comp3 = root.get_subsystem('G.C3')
+            comp4 = root.get_subsystem('G.C4')
+
+            print
+            for comp in [comp1, comp2, comp3, comp4]:
+                print '*1', comp.inputs.views, comp.outputs.views
+
+            comp1.outputs['v1'] = 1.0
+            comp2.outputs['v2'] = 1.0
+            comp3.outputs['v3'] = 1.0
+
+            print
+            for comp in [comp1, comp2, comp3, comp4]:
+                print '*2', comp.inputs.views, comp.outputs.views
+
+            root.vector_transfers[None]['fwd', 0](root.inputs, root.outputs)
+
+            print
+            for comp in [comp1, comp2, comp3, comp4]:
+                print '*3', comp.inputs.views, comp.outputs.views
+
+            root.vector_transfers[None][None](root.inputs, root.outputs)
+
+            print
+            for comp in [comp1, comp2, comp3, comp4]:
+                print '*4', comp.inputs.views, comp.outputs.views
 
 
 

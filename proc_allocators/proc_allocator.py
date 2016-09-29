@@ -3,14 +3,14 @@ import numpy
 
 
 
-class LoadBalancing(object):
+class ProcAllocator(object):
 
     def __init__(self, parallel=False, **kwargs):
         self.parallel = parallel
         self.kwargs = kwargs
 
     def __call__(self, nsub, comm, proc_range):
-        ''' Assigns subsystems and a sub-comm to the current processor '''
+        """ Assigns subsystems and a sub-comm to the current processor """
         # This is a serial group - all procs get all subsystems
         if not self.parallel or comm.size == 1:
             isubs = range(nsub)
@@ -23,7 +23,7 @@ class LoadBalancing(object):
 
 
 
-class BaseLoadBalancing(LoadBalancing):
+class DefaultProcAllocator(ProcAllocator):
 
     def divide_procs(self, nsub, comm, proc_range):
         iproc = comm.rank
