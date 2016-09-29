@@ -2,7 +2,7 @@ from __future__ import division
 import numpy
 import unittest
 
-from Blue.API import Problem, IndepVarComponent, ExplicitComponent, Group
+from Blue.API import Problem, IndepVarComponent, ExplicitComponent, Group, PETScVector
 
 #      (A) -> x
 # x -> (B) -> f
@@ -37,7 +37,7 @@ class Test(unittest.TestCase):
     def setUp(self):
         group = GroupG('G')
         group.add_subsystems()
-        self.p = Problem(group).setup()
+        self.p = Problem(group, Vector=PETScVector).setup()
 
     def assertEqualArrays(self, a, b):
         self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)

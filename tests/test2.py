@@ -2,7 +2,7 @@ from __future__ import division
 import numpy
 import unittest
 
-from Blue.API import Problem, IndepVarComponent, ExplicitComponent, Group
+from Blue.API import Problem, IndepVarComponent, ExplicitComponent, Group, PETScVector
 
 # Systems: R > C1, C2, C3, C4
 # Variables: v1, v2, v3, v4; all depend on each other
@@ -58,7 +58,7 @@ class Test(unittest.TestCase):
     def setUp(self):
         group = GroupG('G')
         group.add_subsystems()
-        self.p = Problem(group).setup()
+        self.p = Problem(group, Vector=PETScVector).setup()
         self.p.root.mpi_proc_allocator.parallel = True
 
     def assertEqualArrays(self, a, b):

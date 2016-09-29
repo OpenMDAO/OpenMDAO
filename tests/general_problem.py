@@ -69,7 +69,7 @@ class GeneralProblem(object):
         self.all_systems = all_systems
 
         self.root.sys_kwargs['use_var_sets'] = use_var_sets
-        self.problem = Problem(self.root).setup()
+        self.problem = Problem(self.root, Vector=PETScVector).setup()
 
     def print_all(self):
         for sys in self.all_systems[::-1]:

@@ -59,26 +59,29 @@ class PETScTransfer(Transfer):
                 op_inds = numpy.array(self.op_inds[key], 'i')
                 ip_indexset = PETSc.IS().createGeneral(ip_inds, comm=self.comm)
                 op_indexset = PETSc.IS().createGeneral(op_inds, comm=self.comm)
-                transfer = PETSc.Scatter().create(self.op_vec.petsc[op_iset],
-                                                  op_indexset,
-                                                  self.ip_vec.petsc[ip_iset],
-                                                  ip_indexset)
+                ip_petsc = self.ip_vec.global_vector.petsc[ip_iset]
+                op_petsc = self.op_vec.global_vector.petsc[op_iset]
+                transfer = PETSc.Scatter().create(op_petsc, op_indexset,
+                                                  ip_petsc, ip_indexset)
                 self.transfers[key] = transfer
 
     def __call__(self, ip_vec, op_vec, mode='fwd'):
-        self.ip_vec.petsc.array = self.ip_vec.data
+        #self.ip_vec.global_vector.petsc.array = self.ip_vec.global_vector.data
+        #self.op_vec.global_vector.petsc.array = self.op_vec.global_vector.data
 
         if mode == 'fwd':
             for ip_iset, op_iset in self.ip_inds:
                 key = (ip_iset, op_iset)
                 if len(self.ip_inds[key]) > 0:
-                    self.transfers[key].scatter(self.op_vec.petsc[op_iset],
-                                                self.ip_vec.petsc[ip_iset],
+                    ip_petsc = self.ip_vec.global_vector.petsc[ip_iset]
+                    op_petsc = self.op_vec.global_vector.petsc[op_iset]
+                    self.transfers[key].scatter(op_petsc, ip_petsc,
                                                 addv=False, mode=False)
         elif mode == 'rev':
             for ip_iset, op_iset in self.ip_inds:
                 key = (ip_iset, op_iset)
                 if len(self.ip_inds[key]) > 0:
-                    self.transfers[key].scatter(self.ip_vec.petsc[ip_iset],
-                                                self.op_vec.petsc[op_iset],
+                    ip_petsc = self.ip_vec.global_vector.petsc[ip_iset]
+                    op_petsc = self.op_vec.global_vector.petsc[op_iset]
+                    self.transfers[key].scatter(ip_petsc, op_petsc,
                                                 addv=True, mode=True)
