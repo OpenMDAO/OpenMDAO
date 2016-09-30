@@ -59,35 +59,31 @@ class Test(unittest.TestCase):
         group = GroupG('G')
         group.add_subsystems()
         self.p = Problem(group, Vector=PETScVector).setup()
-        self.p.root.mpi_proc_allocator.parallel = True
+        self.p.root._mpi_proc_allocator.parallel = True
 
     def assertEqualArrays(self, a, b):
         self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
 
-    def test_variable_allprocs_names(self):
+    def assertList(self, ab_list):
+        for a, b in ab_list:
+            self.assertEqualArrays(a, b)
+
+    def test__variable_allprocs_names(self):
         root = self.p.root
-        names = root.variable_allprocs_names['output']
+        names = root._variable_allprocs_names['output']
         self.assertEqual(names, ['v1', 'v2', 'v3', 'v4'])
 
-    def test_variable_set_IDs(self):
-        set_IDs = self.p.assembler.variable_set_IDs['output']
+    def test__variable_set_IDs(self):
+        set_IDs = self.p._assembler._variable_set_IDs['output']
         self.assertEqual(set_IDs[1], 0)
         self.assertEqual(set_IDs[2], 1)
         self.assertEqual(set_IDs[3], 2)
         self.assertEqual(set_IDs[4], 3)
 
-    def test_variable_set_indices(self):
-        set_indices = self.p.assembler.variable_set_indices['output']
+    def test__variable_set_indices(self):
+        set_indices = self.p._assembler._variable_set_indices['output']
         array = numpy.array([[0,0],[1,0],[2,0],[3,0]])
         self.assertEqualArrays(set_indices, array)
-
-    def test_vectors(self):
-        root = self.p.root
-        rank = root.mpi_comm.rank
-        #print rank, self.p.assembler.variable_sizes['output'][0]
-        if rank == 0:
-            for key in ['v1', 'v2', 'v3', 'v4']:
-                print key, root.outputs[key]
 
     def test_transfer(self):
         root = self.p.root
@@ -98,29 +94,55 @@ class Test(unittest.TestCase):
             comp3 = root.get_subsystem('G.C3')
             comp4 = root.get_subsystem('G.C4')
 
-            print
-            for comp in [comp1, comp2, comp3, comp4]:
-                print '*1', comp.inputs.views, comp.outputs.views
-
             comp1.outputs['v1'] = 1.0
             comp2.outputs['v2'] = 1.0
             comp3.outputs['v3'] = 1.0
 
-            print
-            for comp in [comp1, comp2, comp3, comp4]:
-                print '*2', comp.inputs.views, comp.outputs.views
+            self.assertList([
+            [comp1.outputs['v1'], 1],
+            [comp1.inputs['v2'],  0],
+            [comp1.inputs['v3'],  0],
+            [comp1.inputs['v4'],  0],
+            ])
 
-            root.vector_transfers[None]['fwd', 0](root.inputs, root.outputs)
+            self.assertList([
+            [comp2.inputs['v1'],  0],
+            [comp2.outputs['v2'], 1],
+            [comp2.inputs['v3'],  0],
+            [comp2.inputs['v4'],  0],
+            ])
 
-            print
-            for comp in [comp1, comp2, comp3, comp4]:
-                print '*3', comp.inputs.views, comp.outputs.views
+            root._vector_transfers[None]['fwd', 0](root.inputs, root.outputs)
 
-            root.vector_transfers[None][None](root.inputs, root.outputs)
+            self.assertList([
+            [comp1.outputs['v1'], 1],
+            [comp1.inputs['v2'],  1],
+            [comp1.inputs['v3'],  1],
+            [comp1.inputs['v4'],  0],
+            ])
 
-            print
-            for comp in [comp1, comp2, comp3, comp4]:
-                print '*4', comp.inputs.views, comp.outputs.views
+            self.assertList([
+            [comp2.inputs['v1'],  0],
+            [comp2.outputs['v2'], 1],
+            [comp2.inputs['v3'],  0],
+            [comp2.inputs['v4'],  0],
+            ])
+
+            root._vector_transfers[None][None](root.inputs, root.outputs)
+
+            self.assertList([
+            [comp1.outputs['v1'], 1],
+            [comp1.inputs['v2'],  1],
+            [comp1.inputs['v3'],  1],
+            [comp1.inputs['v4'],  0],
+            ])
+
+            self.assertList([
+            [comp2.inputs['v1'],  1],
+            [comp2.outputs['v2'], 1],
+            [comp2.inputs['v3'],  1],
+            [comp2.inputs['v4'],  0],
+            ])
 
 
 

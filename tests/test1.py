@@ -38,25 +38,30 @@ class Test(unittest.TestCase):
         group = GroupG('G')
         group.add_subsystems()
         self.p = Problem(group, Vector=PETScVector).setup()
+        self.p.root.set_solver_print(False)
 
     def assertEqualArrays(self, a, b):
         self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
 
+    def assertList(self, ab_list):
+        for a, b in ab_list:
+            self.assertEqualArrays(a, b)
+
     def test_subsystems(self):
         root = self.p.root
 
-        self.assertEqual(len(root.subsystems_allprocs), 2)
-        self.assertEqual(len(root.subsystems_myproc), 2)
+        self.assertEqual(len(root._subsystems_allprocs), 2)
+        self.assertEqual(len(root._subsystems_myproc), 2)
 
-    def test_variable_allprocs_names(self):
+    def test__variable_allprocs_names(self):
         root = self.p.root
         compA = root.get_subsystem('G.A')
-        self.assertEqual(compA.variable_allprocs_names['output'], ['x'])
+        self.assertEqual(compA._variable_allprocs_names['output'], ['x'])
 
-    def test_variable_myproc_indices(self):
-        root_inds = self.p.root.variable_myproc_indices
-        compA_inds = self.p.root.get_subsystem('G.A').variable_myproc_indices
-        compB_inds = self.p.root.get_subsystem('G.B').variable_myproc_indices
+    def test__variable_myproc_indices(self):
+        root_inds = self.p.root._variable_myproc_indices
+        compA_inds = self.p.root.get_subsystem('G.A')._variable_myproc_indices
+        compB_inds = self.p.root.get_subsystem('G.B')._variable_myproc_indices
 
         self.assertEqualArrays(root_inds['input'], numpy.array([0]))
         self.assertEqualArrays(root_inds['output'], numpy.array([0,1]))
@@ -67,10 +72,10 @@ class Test(unittest.TestCase):
         self.assertEqualArrays(compB_inds['input'], numpy.array([0]))
         self.assertEqualArrays(compB_inds['output'], numpy.array([1]))
 
-    def test_variable_allprocs_ranges(self):
-        root_rng = self.p.root.variable_allprocs_range
-        compA_rng = self.p.root.get_subsystem('G.A').variable_allprocs_range
-        compB_rng = self.p.root.get_subsystem('G.B').variable_allprocs_range
+    def test__variable_allprocs_ranges(self):
+        root_rng = self.p.root._variable_allprocs_range
+        compA_rng = self.p.root.get_subsystem('G.A')._variable_allprocs_range
+        compB_rng = self.p.root.get_subsystem('G.B')._variable_allprocs_range
 
         self.assertEqualArrays(root_rng['input'], numpy.array([0,1]))
         self.assertEqualArrays(root_rng['output'], numpy.array([0,2]))
@@ -84,33 +89,8 @@ class Test(unittest.TestCase):
     def test_connections(self):
         root = self.p.root
 
-        self.assertEqual(root.variable_connections_indices[0][0], 0)
-        self.assertEqual(root.variable_connections_indices[0][1], 0)
-
-    def te0st_transfer(self):
-        root = self.p.root
-
-        if root.mpi_comm.size == 1:
-            compA = root.get_subsystem('G.A')
-            compB = root.get_subsystem('G.B')
-
-            print root.outputs['A.x']
-            print compA.outputs['x']
-            print compB.inputs['x']
-
-            compA.outputs['x'] = 10
-
-            print
-            print root.outputs['A.x']
-            print compA.outputs['x']
-            print compB.inputs['x']
-
-            root.vector_transfers[0][None](root.inputs, root.outputs)
-
-            print
-            print root.outputs['A.x']
-            print compA.outputs['x']
-            print compB.inputs['x']
+        self.assertEqual(root._variable_connections_indices[0][0], 0)
+        self.assertEqual(root._variable_connections_indices[0][1], 0)
 
     def test_GS(self):
         self.setUp()
@@ -121,20 +101,22 @@ class Test(unittest.TestCase):
             compA = root.get_subsystem('G.A')
             compB = root.get_subsystem('G.B')
 
-            print
-            print root.outputs['A.x']
-            print compA.outputs['x']
-            print compB.inputs['x']
-            print compB.outputs['f']
+            self.assertList([
+            [root.outputs['A.x'], 0],
+            [compA.outputs['x'],  0],
+            [compB.inputs['x'],   0],
+            [compB.outputs['f'],  0],
+            ])
 
             compA.outputs['x'] = 10
             root.solve_nonlinear()
 
-            print
-            print root.outputs['A.x']
-            print compA.outputs['x']
-            print compB.inputs['x']
-            print compB.outputs['f']
+            self.assertList([
+            [root.outputs['A.x'], 10],
+            [compA.outputs['x'],  10],
+            [compB.inputs['x'],   10],
+            [compB.outputs['f'],  20],
+            ])
 
 if __name__ == '__main__':
     unittest.main()

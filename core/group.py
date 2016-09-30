@@ -13,7 +13,7 @@ class Group(System):
         The subclass can override this.
         Otherwise, it assumes a subsystems list is defined in kwargs.
         """
-        self.subsystems_allprocs.extend(kwargs['subsystems'])
+        self._subsystems_allprocs.extend(kwargs['subsystems'])
 
     def add_subsystem(self, subsys):
         """Add a subsystem.
@@ -23,7 +23,7 @@ class Group(System):
         subsys : System
             an instantiated, but not-yet-set up system object.
         """
-        self.subsystems_allprocs.append(subsys)
+        self._subsystems_allprocs.append(subsys)
 
     def connect(self, op_name, ip_name):
         """Connect output op_name to input ip_name in this namespace.
@@ -35,9 +35,9 @@ class Group(System):
         ip_name : str
             name of the input (target) variable to connect
         """
-        self.variable_connections[ip_name] = op_name
+        self._variable_connections[ip_name] = op_name
 
     def apply_nonlinear(self):
         self.transfers[None](self.inputs, self.outputs, 'fwd')
-        for subsys in self.subsystems_myproc:
+        for subsys in self._subsystems_myproc:
             subsys.apply_nonlinear()

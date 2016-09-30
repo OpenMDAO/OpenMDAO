@@ -33,9 +33,9 @@ class Problem(object):
         pointer to the top-level System object (root node in the tree).
     comm : MPI.Comm or FakeComm
         the global communicator; the same as that of assembler and root.
-    assembler : Assembler
+    _assembler : Assembler
         pointer to the global Assembler object.
-    Vector
+    _Vector
         reference to the actual Vector class; not an instance.
     """
 
@@ -54,8 +54,8 @@ class Problem(object):
 
         self.root = root
         self.comm = comm
-        self.assembler = Assembler(comm)
-        self.Vector = Vector
+        self._assembler = Assembler(comm)
+        self._Vector = Vector
 
     def setup(self):
         """Set up everything (root, assembler, vector, solvers, drivers).
@@ -66,35 +66,36 @@ class Problem(object):
             this enables the user to instantiate and setup in one line.
         """
         root = self.root
-        assembler = self.assembler
         comm = self.comm
+        _assembler = self._assembler
+        _Vector = self._Vector
 
         # System setup
-        root.setup_processors(0, assembler, {}, comm, [0, comm.size])
-        root.setup_variables()
-        root.setup_variable_indices({'input': 0, 'output': 0})
-        root.setup_connections()
-        root.setup_solvers()
+        root._setup_processors(0, _assembler, {}, comm, [0, comm.size])
+        root._setup_variables()
+        root._setup_variable_indices({'input': 0, 'output': 0})
+        root._setup_connections()
+        root._setup_solvers()
 
         # Assembler setup: variable sizes and indices
-        sizes = {typ: len(root.variable_allprocs_names[typ])
+        sizes = {typ: len(root._variable_allprocs_names[typ])
                  for typ in ['input', 'output']}
-        variable_metadata = root.variable_myproc_metadata
-        variable_indices = root.variable_myproc_indices
-        assembler.setup_variables(sizes, variable_metadata, variable_indices)
+        variable_metadata = root._variable_myproc_metadata
+        variable_indices = root._variable_myproc_indices
+        _assembler._setup_variables(sizes, variable_metadata, variable_indices)
 
         # Assembler setup: variable connections
-        connections = root.variable_connections_indices
-        variable_allprocs_names = root.variable_allprocs_names
-        assembler.setup_connections(connections, variable_allprocs_names)
+        connections = root._variable_connections_indices
+        _variable_allprocs_names = root._variable_allprocs_names
+        _assembler._setup_connections(connections, _variable_allprocs_names)
 
         # Assembler setup: global transfer indices vector
-        input_metadata = root.variable_myproc_metadata['input']
-        var_indices = root.variable_myproc_indices['input']
-        assembler.setup_input_indices(input_metadata, var_indices)
+        input_metadata = root._variable_myproc_metadata['input']
+        var_indices = root._variable_myproc_indices['input']
+        _assembler._setup__input_indices(input_metadata, var_indices)
 
         # Vector setup for the basic execution vector
-        self.setup_vector(None, self.Vector)
+        self.setup_vector(None, _Vector)
 
         return self
 
@@ -109,21 +110,21 @@ class Problem(object):
             reference to the actual Vector class
         """
         root = self.root
-        assembler = self.assembler
+        _assembler = self._assembler
 
-        vectors = {}
+        _vectors = {}
         for key in ['input', 'output', 'residual']:
             if key is 'residual':
                 typ = 'output'
             else:
                 typ = key
 
-            nvar_all = len(root.variable_allprocs_names[typ])
-            vec = Vector(vec_name, self.comm, root.mpi_proc_range,
-                         root.variable_allprocs_range[typ],
-                         root.variable_allprocs_names[typ],
-                         assembler.variable_sizes[typ],
-                         assembler.variable_set_indices[typ])
-            vectors[key] = vec
+            nvar_all = len(root._variable_allprocs_names[typ])
+            vec = Vector(vec_name, self.comm, root._mpi_proc_range,
+                         root._variable_allprocs_range[typ],
+                         root._variable_allprocs_names[typ],
+                         _assembler._variable_sizes[typ],
+                         _assembler._variable_set_indices[typ])
+            _vectors[key] = vec
 
-        self.root.setup_vector(vec_name, vectors)
+        self.root._setup_vector(vec_name, _vectors)

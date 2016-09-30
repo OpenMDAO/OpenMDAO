@@ -28,7 +28,7 @@ class Component(System):
         'var_set': 0,
     }
 
-    def add_variable(self, name, typ, kwargs):
+    def _add_variable(self, name, typ, kwargs):
         """Add an input/output variable to the component.
 
         Args
@@ -42,17 +42,18 @@ class Component(System):
         """
         metadata = self.DEFAULTS.copy()
         metadata.update(kwargs)
-        metadata['indices'] = numpy.array(metadata['indices'])
-        self.variable_myproc_metadata[typ].append(metadata)
-        self.variable_allprocs_names[typ].append(name)
+        if typ == 'input':
+            metadata['indices'] = numpy.array(metadata['indices'])
+        self._variable_myproc_metadata[typ].append(metadata)
+        self._variable_allprocs_names[typ].append(name)
 
     def add_input(self, name, **kwargs):
-        """See add_variable."""
-        self.add_variable(name, 'input', kwargs)
+        """See _add_variable."""
+        self._add_variable(name, 'input', kwargs)
 
     def add_output(self, name, **kwargs):
-        """See add_variable."""
-        self.add_variable(name, 'output', kwargs)
+        """See _add_variable."""
+        self._add_variable(name, 'output', kwargs)
 
 
 

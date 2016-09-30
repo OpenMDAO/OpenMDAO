@@ -6,26 +6,26 @@ import numpy
 class ProcAllocator(object):
 
     def __init__(self, parallel=False, **kwargs):
-        self.parallel = parallel
-        self.kwargs = kwargs
+        self._parallel = parallel
+        self._kwargs = kwargs
 
     def __call__(self, nsub, comm, proc_range):
         """ Assigns subsystems and a sub-comm to the current processor """
         # This is a serial group - all procs get all subsystems
-        if not self.parallel or comm.size == 1:
+        if not self._parallel or comm.size == 1:
             isubs = range(nsub)
             sub_comm = comm
             sub_proc_range = [proc_range[0], proc_range[1]]
             return isubs, sub_comm, sub_proc_range
         # This is a parallel group
         else:
-            return self.divide_procs(nsub, comm, proc_range)
+            return self._divide_procs(nsub, comm, proc_range)
 
 
 
 class DefaultProcAllocator(ProcAllocator):
 
-    def divide_procs(self, nsub, comm, proc_range):
+    def _divide_procs(self, nsub, comm, proc_range):
         iproc = comm.rank
         nproc = comm.size
 

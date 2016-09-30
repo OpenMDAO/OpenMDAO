@@ -55,7 +55,7 @@ class GeneralProblem(object):
             next_systems = []
             for igroup in xrange(ngroup):
                 group = Group('Group-%i-%i' % (nlevel-ilevel, igroup))
-                group.mpi_proc_allocator.parallel = parallel_groups
+                group._mpi_proc_allocator.parallel = parallel_groups
                 ind1 = numpy.sum(nsub_group[:igroup])
                 ind2 = numpy.sum(nsub_group[:igroup+1])
                 for ind in xrange(ind1, ind2):
@@ -73,9 +73,9 @@ class GeneralProblem(object):
 
     def print_all(self):
         for sys in self.all_systems[::-1]:
-            print sys.sys_name, ':',
-            for subsys in sys.subsystems_allprocs:
-                print subsys.sys_name,
+            print sys._sys_name, ':',
+            for subsys in sys._subsystems_allprocs:
+                print subsys._sys_name,
             print
         print
 

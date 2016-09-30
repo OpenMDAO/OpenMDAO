@@ -8,22 +8,22 @@ class Solver(object):
     SOLVER = 'base_solver'
 
     def __init__(self, options={}, subsolvers={}, **kwargs):
-        self.system = None
-        self.depth = 0
-        self.options = {'ilimit': 10, 'atol': 1e-6, 'rtol':1e-6, 'iprint': 1}
-        self.options.update(options)
+        self._system = None
+        self._depth = 0
+        self._options = {'ilimit': 10, 'atol': 1e-6, 'rtol':1e-6, 'iprint': 1}
+        self._options.update(options)
+        self._kwargs = kwargs
         self.subsolvers = subsolvers
-        self.kwargs = kwargs
 
-    def setup_solvers(self, system, depth):
-        self.system = system
-        self.depth = depth
+    def _setup_solvers(self, system, depth):
+        self._system = system
+        self._depth = depth
 
         for solver in self.subsolvers:
-            solver.setup_solvers(system, depth+1)
+            solver._setup_solvers(system, depth+1)
 
-    def mpi_print(self, iteration, res, res0):
-        raw_sys_name = self.system.sys_name
+    def _mpi_print(self, iteration, res, res0):
+        raw_sys_name = self._system._sys_name
         name_len = 10
         if len(raw_sys_name) > name_len:
             sys_name = raw_sys_name[:name_len]
@@ -37,40 +37,40 @@ class Solver(object):
         else:
             solver_name = solver_name + ' ' * (name_len - len(solver_name))
 
-        iproc = self.system.mpi_comm.rank
-        iprint = self.options['iprint']
-        solvers_print = self.system.solvers_print
-        if iproc == 0 and iprint and solvers_print:
-            print_str = ' ' * self.system.sys_depth + '-' * self.depth
+        iproc = self._system.mpi_comm.rank
+        iprint = self._options['iprint']
+        _solvers_print = self._system._solvers_print
+        if iproc == 0 and iprint and _solvers_print:
+            print_str = ' ' * self._system._sys_depth + '-' * self._depth
             print_str += sys_name + solver_name
             print_str += ' %3d | %.9g %.9g' % (iteration, res, res0)
             print print_str
 
-    def run_iterator(self):
-        ilimit = self.options['ilimit']
-        atol = self.options['atol']
-        rtol = self.options['rtol']
+    def _run_iterator(self):
+        ilimit = self._options['ilimit']
+        atol = self._options['atol']
+        rtol = self._options['rtol']
 
-        norm0, norm = self.iter_initialize()
+        norm0, norm = self._iter_initialize()
         iteration = 0
-        self.mpi_print(iteration, norm/norm0, norm0)
+        self._mpi_print(iteration, norm/norm0, norm0)
         while iteration < ilimit and norm > atol and norm/norm0 > rtol:
-            self.iter_execute()
-            norm = self.iter_get_norm()
+            self._iter_execute()
+            norm = self._iter_get_norm()
             iteration += 1
-            self.mpi_print(iteration, norm/norm0, norm)
+            self._mpi_print(iteration, norm/norm0, norm)
         success = not(norm > atol and norm/norm0 > rtol)
         success = success and (not numpy.isinf(norm))
         success = success and (not numpy.isnan(norm))
         return not success, norm/norm0, norm
 
-    def iter_initialize(self):
+    def _iter_initialize(self):
         pass
 
-    def iter_execute(self):
+    def _iter_execute(self):
         pass
 
-    def iter_get_norm(self):
+    def _iter_get_norm(self):
         pass
 
 
@@ -78,19 +78,19 @@ class Solver(object):
 class NonlinearSolver(Solver):
 
     def __call__(self):
-        return self.run_iterator()
+        return self._run_iterator()
 
-    def iter_initialize(self):
-        if self.options['ilimit'] > 1:
-            norm = self.iter_get_norm()
+    def _iter_initialize(self):
+        if self._options['ilimit'] > 1:
+            norm = self._iter_get_norm()
         else:
             norm = 1.0
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
 
-    def iter_get_norm(self):
-        self.system.apply_nonlinear()
-        return self.system.residuals.get_norm()
+    def _iter_get_norm(self):
+        self._system.apply_nonlinear()
+        return self._system.residuals.get_norm()
 
 
 
@@ -98,10 +98,10 @@ class NewtonSolver(NonlinearSolver):
 
     METHOD = 'NL: Newton'
 
-    def iter_execute(self):
-        system = self.system
-        system.vectors['residual'][''].set_vec(system.residuals)
-        system.vectors['residual'][''] *= -1.0
+    def _iter_execute(self):
+        system = self._system
+        system._vectors['residual'][''].set_vec(system.residuals)
+        system._vectors['residual'][''] *= -1.0
         system.linearize()
         self.subsolvers['linear']([None], 'fwd')
         if 'linesearch' in self.subsolvers:
@@ -115,10 +115,10 @@ class NonlinearBlockJac(NonlinearSolver):
 
     METHOD = 'NL: NLBJ'
 
-    def iter_execute(self):
-        system = self.system
+    def _iter_execute(self):
+        system = self._system
         system.transfers[None](system.inputs, system.outputs, 'fwd')
-        for subsys in system.subsystems_myproc:
+        for subsys in system._subsystems_myproc:
             subsys.solve_nonlinear()
 
 
@@ -127,12 +127,12 @@ class NonlinearBlockGS(NonlinearSolver):
 
     METHOD = 'NL: NLBGS'
 
-    def iter_execute(self):
-        system = self.system
-        for isub in xrange(len(system.subsystems_allprocs)):
+    def _iter_execute(self):
+        system = self._system
+        for isub in xrange(len(system._subsystems_allprocs)):
             system.transfers['fwd', isub](system.inputs, system.outputs, 'fwd')
 
-            if isub in system.subsystems_inds:
-                index = system.subsystems_inds.index(isub)
-                subsys = system.subsystems_myproc[index]
+            if isub in system._subsystems_inds:
+                index = system._subsystems_inds.index(isub)
+                subsys = system._subsystems_myproc[index]
                 subsys.solve_nonlinear()

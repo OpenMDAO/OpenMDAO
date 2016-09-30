@@ -9,19 +9,19 @@ class Assembler(object):
         """ Initializes all attributes """
         self.comm = comm
 
-        self.variable_sizes = {'input': [], 'output': []}
-        self.variable_set_IDs = {'input': {}, 'output': {}}
-        self.variable_set_indices = {'input': None, 'output': None}
+        self._variable_sizes = {'input': [], 'output': []}
+        self._variable_set_IDs = {'input': {}, 'output': {}}
+        self._variable_set_indices = {'input': None, 'output': None}
 
-        self.input_IDs = None
-        self.input_indices = None
-        self.input_indices_meta = None
+        self._input_IDs = None
+        self._input_indices = None
+        self._input_indices_meta = None
 
 
 
 class DefaultAssembler(Assembler):
 
-    def setup_variables(self, sizes, variable_metadata, variable_indices):
+    def _setup_variables(self, sizes, variable_metadata, variable_indices):
         nproc = self.comm.size
 
         for typ in ['input', 'output']:
@@ -44,30 +44,30 @@ class DefaultAssembler(Assembler):
             # Compute set_name to ID maps
             unique_list = list(set(global_set_dict.values()))
             for set_name in unique_list:
-                if set_name not in self.variable_set_IDs[typ]:
-                    nset = len(self.variable_set_IDs[typ])
-                    self.variable_set_IDs[typ][set_name] = nset
+                if set_name not in self._variable_set_IDs[typ]:
+                    nset = len(self._variable_set_IDs[typ])
+                    self._variable_set_IDs[typ][set_name] = nset
 
-            # Compute variable_set_indices and var_count
-            var_count = numpy.zeros(len(self.variable_set_IDs[typ]), int)
-            self.variable_set_indices[typ] = -numpy.ones((nvar_all, 2), int)
+            # Compute _variable_set_indices and var_count
+            var_count = numpy.zeros(len(self._variable_set_IDs[typ]), int)
+            self._variable_set_indices[typ] = -numpy.ones((nvar_all, 2), int)
             for ivar_all in global_set_dict:
                 set_name = global_set_dict[ivar_all]
 
-                iset = self.variable_set_IDs[typ][set_name]
+                iset = self._variable_set_IDs[typ][set_name]
                 ivar_set = var_count[iset]
 
-                self.variable_set_indices[typ][ivar_all, 0] = iset
-                self.variable_set_indices[typ][ivar_all, 1] = ivar_set
+                self._variable_set_indices[typ][ivar_all, 0] = iset
+                self._variable_set_indices[typ][ivar_all, 1] = ivar_set
 
                 var_count[iset] += 1
 
             # Allocate the size arrays using var_count
-            self.variable_sizes[typ] = []
-            for iset in xrange(len(self.variable_set_IDs[typ])):
+            self._variable_sizes[typ] = []
+            for iset in xrange(len(self._variable_set_IDs[typ])):
                 size = var_count[iset]
                 array = numpy.zeros((nproc, size), int)
-                self.variable_sizes[typ].append(array)
+                self._variable_sizes[typ].append(array)
 
         # Populate the sizes arrays
         iproc = self.comm.rank
@@ -77,46 +77,46 @@ class DefaultAssembler(Assembler):
             var = variable_metadata[typ][ivar]
             size = numpy.prod(var['indices'].shape)
             ivar_all = variable_indices[typ][ivar]
-            iset, ivar_set = self.variable_set_indices[typ][ivar_all, :]
-            self.variable_sizes[typ][iset][iproc, ivar_set] = size
+            iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
+            self._variable_sizes[typ][iset][iproc, ivar_set] = size
         typ = 'output'
         nvar = len(variable_metadata[typ])
         for ivar in xrange(nvar):
             var = variable_metadata[typ][ivar]
             size = numpy.prod(var['shape'])
             ivar_all = variable_indices[typ][ivar]
-            iset, ivar_set = self.variable_set_indices[typ][ivar_all, :]
-            self.variable_sizes[typ][iset][iproc, ivar_set] = size
+            iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
+            self._variable_sizes[typ][iset][iproc, ivar_set] = size
 
         # Do an allgather on the sizes arrays
         if self.comm.size > 1:
             for typ in ['input', 'output']:
-                nset = len(self.variable_sizes[typ])
+                nset = len(self._variable_sizes[typ])
                 for iset in xrange(nset):
-                    array = self.variable_sizes[typ][iset]
+                    array = self._variable_sizes[typ][iset]
                     self.comm.Allgather(array[iproc, :], array)
 
-    def setup_connections(self, connections, variable_allprocs_names):
+    def _setup_connections(self, connections, _variable_allprocs_names):
         """ Identifies implicit connections, combines with explicit ones """
-        nvar_input = len(variable_allprocs_names['input'])
-        input_IDs = -numpy.ones(nvar_input, int)
+        nvar_input = len(_variable_allprocs_names['input'])
+        _input_IDs = -numpy.ones(nvar_input, int)
 
-        # Add explicit connections to the input_IDs vector
+        # Add explicit connections to the _input_IDs vector
         for ip_ID, op_ID in connections:
-            input_IDs[ip_ID] = op_ID
+            _input_IDs[ip_ID] = op_ID
 
         # Loop over input variables
         for ip_ID in xrange(nvar_input):
-            name = variable_allprocs_names['input'][ip_ID]
+            name = _variable_allprocs_names['input'][ip_ID]
 
             # If name is also an output variable, add this implicit connection
-            if name in variable_allprocs_names['output']:
-                op_ID = variable_allprocs_names['output'].index(name)
-                input_IDs[ip_ID] = op_ID
+            if name in _variable_allprocs_names['output']:
+                op_ID = _variable_allprocs_names['output'].index(name)
+                _input_IDs[ip_ID] = op_ID
 
-        self.input_IDs = input_IDs
+        self._input_IDs = _input_IDs
 
-    def setup_input_indices(self, input_metadata, var_indices):
+    def _setup__input_indices(self, input_metadata, var_indices):
         """ Assemble global list of input indices """
         # Compute total size of indices vector
         counter = 0
@@ -125,33 +125,33 @@ class DefaultAssembler(Assembler):
             counter += numpy.prod(metadata['indices'].shape)
 
         # Allocate arrays
-        self.input_indices_meta = numpy.zeros((var_indices.shape[0], 2), int)
-        self.input_indices = numpy.zeros(counter, int)
+        self._input_indices_meta = numpy.zeros((var_indices.shape[0], 2), int)
+        self._input_indices = numpy.zeros(counter, int)
 
         # Populate arrays
         ind1, ind2 = 0, 0
         for ind in xrange(len(input_metadata)):
             metadata = input_metadata[ind]
             ind2 += numpy.prod(metadata['indices'].shape)
-            self.input_indices[ind1:ind2] = metadata['indices'].flatten()
+            self._input_indices[ind1:ind2] = metadata['indices'].flatten()
             ivar_all = var_indices[ind]
-            self.input_indices_meta[ivar_all, :] = [ind1, ind2]
+            self._input_indices_meta[ivar_all, :] = [ind1, ind2]
             ind1 += numpy.prod(metadata['indices'].shape)
 
-    def compute_transfers(self, nsub_allprocs, var_range,
-                          subsystems_myproc, subsystems_inds):
-        ip_set_indices = self.variable_set_indices['input']
-        op_set_indices = self.variable_set_indices['output']
+    def _compute_transfers(self, nsub_allprocs, var_range,
+                          _subsystems_myproc, _subsystems_inds):
+        ip_set_indices = self._variable_set_indices['input']
+        op_set_indices = self._variable_set_indices['output']
 
         ip_ind1, ip_ind2 = var_range['input']
         op_ind1, op_ind2 = var_range['output']
         ip_isub_var = -numpy.ones(ip_ind2 - ip_ind1, int)
         op_isub_var = -numpy.ones(op_ind2 - op_ind1, int)
-        for ind in xrange(len(subsystems_myproc)):
-            subsys = subsystems_myproc[ind]
-            isub = subsystems_inds[ind]
+        for ind in xrange(len(_subsystems_myproc)):
+            subsys = _subsystems_myproc[ind]
+            isub = _subsystems_inds[ind]
 
-            sub_var_range = subsys.variable_allprocs_range
+            sub_var_range = subsys._variable_allprocs_range
             sub_ip_ind1, sub_ip_ind2 = sub_var_range['input']
             sub_op_ind1, sub_op_ind2 = sub_var_range['output']
             for ip_ind in xrange(ip_ind1, ip_ind2):
@@ -167,8 +167,8 @@ class DefaultAssembler(Assembler):
         fwd_xfer_op_inds = [{} for sub_ind in xrange(nsub_allprocs)]
         rev_xfer_ip_inds = [{} for sub_ind in xrange(nsub_allprocs)]
         rev_xfer_op_inds = [{} for sub_ind in xrange(nsub_allprocs)]
-        for iset in xrange(len(self.variable_sizes['input'])):
-            for jset in xrange(len(self.variable_sizes['output'])):
+        for iset in xrange(len(self._variable_sizes['input'])):
+            for jset in xrange(len(self._variable_sizes['output'])):
                 xfer_ip_inds[iset, jset] = []
                 xfer_op_inds[iset, jset] = []
                 for sub_ind in xrange(nsub_allprocs):
@@ -180,7 +180,7 @@ class DefaultAssembler(Assembler):
         ip_ind1, ip_ind2 = var_range['input']
         op_ind1, op_ind2 = var_range['output']
         for ip_ind in xrange(ip_ind1, ip_ind2):
-            op_ind = self.input_IDs[ip_ind]
+            op_ind = self._input_IDs[ip_ind]
             if op_ind1 <= op_ind < op_ind2:
 
                 ip_isub = ip_isub_var[ip_ind - ip_ind1]
@@ -190,11 +190,11 @@ class DefaultAssembler(Assembler):
                     ip_iset, ip_ivar_set = ip_set_indices[ip_ind, :]
                     op_iset, op_ivar_set = op_set_indices[op_ind, :]
 
-                    ip_sizes = self.variable_sizes['input'][ip_iset]
-                    op_sizes = self.variable_sizes['output'][op_iset]
+                    ip_sizes = self._variable_sizes['input'][ip_iset]
+                    op_sizes = self._variable_sizes['output'][op_iset]
 
-                    ind1, ind2 = self.input_indices_meta[ip_ivar_set, :]
-                    inds = self.input_indices[ind1:ind2]
+                    ind1, ind2 = self._input_indices_meta[ip_ivar_set, :]
+                    inds = self._input_indices[ind1:ind2]
 
                     output_inds = numpy.zeros(inds.shape[0], int)
                     ind1, ind2 = 0, 0
@@ -235,8 +235,8 @@ class DefaultAssembler(Assembler):
             else:
                 return numpy.array([], int)
 
-        for iset in xrange(len(self.variable_sizes['input'])):
-            for jset in xrange(len(self.variable_sizes['output'])):
+        for iset in xrange(len(self._variable_sizes['input'])):
+            for jset in xrange(len(self._variable_sizes['output'])):
                 xfer_ip_inds[iset, jset] = merge(xfer_ip_inds[iset, jset])
                 xfer_op_inds[iset, jset] = merge(xfer_op_inds[iset, jset])
                 for sub_ind in xrange(nsub_allprocs):

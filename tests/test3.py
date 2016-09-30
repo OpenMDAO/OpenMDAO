@@ -20,8 +20,9 @@ class Test(unittest.TestCase):
         self.gps.append(gp)
 
     def test(self):
-        self.gps[0].print_all()
-        self.gps[1].print_all()
+        pass
+        #self.gps[0].print_all()
+        #self.gps[1].print_all()
 
 
 
