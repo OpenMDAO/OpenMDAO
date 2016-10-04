@@ -119,10 +119,11 @@ class Problem(object):
             else:
                 typ = key
 
-            nvar_all = len(root._variable_allprocs_names[typ])
+            nvar_all = len(root._variable_myproc_names[typ])
             vec = Vector(vec_name, self.comm, root._mpi_proc_range,
                          root._variable_allprocs_range[typ],
-                         root._variable_allprocs_names[typ],
+                         root._variable_myproc_indices[typ],
+                         root._variable_myproc_names[typ],
                          _assembler._variable_sizes[typ],
                          _assembler._variable_set_indices[typ])
             _vectors[key] = vec

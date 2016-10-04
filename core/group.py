@@ -52,7 +52,7 @@ class Group(System):
 
                 d_inputs = self._vectors['input'][vec_name]
                 d_outputs = self._vectors['output'][vec_name]
-                d_residuals = self._vectors['output'][vec_name]
+                d_residuals = self._vectors['residual'][vec_name]
 
                 self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                       op_names, ip_names, mode, var_ind_range)

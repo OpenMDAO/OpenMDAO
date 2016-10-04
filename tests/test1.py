@@ -20,8 +20,8 @@ class CompB(ExplicitComponent):
         self.add_input('x')
         self.add_output('f')
 
-    def compute(self):
-        self._outputs['f'] = 2 * self._inputs['x']
+    def compute(self, inputs, outputs):
+        outputs['f'] = 2 * inputs['x']
 
 
 class GroupG(Group):
@@ -101,22 +101,30 @@ class Test(unittest.TestCase):
             compA = root.get_subsystem('G.A')
             compB = root.get_subsystem('G.B')
 
-            self.assertList([
-            [root._outputs['A.x'], 0],
-            [compA._outputs['x'],  0],
-            [compB._inputs['x'],   0],
-            [compB._outputs['f'],  0],
-            ])
+            if root.comm.rank == 0:
+                self.assertList([
+                [root._outputs['A.x'], 0],
+                [compA._outputs['x'],  0],
+                ])
+                compA._outputs['x'] = 10
+            if root.comm.rank == 2:
+                self.assertList([
+                [compB._inputs['x'],   0],
+                [compB._outputs['f'],  0],
+                ])
 
-            compA._outputs['x'] = 10
             root._solve_nonlinear()
 
-            self.assertList([
-            [root._outputs['A.x'], 10],
-            [compA._outputs['x'],  10],
-            [compB._inputs['x'],   10],
-            [compB._outputs['f'],  20],
-            ])
+            if root.comm.rank == 0:
+                self.assertList([
+                [root._outputs['A.x'], 10],
+                [compA._outputs['x'],  10],
+                ])
+            if root.comm.rank == 2:
+                self.assertList([
+                [compB._inputs['x'],   10],
+                [compB._outputs['f'],  20],
+                ])
 
 if __name__ == '__main__':
     unittest.main()

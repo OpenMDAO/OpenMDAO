@@ -13,22 +13,25 @@ from Blue.vectors.transfer import PETScTransfer
 class Vector(object):
 
     def __init__(self, name, comm, proc_range, _variable_allprocs_range,
-                 _variable_allprocs_names, _variable_sizes,
+                 _variable_myproc_indices,
+                 _variable_myproc_names, _variable_sizes,
                  _variable_set_indices, global_vector=None):
         self._name = name
         self._comm = comm
         self._proc_range = proc_range
         self._variable_allprocs_range = _variable_allprocs_range
-        self._variable_allprocs_names = _variable_allprocs_names
+        self._variable_myproc_indices = _variable_myproc_indices
+        self._variable_myproc_names = _variable_myproc_names
         self._variable_sizes = _variable_sizes
         self._variable_set_indices = _variable_set_indices
 
         self._initialize(global_vector)
         self._views = self._initialize_views()
 
-    def _create_subvector(self, comm, proc_range, var_range, var_names):
+    def _create_subvector(self, comm, proc_range, var_range, var_indices,
+                          var_names):
         MyClass = self.__class__
-        return MyClass(self._name, comm, proc_range, var_range,
+        return MyClass(self._name, comm, proc_range, var_range, var_indices,
                        var_names, self._variable_sizes,
                        self._variable_set_indices, self._global_vector)
 
@@ -110,10 +113,9 @@ class DefaultVector(Vector):
     def _initialize_views(self):
         views = {}
         iproc = self._comm.rank + self._proc_range[0]
-        ind1, ind2 = self._variable_allprocs_range
-        for ivar_all in xrange(ind1, ind2):
-            ivar = ivar_all - self._variable_allprocs_range[0]
-            name = self._variable_allprocs_names[ivar]
+        for ind in xrange(len(self._variable_myproc_names)):
+            name = self._variable_myproc_names[ind]
+            ivar_all = self._variable_myproc_indices[ind]
             iset, ivar = self._variable_set_indices[ivar_all, :]
             ind1 = numpy.sum(self._variable_sizes[iset][iproc, :ivar])
             ind2 = numpy.sum(self._variable_sizes[iset][iproc, :ivar+1])

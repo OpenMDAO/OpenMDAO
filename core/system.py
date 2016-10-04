@@ -4,6 +4,7 @@ import numpy
 
 from Blue.proc_allocators.proc_allocator import DefaultProcAllocator
 from Blue.solvers.solver import NonlinearBlockGS
+from Blue.jacobians.jacobian import DefaultJacobian
 
 
 
@@ -48,6 +49,8 @@ class System(object):
     _variable_allprocs_range : {'input': [int,int], 'output': [int,int]}
         index range of owned variables with respect to all problem variables.
 
+    _variable_myproc_names : {'input': [str, ...], 'output': [str, ...]}
+        list of names of owned variables on current proc.
     _variable_myproc_metadata : {'input': list, 'output': list}
         list of metadata dictionaries of variables that exist on this proc.
     _variable_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
@@ -118,6 +121,7 @@ class System(object):
         self._variable_allprocs_names = {'input': [], 'output': []}
         self._variable_allprocs_range = {'input': [0,0], 'output': [0,0]}
 
+        self._variable_myproc_names = {'input': [], 'output': []}
         self._variable_myproc_metadata = {'input': [], 'output': []}
         self._variable_myproc_indices = {'input': None, 'output': None}
 
@@ -134,7 +138,7 @@ class System(object):
         self._residuals = None
         self._transfers = None
 
-        self._jacobian = None
+        self._jacobian = DefaultJacobian()
 
         self._solvers_nonlinear = NonlinearBlockGS()
         self._solvers_linear = NonlinearBlockGS() # temporary hack!
@@ -181,6 +185,22 @@ class System(object):
         self._solvers_print = flag
         for subsys in self._subsystems_myproc:
             subsys.set_solver_print(flag)
+
+    def set_jacobian(self, jac=None):
+        """Recursively set the system's jacobian attribute.
+
+        Args
+        ----
+        jac : Jacobian or None
+            Jacobian object to be set; if None, reset to the DefaultJacobian.
+        """
+        if jac is None:
+            self._jacobian = DefaultJacobian()
+            self._jacobian.setup(self)
+
+        for subsys in self.subsystems_myproc:
+            subsys.set_jacobian(jac)
+
 
     def _setup_processors(self, depth, assembler, global_kwargs, comm,
                          proc_range):
@@ -241,8 +261,9 @@ class System(object):
 
         # Empty the lists in case this is part of a reconfiguration
         for typ in ['input', 'output']:
-            self._variable_myproc_metadata[typ] = []
             self._variable_allprocs_names[typ] = []
+            self._variable_myproc_names[typ] = []
+            self._variable_myproc_metadata[typ] = []
 
         # If this is a component, the user calls add_input/add_output
         if len(self._subsystems_myproc) == 0:
@@ -256,6 +277,7 @@ class System(object):
                     for sub_name in subsys._variable_allprocs_names[typ]:
                         name = subsys._variable_maps[typ][sub_name]
                         self._variable_allprocs_names[typ].append(name)
+                        self._variable_myproc_names[typ].append(name)
 
                     # Assemble the metadata list from the subsystems
                     metadata = subsys._variable_myproc_metadata[typ]
@@ -405,9 +427,10 @@ class System(object):
             for key in ['input', 'output', 'residual']:
                 typ = 'output' if key is 'residual' else key
                 v_range = subsys._variable_allprocs_range[typ]
-                v_names = subsys._variable_allprocs_names[typ]
+                v_names = subsys._variable_myproc_names[typ]
+                v_inds = subsys._variable_myproc_indices[typ]
                 vec = _vectors[key]._create_subvector(sub_comm, p_range,
-                                                    v_range, v_names)
+                                                      v_range, v_inds, v_names)
                 sub__vectors[key] = vec
 
             subsys._setup_vector(vec_name, sub__vectors)
