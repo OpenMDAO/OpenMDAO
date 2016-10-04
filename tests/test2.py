@@ -88,60 +88,60 @@ class Test(unittest.TestCase):
     def test_transfer(self):
         root = self.p.root
 
-        if root.mpi_comm.size == 1:
+        if root.comm.size == 1:
             comp1 = root.get_subsystem('G.C1')
             comp2 = root.get_subsystem('G.C2')
             comp3 = root.get_subsystem('G.C3')
             comp4 = root.get_subsystem('G.C4')
 
-            comp1.outputs['v1'] = 1.0
-            comp2.outputs['v2'] = 1.0
-            comp3.outputs['v3'] = 1.0
+            comp1._outputs['v1'] = 1.0
+            comp2._outputs['v2'] = 1.0
+            comp3._outputs['v3'] = 1.0
 
             self.assertList([
-            [comp1.outputs['v1'], 1],
-            [comp1.inputs['v2'],  0],
-            [comp1.inputs['v3'],  0],
-            [comp1.inputs['v4'],  0],
+            [comp1._outputs['v1'], 1],
+            [comp1._inputs['v2'],  0],
+            [comp1._inputs['v3'],  0],
+            [comp1._inputs['v4'],  0],
             ])
 
             self.assertList([
-            [comp2.inputs['v1'],  0],
-            [comp2.outputs['v2'], 1],
-            [comp2.inputs['v3'],  0],
-            [comp2.inputs['v4'],  0],
+            [comp2._inputs['v1'],  0],
+            [comp2._outputs['v2'], 1],
+            [comp2._inputs['v3'],  0],
+            [comp2._inputs['v4'],  0],
             ])
 
-            root._vector_transfers[None]['fwd', 0](root.inputs, root.outputs)
+            root._vector_transfers[None]['fwd', 0](root._inputs, root._outputs)
 
             self.assertList([
-            [comp1.outputs['v1'], 1],
-            [comp1.inputs['v2'],  1],
-            [comp1.inputs['v3'],  1],
-            [comp1.inputs['v4'],  0],
-            ])
-
-            self.assertList([
-            [comp2.inputs['v1'],  0],
-            [comp2.outputs['v2'], 1],
-            [comp2.inputs['v3'],  0],
-            [comp2.inputs['v4'],  0],
-            ])
-
-            root._vector_transfers[None][None](root.inputs, root.outputs)
-
-            self.assertList([
-            [comp1.outputs['v1'], 1],
-            [comp1.inputs['v2'],  1],
-            [comp1.inputs['v3'],  1],
-            [comp1.inputs['v4'],  0],
+            [comp1._outputs['v1'], 1],
+            [comp1._inputs['v2'],  1],
+            [comp1._inputs['v3'],  1],
+            [comp1._inputs['v4'],  0],
             ])
 
             self.assertList([
-            [comp2.inputs['v1'],  1],
-            [comp2.outputs['v2'], 1],
-            [comp2.inputs['v3'],  1],
-            [comp2.inputs['v4'],  0],
+            [comp2._inputs['v1'],  0],
+            [comp2._outputs['v2'], 1],
+            [comp2._inputs['v3'],  0],
+            [comp2._inputs['v4'],  0],
+            ])
+
+            root._vector_transfers[None][None](root._inputs, root._outputs)
+
+            self.assertList([
+            [comp1._outputs['v1'], 1],
+            [comp1._inputs['v2'],  1],
+            [comp1._inputs['v3'],  1],
+            [comp1._inputs['v4'],  0],
+            ])
+
+            self.assertList([
+            [comp2._inputs['v1'],  1],
+            [comp2._outputs['v2'], 1],
+            [comp2._inputs['v3'],  1],
+            [comp2._inputs['v4'],  0],
             ])
 
 

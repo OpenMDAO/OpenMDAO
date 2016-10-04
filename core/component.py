@@ -60,31 +60,95 @@ class Component(System):
 class ImplicitComponent(Component):
     """Class to inherit from when all output variables are implicit."""
 
-    pass
+
+    def _apply_nonlinear(self):
+        self.apply_nonlinear()
+
+    def _solve_nonlinear(self):
+        if self._solvers_nonlinear is not None:
+            self._solvers_nonlinear()
+        else:
+            self.solve_nonlinear()
+
+    def _apply_linear(self, vec_names, mode, var_ind_range):
+        if self._jacobian.GLOBAL:
+            for vec_name in vec_names:
+                op_names, ip_names = self._utils_compute_deriv_names(var_ind_range)
+
+                d_inputs = self._vectors['input'][vec_name]
+                d_outputs = self._vectors['output'][vec_name]
+                d_residuals = self._vectors['output'][vec_name]
+
+                self._jacobian._apply(d_inputs, d_outputs, d_residuals,
+                                      op_names, ip_names, mode, var_ind_range)
+        else:
+            self.apply_linear(mode, inames, onames, inputs, outputs,
+                              d_inputs, d_outputs, d_residuals)
+
+    def _solve_linear(self, vec_names, mode):
+        if self._solvers_linear is not None:
+            return self._solvers_linear(vec_names, mode)
+        else:
+            for vec_name in vec_names:
+                d_outputs = self._vectors['output'][vec_name]
+                d_residuals = self._vectors['output'][vec_name]
+                success = self.solve_linear(mode, d_output, d_residuals)
+                if not success: return False
+            return True
+
+    def _linearize(self):
+        self.linearize()
+
+        if self._jacobian.GLOBAL:
+            self._jacobian._update()
+
+    def apply_nonlinear(self):
+        pass
+
+    def solve_nonlinear(self):
+        pass
+
+    def apply_linear(self, mode, inames, onames, inputs, outputs,
+                     d_inputs, d_outputs, d_residuals):
+        pass
+
+    def solve_linear(self, mode, d_output, d_residuals):
+        pass
+
+    def linearize(self):
+        pass
 
 
 
 class ExplicitComponent(Component):
     """Class to inherit from when all output variables are explicit."""
 
-    def apply_nonlinear(self):
-        outputs = self.outputs
-        residuals = self.residuals
+    def _apply_nonlinear(self):
+        outputs = self._outputs
+        residuals = self._residuals
 
         residuals.set_vec(outputs)
         self.compute()
         residuals -= outputs
         outputs += residuals
 
-    def solve_nonlinear(self):
-        self.residuals.set_val(0.0)
+    def _solve_nonlinear(self):
+        self._residuals.set_val(0.0)
         self.compute()
+
+    def _apply_linear(self, vec_names, mode, var_ind_range):
+        if mode == 'fwd':
+            self.compute_jacvec_product()
 
     def compute(self):
         pass
 
-    def compute_derivative(self):
+    def compute_jacobian(self):
         pass
+
+    def compute_jacvec_product(self):
+        pass
+
 
 
 
@@ -92,7 +156,7 @@ class IndepVarComponent(ExplicitComponent):
     """Class to inherit from when all output variables are independent."""
 
     def initialize_variables(self, comm):
-        indep_vars = self.sys_args[0]
+        indep_vars = self.args[0]
         for name, value in indep_vars:
             if type(value) == numpy.ndarray:
                 self.add_output(name, value=value, shape=value.shape)

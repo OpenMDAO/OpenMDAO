@@ -92,7 +92,7 @@ class Problem(object):
         # Assembler setup: global transfer indices vector
         input_metadata = root._variable_myproc_metadata['input']
         var_indices = root._variable_myproc_indices['input']
-        _assembler._setup__input_indices(input_metadata, var_indices)
+        _assembler._setup_input_indices(input_metadata, var_indices)
 
         # Vector setup for the basic execution vector
         self.setup_vector(None, _Vector)

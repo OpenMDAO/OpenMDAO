@@ -21,7 +21,7 @@ class CompB(ExplicitComponent):
         self.add_output('f')
 
     def compute(self):
-        self.outputs['f'] = 2 * self.inputs['x']
+        self._outputs['f'] = 2 * self._inputs['x']
 
 
 class GroupG(Group):
@@ -97,25 +97,25 @@ class Test(unittest.TestCase):
 
         root = self.p.root
 
-        if root.mpi_comm.size == 1:
+        if root.comm.size == 1:
             compA = root.get_subsystem('G.A')
             compB = root.get_subsystem('G.B')
 
             self.assertList([
-            [root.outputs['A.x'], 0],
-            [compA.outputs['x'],  0],
-            [compB.inputs['x'],   0],
-            [compB.outputs['f'],  0],
+            [root._outputs['A.x'], 0],
+            [compA._outputs['x'],  0],
+            [compB._inputs['x'],   0],
+            [compB._outputs['f'],  0],
             ])
 
-            compA.outputs['x'] = 10
-            root.solve_nonlinear()
+            compA._outputs['x'] = 10
+            root._solve_nonlinear()
 
             self.assertList([
-            [root.outputs['A.x'], 10],
-            [compA.outputs['x'],  10],
-            [compB.inputs['x'],   10],
-            [compB.outputs['f'],  20],
+            [root._outputs['A.x'], 10],
+            [compA._outputs['x'],  10],
+            [compB._inputs['x'],   10],
+            [compB._outputs['f'],  20],
             ])
 
 if __name__ == '__main__':

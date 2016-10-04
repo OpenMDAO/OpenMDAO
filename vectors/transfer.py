@@ -51,7 +51,7 @@ class DefaultTransfer(Transfer):
 class PETScTransfer(Transfer):
 
     def _initialize_transfer(self):
-        self.transfers = {}
+        self._transfers = {}
         for ip_iset, op_iset in self.ip_inds:
             key = (ip_iset, op_iset)
             if len(self.ip_inds[key]) > 0:
@@ -63,7 +63,7 @@ class PETScTransfer(Transfer):
                 op_petsc = self.op_vec._global_vector._petsc[op_iset]
                 transfer = PETSc.Scatter().create(op_petsc, op_indexset,
                                                   ip_petsc, ip_indexset)
-                self.transfers[key] = transfer
+                self._transfers[key] = transfer
 
     def __call__(self, ip_vec, op_vec, mode='fwd'):
         if mode == 'fwd':
@@ -72,7 +72,7 @@ class PETScTransfer(Transfer):
                 if len(self.ip_inds[key]) > 0:
                     ip_petsc = self.ip_vec._global_vector._petsc[ip_iset]
                     op_petsc = self.op_vec._global_vector._petsc[op_iset]
-                    self.transfers[key].scatter(op_petsc, ip_petsc,
+                    self._transfers[key].scatter(op_petsc, ip_petsc,
                                                 addv=False, mode=False)
         elif mode == 'rev':
             for ip_iset, op_iset in self.ip_inds:
@@ -80,5 +80,5 @@ class PETScTransfer(Transfer):
                 if len(self.ip_inds[key]) > 0:
                     ip_petsc = self.ip_vec._global_vector._petsc[ip_iset]
                     op_petsc = self.op_vec._global_vector._petsc[op_iset]
-                    self.transfers[key].scatter(ip_petsc, op_petsc,
+                    self._transfers[key].scatter(ip_petsc, op_petsc,
                                                 addv=True, mode=True)

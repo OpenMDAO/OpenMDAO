@@ -9,7 +9,7 @@ from Blue.API import Problem, IndepVarComponent, ExplicitComponent, Group, PETSc
 class GeneralComp(ExplicitComponent):
 
     def initialize_variables(self, comm):
-        kwargs = self.sys_global_kwargs
+        kwargs = self.global_kwargs
         icomp = kwargs['icomp']
         ncomp = kwargs['ncomp']
         use_var_sets = kwargs['use_var_sets']
@@ -68,7 +68,7 @@ class GeneralProblem(object):
         self.root = current_systems[0]
         self.all_systems = all_systems
 
-        self.root.sys_kwargs['use_var_sets'] = use_var_sets
+        self.root.kwargs['use_var_sets'] = use_var_sets
         self.problem = Problem(self.root, Vector=PETScVector).setup()
 
     def print_all(self):

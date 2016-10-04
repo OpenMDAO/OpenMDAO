@@ -37,7 +37,7 @@ class Solver(object):
         else:
             solver_name = solver_name + ' ' * (name_len - len(solver_name))
 
-        iproc = self._system.mpi_comm.rank
+        iproc = self._system.comm.rank
         iprint = self._options['iprint']
         _solvers_print = self._system._solvers_print
         if iproc == 0 and iprint and _solvers_print:
@@ -89,8 +89,8 @@ class NonlinearSolver(Solver):
         return norm0, norm
 
     def _iter_get_norm(self):
-        self._system.apply_nonlinear()
-        return self._system.residuals.get_norm()
+        self._system._apply_nonlinear()
+        return self._system._residuals.get_norm()
 
 
 
@@ -100,14 +100,14 @@ class NewtonSolver(NonlinearSolver):
 
     def _iter_execute(self):
         system = self._system
-        system._vectors['residual'][''].set_vec(system.residuals)
+        system._vectors['residual'][''].set_vec(system._residuals)
         system._vectors['residual'][''] *= -1.0
         system.linearize()
         self.subsolvers['linear']([None], 'fwd')
         if 'linesearch' in self.subsolvers:
             self.subsolvers['linesearch']()
         else:
-            system.outputs += system.vector_list['output'][0]
+            system._outputs += system.vector_list['output'][0]
 
 
 
@@ -117,9 +117,9 @@ class NonlinearBlockJac(NonlinearSolver):
 
     def _iter_execute(self):
         system = self._system
-        system.transfers[None](system.inputs, system.outputs, 'fwd')
+        system._transfers[None](system._inputs, system._outputs, 'fwd')
         for subsys in system._subsystems_myproc:
-            subsys.solve_nonlinear()
+            subsys._solve_nonlinear()
 
 
 
@@ -130,9 +130,9 @@ class NonlinearBlockGS(NonlinearSolver):
     def _iter_execute(self):
         system = self._system
         for isub in xrange(len(system._subsystems_allprocs)):
-            system.transfers['fwd', isub](system.inputs, system.outputs, 'fwd')
+            system._transfers['fwd', isub](system._inputs, system._outputs, 'fwd')
 
             if isub in system._subsystems_inds:
                 index = system._subsystems_inds.index(isub)
                 subsys = system._subsystems_myproc[index]
-                subsys.solve_nonlinear()
+                subsys._solve_nonlinear()

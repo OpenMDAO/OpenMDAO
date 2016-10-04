@@ -37,7 +37,47 @@ class Group(System):
         """
         self._variable_connections[ip_name] = op_name
 
-    def apply_nonlinear(self):
-        self.transfers[None](self.inputs, self.outputs, 'fwd')
+    def _apply_nonlinear(self):
+        self._transfers[None](self._inputs, self._outputs, 'fwd')
         for subsys in self._subsystems_myproc:
-            subsys.apply_nonlinear()
+            subsys._apply_nonlinear()
+
+    def _solve_nonlinear(self):
+        return self._solvers_nonlinear()
+
+    def _apply_linear(self, vec_names, mode, var_ind_range):
+        if self._jacobian.GLOBAL:
+            for vec_name in vec_names:
+                op_names, ip_names = self._utils_compute_deriv_names(var_ind_range)
+
+                d_inputs = self._vectors['input'][vec_name]
+                d_outputs = self._vectors['output'][vec_name]
+                d_residuals = self._vectors['output'][vec_name]
+
+                self._jacobian._apply(d_inputs, d_outputs, d_residuals,
+                                      op_names, ip_names, mode, var_ind_range)
+        else:
+            if mode == 'fwd':
+                for vec_name in vec_names:
+                    d_inputs = self._vectors['input'][vec_name]
+                    d_outputs = self._vectors['output'][vec_name]
+                    self._transfers[None](d_inputs, d_outputs, mode)
+
+            for subsys in self.subsystems_myproc:
+                subsys._apply_linear(vec_names, mode, var_ind_range)
+
+            if mode == 'rev':
+                for vec_name in vec_names:
+                    d_inputs = self._vectors['input'][vec_name]
+                    d_outputs = self._vectors['output'][vec_name]
+                    self._transfers[None](d_inputs, d_outputs, mode)
+
+    def _solve_linear(self, vec_names, mode):
+        return self._solvers_linear(vec_names, mode)
+
+    def _linearize(self):
+        for subsys in self.subsystems_myproc:
+            subsys._linearize()
+
+        if self._jacobian.GLOBAL:
+            self._jacobian._update()

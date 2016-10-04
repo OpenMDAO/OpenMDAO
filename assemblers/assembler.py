@@ -17,10 +17,6 @@ class Assembler(object):
         self._input_indices = None
         self._input_indices_meta = None
 
-
-
-class DefaultAssembler(Assembler):
-
     def _setup_variables(self, sizes, variable_metadata, variable_indices):
         nproc = self.comm.size
 
@@ -116,7 +112,7 @@ class DefaultAssembler(Assembler):
 
         self._input_IDs = _input_IDs
 
-    def _setup__input_indices(self, input_metadata, var_indices):
+    def _setup_input_indices(self, input_metadata, var_indices):
         """ Assemble global list of input indices """
         # Compute total size of indices vector
         counter = 0
@@ -137,6 +133,10 @@ class DefaultAssembler(Assembler):
             ivar_all = var_indices[ind]
             self._input_indices_meta[ivar_all, :] = [ind1, ind2]
             ind1 += numpy.prod(metadata['indices'].shape)
+
+
+
+class DefaultAssembler(Assembler):
 
     def _compute_transfers(self, nsub_allprocs, var_range,
                           _subsystems_myproc, _subsystems_inds):
