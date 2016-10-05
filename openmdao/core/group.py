@@ -1,7 +1,7 @@
 """Define the Group class."""
 from __future__ import division
 
-from Blue.core.system import System
+from openmdao.core.system import System
 
 
 class Group(System):

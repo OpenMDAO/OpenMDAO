@@ -2,9 +2,9 @@
 from __future__ import division
 import numpy
 
-from Blue.proc_allocators.proc_allocator import DefaultProcAllocator
-from Blue.solvers.solver import NonlinearBlockGS
-from Blue.jacobians.jacobian import DefaultJacobian
+from openmdao.proc_allocators.proc_allocator import DefaultProcAllocator
+from openmdao.solvers.solver import NonlinearBlockGS
+from openmdao.jacobians.jacobian import DefaultJacobian
 
 
 
