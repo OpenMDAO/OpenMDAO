@@ -10,7 +10,7 @@ IndepVarComponent - used to define output variables that are all independent
 from __future__ import division
 import numpy
 
-from Blue.core.system import System
+from openmdao.core.system import System
 
 
 

@@ -2,7 +2,7 @@ from __future__ import division
 import numpy
 import unittest
 
-from Blue.API import Problem, IndepVarComponent, ExplicitComponent, Group, PETScVector
+from openmdao.api import Problem, IndepVarComponent, ExplicitComponent, Group, PETScVector
 
 #      (A) -> x
 # x -> (B) -> f

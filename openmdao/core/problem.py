@@ -1,8 +1,8 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 from __future__ import division
 
-from Blue.assemblers.assembler import DefaultAssembler
-from Blue.vectors.vector import DefaultVector
+from openmdao.assemblers.assembler import DefaultAssembler
+from openmdao.vectors.vector import DefaultVector
 
 
 

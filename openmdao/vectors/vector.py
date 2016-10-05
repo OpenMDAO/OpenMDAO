@@ -5,8 +5,8 @@ try:
 except:
     pass
 
-from Blue.vectors.transfer import DefaultTransfer
-from Blue.vectors.transfer import PETScTransfer
+from openmdao.vectors.transfer import DefaultTransfer
+from openmdao.vectors.transfer import PETScTransfer
 
 
 
