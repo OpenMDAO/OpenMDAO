@@ -32,10 +32,13 @@ class Assembler(object):
                 local_set_dict[ivar_all] = var['var_set']
 
             # Broadcast ivar_all-iset pairs to all procs
-            local_set_dicts_list = self.comm.allgather(local_set_dict)
-            global_set_dict = {}
-            for local_set_dict in local_set_dicts_list:
-                global_set_dict.update(local_set_dict)
+            if self.comm.size > 1:
+                local_set_dicts_list = self.comm.allgather(local_set_dict)
+                global_set_dict = {}
+                for local_set_dict in local_set_dicts_list:
+                    global_set_dict.update(local_set_dict)
+            else:
+                global_set_dict = local_set_dict
 
             # Compute set_name to ID maps
             unique_list = list(set(global_set_dict.values()))

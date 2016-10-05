@@ -42,7 +42,7 @@ setup(name='openmdao',
       #     'openmdao.util': ['*.html'],
       # },
       install_requires=[
-        'six', 'numpydoc', 'numpy>=1.9.2',
+        'six', 'numpydoc', #'numpy>=1.9.2',
         'scipy', 'sqlitedict'
       ],
       # entry_points="""
