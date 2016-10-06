@@ -16,8 +16,13 @@ class System(object):
 
     Attributes
     ----------
+    name : str
+        name of the system, must be different from siblings.
+    path_name : str
+        global name of the system, including the path.
     comm : MPI.Comm or FakeComm
         MPI communicator object.
+
     args : list of objects
         user-defined arguments (to be used in apply_nonlinear, ...).
     kwargs : dict of objects
@@ -25,8 +30,6 @@ class System(object):
     global_kwargs : dict of objects
         kwargs combined with kwargs of parent systems.
 
-    _sys_name : str
-        name of the system, must be different from siblings.
     _sys_depth : int
         distance from the root node in the hierarchy tree.
     _sys_assembler: Assembler
@@ -48,6 +51,8 @@ class System(object):
         list of names of all owned variables, not just on current proc.
     _variable_allprocs_range : {'input': [int,int], 'output': [int,int]}
         index range of owned variables with respect to all problem variables.
+    _variable_allprocs_indices : {'input': dict, 'output': dict}
+        dictionary of global indices keyed by the variable name.
 
     _variable_myproc_names : {'input': [str, ...], 'output': [str, ...]}
         list of names of owned variables on current proc.
@@ -102,12 +107,14 @@ class System(object):
         **kwargs: dict of keyword arguments
             available here and in all descendants of this system.
         """
+        self.name = name
+        self.path_name = ''
         self.comm = None
+
         self.args = args
         self.kwargs = kwargs
         self.global_kwargs = {}
 
-        self._sys_name = name
         self._sys_depth = 0
         self._sys_assembler = None
 
@@ -120,6 +127,7 @@ class System(object):
 
         self._variable_allprocs_names = {'input': [], 'output': []}
         self._variable_allprocs_range = {'input': [0,0], 'output': [0,0]}
+        self._variable_allprocs_indices = {'input': {}, 'output': {}}
 
         self._variable_myproc_names = {'input': [], 'output': []}
         self._variable_myproc_metadata = {'input': [], 'output': []}
@@ -144,92 +152,39 @@ class System(object):
         self._solvers_linear = NonlinearBlockGS() # temporary hack!
         self._solvers_print = True
 
-    def get_subsystem(self, name):
-        """Return the system called 'name' in the current namespace.
+        self.initialize()
 
-        Args
-        ----
-        name : str
-            name of the desired system in the current namespace.
-
-        Returns
-        -------
-        System or None
-            System if found on this proc else None.
-        """
-        if name == self._sys_name:
-            # If this system's name matches, target found
-            return self
-        else:
-            ind = len(self._sys_name) + 1
-            # If first part of name matches this system's name, check subsytems
-            if name[:ind] == '%s.' % self._sys_name:
-                for subsys in self._subsystems_myproc:
-                    result = subsys.get_subsystem(name[ind:])
-                    # If result is not None, target found; otherwise continue
-                    if result is not None:
-                        return result
-                # All subsystems failed
-                return None
-            else:
-                return None
-
-    def set_solver_print(self, flag):
-        """Recursively set solver print flag for this and all systems below.
-
-        Args
-        ----
-        flag : boolean
-            if False, solver printing is surpressed for this system and below.
-        """
-        self._solvers_print = flag
-        for subsys in self._subsystems_myproc:
-            subsys.set_solver_print(flag)
-
-    def set_jacobian(self, jac=None):
-        """Recursively set the system's jacobian attribute.
-
-        Args
-        ----
-        jac : Jacobian or None
-            Jacobian object to be set; if None, reset to the DefaultJacobian.
-        """
-        if jac is None:
-            self._jacobian = DefaultJacobian()
-            self._jacobian.setup(self)
-
-        for subsys in self.subsystems_myproc:
-            subsys.set_jacobian(jac)
-
-
-    def _setup_processors(self, depth, assembler, global_kwargs, comm,
-                         proc_range):
+    def _setup_processors(self, path, comm, global_kwargs, depth, assembler,
+                          proc_range):
         """Recursively split comms and define local subsystems.
 
         Args
         ----
+        path : str
+            parent names to prepend to name to get the pathname
+        comm : MPI.Comm or FakeComm
+            communicator for this system (already split, if applicable).
+        global_kwargs : dict
+            dictionary with kwargs of all parents assembled in it.
         depth : int
             depth level for this system - i.e., distance from root node.
         assembler : Assembler
             pointer to the global assember object to distribute to everyone.
-        global_kwargs : dict
-            dictionary with kwargs of all parents assembled in it.
-        comm : MPI.Comm or FakeComm
-            communicator for this system (already split, if applicable).
         proc_range : [int, int]
             indices of procs owned by comm with respect to COMM_WORLD.
         """
         # Set attributes
+        self.path_name = path + self.name
+        self.comm = comm
+        self.global_kwargs = global_kwargs
         self._sys_depth = depth
         self._sys_assembler = assembler
-        self.global_kwargs = global_kwargs
-        self.comm = comm
         self._mpi_proc_range = proc_range
 
         self.global_kwargs.update(self.kwargs)
 
         # Optional user-defined init method
-        self.initialize(comm)
+        self.initialize_processors(comm)
 
         nsub = len(self._subsystems_allprocs)
         if nsub > 0:
@@ -239,12 +194,13 @@ class System(object):
 
             # Define local subsystems and perform recursion
             self._subsystems_myproc = [self._subsystems_allprocs[ind]
-                                      for ind in sub_inds]
+                                       for ind in sub_inds]
             self._subsystems_inds = sub_inds
             for subsys in self._subsystems_myproc:
                 sub_global_kwargs = self.global_kwargs.copy()
-                subsys._setup_processors(depth+1, assembler, sub_global_kwargs,
-                                        sub_comm, sub_proc_range)
+                subsys._setup_processors(self.path_name + '.', sub_comm,
+                                         sub_global_kwargs, depth+1, assembler,
+                                         sub_proc_range)
 
     def _setup_variables(self, recursion=True):
         """Assemble variable metadata and names lists.
@@ -273,7 +229,7 @@ class System(object):
             for typ in ['input', 'output']:
                 for subsys in self._subsystems_myproc:
                     # Assemble the names list from subsystems
-                    subsys._utils_compute_maps(typ)
+                    subsys._variable_maps[typ] = subsys._utils_get_maps(typ)
                     for sub_name in subsys._variable_allprocs_names[typ]:
                         name = subsys._variable_maps[typ][sub_name]
                         self._variable_allprocs_names[typ].append(name)
@@ -304,7 +260,7 @@ class System(object):
 
         Args
         ----
-        index : int
+        index : {'input': int, 'output': int}
             current global variable counter.
         recursion : boolean
             recursion is not performed if traversing up the tree after reconf.
@@ -361,6 +317,13 @@ class System(object):
         for typ in ['input', 'output']:
             index[typ] = self._variable_allprocs_range[typ][1]
 
+        # Populate the _variable_allprocs_indices dictionary
+        for typ in ['input', 'output']:
+            for ind in xrange(len(self._variable_allprocs_names[typ])):
+                name = self._variable_allprocs_names[typ][ind]
+                ivar_all = self._variable_allprocs_range[typ][0] + ind
+                self._variable_allprocs_indices[typ][name] = ivar_all
+
     def _setup_connections(self):
         """Recursively assemble a list of input-output connections."""
         # Perform recursion and assemble pairs from subsystems
@@ -408,7 +371,7 @@ class System(object):
             self._vectors[key][vec_name] = _vectors[key]
 
         # Compute the transfer for this vector set
-        transfers = self._util_compute_transfers(_vectors)
+        transfers = self._utils_get_transfers(_vectors)
         self._vector_transfers[vec_name] = transfers
 
         # Define shortcuts for convenience
@@ -442,7 +405,7 @@ class System(object):
         for subsys in self._subsystems_myproc:
             subsys._setup_solvers()
 
-    def _util_compute_transfers(self, _vectors):
+    def _utils_get_transfers(self, _vectors):
         """Compute transfers.
 
         Args
@@ -491,7 +454,7 @@ class System(object):
                                               self.comm)
         return transfers
 
-    def _utils_compute_maps(self, typ):
+    def _utils_get_maps(self, typ):
         """Define variable maps based on promotes and renames lists.
 
         Args
@@ -513,7 +476,7 @@ class System(object):
         else:
             # Default: the parent system's name is prepended to variable name
             for name in self._variable_allprocs_names[typ]:
-                maps[name] = self._sys_name + '.' + name
+                maps[name] = self.name + '.' + name
 
             # Promote selected variables
             promotes = 'promotes_%ss' % typ
@@ -527,9 +490,19 @@ class System(object):
                 for name in kwargs[renames]:
                     maps[name] = kwargs[renames][name]
 
-        self._variable_maps[typ] = maps
+        return maps
 
-    def _utils_compute_deriv_names(self, var_ind_range):
+    def _utils_get_vectors(self, vec_name, var_ind_range, mode):
+        d_inputs = self._vectors['input'][vec_name]
+        d_outputs = self._vectors['output'][vec_name]
+        d_residuals = self._vectors['residual'][vec_name]
+
+        if mode == 'fwd':
+            d_residuals.set_const(0.0)
+        elif mode == 'rev':
+            d_inputs.set_const(0.0)
+            d_outputs.set_const(0.0)
+
         op_names = []
         op_ind = self.variable_allprocs_range['output'][0]
         for op_name in self.variable_allprocs_names['output']:
@@ -547,10 +520,81 @@ class System(object):
                 ip_names.append(ip_name)
             ip_ind += 1
 
-        return op_names, ip_names
+        d_inputs._names = ip_names
+        d_outputs._names = op_names
 
-    def initialize(self, comm):
-        """Optional user-defined init method in groups and components."""
+        return d_inputs, d_outputs, d_residuals
+
+    def get_subsystem(self, name):
+        """Return the system called 'name' in the current namespace.
+
+        Args
+        ----
+        name : str
+            name of the desired system in the current namespace.
+
+        Returns
+        -------
+        System or None
+            System if found on this proc else None.
+        """
+        if name == self.name:
+            # If this system's name matches, target found
+            return self
+        else:
+            ind = len(self.name) + 1
+            # If first part of name matches this system's name, check subsytems
+            if name[:ind] == '%s.' % self.name:
+                for subsys in self._subsystems_myproc:
+                    result = subsys.get_subsystem(name[ind:])
+                    # If result is not None, target found; otherwise continue
+                    if result is not None:
+                        return result
+                # All subsystems failed
+                return None
+            else:
+                return None
+
+    def set_solver_print(self, flag):
+        """Recursively set solver print flag for this and all systems below.
+
+        Args
+        ----
+        flag : boolean
+            if False, solver printing is surpressed for this system and below.
+        """
+        self._solvers_print = flag
+        for subsys in self._subsystems_myproc:
+            subsys.set_solver_print(flag)
+
+    def set_jacobian(self, jacobian=None, is_top=True):
+        """Recursively set the system's jacobian attribute.
+
+        Args
+        ----
+        jacobian : Jacobian or None
+            Jacobian object to be set; if None, reset to the DefaultJacobian.
+        is_top : boolean
+            whether this is the top; i.e., start of the recursion
+        """
+        if jacobian is None:
+            self._jacobian = DefaultJacobian()
+        else:
+            self._jacobian = jacobian
+            if is_top:
+                self._jacobian._top_name = self._path_name
+                self._jacobian._top_system = self
+                self._jacobian._assembler = self._sys_assembler
+
+        for subsys in self.subsystems_myproc:
+            subsys.set_jacobian(jacobian, False)
+
+    def initialize(self):
+        """Optional user-defined method run once during instantiation."""
+        pass
+
+    def initialize_processors(self, comm):
+        """Optional user-defined method run after repartitioning/rebalancing."""
         pass
 
     def initialize_variables(self, comm):

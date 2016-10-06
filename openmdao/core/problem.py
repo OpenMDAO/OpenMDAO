@@ -5,7 +5,6 @@ from openmdao.assemblers.assembler import DefaultAssembler
 from openmdao.vectors.vector import DefaultVector
 
 
-
 class FakeComm(object):
     """Fake MPI communicator class used if mpi4py is not installed.
 
@@ -23,7 +22,6 @@ class FakeComm(object):
         self.size = 1
 
 
-
 class Problem(object):
     """Top-level container for the systems and drivers.
 
@@ -35,11 +33,11 @@ class Problem(object):
         the global communicator; the same as that of assembler and root.
     _assembler : Assembler
         pointer to the global Assembler object.
-    _Vector
+    _VectorClass
         reference to the actual Vector class; not an instance.
     """
 
-    def __init__(self, root, comm=None, Assembler=None, Vector=None):
+    def __init__(self, root, comm=None, AssemblerClass=None, VectorClass=None):
         """Initialize attributes."""
         if comm is None:
             try:
@@ -47,15 +45,15 @@ class Problem(object):
                 comm = MPI.COMM_WORLD
             except:
                 comm = FakeComm()
-        if Assembler is None:
-            Assembler = DefaultAssembler
-        if Vector is None:
-            Vector = DefaultVector
+        if AssemblerClass is None:
+            AssemblerClass = DefaultAssembler
+        if VectorClass is None:
+            VectorClass = DefaultVector
 
         self.root = root
         self.comm = comm
-        self._assembler = Assembler(comm)
-        self._Vector = Vector
+        self._assembler = AssemblerClass(comm)
+        self._VectorClass = VectorClass
 
     def setup(self):
         """Set up everything (root, assembler, vector, solvers, drivers).
@@ -67,11 +65,11 @@ class Problem(object):
         """
         root = self.root
         comm = self.comm
-        _assembler = self._assembler
-        _Vector = self._Vector
+        assembler = self._assembler
+        VectorClass = self._VectorClass
 
         # System setup
-        root._setup_processors(0, _assembler, {}, comm, [0, comm.size])
+        root._setup_processors('', comm, {}, 0, assembler, [0, comm.size])
         root._setup_variables()
         root._setup_variable_indices({'input': 0, 'output': 0})
         root._setup_connections()
@@ -82,20 +80,20 @@ class Problem(object):
                  for typ in ['input', 'output']}
         variable_metadata = root._variable_myproc_metadata
         variable_indices = root._variable_myproc_indices
-        _assembler._setup_variables(sizes, variable_metadata, variable_indices)
+        assembler._setup_variables(sizes, variable_metadata, variable_indices)
 
         # Assembler setup: variable connections
         connections = root._variable_connections_indices
-        _variable_allprocs_names = root._variable_allprocs_names
-        _assembler._setup_connections(connections, _variable_allprocs_names)
+        variable_allprocs_names = root._variable_allprocs_names
+        assembler._setup_connections(connections, variable_allprocs_names)
 
         # Assembler setup: global transfer indices vector
         input_metadata = root._variable_myproc_metadata['input']
         var_indices = root._variable_myproc_indices['input']
-        _assembler._setup_input_indices(input_metadata, var_indices)
+        assembler._setup_input_indices(input_metadata, var_indices)
 
         # Vector setup for the basic execution vector
-        self.setup_vector(None, _Vector)
+        self.setup_vector(None, VectorClass)
 
         return self
 
@@ -110,9 +108,9 @@ class Problem(object):
             reference to the actual Vector class
         """
         root = self.root
-        _assembler = self._assembler
+        assembler = self._assembler
 
-        _vectors = {}
+        vectors = {}
         for key in ['input', 'output', 'residual']:
             if key is 'residual':
                 typ = 'output'
@@ -124,8 +122,8 @@ class Problem(object):
                          root._variable_allprocs_range[typ],
                          root._variable_myproc_indices[typ],
                          root._variable_myproc_names[typ],
-                         _assembler._variable_sizes[typ],
-                         _assembler._variable_set_indices[typ])
-            _vectors[key] = vec
+                         assembler._variable_sizes[typ],
+                         assembler._variable_set_indices[typ])
+            vectors[key] = vec
 
-        self.root._setup_vector(vec_name, _vectors)
+        self.root._setup_vector(vec_name, vectors)

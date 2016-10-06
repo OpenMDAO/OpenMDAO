@@ -23,12 +23,12 @@ class Solver(object):
             solver._setup_solvers(system, depth+1)
 
     def _mpi_print(self, iteration, res, res0):
-        raw_sys_name = self._system._sys_name
+        rawname = self._system.name
         name_len = 10
-        if len(raw_sys_name) > name_len:
-            sys_name = raw_sys_name[:name_len]
+        if len(rawname) > name_len:
+            sys_name = rawname[:name_len]
         else:
-            sys_name = raw_sys_name + ' ' * (name_len - len(raw_sys_name))
+            sys_name = rawname + ' ' * (name_len - len(rawname))
 
         solver_name = self.SOLVER
         name_len = 12

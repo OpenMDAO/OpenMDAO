@@ -6,53 +6,64 @@ except:
     pass
 
 
-
 class Jacobian(object):
 
     def __init__(self):
-        self._system = None
+        self._top_name = None
+        self._top_system = None
         self._assembler = None
+        self._system = None
 
         self._dict = {}
         self._mtx = {}
-        self._explicit = {}
 
-    def setup(self, system):
-        self._system = system
-        self._assembler = system._sys_assembler
-
-    def __setitem__(self, key, jac):
+    def _process_key(self, key):
         op_name, ip_name = key
-        op_view = self._system.outputs[op_name]
-        ip_view = self._system.inputs[ip_name]
+        outputs = self._system._outputs
+        inputs = self._system._inputs
 
         op_size = len(outputs[op_name])
+        op_ind = self._system._variable_allprocs_indices['output'][op_name]
         if ip_name in inputs:
             ip_size = len(inputs[ip_name])
+            ip_ind = self._system._variable_allprocs_indices['input'][ip_name]
         elif ip_name in outputs:
             ip_size = len(outputs[ip_name])
+            ip_ind = self._system._variable_allprocs_indices['output'][ip_name]
+
+        return op_ind, ip_ind, op_size, ip_size
+
+    def _negate(self, key):
+        op_ind, ip_ind, op_size, ip_size = self._process_key(key)
+        jac = self._dict[op_ind, ip_ind]
+
+        if numpy.isscalar(jac):
+            self._dict[op_ind, ip_ind] = -jac
+        elif type(jac) == numpy.ndarray:
+            self._dict[op_ind, ip_ind] = -jac
+        elif len(jac) == 3:
+            self._dict[op_ind, ip_ind][0] = -self._dict[op_ind, ip_ind][0]
+
+    def __contains__(self, key):
+        op_ind, ip_ind, op_size, ip_size = self._process_key(key)
+        return (op_ind, ip_ind) in self._dict
+
+    def __setitem__(self, key, jac):
+        op_ind, ip_ind, op_size, ip_size = self._process_key(key)
 
         if numpy.isscalar(jac):
             jac = numpy.array([jac]).reshape((op_size, ip_size))
         elif type(jac) is list:
             jac = numpy.array(jac).reshape((op_size, ip_size))
 
-        self._dict[key] = jac
+        self._dict[op_ind, ip_ind] = jac
 
     def __getitem__(self, key):
-        return self._dict[key]
-
-    def __contains__(self, key):
-        return key in self._dict
-
-    def __iter__(self):
-        return iter(self._dict)
+        op_ind, ip_ind, op_size, ip_size = self._process_key(key)
+        return self._dict[op_ind, ip_ind]
 
 
-
-class DefaultJacobian(object):
-
-    GLOBAL = False
+class DefaultJacobian(Jacobian):
 
     def _initialize(self):
         pass
@@ -84,10 +95,7 @@ class DefaultJacobian(object):
                     d_inputs[ip_name] += jac.T.dot(d_residuals[op_name])
 
 
-
 class DenseJacobian(object):
-
-    GLOBAL = True
 
     def _initialize(self):
         sizes = self._assembler.variable_sizes

@@ -63,40 +63,20 @@ class ImplicitComponent(Component):
 
 
     def _apply_nonlinear(self):
-        self.apply_nonlinear()
+        self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
     def _solve_nonlinear(self):
         if self._solvers_nonlinear is not None:
-            self._solvers_nonlinear()
+            self._solvers_nonlinear(self._inputs, self._outputs)
         else:
-            self.solve_nonlinear()
+            self.solve_nonlinear(self._inputs, self._outputs)
 
     def _apply_linear(self, vec_names, mode, var_ind_range):
-        if self._jacobian.GLOBAL:
-            for vec_name in vec_names:
-                op_names, ip_names = self._utils_compute_deriv_names(var_ind_range)
-
-                d_inputs = self._vectors['input'][vec_name]
-                d_outputs = self._vectors['output'][vec_name]
-                d_residuals = self._vectors['residual'][vec_name]
-
-                self._jacobian._apply(d_inputs, d_outputs, d_residuals,
-                                      op_names, ip_names, mode, var_ind_range)
-        else:
-            for vec_name in vec_names:
-                op_names, ip_names = self._utils_compute_deriv_names(var_ind_range)
-
-                d_inputs = self._vectors['input'][vec_name]
-                d_outputs = self._vectors['output'][vec_name]
-                d_residuals = self._vectors['residual'][vec_name]
-
-                if mode == 'fwd':
-                    d_residuals.set_const(0.0)
-                elif mode == 'rev':
-                    d_inputs.set_const(0.0)
-                    d_outputs.set_const(0.0)
-                self.apply_linear(mode, ip_names, op_names, inputs, outputs,
-                                  d_inputs, d_outputs, d_residuals)
+        for vec_name in vec_names:
+            tmp = self._utils_get_vectors(vec_name, var_ind_range, mode)
+            d_inputs, d_outputs, d_residuals = tmp
+            self.apply_linear(self._inputs, self._outputs,
+                              d_inputs, d_outputs, d_residuals, mode)
 
     def _solve_linear(self, vec_names, mode):
         if self._solvers_linear is not None:
@@ -105,27 +85,29 @@ class ImplicitComponent(Component):
             for vec_name in vec_names:
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
-                success = self.solve_linear(mode, d_output, d_residuals)
-                if not success: return False
+                success = self.solve_linear(d_output, d_residuals, mode)
+                if not success:
+                    return False
             return True
 
     def _linearize(self):
-        self.linearize()
+        self._jacobian._system = self
+        self.linearize(self._inputs, self._outputs, self._jacobian)
 
-        if self._jacobian.GLOBAL:
+        if self._jacobian._top_name == self._path_name:
             self._jacobian._update()
 
-    def apply_nonlinear(self):
+    def apply_nonlinear(self, inputs, outputs, residuals):
         pass
 
-    def solve_nonlinear(self):
+    def solve_nonlinear(self, inputs, outputs):
         pass
 
-    def apply_linear(self, mode, ip_names, op_names, inputs, outputs,
-                     d_inputs, d_outputs, d_residuals):
-        pass
+    def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals,
+                     mode):
+        self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
 
-    def solve_linear(self, mode, d_output, d_residuals):
+    def solve_linear(self, d_output, d_residuals, mode):
         pass
 
     def linearize(self):
@@ -155,61 +137,55 @@ class ExplicitComponent(Component):
         self.compute(inputs, outputs)
 
     def _apply_linear(self, vec_names, mode, var_ind_range):
-        if self._jacobian.GLOBAL:
+        if self._jacobian._top_name == self._path_name:
             for vec_name in vec_names:
-                op_names, ip_names = self._utils_compute_deriv_names(var_ind_range)
-
-                d_inputs = self._vectors['input'][vec_name]
-                d_outputs = self._vectors['output'][vec_name]
-                d_residuals = self._vectors['residual'][vec_name]
-
+                tmp = self._utils_get_vectors(vec_name, var_ind_range, mode)
+                d_inputs, d_outputs, d_residuals = tmp
                 self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                       op_names, ip_names, mode, var_ind_range)
         else:
             if mode == 'fwd':
                 for vec_name in vec_names:
-                    op_names, ip_names = self._utils_compute_deriv_names(var_ind_range)
+                    tmp = self._utils_get_vectors(vec_name, var_ind_range, mode)
+                    d_inputs, d_outputs, d_residuals = tmp
 
-                    d_inputs = self._vectors['input'][vec_name]
-                    d_outputs = self._vectors['output'][vec_name]
-                    d_residuals = self._vectors['residual'][vec_name]
-
-                    d_residuals.set_const(0.)
-                    self.compute_jacvec_product(mode, ip_names, op_names,
-                                                inputs, d_inputs, d_residuals)
+                    self.compute_jacvec_product(inputs, outputs,
+                                                d_inputs, d_residuals, mode)
                     d_residuals *= -1.0
                     d_residuals += d_outputs
             elif mode == 'rev':
                 for vec_name in vec_names:
-                    op_names, ip_names = self._utils_compute_deriv_names(var_ind_range)
+                    tmp = self._utils_get_vectors(vec_name, var_ind_range, mode)
+                    d_inputs, d_outputs, d_residuals = tmp
 
-                    d_inputs = self._vectors['input'][vec_name]
-                    d_outputs = self._vectors['output'][vec_name]
-                    d_residuals = self._vectors['residual'][vec_name]
-
-                    d_inputs.set_const(0.)
-                    d_outputs.set_const(0.)
                     d_residuals *= -1.0
-                    self.compute_jacvec_product(mode, ip_names, op_names,
-                                                inputs, d_inputs, d_residuals)
+                    self.compute_jacvec_product(inputs, outputs,
+                                                d_inputs, d_residuals, mode)
                     d_residuals *= -1.0
                     d_outputs.set_vec(d_residuals)
 
     def _linearize(self):
-        self.compute_jacobian(self._inputs, self._jacobian)
+        self.compute_jacobian(self._inputs, self._outputs, self._jacobian)
+
+        for op_name in self._variable_myproc_names['output']:
+            size = len(self._outputs[op_name])
+            ones = numpy.ones(size)
+            arange = numpy.arange(size)
+            self._jacobian[op_name, op_name] = (ones, arange, arange)
 
         for op_name in self._variable_myproc_names['output']:
             for ip_name in self._variable_myproc_names['input']:
-                self._jacobian._explicit[op_name, ip_name] = True
+                if (op_name, ip_name) in self._jacobian:
+                    self._jacobian._negate(op_name, ip_name)
 
     def compute(self, inputs, outputs):
         pass
 
-    def compute_jacobian(self, inputs, jacobian):
+    def compute_jacobian(self, inputs, outputs, jacobian):
         pass
 
-    def compute_jacvec_product(self, mode, ip_names, op_names,
-                               inputs, d_inputs, d_residuals):
+    def compute_jacvec_product(self, inputs, outputs, d_inputs, d_residuals,
+                               mode):
         pass
 
 

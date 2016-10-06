@@ -1,22 +1,18 @@
 {\rtf1\ansi\ansicpg1252\cocoartf1404\cocoasubrtf470
 {\fonttbl\f0\fswiss\fcharset0 Helvetica;}
 {\colortbl;\red255\green255\blue255;}
-\margl1440\margr1440\vieww12600\viewh7600\viewkind0
+\margl1440\margr1440\vieww14200\viewh15500\viewkind0
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
 \f0\fs24 \cf0 API\
-\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
-\cf0 -----\
-\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
-\cf0 apply_nonlinear - comm, inputs, outputs, residuals\
+-----\
+apply_nonlinear - comm, inputs, outputs, residuals\
 	inputs, outputs, residuals\
 *solve_nonlinear - comm, inputs, outputs\
 	inputs, outputs\
-\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
-\cf0 apply_linear - comm, inputs, outputs, d_inputs, d_outputs, d_residuals, vec_names, mode\
+apply_linear - comm, inputs, outputs, d_inputs, d_outputs, d_residuals, vec_names, mode\
 	inputs, outputs, d_inputs, d_outputs, d_residuals, vec_names, mode***\
-\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
-\cf0 *solve_linear - comm, inputs, outputs, d_outputs, d_residuals, vec_names, mode\
+*solve_linear - comm, inputs, outputs, d_outputs, d_residuals, vec_names, mode\
 	d_output, d_residuals, vec_names, mode***\
 *linearize - comm, inputs, outputs, jacobians_dict\
 	inputs, outputs, jacobians_dict\
@@ -31,10 +27,8 @@ compute - comm, inputs, outputs\
 compute_jacobian - comm, inputs, outputs?, jacobians_dict\
 	inputs, outputs?, jacobians_dict\
 compute_jacvec_product - comm, inputs, d_inputs, d_outputs, mode\
-\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
-\cf0 	inputs, d_inputs, d_outputs, mode\
-\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
-\cf0 \
+	inputs, d_inputs, d_outputs, mode\
+\
 \
 rhs_list := vec_names\
 \

@@ -27,6 +27,7 @@ class Vector(object):
 
         self._initialize(global_vector)
         self._views = self._initialize_views()
+        self._names = []
 
     def _create_subvector(self, comm, proc_range, var_range, var_indices,
                           var_names):
@@ -34,6 +35,9 @@ class Vector(object):
         return MyClass(self._name, comm, proc_range, var_range, var_indices,
                        var_names, self._variable_sizes,
                        self._variable_set_indices, self._global_vector)
+
+    def __contains__(self, key):
+        return key in self._names
 
     def __getitem__(self, key):
         return self._views[key]

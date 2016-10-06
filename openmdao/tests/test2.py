@@ -46,7 +46,10 @@ class Comp4(ExplicitComponent):
 
 class GroupG(Group):
 
-    def add_subsystems(self):
+    def __init__(self, name):
+        super(GroupG, self).__init__(name)
+
+    def initialize(self):
         self.add_subsystem(Comp1('C1', promotes_all=True))
         self.add_subsystem(Comp2('C2', promotes_all=True))
         self.add_subsystem(Comp3('C3', promotes_all=True))
@@ -57,8 +60,7 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         group = GroupG('G')
-        group.add_subsystems()
-        self.p = Problem(group, Vector=PETScVector).setup()
+        self.p = Problem(group, VectorClass=PETScVector).setup()
         self.p.root._mpi_proc_allocator.parallel = True
 
     def assertEqualArrays(self, a, b):

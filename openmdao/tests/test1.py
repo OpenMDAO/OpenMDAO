@@ -37,7 +37,7 @@ class Test(unittest.TestCase):
     def setUp(self):
         group = GroupG('G')
         group.add_subsystems()
-        self.p = Problem(group, Vector=PETScVector).setup()
+        self.p = Problem(group, VectorClass=PETScVector).setup()
         self.p.root.set_solver_print(False)
 
     def assertEqualArrays(self, a, b):

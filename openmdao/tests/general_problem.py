@@ -69,13 +69,13 @@ class GeneralProblem(object):
         self.all_systems = all_systems
 
         self.root.kwargs['use_var_sets'] = use_var_sets
-        self.problem = Problem(self.root, Vector=PETScVector).setup()
+        self.problem = Problem(self.root, VectorClass=PETScVector).setup()
 
     def print_all(self):
         for sys in self.all_systems[::-1]:
-            print sys._sys_name, ':',
+            print sys.name, ':',
             for subsys in sys._subsystems_allprocs:
-                print subsys._sys_name,
+                print subsys.name,
             print
         print
 

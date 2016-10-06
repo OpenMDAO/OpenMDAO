@@ -7,13 +7,10 @@ from openmdao.core.system import System
 class Group(System):
     """Class used to group systems together; instantiate or inherit."""
 
-    def add_subsystems(self):
-        """Optional method for adding subsystems.
-
-        The subclass can override this.
-        Otherwise, it assumes a subsystems list is defined in kwargs.
-        """
-        self._subsystems_allprocs.extend(kwargs['subsystems'])
+    def initialize(self):
+        """Add subsystems from kwargs; the subclass can override this."""
+        if 'subsystems' in self.kwargs:
+            self._subsystems_allprocs.extend(self.kwargs['subsystems'])
 
     def add_subsystem(self, subsys):
         """Add a subsystem.
@@ -46,16 +43,11 @@ class Group(System):
         return self._solvers_nonlinear()
 
     def _apply_linear(self, vec_names, mode, var_ind_range):
-        if self._jacobian.GLOBAL:
+        if self._jacobian._top_name == self._path_name:
             for vec_name in vec_names:
-                op_names, ip_names = self._utils_compute_deriv_names(var_ind_range)
-
-                d_inputs = self._vectors['input'][vec_name]
-                d_outputs = self._vectors['output'][vec_name]
-                d_residuals = self._vectors['residual'][vec_name]
-
-                self._jacobian._apply(d_inputs, d_outputs, d_residuals,
-                                      op_names, ip_names, mode, var_ind_range)
+                tmp = self._utils_get_vectors(vec_name, var_ind_range, mode)
+                d_inputs, d_outputs, d_residuals = tmp
+                self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
         else:
             if mode == 'fwd':
                 for vec_name in vec_names:
@@ -79,5 +71,5 @@ class Group(System):
         for subsys in self.subsystems_myproc:
             subsys._linearize()
 
-        if self._jacobian.GLOBAL:
+        if self._jacobian._top_name == self._path_name:
             self._jacobian._update()
