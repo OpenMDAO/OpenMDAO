@@ -10,7 +10,7 @@ from openmdao.api import Problem, IndepVarComponent, ExplicitComponent, Group, P
 
 class Comp1(ExplicitComponent):
 
-    def initialize_variables(self, comm):
+    def initialize_variables(self):
         self.add_input('v2')
         self.add_input('v3')
         self.add_input('v4')
@@ -19,7 +19,7 @@ class Comp1(ExplicitComponent):
 
 class Comp2(ExplicitComponent):
 
-    def initialize_variables(self, comm):
+    def initialize_variables(self):
         self.add_input('v1')
         self.add_input('v3')
         self.add_input('v4')
@@ -28,7 +28,7 @@ class Comp2(ExplicitComponent):
 
 class Comp3(ExplicitComponent):
 
-    def initialize_variables(self, comm):
+    def initialize_variables(self):
         self.add_input('v1')
         self.add_input('v2')
         self.add_input('v4')
@@ -37,7 +37,7 @@ class Comp3(ExplicitComponent):
 
 class Comp4(ExplicitComponent):
 
-    def initialize_variables(self, comm):
+    def initialize_variables(self):
         self.add_input('v1')
         self.add_input('v2')
         self.add_input('v3')
@@ -60,7 +60,7 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         group = GroupG('G')
-        self.p = Problem(group, VectorClass=PETScVector).setup()
+        self.p = Problem(group).setup(PETScVector)
         self.p.root._mpi_proc_allocator.parallel = True
 
     def assertEqualArrays(self, a, b):

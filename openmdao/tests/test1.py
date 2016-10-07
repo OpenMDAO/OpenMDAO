@@ -10,13 +10,13 @@ from openmdao.api import Problem, IndepVarComponent, ExplicitComponent, Group, P
 
 class CompA(ExplicitComponent):
 
-    def initialize_variables(self, comm):
+    def initialize_variables(self):
         self.add_output('x')
 
 
 class CompB(ExplicitComponent):
 
-    def initialize_variables(self, comm):
+    def initialize_variables(self):
         self.add_input('x')
         self.add_output('f')
 
@@ -37,7 +37,7 @@ class Test(unittest.TestCase):
     def setUp(self):
         group = GroupG('G')
         group.add_subsystems()
-        self.p = Problem(group, VectorClass=PETScVector).setup()
+        self.p = Problem(group).setup(PETScVector)
         self.p.root.set_solver_print(False)
 
     def assertEqualArrays(self, a, b):

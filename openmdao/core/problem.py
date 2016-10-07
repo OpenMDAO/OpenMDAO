@@ -13,7 +13,7 @@ class FakeComm(object):
     rank : int
         index of current proc; value is 0 because there is only 1 proc.
     size : int
-        number of procs in the comm; value is 1.
+        number of procs in the comm; value is 1 since MPI is not available.
     """
 
     def __init__(self):
@@ -33,30 +33,30 @@ class Problem(object):
         the global communicator; the same as that of assembler and root.
     _assembler : Assembler
         pointer to the global Assembler object.
-    _VectorClass
-        reference to the actual Vector class; not an instance.
     """
 
-    def __init__(self, root, comm=None, AssemblerClass=None, VectorClass=None):
+    def __init__(self, root, comm=None, AssemblerClass=None):
         """Initialize attributes."""
         if comm is None:
             try:
                 from mpi4py import MPI
                 comm = MPI.COMM_WORLD
-            except:
+            except ImportError:
                 comm = FakeComm()
         if AssemblerClass is None:
             AssemblerClass = DefaultAssembler
-        if VectorClass is None:
-            VectorClass = DefaultVector
 
         self.root = root
         self.comm = comm
         self._assembler = AssemblerClass(comm)
-        self._VectorClass = VectorClass
 
-    def setup(self):
+    def setup(self, VectorClass=None):
         """Set up everything (root, assembler, vector, solvers, drivers).
+
+        Args
+        ----
+        VectorClass
+            reference to an actual Vector class; not an instance.
 
         Returns
         -------
@@ -66,16 +66,18 @@ class Problem(object):
         root = self.root
         comm = self.comm
         assembler = self._assembler
-        VectorClass = self._VectorClass
 
-        # System setup
+        if VectorClass is None:
+            VectorClass = DefaultVector
+
+        # Recursive system setup
         root._setup_processors('', comm, {}, 0, assembler, [0, comm.size])
         root._setup_variables()
         root._setup_variable_indices({'input': 0, 'output': 0})
         root._setup_connections()
         root._setup_solvers()
 
-        # Assembler setup: variable sizes and indices
+        # Assembler setup: variable metadata and indices
         sizes = {typ: len(root._variable_allprocs_names[typ])
                  for typ in ['input', 'output']}
         variable_metadata = root._variable_myproc_metadata
@@ -97,14 +99,14 @@ class Problem(object):
 
         return self
 
-    def setup_vector(self, vec_name, Vector):
+    def setup_vector(self, vec_name, VectorClass):
         """Set up the 'vec_name' Vector.
 
         Args
         ----
         vec_name : str
             name of the vector
-        Vector
+        VectorClass
             reference to the actual Vector class
         """
         root = self.root
@@ -117,13 +119,12 @@ class Problem(object):
             else:
                 typ = key
 
-            nvar_all = len(root._variable_myproc_names[typ])
-            vec = Vector(vec_name, self.comm, root._mpi_proc_range,
-                         root._variable_allprocs_range[typ],
-                         root._variable_myproc_indices[typ],
-                         root._variable_myproc_names[typ],
-                         assembler._variable_sizes[typ],
-                         assembler._variable_set_indices[typ])
+            vec = VectorClass(vec_name, self.comm, root._mpi_proc_range,
+                              root._variable_allprocs_range[typ],
+                              root._variable_myproc_indices[typ],
+                              root._variable_myproc_names[typ],
+                              assembler._variable_sizes[typ],
+                              assembler._variable_set_indices[typ])
             vectors[key] = vec
 
         self.root._setup_vector(vec_name, vectors)

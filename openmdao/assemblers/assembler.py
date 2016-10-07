@@ -13,7 +13,7 @@ class Assembler(object):
         self._variable_set_IDs = {'input': {}, 'output': {}}
         self._variable_set_indices = {'input': None, 'output': None}
 
-        self._input_IDs = None
+        self._input_var_ids = None
         self._input_indices = None
         self._input_indices_meta = None
 
@@ -98,11 +98,11 @@ class Assembler(object):
     def _setup_connections(self, connections, _variable_allprocs_names):
         """ Identifies implicit connections, combines with explicit ones """
         nvar_input = len(_variable_allprocs_names['input'])
-        _input_IDs = -numpy.ones(nvar_input, int)
+        _input_var_ids = -numpy.ones(nvar_input, int)
 
-        # Add explicit connections to the _input_IDs vector
+        # Add explicit connections to the _input_var_ids vector
         for ip_ID, op_ID in connections:
-            _input_IDs[ip_ID] = op_ID
+            _input_var_ids[ip_ID] = op_ID
 
         # Loop over input variables
         for ip_ID in xrange(nvar_input):
@@ -111,9 +111,9 @@ class Assembler(object):
             # If name is also an output variable, add this implicit connection
             if name in _variable_allprocs_names['output']:
                 op_ID = _variable_allprocs_names['output'].index(name)
-                _input_IDs[ip_ID] = op_ID
+                _input_var_ids[ip_ID] = op_ID
 
-        self._input_IDs = _input_IDs
+        self._input_var_ids = _input_var_ids
 
     def _setup_input_indices(self, input_metadata, var_indices):
         """ Assemble global list of input indices """
@@ -183,7 +183,7 @@ class DefaultAssembler(Assembler):
         ip_ind1, ip_ind2 = var_range['input']
         op_ind1, op_ind2 = var_range['output']
         for ip_ind in xrange(ip_ind1, ip_ind2):
-            op_ind = self._input_IDs[ip_ind]
+            op_ind = self._input_var_ids[ip_ind]
             if op_ind1 <= op_ind < op_ind2:
 
                 ip_isub = ip_isub_var[ip_ind - ip_ind1]

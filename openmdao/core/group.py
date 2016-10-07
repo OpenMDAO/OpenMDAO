@@ -35,17 +35,20 @@ class Group(System):
         self._variable_connections[ip_name] = op_name
 
     def _apply_nonlinear(self):
+        """Compute residuals; perform recursion."""
         self._transfers[None](self._inputs, self._outputs, 'fwd')
         for subsys in self._subsystems_myproc:
             subsys._apply_nonlinear()
 
     def _solve_nonlinear(self):
+        """Compute outputs; run nonlinear solver."""
         return self._solvers_nonlinear()
 
     def _apply_linear(self, vec_names, mode, var_ind_range):
-        if self._jacobian._top_name == self._path_name:
+        """Compute jac-vector product; use global Jacobian / apply recursion."""
+        if self._jacobian._top_name == self.path_name:
             for vec_name in vec_names:
-                tmp = self._utils_get_vectors(vec_name, var_ind_range, mode)
+                tmp = self._get_vectors(vec_name, var_ind_range, mode)
                 d_inputs, d_outputs, d_residuals = tmp
                 self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
         else:
@@ -55,7 +58,7 @@ class Group(System):
                     d_outputs = self._vectors['output'][vec_name]
                     self._transfers[None](d_inputs, d_outputs, mode)
 
-            for subsys in self.subsystems_myproc:
+            for subsys in self._subsystems_myproc:
                 subsys._apply_linear(vec_names, mode, var_ind_range)
 
             if mode == 'rev':
@@ -65,11 +68,13 @@ class Group(System):
                     self._transfers[None](d_inputs, d_outputs, mode)
 
     def _solve_linear(self, vec_names, mode):
+        """Apply inverse jac product; run linear solver."""
         return self._solvers_linear(vec_names, mode)
 
     def _linearize(self):
-        for subsys in self.subsystems_myproc:
+        """Compute jacobian / factorization; apply recursion."""
+        for subsys in self._subsystems_myproc:
             subsys._linearize()
 
-        if self._jacobian._top_name == self._path_name:
+        if self._jacobian._top_name == self.path_name:
             self._jacobian._update()

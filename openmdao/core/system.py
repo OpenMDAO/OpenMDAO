@@ -11,7 +11,7 @@ from openmdao.jacobians.jacobian import DefaultJacobian
 class System(object):
     """Base class for all systems in OpenMDAO.
 
-    Always subclassed by Group or Component, or a subclass thereof.
+    Never instantiated; subclassed by Group or Component.
     All subclasses have their attributes defined here.
 
     Attributes
@@ -28,7 +28,7 @@ class System(object):
     kwargs : dict of objects
         dictionary of user-defined arguments.
     global_kwargs : dict of objects
-        kwargs combined with kwargs of parent systems.
+        self.kwargs combined with kwargs of parent systems.
 
     _sys_depth : int
         distance from the root node in the hierarchy tree.
@@ -49,7 +49,7 @@ class System(object):
 
     _variable_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
         list of names of all owned variables, not just on current proc.
-    _variable_allprocs_range : {'input': [int,int], 'output': [int,int]}
+    _variable_allprocs_range : {'input': [int, int], 'output': [int, int]}
         index range of owned variables with respect to all problem variables.
     _variable_allprocs_indices : {'input': dict, 'output': dict}
         dictionary of global indices keyed by the variable name.
@@ -62,9 +62,9 @@ class System(object):
         integer arrays of global indices of variables on this proc.
 
     _variable_maps : {'input': dict, 'output': dict}
-        dict of variable names and their aliases (for promotes/renames).
+        dictionary of variable names and their aliases (for promotes/renames).
     _variable_connections : dict
-        dict of input:output connections between subsystems.
+        dictionary of input:output connections between subsystems.
     _variable_connections_indices : [(int, int), ...]
         _variable_connections with variable indices instead of names.
 
@@ -72,14 +72,16 @@ class System(object):
         dict of vector objects.
     _vector_transfers : dict
         dict of transfer objects.
+    _vector_var_ids : dict
+        dictionary of index arrays of relevant variables for this vector
 
-    inputs : Vector
+    _inputs : Vector
         inputs vector; points to _vectors['input'][None].
-    outputs : Vector
+    _outputs : Vector
         outputs vector; points to _vectors['output'][None].
-    residuals : Vector
+    _residuals : Vector
         residuals vector; points to _vectors['residual'][None].
-    transfers : dict of Transfer
+    _transfers : dict of Transfer
         transfer object; points to _vector_transfers[None].
 
     _jacobian : Jacobian
@@ -119,14 +121,14 @@ class System(object):
         self._sys_assembler = None
 
         self._mpi_proc_allocator = DefaultProcAllocator()
-        self._mpi_proc_range = None
+        self._mpi_proc_range = [0, 1]
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_inds = []
 
         self._variable_allprocs_names = {'input': [], 'output': []}
-        self._variable_allprocs_range = {'input': [0,0], 'output': [0,0]}
+        self._variable_allprocs_range = {'input': [0, 0], 'output': [0, 0]}
         self._variable_allprocs_indices = {'input': {}, 'output': {}}
 
         self._variable_myproc_names = {'input': [], 'output': []}
@@ -139,7 +141,7 @@ class System(object):
 
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._vector_transfers = {}
-        self._vector_IDs = {}
+        self._vector_var_ids = {}
 
         self._inputs = None
         self._outputs = None
@@ -154,9 +156,19 @@ class System(object):
 
         self.initialize()
 
-    def _setup_processors(self, path, comm, global_kwargs, depth, assembler,
-                          proc_range):
+    def _setup_processors(self, path, comm, global_kwargs,
+                          depth, assembler, proc_range):
         """Recursively split comms and define local subsystems.
+
+        Sets the following attributes:
+            path_name
+            comm
+            global_kwargs
+            _sys_depth
+            _sys_assembler
+            _mpi_proc_range
+            _subsystems_myproc
+            _subsystems_inds
 
         Args
         ----
@@ -181,21 +193,25 @@ class System(object):
         self._sys_assembler = assembler
         self._mpi_proc_range = proc_range
 
+        # Add self's kwargs to dictionary of parents' kwargs (already new copy)
         self.global_kwargs.update(self.kwargs)
 
-        # Optional user-defined init method
-        self.initialize_processors(comm)
+        # Optional user-defined method
+        self.initialize_processors()
 
         nsub = len(self._subsystems_allprocs)
+        # If this is a group:
         if nsub > 0:
-            # If this is a group, call the load balancing algorithm
+            # Call the load balancing algorithm
             tmp = self._mpi_proc_allocator(nsub, comm, proc_range)
             sub_inds, sub_comm, sub_proc_range = tmp
 
-            # Define local subsystems and perform recursion
+            # Define local subsystems
             self._subsystems_myproc = [self._subsystems_allprocs[ind]
                                        for ind in sub_inds]
             self._subsystems_inds = sub_inds
+
+            # Perform recursion
             for subsys in self._subsystems_myproc:
                 sub_global_kwargs = self.global_kwargs.copy()
                 subsys._setup_processors(self.path_name + '.', sub_comm,
@@ -204,6 +220,11 @@ class System(object):
 
     def _setup_variables(self, recursion=True):
         """Assemble variable metadata and names lists.
+
+        Sets the following attributes:
+            _variable_allprocs_names
+            _variable_myproc_names
+            _variable_myproc_metadata
 
         Args
         ----
@@ -222,14 +243,14 @@ class System(object):
             self._variable_myproc_metadata[typ] = []
 
         # If this is a component, the user calls add_input/add_output
-        if len(self._subsystems_myproc) == 0:
-            self.initialize_variables(self.comm)
+        if len(self._subsystems_allprocs) == 0:
+            self.initialize_variables()
         # If this is a group, assemble the metadata and names lists
         else:
             for typ in ['input', 'output']:
                 for subsys in self._subsystems_myproc:
                     # Assemble the names list from subsystems
-                    subsys._variable_maps[typ] = subsys._utils_get_maps(typ)
+                    subsys._variable_maps[typ] = subsys._get_maps(typ)
                     for sub_name in subsys._variable_allprocs_names[typ]:
                         name = subsys._variable_maps[typ][sub_name]
                         self._variable_allprocs_names[typ].append(name)
@@ -256,7 +277,12 @@ class System(object):
                         self._variable_allprocs_names[typ].extend(names)
 
     def _setup_variable_indices(self, index, recursion=True):
-        """Define the variable indices (local) and range (global).
+        """Define the variable indices and range.
+
+        Sets the following attributes:
+            _variable_allprocs_range
+            _variable_allprocs_indices
+            _variable_myproc_indices
 
         Args
         ----
@@ -278,9 +304,8 @@ class System(object):
             # Pre-recursion: compute 'index' to pass to subsystems
             # Need offset: number of variables on procs before current proc
             # Necessary because of multiple global counters on different procs
-            for typ in ['input', 'output']:
-                if self.comm.size > 1:
-
+            if self.comm.size > 1:
+                for typ in ['input', 'output']:
                     # Compute the variable count list; 0 on rank > 0 procs
                     sub_comm = self._subsystems_myproc[0].comm
                     if sub_comm.rank == 0:
@@ -296,8 +321,9 @@ class System(object):
                                - nvar_myproc
 
             # Perform the recursion
-            for subsys in self._subsystems_myproc:
-                subsys._setup_variable_indices(index)
+            if recursion:
+                for subsys in self._subsystems_myproc:
+                    subsys._setup_variable_indices(index)
 
             # Post-recursion: assemble local variable indices from subsystems
             for typ in ['input', 'output']:
@@ -325,7 +351,11 @@ class System(object):
                 self._variable_allprocs_indices[typ][name] = ivar_all
 
     def _setup_connections(self):
-        """Recursively assemble a list of input-output connections."""
+        """Recursively assemble a list of input-output connections.
+
+        Sets the following attributes:
+            _variable_connections_indices
+        """
         # Perform recursion and assemble pairs from subsystems
         pairs = []
         for subsys in self._subsystems_myproc:
@@ -337,8 +367,8 @@ class System(object):
         if self.comm.size > 1:
             pairs_raw = self.comm.allgather(pairs)
             pairs = []
-            for pairs0 in pairs_raw:
-                pairs.extend(pairs0)
+            for sub_pairs in pairs_raw:
+                pairs.extend(sub_pairs)
 
         # Loop through user-defined connections
         var_allprocs_names = self._variable_allprocs_names
@@ -356,47 +386,55 @@ class System(object):
 
         self._variable_connections_indices = pairs
 
-    def _setup_vector(self, vec_name, _vectors):
+    def _setup_vector(self, vec_name, vectors):
         """Add this vector and assign sub_vectors to subsystems.
+
+        Sets the following attributes:
+            _vectors
+            _vector_transfers
+            _inputs*
+            _outputs*
+            _residuals*
+            _transfers*
+        * If vec_name is None - i.e., we are setting up the nonlinear vector
 
         Args
         ----
         vec_name : str
             name of the Vector (None, '', or name of the RHS for derivatives).
-        _vectors : {'input': Vector, 'output': Vector, 'residual': Vector}
+        vectors : {'input': Vector, 'output': Vector, 'residual': Vector}
             Vector objects corresponding to 'name'.
         """
         # Set the incoming _vectors in the appropriate attribute
         for key in ['input', 'output', 'residual']:
-            self._vectors[key][vec_name] = _vectors[key]
+            self._vectors[key][vec_name] = vectors[key]
 
         # Compute the transfer for this vector set
-        transfers = self._utils_get_transfers(_vectors)
-        self._vector_transfers[vec_name] = transfers
+        self._vector_transfers[vec_name] = self._get_transfers(vectors)
 
         # Define shortcuts for convenience
-        if vec_name == None:
-            self._inputs = _vectors['input']
-            self._outputs = _vectors['output']
-            self._residuals = _vectors['residual']
-            self._transfers = transfers
+        if vec_name is None:
+            self._inputs = self._vectors['input'][None]
+            self._outputs = self._vectors['output'][None]
+            self._residuals = self._vectors['residual'][None]
+            self._transfers = self._vector_transfers[None]
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
             sub_comm = subsys.comm
             p_range = subsys._mpi_proc_range
 
-            sub__vectors = {}
+            sub_vectors = {}
             for key in ['input', 'output', 'residual']:
                 typ = 'output' if key is 'residual' else key
                 v_range = subsys._variable_allprocs_range[typ]
                 v_names = subsys._variable_myproc_names[typ]
                 v_inds = subsys._variable_myproc_indices[typ]
-                vec = _vectors[key]._create_subvector(sub_comm, p_range,
-                                                      v_range, v_inds, v_names)
-                sub__vectors[key] = vec
+                vec = vectors[key]._create_subvector(sub_comm, p_range,
+                                                     v_range, v_inds, v_names)
+                sub_vectors[key] = vec
 
-            subsys._setup_vector(vec_name, sub__vectors)
+            subsys._setup_vector(vec_name, sub_vectors)
 
     def _setup_solvers(self):
         """Recursively set up all solvers in this and systems below."""
@@ -405,12 +443,12 @@ class System(object):
         for subsys in self._subsystems_myproc:
             subsys._setup_solvers()
 
-    def _utils_get_transfers(self, _vectors):
+    def _get_transfers(self, vectors):
         """Compute transfers.
 
         Args
         ----
-        _vectors : {'input': Vector, 'output': Vector, 'residual': Vector}
+        vectors : {'input': Vector, 'output': Vector, 'residual': Vector}
             dictionary of Vector objects
 
         Returns
@@ -418,43 +456,43 @@ class System(object):
         dict of Transfer
             dictionary of full and partial Transfer objects.
         """
-        Transfer = _vectors['output'].TRANSFER
+        Transfer = vectors['output'].TRANSFER
 
         nsub_allprocs = len(self._subsystems_allprocs)
         var_range = self._variable_allprocs_range
-        _subsystems_myproc = self._subsystems_myproc
-        _subsystems_inds = self._subsystems_inds
+        subsystems_myproc = self._subsystems_myproc
+        subsystems_inds = self._subsystems_inds
 
         # Call the assembler's transfer setup routine
-        _compute_transfers = self._sys_assembler._compute_transfers
-        xfer_indices = _compute_transfers(nsub_allprocs, var_range,
-                                          _subsystems_myproc, _subsystems_inds)
+        compute_transfers = self._sys_assembler._compute_transfers
+        xfer_indices = compute_transfers(nsub_allprocs, var_range,
+                                         subsystems_myproc, subsystems_inds)
         [xfer_ip_inds, xfer_op_inds,
          fwd_xfer_ip_inds, fwd_xfer_op_inds,
          rev_xfer_ip_inds, rev_xfer_op_inds] = xfer_indices
 
         # Create Transfer objects from the raw indices
         transfers = {}
-        transfers[None] = Transfer(_vectors['input'],
-                                   _vectors['output'],
+        transfers[None] = Transfer(vectors['input'],
+                                   vectors['output'],
                                    xfer_ip_inds,
                                    xfer_op_inds,
                                    self.comm)
         for isub in xrange(len(fwd_xfer_ip_inds)):
-            transfers['fwd', isub] = Transfer(_vectors['input'],
-                                              _vectors['output'],
+            transfers['fwd', isub] = Transfer(vectors['input'],
+                                              vectors['output'],
                                               fwd_xfer_ip_inds[isub],
                                               fwd_xfer_op_inds[isub],
                                               self.comm)
         for isub in xrange(len(rev_xfer_ip_inds)):
-            transfers['rev', isub] = Transfer(_vectors['input'],
-                                              _vectors['output'],
+            transfers['rev', isub] = Transfer(vectors['input'],
+                                              vectors['output'],
                                               rev_xfer_ip_inds[isub],
                                               rev_xfer_op_inds[isub],
                                               self.comm)
         return transfers
 
-    def _utils_get_maps(self, typ):
+    def _get_maps(self, typ):
         """Define variable maps based on promotes and renames lists.
 
         Args
@@ -492,7 +530,7 @@ class System(object):
 
         return maps
 
-    def _utils_get_vectors(self, vec_name, var_ind_range, mode):
+    def _get_vectors(self, vec_name, var_ind_range, mode):
         d_inputs = self._vectors['input'][vec_name]
         d_outputs = self._vectors['output'][vec_name]
         d_residuals = self._vectors['residual'][vec_name]
@@ -504,18 +542,18 @@ class System(object):
             d_outputs.set_const(0.0)
 
         op_names = []
-        op_ind = self.variable_allprocs_range['output'][0]
-        for op_name in self.variable_allprocs_names['output']:
-            if op_ind in self._vector_IDs[vec_name]:
+        op_ind = self._variable_allprocs_range['output'][0]
+        for op_name in self._variable_allprocs_names['output']:
+            if op_ind in self._vector_var_ids[vec_name]:
                 op_names.append(op_name)
             op_ind += 1
 
         ip_names = []
-        ip_ind = self.variable_allprocs_range['input'][0]
-        for ip_name in self.variable_allprocs_names['input']:
-            input_ID = self._sys_assembler._input_IDs[ip_ind]
+        ip_ind = self._variable_allprocs_range['input'][0]
+        for ip_name in self._variable_allprocs_names['input']:
+            input_var_id = self._sys_assembler._input_var_ids[ip_ind]
             valid = var_ind_range[0] <= ip_ind < var_ind_range[1]
-            valid = valid and input_ID in self._vector_IDs[vec_name]
+            valid = valid and input_var_id in self._vector_var_ids[vec_name]
             if valid:
                 ip_names.append(ip_name)
             ip_ind += 1
@@ -538,22 +576,15 @@ class System(object):
         System or None
             System if found on this proc else None.
         """
-        if name == self.name:
+        if name == self.path_name:
             # If this system's name matches, target found
             return self
         else:
-            ind = len(self.name) + 1
-            # If first part of name matches this system's name, check subsytems
-            if name[:ind] == '%s.' % self.name:
-                for subsys in self._subsystems_myproc:
-                    result = subsys.get_subsystem(name[ind:])
-                    # If result is not None, target found; otherwise continue
-                    if result is not None:
-                        return result
-                # All subsystems failed
-                return None
-            else:
-                return None
+            for subsys in self._subsystems_myproc:
+                result = subsys.get_subsystem(name)
+                if result is not None:
+                    return result
+            return None
 
     def set_solver_print(self, flag):
         """Recursively set solver print flag for this and all systems below.
@@ -582,21 +613,45 @@ class System(object):
         else:
             self._jacobian = jacobian
             if is_top:
-                self._jacobian._top_name = self._path_name
+                self._jacobian._top_name = self.path_name
                 self._jacobian._top_system = self
                 self._jacobian._assembler = self._sys_assembler
 
-        for subsys in self.subsystems_myproc:
+        for subsys in self._subsystems_myproc:
             subsys.set_jacobian(jacobian, False)
 
     def initialize(self):
-        """Optional user-defined method run once during instantiation."""
+        """Optional user-defined method run once during instantiation.
+
+        Available attributes:
+            name
+            args
+            kwargs
+        """
         pass
 
-    def initialize_processors(self, comm):
-        """Optional user-defined method run after repartitioning/rebalancing."""
+    def initialize_processors(self):
+        """Optional user-defined method run after repartitioning/rebalancing.
+
+        Available attributes:
+            name
+            path_name
+            comm
+            args
+            kwargs
+            global_kwargs
+        """
         pass
 
-    def initialize_variables(self, comm):
-        """Required method for components to declare inputs and outputs."""
+    def initialize_variables(self):
+        """Required method for components to declare inputs and outputs.
+
+        Available attributes:
+            name
+            path_name
+            comm
+            args
+            kwargs
+            global_kwargs
+        """
         pass

@@ -48,6 +48,9 @@ class Jacobian(object):
         op_ind, ip_ind, op_size, ip_size = self._process_key(key)
         return (op_ind, ip_ind) in self._dict
 
+    def __iter__(self):
+        return iter(self._dict)
+
     def __setitem__(self, key, jac):
         op_ind, ip_ind, op_size, ip_size = self._process_key(key)
 
@@ -71,24 +74,15 @@ class DefaultJacobian(Jacobian):
     def _update(self):
         pass
 
-    def _apply(self, d_inputs, d_outputs, d_residuals, op_names, ip_names,
-               mode, var_ind_range):
-        if mode == 'fwd':
-            d_residuals.set_const(0.0)
-        elif mode == 'rev':
-            d_inputs.set_const(0.0)
-            d_outputs.set_const(0.0)
-
-        for (op_name, ip_name) in self._dict:
-            jac = self._dict[op_name, ip_name]
-
-            if op_name in op_names and ip_name in op_names:
+    def _apply(self, d_inputs, d_outputs, d_residuals, mode):
+        for op_name, ip_name in self._dict:
+            if op_name in d_outputs and ip_name in d_outputs:
                 if mode == 'fwd':
                     d_residuals[op_name] += jac.dot(d_outputs[ip_name])
                 if mode == 'rev':
                     d_outputs[ip_name] = jac.T.dot(d_residuals[op_name])
 
-            if op_name in op_names and ip_name in ip_names:
+            if op_name in d_outputs and ip_name in d_inputs:
                 if mode == 'fwd':
                     d_residuals[op_name] += jac.dot(d_inputs[ip_name])
                 if mode == 'rev':

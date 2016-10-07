@@ -8,7 +8,7 @@ from openmdao.api import Problem, IndepVarComponent, ExplicitComponent, Group, P
 
 class GeneralComp(ExplicitComponent):
 
-    def initialize_variables(self, comm):
+    def initialize_variables(self):
         kwargs = self.global_kwargs
         icomp = kwargs['icomp']
         ncomp = kwargs['ncomp']
@@ -69,7 +69,7 @@ class GeneralProblem(object):
         self.all_systems = all_systems
 
         self.root.kwargs['use_var_sets'] = use_var_sets
-        self.problem = Problem(self.root, VectorClass=PETScVector).setup()
+        self.problem = Problem(self.root).setup(PETScVector)
 
     def print_all(self):
         for sys in self.all_systems[::-1]:
