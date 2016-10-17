@@ -85,13 +85,13 @@ class ImplicitComponent(Component):
         if self._solvers_linear is not None:
             return self._solvers_linear(vec_names, mode)
         else:
+            success = True
             for vec_name in vec_names:
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
-                success = self.solve_linear(d_outputs, d_residuals, mode)
-                if not success:
-                    return False
-            return True
+                tmp = self.solve_linear(d_outputs, d_residuals, mode)
+                success = success and tmp
+            return success
 
     def _linearize(self):
         """Compute jacobian / factorization; call user's linearize."""

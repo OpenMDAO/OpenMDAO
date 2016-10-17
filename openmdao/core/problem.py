@@ -97,6 +97,9 @@ class Problem(object):
         # Vector setup for the basic execution vector
         self.setup_vector(None, VectorClass)
 
+        # Vector setup for the linear vector
+        self.setup_vector('', VectorClass)
+
         return self
 
     def setup_vector(self, vec_name, VectorClass):
@@ -121,4 +124,9 @@ class Problem(object):
 
             vectors[key] = VectorClass(vec_name, typ, self.root)
 
-        self.root._setup_vector(vectors)
+        # TODO: implement this properly
+        ind1, ind2 = self.root._variable_allprocs_range['output']
+        import numpy
+        vector_var_ids = numpy.arange(ind1, ind2)
+
+        self.root._setup_vector(vectors, vector_var_ids)

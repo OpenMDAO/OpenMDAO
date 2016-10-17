@@ -386,7 +386,7 @@ class System(object):
 
         self._variable_connections_indices = pairs
 
-    def _setup_vector(self, vectors):
+    def _setup_vector(self, vectors, vector_var_ids):
         """Add this vector and assign sub_vectors to subsystems.
 
         Sets the following attributes:
@@ -402,6 +402,8 @@ class System(object):
         ----
         vectors : {'input': Vector, 'output': Vector, 'residual': Vector}
             Vector objects corresponding to 'name'.
+        vector_var_ids : ndarray[:]
+            integer array of all relevant variables for this vector.
         """
         vec_name = vectors['output']._name
 
@@ -411,6 +413,9 @@ class System(object):
 
         # Compute the transfer for this vector set
         self._vector_transfers[vec_name] = self._get_transfers(vectors)
+
+        # Assign relevant variables IDs array
+        self._vector_var_ids[vec_name] = vector_var_ids
 
         # Define shortcuts for convenience
         if vec_name is None:
@@ -426,7 +431,7 @@ class System(object):
             for key in ['input', 'output', 'residual']:
                 sub_vectors[key] = vectors[key]._create_subvector(subsys)
 
-            subsys._setup_vector(sub_vectors)
+            subsys._setup_vector(sub_vectors, vector_var_ids)
 
     def _setup_solvers(self):
         """Recursively set up all solvers in this and systems below."""

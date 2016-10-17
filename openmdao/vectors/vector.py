@@ -28,6 +28,10 @@ class Vector(object):
         return self.__class__(self._name, self._typ, system,
                               self._global_vector)
 
+    def _clone(self):
+        return self.__class__(self._name, self._typ, self._system,
+                              self._global_vector)
+
     def __contains__(self, key):
         return key in self._names
 
