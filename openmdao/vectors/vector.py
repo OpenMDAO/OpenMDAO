@@ -12,29 +12,21 @@ from openmdao.vectors.transfer import PETScTransfer
 
 class Vector(object):
 
-    def __init__(self, name, comm, proc_range, _variable_allprocs_range,
-                 _variable_myproc_indices,
-                 _variable_myproc_names, _variable_sizes,
-                 _variable_set_indices, global_vector=None):
+    def __init__(self, name, typ, system, global_vector=None):
         self._name = name
-        self._comm = comm
-        self._proc_range = proc_range
-        self._variable_allprocs_range = _variable_allprocs_range
-        self._variable_myproc_indices = _variable_myproc_indices
-        self._variable_myproc_names = _variable_myproc_names
-        self._variable_sizes = _variable_sizes
-        self._variable_set_indices = _variable_set_indices
+        self._typ = typ
 
+        self._assembler = system._sys_assembler
+        self._system = system
+
+        self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
         self._initialize(global_vector)
         self._views = self._initialize_views()
         self._names = []
 
-    def _create_subvector(self, comm, proc_range, var_range, var_indices,
-                          var_names):
-        MyClass = self.__class__
-        return MyClass(self._name, comm, proc_range, var_range, var_indices,
-                       var_names, self._variable_sizes,
-                       self._variable_set_indices, self._global_vector)
+    def _create_subvector(self, system):
+        return self.__class__(self._name, self._typ, system,
+                              self._global_vector)
 
     def __contains__(self, key):
         return key in self._names
@@ -90,39 +82,48 @@ class DefaultVector(Vector):
             self._data = self._extract_data()
 
     def _create_data(self):
+        variable_sizes = self._assembler._variable_sizes[self._typ]
+
         data = []
-        iproc = self._comm.rank + self._proc_range[0]
-        for iset in xrange(len(self._variable_sizes)):
-            size = numpy.sum(self._variable_sizes[iset][iproc, :])
+        for iset in xrange(len(variable_sizes)):
+            size = numpy.sum(variable_sizes[iset][self._iproc, :])
             data.append(numpy.zeros(size))
         return data
 
     def _extract_data(self):
-        ind1, ind2 = self._variable_allprocs_range
-        sub__variable_set_indices = self._variable_set_indices[ind1:ind2, :]
+        variable_sizes = self._assembler._variable_sizes[self._typ]
+        variable_set_indices = self._assembler._variable_set_indices[self._typ]
+
+        ind1, ind2 = self._system._variable_allprocs_range[self._typ]
+        sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
 
         data = []
-        iproc = self._comm.rank + self._proc_range[0]
-        for iset in xrange(len(self._variable_sizes)):
-            bool_vector = sub__variable_set_indices[:, 0] == iset
-            data_inds = sub__variable_set_indices[bool_vector, 1]
+        for iset in xrange(len(variable_sizes)):
+            bool_vector = sub_variable_set_indices[:, 0] == iset
+            data_inds = sub_variable_set_indices[bool_vector, 1]
             if len(data_inds) > 0:
-                sizes_array = self._variable_sizes[iset]
-                ind1 = numpy.sum(sizes_array[iproc, :data_inds[0]])
-                ind2 = numpy.sum(sizes_array[iproc, :data_inds[-1]+1])
+                sizes_array = variable_sizes[iset]
+                ind1 = numpy.sum(sizes_array[self._iproc, :data_inds[0]])
+                ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1]+1])
             data.append(self._global_vector._data[iset][ind1:ind2])
 
         return data
 
     def _initialize_views(self):
+        variable_sizes = self._assembler._variable_sizes[self._typ]
+        variable_set_indices = self._assembler._variable_set_indices[self._typ]
+
+        system = self._system
+        variable_myproc_names = system._variable_myproc_names[self._typ]
+        variable_myproc_indices = system._variable_myproc_indices[self._typ]
+
         views = {}
-        iproc = self._comm.rank + self._proc_range[0]
-        for ind in xrange(len(self._variable_myproc_names)):
-            name = self._variable_myproc_names[ind]
-            ivar_all = self._variable_myproc_indices[ind]
-            iset, ivar = self._variable_set_indices[ivar_all, :]
-            ind1 = numpy.sum(self._variable_sizes[iset][iproc, :ivar])
-            ind2 = numpy.sum(self._variable_sizes[iset][iproc, :ivar+1])
+        for ind in xrange(len(variable_myproc_names)):
+            name = variable_myproc_names[ind]
+            ivar_all = variable_myproc_indices[ind]
+            iset, ivar = variable_set_indices[ivar_all, :]
+            ind1 = numpy.sum(variable_sizes[iset][self._iproc, :ivar])
+            ind2 = numpy.sum(variable_sizes[iset][self._iproc, :ivar+1])
             views[name] = self._global_vector._data[iset][ind1:ind2]
         return views
 
@@ -176,11 +177,11 @@ class PETScVector(DefaultVector):
         self._petsc = []
         for iset in xrange(len(self._data)):
             petsc = PETSc.Vec().createWithArray(self._data[iset][:],
-                                                comm=self._comm)
+                                                comm=self._system.comm)
             self._petsc.append(petsc)
 
     def get_norm(self):
         global_sum = 0
         for iset in xrange(len(self._data)):
             global_sum += numpy.sum(self._data[iset]**2)
-        return self._comm.allreduce(global_sum) ** 0.5
+        return self._system.comm.allreduce(global_sum) ** 0.5

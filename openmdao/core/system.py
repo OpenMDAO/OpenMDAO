@@ -386,7 +386,7 @@ class System(object):
 
         self._variable_connections_indices = pairs
 
-    def _setup_vector(self, vec_name, vectors):
+    def _setup_vector(self, vectors):
         """Add this vector and assign sub_vectors to subsystems.
 
         Sets the following attributes:
@@ -400,11 +400,11 @@ class System(object):
 
         Args
         ----
-        vec_name : str
-            name of the Vector (None, '', or name of the RHS for derivatives).
         vectors : {'input': Vector, 'output': Vector, 'residual': Vector}
             Vector objects corresponding to 'name'.
         """
+        vec_name = vectors['output']._name
+
         # Set the incoming _vectors in the appropriate attribute
         for key in ['input', 'output', 'residual']:
             self._vectors[key][vec_name] = vectors[key]
@@ -421,20 +421,12 @@ class System(object):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            sub_comm = subsys.comm
-            p_range = subsys._mpi_proc_range
 
             sub_vectors = {}
             for key in ['input', 'output', 'residual']:
-                typ = 'output' if key is 'residual' else key
-                v_range = subsys._variable_allprocs_range[typ]
-                v_names = subsys._variable_myproc_names[typ]
-                v_inds = subsys._variable_myproc_indices[typ]
-                vec = vectors[key]._create_subvector(sub_comm, p_range,
-                                                     v_range, v_inds, v_names)
-                sub_vectors[key] = vec
+                sub_vectors[key] = vectors[key]._create_subvector(subsys)
 
-            subsys._setup_vector(vec_name, sub_vectors)
+            subsys._setup_vector(sub_vectors)
 
     def _setup_solvers(self):
         """Recursively set up all solvers in this and systems below."""

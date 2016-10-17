@@ -119,12 +119,6 @@ class Problem(object):
             else:
                 typ = key
 
-            vec = VectorClass(vec_name, self.comm, root._mpi_proc_range,
-                              root._variable_allprocs_range[typ],
-                              root._variable_myproc_indices[typ],
-                              root._variable_myproc_names[typ],
-                              assembler._variable_sizes[typ],
-                              assembler._variable_set_indices[typ])
-            vectors[key] = vec
+            vectors[key] = VectorClass(vec_name, typ, self.root)
 
-        self.root._setup_vector(vec_name, vectors)
+        self.root._setup_vector(vectors)
