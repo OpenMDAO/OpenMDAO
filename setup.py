@@ -35,6 +35,7 @@ setup(name='openmdao',
           'openmdao.assemblers',
           'openmdao.tests',
           'openmdao.jacobians',
+          'openmdao.devtools',
       ],
       # package_data={
       #     'openmdao.units': ['unit_library.ini'],
@@ -46,9 +47,10 @@ setup(name='openmdao',
         'scipy', 'sqlitedict'
       ],
       #scripts=['bin/om-pylint.sh']
-      # entry_points="""
-      # [console_scripts]
-      # wingproj=openmdao.devtools.wingproj:run_wing
+      entry_points="""
+      [console_scripts]
+      wingproj=openmdao.devtools.wingproj:run_wing
+      """
       # webview=openmdao.devtools.webview:webview_argv
       # view_profile=openmdao.util.profile:prof_view
       # proftotals=openmdao.util.profile:prof_totals
