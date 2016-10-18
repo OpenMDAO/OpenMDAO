@@ -71,8 +71,11 @@ class ImplicitComponent(Component):
         else:
             self.solve_nonlinear(self._inputs, self._outputs)
 
-    def _apply_linear(self, vec_names, mode, var_ind_range):
+    def _apply_linear(self, vec_names, mode, var_ind_range=None):
         """Compute jac-vector product; call user's / Jacobian's apply_linear."""
+        if var_ind_range is None:
+            var_ind_range = self._variable_allprocs_range['output']
+
         for vec_name in vec_names:
             tmp = self._get_vectors(vec_name, var_ind_range, mode)
             d_inputs, d_outputs, d_residuals = tmp
@@ -208,11 +211,14 @@ class ExplicitComponent(Component):
         residuals.set_val(0.0)
         self.compute(inputs, outputs)
 
-    def _apply_linear(self, vec_names, mode, var_ind_range):
+    def _apply_linear(self, vec_names, mode, var_ind_range=None):
         """Compute jac-vector product.
 
         Wrap user's 'compute_jacvec_product' or Jacobian's apply method.
         """
+        if var_ind_range is None:
+            var_ind_range = self._variable_allprocs_range['output']
+
         if self._jacobian._top_name == self.path_name:
             for vec_name in vec_names:
                 tmp = self._get_vectors(vec_name, var_ind_range, mode)

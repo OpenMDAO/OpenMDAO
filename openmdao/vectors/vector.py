@@ -109,7 +109,9 @@ class DefaultVector(Vector):
                 sizes_array = variable_sizes[iset]
                 ind1 = numpy.sum(sizes_array[self._iproc, :data_inds[0]])
                 ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1]+1])
-            data.append(self._global_vector._data[iset][ind1:ind2])
+                data.append(self._global_vector._data[iset][ind1:ind2])
+            else:
+                data.append(numpy.zeros(0))
 
         return data
 

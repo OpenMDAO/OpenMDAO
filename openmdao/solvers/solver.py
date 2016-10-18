@@ -242,7 +242,7 @@ class ScipyIterativeSolver(LinearSolver):
             linop = LinearOperator((size, size), dtype=float,
                                    matvec=self._mat_vec)
             self._counter = 0
-            x_vec.data[:] = solver(linop, numpy.array(b_vec._data[0]),
-                                   x0=numpy.array(x_vec._data[0]),
-                                   maxiter=ilimit, tol=atol,
-                                   callback=self._monitor)[0]
+            x_vec._data[0][:] = solver(linop, numpy.array(b_vec._data[0]),
+                                       x0=numpy.array(x_vec._data[0]),
+                                       maxiter=ilimit, tol=atol,
+                                       callback=self._monitor)[0]

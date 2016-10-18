@@ -44,8 +44,11 @@ class Group(System):
         """Compute outputs; run nonlinear solver."""
         return self._solvers_nonlinear()
 
-    def _apply_linear(self, vec_names, mode, var_ind_range):
+    def _apply_linear(self, vec_names, mode, var_ind_range=None):
         """Compute jac-vector product; use global Jacobian / apply recursion."""
+        if var_ind_range is None:
+            var_ind_range = self._variable_allprocs_range['output']
+
         if self._jacobian._top_name == self.path_name:
             for vec_name in vec_names:
                 tmp = self._get_vectors(vec_name, var_ind_range, mode)
