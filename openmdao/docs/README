@@ -1,0 +1,2 @@
+To build docs, from the blue/openmdao/docs level, type 'make html'
+Point a browser to blue/openmdao/docs/_build/html/index.html to view docs.
