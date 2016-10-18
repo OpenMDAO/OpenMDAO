@@ -1,7 +1,7 @@
 from __future__ import division
 import numpy
 
-
+from six.moves import range
 
 class Assembler(object):
 
@@ -26,7 +26,7 @@ class Assembler(object):
 
             # Locally determine var_set for each var
             local_set_dict = {}
-            for ivar in xrange(nvar):
+            for ivar in range(nvar):
                 var = variable_metadata[typ][ivar]
                 ivar_all = variable_indices[typ][ivar]
                 local_set_dict[ivar_all] = var['var_set']
@@ -63,7 +63,7 @@ class Assembler(object):
 
             # Allocate the size arrays using var_count
             self._variable_sizes[typ] = []
-            for iset in xrange(len(self._variable_set_IDs[typ])):
+            for iset in range(len(self._variable_set_IDs[typ])):
                 size = var_count[iset]
                 array = numpy.zeros((nproc, size), int)
                 self._variable_sizes[typ].append(array)
@@ -72,7 +72,7 @@ class Assembler(object):
         iproc = self.comm.rank
         typ = 'input'
         nvar = len(variable_metadata[typ])
-        for ivar in xrange(nvar):
+        for ivar in range(nvar):
             var = variable_metadata[typ][ivar]
             size = numpy.prod(var['indices'].shape)
             ivar_all = variable_indices[typ][ivar]
@@ -80,7 +80,7 @@ class Assembler(object):
             self._variable_sizes[typ][iset][iproc, ivar_set] = size
         typ = 'output'
         nvar = len(variable_metadata[typ])
-        for ivar in xrange(nvar):
+        for ivar in range(nvar):
             var = variable_metadata[typ][ivar]
             size = numpy.prod(var['shape'])
             ivar_all = variable_indices[typ][ivar]
@@ -91,7 +91,7 @@ class Assembler(object):
         if self.comm.size > 1:
             for typ in ['input', 'output']:
                 nset = len(self._variable_sizes[typ])
-                for iset in xrange(nset):
+                for iset in range(nset):
                     array = self._variable_sizes[typ][iset]
                     self.comm.Allgather(array[iproc, :], array)
 
@@ -105,7 +105,7 @@ class Assembler(object):
             _input_var_ids[ip_ID] = op_ID
 
         # Loop over input variables
-        for ip_ID in xrange(nvar_input):
+        for ip_ID in range(nvar_input):
             name = _variable_allprocs_names['input'][ip_ID]
 
             # If name is also an output variable, add this implicit connection
@@ -119,7 +119,7 @@ class Assembler(object):
         """ Assemble global list of input indices """
         # Compute total size of indices vector
         counter = 0
-        for ind in xrange(len(input_metadata)):
+        for ind in range(len(input_metadata)):
             metadata = input_metadata[ind]
             counter += numpy.prod(metadata['indices'].shape)
 
@@ -129,7 +129,7 @@ class Assembler(object):
 
         # Populate arrays
         ind1, ind2 = 0, 0
-        for ind in xrange(len(input_metadata)):
+        for ind in range(len(input_metadata)):
             metadata = input_metadata[ind]
             ind2 += numpy.prod(metadata['indices'].shape)
             self._input_indices[ind1:ind2] = metadata['indices'].flatten()
@@ -150,31 +150,31 @@ class DefaultAssembler(Assembler):
         op_ind1, op_ind2 = var_range['output']
         ip_isub_var = -numpy.ones(ip_ind2 - ip_ind1, int)
         op_isub_var = -numpy.ones(op_ind2 - op_ind1, int)
-        for ind in xrange(len(_subsystems_myproc)):
+        for ind in range(len(_subsystems_myproc)):
             subsys = _subsystems_myproc[ind]
             isub = _subsystems_inds[ind]
 
             sub_var_range = subsys._variable_allprocs_range
             sub_ip_ind1, sub_ip_ind2 = sub_var_range['input']
             sub_op_ind1, sub_op_ind2 = sub_var_range['output']
-            for ip_ind in xrange(ip_ind1, ip_ind2):
+            for ip_ind in range(ip_ind1, ip_ind2):
                 if sub_ip_ind1 <= ip_ind < sub_ip_ind2:
                     ip_isub_var[ip_ind - ip_ind1] = isub
-            for op_ind in xrange(op_ind1, op_ind2):
+            for op_ind in range(op_ind1, op_ind2):
                 if sub_op_ind1 <= op_ind < sub_op_ind2:
                     op_isub_var[op_ind - op_ind1] = isub
 
         xfer_ip_inds = {}
         xfer_op_inds = {}
-        fwd_xfer_ip_inds = [{} for sub_ind in xrange(nsub_allprocs)]
-        fwd_xfer_op_inds = [{} for sub_ind in xrange(nsub_allprocs)]
-        rev_xfer_ip_inds = [{} for sub_ind in xrange(nsub_allprocs)]
-        rev_xfer_op_inds = [{} for sub_ind in xrange(nsub_allprocs)]
-        for iset in xrange(len(self._variable_sizes['input'])):
-            for jset in xrange(len(self._variable_sizes['output'])):
+        fwd_xfer_ip_inds = [{} for sub_ind in range(nsub_allprocs)]
+        fwd_xfer_op_inds = [{} for sub_ind in range(nsub_allprocs)]
+        rev_xfer_ip_inds = [{} for sub_ind in range(nsub_allprocs)]
+        rev_xfer_op_inds = [{} for sub_ind in range(nsub_allprocs)]
+        for iset in range(len(self._variable_sizes['input'])):
+            for jset in range(len(self._variable_sizes['output'])):
                 xfer_ip_inds[iset, jset] = []
                 xfer_op_inds[iset, jset] = []
-                for sub_ind in xrange(nsub_allprocs):
+                for sub_ind in range(nsub_allprocs):
                     fwd_xfer_ip_inds[sub_ind][iset, jset] = []
                     fwd_xfer_op_inds[sub_ind][iset, jset] = []
                     rev_xfer_ip_inds[sub_ind][iset, jset] = []
@@ -182,7 +182,7 @@ class DefaultAssembler(Assembler):
 
         ip_ind1, ip_ind2 = var_range['input']
         op_ind1, op_ind2 = var_range['output']
-        for ip_ind in xrange(ip_ind1, ip_ind2):
+        for ip_ind in range(ip_ind1, ip_ind2):
             op_ind = self._input_var_ids[ip_ind]
             if op_ind1 <= op_ind < op_ind2:
 
@@ -201,7 +201,7 @@ class DefaultAssembler(Assembler):
 
                     output_inds = numpy.zeros(inds.shape[0], int)
                     ind1, ind2 = 0, 0
-                    for iproc in xrange(self.comm.size):
+                    for iproc in range(self.comm.size):
                         ind2 += op_sizes[iproc, op_ivar_set]
 
                         on_iproc = numpy.logical_and(ind1 <= inds,
@@ -238,11 +238,11 @@ class DefaultAssembler(Assembler):
             else:
                 return numpy.array([], int)
 
-        for iset in xrange(len(self._variable_sizes['input'])):
-            for jset in xrange(len(self._variable_sizes['output'])):
+        for iset in range(len(self._variable_sizes['input'])):
+            for jset in range(len(self._variable_sizes['output'])):
                 xfer_ip_inds[iset, jset] = merge(xfer_ip_inds[iset, jset])
                 xfer_op_inds[iset, jset] = merge(xfer_op_inds[iset, jset])
-                for sub_ind in xrange(nsub_allprocs):
+                for sub_ind in range(nsub_allprocs):
                     fwd_xfer_ip_inds[sub_ind][iset, jset] = \
                         merge(fwd_xfer_ip_inds[sub_ind][iset, jset])
                     fwd_xfer_op_inds[sub_ind][iset, jset] = \

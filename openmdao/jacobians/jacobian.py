@@ -1,5 +1,7 @@
 from __future__ import division
 import numpy
+from six.moves import range
+
 try:
     from petsc4py import PETSc
 except:
@@ -99,7 +101,7 @@ class DenseJacobian(object):
         ip_nvar_set = len(self._assembler.variable_set_IDs['input'])
         op_nvar_set = len(self._assembler.variable_set_IDs['output'])
 
-        for ip_ivar_set in xrange(ip_nvar_set):
+        for ip_ivar_set in range(ip_nvar_set):
             ip_bool = set_indices['input'][:, 0] == ip_ivar_set
             ip_inds = set_indices['input'][ip_bool, 1]
             if len(ip_inds) > 0:
@@ -110,7 +112,7 @@ class DenseJacobian(object):
             else:
                 ip_size = 0
 
-            for op_ivar_set in xrange(op_nvar_set):
+            for op_ivar_set in range(op_nvar_set):
                 op_bool = set_indices['output'][:, 0] == op_ivar_set
                 op_inds = set_indices['output'][op_bool, 1]
                 if len(op_inds) > 0:
@@ -132,7 +134,7 @@ class DenseJacobian(object):
         set_indices = self._assembler.variable_set_indices
         iproc = self._system._comm.rank + self._system._proc_range[0]
 
-        for ip_ind in xrange(len(names['input'])):
+        for ip_ind in range(len(names['input'])):
             ip_name = names['input'][ip_ind]
             ip_ivar_all = indices['input'][ip_ind]
             ip_ivar_set, ip_ivar = set_indices[ip_ivar_all, :]
@@ -140,7 +142,7 @@ class DenseJacobian(object):
             ip_ind1 = numpy.sum(sizes_array[iproc, :ip_ivar])
             ip_ind2 = numpy.sum(sizes_array[iproc, :ip_ivar+1])
 
-            for op_ind in xrange(len(names['output'])):
+            for op_ind in range(len(names['output'])):
                 op_name = names['output'][op_ind]
                 op_ivar_all = indices['output'][op_ind]
                 op_ivar_set, op_ivar = set_indices[op_ivar_all, :]

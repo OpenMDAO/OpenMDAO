@@ -5,6 +5,8 @@ try:
 except:
     pass
 
+from six.moves import range
+
 from openmdao.vectors.transfer import DefaultTransfer
 from openmdao.vectors.transfer import PETScTransfer
 
@@ -89,7 +91,7 @@ class DefaultVector(Vector):
         variable_sizes = self._assembler._variable_sizes[self._typ]
 
         data = []
-        for iset in xrange(len(variable_sizes)):
+        for iset in range(len(variable_sizes)):
             size = numpy.sum(variable_sizes[iset][self._iproc, :])
             data.append(numpy.zeros(size))
         return data
@@ -102,7 +104,7 @@ class DefaultVector(Vector):
         sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
 
         data = []
-        for iset in xrange(len(variable_sizes)):
+        for iset in range(len(variable_sizes)):
             bool_vector = sub_variable_set_indices[:, 0] == iset
             data_inds = sub_variable_set_indices[bool_vector, 1]
             if len(data_inds) > 0:
@@ -124,7 +126,7 @@ class DefaultVector(Vector):
         variable_myproc_indices = system._variable_myproc_indices[self._typ]
 
         views = {}
-        for ind in xrange(len(variable_myproc_names)):
+        for ind in range(len(variable_myproc_names)):
             name = variable_myproc_names[ind]
             ivar_all = variable_myproc_indices[ind]
             iset, ivar = variable_set_indices[ivar_all, :]
@@ -134,35 +136,35 @@ class DefaultVector(Vector):
         return views
 
     def __iadd__(self, vec):
-        for iset in xrange(len(self._data)):
+        for iset in range(len(self._data)):
             self._data[iset] += vec._data[iset]
         return self
 
     def __isub__(self, vec):
-        for iset in xrange(len(self._data)):
+        for iset in range(len(self._data)):
             self._data[iset] -= vec._data[iset]
         return self
 
     def __imul__(self, val):
-        for iset in xrange(len(self._data)):
+        for iset in range(len(self._data)):
             self._data[iset] *= val
         return self
 
     def add_scal_vec(self, val, vec):
-        for iset in xrange(len(self._data)):
+        for iset in range(len(self._data)):
             self._data[iset] *= val * vec._data[iset]
 
     def set_vec(self, vec):
-        for iset in xrange(len(self._data)):
+        for iset in range(len(self._data)):
             self._data[iset][:] = vec._data[iset]
 
     def set_const(self, val):
-        for iset in xrange(len(self._data)):
+        for iset in range(len(self._data)):
             self._data[iset][:] = val
 
     def get_norm(self):
         global_sum = 0
-        for iset in xrange(len(self._data)):
+        for iset in range(len(self._data)):
             global_sum += numpy.sum(self._data[iset]**2)
         return global_sum ** 0.5
 
@@ -181,13 +183,13 @@ class PETScVector(DefaultVector):
             self._data = self._extract_data()
 
         self._petsc = []
-        for iset in xrange(len(self._data)):
+        for iset in range(len(self._data)):
             petsc = PETSc.Vec().createWithArray(self._data[iset][:],
                                                 comm=self._system.comm)
             self._petsc.append(petsc)
 
     def get_norm(self):
         global_sum = 0
-        for iset in xrange(len(self._data)):
+        for iset in range(len(self._data)):
             global_sum += numpy.sum(self._data[iset]**2)
         return self._system.comm.allreduce(global_sum) ** 0.5

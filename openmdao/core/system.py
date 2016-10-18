@@ -1,6 +1,7 @@
 """Define the base System class."""
 from __future__ import division
 import numpy
+from six.moves import range
 
 from openmdao.proc_allocators.proc_allocator import DefaultProcAllocator
 from openmdao.solvers.solver import NonlinearBlockGS
@@ -345,7 +346,7 @@ class System(object):
 
         # Populate the _variable_allprocs_indices dictionary
         for typ in ['input', 'output']:
-            for ind in xrange(len(self._variable_allprocs_names[typ])):
+            for ind in range(len(self._variable_allprocs_names[typ])):
                 name = self._variable_allprocs_names[typ][ind]
                 ivar_all = self._variable_allprocs_range[typ][0] + ind
                 self._variable_allprocs_indices[typ][name] = ivar_all
@@ -475,13 +476,13 @@ class System(object):
                                    xfer_ip_inds,
                                    xfer_op_inds,
                                    self.comm)
-        for isub in xrange(len(fwd_xfer_ip_inds)):
+        for isub in range(len(fwd_xfer_ip_inds)):
             transfers['fwd', isub] = Transfer(vectors['input'],
                                               vectors['output'],
                                               fwd_xfer_ip_inds[isub],
                                               fwd_xfer_op_inds[isub],
                                               self.comm)
-        for isub in xrange(len(rev_xfer_ip_inds)):
+        for isub in range(len(rev_xfer_ip_inds)):
             transfers['rev', isub] = Transfer(vectors['input'],
                                               vectors['output'],
                                               rev_xfer_ip_inds[isub],

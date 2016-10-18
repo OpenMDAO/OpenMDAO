@@ -16,14 +16,14 @@ setup(name='openmdao',
         'Topic :: Scientific/Engineering',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: Implementation :: CPython',
       ],
       keywords='optimization multidisciplinary multi-disciplinary analysis',
       author='OpenMDAO Team',
       author_email='openmdao@openmdao.org',
       url='http://openmdao.org',
-      download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/1.7.2',
+      #download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/1.7.2',
       license='Apache License, Version 2.0',
       packages=[
           'openmdao',
@@ -35,6 +35,7 @@ setup(name='openmdao',
           'openmdao.assemblers',
           'openmdao.tests',
           'openmdao.jacobians',
+          'openmdao.devtools',
       ],
       # package_data={
       #     'openmdao.units': ['unit_library.ini'],
@@ -45,10 +46,11 @@ setup(name='openmdao',
         'six', 'numpydoc', #'numpy>=1.9.2',
         'scipy', 'sqlitedict'
       ],
-      scripts=['bin/om-pylint.sh']
-      # entry_points="""
-      # [console_scripts]
-      # wingproj=openmdao.devtools.wingproj:run_wing
+      #scripts=['bin/om-pylint.sh']
+      entry_points="""
+      [console_scripts]
+      wingproj=openmdao.devtools.wingproj:run_wing
+      """
       # webview=openmdao.devtools.webview:webview_argv
       # view_profile=openmdao.util.profile:prof_view
       # proftotals=openmdao.util.profile:prof_totals
