@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import division, print_function
 import numpy
 import unittest
 
@@ -14,7 +14,7 @@ class GeneralComp(ExplicitComponent):
         ncomp = kwargs['ncomp']
         use_var_sets = kwargs['use_var_sets']
 
-        for ind in xrange(ncomp):
+        for ind in range(ncomp):
             if use_var_sets:
                 var_set = ind
             else:
@@ -41,7 +41,7 @@ class GeneralProblem(object):
         all_systems = []
 
         current_systems = []
-        for icomp in xrange(ncomp):
+        for icomp in range(ncomp):
             comp = GeneralComp('Comp-%i-%i' % (nlevel-ilevel, icomp),
                                icomp=icomp, ncomp=ncomp, promotes_all=True)
             current_systems.append(comp)
@@ -53,12 +53,12 @@ class GeneralProblem(object):
             nsub_group = int(numpy.floor(nsub/ngroup)) * numpy.ones(ngroup, int)
             nsub_group[-1] += nsub - numpy.sum(nsub_group)
             next_systems = []
-            for igroup in xrange(ngroup):
+            for igroup in range(ngroup):
                 group = Group('Group-%i-%i' % (nlevel-ilevel, igroup))
                 group._mpi_proc_allocator.parallel = parallel_groups
                 ind1 = numpy.sum(nsub_group[:igroup])
                 ind2 = numpy.sum(nsub_group[:igroup+1])
-                for ind in xrange(ind1, ind2):
+                for ind in range(ind1, ind2):
                     group.add_subsystem(current_systems[ind])
                 next_systems.append(group)
             current_systems = next_systems
@@ -73,11 +73,11 @@ class GeneralProblem(object):
 
     def print_all(self):
         for sys in self.all_systems[::-1]:
-            print sys.name, ':',
+            print(sys.name, ':', end=' ')
             for subsys in sys._subsystems_allprocs:
-                print subsys.name,
-            print
-        print
+                print(subsys.name, end=' ')
+            print()
+        print()
 
 if __name__ == '__main__':
 

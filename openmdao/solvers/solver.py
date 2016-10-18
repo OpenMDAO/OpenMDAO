@@ -1,6 +1,7 @@
-from __future__ import division
+from __future__ import division, print_function
 import numpy
 from scipy.sparse.linalg import LinearOperator
+from six.moves import range
 
 
 class Solver(object):
@@ -44,7 +45,7 @@ class Solver(object):
             print_str = ' ' * self._system._sys_depth + '-' * self._depth
             print_str += sys_name + solver_name
             print_str += ' %3d | %.9g %.9g' % (iteration, res, res0)
-            print print_str
+            print(print_str)
 
     def _run_iterator(self):
         ilimit = self._options['ilimit']
@@ -125,7 +126,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
     def _iter_execute(self):
         system = self._system
-        for isub in xrange(len(system._subsystems_allprocs)):
+        for isub in range(len(system._subsystems_allprocs)):
             system._transfers['fwd', isub](system._inputs, system._outputs, 'fwd')
 
             if isub in system._subsystems_inds:
