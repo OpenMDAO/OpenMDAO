@@ -37,6 +37,9 @@ class Vector(object):
     def __contains__(self, key):
         return key in self._names
 
+    def __iter__(self):
+        return iter(self._names)
+
     def __getitem__(self, key):
         return self._views[key]
 
