@@ -2,6 +2,7 @@
 from __future__ import division
 import numpy
 from six.moves import range
+from fnmatch import fnmatchcase
 
 from openmdao.proc_allocators.proc_allocator import DefaultProcAllocator
 from openmdao.solvers.solver import NonlinearBlockGS
@@ -64,6 +65,11 @@ class System(object):
 
     _variable_maps : {'input': dict, 'output': dict}
         dictionary of variable names and their aliases (for promotes/renames).
+    _variable_promotes : { 'any': set(), 'input': set(), 'output': set() }
+        dictionary of sets of variable names/wildcards specifying promotion (used to calculate _variable_maps)
+    _variable_renames : { 'input': {}, 'output': {} }
+        dictionary of mappings used to specify variables to be renamed in the parent group. (used to calculate _variable_maps)
+        
     _variable_connections : dict
         dictionary of input:output connections between subsystems.
     _variable_connections_indices : [(int, int), ...]
@@ -135,6 +141,9 @@ class System(object):
         self._variable_myproc_indices = {'input': None, 'output': None}
 
         self._variable_maps = {'input': {}, 'output': {}}
+        self._variable_promotes = { 'any': set(), 'input': set(), 'output': set() }
+        self._variable_renames = { 'input': {}, 'output': {} }
+        
         self._variable_connections = {}
         self._variable_connections_indices = []
 
@@ -496,33 +505,41 @@ class System(object):
         typ : str
             Either 'input' or 'output'.
         """
-        kwargs = self.kwargs
         maps = {}
 
-        # Give all variables the same names in the parent system
-        promotes_all = 'promotes_all_%ss' % typ
-        if 'promotes_all' in kwargs and kwargs['promotes_all']:
-            for name in self._variable_allprocs_names[typ]:
-                maps[name] = name
-        elif promotes_all in kwargs and kwargs[promotes_all]:
-            for name in self._variable_allprocs_names[typ]:
-                maps[name] = name
+        gname = self.name + '.' if self.name else ''
+        
+        promotes = self._variable_promotes['any']
+        promotes_typ = self._variable_promotes[typ]
+        renames = self._variable_renames[typ]
+
+        if promotes:
+            names = promotes
+            patterns = [n for n in names if '*' in n or '?' in n]
+        elif promotes_typ:
+            names = promotes_typ
+            patterns = [n for n in names if '*' in n or '?' in n]
         else:
-            # Default: the parent system's name is prepended to variable name
-            for name in self._variable_allprocs_names[typ]:
-                maps[name] = self.name + '.' + name
+            names = ()
+            patterns = ()
 
-            # Promote selected variables
-            promotes = 'promotes_%ss' % typ
-            if promotes in kwargs:
-                for name in kwargs[promotes]:
+        for name in self._variable_allprocs_names[typ]:
+            if name in names:
+                maps[name] = name
+                continue
+            
+            for pattern in patterns:
+                # if name matches, promote that variable to parent
+                if fnmatchcase(name, pattern):
                     maps[name] = name
-
-            # Rename selected variables to custom names in the parent system
-            renames = 'renames_%ss' % typ
-            if renames in kwargs:
-                for name in kwargs[renames]:
-                    maps[name] = kwargs[renames][name]
+                    break
+            else:
+                if name in renames:
+                    # Rename selected variables to custom names in the parent system
+                    maps[name] = renames[name]
+                else:
+                    # Default: the parent system's name is prepended to variable name
+                    maps[name] = gname + name if gname else name
 
         return maps
 

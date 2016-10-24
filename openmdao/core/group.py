@@ -12,7 +12,9 @@ class Group(System):
         if 'subsystems' in self.kwargs:
             self._subsystems_allprocs.extend(self.kwargs['subsystems'])
 
-    def add_subsystem(self, name, subsys):
+    def add_subsystem(self, name, subsys, promotes=None, 
+                      promotes_inputs=None, promotes_outputs=None,
+                      renames_inputs=None, renames_outputs=None):
         """Add a subsystem.
 
         Args
@@ -22,9 +24,42 @@ class Group(System):
 
         subsys : System
             An instantiated, but not-yet-set up system object.
+            
+        promotes : iter of str, optional
+            A list of variable names or wildcards specifying which subsystem variables 
+            to 'promote' up to this group. This is for backwards compatability with older 
+            versions of OpenMDAO.
+            
+        promotes_inputs : iter of str, optional
+            A list of input variable names or wildcards specifying which subsystem input
+            variables to 'promote' up to this group.
+        
+        promotes_outputs : iter of str, optional
+            A list of output variable names or wildcards specifying which subsystem output
+            variables to 'promote' up to this group.
+            
+        renames_inputs : list of (str, str) or dict, optional
+            A dict mapping old name to new name for any subsystem input variables that should
+            be renamed in this group.
+        
+        renames_outputs : list of (str, str) or dict, optional
+            A dict mapping old name to new name for any subsystem output variables that should
+            be renamed in this group.
+        
         """
         self._subsystems_allprocs.append(subsys)
         subsys.name = name
+        
+        if promotes:
+            subsys._variable_promotes['any'] = set(promotes)
+        if promotes_inputs:
+            subsys._variable_promotes['input'] = set(promotes_inputs)
+        if promotes_outputs:
+            subsys._variable_promotes['output'] = set(promotes_outputs)
+        if renames_inputs:
+            subsys._variable_renames['input'] = dict(renames_inputs)
+        if renames_outputs:
+            subsys._variable_renames['output'] = dict(renames_outputs)
 
     def connect(self, op_name, ip_name):
         """Connect output op_name to input ip_name in this namespace.

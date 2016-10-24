@@ -62,14 +62,14 @@ class CompB(ImplicitComponent):
 class GroupG(Group):
 
     def initialize(self):
-        self.add_subsystem('CA', CompA(promotes_all=True))
-        self.add_subsystem('CB', CompB(promotes_all=True))
+        self.add_subsystem('CA', CompA(), promotes=['*'])
+        self.add_subsystem('CB', CompB(), promotes=['*'])
 
 
 class Test(unittest.TestCase):
 
     def setUp(self):
-        group = GroupG('G')
+        group = GroupG()
         self.p = Problem(group)
 
         gmres = scipy.sparse.linalg.gmres

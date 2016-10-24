@@ -47,10 +47,10 @@ class Comp4(ExplicitComponent):
 class GroupG(Group):
 
     def initialize(self):
-        self.add_subsystem('C1', Comp1(promotes_all=True))
-        self.add_subsystem('C2', Comp2(promotes_all=True))
-        self.add_subsystem('C3', Comp3(promotes_all=True))
-        self.add_subsystem('C4', Comp4(promotes_all=True))
+        self.add_subsystem('C1', Comp1(), promotes=['*'])
+        self.add_subsystem('C2', Comp2(), promotes=['*'])
+        self.add_subsystem('C3', Comp3(), promotes=['*'])
+        self.add_subsystem('C4', Comp4(), promotes=['*'])
 
 
 class Test(unittest.TestCase):
