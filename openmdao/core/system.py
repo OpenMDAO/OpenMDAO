@@ -96,21 +96,19 @@ class System(object):
         global overriding flag that turns off all solver output if 'False'.
     """
 
-    def __init__(self, name, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         """Initialize all attributes.
 
         All subclasses use this __init__ method without overriding it.
 
         Args
         ----
-        name : str
-            system name.
         *args : list of arguments
             available in methods as self.args.
         **kwargs: dict of keyword arguments
             available here and in all descendants of this system.
         """
-        self.name = name
+        self.name = ''
         self.path_name = ''
         self.comm = None
 
@@ -187,7 +185,7 @@ class System(object):
             indices of procs owned by comm with respect to COMM_WORLD.
         """
         # Set attributes
-        self.path_name = path + self.name
+        self.path_name = '.'.join((path, self.name)) if path else self.name
         self.comm = comm
         self.global_kwargs = global_kwargs
         self._sys_depth = depth
@@ -215,7 +213,7 @@ class System(object):
             # Perform recursion
             for subsys in self._subsystems_myproc:
                 sub_global_kwargs = self.global_kwargs.copy()
-                subsys._setup_processors(self.path_name + '.', sub_comm,
+                subsys._setup_processors(self.path_name, sub_comm,
                                          sub_global_kwargs, depth+1, assembler,
                                          sub_proc_range)
 

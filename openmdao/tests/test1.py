@@ -27,15 +27,15 @@ class CompB(ExplicitComponent):
 class GroupG(Group):
 
     def add_subsystems(self):
-        self.add_subsystem(IndepVarComponent('A', [('x', 0)]))
-        self.add_subsystem(CompB('B'))
+        self.add_subsystem('A', IndepVarComponent([('x', 0)]))
+        self.add_subsystem('B', CompB())
         self.connect('A.x', 'B.x')
 
 
 class Test(unittest.TestCase):
 
     def setUp(self):
-        group = GroupG('G')
+        group = GroupG()
         group.add_subsystems()
         self.p = Problem(group).setup(PETScVector)
         self.p.root.set_solver_print(False)
@@ -55,13 +55,13 @@ class Test(unittest.TestCase):
 
     def test__variable_allprocs_names(self):
         root = self.p.root
-        compA = root.get_subsystem('G.A')
+        compA = root.get_subsystem('A')
         self.assertEqual(compA._variable_allprocs_names['output'], ['x'])
 
     def test__variable_myproc_indices(self):
         root_inds = self.p.root._variable_myproc_indices
-        compA_inds = self.p.root.get_subsystem('G.A')._variable_myproc_indices
-        compB_inds = self.p.root.get_subsystem('G.B')._variable_myproc_indices
+        compA_inds = self.p.root.get_subsystem('A')._variable_myproc_indices
+        compB_inds = self.p.root.get_subsystem('B')._variable_myproc_indices
 
         self.assertEqualArrays(root_inds['input'], numpy.array([0]))
         self.assertEqualArrays(root_inds['output'], numpy.array([0,1]))
@@ -74,8 +74,8 @@ class Test(unittest.TestCase):
 
     def test__variable_allprocs_ranges(self):
         root_rng = self.p.root._variable_allprocs_range
-        compA_rng = self.p.root.get_subsystem('G.A')._variable_allprocs_range
-        compB_rng = self.p.root.get_subsystem('G.B')._variable_allprocs_range
+        compA_rng = self.p.root.get_subsystem('A')._variable_allprocs_range
+        compB_rng = self.p.root.get_subsystem('B')._variable_allprocs_range
 
         self.assertEqualArrays(root_rng['input'], numpy.array([0,1]))
         self.assertEqualArrays(root_rng['output'], numpy.array([0,2]))
@@ -93,13 +93,11 @@ class Test(unittest.TestCase):
         self.assertEqual(root._variable_connections_indices[0][1], 0)
 
     def test_GS(self):
-        self.setUp()
-
         root = self.p.root
 
         if root.comm.size == 1:
-            compA = root.get_subsystem('G.A')
-            compB = root.get_subsystem('G.B')
+            compA = root.get_subsystem('A')
+            compB = root.get_subsystem('B')
 
             if root.comm.rank == 0:
                 self.assertList([

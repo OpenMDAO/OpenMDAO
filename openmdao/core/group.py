@@ -12,15 +12,19 @@ class Group(System):
         if 'subsystems' in self.kwargs:
             self._subsystems_allprocs.extend(self.kwargs['subsystems'])
 
-    def add_subsystem(self, subsys):
+    def add_subsystem(self, name, subsys):
         """Add a subsystem.
 
         Args
         ----
+        name : str
+            Name of the subsystem being added
+
         subsys : System
-            an instantiated, but not-yet-set up system object.
+            An instantiated, but not-yet-set up system object.
         """
         self._subsystems_allprocs.append(subsys)
+        subsys.name = name
 
     def connect(self, op_name, ip_name):
         """Connect output op_name to input ip_name in this namespace.

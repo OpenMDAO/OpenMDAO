@@ -46,20 +46,17 @@ class Comp4(ExplicitComponent):
 
 class GroupG(Group):
 
-    def __init__(self, name):
-        super(GroupG, self).__init__(name)
-
     def initialize(self):
-        self.add_subsystem(Comp1('C1', promotes_all=True))
-        self.add_subsystem(Comp2('C2', promotes_all=True))
-        self.add_subsystem(Comp3('C3', promotes_all=True))
-        self.add_subsystem(Comp4('C4', promotes_all=True))
+        self.add_subsystem('C1', Comp1(promotes_all=True))
+        self.add_subsystem('C2', Comp2(promotes_all=True))
+        self.add_subsystem('C3', Comp3(promotes_all=True))
+        self.add_subsystem('C4', Comp4(promotes_all=True))
 
 
 class Test(unittest.TestCase):
 
     def setUp(self):
-        group = GroupG('G')
+        group = GroupG()
         self.p = Problem(group).setup(PETScVector)
         self.p.root._mpi_proc_allocator.parallel = True
 
@@ -91,10 +88,10 @@ class Test(unittest.TestCase):
         root = self.p.root
 
         if root.comm.size == 1:
-            comp1 = root.get_subsystem('G.C1')
-            comp2 = root.get_subsystem('G.C2')
-            comp3 = root.get_subsystem('G.C3')
-            comp4 = root.get_subsystem('G.C4')
+            comp1 = root.get_subsystem('C1')
+            comp2 = root.get_subsystem('C2')
+            comp3 = root.get_subsystem('C3')
+            comp4 = root.get_subsystem('C4')
 
             comp1._outputs['v1'] = 1.0
             comp2._outputs['v2'] = 1.0

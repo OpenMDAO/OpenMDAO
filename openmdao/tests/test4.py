@@ -61,12 +61,9 @@ class CompB(ImplicitComponent):
 
 class GroupG(Group):
 
-    def __init__(self, name):
-        super(GroupG, self).__init__(name)
-
     def initialize(self):
-        self.add_subsystem(CompA('CA', promotes_all=True))
-        self.add_subsystem(CompB('CB', promotes_all=True))
+        self.add_subsystem('CA', CompA(promotes_all=True))
+        self.add_subsystem('CB', CompB(promotes_all=True))
 
 
 class Test(unittest.TestCase):
