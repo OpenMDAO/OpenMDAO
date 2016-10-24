@@ -2,7 +2,7 @@ from __future__ import division
 import numpy
 import unittest
 
-from openmdao.api import Problem, IndepVarComponent, ExplicitComponent, Group, PETScVector
+from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, PETScVector
 
 #      (A) -> x
 # x -> (B) -> f
@@ -27,7 +27,7 @@ class CompB(ExplicitComponent):
 class GroupG(Group):
 
     def add_subsystems(self):
-        self.add_subsystem('A', IndepVarComponent([('x', 0)]))
+        self.add_subsystem('A', IndepVarComp('x', 0.))
         self.add_subsystem('B', CompB())
         self.connect('A.x', 'B.x')
 

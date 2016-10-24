@@ -5,15 +5,16 @@ Classes
 Component - base Component class
 ImplicitComponent - used to define output variables that are all implicit
 ExplicitComponent - used to define output variables that are all explicit
-IndepVarComponent - used to define output variables that are all independent
+IndepVarComp - used to define output variables that are all independent
 """
 
 from __future__ import division
 import numpy
 
+import collections
+from six import string_types, iteritems
+
 from openmdao.core.system import System
-
-
 
 class Component(System):
     """Base Component class; not to be directly instantiated."""
@@ -29,33 +30,41 @@ class Component(System):
         'var_set': 0,
     }
 
-    def _add_variable(self, name, typ, kwargs):
+    def _add_variable(self, name, typ, val, kwargs):
         """Add an input/output variable to the component.
 
         Args
         ----
         name : str
             name of the variable in this component's namespace.
+            
         typ : str
             either 'input' or 'output'
+        
+        val : object
+            The value of the variable being added.
+            
         **kwargs : dict
             variable metadata with DEFAULTS defined above.
         """
         metadata = self.DEFAULTS.copy()
         metadata.update(kwargs)
+        metadata['value'] = val
+        
         if typ == 'input':
             metadata['indices'] = numpy.array(metadata['indices'])
+            
         self._variable_allprocs_names[typ].append(name)
         self._variable_myproc_names[typ].append(name)
         self._variable_myproc_metadata[typ].append(metadata)
 
-    def add_input(self, name, **kwargs):
+    def add_input(self, name, val=1.0, **kwargs):
         """See _add_variable."""
-        self._add_variable(name, 'input', kwargs)
+        self._add_variable(name, 'input', val, kwargs)
 
-    def add_output(self, name, **kwargs):
+    def add_output(self, name, val=1.0, **kwargs):
         """See _add_variable."""
-        self._add_variable(name, 'output', kwargs)
+        self._add_variable(name, 'output', val, kwargs)
 
 
 class ImplicitComponent(Component):
@@ -325,14 +334,47 @@ class ExplicitComponent(Component):
         pass
 
 
-class IndepVarComponent(ExplicitComponent):
+class IndepVarComp(ExplicitComponent):
     """Class to inherit from when all output variables are independent."""
+
+    def __init__(self, name, val=1.0, **kwargs):
+        super(IndepVarComp, self).__init__(**kwargs)
+        self._indep = (name, val)
+        
+        for illegal in ('promotes', 'promotes_inputs', 'promotes_outputs'):
+            if illegal in kwargs:
+                raise ValueError("IndepVarComp init: '%s' is not supported in IndepVarComp." % illegal)
 
     def initialize_variables(self):
         """Define the independent variables as output variables."""
-        indep_vars = self.args[0]
-        for name, value in indep_vars:
-            if isinstance(value, numpy.ndarray):
-                self.add_output(name, value=value, shape=value.shape)
-            else:
-                self.add_output(name, value=value, shape=[1])
+        
+        name, val = self._indep
+        kwargs = self.kwargs
+        
+        if isinstance(name, string_types):
+            self.add_output(name, val, **kwargs)
+
+        elif isinstance(name, collections.Iterable):
+            for tup in name:
+                badtup = None
+                if isinstance(tup, tuple):
+                    if len(tup) == 3:
+                        n, v, kw = tup
+                    elif len(tup) == 2:
+                        n, v = tup
+                        kw = {}
+                    else:
+                        badtup = tup
+                else:
+                    badtup = tup
+                if badtup:
+                    if isinstance(badtup, string_types):
+                        badtup = name
+                    raise ValueError("IndepVarComp init: arg %s must be a tuple of the form "
+                                     "(name, value) or (name, value, keyword_dict)." %
+                                     str(badtup))
+                self.add_output(n, v, **kw)
+        else:
+            raise ValueError("first argument to IndepVarComp init must be either of type "
+                             "`str` or an iterable of tuples of the form (name, value) or "
+                             "(name, value, keyword_dict).")        

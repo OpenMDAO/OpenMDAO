@@ -2,7 +2,7 @@ from __future__ import division, print_function
 import numpy
 import unittest
 
-from openmdao.api import Problem, IndepVarComponent, ExplicitComponent, Group, PETScVector
+from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, PETScVector
 
 
 

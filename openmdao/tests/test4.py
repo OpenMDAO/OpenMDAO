@@ -3,7 +3,7 @@ import numpy
 import unittest
 import scipy.sparse.linalg
 
-from openmdao.api import Problem, IndepVarComponent, ImplicitComponent, Group, PETScVector
+from openmdao.api import Problem, ImplicitComponent, Group, PETScVector
 from openmdao.solvers.solver import ScipyIterativeSolver
 
 
