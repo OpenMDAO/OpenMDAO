@@ -73,7 +73,7 @@ class System(object):
         dictionary of sets of variable names/wildcards specifying promotion (used to calculate _variable_maps)
     _variable_renames : { 'input': {}, 'output': {} }
         dictionary of mappings used to specify variables to be renamed in the parent group. (used to calculate _variable_maps)
-        
+
     _variable_connections : dict
         dictionary of input:output connections between subsystems.
     _variable_connections_indices : [(int, int), ...]
@@ -113,8 +113,7 @@ class System(object):
 
         Args
         ----
-        *args : list of arguments
-            available in methods as self.args.
+        
         **kwargs: dict of keyword arguments
             available here and in all descendants of this system.
         """
@@ -146,7 +145,7 @@ class System(object):
         self._variable_maps = {'input': {}, 'output': {}}
         self._variable_promotes = { 'any': set(), 'input': set(), 'output': set() }
         self._variable_renames = { 'input': {}, 'output': {} }
-        
+
         self._variable_connections = {}
         self._variable_connections_indices = []
 
@@ -391,7 +390,7 @@ class System(object):
                 ip_index += self._variable_allprocs_range['input'][0]
                 op_index += self._variable_allprocs_range['output'][0]
                 pairs.append([ip_index, op_index])
-                
+
                 if src_indices is not None:
                     # set the 'indices' metadata in the input variable
                     try:
@@ -523,7 +522,7 @@ class System(object):
         maps = {}
 
         gname = self.name + '.' if self.name else ''
-        
+
         promotes = self._variable_promotes['any']
         promotes_typ = self._variable_promotes[typ]
         renames = self._variable_renames[typ]
@@ -542,7 +541,7 @@ class System(object):
             if name in names:
                 maps[name] = name
                 continue
-            
+
             for pattern in patterns:
                 # if name matches, promote that variable to parent
                 if fnmatchcase(name, pattern):
