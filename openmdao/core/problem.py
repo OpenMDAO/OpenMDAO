@@ -52,24 +52,23 @@ class Problem(object):
         self.comm = comm
         self._assembler = AssemblerClass(comm)
 
-    # FIXME: getitem/setitem need to properly handle scaling/units and must
-    # properly handle getting/setting using arrays > 1D
+    # TODO: getitem/setitem need to properly handle scaling/units
     def __getitem__(self, name):
         try:
             return self.root._outputs[name]
         except KeyError:
             return self.root._inputs[name]
-    
+
     def __setitem__(self, name, value):
         try:
             self.root._outputs[name] = value
         except KeyError:
             self.root._inputs[name] = value
-    
-    # FIXME: once we have drivers, this should call self.driver.run() instead
+
+    # TODO: once we have drivers, this should call self.driver.run() instead
     def run(self):
         self.root._solve_nonlinear()
-        
+
     def setup(self, VectorClass=None, check=False, out_stream=sys.stdout):
         """Set up everything (root, assembler, vector, solvers, drivers).
 

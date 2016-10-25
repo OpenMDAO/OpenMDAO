@@ -165,7 +165,7 @@ class ExecComp(ExplicitComponent):
         units_dict = self._units_dict
         outs = self._outs
         exprs = self._exprs
-        
+
         for var in sorted(allvars):
             # if user supplied an initial value, use it, otherwise set to 0.0
             val = kwargs.get(var, 0.0)
@@ -177,7 +177,7 @@ class ExecComp(ExplicitComponent):
                 self.add_input(var, val, **new_kwargs)
 
         # need to exclude any non-pbo outputs (like case_rank in ExecComp4Test)
-        # FIXME: for now, assume all outputs are non-pbo
+        # TODO: for now, assume all outputs are non-pbo
         self._non_pbo_outputs = self._variable_myproc_names['output'] #[u for u in self._init_unknowns_dict  if u in allvars]
 
         self._to_colons = {}
