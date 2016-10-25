@@ -63,17 +63,23 @@ class Group(System):
             
         return subsys
 
-    def connect(self, op_name, ip_name):
+    def connect(self, op_name, ip_name, src_indices=None):
         """Connect output op_name to input ip_name in this namespace.
 
         Args
         ----
         op_name : str
             name of the output (source) variable to connect
+            
         ip_name : str
             name of the input (target) variable to connect
+            
+        src_indices : collection of int, optional
+            When an input variable connects to some subset of an array output
+            variable, you can specify which indices of the source to be 
+            transferred to the input here.
         """
-        self._variable_connections[ip_name] = op_name
+        self._variable_connections[ip_name] = (op_name, src_indices)
 
     def _apply_nonlinear(self):
         """Compute residuals; perform recursion."""

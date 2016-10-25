@@ -6,6 +6,7 @@ import re
 
 import numpy
 from numpy import ndarray, complex, imag
+from itertools import product
 
 from six import string_types
 
@@ -130,7 +131,7 @@ class ExecComp(ExplicitComponent):
 
         self._exprs = exprs[:]
 
-        outs = set()
+        outs = self._outs = set()
         self._allvars = allvars = set()
 
         # find all of the variables and which ones are outputs
@@ -140,7 +141,7 @@ class ExecComp(ExplicitComponent):
             allvars.update(_parse_for_vars(expr))
 
         if inits is not None:
-            kwargs.update(inits)
+            self.kwargs.update(inits)
 
         # make sure all kwargs are legit
         for kwarg in kwargs:
@@ -150,7 +151,7 @@ class ExecComp(ExplicitComponent):
                                    "expressions %s" % (kwarg, exprs))
 
         # make sure units are legit
-        units_dict = units if units is not None else {}
+        self._units_dict = units_dict = units if units is not None else {}
         for unit_var in units_dict:
             if unit_var not in allvars:
                 raise RuntimeError("Units specific for variable {0} "
@@ -158,19 +159,26 @@ class ExecComp(ExplicitComponent):
                                    "not appear in the expression "
                                    "{1}".format(unit_var, exprs))
 
+    def initialize_variables(self):
+        allvars = self._allvars
+        kwargs = self.kwargs
+        units_dict = self._units_dict
+        outs = self._outs
+        exprs = self._exprs
+        
         for var in sorted(allvars):
             # if user supplied an initial value, use it, otherwise set to 0.0
             val = kwargs.get(var, 0.0)
-            units_kwarg = { 'units':units_dict[var] } if var in units_dict else {}
+            new_kwargs = { 'units':units_dict[var] } if var in units_dict else {}
 
             if var in outs:
-                self.add_output(var, val, **units_kwarg)
+                self.add_output(var, val, **new_kwargs)
             else:
-                self.add_input(var, val, **units_kwarg)
+                self.add_input(var, val, **new_kwargs)
 
-        ## need to exclude any non-pbo unknowns (like case_rank in ExecComp4Test)
-        #self._non_pbo_unknowns = [u for u in self._init_unknowns_dict
-                                      #if u in allvars]
+        # need to exclude any non-pbo outputs (like case_rank in ExecComp4Test)
+        # FIXME: for now, assume all outputs are non-pbo
+        self._non_pbo_outputs = self._variable_myproc_names['output'] #[u for u in self._init_unknowns_dict  if u in allvars]
 
         self._to_colons = {}
         from_colons = self._from_colons = {}
@@ -184,7 +192,7 @@ class ExecComp(ExplicitComponent):
 
         self._colon_names = { n for n in allvars if ':' in n }
 
-        self._codes = self._compile_exprs(exprs)
+        self._codes = self._compile_exprs(self._exprs)
 
     def _compile_exprs(self, exprs):
         exprs = exprs[:]
@@ -205,23 +213,21 @@ class ExecComp(ExplicitComponent):
         self.__dict__.update(state)
         self._codes = self._compile_exprs(self._exprs)
 
-    def solve_nonlinear(self, params, unknowns, resids):
+    def compute(self, inputs, outputs):
         """
         Executes this component's assignment statemens.
 
         Args
         ----
-        params : `VecWrapper`, optional
-            `VecWrapper` containing parameters. (p)
+        inputs : `Vector`
+            `Vector` containing inputs.
 
-        unknowns : `VecWrapper`, optional
-            `VecWrapper` containing outputs and states. (u)
+        outputs : `Vector`
+            `Vector` containing outputs.
 
-        resids : `VecWrapper`, optional
-            `VecWrapper` containing residuals. (r)
         """
         for expr in self._codes:
-            exec(expr, _expr_dict, _UPDict(unknowns, params, self._to_colons))
+            exec(expr, _expr_dict, _UPDict(outputs, inputs, self._to_colons))
 
     def linearize(self, params, unknowns, resids):
         """
@@ -249,7 +255,7 @@ class ExecComp(ExplicitComponent):
         step = self.complex_stepsize * 1j
 
         J = OrderedDict()
-        non_pbo_unknowns = self._non_pbo_unknowns
+        non_pbo_outputs = self._non_pbo_outputs
 
         for param in params:
 
@@ -276,9 +282,10 @@ class ExecComp(ExplicitComponent):
                 uwrap = _TmpDict(unknowns, complex=True)
 
                 # solve with complex param value
-                self.solve_nonlinear(pwrap, uwrap, resids)
+                self._residuals.set_val(0.0)
+                self.compute(pwrap, uwrap)
 
-                for u in non_pbo_unknowns:
+                for u in non_pbo_outputs:
                     jval = imag(uwrap[u] / self.complex_stepsize)
                     if (u, param) not in J: # create the dict entry
                         J[(u, param)] = numpy.zeros((jval.size, psize))
@@ -341,38 +348,38 @@ class _TmpDict(object):
 
 class _UPDict(object):
     """
-    A dict-like wrapper for the unknowns and params
-    objects.  Items are first looked for in the unknowns
-    and then the params.
+    A dict-like wrapper for the outputs and inputs
+    objects.  Items are first looked for in the outputs
+    and then the inputs.
 
     Args
     ----
-    unknowns : dict-like
-        The unknowns object to be wrapped.
+    outputs : dict-like
+        The outputs object to be wrapped.
 
-    params : dict-like
-        The params object to be wrapped.
+    inputs : dict-like
+        The inputs object to be wrapped.
     """
-    def __init__(self, unknowns, params, to_colons):
-        self._unknowns = unknowns
-        self._params = params
+    def __init__(self, outputs, inputs, to_colons):
+        self._outputs = outputs
+        self._inputs = inputs
         self._to_colons = to_colons
 
     def __getitem__(self, name):
         name = self._to_colons[name]
         try:
-            return self._unknowns[name]
+            return self._outputs[name]
         except KeyError:
-            return self._params[name]
+            return self._inputs[name]
 
     def __setitem__(self, name, value):
         name = self._to_colons[name]
-        if name in self._unknowns:
-            self._unknowns[name] = value
-        elif name in self._params:
-            self._params[name] = value
+        if name in self._outputs:
+            self._outputs[name] = value
+        elif name in self._inputs:
+            self._inputs[name] = value
         else:
-            self._unknowns[name] # will raise KeyError
+            self._outputs[name] # will raise KeyError
 
 
 def _import_functs(mod, dct, names=None):

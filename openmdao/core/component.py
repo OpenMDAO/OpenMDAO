@@ -21,7 +21,7 @@ class Component(System):
 
     DEFAULTS = {
         'indices': [0],
-        'shape': [1],
+        'shape': (1,),
         'units': '',
         'value': 1.0,
         'scale': 1.0,
@@ -50,6 +50,10 @@ class Component(System):
         metadata = self.DEFAULTS.copy()
         metadata.update(kwargs)
         metadata['value'] = val
+        if isinstance(val, numpy.ndarray):
+            metadata['shape'] = val.shape
+            if typ == 'input' and 'indices' not in kwargs:
+                metadata['indices'] = numpy.arange(0, val.size, dtype=int)
         
         if typ == 'input':
             metadata['indices'] = numpy.array(metadata['indices'])
@@ -66,7 +70,18 @@ class Component(System):
         """See _add_variable."""
         self._add_variable(name, 'output', val, kwargs)
 
-
+    def _set_initial_inputs(self):
+        """Required method for components to load initial values into
+        the input vector.
+        """
+        #TODO: I don't think we really need to do this for connected inputs, but
+        # for unconnected ones, if we don't do this then the values set in add_input
+        # won't end up in the inputs vector when the component runs
+        names = self._variable_myproc_names['input']
+        inputs = self._inputs
+        for i, meta in enumerate(self._variable_myproc_metadata['input']):
+            inputs[names[i]] = meta['value']
+    
 class ImplicitComponent(Component):
     """Class to inherit from when all output variables are implicit."""
 

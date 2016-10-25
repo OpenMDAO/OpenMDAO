@@ -32,9 +32,9 @@ class TestConnections(unittest.TestCase):
         self.p['G3.G4.C3.x'] = 222.
         self.p['G3.G4.C4.x'] = 333.
 
-        self.assertEqual(self.p.root.G1.G2.C1._inputs['x'], 111.)
-        self.assertEqual(self.p.root.G3.G4.C3._inputs['x'], 222.)
-        self.assertEqual(self.p.root.G3.G4.C4._inputs['x'], 333.)
+        self.assertEqual(self.C1._inputs['x'], 111.)
+        self.assertEqual(self.C3._inputs['x'], 222.)
+        self.assertEqual(self.C4._inputs['x'], 333.)
 
     def test_inp_inp_conn_w_src(self):
         self.p.root.connect('G3.G4.C3.x', 'G3.G4.C4.x')
@@ -42,25 +42,12 @@ class TestConnections(unittest.TestCase):
         self.p.setup(check=False)
 
         self.p['G1.G2.C2.x'] = 999.
-        self.assertEqual(self.p.root.G3.G4.C3._inputs['x'], 0.)
-        self.assertEqual(self.p.root.G3.G4.C4._inputs['x'], 0.)
+        self.assertEqual(self.C3._inputs['x'], 0.)
+        self.assertEqual(self.C4._inputs['x'], 0.)
 
         self.p.run()
-        self.assertEqual(self.p.root.G3.G4.C3._inputs['x'], 999.)
-        self.assertEqual(self.p.root.G3.G4.C4._inputs['x'], 999.)
-
-    def test_inp_inp_conn_w_src2(self):
-        self.p.root.connect('G3.G4.C3.x', 'G3.G4.C4.x')
-        self.p.root.connect('G1.G2.C2.x', 'G3.G4.C4.x')
-        self.p.setup(check=False)
-
-        self.p['G1.G2.C2.x'] = 999.
-        self.assertEqual(self.p.root.G3.G4.C3._inputs['x'], 0.)
-        self.assertEqual(self.p.root.G3.G4.C4._inputs['x'], 0.)
-
-        self.p.run()
-        self.assertEqual(self.p.root.G3.G4.C3._inputs['x'], 999.)
-        self.assertEqual(self.p.root.G3.G4.C4._inputs['x'], 999.)
+        self.assertEqual(self.C3._inputs['x'], 999.)
+        self.assertEqual(self.C4._inputs['x'], 999.)
 
     #def test_inp_inp_conn_no_src(self):
         #self.p.root.connect('G3.G4.C3.x', 'G3.G4.C4.x')
@@ -169,16 +156,13 @@ class TestConnections(unittest.TestCase):
 
         class Src(Component):
 
-            def __init__(self):
-                super(Src, self).__init__()
+            def initialize_variables(self):
 
                 self.add_input('x', 2.0)
                 self.add_output('y1', np.zeros((3, )))
                 self.add_output('y2', shape=((3, )))
 
             def solve_nonlinear(self, params, unknowns, resids):
-                """ counts up. """
-
                 x = params['x']
 
                 unknowns['y1'] = x * np.array( [1.0, 2.0, 3.0])
@@ -186,8 +170,7 @@ class TestConnections(unittest.TestCase):
 
         class Tgt(Component):
 
-            def __init__(self):
-                super(Tgt, self).__init__()
+            def initialize_variables(self):
 
                 self.add_input('x1')
                 self.add_input('x2')
@@ -195,34 +178,31 @@ class TestConnections(unittest.TestCase):
                 self.add_output('y2', 0.0)
 
             def solve_nonlinear(self, params, unknowns, resids):
-                """ counts up. """
-
                 x1 = params['x1']
                 x2 = params['x2']
 
                 unknowns['y1'] = np.sum(x1)
                 unknowns['y2'] = np.sum(x2)
 
-        top = Problem()
-        top.root = Group()
-        top.root.add_subsystem('src', Src())
-        top.root.add_subsystem('tgt', Tgt())
+        p = Problem()
+        p.root = Group()
+        p.root.add_subsystem('src', Src())
+        p.root.add_subsystem('tgt', Tgt())
 
-        top.root.connect('src.y1', 'tgt.x1')
-        top.root.connect('src.y2', 'tgt.x2')
+        p.root.connect('src.y1', 'tgt.x1')
+        p.root.connect('src.y2', 'tgt.x2')
 
-        top.setup(check=False)
-        top.run()
+        p.setup(check=False)
+        p.run()
 
-        self.assertEqual(top['tgt.y1'], 12.0)
-        self.assertEqual(top['tgt.y2'], 12.0)
+        self.assertEqual(p['tgt.y1'], 12.0)
+        self.assertEqual(p['tgt.y2'], 12.0)
 
     def test_pull_size_from_source_with_indices(self):
 
         class Src(Component):
 
-            def __init__(self):
-                super(Src, self).__init__()
+            def initialize_variables(self):
 
                 self.add_input('x', 2.0)
                 self.add_output('y1', np.zeros((3, )))
@@ -240,8 +220,7 @@ class TestConnections(unittest.TestCase):
 
         class Tgt(Component):
 
-            def __init__(self):
-                super(Tgt, self).__init__()
+            def initialize_variables(self):
 
                 self.add_input('x1')
                 self.add_input('x2')
@@ -291,34 +270,6 @@ class TestConnectionsPromoted(unittest.TestCase):
         C2 = G2.add_subsystem("C2", ExecComp('y=x*2.0'))
 
         G3 = root.add_subsystem("G3", Group())
-        G4 = G3.add_subsystem("G4", Group())
-        C3 = G4.add_subsystem("C3", ExecComp('y=x*2.0'), promotes=['x'])
-        C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0'), promotes=['x'])
-
-        stream = cStringIO()
-        checks = p.setup(out_stream=stream)
-        self.assertEqual(checks['dangling_params'],
-                         ['G1.G2.C1.x', 'G1.G2.C2.x', 'G3.G4.x'])
-        self.assertEqual(checks['no_connect_comps'],
-                         ['G1.G2.C1', 'G1.G2.C2', 'G3.G4.C3', 'G3.G4.C4'])
-        self.assertEqual(p._dangling['G3.G4.x'], set(['G3.G4.C3.x','G3.G4.C4.x']))
-
-        # setting promoted name should set both params mapped to that name since the
-        # params are dangling.
-        p['G3.G4.x'] = 999.
-        self.assertEqual(p.root.G3.G4.C3._inputs['x'], 999.)
-        self.assertEqual(p.root.G3.G4.C4._inputs['x'], 999.)
-
-    def test_inp_inp_promoted_no_src2(self):
-        p = Problem(root=Group())
-        root = p.root
-
-        G1 = root.add_subsystem("G1", Group())
-        G2 = G1.add_subsystem("G2", Group())
-        C1 = G2.add_subsystem("C1", ExecComp('y=x*2.0'))
-        C2 = G2.add_subsystem("C2", ExecComp('y=x*2.0'))
-
-        G3 = root.add_subsystem("G3", Group())
         G4 = G3.add_subsystem("G4", Group(), promotes=['x'])
         C3 = G4.add_subsystem("C3", ExecComp('y=x*2.0'), promotes=['x'])
         C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0'), promotes=['x'])
@@ -327,8 +278,8 @@ class TestConnectionsPromoted(unittest.TestCase):
 
         # setting promoted name should set both params mapped to that name
         p['G3.x'] = 999.
-        self.assertEqual(p.root.G3.G4.C3._inputs['x'], 999.)
-        self.assertEqual(p.root.G3.G4.C4._inputs['x'], 999.)
+        self.assertEqual(C3._inputs['x'], 999.)
+        self.assertEqual(C4._inputs['x'], 999.)
 
     def test_inp_inp_promoted_w_prom_src(self):
         p = Problem(root=Group())
@@ -376,15 +327,15 @@ class TestConnectionsPromoted(unittest.TestCase):
         # setting promoted name will set the value into the unknowns, but will
         # not propagate it to the params. That will happen during run().
         p['G1.x'] = 999.
-        self.assertEqual(p.root.G3.G4.C3._inputs['x'], 0.)
-        self.assertEqual(p.root.G3.G4.C4._inputs['x'], 0.)
+        self.assertEqual(C3._inputs['x'], 0.)
+        self.assertEqual(C4._inputs['x'], 0.)
 
         p.run()
-        self.assertEqual(p.root.G3.G4.C3._inputs['x'], 999.)
-        self.assertEqual(p.root.G3.G4.C4._inputs['x'], 999.)
+        self.assertEqual(C3._inputs['x'], 999.)
+        self.assertEqual(C4._inputs['x'], 999.)
 
     def test_unit_conv_message(self):
-
+        raise unittest.SkipTest("no units yet")
         prob = Problem(root=Group())
         root = prob.root
 

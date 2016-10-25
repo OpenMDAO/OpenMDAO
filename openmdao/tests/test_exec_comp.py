@@ -4,7 +4,7 @@ import math
 import numpy as np
 
 from openmdao.api import IndepVarComp, Group, Problem, ExecComp
-
+from openmdao.devtools.testutil import assert_rel_error
 
 class TestExecComp(unittest.TestCase):
 
@@ -19,10 +19,11 @@ class TestExecComp(unittest.TestCase):
         prob = Problem(root=Group())
         C1 = prob.root.add_subsystem('C1', ExecComp('y=numpy.sum(x)',
                                           x=np.arange(10,dtype=float)))
-        self.assertTrue('x' in C1._init_params_dict)
-        self.assertTrue('y' in C1._init_unknowns_dict)
-
         prob.setup(check=False)
+        
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
+
         prob.run()
 
         assert_rel_error(self, C1._outputs['y'], 45.0, 0.00001)
@@ -30,10 +31,12 @@ class TestExecComp(unittest.TestCase):
     def test_simple(self):
         prob = Problem(root=Group())
         C1 = prob.root.add_subsystem('C1', ExecComp('y=x+1.', x=2.0))
-        self.assertTrue('x' in C1._init_params_dict)
-        self.assertTrue('y' in C1._init_unknowns_dict)
 
         prob.setup(check=False)
+        
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
+        
         prob.run()
 
         assert_rel_error(self, C1._outputs['y'], 3.0, 0.00001)
@@ -41,26 +44,30 @@ class TestExecComp(unittest.TestCase):
     def test_for_spaces(self):
         prob = Problem(root=Group())
         C1 = prob.root.add_subsystem('C1', ExecComp('y = pi * x', x=2.0))
-        self.assertTrue('x' in C1._init_params_dict)
-        self.assertTrue('y' in C1._init_unknowns_dict)
-        self.assertTrue('pi' not in C1._init_params_dict)
 
         prob.setup(check=False)
+        
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
+        self.assertTrue('pi' not in C1._inputs)
+        
         prob.run()
 
         assert_rel_error(self, C1._outputs['y'], 2 * math.pi, 0.00001)
 
     def test_units(self):
+        raise unittest.SkipTest("no units support yet")
         prob = Problem(root=Group())
         C1 = prob.root.add_subsystem('C1', ExecComp('y=x+z+1.', x=2.0, z=2.0, units={'x':'m','y':'m'}))
 
-        self.assertTrue('units' in C1._init_params_dict['x'])
-        self.assertTrue(C1._init_params_dict['x']['units'] == 'm')
-        self.assertTrue('units' in C1._init_unknowns_dict['y'])
-        self.assertTrue(C1._init_unknowns_dict['y']['units'] == 'm')
-        self.assertFalse('units' in C1._init_params_dict['z'])
-
         prob.setup(check=False)
+        
+        self.assertTrue('units' in C1._inputs['x'])
+        self.assertTrue(C1._inputs['x']['units'] == 'm')
+        self.assertTrue('units' in C1._outputs['y'])
+        self.assertTrue(C1._outputs['y']['units'] == 'm')
+        self.assertFalse('units' in C1._inputs['z'])
+
         prob.run()
 
         assert_rel_error(self, C1._outputs['y'], 5.0, 0.00001)
@@ -81,10 +88,12 @@ class TestExecComp(unittest.TestCase):
     def test_array(self):
         prob = Problem(root=Group())
         C1 = prob.root.add_subsystem('C1', ExecComp('y=x[1]', x=np.array([1.,2.,3.]), y=0.0))
-        self.assertTrue('x' in C1._init_params_dict)
-        self.assertTrue('y' in C1._init_unknowns_dict)
 
         prob.setup(check=False)
+        
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
+        
         prob.run()
 
         assert_rel_error(self, C1._outputs['y'], 2.0, 0.00001)
@@ -93,15 +102,18 @@ class TestExecComp(unittest.TestCase):
         prob = Problem(root=Group())
         C1 = prob.root.add_subsystem('C1', ExecComp(['y[0]=x[1]', 'y[1]=x[0]'],
                                           x=np.array([1.,2.,3.]), y=np.array([0.,0.])))
-        self.assertTrue('x' in C1._init_params_dict)
-        self.assertTrue('y' in C1._init_unknowns_dict)
 
         prob.setup(check=False)
+
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
+
         prob.run()
 
         assert_rel_error(self, C1._outputs['y'], np.array([2.,1.]), 0.00001)
 
     def test_simple_array_model(self):
+        raise unittest.SkipTest("no check_partial_derivatives function")
         prob = Problem()
         prob.root = Group()
         prob.root.add_subsystem('comp', ExecComp(['y[0]=2.0*x[0]+7.0*x[1]',
@@ -125,6 +137,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, data['comp'][('y','x')]['rel error'][2], 0.0, 1e-5)
 
     def test_simple_array_model2(self):
+        raise unittest.SkipTest("no check_partial_derivatives function")
         prob = Problem()
         prob.root = Group()
         comp = prob.root.add_subsystem('comp', ExecComp('y = mat.dot(x)',
@@ -151,19 +164,21 @@ class TestExecComp(unittest.TestCase):
         prob = Problem(root=Group())
         C1 = prob.root.add_subsystem('C1', ExecComp(['y=2.0*x+1.'], x=2.0))
 
-        self.assertTrue('x' in C1._init_params_dict)
-        self.assertTrue('y' in C1._init_unknowns_dict)
-
         prob.setup(check=False)
+        
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
+
         prob.run()
 
         assert_rel_error(self, C1._outputs['y'], 5.0, 0.00001)
 
-        J = C1.linearize(C1.params, C1.unknowns, C1.resids)
+        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
 
         assert_rel_error(self, J[('y','x')], 2.0, 0.00001)
 
     def test_complex_step2(self):
+        raise unittest.SkipTest("problem missing calc_gradient")
         prob = Problem(Group())
         comp = prob.root.add_subsystem('comp', ExecComp('y=x*x + x*2.0'))
         prob.root.add_subsystem('p1', IndepVarComp('x', 2.0))
@@ -191,15 +206,15 @@ class TestExecComp(unittest.TestCase):
 
         # any negative C1.x should give a -2.0 derivative for dy/dx
         prob['C1.x'] = -1.0e-10
-        J = C1.linearize(C1.params, C1.unknowns, C1.resids)
+        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
         assert_rel_error(self, J[('y','x')], -2.0, 0.00001)
 
         prob['C1.x'] = 3.0
-        J = C1.linearize(C1.params, C1.unknowns, C1.resids)
+        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
         assert_rel_error(self, J[('y','x')], 2.0, 0.00001)
 
         prob['C1.x'] = 0.0
-        J = C1.linearize(C1.params, C1.unknowns, C1.resids)
+        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
         assert_rel_error(self, J[('y','x')], 2.0, 0.00001)
 
     def test_abs_array_complex_step(self):
@@ -214,19 +229,19 @@ class TestExecComp(unittest.TestCase):
 
         # any negative C1.x should give a -2.0 derivative for dy/dx
         prob['C1.x'] = np.ones(3)*-1.0e-10
-        J = C1.linearize(C1.params, C1.unknowns, C1.resids)
+        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
         assert_rel_error(self, J[('y','x')], np.eye(3)*-2.0, 0.00001)
 
         prob['C1.x'] = np.ones(3)*3.0
-        J = C1.linearize(C1.params, C1.unknowns, C1.resids)
+        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
         assert_rel_error(self, J[('y','x')], np.eye(3)*2.0, 0.00001)
 
         prob['C1.x'] = np.zeros(3)
-        J = C1.linearize(C1.params, C1.unknowns, C1.resids)
+        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
         assert_rel_error(self, J[('y','x')], np.eye(3)*2.0, 0.00001)
 
         prob['C1.x'] = np.array([1.5, -0.6, 2.4])
-        J = C1.linearize(C1.params, C1.unknowns, C1.resids)
+        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
         expect = np.zeros((3,3))
         expect[0,0] = 2.0
         expect[1,1] = -2.0
@@ -237,10 +252,11 @@ class TestExecComp(unittest.TestCase):
     def test_colon_names(self):
         prob = Problem(root=Group())
         C1 = prob.root.add_subsystem('C1', ExecComp('a:y=a:x+1.+b', inits={'a:x':2.0}, b=0.5))
-        self.assertTrue('a:x' in C1._init_params_dict)
-        self.assertTrue('a:y' in C1._init_unknowns_dict)
-
         prob.setup(check=False)
+        
+        self.assertTrue('a:x' in C1._inputs)
+        self.assertTrue('a:y' in C1._outputs)
+
         prob.run()
 
         assert_rel_error(self, C1._outputs['a:y'], 3.5, 0.00001)
@@ -249,19 +265,21 @@ class TestExecComp(unittest.TestCase):
         prob = Problem(root=Group())
         C1 = prob.root.add_subsystem('C1', ExecComp(['foo:y=2.0*foo:bar:x+1.'], inits={'foo:bar:x':2.0}))
 
-        self.assertTrue('foo:bar:x' in C1._init_params_dict)
-        self.assertTrue('foo:y' in C1._init_unknowns_dict)
-
         prob.setup(check=False)
+        
+        self.assertTrue('foo:bar:x' in C1._inputs)
+        self.assertTrue('foo:y' in C1._outputs)
+
         prob.run()
 
         assert_rel_error(self, C1._outputs['foo:y'], 5.0, 0.00001)
 
-        J = C1.linearize(C1.params, C1.unknowns, C1.resids)
+        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
 
         assert_rel_error(self, J[('foo:y','foo:bar:x')], 2.0, 0.00001)
 
     def test_complex_step2_colons(self):
+        raise unittest.SkipTest("problem missing calc_gradient")
         prob = Problem(Group())
         comp = prob.root.add_subsystem('comp', ExecComp('foo:y=foo:x*foo:x + foo:x*2.0'))
         prob.root.add_subsystem('p1', IndepVarComp('x', 2.0))
@@ -279,6 +297,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, J['comp.foo:y']['p1.x'], np.array([6.0]), 0.00001)
 
     def test_simple_array_model2_colons(self):
+        raise unittest.SkipTest("no check_partial_derivatives function")
         prob = Problem()
         prob.root = Group()
         comp = prob.root.add_subsystem('comp', ExecComp('foo:y = foo:mat.dot(x)',

@@ -8,8 +8,11 @@ def convert():
     cvt_map = {
         '.add(' : '.add_subsystem(',
         '.add_param(' : '.add_input(',
-        '.params[': '._inputs[',
-        '.unknowns[': '._outputs[',
+        '.params': '._inputs',
+        '.unknowns': '._outputs',
+        '.resids': '._residuals',
+        'openmdao.test.util': 'openmdao.devtools.testutil',
+        'def solve_nonlinear(self, params, unknowns, resids)': 'def compute(params, unknowns)',
     }
     
     parser = argparse.ArgumentParser()

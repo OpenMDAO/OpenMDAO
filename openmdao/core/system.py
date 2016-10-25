@@ -1,7 +1,11 @@
 """Define the base System class."""
 from __future__ import division
+
 import numpy
+
+from six import iteritems
 from six.moves import range
+
 from fnmatch import fnmatchcase
 
 from openmdao.proc_allocators.proc_allocator import DefaultProcAllocator
@@ -379,17 +383,25 @@ class System(object):
 
         # Loop through user-defined connections
         var_allprocs_names = self._variable_allprocs_names
-        for ip_name in self._variable_connections:
-            op_name = self._variable_connections[ip_name]
+        for ip_name, (op_name, src_indices) in iteritems(self._variable_connections):
 
-            ip_found = ip_name in var_allprocs_names['input']
-            op_found = op_name in var_allprocs_names['output']
-            if ip_found and op_found:
+            if ip_name in var_allprocs_names['input'] and op_name in var_allprocs_names['output']:
                 ip_index = var_allprocs_names['input'].index(ip_name)
                 op_index = var_allprocs_names['output'].index(op_name)
                 ip_index += self._variable_allprocs_range['input'][0]
                 op_index += self._variable_allprocs_range['output'][0]
                 pairs.append([ip_index, op_index])
+                
+                if src_indices is not None:
+                    # set the 'indices' metadata in the input variable
+                    try:
+                        ip_myproc_index = self._variable_myproc_names['input'].index(ip_name)
+                    except ValueError:
+                        pass
+                    else:
+                        meta = self._variable_myproc_metadata['input'][ip_myproc_index]
+                        meta['indices'] = numpy.array(src_indices, dtype=int)
+                        meta['shape'] = meta['indices'].shape
 
         self._variable_connections_indices = pairs
 
@@ -439,6 +451,10 @@ class System(object):
                 sub_vectors[key] = vectors[key]._create_subvector(subsys)
 
             subsys._setup_vector(sub_vectors, vector_var_ids)
+
+        # Components need to load their initial input values into the _inputs vector
+        if vec_name is None and not self._subsystems_myproc:
+            self._set_initial_inputs()
 
     def _setup_solvers(self):
         """Recursively set up all solvers in this and systems below."""
@@ -665,5 +681,11 @@ class System(object):
             args
             kwargs
             global_kwargs
+        """
+        pass
+
+    def _set_initial_inputs(self):
+        """Required method for components to load initial values into
+        the input vector.
         """
         pass
