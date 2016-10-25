@@ -14,7 +14,7 @@ import textwrap
 
 import openmdao
 
-def generate_docs():
+def generate_docs(type):
     index_top = """.. _source_documentation:
 
 =============================
@@ -38,7 +38,8 @@ OpenMDAO Source Documentation
 * :ref:`search`
 """
 
-    ref_sheet_bottom = """
+    if(type == "dev"):
+        ref_sheet_bottom = """
    :members:
    :undoc-members:
    :private-members:
@@ -47,22 +48,34 @@ OpenMDAO Source Documentation
 .. toctree::
    :maxdepth: 2
 """
+    elif(type == "usr"):
+        ref_sheet_bottom = """
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
+.. toctree::
+   :maxdepth: 2
+"""
 
     # need to set up the srcdocs directory structure, relative to docs.
     dir = os.path.dirname(__file__)
-    if os.path.isdir(os.path.join(dir, "srcdocs")):
+    if os.path.isdir(os.path.join(dir, "srcdocs", type)):
         import shutil
-        shutil.rmtree(os.path.join(dir, "srcdocs"))
-    os.mkdir(os.path.join(dir, "srcdocs"))
-    os.mkdir(os.path.join(dir, "srcdocs", "packages"))
+        shutil.rmtree(os.path.join(dir, "srcdocs", type))
 
+    if not os.path.isdir(os.path.join(dir, "srcdocs")):
+        os.mkdir(os.path.join(dir, "srcdocs"))
+    if not os.path.isdir(os.path.join(dir, "srcdocs", type)):
+        os.mkdir(os.path.join(dir, "srcdocs", type))
+    if not os.path.isdir(os.path.join(dir, "srcdocs", type, "packages")):
+        os.mkdir(os.path.join(dir, "srcdocs", type, "packages"))
 
     # look for directories in the openmdao level, one up from docs
     # those directories will be the openmdao packages
     # auto-generate the top-level index.rst file for srcdocs, based on
     # openmdao packages:
-    IGNORE_LIST = ['docs', 'tests', '__pycache__']
+    IGNORE_LIST = ['docs', 'tests', 'devtools', '__pycache__']
     # to improve the order that the user sees in the source docs, put
     # the important packages in this list explicitly. Any new ones that
     # get added will show up at the end.
@@ -74,8 +87,10 @@ OpenMDAO Source Documentation
             if listing not in IGNORE_LIST and listing not in packages:
                 packages.append(listing)
 
-    # begin writing the 'srcdocs/index.rst' file at top level.
-    index_filename = os.path.join(dir, "srcdocs", "index.rst")
+    #write
+
+    # begin writing the 'srcdocs/index.rst' file at mid  level.
+    index_filename = os.path.join(dir, "srcdocs", type, "index.rst")
     index = open(index_filename, "w")
     index.write(index_top)
 
@@ -84,7 +99,7 @@ OpenMDAO Source Documentation
         # a package is e.g. openmdao.core, that contains source files
         # a sub_package, is a src file, e.g. openmdao.core.component
         sub_packages = []
-        package_filename = os.path.join(dir, "srcdocs", "packages",
+        package_filename = os.path.join(dir, "srcdocs", type, "packages",
                                         "openmdao." + package + ".rst")
         package_name = "openmdao." + package
 
@@ -106,7 +121,7 @@ OpenMDAO Source Documentation
             index.write("   packages/openmdao." + package + "\n")
 
             # make subpkg directory (e.g. srcdocs/packages/core) for ref sheets
-            package_dirname = os.path.join(dir, "srcdocs", "packages", package)
+            package_dirname = os.path.join(dir, "srcdocs", type, "packages", package)
             os.mkdir(package_dirname)
 
             # create/write a package index file: (e.g. "srcdocs/packages/openmdao.core.rst")
@@ -138,6 +153,7 @@ OpenMDAO Source Documentation
                     ref_sheet.write(ref_sheet_bottom)
                     ref_sheet.close()
 
+
             # finish and close each package file
             package_file.write(package_bottom)
             package_file.close()
@@ -145,8 +161,8 @@ OpenMDAO Source Documentation
     # finish and close top-level index file
     index.close()
 
-
-generate_docs()
+generate_docs("dev")
+generate_docs("usr")
 
 
 def _parse(self):

@@ -3,4 +3,5 @@
 .. toctree::
    :maxdepth: 1
 
-   srcdocs/index.rst
+  srcdocs/dev/index.rst
+  srcdocs/usr/index.rst
