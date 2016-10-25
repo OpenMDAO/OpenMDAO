@@ -6,4 +6,3 @@ from openmdao.core.component import IndepVarComp
 from openmdao.vectors.vector import PETScVector
 from openmdao.components.exec_comp import ExecComp
 
-Component = ExplicitComponent

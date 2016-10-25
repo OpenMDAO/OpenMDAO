@@ -6,7 +6,7 @@ from six import text_type, PY3
 from six.moves import cStringIO
 import warnings
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, Component
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 
 
 class TestConnections(unittest.TestCase):
@@ -48,6 +48,111 @@ class TestConnections(unittest.TestCase):
         self.p.run()
         self.assertEqual(self.C3._inputs['x'], 999.)
         self.assertEqual(self.C4._inputs['x'], 999.)
+
+
+    def test_pull_size_from_source(self):
+
+        class Src(ExplicitComponent):
+
+            def initialize_variables(self):
+
+                self.add_input('x', 2.0)
+                self.add_output('y1', np.zeros((3, )))
+                self.add_output('y2', shape=((3, )))
+
+            def solve_nonlinear(self, params, unknowns, resids):
+                x = params['x']
+
+                unknowns['y1'] = x * np.array( [1.0, 2.0, 3.0])
+                unknowns['y2'] = x * np.array( [1.0, 2.0, 3.0])
+
+        class Tgt(ExplicitComponent):
+
+            def initialize_variables(self):
+
+                self.add_input('x1')
+                self.add_input('x2')
+                self.add_output('y1', 0.0)
+                self.add_output('y2', 0.0)
+
+            def solve_nonlinear(self, params, unknowns, resids):
+                x1 = params['x1']
+                x2 = params['x2']
+
+                unknowns['y1'] = np.sum(x1)
+                unknowns['y2'] = np.sum(x2)
+
+        p = Problem()
+        p.root = Group()
+        p.root.add_subsystem('src', Src())
+        p.root.add_subsystem('tgt', Tgt())
+
+        p.root.connect('src.y1', 'tgt.x1')
+        p.root.connect('src.y2', 'tgt.x2')
+
+        p.setup(check=False)
+        p.run()
+
+        self.assertEqual(p['tgt.y1'], 12.0)
+        self.assertEqual(p['tgt.y2'], 12.0)
+
+    def test_pull_size_from_source_with_indices(self):
+
+        class Src(ExplicitComponent):
+
+            def initialize_variables(self):
+
+                self.add_input('x', 2.0)
+                self.add_output('y1', np.zeros((3, )))
+                self.add_output('y2', shape=((3, )))
+                self.add_output('y3', 3.0)
+
+            def solve_nonlinear(self, params, unknowns, resids):
+                """ counts up. """
+
+                x = params['x']
+
+                unknowns['y1'] = x * np.array( [1.0, 2.0, 3.0])
+                unknowns['y2'] = x * np.array( [1.0, 2.0, 3.0])
+                unknowns['y3'] = x * 4.0
+
+        class Tgt(ExplicitComponent):
+
+            def initialize_variables(self):
+
+                self.add_input('x1')
+                self.add_input('x2')
+                self.add_input('x3')
+                self.add_output('y1', 0.0)
+                self.add_output('y2', 0.0)
+                self.add_output('y3', 0.0)
+
+            def solve_nonlinear(self, params, unknowns, resids):
+                """ counts up. """
+
+                x1 = params['x1']
+                x2 = params['x2']
+                x3 = params['x3']
+
+                unknowns['y1'] = np.sum(x1)
+                unknowns['y2'] = np.sum(x2)
+                unknowns['y3'] = np.sum(x3)
+
+        top = Problem()
+        top.root = Group()
+        top.root.add_subsystem('src', Src())
+        top.root.add_subsystem('tgt', Tgt())
+
+        top.root.connect('src.y1', 'tgt.x1', src_indices=(0, 1))
+        top.root.connect('src.y2', 'tgt.x2', src_indices=(0, 1))
+        top.root.connect('src.y3', 'tgt.x3')
+
+        top.setup(check=False)
+        top.run()
+
+        self.assertEqual(top['tgt.y1'], 6.0)
+        self.assertEqual(top['tgt.y2'], 6.0)
+        self.assertEqual(top['tgt.y3'], 8.0)
 
     #def test_inp_inp_conn_no_src(self):
         #self.p.root.connect('G3.G4.C3.x', 'G3.G4.C4.x')
@@ -151,111 +256,6 @@ class TestConnections(unittest.TestCase):
         #root.connect('desvars.dvar1', 'C10.x')
 
         #p.setup(check=False)
-
-    def test_pull_size_from_source(self):
-
-        class Src(Component):
-
-            def initialize_variables(self):
-
-                self.add_input('x', 2.0)
-                self.add_output('y1', np.zeros((3, )))
-                self.add_output('y2', shape=((3, )))
-
-            def solve_nonlinear(self, params, unknowns, resids):
-                x = params['x']
-
-                unknowns['y1'] = x * np.array( [1.0, 2.0, 3.0])
-                unknowns['y2'] = x * np.array( [1.0, 2.0, 3.0])
-
-        class Tgt(Component):
-
-            def initialize_variables(self):
-
-                self.add_input('x1')
-                self.add_input('x2')
-                self.add_output('y1', 0.0)
-                self.add_output('y2', 0.0)
-
-            def solve_nonlinear(self, params, unknowns, resids):
-                x1 = params['x1']
-                x2 = params['x2']
-
-                unknowns['y1'] = np.sum(x1)
-                unknowns['y2'] = np.sum(x2)
-
-        p = Problem()
-        p.root = Group()
-        p.root.add_subsystem('src', Src())
-        p.root.add_subsystem('tgt', Tgt())
-
-        p.root.connect('src.y1', 'tgt.x1')
-        p.root.connect('src.y2', 'tgt.x2')
-
-        p.setup(check=False)
-        p.run()
-
-        self.assertEqual(p['tgt.y1'], 12.0)
-        self.assertEqual(p['tgt.y2'], 12.0)
-
-    def test_pull_size_from_source_with_indices(self):
-
-        class Src(Component):
-
-            def initialize_variables(self):
-
-                self.add_input('x', 2.0)
-                self.add_output('y1', np.zeros((3, )))
-                self.add_output('y2', shape=((3, )))
-                self.add_output('y3', 3.0)
-
-            def solve_nonlinear(self, params, unknowns, resids):
-                """ counts up. """
-
-                x = params['x']
-
-                unknowns['y1'] = x * np.array( [1.0, 2.0, 3.0])
-                unknowns['y2'] = x * np.array( [1.0, 2.0, 3.0])
-                unknowns['y3'] = x * 4.0
-
-        class Tgt(Component):
-
-            def initialize_variables(self):
-
-                self.add_input('x1')
-                self.add_input('x2')
-                self.add_input('x3')
-                self.add_output('y1', 0.0)
-                self.add_output('y2', 0.0)
-                self.add_output('y3', 0.0)
-
-            def solve_nonlinear(self, params, unknowns, resids):
-                """ counts up. """
-
-                x1 = params['x1']
-                x2 = params['x2']
-                x3 = params['x3']
-
-                unknowns['y1'] = np.sum(x1)
-                unknowns['y2'] = np.sum(x2)
-                unknowns['y3'] = np.sum(x3)
-
-        top = Problem()
-        top.root = Group()
-        top.root.add_subsystem('src', Src())
-        top.root.add_subsystem('tgt', Tgt())
-
-        top.root.connect('src.y1', 'tgt.x1', src_indices=(0, 1))
-        top.root.connect('src.y2', 'tgt.x2', src_indices=(0, 1))
-        top.root.connect('src.y3', 'tgt.x3')
-
-        top.setup(check=False)
-        top.run()
-
-        self.assertEqual(top['tgt.y1'], 6.0)
-        self.assertEqual(top['tgt.y2'], 6.0)
-        self.assertEqual(top['tgt.y3'], 8.0)
-
 
 
 class TestConnectionsPromoted(unittest.TestCase):
@@ -407,16 +407,14 @@ class TestConnectionsPromoted(unittest.TestCase):
         ##assert_rel_error(self, p['C1.y'], 5.0, 1e-6)
 
 
-class Sink1(Component):
-    def __init__(self):
-        super(Sink1, self).__init__()
-        self.add_input('x', val=0.0, units='m')
+#class Sink1(ExplicitComponent):
+    #def initialize_variables(self):
+        #self.add_input('x', val=0.0, units='m')
 
 
-class Sink2(Component):
-    def __init__(self):
-        super(Sink2, self).__init__()
-        self.add_input('x', val=0.0, units='mm')
+#class Sink2(ExplicitComponent):
+    #def initialize_variables(self):
+        #self.add_input('x', val=0.0, units='mm')
 
 #class TestConnSetup(unittest.TestCase):
 
