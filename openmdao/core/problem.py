@@ -1,6 +1,8 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 from __future__ import division
 
+import sys
+
 from openmdao.assemblers.assembler import DefaultAssembler
 from openmdao.vectors.vector import DefaultVector
 
@@ -35,7 +37,7 @@ class Problem(object):
         pointer to the global Assembler object.
     """
 
-    def __init__(self, root, comm=None, AssemblerClass=None):
+    def __init__(self, root=None, comm=None, AssemblerClass=None):
         """Initialize attributes."""
         if comm is None:
             try:
@@ -50,7 +52,25 @@ class Problem(object):
         self.comm = comm
         self._assembler = AssemblerClass(comm)
 
-    def setup(self, VectorClass=None):
+    # FIXME: getitem/setitem need to properly handle scaling/units and must
+    # properly handle getting/setting using arrays > 1D
+    def __getitem__(self, name):
+        try:
+            return self.root._outputs[name]
+        except KeyError:
+            return self.root._inputs[name]
+    
+    def __setitem__(self, name, value):
+        try:
+            self.root._outputs[name] = value
+        except KeyError:
+            self.root._inputs[name] = value
+    
+    # FIXME: once we have drivers, this should call self.driver.run() instead
+    def run(self):
+        self.root._solve_nonlinear()
+        
+    def setup(self, VectorClass=None, check=False, out_stream=sys.stdout):
         """Set up everything (root, assembler, vector, solvers, drivers).
 
         Args

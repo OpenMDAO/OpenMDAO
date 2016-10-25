@@ -102,7 +102,7 @@ class System(object):
         global overriding flag that turns off all solver output if 'False'.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         """Initialize all attributes.
 
         All subclasses use this __init__ method without overriding it.
@@ -118,7 +118,6 @@ class System(object):
         self.path_name = ''
         self.comm = None
 
-        self.args = args
         self.kwargs = kwargs
         self.global_kwargs = {}
 

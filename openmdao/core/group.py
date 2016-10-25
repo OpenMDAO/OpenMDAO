@@ -60,6 +60,8 @@ class Group(System):
             subsys._variable_renames['input'] = dict(renames_inputs)
         if renames_outputs:
             subsys._variable_renames['output'] = dict(renames_outputs)
+            
+        return subsys
 
     def connect(self, op_name, ip_name):
         """Connect output op_name to input ip_name in this namespace.

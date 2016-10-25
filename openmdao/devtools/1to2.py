@@ -8,6 +8,8 @@ def convert():
     cvt_map = {
         '.add(' : '.add_subsystem(',
         '.add_param(' : '.add_input(',
+        '.params[': '._inputs[',
+        '.unknowns[': '._outputs[',
     }
     
     parser = argparse.ArgumentParser()
