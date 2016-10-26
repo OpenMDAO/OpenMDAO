@@ -43,10 +43,6 @@ OpenMDAO User Source Documentation
 
 """
 
-#     package_bottom = """
-# * :ref:`search`
-# """
-
     if(type == "dev"):
         ref_sheet_bottom = """
    :members:
@@ -74,8 +70,6 @@ OpenMDAO User Source Documentation
         import shutil
         shutil.rmtree(os.path.join(dir, "srcdocs", type))
 
-    if not os.path.isdir(os.path.join(dir, "srcdocs")):
-        os.mkdir(os.path.join(dir, "srcdocs"))
     if not os.path.isdir(os.path.join(dir, "srcdocs", type)):
         os.mkdir(os.path.join(dir, "srcdocs", type))
     if not os.path.isdir(os.path.join(dir, "srcdocs", type, "packages")):
@@ -166,12 +160,12 @@ OpenMDAO User Source Documentation
 
 
             # finish and close each package file
-            #package_file.write(package_bottom)
             package_file.close()
 
     # finish and close top-level index file
     index.close()
 
+#generate two versions of the docs, one with private members, one without.
 generate_docs("dev")
 generate_docs("usr")
 
