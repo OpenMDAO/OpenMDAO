@@ -451,10 +451,6 @@ class System(object):
 
             subsys._setup_vector(sub_vectors, vector_var_ids)
 
-        # Components need to load their initial input values into the _inputs vector
-        if vec_name is None and not self._subsystems_myproc:
-            self._set_initial_inputs()
-
     def _setup_solvers(self):
         """Recursively set up all solvers in this and systems below."""
         self._solvers_nonlinear._setup_solvers(self, 0)
@@ -680,11 +676,5 @@ class System(object):
             args
             kwargs
             global_kwargs
-        """
-        pass
-
-    def _set_initial_inputs(self):
-        """Required method for components to load initial values into
-        the input vector.
         """
         pass

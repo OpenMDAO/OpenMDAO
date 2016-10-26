@@ -128,8 +128,9 @@ class DefaultVector(Vector):
         self._names = variable_myproc_names[:]
 
         views = {}
-        # contains an index for floats or a slice for arrays so getitem/setitem will get/set will work
-        # properly with a float or with an array
+        
+        # contains a 0 index for floats or a slice(None) for arrays so getitem will 
+        # return either a float or a properly shaped array respectively.
         idxs = {}  
         
         for ind, name in enumerate(variable_myproc_names):
