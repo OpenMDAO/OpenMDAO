@@ -1,5 +1,6 @@
 from __future__ import division
 import numpy
+import scipy.sparse
 from six.moves import range
 
 try:
@@ -17,9 +18,47 @@ class Jacobian(object):
         self._system = None
 
         self._dict = {}
+        self._inds_to_names = {}
+        self._names_to_inds = {}
         self._mtx = {}
 
-    def _process_key(self, key):
+    def _get_sizes(self, key):
+        op_name, ip_name = key
+        outputs = self._system._outputs
+        inputs = self._system._inputs
+
+        op_size = len(outputs[op_name])
+        if ip_name in inputs:
+            ip_size = len(inputs[ip_name])
+        elif ip_name in outputs:
+            ip_size = len(outputs[ip_name])
+
+        return op_size, ip_size
+
+    def _negate(self, key):
+        op_size, ip_size = self._get_sizes(key)
+        jac = self[key]
+
+        if type(jac) == numpy.ndarray:
+            self[key] = -jac
+        elif scipy.sparse.issparse(jac):
+            self[key].data *= -1.0 # DOK not supported
+        elif len(jac) == 3:
+            self[key][0] = -self._dict[op_ind, ip_ind][0]
+        elif len(jac) == 2:
+            # In this case, negation is not necessary because sparse FD
+            # works on the residuals which already contains the negation
+            pass
+
+    def __contains__(self, key):
+        return self._names_to_inds[key] in self._dict
+
+    def __iter__(self):
+        name_pairs = [self._inds_to_names[op_ind, ip_ind]
+                      for op_ind, ip_ind in self._dict]
+        return iter(name_pairs)
+
+    def __setitem__(self, key, jac):
         op_name, ip_name = key
         outputs = self._system._outputs
         inputs = self._system._inputs
@@ -33,39 +72,17 @@ class Jacobian(object):
             ip_size = len(outputs[ip_name])
             ip_ind = self._system._variable_allprocs_indices['output'][ip_name]
 
-        return op_ind, ip_ind, op_size, ip_size
-
-    def _negate(self, key):
-        op_ind, ip_ind, op_size, ip_size = self._process_key(key)
-        jac = self._dict[op_ind, ip_ind]
-
-        if numpy.isscalar(jac):
-            self._dict[op_ind, ip_ind] = -jac
-        elif type(jac) == numpy.ndarray:
-            self._dict[op_ind, ip_ind] = -jac
-        elif len(jac) == 3:
-            self._dict[op_ind, ip_ind][0] = -self._dict[op_ind, ip_ind][0]
-
-    def __contains__(self, key):
-        op_ind, ip_ind, op_size, ip_size = self._process_key(key)
-        return (op_ind, ip_ind) in self._dict
-
-    def __iter__(self):
-        return iter(self._dict)
-
-    def __setitem__(self, key, jac):
-        op_ind, ip_ind, op_size, ip_size = self._process_key(key)
-
         if numpy.isscalar(jac):
             jac = numpy.array([jac]).reshape((op_size, ip_size))
-        elif type(jac) is list:
+        elif type(jac) is list or type(jac) is tuple:
             jac = numpy.array(jac).reshape((op_size, ip_size))
 
         self._dict[op_ind, ip_ind] = jac
+        self._inds_to_names[op_ind, ip_ind] = key
+        self._names_to_inds[key] = (op_ind, ip_ind)
 
     def __getitem__(self, key):
-        op_ind, ip_ind, op_size, ip_size = self._process_key(key)
-        return self._dict[op_ind, ip_ind]
+        return self._dict[self._names_to_inds[key]]
 
 
 class DefaultJacobian(Jacobian):
@@ -77,7 +94,8 @@ class DefaultJacobian(Jacobian):
         pass
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
-        for op_name, ip_name in self._dict:
+        for op_name, ip_name in self:
+            jac = self[op_name, ip_name]
             if op_name in d_outputs and ip_name in d_outputs:
                 if mode == 'fwd':
                     d_residuals[op_name] += jac.dot(d_outputs[ip_name])
