@@ -15,28 +15,37 @@ import textwrap
 import openmdao
 
 def generate_docs(type):
-    index_top = """.. _source_documentation:
+    index_top_dev = """.. _source_documentation_dev:
 
-=============================
-OpenMDAO Source Documentation
-=============================
+=======================================
+OpenMDAO Developer Source Documentation
+=======================================
 
 .. toctree::
-   :maxdepth: 3
-   :glob:
-
+   :titlesonly:
+   :maxdepth: 1
 
 """
+    index_top_usr = """.. _source_documentation_usr:
 
+==================================
+OpenMDAO User Source Documentation
+==================================
+
+.. toctree::
+   :titlesonly:
+   :maxdepth: 1
+
+"""
     package_top = """
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 1
 
 """
 
-    package_bottom = """
-* :ref:`search`
-"""
+#     package_bottom = """
+# * :ref:`search`
+# """
 
     if(type == "dev"):
         ref_sheet_bottom = """
@@ -44,11 +53,12 @@ OpenMDAO Source Documentation
    :undoc-members:
    :private-members:
    :show-inheritance:
+   :noindex:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 """
-    elif(type == "usr"):
+    else:
         ref_sheet_bottom = """
    :members:
    :undoc-members:
@@ -87,12 +97,13 @@ OpenMDAO Source Documentation
             if listing not in IGNORE_LIST and listing not in packages:
                 packages.append(listing)
 
-    #write
-
     # begin writing the 'srcdocs/index.rst' file at mid  level.
     index_filename = os.path.join(dir, "srcdocs", type, "index.rst")
     index = open(index_filename, "w")
-    index.write(index_top)
+    if (type == "dev"):
+        index.write(index_top_dev)
+    else:
+        index.write(index_top_usr)
 
     # auto-generate package header files (e.g. 'openmdao.core.rst')
     for package in packages:
@@ -113,7 +124,7 @@ OpenMDAO Source Documentation
 
         if len(sub_packages) > 0:
             # continue to write in the top-level index file.
-            # only document non-empty packages to avoid errors
+            # only document non-empty packages -- to avoid errors
             # (e.g. at time of writing, doegenerators, drivers, are empty dirs)
 
             #specifically don't use os.path.join here.  Even windows wants the
@@ -144,8 +155,8 @@ OpenMDAO Source Documentation
                     ref_sheet = open(ref_sheet_filename, "w")
                     # get the meat of the ref sheet code done
                     filename = sub_package + ".py"
-                    ref_sheet.write(".. index:: " + filename + "\n\n")
-                    ref_sheet.write(".. _" + package_name + "." + filename + ":\n\n")
+                    ref_sheet.write(".. index:: " + type + "_" + filename + "\n\n")
+                    ref_sheet.write(".. _" + type + "_" + package_name + "." + filename + ":\n\n")
                     ref_sheet.write(filename + "\n")
                     ref_sheet.write("+" * len(filename) + "\n\n")
                     ref_sheet.write(".. automodule:: " + package_name + "." + sub_package)
@@ -155,7 +166,7 @@ OpenMDAO Source Documentation
 
 
             # finish and close each package file
-            package_file.write(package_bottom)
+            #package_file.write(package_bottom)
             package_file.close()
 
     # finish and close top-level index file
