@@ -1,7 +1,8 @@
 
 import sys
-import argparse
 
+
+#TODO: auto convert component __init__ into initialize_variables()
 
 def convert():
     """A crude converter for OpenMDAO v1 files to OpenMDAO v2"""
@@ -16,19 +17,13 @@ def convert():
         'def solve_nonlinear(self, params, unknowns, resids)': 'def compute(params, unknowns)',
     }
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("infile")
-    parser.add_argument("-o", "--output", type=str, help="output file. Defaults to stdout.")
-
-    options = parser.parse_args()
-
-    with open(options.infile, 'r') as f:
+    with open(sys.argv[1], 'r') as f:
         contents = f.read()
         for old, new in cvt_map.items():
             contents = contents.replace(old, new)
 
-    if options.output:
-        with open(options.output, 'w') as f:
-            f.write(contents)
-    else:
-        sys.stdout.write(contents)
+    sys.stdout.write(contents)
+
+
+if __name__ == '__main__':
+    convert()

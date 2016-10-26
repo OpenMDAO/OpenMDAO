@@ -1,12 +1,12 @@
 """Define the base System class."""
 from __future__ import division
 
+from fnmatch import fnmatchcase
+
 import numpy
 
 from six import iteritems
 from six.moves import range
-
-from fnmatch import fnmatchcase
 
 from openmdao.proc_allocators.proc_allocator import DefaultProcAllocator
 from openmdao.solvers.solver import NonlinearBlockGS
@@ -70,9 +70,11 @@ class System(object):
     _variable_maps : {'input': dict, 'output': dict}
         dictionary of variable names and their aliases (for promotes/renames).
     _variable_promotes : { 'any': set(), 'input': set(), 'output': set() }
-        dictionary of sets of variable names/wildcards specifying promotion (used to calculate _variable_maps)
+        dictionary of sets of variable names/wildcards specifying promotion
+        (used to calculate _variable_maps)
     _variable_renames : { 'input': {}, 'output': {} }
-        dictionary of mappings used to specify variables to be renamed in the parent group. (used to calculate _variable_maps)
+        dictionary of mappings used to specify variables to be renamed in the
+        parent group. (used to calculate _variable_maps)
 
     _variable_connections : dict
         dictionary of input:output connections between subsystems.
@@ -113,7 +115,7 @@ class System(object):
 
         Args
         ----
-        
+
         **kwargs: dict of keyword arguments
             available here and in all descendants of this system.
         """
@@ -143,8 +145,8 @@ class System(object):
         self._variable_myproc_indices = {'input': None, 'output': None}
 
         self._variable_maps = {'input': {}, 'output': {}}
-        self._variable_promotes = { 'any': set(), 'input': set(), 'output': set() }
-        self._variable_renames = { 'input': {}, 'output': {} }
+        self._variable_promotes = {'any': set(), 'input': set(), 'output': set()}
+        self._variable_renames = {'input': {}, 'output': {}}
 
         self._variable_connections = {}
         self._variable_connections_indices = []

@@ -9,10 +9,11 @@ IndepVarComp - used to define output variables that are all independent
 """
 
 from __future__ import division
-import numpy
 
 import collections
-from six import string_types, iteritems
+
+import numpy
+from six import string_types
 
 from openmdao.core.system import System
 
@@ -37,13 +38,13 @@ class Component(System):
         ----
         name : str
             name of the variable in this component's namespace.
-            
+
         typ : str
             either 'input' or 'output'
-        
+
         val : object
             The value of the variable being added.
-            
+
         **kwargs : dict
             variable metadata with DEFAULTS defined above.
         """
@@ -54,10 +55,10 @@ class Component(System):
             metadata['shape'] = val.shape
             if typ == 'input' and 'indices' not in kwargs:
                 metadata['indices'] = numpy.arange(0, val.size, dtype=int)
-        
+
         if typ == 'input':
             metadata['indices'] = numpy.array(metadata['indices'])
-            
+
         self._variable_allprocs_names[typ].append(name)
         self._variable_myproc_names[typ].append(name)
         self._variable_myproc_metadata[typ].append(metadata)
@@ -72,7 +73,7 @@ class Component(System):
 
     def _setup_vector(self, vectors, vector_var_ids):
         super(Component, self)._setup_vector(vectors, vector_var_ids)
-        
+
         # Components need to load their initial input values into the _inputs vector
         if vectors['input']._name is None:
             names = self._variable_myproc_names['input']
@@ -324,7 +325,7 @@ class ExplicitComponent(Component):
         jacobian : Jacobian
             sub-jac components written to jacobian[output_name, input_name]
         """
-        
+
         pass
 
     def compute_jacvec_product(self, inputs, outputs,
@@ -357,17 +358,18 @@ class IndepVarComp(ExplicitComponent):
     def __init__(self, name, val=1.0, **kwargs):
         super(IndepVarComp, self).__init__(**kwargs)
         self._indep = (name, val)
-        
+
         for illegal in ('promotes', 'promotes_inputs', 'promotes_outputs'):
             if illegal in kwargs:
-                raise ValueError("IndepVarComp init: '%s' is not supported in IndepVarComp." % illegal)
+                raise ValueError("IndepVarComp init: '%s' is not supported "
+                                 "in IndepVarComp." % illegal)
 
     def initialize_variables(self):
         """Define the independent variables as output variables."""
-        
+
         name, val = self._indep
         kwargs = self.kwargs
-        
+
         if isinstance(name, string_types):
             self.add_output(name, val, **kwargs)
 
@@ -394,4 +396,4 @@ class IndepVarComp(ExplicitComponent):
         else:
             raise ValueError("first argument to IndepVarComp init must be either of type "
                              "`str` or an iterable of tuples of the form (name, value) or "
-                             "(name, value, keyword_dict).")        
+                             "(name, value, keyword_dict).")
