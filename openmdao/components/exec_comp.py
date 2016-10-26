@@ -3,18 +3,18 @@
 import math
 import cmath
 import re
+from collections import OrderedDict
+from itertools import product
 
 import numpy
-from numpy import ndarray, complex, imag
-from itertools import product
+from numpy import ndarray, imag, complex as npcomplex
 
 from six import string_types
 
 from openmdao.core.component import ExplicitComponent
-from collections import OrderedDict
 
 # regex to check for variable names.
-var_rgx = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
+VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
 
 def array_idx_iter(shape):
     """
@@ -29,8 +29,8 @@ def array_idx_iter(shape):
         yield p
 
 def _parse_for_vars(s):
-    return set([x.strip() for x in re.findall(var_rgx, s)
-                    if not x.endswith('(') and x.strip() not in _expr_dict])
+    return set([x.strip() for x in re.findall(VAR_RGX, s)
+                if not x.endswith('(') and x.strip() not in _expr_dict])
 
 def _valid_name(s, exprs):
     """Replace colons with numbers such that the new name does not exist in any
@@ -39,7 +39,7 @@ def _valid_name(s, exprs):
     i = 0
     check = ' '.join(exprs)
     while True:
-        n = s.replace(':','%d'%i)
+        n = s.replace(':', '%d'%i)
         if n not in check:
             return n
         i += 1
@@ -130,6 +130,11 @@ class ExecComp(ExplicitComponent):
             exprs = [exprs]
 
         self._exprs = exprs[:]
+        self._codes = None
+        self._non_pbo_outputs = None
+        self._to_colons = None
+        self._from_colons = None
+        self._colon_names = None
 
         outs = self._outs = set()
         self._allvars = allvars = set()
@@ -160,6 +165,9 @@ class ExecComp(ExplicitComponent):
                                    "{1}".format(unit_var, exprs))
 
     def initialize_variables(self):
+        """Add inputs and outputs based on the contents of our expression
+        strings.
+        """
         allvars = self._allvars
         kwargs = self.kwargs
         units_dict = self._units_dict
@@ -169,7 +177,7 @@ class ExecComp(ExplicitComponent):
         for var in sorted(allvars):
             # if user supplied an initial value, use it, otherwise set to 0.0
             val = kwargs.get(var, 0.0)
-            new_kwargs = { 'units':units_dict[var] } if var in units_dict else {}
+            new_kwargs = {'units':units_dict[var]} if var in units_dict else {}
 
             if var in outs:
                 self.add_output(var, val, **new_kwargs)
@@ -178,7 +186,7 @@ class ExecComp(ExplicitComponent):
 
         # need to exclude any non-pbo outputs (like case_rank in ExecComp4Test)
         # TODO: for now, assume all outputs are non-pbo
-        self._non_pbo_outputs = self._variable_myproc_names['output'] #[u for u in self._init_unknowns_dict  if u in allvars]
+        self._non_pbo_outputs = self._variable_myproc_names['output']
 
         self._to_colons = {}
         from_colons = self._from_colons = {}
@@ -190,15 +198,14 @@ class ExecComp(ExplicitComponent):
             self._to_colons[no_colon] = n
             from_colons[n] = no_colon
 
-        self._colon_names = { n for n in allvars if ':' in n }
+        self._colon_names = {n for n in allvars if ':' in n}
 
         self._codes = self._compile_exprs(self._exprs)
 
     def _compile_exprs(self, exprs):
-        exprs = exprs[:]
-        for i in range(len(exprs)):
-            for n in self._colon_names:
-                exprs[i] = exprs[i].replace(n, self._from_colons[n])
+        for name in self._colon_names:
+            exprs = [expr.replace(name, self._from_colons[name])
+                     for expr in exprs]
 
         return [compile(expr, expr, 'exec') for expr in exprs]
 
@@ -264,11 +271,11 @@ class ExecComp(ExplicitComponent):
             pval = params[param]
             if isinstance(pval, ndarray):
                 # replace the param array with a complex copy
-                pwrap[param] = numpy.asarray(pval, complex)
+                pwrap[param] = numpy.asarray(pval, npcomplex)
                 idx_iter = array_idx_iter(pwrap[param].shape)
                 psize = pval.size
             else:
-                pwrap[param] = complex(pval)
+                pwrap[param] = npcomplex(pval)
                 idx_iter = (None,)
                 psize = 1
 
@@ -279,7 +286,7 @@ class ExecComp(ExplicitComponent):
                 else:
                     pwrap[param][idx] += step
 
-                uwrap = _TmpDict(unknowns, complex=True)
+                uwrap = _TmpDict(unknowns, return_complex=True)
 
                 # solve with complex param value
                 self._residuals.set_val(0.0)
@@ -315,13 +322,13 @@ class _TmpDict(object):
     inner : dict-like
         The dictionary to be wrapped.
 
-    complex : bool, optional
+    return_complex : bool, optional
         If True, return a complex version of values from __getitem__
     """
-    def __init__(self, inner, complex=False):
+    def __init__(self, inner, return_complex=False):
         self._inner = inner
         self._changed = {}
-        self._complex = complex
+        self._complex = return_complex
 
     def __getitem__(self, name):
         if name in self._changed:
@@ -329,9 +336,9 @@ class _TmpDict(object):
         elif self._complex:
             val = self._inner[name]
             if isinstance(val, ndarray):
-                self._changed[name] = numpy.asarray(val, dtype=complex)
+                self._changed[name] = numpy.asarray(val, dtype=npcomplex)
             else:
-                self._changed[name] = complex(val)
+                self._changed[name] = npcomplex(val)
             return self._changed[name]
         else:
             return self._inner[name]
@@ -379,7 +386,7 @@ class _UPDict(object):
         elif name in self._inputs:
             self._inputs[name] = value
         else:
-            self._outputs[name] # will raise KeyError
+            self._outputs[name] = value # will raise KeyError
 
 
 def _import_functs(mod, dct, names=None):
