@@ -583,8 +583,8 @@ class System(object):
                 ip_names.append(ip_name)
             ip_ind += 1
 
-        d_inputs._names = ip_names
-        d_outputs._names = op_names
+        d_inputs._names = set(ip_names)
+        d_outputs._names = set(op_names)
 
         return d_inputs, d_outputs, d_residuals
 

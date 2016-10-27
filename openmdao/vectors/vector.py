@@ -18,7 +18,6 @@ class Vector(object):
     def __init__(self, name, typ, system, global_vector=None):
         self._name = name
         self._typ = typ
-        self._names = []
 
         self._assembler = system._sys_assembler
         self._system = system
@@ -26,6 +25,7 @@ class Vector(object):
         self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
         self._initialize(global_vector)
         self._views, self._idxs = self._initialize_views()
+        self._names = []
 
     def _create_subvector(self, system):
         return self.__class__(self._name, self._typ, system,
@@ -36,7 +36,7 @@ class Vector(object):
                               self._global_vector)
 
     def __contains__(self, key):
-        return key in self._views
+        return key in self._names
 
     def __iter__(self):
         return iter(self._names)
@@ -92,7 +92,7 @@ class DefaultVector(Vector):
             self._data = self._extract_data()
 
     def _create_data(self):
-        return [numpy.zeros(numpy.sum(sizes[self._iproc, :])) 
+        return [numpy.zeros(numpy.sum(sizes[self._iproc, :]))
                    for sizes in self._assembler._variable_sizes[self._typ]]
 
     def _extract_data(self):
@@ -124,15 +124,13 @@ class DefaultVector(Vector):
         variable_myproc_names = system._variable_myproc_names[self._typ]
         variable_myproc_indices = system._variable_myproc_indices[self._typ]
         meta = system._variable_myproc_metadata[self._typ]
-        
-        self._names = variable_myproc_names[:]
 
         views = {}
-        
-        # contains a 0 index for floats or a slice(None) for arrays so getitem will 
+
+        # contains a 0 index for floats or a slice(None) for arrays so getitem will
         # return either a float or a properly shaped array respectively.
-        idxs = {}  
-        
+        idxs = {}
+
         for ind, name in enumerate(variable_myproc_names):
             ivar_all = variable_myproc_indices[ind]
             iset, ivar = variable_set_indices[ivar_all, :]
@@ -145,7 +143,7 @@ class DefaultVector(Vector):
                 idxs[name] = 0
             elif isinstance(val, numpy.ndarray):
                 idxs[name] = slice(None)
-            
+
         return views, idxs
 
     def __iadd__(self, vec):
