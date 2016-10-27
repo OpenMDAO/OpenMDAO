@@ -3,7 +3,7 @@ import numpy
 import unittest
 import scipy.sparse.linalg
 
-from openmdao.api import Problem, IndepVarComponent, ImplicitComponent, Group, PETScVector
+from openmdao.api import Problem, ImplicitComponent, Group, PETScVector
 from openmdao.solvers.solver import ScipyIterativeSolver
 
 
@@ -61,18 +61,15 @@ class CompB(ImplicitComponent):
 
 class GroupG(Group):
 
-    def __init__(self, name):
-        super(GroupG, self).__init__(name)
-
     def initialize(self):
-        self.add_subsystem(CompA('CA', promotes_all=True))
-        self.add_subsystem(CompB('CB', promotes_all=True))
+        self.add_subsystem('CA', CompA(), promotes=['*'])
+        self.add_subsystem('CB', CompB(), promotes=['*'])
 
 
 class Test(unittest.TestCase):
 
     def setUp(self):
-        group = GroupG('G')
+        group = GroupG()
         self.p = Problem(group)
 
         gmres = scipy.sparse.linalg.gmres

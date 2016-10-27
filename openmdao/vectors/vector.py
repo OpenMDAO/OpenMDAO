@@ -5,26 +5,27 @@ try:
 except:
     pass
 
+import numbers
 from six.moves import range
 
 from openmdao.vectors.transfer import DefaultTransfer
 from openmdao.vectors.transfer import PETScTransfer
 
-
+real_types = tuple([numbers.Real, numpy.float32, numpy.float64])
 
 class Vector(object):
 
     def __init__(self, name, typ, system, global_vector=None):
         self._name = name
         self._typ = typ
+        self._names = []
 
         self._assembler = system._sys_assembler
         self._system = system
 
         self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
         self._initialize(global_vector)
-        self._views = self._initialize_views()
-        self._names = []
+        self._views, self._idxs = self._initialize_views()
 
     def _create_subvector(self, system):
         return self.__class__(self._name, self._typ, system,
@@ -35,13 +36,13 @@ class Vector(object):
                               self._global_vector)
 
     def __contains__(self, key):
-        return key in self._names
+        return key in self._views
 
     def __iter__(self):
         return iter(self._names)
 
     def __getitem__(self, key):
-        return self._views[key]
+        return self._views[key][self._idxs[key]]
 
     def __setitem__(self, key, value):
         self._views[key][:] = value
@@ -91,13 +92,8 @@ class DefaultVector(Vector):
             self._data = self._extract_data()
 
     def _create_data(self):
-        variable_sizes = self._assembler._variable_sizes[self._typ]
-
-        data = []
-        for iset in range(len(variable_sizes)):
-            size = numpy.sum(variable_sizes[iset][self._iproc, :])
-            data.append(numpy.zeros(size))
-        return data
+        return [numpy.zeros(numpy.sum(sizes[self._iproc, :])) 
+                   for sizes in self._assembler._variable_sizes[self._typ]]
 
     def _extract_data(self):
         variable_sizes = self._assembler._variable_sizes[self._typ]
@@ -127,16 +123,30 @@ class DefaultVector(Vector):
         system = self._system
         variable_myproc_names = system._variable_myproc_names[self._typ]
         variable_myproc_indices = system._variable_myproc_indices[self._typ]
+        meta = system._variable_myproc_metadata[self._typ]
+        
+        self._names = variable_myproc_names[:]
 
         views = {}
-        for ind in range(len(variable_myproc_names)):
-            name = variable_myproc_names[ind]
+        
+        # contains a 0 index for floats or a slice(None) for arrays so getitem will 
+        # return either a float or a properly shaped array respectively.
+        idxs = {}  
+        
+        for ind, name in enumerate(variable_myproc_names):
             ivar_all = variable_myproc_indices[ind]
             iset, ivar = variable_set_indices[ivar_all, :]
             ind1 = numpy.sum(variable_sizes[iset][self._iproc, :ivar])
             ind2 = numpy.sum(variable_sizes[iset][self._iproc, :ivar+1])
             views[name] = self._global_vector._data[iset][ind1:ind2]
-        return views
+            views[name].shape = meta[ind]['shape']
+            val = meta[ind]['value']
+            if isinstance(val, real_types):
+                idxs[name] = 0
+            elif isinstance(val, numpy.ndarray):
+                idxs[name] = slice(None)
+            
+        return views, idxs
 
     def __iadd__(self, vec):
         for iset in range(len(self._data)):
@@ -149,8 +159,8 @@ class DefaultVector(Vector):
         return self
 
     def __imul__(self, val):
-        for iset in range(len(self._data)):
-            self._data[iset] *= val
+        for data in self._data:
+            data *= val
         return self
 
     def add_scal_vec(self, val, vec):
@@ -162,13 +172,13 @@ class DefaultVector(Vector):
             self._data[iset][:] = vec._data[iset]
 
     def set_const(self, val):
-        for iset in range(len(self._data)):
-            self._data[iset][:] = val
+        for data in self._data:
+            data[:] = val
 
     def get_norm(self):
         global_sum = 0
-        for iset in range(len(self._data)):
-            global_sum += numpy.sum(self._data[iset]**2)
+        for data in self._data:
+            global_sum += numpy.sum(data**2)
         return global_sum ** 0.5
 
 

@@ -2,7 +2,7 @@ from __future__ import division, print_function
 import numpy
 import unittest
 
-from openmdao.api import Problem, IndepVarComponent, ExplicitComponent, Group, PETScVector
+from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, PETScVector
 
 
 
@@ -41,10 +41,11 @@ class GeneralProblem(object):
         all_systems = []
 
         current_systems = []
+        current_sysnames = []
         for icomp in range(ncomp):
-            comp = GeneralComp('Comp-%i-%i' % (nlevel-ilevel, icomp),
-                               icomp=icomp, ncomp=ncomp, promotes_all=True)
+            comp = GeneralComp(icomp=icomp, ncomp=ncomp)
             current_systems.append(comp)
+            current_sysnames.append('Comp-%i-%i' % (nlevel-ilevel, icomp))
         all_systems.extend(current_systems[::-1])
         ilevel += 1
 
@@ -53,15 +54,23 @@ class GeneralProblem(object):
             nsub_group = int(numpy.floor(nsub/ngroup)) * numpy.ones(ngroup, int)
             nsub_group[-1] += nsub - numpy.sum(nsub_group)
             next_systems = []
+            next_sysnames = []
             for igroup in range(ngroup):
-                group = Group('Group-%i-%i' % (nlevel-ilevel, igroup))
+                group = Group()
                 group._mpi_proc_allocator.parallel = parallel_groups
                 ind1 = numpy.sum(nsub_group[:igroup])
                 ind2 = numpy.sum(nsub_group[:igroup+1])
                 for ind in range(ind1, ind2):
-                    group.add_subsystem(current_systems[ind])
+                    if isinstance(current_systems[ind], Group):
+                        promotes = None
+                    else:
+                        promotes = ['*']
+                    group.add_subsystem(current_sysnames[ind], current_systems[ind],
+                                        promotes=promotes)
                 next_systems.append(group)
+                next_sysnames.append('Group-%i-%i' % (nlevel-ilevel, igroup))
             current_systems = next_systems
+            current_sysnames = next_sysnames
             all_systems.extend(current_systems[::-1])
             ilevel += 1
 

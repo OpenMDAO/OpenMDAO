@@ -2,7 +2,7 @@ from __future__ import division
 import numpy
 import unittest
 
-from openmdao.api import Problem, IndepVarComponent, ExplicitComponent, Group, PETScVector
+from openmdao.api import Problem, ExplicitComponent, Group, PETScVector
 
 # Systems: R > C1, C2, C3, C4
 # Variables: v1, v2, v3, v4; all depend on each other
@@ -46,20 +46,17 @@ class Comp4(ExplicitComponent):
 
 class GroupG(Group):
 
-    def __init__(self, name):
-        super(GroupG, self).__init__(name)
-
     def initialize(self):
-        self.add_subsystem(Comp1('C1', promotes_all=True))
-        self.add_subsystem(Comp2('C2', promotes_all=True))
-        self.add_subsystem(Comp3('C3', promotes_all=True))
-        self.add_subsystem(Comp4('C4', promotes_all=True))
+        self.add_subsystem('C1', Comp1(), promotes=['*'])
+        self.add_subsystem('C2', Comp2(), promotes=['*'])
+        self.add_subsystem('C3', Comp3(), promotes=['*'])
+        self.add_subsystem('C4', Comp4(), promotes=['*'])
 
 
 class Test(unittest.TestCase):
 
     def setUp(self):
-        group = GroupG('G')
+        group = GroupG()
         self.p = Problem(group).setup(PETScVector)
         self.p.root._mpi_proc_allocator.parallel = True
 
@@ -91,59 +88,60 @@ class Test(unittest.TestCase):
         root = self.p.root
 
         if root.comm.size == 1:
-            comp1 = root.get_subsystem('G.C1')
-            comp2 = root.get_subsystem('G.C2')
-            comp3 = root.get_subsystem('G.C3')
-            comp4 = root.get_subsystem('G.C4')
+            comp1 = root.get_subsystem('C1')
+            comp2 = root.get_subsystem('C2')
+            comp3 = root.get_subsystem('C3')
+            comp4 = root.get_subsystem('C4')
 
-            comp1._outputs['v1'] = 1.0
-            comp2._outputs['v2'] = 1.0
-            comp3._outputs['v3'] = 1.0
+            comp1._outputs['v1'] = 2.0
+            comp2._outputs['v2'] = 4.0
+            comp3._outputs['v3'] = 6.0
+            comp4._outputs['v4'] = 8.0
 
             self.assertList([
-            [comp1._outputs['v1'], 1],
-            [comp1._inputs['v2'],  0],
-            [comp1._inputs['v3'],  0],
-            [comp1._inputs['v4'],  0],
+            [comp1._outputs['v1'], 2.0],
+            [comp1._inputs['v2'],  1.0],
+            [comp1._inputs['v3'],  1.0],
+            [comp1._inputs['v4'],  1.0],
             ])
 
             self.assertList([
-            [comp2._inputs['v1'],  0],
-            [comp2._outputs['v2'], 1],
-            [comp2._inputs['v3'],  0],
-            [comp2._inputs['v4'],  0],
+            [comp2._inputs['v1'],  1.0],
+            [comp2._outputs['v2'], 4.0],
+            [comp2._inputs['v3'],  1.0],
+            [comp2._inputs['v4'],  1.0],
             ])
 
             root._vector_transfers[None]['fwd', 0](root._inputs, root._outputs)
 
             self.assertList([
-            [comp1._outputs['v1'], 1],
-            [comp1._inputs['v2'],  1],
-            [comp1._inputs['v3'],  1],
-            [comp1._inputs['v4'],  0],
+            [comp1._outputs['v1'], 2.0],
+            [comp1._inputs['v2'],  4.0],
+            [comp1._inputs['v3'],  6.0],
+            [comp1._inputs['v4'],  8.0],
             ])
 
             self.assertList([
-            [comp2._inputs['v1'],  0],
-            [comp2._outputs['v2'], 1],
-            [comp2._inputs['v3'],  0],
-            [comp2._inputs['v4'],  0],
+            [comp2._inputs['v1'],  1.0],
+            [comp2._outputs['v2'], 4.0],
+            [comp2._inputs['v3'],  1.0],
+            [comp2._inputs['v4'],  1.0],
             ])
 
             root._vector_transfers[None][None](root._inputs, root._outputs)
 
             self.assertList([
-            [comp1._outputs['v1'], 1],
-            [comp1._inputs['v2'],  1],
-            [comp1._inputs['v3'],  1],
-            [comp1._inputs['v4'],  0],
+            [comp1._outputs['v1'], 2.0],
+            [comp1._inputs['v2'],  4.0],
+            [comp1._inputs['v3'],  6.0],
+            [comp1._inputs['v4'],  8.0],
             ])
 
             self.assertList([
-            [comp2._inputs['v1'],  1],
-            [comp2._outputs['v2'], 1],
-            [comp2._inputs['v3'],  1],
-            [comp2._inputs['v4'],  0],
+            [comp2._inputs['v1'],  2.0],
+            [comp2._outputs['v2'], 4.0],
+            [comp2._inputs['v3'],  6.0],
+            [comp2._inputs['v4'],  8.0],
             ])
 
 

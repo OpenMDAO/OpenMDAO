@@ -1,6 +1,11 @@
 """Define the base System class."""
 from __future__ import division
+
+from fnmatch import fnmatchcase
+
 import numpy
+
+from six import iteritems
 from six.moves import range
 
 from openmdao.proc_allocators.proc_allocator import DefaultProcAllocator
@@ -64,6 +69,13 @@ class System(object):
 
     _variable_maps : {'input': dict, 'output': dict}
         dictionary of variable names and their aliases (for promotes/renames).
+    _variable_promotes : { 'any': set(), 'input': set(), 'output': set() }
+        dictionary of sets of variable names/wildcards specifying promotion
+        (used to calculate _variable_maps)
+    _variable_renames : { 'input': {}, 'output': {} }
+        dictionary of mappings used to specify variables to be renamed in the
+        parent group. (used to calculate _variable_maps)
+
     _variable_connections : dict
         dictionary of input:output connections between subsystems.
     _variable_connections_indices : [(int, int), ...]
@@ -96,25 +108,21 @@ class System(object):
         global overriding flag that turns off all solver output if 'False'.
     """
 
-    def __init__(self, name, *args, **kwargs):
+    def __init__(self, **kwargs):
         """Initialize all attributes.
 
         All subclasses use this __init__ method without overriding it.
 
         Args
         ----
-        name : str
-            system name.
-        *args : list of arguments
-            available in methods as self.args.
+
         **kwargs: dict of keyword arguments
             available here and in all descendants of this system.
         """
-        self.name = name
+        self.name = ''
         self.path_name = ''
         self.comm = None
 
-        self.args = args
         self.kwargs = kwargs
         self.global_kwargs = {}
 
@@ -137,6 +145,9 @@ class System(object):
         self._variable_myproc_indices = {'input': None, 'output': None}
 
         self._variable_maps = {'input': {}, 'output': {}}
+        self._variable_promotes = {'any': set(), 'input': set(), 'output': set()}
+        self._variable_renames = {'input': {}, 'output': {}}
+
         self._variable_connections = {}
         self._variable_connections_indices = []
 
@@ -187,7 +198,7 @@ class System(object):
             indices of procs owned by comm with respect to COMM_WORLD.
         """
         # Set attributes
-        self.path_name = path + self.name
+        self.path_name = '.'.join((path, self.name)) if path else self.name
         self.comm = comm
         self.global_kwargs = global_kwargs
         self._sys_depth = depth
@@ -215,7 +226,7 @@ class System(object):
             # Perform recursion
             for subsys in self._subsystems_myproc:
                 sub_global_kwargs = self.global_kwargs.copy()
-                subsys._setup_processors(self.path_name + '.', sub_comm,
+                subsys._setup_processors(self.path_name, sub_comm,
                                          sub_global_kwargs, depth+1, assembler,
                                          sub_proc_range)
 
@@ -373,17 +384,25 @@ class System(object):
 
         # Loop through user-defined connections
         var_allprocs_names = self._variable_allprocs_names
-        for ip_name in self._variable_connections:
-            op_name = self._variable_connections[ip_name]
+        for ip_name, (op_name, src_indices) in iteritems(self._variable_connections):
 
-            ip_found = ip_name in var_allprocs_names['input']
-            op_found = op_name in var_allprocs_names['output']
-            if ip_found and op_found:
+            if ip_name in var_allprocs_names['input'] and op_name in var_allprocs_names['output']:
                 ip_index = var_allprocs_names['input'].index(ip_name)
                 op_index = var_allprocs_names['output'].index(op_name)
                 ip_index += self._variable_allprocs_range['input'][0]
                 op_index += self._variable_allprocs_range['output'][0]
                 pairs.append([ip_index, op_index])
+
+                if src_indices is not None:
+                    # set the 'indices' metadata in the input variable
+                    try:
+                        ip_myproc_index = self._variable_myproc_names['input'].index(ip_name)
+                    except ValueError:
+                        pass
+                    else:
+                        meta = self._variable_myproc_metadata['input'][ip_myproc_index]
+                        meta['indices'] = numpy.array(src_indices, dtype=int)
+                        meta['shape'] = meta['indices'].shape
 
         self._variable_connections_indices = pairs
 
@@ -498,33 +517,41 @@ class System(object):
         typ : str
             Either 'input' or 'output'.
         """
-        kwargs = self.kwargs
         maps = {}
 
-        # Give all variables the same names in the parent system
-        promotes_all = 'promotes_all_%ss' % typ
-        if 'promotes_all' in kwargs and kwargs['promotes_all']:
-            for name in self._variable_allprocs_names[typ]:
-                maps[name] = name
-        elif promotes_all in kwargs and kwargs[promotes_all]:
-            for name in self._variable_allprocs_names[typ]:
-                maps[name] = name
+        gname = self.name + '.' if self.name else ''
+
+        promotes = self._variable_promotes['any']
+        promotes_typ = self._variable_promotes[typ]
+        renames = self._variable_renames[typ]
+
+        if promotes:
+            names = promotes
+            patterns = [n for n in names if '*' in n or '?' in n]
+        elif promotes_typ:
+            names = promotes_typ
+            patterns = [n for n in names if '*' in n or '?' in n]
         else:
-            # Default: the parent system's name is prepended to variable name
-            for name in self._variable_allprocs_names[typ]:
-                maps[name] = self.name + '.' + name
+            names = ()
+            patterns = ()
 
-            # Promote selected variables
-            promotes = 'promotes_%ss' % typ
-            if promotes in kwargs:
-                for name in kwargs[promotes]:
+        for name in self._variable_allprocs_names[typ]:
+            if name in names:
+                maps[name] = name
+                continue
+
+            for pattern in patterns:
+                # if name matches, promote that variable to parent
+                if fnmatchcase(name, pattern):
                     maps[name] = name
-
-            # Rename selected variables to custom names in the parent system
-            renames = 'renames_%ss' % typ
-            if renames in kwargs:
-                for name in kwargs[renames]:
-                    maps[name] = kwargs[renames][name]
+                    break
+            else:
+                if name in renames:
+                    # Rename selected variables to custom names in the parent system
+                    maps[name] = renames[name]
+                else:
+                    # Default: the parent system's name is prepended to variable name
+                    maps[name] = gname + name if gname else name
 
         return maps
 
