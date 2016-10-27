@@ -1,6 +1,8 @@
 .. _OpenMDAO Reference Sheets: srcdocs/index.html
 
 .. toctree::
+   :titlesonly:
    :maxdepth: 1
 
-   srcdocs/index.rst
+   srcdocs/dev/index.rst
+   srcdocs/usr/index.rst
