@@ -6,12 +6,6 @@ from mock import Mock
 MOCK_MODULES = ['h5py', 'petsc4py', 'mpi4py', 'pyoptsparse']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
-#------------------------begin monkeypatch-----------------------
-#monkeypatch to make our docs say "Args" instead of "Parameters"
-from numpydoc.docscrape_sphinx import SphinxDocString
-from numpydoc.docscrape import NumpyDocString, Reader
-import textwrap
-
 import openmdao
 
 def generate_docs(type):
@@ -169,6 +163,11 @@ OpenMDAO User Source Documentation
 generate_docs("dev")
 generate_docs("usr")
 
+#------------------------begin monkeypatch-----------------------
+#monkeypatch to make our docs say "Args" instead of "Parameters"
+from numpydoc.docscrape_sphinx import SphinxDocString
+from numpydoc.docscrape import NumpyDocString, Reader
+import textwrap
 
 def _parse(self):
         self._doc.reset()
