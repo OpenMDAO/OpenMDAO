@@ -89,7 +89,7 @@ Detailed docstring rules:
 
      Args
      ----
-     argument_name: Type
+     argument_name : Type
          description ending with a period.
 
      Returns
