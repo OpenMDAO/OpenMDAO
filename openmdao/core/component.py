@@ -163,8 +163,8 @@ class ImplicitComponent(Component):
         """Compute jac-vector product.
 
         If mode is:
-            'fwd': (d_inputs, d_outputs) |-> d_residuals
-            'rev': d_residuals |-> (d_inputs, d_outputs)
+            'fwd': (d_inputs, d_outputs) -> d_residuals
+            'rev': d_residuals -> (d_inputs, d_outputs)
 
         Args
         ----
@@ -187,8 +187,8 @@ class ImplicitComponent(Component):
         """Apply inverse jac product.
 
         If mode is:
-            'fwd': d_residuals |-> d_outputs
-            'rev': d_outputs |-> d_residuals
+            'fwd': d_residuals -> d_outputs
+            'rev': d_outputs -> d_residuals
 
         Args
         ----
@@ -333,8 +333,8 @@ class ExplicitComponent(Component):
         """Compute jac-vector product.
 
         If mode is:
-            'fwd': d_inputs |-> d_outputs
-            'rev': d_outputs |-> d_inputs
+            'fwd': d_inputs -> d_outputs
+            'rev': d_outputs -> d_inputs
 
         Args
         ----
