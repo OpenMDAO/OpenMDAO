@@ -416,6 +416,7 @@ class System(object):
             _outputs*
             _residuals*
             _transfers*
+
         * If vec_name is None - i.e., we are setting up the nonlinear vector
 
         Args
