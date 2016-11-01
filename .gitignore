@@ -3,4 +3,10 @@
 .DS_Store
 .dropbox
 wingproj.wpr
+openmdao.egg-info/*
+openmdao/docs/_build/
+openmdao/docs/srcdocs/usr/
+openmdao/docs/srcdocs/dev/
+openmdao/docs/srcdocs/packages/
+openmdao/docs/srcdocs/index.rst
 
