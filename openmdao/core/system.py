@@ -13,7 +13,6 @@ from openmdao.solvers.solver import NonlinearBlockGS
 from openmdao.jacobians.jacobian import DefaultJacobian
 
 
-
 class System(object):
     """Base class for all systems in OpenMDAO.
 
@@ -75,7 +74,7 @@ class System(object):
         parent group. (used to calculate _variable_maps)
 
     _variable_connections : dict
-        dictionary of input:output connections between subsystems.
+        dictionary of input_name: (output_name, src_indices) connections.
     _variable_connections_indices : [(int, int), ...]
         _variable_connections with variable indices instead of names.
 
@@ -113,7 +112,6 @@ class System(object):
 
         Args
         ----
-
         **kwargs: dict of keyword arguments
             available here and in all descendants of this system.
         """
@@ -143,7 +141,8 @@ class System(object):
         self._variable_myproc_indices = {'input': None, 'output': None}
 
         self._variable_maps = {'input': {}, 'output': {}}
-        self._variable_promotes = {'any': set(), 'input': set(), 'output': set()}
+        self._variable_promotes = {'input': set(), 'output': set(),
+                                   'any': set()}
         self._variable_renames = {'input': {}, 'output': {}}
 
         self._variable_connections = {}
@@ -161,7 +160,7 @@ class System(object):
         self._jacobian = DefaultJacobian()
 
         self._solvers_nonlinear = NonlinearBlockGS()
-        self._solvers_linear = NonlinearBlockGS() # temporary hack!
+        self._solvers_linear = NonlinearBlockGS()  # temporary hack!
         self._solvers_print = True
 
         self.initialize()
@@ -316,19 +315,21 @@ class System(object):
             # Necessary because of multiple global counters on different procs
             if self.comm.size > 1:
                 for typ in ['input', 'output']:
+                    local_var_size = len(subsys0._variable_allprocs_names[typ])
+
                     # Compute the variable count list; 0 on rank > 0 procs
                     sub_comm = self._subsystems_myproc[0].comm
                     if sub_comm.rank == 0:
-                        nvar_myproc = len(subsys0._variable_allprocs_names[typ])
+                        nvar_myproc = local_var_size
                     else:
                         nvar_myproc = 0
                     nvar_allprocs = self.comm.allgather(nvar_myproc)
 
                     # Compute the offset
                     iproc = self.comm.rank
-                    nvar_myproc = len(subsys0._variable_allprocs_names[typ])
-                    index[typ] += numpy.sum(nvar_allprocs[:iproc+1]) \
-                               - nvar_myproc
+                    nvar_myproc = local_var_size
+                    index[typ] += (numpy.sum(nvar_allprocs[:iproc+1]) -
+                                   nvar_myproc)
 
             # Perform the recursion
             if recursion:
@@ -382,9 +383,12 @@ class System(object):
 
         # Loop through user-defined connections
         var_allprocs_names = self._variable_allprocs_names
-        for ip_name, (op_name, src_indices) in iteritems(self._variable_connections):
+        for ip_name, (op_name, src_indices) \
+                in iteritems(self._variable_connections):
 
-            if ip_name in var_allprocs_names['input'] and op_name in var_allprocs_names['output']:
+            is_valid = (ip_name in var_allprocs_names['input'] and
+                        op_name in var_allprocs_names['output'])
+            if is_valid:
                 ip_index = var_allprocs_names['input'].index(ip_name)
                 op_index = var_allprocs_names['output'].index(op_name)
                 ip_index += self._variable_allprocs_range['input'][0]
@@ -394,11 +398,13 @@ class System(object):
                 if src_indices is not None:
                     # set the 'indices' metadata in the input variable
                     try:
-                        ip_myproc_index = self._variable_myproc_names['input'].index(ip_name)
+                        input_var_names = self._variable_myproc_names['input']
+                        ip_myproc_index = input_var_names.index(ip_name)
                     except ValueError:
                         pass
                     else:
-                        meta = self._variable_myproc_metadata['input'][ip_myproc_index]
+                        input_meta = self._variable_myproc_metadata['input']
+                        meta = input_meta[ip_myproc_index]
                         meta['indices'] = numpy.array(src_indices, dtype=int)
                         meta['shape'] = meta['indices'].shape
 
@@ -414,6 +420,7 @@ class System(object):
             _outputs*
             _residuals*
             _transfers*
+
         * If vec_name is None - i.e., we are setting up the nonlinear vector
 
         Args
@@ -545,10 +552,10 @@ class System(object):
                     break
             else:
                 if name in renames:
-                    # Rename selected variables to custom names in the parent system
+                    # Rename selected variables in the parent system
                     maps[name] = renames[name]
                 else:
-                    # Default: the parent system's name is prepended to variable name
+                    # Default: prepend the parent system's name
                     maps[name] = gname + name if gname else name
 
         return maps

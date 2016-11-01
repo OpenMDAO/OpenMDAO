@@ -54,19 +54,35 @@ class Problem(object):
 
     # TODO: getitem/setitem need to properly handle scaling/units
     def __getitem__(self, name):
-        try:
-            return self.root._outputs[name]
-        except KeyError:
-            return self.root._inputs[name]
+        """Get an output variable.
+
+        Args
+        ----
+        name : str
+            name of the output variable in the root's namespace.
+
+        Returns
+        -------
+        ndarray.view
+            the requested variable
+        """
+        return self.root._outputs[name]
 
     def __setitem__(self, name, value):
-        try:
-            self.root._outputs[name] = value
-        except KeyError:
-            self.root._inputs[name] = value
+        """Set an output variable.
+
+        Args
+        ----
+        name : str
+            name of the output variable in the root's namespace.
+        value : float or ndarray or list
+            value to set this variable to.
+        """
+        self.root._outputs[name] = value
 
     # TODO: once we have drivers, this should call self.driver.run() instead
     def run(self):
+        """Run the model by calling the root's solve_nonlinear."""
         self.root._solve_nonlinear()
 
     def setup(self, VectorClass=None, check=False, out_stream=sys.stdout):
@@ -111,7 +127,7 @@ class Problem(object):
         # Assembler setup: global transfer indices vector
         input_metadata = root._variable_myproc_metadata['input']
         var_indices = root._variable_myproc_indices['input']
-        assembler._setup_input_indices(input_metadata, var_indices)
+        assembler._setup_src_indices(input_metadata, var_indices)
 
         # Vector setup for the basic execution vector
         self.setup_vector(None, VectorClass)

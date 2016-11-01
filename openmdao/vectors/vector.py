@@ -1,3 +1,4 @@
+"""Define the base Vector class."""
 from __future__ import division
 import numpy
 try:
@@ -13,9 +14,53 @@ from openmdao.vectors.transfer import PETScTransfer
 
 real_types = tuple([numbers.Real, numpy.float32, numpy.float64])
 
+
 class Vector(object):
+    """Base Vector class.
+
+    This class is instantiated for inputs, outputs, and residuals.
+    It provides a dictionary interface and an arithmetic operations interface.
+
+    Implementations:
+        DefaultVector
+        PETScVector
+
+    Attributes
+    ----------
+    _name : str
+        right-hand-side (RHS) name.
+    _typ : str
+        'input' or 'output'.
+    _assembler : Assembler
+        pointer to the assembler.
+    _system : System
+        pointer to the owning system.
+    _iproc : int
+        global processor index.
+    _views : dict
+        dictionary mapping variable names to the corresponding ndarray views.
+    _idxs : dict
+        0 or slice(None), used so that 1-sized vectors are made floats.
+    _names : [str, ...]
+        list of variables that are relevant in the current mat-vec product.
+    _global_vector : Vector
+        pointer to the vector owned by the root system.
+    _data : object
+        the actual allocated data (depends on implementation).
+    """
 
     def __init__(self, name, typ, system, global_vector=None):
+        """Initialize all attributes.
+
+        name : str
+            right-hand-side (RHS) name.
+        typ : str
+            'input' for input vectors; 'output' for output/residual vectors.
+        system : System
+            pointer to the owning system.
+        global_vector : Vector
+            pointer to the vector owned by the root system.
+        """
         self._name = name
         self._typ = typ
 
@@ -23,79 +68,233 @@ class Vector(object):
         self._system = system
 
         self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
-        self._initialize(global_vector)
-        self._views, self._idxs = self._initialize_views()
+        self._views = {}
+        self._idxs = {}
         self._names = []
 
+        self._global_vector = None
+        self._data = None
+        if global_vector is None:
+            self._global_vector = self
+        else:
+            self._global_vector = global_vector
+
+        self._initialize_data(global_vector)
+        self._initialize_views()
+
     def _create_subvector(self, system):
+        """Return a smaller vector for a subsystem.
+
+        Args
+        ----
+        system : System
+            system for the subvector that is a subsystem of self._system.
+
+        Returns
+        -------
+        Vector
+            subvector instance.
+        """
         return self.__class__(self._name, self._typ, system,
                               self._global_vector)
 
     def _clone(self):
+        """Copy the current instance.
+
+        Returns
+        -------
+        Vector
+            instance of the clone; the data is not copied.
+        """
         return self.__class__(self._name, self._typ, self._system,
                               self._global_vector)
 
     def __contains__(self, key):
+        """Check if the variable is involved in the current mat-vec product.
+
+        Args
+        ----
+        key : str
+            variable name in the owning system's namespace.
+
+        Returns
+        -------
+        boolean
+            True or False.
+        """
         return key in self._names
 
     def __iter__(self):
+        """Iterator over variables involved in the current mat-vec product.
+
+        Returns
+        -------
+        listiterator
+            iterator over the variable names.
+        """
         return iter(self._names)
 
     def __getitem__(self, key):
+        """Get the unscaled variable value in true units.
+
+        Args
+        ----
+        key : str
+            variable name in the owning system's namespace.
+
+        Returns
+        -------
+        float or ndarray
+            variable value (not scaled, not dimensionless).
+        """
         return self._views[key][self._idxs[key]]
 
     def __setitem__(self, key, value):
+        """Set the unscaled variable value in true units.
+
+        Args
+        ----
+        key : str
+            variable name in the owning system's namespace.
+        value : float or list or tuple or ndarray
+            variable value to set (not scaled, not dimensionless).
+        """
         self._views[key][:] = value
 
-    def _initialize(self):
+    def _initialize_data(self, global_vector):
+        """Internally allocate vectors.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        global_vector : Vector or None
+            the root's vector instance or None, if we are at the root.
+        """
         pass
 
     def _initialize_views(self):
+        """Internally assemble views onto the vectors.
+
+        Must be implemented by the subclass.
+
+        Sets the following attributes:
+            _views
+            _idxs
+        """
         pass
 
     def __iadd__(self, vec):
+        """Perform in-place vector addition.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        vec : Vector
+            vector to add to self.
+        """
         pass
 
     def __isub__(self, vec):
+        """Perform in-place vector substraction.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        vec : Vector
+            vector to subtract from self.
+        """
         pass
 
     def __imul__(self, val):
+        """Perform in-place scalar multiplication.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        val : int or float
+            scalar to multiply self.
+        """
         pass
 
     def add_scal_vec(self, val, vec):
+        """Perform in-place addition of a vector times a scalar.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        vec : Vector
+            this vector times val is added to self.
+        val : int or float
+            scalar.
+        """
         pass
 
     def set_vec(self, vec):
+        """Set the value of this vector to that of the incoming vector.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        vec : Vector
+            the vector whose values self is set to.
+        """
         pass
 
     def set_const(self, val):
-        pass
+        """Set the value of this vector to a constant value.
 
-    def set_val(self, val):
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        val : int or float
+            scalar to set self to.
+        """
         pass
 
     def get_norm(self):
+        """Return the norm of this vector.
+
+        Must be implemented by the subclass.
+
+        Returns
+        -------
+        float
+            norm of this vector.
+        """
         pass
 
 
-
 class DefaultVector(Vector):
+    """Default NumPy vector."""
 
     TRANSFER = DefaultTransfer
 
-    def _initialize(self, global_vector):
-        if global_vector is None:
-            self._global_vector = self
-            self._data = self._create_data()
-        else:
-            self._global_vector = global_vector
-            self._data = self._extract_data()
-
     def _create_data(self):
+        """Allocate list of arrays, one for each var_set.
+
+        Returns
+        -------
+        [ndarray[:], ...]
+            list of zeros arrays of correct size, one for each var_set.
+        """
         return [numpy.zeros(numpy.sum(sizes[self._iproc, :]))
-                   for sizes in self._assembler._variable_sizes[self._typ]]
+                for sizes in self._assembler._variable_sizes[self._typ]]
 
     def _extract_data(self):
+        """Extract views of arrays from global_vector.
+
+        Returns
+        -------
+        [ndarray[:], ...]
+            list of zeros arrays of correct size, one for each var_set.
+        """
         variable_sizes = self._assembler._variable_sizes[self._typ]
         variable_set_indices = self._assembler._variable_set_indices[self._typ]
 
@@ -116,7 +315,15 @@ class DefaultVector(Vector):
 
         return data
 
+    def _initialize_data(self, global_vector):
+        """See openmdao.vectors.Vector."""
+        if global_vector is None:
+            self._data = self._create_data()
+        else:
+            self._data = self._extract_data()
+
     def _initialize_views(self):
+        """See openmdao.vectors.Vector."""
         variable_sizes = self._assembler._variable_sizes[self._typ]
         variable_set_indices = self._assembler._variable_set_indices[self._typ]
 
@@ -127,8 +334,8 @@ class DefaultVector(Vector):
 
         views = {}
 
-        # contains a 0 index for floats or a slice(None) for arrays so getitem will
-        # return either a float or a properly shaped array respectively.
+        # contains a 0 index for floats or a slice(None) for arrays so getitem
+        # will return either a float or a properly shaped array respectively.
         idxs = {}
 
         for ind, name in enumerate(variable_myproc_names):
@@ -144,53 +351,63 @@ class DefaultVector(Vector):
             elif isinstance(val, numpy.ndarray):
                 idxs[name] = slice(None)
 
-        return views, idxs
+        self._views = views
+        self._idxs = idxs
 
     def __iadd__(self, vec):
+        """See openmdao.vectors.Vector."""
         for iset in range(len(self._data)):
             self._data[iset] += vec._data[iset]
         return self
 
     def __isub__(self, vec):
+        """See openmdao.vectors.Vector."""
         for iset in range(len(self._data)):
             self._data[iset] -= vec._data[iset]
         return self
 
     def __imul__(self, val):
+        """See openmdao.vectors.Vector."""
         for data in self._data:
             data *= val
         return self
 
     def add_scal_vec(self, val, vec):
+        """See openmdao.vectors.Vector."""
         for iset in range(len(self._data)):
             self._data[iset] *= val * vec._data[iset]
 
     def set_vec(self, vec):
+        """See openmdao.vectors.Vector."""
         for iset in range(len(self._data)):
             self._data[iset][:] = vec._data[iset]
 
     def set_const(self, val):
+        """See openmdao.vectors.Vector."""
         for data in self._data:
             data[:] = val
 
     def get_norm(self):
+        """See openmdao.vectors.Vector."""
         global_sum = 0
         for data in self._data:
             global_sum += numpy.sum(data**2)
         return global_sum ** 0.5
 
 
-
 class PETScVector(DefaultVector):
+    """PETSc Vector implementation for running in parallel.
+
+    Most methods use the DefaultVector's implementation.
+    """
 
     TRANSFER = PETScTransfer
 
-    def _initialize(self, global_vector):
+    def _initialize_data(self, global_vector):
+        """See openmdao.vectors.Vector."""
         if global_vector is None:
-            self._global_vector = self
             self._data = self._create_data()
         else:
-            self._global_vector = global_vector
             self._data = self._extract_data()
 
         self._petsc = []
@@ -200,6 +417,7 @@ class PETScVector(DefaultVector):
             self._petsc.append(petsc)
 
     def get_norm(self):
+        """See openmdao.vectors.Vector."""
         global_sum = 0
         for iset in range(len(self._data)):
             global_sum += numpy.sum(self._data[iset]**2)

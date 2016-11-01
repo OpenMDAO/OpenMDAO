@@ -26,25 +26,25 @@ class Group(System):
             An instantiated, but not-yet-set up system object.
 
         promotes : iter of str, optional
-            A list of variable names or wildcards specifying which subsystem variables
-            to 'promote' up to this group. This is for backwards compatability with older
-            versions of OpenMDAO.
+            A list of variable names specifying which subsystem variables
+            to 'promote' up to this group. This is for backwards compatibility
+            with older versions of OpenMDAO.
 
         promotes_inputs : iter of str, optional
-            A list of input variable names or wildcards specifying which subsystem input
+            A list of input variable names specifying which subsystem input
             variables to 'promote' up to this group.
 
         promotes_outputs : iter of str, optional
-            A list of output variable names or wildcards specifying which subsystem output
+            A list of output variable names specifying which subsystem output
             variables to 'promote' up to this group.
 
         renames_inputs : list of (str, str) or dict, optional
-            A dict mapping old name to new name for any subsystem input variables that should
-            be renamed in this group.
+            A dict mapping old name to new name for any subsystem
+            input variables that should be renamed in this group.
 
         renames_outputs : list of (str, str) or dict, optional
-            A dict mapping old name to new name for any subsystem output variables that should
-            be renamed in this group.
+            A dict mapping old name to new name for any subsystem
+            output variables that should be renamed in this group.
 
         """
         self._subsystems_allprocs.append(subsys)
@@ -92,7 +92,7 @@ class Group(System):
         return self._solvers_nonlinear()
 
     def _apply_linear(self, vec_names, mode, var_ind_range=None):
-        """Compute jac-vector product; use global Jacobian / apply recursion."""
+        """Compute jac-vec product; use global Jacobian / apply recursion."""
         if var_ind_range is None:
             var_ind_range = self._variable_allprocs_range['output']
 
@@ -100,6 +100,7 @@ class Group(System):
             for vec_name in vec_names:
                 tmp = self._get_vectors(vec_name, var_ind_range, mode)
                 d_inputs, d_outputs, d_residuals = tmp
+                self._jacobian._system = self
                 self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
         else:
             if mode == 'fwd':
@@ -127,4 +128,5 @@ class Group(System):
             subsys._linearize()
 
         if self._jacobian._top_name == self.path_name:
+            self._jacobian._system = self
             self._jacobian._update()
