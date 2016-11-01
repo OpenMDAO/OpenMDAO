@@ -24,7 +24,7 @@ class ScipyIterativeSolver(LinearSolver):
 
         # TODO: generalize this to multiple var_sets
         x_vec._data[0][:] = in_vec
-        system._apply_linear([vec_name], self._mode, [ind1, ind2])
+        system._apply_linear([vec_name], self._mode, numpy.arange(ind1, ind2))
         return b_vec._data[0][:]
 
     def _monitor(self, res):

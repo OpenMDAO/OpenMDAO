@@ -21,6 +21,10 @@ class Solver(object):
         options dictionary.
     _kwargs : dict
         kwargs dictionary for additional options / parameters.
+    _vec_names : [str, ...]
+        list of right-hand-side (RHS) vector names.
+    _mode : str
+        'fwd' or 'rev', applicable to linear solvers only.
     subsolvers : dict
         dictionary of pointers to subsolvers.
     """
@@ -44,6 +48,8 @@ class Solver(object):
         self._options = {'ilimit': 10, 'atol': 1e-6, 'rtol': 1e-6, 'iprint': 1}
         self._options.update(options)
         self._kwargs = kwargs
+        self._vec_names = None
+        self._mode = 'fwd'
         self.subsolvers = subsolvers
 
     def _setup_solvers(self, system, depth):

@@ -562,7 +562,7 @@ class System(object):
 
         return maps
 
-    def _get_vectors(self, vec_name, var_ind_range, mode):
+    def _get_vectors(self, vec_name, var_inds, mode):
         d_inputs = self._vectors['input'][vec_name]
         d_outputs = self._vectors['output'][vec_name]
         d_residuals = self._vectors['residual'][vec_name]
@@ -576,7 +576,10 @@ class System(object):
         op_names = []
         op_ind = self._variable_allprocs_range['output'][0]
         for op_name in self._variable_allprocs_names['output']:
-            if op_ind in self._vector_var_ids[vec_name]:
+            valid = op_ind in self._vector_var_ids[vec_name]
+            if var_inds is not None:
+                valid = valid and op_ind in var_inds
+            if valid:
                 op_names.append(op_name)
             op_ind += 1
 
@@ -584,11 +587,15 @@ class System(object):
         ip_ind = self._variable_allprocs_range['input'][0]
         for ip_name in self._variable_allprocs_names['input']:
             input_var_id = self._sys_assembler._input_var_ids[ip_ind]
-            valid = var_ind_range[0] <= ip_ind < var_ind_range[1]
             valid = valid and input_var_id in self._vector_var_ids[vec_name]
+            if var_inds is not None:
+                valid = valid and ip_ind in var_inds
             if valid:
                 ip_names.append(ip_name)
             ip_ind += 1
+
+        # TODO: see if we can avoid the `in var_inds` because this is slow
+        # e.g., var_inds could be two range pairs to account for gaps
 
         d_inputs._names = set(ip_names)
         d_outputs._names = set(op_names)

@@ -13,7 +13,8 @@ class NonlinearBlockGS(NonlinearSolver):
         """See openmdao.solvers.solver.Solver."""
         system = self._system
         for isub in range(len(system._subsystems_allprocs)):
-            system._transfers['fwd', isub](system._inputs, system._outputs, 'fwd')
+            system._transfers['fwd', isub](system._inputs,
+                                           system._outputs, 'fwd')
 
             if isub in system._subsystems_inds:
                 index = system._subsystems_inds.index(isub)

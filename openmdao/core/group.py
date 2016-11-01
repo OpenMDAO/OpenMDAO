@@ -91,14 +91,11 @@ class Group(System):
         """Compute outputs; run nonlinear solver."""
         return self._solvers_nonlinear()
 
-    def _apply_linear(self, vec_names, mode, var_ind_range=None):
+    def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product; use global Jacobian / apply recursion."""
-        if var_ind_range is None:
-            var_ind_range = self._variable_allprocs_range['output']
-
         if self._jacobian._top_name == self.path_name:
             for vec_name in vec_names:
-                tmp = self._get_vectors(vec_name, var_ind_range, mode)
+                tmp = self._get_vectors(vec_name, var_inds, mode)
                 d_inputs, d_outputs, d_residuals = tmp
                 self._jacobian._system = self
                 self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
@@ -110,7 +107,7 @@ class Group(System):
                     self._transfers[None](d_inputs, d_outputs, mode)
 
             for subsys in self._subsystems_myproc:
-                subsys._apply_linear(vec_names, mode, var_ind_range)
+                subsys._apply_linear(vec_names, mode, var_inds)
 
             if mode == 'rev':
                 for vec_name in vec_names:
