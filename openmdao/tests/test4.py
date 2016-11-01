@@ -4,7 +4,7 @@ import unittest
 import scipy.sparse.linalg
 
 from openmdao.api import Problem, ImplicitComponent, Group, PETScVector
-from openmdao.solvers.solver import ScipyIterativeSolver
+from openmdao.solvers.ln_scipy import ScipyIterativeSolver
 
 
 class CompA(ImplicitComponent):

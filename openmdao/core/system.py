@@ -9,7 +9,7 @@ from six import iteritems
 from six.moves import range
 
 from openmdao.proc_allocators.proc_allocator import DefaultProcAllocator
-from openmdao.solvers.solver import NonlinearBlockGS
+from openmdao.solvers.nl_bgs import NonlinearBlockGS
 from openmdao.jacobians.jacobian import DefaultJacobian
 
 
