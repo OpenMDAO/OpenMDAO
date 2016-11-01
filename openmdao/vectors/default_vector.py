@@ -14,7 +14,7 @@ class DefaultTransfer(Transfer):
     """Default NumPy transfer."""
 
     def __call__(self, ip_vec, op_vec, mode='fwd'):
-        """See openmdao.vectors.Transfer."""
+        """See openmdao.vectors.vector.Transfer."""
         ip_inds = self._ip_inds
         op_inds = self._op_inds
 
@@ -82,14 +82,14 @@ class DefaultVector(Vector):
         return data
 
     def _initialize_data(self, global_vector):
-        """See openmdao.vectors.Vector."""
+        """See openmdao.vectors.vector.Vector."""
         if global_vector is None:
             self._data = self._create_data()
         else:
             self._data = self._extract_data()
 
     def _initialize_views(self):
-        """See openmdao.vectors.Vector."""
+        """See openmdao.vectors.vector.Vector."""
         variable_sizes = self._assembler._variable_sizes[self._typ]
         variable_set_indices = self._assembler._variable_set_indices[self._typ]
 
@@ -121,40 +121,40 @@ class DefaultVector(Vector):
         self._idxs = idxs
 
     def __iadd__(self, vec):
-        """See openmdao.vectors.Vector."""
+        """See openmdao.vectors.vector.Vector."""
         for iset in range(len(self._data)):
             self._data[iset] += vec._data[iset]
         return self
 
     def __isub__(self, vec):
-        """See openmdao.vectors.Vector."""
+        """See openmdao.vectors.vector.Vector."""
         for iset in range(len(self._data)):
             self._data[iset] -= vec._data[iset]
         return self
 
     def __imul__(self, val):
-        """See openmdao.vectors.Vector."""
+        """See openmdao.vectors.vector.Vector."""
         for data in self._data:
             data *= val
         return self
 
     def add_scal_vec(self, val, vec):
-        """See openmdao.vectors.Vector."""
+        """See openmdao.vectors.vector.Vector."""
         for iset in range(len(self._data)):
             self._data[iset] *= val * vec._data[iset]
 
     def set_vec(self, vec):
-        """See openmdao.vectors.Vector."""
+        """See openmdao.vectors.vector.Vector."""
         for iset in range(len(self._data)):
             self._data[iset][:] = vec._data[iset]
 
     def set_const(self, val):
-        """See openmdao.vectors.Vector."""
+        """See openmdao.vectors.vector.Vector."""
         for data in self._data:
             data[:] = val
 
     def get_norm(self):
-        """See openmdao.vectors.Vector."""
+        """See openmdao.vectors.vector.Vector."""
         global_sum = 0
         for data in self._data:
             global_sum += numpy.sum(data**2)

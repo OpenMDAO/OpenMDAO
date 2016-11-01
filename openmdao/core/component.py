@@ -65,11 +65,11 @@ class Component(System):
         self._variable_myproc_metadata[typ].append(metadata)
 
     def add_input(self, name, val=1.0, **kwargs):
-        """See _add_variable."""
+        """See openmdao.core.component.Component._add_variable."""
         self._add_variable(name, 'input', val, kwargs)
 
     def add_output(self, name, val=1.0, **kwargs):
-        """See _add_variable."""
+        """See openmdao.core.component.Component._add_variable."""
         self._add_variable(name, 'output', val, kwargs)
 
     def _setup_vector(self, vectors, vector_var_ids):

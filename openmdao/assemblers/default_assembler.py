@@ -12,7 +12,7 @@ class DefaultAssembler(Assembler):
 
     def _compute_transfers(self, nsub_allprocs, var_range,
                            subsystems_myproc, subsystems_inds):
-        """See openmdao.asssemblers.Assembler."""
+        """See openmdao.assemblers.assembler.Assembler."""
         ip_set_indices = self._variable_set_indices['input']
         op_set_indices = self._variable_set_indices['output']
 

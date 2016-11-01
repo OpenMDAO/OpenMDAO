@@ -10,7 +10,7 @@ class DefaultAllocator(ProcAllocator):
     """Default processor allocator."""
 
     def _divide_procs(self, nsub, comm, proc_range):
-        """See openmdao.proc_allocators.ProcAllocator."""
+        """See openmdao.proc_allocators.proc_allocator.ProcAllocator."""
         iproc = comm.rank
         nproc = comm.size
 

@@ -11,7 +11,7 @@ class DefaultJacobian(Jacobian):
     """No global Jacobian; use dictionary of user-supplied sub-Jacobians."""
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
-        """See openmdao.jacobians.Jacobian."""
+        """See openmdao.jacobians.jacobian.Jacobian."""
         for op_name, ip_name in self:
             jac = self[op_name, ip_name]
             if op_name in d_outputs and ip_name in d_outputs:

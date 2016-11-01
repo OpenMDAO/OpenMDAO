@@ -11,7 +11,7 @@ class DenseJacobian(object):
     """Assemble dense global Jacobian."""
 
     def _initialize(self):
-        """See openmdao.jacobians.Jacobian."""
+        """See openmdao.jacobians.jacobian.Jacobian."""
         sizes = self._assembler.variable_sizes
         set_indices = self._assembler.variable_set_indices
         iproc = self._system._comm.rank + self._system._proc_range[0]
@@ -46,7 +46,7 @@ class DenseJacobian(object):
                     self._mtx[op_ivar_set, ip_ivar_set] = array
 
     def _update(self):
-        """See openmdao.jacobians.Jacobian."""
+        """See openmdao.jacobians.jacobian.Jacobian."""
         names = self._system.variable_myproc_names
         indices = self._system.variable_myproc_indices
         sizes = self._assembler.variable_sizes

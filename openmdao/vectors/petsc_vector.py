@@ -15,7 +15,7 @@ class PETScTransfer(DefaultTransfer):
     """PETSc Transfer implementation for running in parallel."""
 
     def _initialize_transfer(self):
-        """See openmdao.vectors.Transfer."""
+        """See openmdao.vectors.vector.Transfer."""
         self._transfers = {}
         for ip_iset, op_iset in self._ip_inds:
             key = (ip_iset, op_iset)
@@ -33,7 +33,7 @@ class PETScTransfer(DefaultTransfer):
                 self._transfers[key] = transfer
 
     def __call__(self, ip_vec, op_vec, mode='fwd'):
-        """See openmdao.vectors.Transfer."""
+        """See openmdao.vectors.vector.Transfer."""
         if mode == 'fwd':
             for ip_iset, op_iset in self._ip_inds:
                 key = (ip_iset, op_iset)
@@ -61,7 +61,7 @@ class PETScVector(DefaultVector):
     TRANSFER = PETScTransfer
 
     def _initialize_data(self, global_vector):
-        """See openmdao.vectors.Vector."""
+        """See openmdao.vectors.vector.Vector."""
         if global_vector is None:
             self._data = self._create_data()
         else:
@@ -74,7 +74,7 @@ class PETScVector(DefaultVector):
             self._petsc.append(petsc)
 
     def get_norm(self):
-        """See openmdao.vectors.Vector."""
+        """See openmdao.vectors.vector.Vector."""
         global_sum = 0
         for iset in range(len(self._data)):
             global_sum += numpy.sum(self._data[iset]**2)
