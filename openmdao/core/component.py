@@ -95,7 +95,7 @@ class ImplicitComponent(Component):
     def _solve_nonlinear(self):
         """Compute outputs; call user's solve_nonlinear or nonlinear solver."""
         if self._solvers_nonlinear is not None:
-            self._solvers_nonlinear(self._inputs, self._outputs)
+            self._solvers_nonlinear()
         else:
             self.solve_nonlinear(self._inputs, self._outputs)
 

@@ -29,8 +29,6 @@ class System(object):
     comm : MPI.Comm or FakeComm
         MPI communicator object.
 
-    args : list of objects
-        user-defined arguments (to be used in apply_nonlinear, ...).
     kwargs : dict of objects
         dictionary of user-defined arguments.
     global_kwargs : dict of objects
