@@ -3,8 +3,8 @@ from __future__ import division
 
 import sys
 
-from openmdao.assemblers.assembler import DefaultAssembler
-from openmdao.vectors.vector import DefaultVector
+from openmdao.assemblers.default_assembler import DefaultAssembler
+from openmdao.vectors.default_vector import DefaultVector
 
 
 class FakeComm(object):

@@ -4,11 +4,6 @@ import numpy
 import scipy.sparse
 from six.moves import range
 
-try:
-    from petsc4py import PETSc
-except:
-    pass
-
 
 class Jacobian(object):
     """Base Jacobian class.
@@ -215,91 +210,3 @@ class Jacobian(object):
             'fwd' or 'rev'.
         """
         pass
-
-
-class DefaultJacobian(Jacobian):
-    """No global Jacobian; use dictionary of user-supplied sub-Jacobians."""
-
-    def _apply(self, d_inputs, d_outputs, d_residuals, mode):
-        """See openmdao.jacobians.Jacobian."""
-        for op_name, ip_name in self:
-            jac = self[op_name, ip_name]
-            if op_name in d_outputs and ip_name in d_outputs:
-                if mode == 'fwd':
-                    d_residuals[op_name] += jac.dot(d_outputs[ip_name])
-                if mode == 'rev':
-                    d_outputs[ip_name] = jac.T.dot(d_residuals[op_name])
-
-            if op_name in d_outputs and ip_name in d_inputs:
-                if mode == 'fwd':
-                    d_residuals[op_name] += jac.dot(d_inputs[ip_name])
-                if mode == 'rev':
-                    d_inputs[ip_name] += jac.T.dot(d_residuals[op_name])
-
-
-class DenseJacobian(object):
-    """Assemble dense global Jacobian."""
-
-    def _initialize(self):
-        """See openmdao.jacobians.Jacobian."""
-        sizes = self._assembler.variable_sizes
-        set_indices = self._assembler.variable_set_indices
-        iproc = self._system._comm.rank + self._system._proc_range[0]
-
-        ip_nvar_set = len(self._assembler.variable_set_IDs['input'])
-        op_nvar_set = len(self._assembler.variable_set_IDs['output'])
-
-        for ip_ivar_set in range(ip_nvar_set):
-            ip_bool = set_indices['input'][:, 0] == ip_ivar_set
-            ip_inds = set_indices['input'][ip_bool, 1]
-            if len(ip_inds) > 0:
-                sizes_array = sizes['input'][ip_ivar_set]
-                ind1 = numpy.sum(sizes_array[iproc, :ip_inds[0]])
-                ind2 = numpy.sum(sizes_array[iproc, :ip_inds[-1]+1])
-                ip_size = ind2 - ind1
-            else:
-                ip_size = 0
-
-            for op_ivar_set in range(op_nvar_set):
-                op_bool = set_indices['output'][:, 0] == op_ivar_set
-                op_inds = set_indices['output'][op_bool, 1]
-                if len(op_inds) > 0:
-                    sizes_array = sizes['output'][op_ivar_set]
-                    ind1 = numpy.sum(sizes_array[oproc, :op_inds[0]])
-                    ind2 = numpy.sum(sizes_array[oproc, :op_inds[-1]+1])
-                    op_size = ind2 - ind1
-                else:
-                    op_size = 0
-
-                if ip_size > 0 and op_size > 0:
-                    array = numpy.zeros((op_size, ip_size))
-                    self._mtx[op_ivar_set, ip_ivar_set] = array
-
-    def _update(self):
-        """See openmdao.jacobians.Jacobian."""
-        names = self._system.variable_myproc_names
-        indices = self._system.variable_myproc_indices
-        sizes = self._assembler.variable_sizes
-        set_indices = self._assembler.variable_set_indices
-        iproc = self._system._comm.rank + self._system._proc_range[0]
-
-        for ip_ind in range(len(names['input'])):
-            ip_name = names['input'][ip_ind]
-            ip_ivar_all = indices['input'][ip_ind]
-            ip_ivar_set, ip_ivar = set_indices[ip_ivar_all, :]
-            sizes_array = sizes['input'][ip_ivar_set]
-            ip_ind1 = numpy.sum(sizes_array[iproc, :ip_ivar])
-            ip_ind2 = numpy.sum(sizes_array[iproc, :ip_ivar+1])
-
-            for op_ind in range(len(names['output'])):
-                op_name = names['output'][op_ind]
-                op_ivar_all = indices['output'][op_ind]
-                op_ivar_set, op_ivar = set_indices[op_ivar_all, :]
-                sizes_array = sizes['output'][op_ivar_set]
-                ip_ind1 = numpy.sum(sizes_array[iproc, :op_ivar])
-                ip_ind2 = numpy.sum(sizes_array[iproc, :op_ivar+1])
-
-                if (op_name, ip_name) in self._dict:
-                    jac = self._dict[op_name, ip_name]
-                    mtx = self._mtx[op_ivar_set, ip_ivar_set]
-                    mtx[op_ind1:op_ind2, ip_ind1:ip_ind2] = jac

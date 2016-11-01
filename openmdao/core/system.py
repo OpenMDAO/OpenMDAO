@@ -8,9 +8,9 @@ import numpy
 from six import iteritems
 from six.moves import range
 
-from openmdao.proc_allocators.proc_allocator import DefaultProcAllocator
+from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
-from openmdao.jacobians.jacobian import DefaultJacobian
+from openmdao.jacobians.default_jacobian import DefaultJacobian
 
 
 class System(object):
@@ -127,7 +127,7 @@ class System(object):
         self._sys_depth = 0
         self._sys_assembler = None
 
-        self._mpi_proc_allocator = DefaultProcAllocator()
+        self._mpi_proc_allocator = DefaultAllocator()
         self._mpi_proc_range = [0, 1]
 
         self._subsystems_allprocs = []
