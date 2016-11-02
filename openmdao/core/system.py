@@ -9,7 +9,6 @@ from six import iteritems
 from six.moves import range
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
-from openmdao.solvers.nl_bgs import NonlinearBlockGS
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 
 
@@ -162,9 +161,6 @@ class System(object):
         self._nl_solver = None
         self._ln_solver = None
         self._suppress_solver_output = False
-
-        self.nl_solver = NonlinearBlockGS()
-        self.ln_solver = NonlinearBlockGS()  # temporary hack!
 
         self.initialize()
 
@@ -359,8 +355,7 @@ class System(object):
 
         # Populate the _variable_allprocs_indices dictionary
         for typ in ['input', 'output']:
-            for ind in range(len(self._variable_allprocs_names[typ])):
-                name = self._variable_allprocs_names[typ][ind]
+            for ind, name in enumerate(self._variable_allprocs_names[typ]):
                 ivar_all = self._variable_allprocs_range[typ][0] + ind
                 self._variable_allprocs_indices[typ][name] = ivar_all
 
@@ -567,6 +562,7 @@ class System(object):
             d_inputs.set_const(0.0)
             d_outputs.set_const(0.0)
 
+        # TODO: check if we can loop over myproc vars to save time
         op_names = []
         op_ind = self._variable_allprocs_range['output'][0]
         for op_name in self._variable_allprocs_names['output']:
@@ -580,19 +576,28 @@ class System(object):
         ip_names = []
         ip_ind = self._variable_allprocs_range['input'][0]
         for ip_name in self._variable_allprocs_names['input']:
-            input_var_id = self._sys_assembler._input_var_ids[ip_ind]
-            valid = valid and input_var_id in self._vector_var_ids[vec_name]
+            op_ind = self._sys_assembler._input_var_ids[ip_ind]
+            valid = op_ind in self._vector_var_ids[vec_name]
             if var_inds is not None:
-                valid = valid and ip_ind in var_inds
+                valid = valid and op_ind in var_inds
             if valid:
                 ip_names.append(ip_name)
             ip_ind += 1
+
+        res_names = []
+        op_ind = self._variable_allprocs_range['output'][0]
+        for op_name in self._variable_allprocs_names['output']:
+            valid = op_ind in self._vector_var_ids[vec_name]
+            if valid:
+                res_names.append(op_name)
+            op_ind += 1
 
         # TODO: see if we can avoid the `in var_inds` because this is slow
         # e.g., var_inds could be two range pairs to account for gaps
 
         d_inputs._names = set(ip_names)
         d_outputs._names = set(op_names)
+        d_residuals._names = set(res_names)
 
         return d_inputs, d_outputs, d_residuals
 
@@ -605,7 +610,8 @@ class System(object):
     def nl_solver(self, solver):
         """Set this system's nonlinear solver and perform setup."""
         self._nl_solver = solver
-        self._nl_solver._setup_solvers(self, 0)
+        if solver is not None:
+            self._nl_solver._setup_solvers(self, 0)
 
     @property
     def ln_solver(self):
@@ -616,7 +622,8 @@ class System(object):
     def ln_solver(self, solver):
         """Set this system's linear (adjoint) solver and perform setup."""
         self._ln_solver = solver
-        self._ln_solver._setup_solvers(self, 0)
+        if solver is not None:
+            self._ln_solver._setup_solvers(self, 0)
 
     @property
     def suppress_solver_output(self):

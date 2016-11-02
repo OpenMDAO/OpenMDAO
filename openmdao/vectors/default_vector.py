@@ -120,6 +120,12 @@ class DefaultVector(Vector):
         self._views = views
         self._idxs = idxs
 
+    def _clone_data(self):
+        """See openmdao.vectors.vector.Vector."""
+        for iset in range(len(self._data)):
+            data = self._data[iset]
+            self._data[iset] = numpy.array(data)
+
     def __iadd__(self, vec):
         """See openmdao.vectors.vector.Vector."""
         for iset in range(len(self._data)):

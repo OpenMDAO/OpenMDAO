@@ -5,7 +5,7 @@ from solver import LinearSolver
 class LinearBlockGS(LinearSolver):
     """Linear block Gauss-Seidel solver."""
 
-    METHOD = 'LN: LNBGS'
+    SOLVER = 'LN: LNBGS'
 
     def _iter_execute(self):
         """See openmdao.solvers.solver.Solver."""

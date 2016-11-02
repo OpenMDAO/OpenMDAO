@@ -89,15 +89,17 @@ class Vector(object):
                               self._global_vector)
 
     def _clone(self):
-        """Copy the current instance.
+        """Return a copy that does not provide view access to its data.
 
         Returns
         -------
         Vector
-            instance of the clone; the data is not copied.
+            instance of the clone; the data is copied.
         """
-        return self.__class__(self._name, self._typ, self._system,
-                              self._global_vector)
+        vec = self.__class__(self._name, self._typ, self._system,
+                             self._global_vector)
+        vec._clone_data()
+        return vec
 
     def _combined_varset_data(self):
         """Return an array that combines all var set entries of our _data list."""
@@ -175,6 +177,9 @@ class Vector(object):
 
         Must be implemented by the subclass.
 
+        Sets the following attributes:
+            _data
+
         Args
         ----
         global_vector : Vector or None
@@ -190,6 +195,13 @@ class Vector(object):
         Sets the following attributes:
             _views
             _idxs
+        """
+        pass
+
+    def _clone_data(self):
+        """For each item in _data, replace it with a copy of the data.
+
+        Must be implemented by the subclass.
         """
         pass
 

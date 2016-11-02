@@ -5,7 +5,7 @@ from solver import LinearSolver
 class LinearBlockJac(LinearSolver):
     """Linear block Jacobi solver."""
 
-    METHOD = 'LN: LNBJ'
+    SOLVER = 'LN: LNBJ'
 
     def _iter_execute(self):
         """See openmdao.solvers.solver.Solver."""
