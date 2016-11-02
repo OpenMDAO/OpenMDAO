@@ -20,8 +20,7 @@ class DefaultAssembler(Assembler):
         op_ind1, op_ind2 = var_range['output']
         ip_isub_var = -numpy.ones(ip_ind2 - ip_ind1, int)
         op_isub_var = -numpy.ones(op_ind2 - op_ind1, int)
-        for ind in range(len(subsystems_myproc)):
-            subsys = subsystems_myproc[ind]
+        for ind, subsys in enumerate(subsystems_myproc):
             isub = subsystems_inds[ind]
 
             sub_var_range = subsys._variable_allprocs_range
@@ -66,7 +65,7 @@ class DefaultAssembler(Assembler):
                     ip_sizes = self._variable_sizes['input'][ip_iset]
                     op_sizes = self._variable_sizes['output'][op_iset]
 
-                    ind1, ind2 = self._src_indices_meta[ip_ivar_set, :]
+                    ind1, ind2 = self._src_indices_range[ip_ivar_set, :]
                     inds = self._src_indices[ind1:ind2]
 
                     output_inds = numpy.zeros(inds.shape[0], int)
@@ -84,9 +83,8 @@ class DefaultAssembler(Assembler):
 
                     iproc = self._comm.rank
 
-                    ind1 = numpy.sum(ip_sizes[:iproc, :])
+                    ind1 = ind2 = numpy.sum(ip_sizes[:iproc, :])
                     ind1 += numpy.sum(ip_sizes[iproc, :ip_ivar_set])
-                    ind2 = numpy.sum(ip_sizes[:iproc, :])
                     ind2 += numpy.sum(ip_sizes[iproc, :ip_ivar_set+1])
                     input_inds = numpy.arange(ind1, ind2)
 
@@ -121,7 +119,5 @@ class DefaultAssembler(Assembler):
                     rev_xfer_op_inds[sub_ind][iset, jset] = \
                         merge(rev_xfer_op_inds[sub_ind][iset, jset])
 
-        xfer_indices = [xfer_ip_inds, xfer_op_inds,
-                        fwd_xfer_ip_inds, fwd_xfer_op_inds,
-                        rev_xfer_ip_inds, rev_xfer_op_inds]
-        return xfer_indices
+        return (xfer_ip_inds, xfer_op_inds, fwd_xfer_ip_inds, fwd_xfer_op_inds,
+                rev_xfer_ip_inds, rev_xfer_op_inds)

@@ -29,7 +29,7 @@ class Assembler(object):
         the output variable ID for each input variable ID.
     _src_indices : int ndarray[:]
         all the input indices vectors concatenated together.
-    _src_indices_meta : int ndarray[num_input_var_all, 2]
+    _src_indices_range : int ndarray[num_input_var_all, 2]
         the initial and final indices for the indices vector for each input.
     """
 
@@ -49,7 +49,7 @@ class Assembler(object):
 
         self._input_var_ids = None
         self._src_indices = None
-        self._src_indices_meta = None
+        self._src_indices_range = None
 
     def _setup_variables(self, sizes, variable_metadata, variable_indices):
         """Compute the variable sets and sizes.
@@ -76,26 +76,21 @@ class Assembler(object):
 
             # Locally determine var_set for each var
             local_set_dict = {}
-            for ivar in range(nvar):
-                var = variable_metadata[typ][ivar]
+            for ivar, meta in enumerate(variable_metadata[typ]):
                 ivar_all = variable_indices[typ][ivar]
-                local_set_dict[ivar_all] = var['var_set']
+                local_set_dict[ivar_all] = meta['var_set']
 
             # Broadcast ivar_all-iset pairs to all procs
             if self._comm.size > 1:
-                local_set_dicts_list = self._comm.allgather(local_set_dict)
                 global_set_dict = {}
-                for local_set_dict in local_set_dicts_list:
+                for local_set_dict in self._comm.allgather(local_set_dict):
                     global_set_dict.update(local_set_dict)
             else:
                 global_set_dict = local_set_dict
 
             # Compute set_name to ID maps
-            unique_list = list(set(global_set_dict.values()))
-            for set_name in unique_list:
-                if set_name not in self._variable_set_IDs[typ]:
-                    nset = len(self._variable_set_IDs[typ])
-                    self._variable_set_IDs[typ][set_name] = nset
+            for iset, set_name in enumerate(set(global_set_dict.values())):
+                self._variable_set_IDs[typ][set_name] = iset
 
             # Compute _variable_set_indices and var_count
             var_count = numpy.zeros(len(self._variable_set_IDs[typ]), int)
@@ -104,35 +99,30 @@ class Assembler(object):
                 set_name = global_set_dict[ivar_all]
 
                 iset = self._variable_set_IDs[typ][set_name]
-                ivar_set = var_count[iset]
 
                 self._variable_set_indices[typ][ivar_all, 0] = iset
-                self._variable_set_indices[typ][ivar_all, 1] = ivar_set
+                self._variable_set_indices[typ][ivar_all, 1] = var_count[iset]
 
                 var_count[iset] += 1
 
             # Allocate the size arrays using var_count
             self._variable_sizes[typ] = []
             for iset in range(len(self._variable_set_IDs[typ])):
-                size = var_count[iset]
-                array = numpy.zeros((nproc, size), int)
-                self._variable_sizes[typ].append(array)
+                self._variable_sizes[typ].append(numpy.zeros((nproc, 
+                                                              var_count[iset]), int))
 
         # Populate the sizes arrays
         iproc = self._comm.rank
         typ = 'input'
-        nvar = len(variable_metadata[typ])
-        for ivar in range(nvar):
-            var = variable_metadata[typ][ivar]
-            size = numpy.prod(var['indices'].shape)
+        for ivar, meta in enumerate(variable_metadata[typ]):
+            size = numpy.prod(meta['indices'].shape)
             ivar_all = variable_indices[typ][ivar]
             iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
             self._variable_sizes[typ][iset][iproc, ivar_set] = size
+            
         typ = 'output'
-        nvar = len(variable_metadata[typ])
-        for ivar in range(nvar):
-            var = variable_metadata[typ][ivar]
-            size = numpy.prod(var['shape'])
+        for ivar, meta in enumerate(variable_metadata[typ]):
+            size = numpy.prod(meta['shape'])
             ivar_all = variable_indices[typ][ivar]
             iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
             self._variable_sizes[typ][iset][iproc, ivar_set] = size
@@ -166,8 +156,7 @@ class Assembler(object):
             _input_var_ids[ip_ID] = op_ID
 
         # Loop over input variables
-        for ip_ID in range(nvar_input):
-            name = variable_allprocs_names['input'][ip_ID]
+        for ip_ID, name in enumerate(variable_allprocs_names['input']):
 
             # If name is also an output variable, add this implicit connection
             if name in variable_allprocs_names['output']:
@@ -176,39 +165,37 @@ class Assembler(object):
 
         self._input_var_ids = _input_var_ids
 
-    def _setup_src_indices(self, input_metadata, var_indices):
+    def _setup_src_indices(self, input_metadata, global_var_indices):
         """Assemble global list of src_indices.
 
         Sets the following attributes:
             _src_indices
-            _src_indices_meta
+            _src_indices_range
 
         Args
         ----
         input_metadata : [{}, ...]
             list of metadata dictionaries of inputs that exist on this proc.
-        var_indices : ndarray[:]
+        global_var_indices : ndarray[:]
             integer arrays of global indices of variables on this proc.
         """
         # Compute total size of indices vector
-        counter = 0
-        for ind in range(len(input_metadata)):
-            metadata = input_metadata[ind]
-            counter += numpy.prod(metadata['indices'].shape)
+        total_idx_size = 0
+        for ind, metadata in enumerate(input_metadata):
+            total_idx_size += numpy.prod(metadata['indices'].shape)
 
         # Allocate arrays
-        self._src_indices = numpy.zeros(counter, int)
-        self._src_indices_meta = numpy.zeros((var_indices.shape[0], 2), int)
+        self._src_indices = numpy.zeros(total_idx_size, int)
+        self._src_indices_range = numpy.zeros((global_var_indices.shape[0], 2), int)
 
         # Populate arrays
         ind1, ind2 = 0, 0
-        for ind in range(len(input_metadata)):
-            metadata = input_metadata[ind]
-            ind2 += numpy.prod(metadata['indices'].shape)
+        for ind, metadata in enumerate(input_metadata):
+            isize = numpy.prod(metadata['indices'].shape)
+            ind2 += isize
             self._src_indices[ind1:ind2] = metadata['indices'].flatten()
-            ivar_all = var_indices[ind]
-            self._src_indices_meta[ivar_all, :] = [ind1, ind2]
-            ind1 += numpy.prod(metadata['indices'].shape)
+            self._src_indices_range[global_var_indices[ind], :] = [ind1, ind2]
+            ind1 += isize
 
     def _compute_transfers(self, nsub_allprocs, var_range,
                            subsystems_myproc, subsystems_inds):
@@ -242,3 +229,4 @@ class Assembler(object):
         rev_xfer_op_inds : [dict of int ndarray[:], ...]
             list of output indices of reverse transfers.
         """
+        pass

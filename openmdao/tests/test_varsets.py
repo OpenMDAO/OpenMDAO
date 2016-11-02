@@ -3,8 +3,9 @@ import unittest
 import numpy as np
 import scipy
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ImplicitComponent
-from openmdao.solvers.ln_scipy import ScipyIterativeSolver
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ImplicitComponent, \
+                         ScipyIterativeSolver
+from openmdao.solvers.nl_bgs import NonlinearBlockGS
 
 class Comp(ImplicitComponent):
 
@@ -13,7 +14,7 @@ class Comp(ImplicitComponent):
         self.add_input('b', var_set=0)
         self.add_input('c', var_set=1)
         self.add_input('d', var_set=2)
-        
+
         self.add_output('w', var_set=5)
         self.add_output('x', var_set=1)
         self.add_output('y', var_set=1)
@@ -88,20 +89,21 @@ class TestVarSets(unittest.TestCase):
         root.connect("C1.x", "C2.b")
         root.connect("C1.y", "C2.c")
         root.connect("C1.z", "C2.d")
-    
+
         root.connect("C2.w", "C1.a")
         root.connect("C2.x", "C1.b")
         root.connect("C2.y", "C1.c")
         root.connect("C2.z", "C1.d")
-    
+
         gmres = scipy.sparse.linalg.gmres
-        root._solvers_linear = ScipyIterativeSolver(options={'solver':gmres})
+        root.ln_solver = ScipyIterativeSolver(options={'solver':gmres})
+        root.nl_solver = NonlinearBlockGS()
         p.setup()
-    
-        root.set_solver_print(False)
-        
+
+        root.suppress_solver_output = True
+
         self.p = p
-        
+
     def test_apply_linear(self):
         root = self.p.root
 
@@ -122,16 +124,16 @@ class TestVarSets(unittest.TestCase):
     def test_solve_linear(self):
         root = self.p.root
         root._solve_nonlinear()
-    
+
         root._vectors['residual'][''].set_const(1.0)
         root._solve_linear([''], 'fwd')
         output = root._vectors['output']['']._data
         self.assertEqualArrays(output[0], [ 0.25,  0.2 ,  0.25,  0.2 ])
         self.assertEqualArrays(output[1], [ 1./3.,  1./6. ,  1./3.,  1./6. ])
-    
+
         root._vectors['output'][''].set_const(1.0)
         root._solve_linear([''], 'rev')
         output = root._vectors['residual']['']._data
         self.assertEqualArrays(output[0], [ 0.25,  0.2 ,  0.25,  0.2 ])
         self.assertEqualArrays(output[1], [ 1./3.,  1./6. ,  1./3.,  1./6. ])
-        
+
