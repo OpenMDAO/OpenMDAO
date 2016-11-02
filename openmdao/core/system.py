@@ -582,7 +582,8 @@ class System(object):
         ip_ind = self._variable_allprocs_range['input'][0]
         for ip_name in self._variable_allprocs_names['input']:
             input_var_id = self._sys_assembler._input_var_ids[ip_ind]
-            valid = var_ind_range[0] <= ip_ind < var_ind_range[1]
+            # TODO: speed this up! valid check is slow
+            valid = ip_ind in var_ind_range
             valid = valid and input_var_id in self._vector_var_ids[vec_name]
             if valid:
                 ip_names.append(ip_name)

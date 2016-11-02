@@ -109,6 +109,25 @@ class Vector(object):
         return self.__class__(self._name, self._typ, self._system,
                               self._global_vector)
 
+    def _combined_varset_data(self):
+        """Return an array that combines all var set entries of our _data list."""
+        return numpy.concatenate(self._data)
+    
+    def _update_varset_data(self, arr):
+        """Update the data entry for each var set with the appropriate part of
+        the given array.
+        
+        Args
+        ----
+        arr : ndarray
+            Array to be assigned to our _data entries.
+        """
+        start = 0
+        for dat in self._data:
+            end = start + dat.size
+            dat[:] = arr[start:end]
+            start = end
+    
     def __contains__(self, key):
         """Check if the variable is involved in the current mat-vec product.
 

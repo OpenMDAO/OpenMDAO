@@ -22,10 +22,9 @@ class ScipyIterativeSolver(LinearSolver):
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
-        # TODO: generalize this to multiple var_sets
-        x_vec._data[0][:] = in_vec
-        system._apply_linear([vec_name], self._mode, [ind1, ind2])
-        return b_vec._data[0][:]
+        x_vec._update_varset_data(in_vec)
+        system._apply_linear([vec_name], self._mode, numpy.arange(ind1, ind2))
+        return b_vec._combined_varset_data()
 
     def _monitor(self, res):
         norm = numpy.linalg.norm(res)
@@ -58,12 +57,12 @@ class ScipyIterativeSolver(LinearSolver):
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
-            # TODO: generalize this to multiple var_sets
-            size = x_vec._data[0].shape[0]
+            x_vec_combined = x_vec._combined_varset_data()
+            size = x_vec_combined.shape[0]
             linop = LinearOperator((size, size), dtype=float,
                                    matvec=self._mat_vec)
             self._counter = 0
-            x_vec._data[0][:] = solver(linop, numpy.array(b_vec._data[0]),
-                                       x0=numpy.array(x_vec._data[0]),
-                                       maxiter=ilimit, tol=atol,
-                                       callback=self._monitor)[0]
+            x_vec._update_varset_data(solver(linop,b_vec._combined_varset_data(),
+                                             x0=x_vec_combined,
+                                             maxiter=ilimit, tol=atol,
+                                             callback=self._monitor)[0])

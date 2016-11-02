@@ -126,7 +126,7 @@ class LinearSolver(Solver):
         system = self._system
         ind1, ind2 = system._variable_allprocs_range['output']
 
-        system._apply_linear(self._vec_names, self._mode, [ind1, ind2])
+        system._apply_linear(self._vec_names, self._mode, numpy.arange(ind1, ind2))
 
         norm = 0
         for vec_name in vec_names:
