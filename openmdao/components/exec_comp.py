@@ -262,7 +262,7 @@ class ExecComp(ExplicitComponent):
         J = OrderedDict()
         non_pbo_outputs = self._non_pbo_outputs
 
-        for param in params:
+        for param in params._views:
 
             pwrap = _TmpDict(params)
 
@@ -287,7 +287,7 @@ class ExecComp(ExplicitComponent):
                 uwrap = _TmpDict(unknowns, return_complex=True)
 
                 # solve with complex param value
-                self._residuals.set_val(0.0)
+                self._residuals.set_const(0.0)
                 self.compute(pwrap, uwrap)
 
                 for u in non_pbo_outputs:
