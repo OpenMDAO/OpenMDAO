@@ -3,8 +3,8 @@ from __future__ import division
 
 import sys
 
-from openmdao.assemblers.assembler import DefaultAssembler
-from openmdao.vectors.vector import DefaultVector
+from openmdao.assemblers.default_assembler import DefaultAssembler
+from openmdao.vectors.default_vector import DefaultVector
 
 
 class FakeComm(object):
@@ -110,7 +110,6 @@ class Problem(object):
         root._setup_variables()
         root._setup_variable_indices({'input': 0, 'output': 0})
         root._setup_connections()
-        root._setup_solvers()
 
         # Assembler setup: variable metadata and indices
         sizes = {typ: len(root._variable_allprocs_names[typ])

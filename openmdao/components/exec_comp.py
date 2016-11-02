@@ -1,5 +1,4 @@
-""" Class definition for ExecComp, a component that evaluates an expression."""
-
+"""Define the ExecComp class, a component that evaluates an expression."""
 import math
 import cmath
 import re
@@ -17,8 +16,7 @@ from openmdao.core.component import ExplicitComponent
 VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
 
 def array_idx_iter(shape):
-    """
-    Return an iterator over the indices into a n-dimensional array.
+    """Return an iterator over the indices into a n-dimensional array.
 
     Args
     ----

@@ -65,11 +65,11 @@ class Component(System):
         self._variable_myproc_metadata[typ].append(metadata)
 
     def add_input(self, name, val=1.0, **kwargs):
-        """See _add_variable."""
+        """See openmdao.core.component.Component._add_variable."""
         self._add_variable(name, 'input', val, kwargs)
 
     def add_output(self, name, val=1.0, **kwargs):
-        """See _add_variable."""
+        """See openmdao.core.component.Component._add_variable."""
         self._add_variable(name, 'output', val, kwargs)
 
     def _setup_vector(self, vectors, vector_var_ids):
@@ -96,18 +96,15 @@ class ImplicitComponent(Component):
 
     def _solve_nonlinear(self):
         """Compute outputs; call user's solve_nonlinear or nonlinear solver."""
-        if self._solvers_nonlinear is not None:
-            self._solvers_nonlinear()
+        if self._nl_solver is not None:
+            self._nl_solver(self._inputs, self._outputs)
         else:
             self.solve_nonlinear(self._inputs, self._outputs)
 
-    def _apply_linear(self, vec_names, mode, var_ind_range=None):
+    def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product; call user's / Jacobian's apply_linear."""
-        if var_ind_range is None:
-            var_ind_range = self._variable_allprocs_range['output']
-
         for vec_name in vec_names:
-            tmp = self._get_vectors(vec_name, var_ind_range, mode)
+            tmp = self._get_vectors(vec_name, var_inds, mode)
             d_inputs, d_outputs, d_residuals = tmp
             self.apply_linear(self._inputs, self._outputs,
                               d_inputs, d_outputs, d_residuals, mode)
@@ -116,8 +113,8 @@ class ImplicitComponent(Component):
 
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product; linear solver / user's solve_linear."""
-        if self._solvers_linear is not None:
-            return self._solvers_linear(vec_names, mode)
+        if self._ln_solver is not None:
+            return self._ln_solver(vec_names, mode)
         else:
             success = True
             for vec_name in vec_names:
@@ -243,24 +240,21 @@ class ExplicitComponent(Component):
         residuals.set_const(0.0)
         self.compute(inputs, outputs)
 
-    def _apply_linear(self, vec_names, mode, var_ind_range=None):
+    def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vector product.
 
         Wrap user's 'compute_jacvec_product' or Jacobian's apply method.
         """
-        if var_ind_range is None:
-            var_ind_range = self._variable_allprocs_range['output']
-
         if self._jacobian._top_name == self.path_name:
             for vec_name in vec_names:
-                tmp = self._get_vectors(vec_name, var_ind_range, mode)
+                tmp = self._get_vectors(vec_name, var_inds, mode)
                 d_inputs, d_outputs, d_residuals = tmp
                 self._jacobian._system = self
                 self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
         else:
             if mode == 'fwd':
                 for vec_name in vec_names:
-                    tmp = self._get_vectors(vec_name, var_ind_range, mode)
+                    tmp = self._get_vectors(vec_name, var_inds, mode)
                     d_inputs, d_outputs, d_residuals = tmp
 
                     self.compute_jacvec_product(self._inputs, self._outputs,
@@ -269,7 +263,7 @@ class ExplicitComponent(Component):
                     d_residuals += d_outputs
             elif mode == 'rev':
                 for vec_name in vec_names:
-                    tmp = self._get_vectors(vec_name, var_ind_range, mode)
+                    tmp = self._get_vectors(vec_name, var_inds, mode)
                     d_inputs, d_outputs, d_residuals = tmp
 
                     d_residuals *= -1.0

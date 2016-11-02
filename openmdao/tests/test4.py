@@ -3,8 +3,9 @@ import numpy
 import unittest
 import scipy.sparse.linalg
 
-from openmdao.api import Problem, ImplicitComponent, Group, PETScVector
-from openmdao.solvers.ln_scipy import ScipyIterativeSolver
+from openmdao.api import Problem, ImplicitComponent, Group
+from openmdao.parallel_api import PETScVector
+from openmdao.api import ScipyIterativeSolver, LinearBlockJac, LinearBlockGS
 
 
 class CompA(ImplicitComponent):
@@ -73,8 +74,8 @@ class Test(unittest.TestCase):
         self.p = Problem(group)
 
         gmres = scipy.sparse.linalg.gmres
-        self.p.root._solvers_linear = ScipyIterativeSolver(options={'solver':gmres})
         self.p.setup()
+        self.p.root.ln_solver = ScipyIterativeSolver(options={'solver':gmres})
 
     def assertEqualArrays(self, a, b):
         self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
@@ -82,7 +83,7 @@ class Test(unittest.TestCase):
     def test_apply_linear(self):
         root = self.p.root
 
-        root.set_solver_print(False)
+        root.suppress_solver_output = True
         root._solve_nonlinear()
 
         root._vectors['output'][''].set_const(1.0)
@@ -98,7 +99,7 @@ class Test(unittest.TestCase):
     def test_solve_linear(self):
         root = self.p.root
 
-        root.set_solver_print(False)
+        root.suppress_solver_output = True
         root._solve_nonlinear()
 
         root._vectors['residual'][''].set_const(1.0)

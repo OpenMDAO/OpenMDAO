@@ -1,15 +1,14 @@
-from __future__ import division, print_function
-import numpy
-from six.moves import range
-
+"""Define the NewtonSolver class."""
 from solver import NonlinearSolver
 
 
 class NewtonSolver(NonlinearSolver):
+    """Newton solver."""
 
     METHOD = 'NL: Newton'
 
     def _iter_execute(self):
+        """See openmdao.solvers.solver.Solver."""
         system = self._system
         system._vectors['residual'][''].set_vec(system._residuals)
         system._vectors['residual'][''] *= -1.0
