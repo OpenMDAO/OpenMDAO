@@ -377,7 +377,7 @@ class IndepVarComp(ExplicitComponent):
     def initialize_variables(self):
         """Define the independent variables as output variables."""
         name, val = self._indep
-        kwargs = self.kwargs
+        kwargs = self.metadata
 
         if isinstance(name, string_types):
             self.add_output(name, val, **kwargs)

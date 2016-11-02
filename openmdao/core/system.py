@@ -10,6 +10,7 @@ from six.moves import range
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
+from openmdao.utils.generalized_dict import GeneralizedDictionary
 
 
 class System(object):
@@ -26,11 +27,8 @@ class System(object):
         global name of the system, including the path.
     comm : MPI.Comm or FakeComm
         MPI communicator object.
-
-    kwargs : dict of objects
+    metadata : GeneralizedDictionary
         dictionary of user-defined arguments.
-    global_kwargs : dict of objects
-        self.kwargs combined with kwargs of parent systems.
 
     _sys_depth : int
         distance from the root node in the hierarchy tree.
@@ -117,9 +115,7 @@ class System(object):
         self.name = ''
         self.path_name = ''
         self.comm = None
-
-        self.kwargs = kwargs
-        self.global_kwargs = {}
+        self.metadata = GeneralizedDictionary()
 
         self._sys_depth = 0
         self._sys_assembler = None
@@ -162,16 +158,16 @@ class System(object):
         self._ln_solver = None
         self._suppress_solver_output = False
 
+        self.metadata._dict = kwargs
         self.initialize()
 
-    def _setup_processors(self, path, comm, global_kwargs,
+    def _setup_processors(self, path, comm, global_dict,
                           depth, assembler, proc_range):
         """Recursively split comms and define local subsystems.
 
         Sets the following attributes:
             path_name
             comm
-            global_kwargs
             _sys_depth
             _sys_assembler
             _mpi_proc_range
@@ -184,7 +180,7 @@ class System(object):
             parent names to prepend to name to get the pathname
         comm : MPI.Comm or FakeComm
             communicator for this system (already split, if applicable).
-        global_kwargs : dict
+        global_dict : dict
             dictionary with kwargs of all parents assembled in it.
         depth : int
             depth level for this system - i.e., distance from root node.
@@ -196,13 +192,12 @@ class System(object):
         # Set attributes
         self.path_name = '.'.join((path, self.name)) if path else self.name
         self.comm = comm
-        self.global_kwargs = global_kwargs
         self._sys_depth = depth
         self._sys_assembler = assembler
         self._mpi_proc_range = proc_range
 
         # Add self's kwargs to dictionary of parents' kwargs (already new copy)
-        self.global_kwargs.update(self.kwargs)
+        self.metadata._assemble_global_dict(global_dict)
 
         # Optional user-defined method
         self.initialize_processors()
@@ -221,9 +216,9 @@ class System(object):
 
             # Perform recursion
             for subsys in self._subsystems_myproc:
-                sub_global_kwargs = self.global_kwargs.copy()
+                sub_global_dict = self.metadata._global_dict.copy()
                 subsys._setup_processors(self.path_name, sub_comm,
-                                         sub_global_kwargs, depth+1, assembler,
+                                         sub_global_dict, depth+1, assembler,
                                          sub_proc_range)
 
     def _setup_variables(self, recursion=True):
@@ -708,8 +703,7 @@ class System(object):
 
         Available attributes:
             name
-            args
-            kwargs
+            metadata (only local)
         """
         pass
 
@@ -720,9 +714,7 @@ class System(object):
             name
             path_name
             comm
-            args
-            kwargs
-            global_kwargs
+            metadata (local and global)
         """
         pass
 
@@ -733,8 +725,6 @@ class System(object):
             name
             path_name
             comm
-            args
-            kwargs
-            global_kwargs
+            metadata (local and global)
         """
         pass

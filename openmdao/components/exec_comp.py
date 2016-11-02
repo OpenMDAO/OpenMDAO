@@ -144,7 +144,7 @@ class ExecComp(ExplicitComponent):
             allvars.update(_parse_for_vars(expr))
 
         if inits is not None:
-            self.kwargs.update(inits)
+            self.metadata._dict.update(inits)
 
         # make sure all kwargs are legit
         for kwarg in kwargs:
@@ -167,7 +167,7 @@ class ExecComp(ExplicitComponent):
         strings.
         """
         allvars = self._allvars
-        kwargs = self.kwargs
+        kwargs = self.metadata
         units_dict = self._units_dict
         outs = self._outs
         exprs = self._exprs

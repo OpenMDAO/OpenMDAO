@@ -11,8 +11,8 @@ class Group(System):
 
     def initialize(self):
         """Add subsystems from kwargs; set block Gauss-Seidel as default."""
-        if 'subsystems' in self.kwargs:
-            self._subsystems_allprocs.extend(self.kwargs['subsystems'])
+        if 'subsystems' in self.metadata:
+            self._subsystems_allprocs.extend(self.metadata['subsystems'])
 
         self.nl_solver = NonlinearBlockGS()
         self.ln_solver = LinearBlockGS()
