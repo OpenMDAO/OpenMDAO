@@ -2,15 +2,20 @@
 from __future__ import division
 
 from openmdao.core.system import System
+from openmdao.solvers.nl_bgs import NonlinearBlockGS
+from openmdao.solvers.ln_bgs import LinearBlockGS
 
 
 class Group(System):
     """Class used to group systems together; instantiate or inherit."""
 
     def initialize(self):
-        """Add subsystems from kwargs; the subclass can override this."""
+        """Add subsystems from kwargs; set block Gauss-Seidel as default."""
         if 'subsystems' in self.kwargs:
             self._subsystems_allprocs.extend(self.kwargs['subsystems'])
+
+        self.nl_solver = NonlinearBlockGS()
+        self.ln_solver = LinearBlockGS()
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,

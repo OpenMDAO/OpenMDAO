@@ -7,7 +7,7 @@ from solver import NonlinearSolver
 class NonlinearBlockGS(NonlinearSolver):
     """Nonlinear block Gauss-Seidel solver."""
 
-    METHOD = 'NL: NLBGS'
+    SOLVER = 'NL: NLBGS'
 
     def _iter_execute(self):
         """See openmdao.solvers.solver.Solver."""
