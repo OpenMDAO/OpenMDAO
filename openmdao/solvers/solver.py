@@ -25,7 +25,7 @@ class Solver(object):
         list of right-hand-side (RHS) vector names.
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
-    subsolvers : dict
+    _subsolvers : dict
         dictionary of pointers to subsolvers.
     """
 
@@ -50,7 +50,7 @@ class Solver(object):
         self._kwargs = kwargs
         self._vec_names = None
         self._mode = 'fwd'
-        self.subsolvers = subsolvers
+        self._subsolvers = subsolvers
 
     def _setup_solvers(self, system, depth):
         """Assign system instance, set depth, and optionally perform setup.
@@ -65,7 +65,7 @@ class Solver(object):
         self._system = system
         self._depth = depth
 
-        for solver in self.subsolvers:
+        for solver in self._subsolvers:
             solver._setup_solvers(system, depth+1)
 
     def _mpi_print(self, iteration, res, res0):
@@ -96,8 +96,8 @@ class Solver(object):
 
         iproc = self._system.comm.rank
         iprint = self._options['iprint']
-        _solvers_print = self._system._solvers_print
-        if iproc == 0 and iprint and _solvers_print:
+        suppress_solver_output = self._system._suppress_solver_output
+        if iproc == 0 and iprint and not suppress_solver_output:
             print_str = ' ' * self._system._sys_depth + '-' * self._depth
             print_str += sys_name + solver_name
             print_str += ' %3d | %.9g %.9g' % (iteration, res, res0)
@@ -169,6 +169,29 @@ class Solver(object):
             error at the first iteration.
         """
         pass
+
+    def set_subsolver(self, name, solver):
+        """Add a subsolver to this solver.
+
+        Args
+        ----
+        name : str
+            name of the subsolver.
+        solver : Solver
+            the subsolver instance.
+        """
+        self._subsolvers[name] = solver
+        self._subsolvers[name]._setup_solvers(self._system, self._depth+1)
+
+    def get_subsolver(self, name):
+        """Get a subsolver.
+
+        Returns
+        -------
+        Solver
+            the instance of the requested subsolver.
+        """
+        return self._subsolvers[name]
 
 
 class NonlinearSolver(Solver):

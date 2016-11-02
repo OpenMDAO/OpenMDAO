@@ -89,10 +89,10 @@ class Test(unittest.TestCase):
         root = self.p.root
 
         if root.comm.size == 1:
-            comp1 = root.get_subsystem('C1')
-            comp2 = root.get_subsystem('C2')
-            comp3 = root.get_subsystem('C3')
-            comp4 = root.get_subsystem('C4')
+            comp1 = root.get_system('C1')
+            comp2 = root.get_system('C2')
+            comp3 = root.get_system('C3')
+            comp4 = root.get_system('C4')
 
             comp1._outputs['v1'] = 2.0
             comp2._outputs['v2'] = 4.0

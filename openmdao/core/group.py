@@ -89,7 +89,7 @@ class Group(System):
 
     def _solve_nonlinear(self):
         """Compute outputs; run nonlinear solver."""
-        return self._solvers_nonlinear()
+        return self._nl_solver()
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product; use global Jacobian / apply recursion."""
@@ -117,7 +117,7 @@ class Group(System):
 
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product; run linear solver."""
-        return self._solvers_linear(vec_names, mode)
+        return self._ln_solver(vec_names, mode)
 
     def _linearize(self):
         """Compute jacobian / factorization; apply recursion."""

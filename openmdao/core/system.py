@@ -28,8 +28,6 @@ class System(object):
     comm : MPI.Comm or FakeComm
         MPI communicator object.
 
-    args : list of objects
-        user-defined arguments (to be used in apply_nonlinear, ...).
     kwargs : dict of objects
         dictionary of user-defined arguments.
     global_kwargs : dict of objects
@@ -99,11 +97,11 @@ class System(object):
     _jacobian : Jacobian
         global Jacobian object to be used in apply_linear
 
-    _solvers_nonlinear : NonlinearSolver
+    _nl_solver : NonlinearSolver
         nonlinear solver to be used for solve_nonlinear.
-    _solvers_linear : LinearSolver
+    _ln_solver : LinearSolver
         linear solver to be used for solve_linear; not the Newton system.
-    _solvers_print : boolean
+    _suppress_solver_output : boolean
         global overriding flag that turns off all solver output if 'False'.
     """
 
@@ -161,9 +159,12 @@ class System(object):
 
         self._jacobian = DefaultJacobian()
 
-        self._solvers_nonlinear = NonlinearBlockGS()
-        self._solvers_linear = NonlinearBlockGS()  # temporary hack!
-        self._solvers_print = True
+        self._nl_solver = None
+        self._ln_solver = None
+        self._suppress_solver_output = False
+
+        self.nl_solver = NonlinearBlockGS()
+        self.ln_solver = NonlinearBlockGS()  # temporary hack!
 
         self.initialize()
 
@@ -460,13 +461,6 @@ class System(object):
 
             subsys._setup_vector(sub_vectors, vector_var_ids)
 
-    def _setup_solvers(self):
-        """Recursively set up all solvers in this and systems below."""
-        self._solvers_nonlinear._setup_solvers(self, 0)
-        self._solvers_linear._setup_solvers(self, 0)
-        for subsys in self._subsystems_myproc:
-            subsys._setup_solvers()
-
     def _get_transfers(self, vectors):
         """Compute transfers.
 
@@ -602,42 +596,61 @@ class System(object):
 
         return d_inputs, d_outputs, d_residuals
 
-    def get_subsystem(self, name):
-        """Return the system called 'name' in the current namespace.
+    @property
+    def nl_solver(self):
+        """The nonlinear solver for this system."""
+        return self._nl_solver
 
-        Args
-        ----
-        name : str
-            name of the desired system in the current namespace.
+    @nl_solver.setter
+    def nl_solver(self, solver):
+        """Set this system's nonlinear solver and perform setup."""
+        self._nl_solver = solver
+        self._nl_solver._setup_solvers(self, 0)
 
-        Returns
-        -------
-        System or None
-            System if found on this proc else None.
-        """
-        if name == self.path_name:
-            # If this system's name matches, target found
-            return self
-        else:
-            for subsys in self._subsystems_myproc:
-                result = subsys.get_subsystem(name)
-                if result is not None:
-                    return result
-            return None
+    @property
+    def ln_solver(self):
+        """The linear (adjoint) solver for this system."""
+        return self._ln_solver
 
-    def set_solver_print(self, flag):
-        """Recursively set solver print flag for this and all systems below.
+    @ln_solver.setter
+    def ln_solver(self, solver):
+        """Set this system's linear (adjoint) solver and perform setup."""
+        self._ln_solver = solver
+        self._ln_solver._setup_solvers(self, 0)
 
-        Args
-        ----
-        flag : boolean
-            if False, solver printing is surpressed for this system and below.
-        """
-        self._solvers_print = flag
+    @property
+    def suppress_solver_output(self):
+        """The value of the global toggle to disable solver printing."""
+        return self._suppress_solver_output
+
+    @suppress_solver_output.setter
+    def suppress_solver_output(self, value):
+        """Recursively set the solver print suppression toggle."""
+        self._suppress_solver_output = value
         for subsys in self._subsystems_myproc:
-            subsys.set_solver_print(flag)
+            subsys.suppress_solver_output = value
 
-    def set_jacobian(self, jacobian=None, is_top=True):
+    @property
+    def proc_allocator(self):
+        """The current system's processor allocator object."""
+        return self._mpi_proc_allocator
+
+    @proc_allocator.setter
+    def proc_allocator(self, value):
+        """Set the processor allocator object."""
+        self._mpi_proc_allocator = value
+
+    @property
+    def jacobian(self):
+        """The Jacobian."""
+        return self._jacobian
+
+    @jacobian.setter
+    def jacobian(self, jac):
+        """Set the Jacobian."""
+        self._set_jacobian(jac, True)
+
+    def _set_jacobian(self, jacobian, is_top=True):
         """Recursively set the system's jacobian attribute.
 
         Args
@@ -657,7 +670,30 @@ class System(object):
                 self._jacobian._assembler = self._sys_assembler
 
         for subsys in self._subsystems_myproc:
-            subsys.set_jacobian(jacobian, False)
+            subsys._set_jacobian(jacobian, False)
+
+    def get_system(self, name):
+        """Return the system called 'name' in the current namespace.
+
+        Args
+        ----
+        name : str
+            name of the desired system in the current namespace.
+
+        Returns
+        -------
+        System or None
+            System if found on this proc else None.
+        """
+        if name == self.path_name:
+            # If this system's name matches, target found
+            return self
+        else:
+            for subsys in self._subsystems_myproc:
+                result = subsys.get_system(name)
+                if result is not None:
+                    return result
+            return None
 
     def initialize(self):
         """Optional user-defined method run once during instantiation.

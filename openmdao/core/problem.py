@@ -110,7 +110,6 @@ class Problem(object):
         root._setup_variables()
         root._setup_variable_indices({'input': 0, 'output': 0})
         root._setup_connections()
-        root._setup_solvers()
 
         # Assembler setup: variable metadata and indices
         sizes = {typ: len(root._variable_allprocs_names[typ])

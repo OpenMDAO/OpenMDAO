@@ -96,8 +96,8 @@ class ImplicitComponent(Component):
 
     def _solve_nonlinear(self):
         """Compute outputs; call user's solve_nonlinear or nonlinear solver."""
-        if self._solvers_nonlinear is not None:
-            self._solvers_nonlinear(self._inputs, self._outputs)
+        if self._nl_solver is not None:
+            self._nl_solver(self._inputs, self._outputs)
         else:
             self.solve_nonlinear(self._inputs, self._outputs)
 
@@ -113,8 +113,8 @@ class ImplicitComponent(Component):
 
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product; linear solver / user's solve_linear."""
-        if self._solvers_linear is not None:
-            return self._solvers_linear(vec_names, mode)
+        if self._ln_solver is not None:
+            return self._ln_solver(vec_names, mode)
         else:
             success = True
             for vec_name in vec_names:
