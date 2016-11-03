@@ -54,31 +54,37 @@ class Problem(object):
 
     # TODO: getitem/setitem need to properly handle scaling/units
     def __getitem__(self, name):
-        """Get an output variable.
+        """Get an output/input variable.
 
         Args
         ----
         name : str
-            name of the output variable in the root's namespace.
+            name of the variable in the root's namespace.
 
         Returns
         -------
         ndarray.view
-            the requested variable
+            the requested output/input variable.
         """
-        return self.root._outputs[name]
+        try:
+            return self.root._outputs[name]
+        except KeyError:
+            return self.root._inputs[name]
 
     def __setitem__(self, name, value):
-        """Set an output variable.
+        """Set an output/input variable.
 
         Args
         ----
         name : str
-            name of the output variable in the root's namespace.
+            name of the output/input variable in the root's namespace.
         value : float or ndarray or list
             value to set this variable to.
         """
-        self.root._outputs[name] = value
+        try:
+            self.root._outputs[name] = value
+        except KeyError:
+            self.root._inputs[name] = value
 
     # TODO: once we have drivers, this should call self.driver.run() instead
     def run(self):
