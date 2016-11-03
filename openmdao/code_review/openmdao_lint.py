@@ -8,6 +8,7 @@ directories = [
     'jacobians',
     'proc_allocators',
     'solvers',
+    'utils',
     'vectors',
 ]
 

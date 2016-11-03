@@ -13,7 +13,7 @@ except ImportError:
 class GeneralComp(ExplicitComponent):
 
     def initialize_variables(self):
-        kwargs = self.global_kwargs
+        kwargs = self.metadata
         icomp = kwargs['icomp']
         ncomp = kwargs['ncomp']
         use_var_sets = kwargs['use_var_sets']
