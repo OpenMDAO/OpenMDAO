@@ -81,7 +81,7 @@ class GeneralProblem(object):
         self.root = current_systems[0]
         self.all_systems = all_systems
 
-        self.root.kwargs['use_var_sets'] = use_var_sets
+        self.root.metadata['use_var_sets'] = use_var_sets
         self.problem = Problem(self.root).setup(vec_impl)
 
     def print_all(self):

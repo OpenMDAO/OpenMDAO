@@ -4,9 +4,7 @@ import unittest
 import scipy.sparse.linalg
 
 from openmdao.api import Problem, ImplicitComponent, Group
-from openmdao.parallel_api import PETScVector
 from openmdao.api import ScipyIterativeSolver, LinearBlockJac, LinearBlockGS
-
 
 class CompA(ImplicitComponent):
 
