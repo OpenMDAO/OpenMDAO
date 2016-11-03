@@ -115,7 +115,7 @@ class System(object):
         self.name = ''
         self.path_name = ''
         self.comm = None
-        self.metadata = GeneralizedDictionary()
+        self.metadata = GeneralizedDictionary(kwargs)
 
         self._sys_depth = 0
         self._sys_assembler = None
@@ -158,7 +158,6 @@ class System(object):
         self._ln_solver = None
         self._suppress_solver_output = False
 
-        self.metadata._dict = kwargs
         self.initialize()
 
     def _setup_processors(self, path, comm, global_dict,

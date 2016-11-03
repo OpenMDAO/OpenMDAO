@@ -4,6 +4,8 @@ import numpy
 from six.moves import range
 from scipy.sparse.linalg import LinearOperator
 
+from openmdao.utils.generalized_dict import GeneralizedDictionary
+
 
 class Solver(object):
     """Base solver class.
@@ -17,40 +19,39 @@ class Solver(object):
         pointer to the owning system.
     _depth : int
         how many subsolvers deep this solver is (0 means not a subsolver).
-    _options : dict
-        options dictionary.
-    _kwargs : dict
-        kwargs dictionary for additional options / parameters.
     _vec_names : [str, ...]
         list of right-hand-side (RHS) vector names.
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
     _subsolvers : dict
         dictionary of pointers to subsolvers.
+    options : GeneralizedDictionary
+        options dictionary.
     """
 
     SOLVER = 'base_solver'
 
-    def __init__(self, subsolvers={}, options={}, **kwargs):
+    def __init__(self, subsolvers=None, **kwargs):
         """Initialize all attributes.
 
         Args
         ----
         subsolvers : dict
             dictionary of pointers to subsolvers.
-        options : dict
+        **kwargs : dict
             options dictionary.
-        kwargs : dict
-            kwargs dictionary for additional options / parameters.
         """
         self._system = None
         self._depth = 0
-        self._options = {'ilimit': 10, 'atol': 1e-6, 'rtol': 1e-6, 'iprint': 1}
-        self._options.update(options)
-        self._kwargs = kwargs
         self._vec_names = None
         self._mode = 'fwd'
-        self._subsolvers = subsolvers
+        self._subsolvers = subsolvers if subsolvers is not None else {}
+
+        self.options = GeneralizedDictionary(kwargs)
+        self.options.declare('ilimit', typ=int, value=10)
+        self.options.declare('atol', value=1e-6)
+        self.options.declare('rtol', value=1e-6)
+        self.options.declare('iprint', typ=int, value=1)
 
     def _setup_solvers(self, system, depth):
         """Assign system instance, set depth, and optionally perform setup.
@@ -95,7 +96,7 @@ class Solver(object):
             solver_name = solver_name + ' ' * (name_len - len(solver_name))
 
         iproc = self._system.comm.rank
-        iprint = self._options['iprint']
+        iprint = self.options['iprint']
         suppress_solver_output = self._system._suppress_solver_output
         if iproc == 0 and iprint and not suppress_solver_output:
             print_str = ' ' * self._system._sys_depth + '-' * self._depth
@@ -115,9 +116,9 @@ class Solver(object):
         float
             absolute error at termination.
         """
-        ilimit = self._options['ilimit']
-        atol = self._options['atol']
-        rtol = self._options['rtol']
+        ilimit = self.options['ilimit']
+        atol = self.options['atol']
+        rtol = self.options['rtol']
 
         norm0, norm = self._iter_initialize()
         iteration = 0
@@ -203,7 +204,7 @@ class NonlinearSolver(Solver):
 
     def _iter_initialize(self):
         """See openmdao.solvers.solver.Solver."""
-        if self._options['ilimit'] > 1:
+        if self.options['ilimit'] > 1:
             norm = self._iter_get_norm()
         else:
             norm = 1.0
@@ -238,7 +239,7 @@ class LinearSolver(Solver):
 
             self._rhs_vecs[vec_name] = b_vec._clone()
 
-        if self._options['ilimit'] > 1:
+        if self.options['ilimit'] > 1:
             norm = self._iter_get_norm()
         else:
             norm = 1.0

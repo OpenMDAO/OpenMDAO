@@ -20,11 +20,20 @@ class GeneralizedDictionary(dict):
         dictionary of entry declarations.
     """
 
-    def __init__(self):
-        """Initialize all attributes."""
+    def __init__(self, in_dict=None):
+        """Initialize all attributes.
+
+        Args
+        ----
+        in_dict : dict or None
+            optional dictionary with which to initialize.
+        """
         self._dict = {}
         self._global_dict = {}
         self._declared_entries = {}
+
+        if in_dict is not None:
+            self._dict.update(in_dict)
 
     def _check_type_and_value(self, name, value):
         """If declared, check that value has the right type and is valid.
@@ -65,8 +74,8 @@ class GeneralizedDictionary(dict):
         required : boolean
             if True, this entry must be specified in _dict or _global_dict.
         """
-        # Check if an entry of the same name has already been declare
-        if name in self._options:
+        # Check if an entry of the same name has already been declared
+        if name in self._declared_entries:
             raise ValueError("Entry '{}' already exists".format(name))
 
         self._declared_entries[name] = {
@@ -80,6 +89,10 @@ class GeneralizedDictionary(dict):
         # If the entry has already been set, check if valid:
         if name in self._dict:
             self._check_type_and_value(name, self._dict[name])
+
+    def update(self, in_dict):
+        for key in in_dict:
+            self[key] = in_dict[key]
 
     def _assemble_global_dict(self, parents_dict):
         """Incorporate the dictionary passed down from the systems above.
