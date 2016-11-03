@@ -1,7 +1,7 @@
 from __future__ import division, print_function
 import numpy
 from six.moves import range
-from scipy.sparse.linalg import LinearOperator
+from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
 
@@ -9,6 +9,11 @@ from openmdao.solvers.solver import LinearSolver
 class ScipyIterativeSolver(LinearSolver):
 
     METHOD = 'LN: SCIPY'
+
+    def __init__(self, subsolvers=None, **kwargs):
+        super(ScipyIterativeSolver, self).__init__(subsolvers=subsolvers,
+                                                   **kwargs)
+        self.options.declare('solver', typ=object, value=gmres)
 
     def _mat_vec(self, in_vec):
         vec_name = self._vec_name
@@ -41,11 +46,11 @@ class ScipyIterativeSolver(LinearSolver):
         self._mode = mode
 
         system = self._system
-        solver = self._options['solver']
+        solver = self.options['solver']
 
-        ilimit = self._options['ilimit']
-        atol = self._options['atol']
-        rtol = self._options['rtol']
+        ilimit = self.options['ilimit']
+        atol = self.options['atol']
+        rtol = self.options['rtol']
 
         for vec_name in self._vec_names:
             self._vec_name = vec_name
@@ -58,7 +63,7 @@ class ScipyIterativeSolver(LinearSolver):
                 b_vec = system._vectors['output'][vec_name]
 
             x_vec_combined = x_vec._combined_varset_data()
-            size = x_vec_combined.shape[0]
+            size = x_vec_combined.size
             linop = LinearOperator((size, size), dtype=float,
                                    matvec=self._mat_vec)
             self._counter = 0

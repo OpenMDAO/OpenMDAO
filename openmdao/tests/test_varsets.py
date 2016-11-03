@@ -1,15 +1,13 @@
 
-from copy import deepcopy
 import unittest
 import numpy as np
 import scipy
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ImplicitComponent, \
-                         ScipyIterativeSolver
-from openmdao.solvers.nl_bgs import NonlinearBlockGS
+                         ScipyIterativeSolver, NonlinearBlockGS
 
 class Comp(ImplicitComponent):
-    
+
     def __init__(self, use_varsets=True):
         super(Comp, self).__init__()
         self._use_var_sets = use_varsets
@@ -20,7 +18,7 @@ class Comp(ImplicitComponent):
             self.add_input('b', var_set=0)
             self.add_input('c', var_set=1)
             self.add_input('d', var_set=2)
-    
+
             self.add_output('w', var_set=5)
             self.add_output('x', var_set=1)
             self.add_output('y', var_set=1)
@@ -30,7 +28,7 @@ class Comp(ImplicitComponent):
             self.add_input('b')
             self.add_input('c')
             self.add_input('d')
-    
+
             self.add_output('w')
             self.add_output('x')
             self.add_output('y')
@@ -45,10 +43,6 @@ class Comp(ImplicitComponent):
     def apply_linear(self, inputs, outputs,
                      d_inputs, d_outputs, d_residuals, mode):
         if mode == 'fwd':
-            d_residuals['w'] = 0
-            d_residuals['x'] = 0
-            d_residuals['y'] = 0
-            d_residuals['z'] = 0
             if 'w' in d_outputs:
                 d_residuals['w'] += d_outputs['w']
                 if 'a' in d_inputs:
@@ -66,14 +60,6 @@ class Comp(ImplicitComponent):
                 if 'd' in d_inputs:
                     d_residuals['z'] += 5 * d_inputs['d']
         else:
-            d_outputs['w'] = 0
-            d_outputs['x'] = 0
-            d_outputs['y'] = 0
-            d_outputs['z'] = 0
-            d_inputs['a'] = 0
-            d_inputs['b'] = 0
-            d_inputs['c'] = 0
-            d_inputs['d'] = 0
             if 'w' in d_outputs:
                 d_outputs['w'] += d_residuals['w']
                 if 'a' in d_inputs:
@@ -112,14 +98,14 @@ class TestVarSets(unittest.TestCase):
         root.connect("C2.z", "C1.d")
 
         gmres = scipy.sparse.linalg.gmres
-        root.ln_solver = ScipyIterativeSolver(options={'solver':gmres})
+        root.ln_solver = ScipyIterativeSolver()
         root.nl_solver = NonlinearBlockGS()
         p.setup()
 
         root.suppress_solver_output = True
 
         self.p = p
-        
+
         # now create the same problem with no varsets
         p = Problem(Group())
         root = p.root
@@ -136,7 +122,7 @@ class TestVarSets(unittest.TestCase):
         root.connect("C2.z", "C1.d")
 
         gmres = scipy.sparse.linalg.gmres
-        root.ln_solver = ScipyIterativeSolver(options={'solver':gmres})
+        root.ln_solver = ScipyIterativeSolver()
         root.nl_solver = NonlinearBlockGS()
         p.setup()
 
@@ -146,51 +132,73 @@ class TestVarSets(unittest.TestCase):
 
     def test_apply_linear(self):
         root = self.p.root
-
         root._vectors['output'][''].set_const(1.0)
         root._apply_linear([''], 'fwd')
-        output_fwd = deepcopy(root._vectors['residual']['']._data)
-        self.assertEqualArrays(output_fwd[0], [4, 5, 4, 5])
-        self.assertEqualArrays(output_fwd[1], [3, 6, 3, 6])
+        output = root._vectors['residual']['']._data
+        self.assertEqualArrays(output[0], [4, 5, 4, 5])
+        self.assertEqualArrays(output[1], [3, 6, 3, 6])
 
-        root._vectors['residual'][''].set_const(1.0)
-        root._apply_linear([''], 'rev')
-        output_rev = deepcopy(root._vectors['output']['']._data.copy())
-        self.assertEqualArrays(output_rev[0], [4, 5, 4,5])
-        self.assertEqualArrays(output_rev[1], [3, 6, 3, 6])
-        
         # for no varsets, number should be the same, but reordered
         root = self.p_no_varsets.root
-
+    
         root._vectors['output'][''].set_const(1.0)
         root._apply_linear([''], 'fwd')
-        output_fwd_novs = root._vectors['residual']['']._data
-        
-        expected_fwd = np.array([output_fwd[i][j] 
+        output_novs = root._vectors['residual']['']._data
+    
+        expected = np.array([output[i][j]
                                  for i,j in self.p._assembler._variable_set_indices['output']])
-        self.assertEqualArrays(output_fwd_novs, expected_fwd)
-        
+        self.assertEqualArrays(output_novs, expected)
+
+        root = self.p.root
         root._vectors['residual'][''].set_const(1.0)
         root._apply_linear([''], 'rev')
-        output_rev_novs = root._vectors['output']['']._data
-        expected_rev = np.array([output_rev[i][j] 
+        output = root._vectors['output']['']._data
+        self.assertEqualArrays(output[0], [4, 5, 4, 5])
+        self.assertEqualArrays(output[1], [3, 6, 3, 6])
+
+        # for no varsets, number should be the same, but reordered
+        root = self.p_no_varsets.root
+        root._vectors['residual'][''].set_const(1.0)
+        root._apply_linear([''], 'rev')
+        output_novs = root._vectors['output']['']._data
+        expected = np.array([output[i][j]
                                  for i,j in self.p._assembler._variable_set_indices['output']])
-        self.assertEqualArrays(output_rev_novs, expected_rev)
+        self.assertEqualArrays(output_novs, expected)
 
     def test_solve_linear(self):
         root = self.p.root
-
         root._vectors['residual'][''].set_const(1.0)
         root._vectors['output'][''].set_const(0.0)
         root._solve_linear([''], 'fwd')
         output = root._vectors['output']['']._data
-        self.assertEqualArrays(output[0], [ 0.25,  0.2 ,  0.25,  0.2 ])
+        self.assertEqualArrays(output[0], [ 1./4.,  1./5. ,  1./4.,  1./5. ])
         self.assertEqualArrays(output[1], [ 1./3.,  1./6. ,  1./3.,  1./6. ])
 
+        # now try without varsets for comparison
+        root = self.p_no_varsets.root
+        root._vectors['residual'][''].set_const(1.0)
+        root._vectors['output'][''].set_const(0.0)
+        root._solve_linear([''], 'fwd')
+        output_novs = root._vectors['output']['']._data
+        expected = np.array([output[i][j]
+                                 for i,j in self.p._assembler._variable_set_indices['output']])
+        self.assertEqualArrays(output_novs, expected)
+
+        root = self.p.root
         root._vectors['output'][''].set_const(1.0)
         root._vectors['residual'][''].set_const(0.0)
         root._solve_linear([''], 'rev')
         output = root._vectors['residual']['']._data
-        self.assertEqualArrays(output[0], [ 0.25,  0.2 ,  0.25,  0.2 ])
+        self.assertEqualArrays(output[0], [ 1./4.,  1./5. , 1./4.,  1./5. ])
         self.assertEqualArrays(output[1], [ 1./3.,  1./6. ,  1./3.,  1./6. ])
 
+        # now try without varsets for comparison
+        root = self.p_no_varsets.root
+        root._vectors['output'][''].set_const(1.0)
+        root._vectors['residual'][''].set_const(0.0)
+        root._solve_linear([''], 'rev')
+        output_novs = root._vectors['residual']['']._data
+        expected = np.array([output[i][j]
+                                 for i,j in self.p._assembler._variable_set_indices['output']])
+        self.assertEqualArrays(output_novs, expected)
+        

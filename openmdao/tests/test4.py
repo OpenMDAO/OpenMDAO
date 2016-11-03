@@ -83,7 +83,6 @@ class Test(unittest.TestCase):
 
         gmres = scipy.sparse.linalg.gmres
         self.p.setup()
-        self.p.root.ln_solver = ScipyIterativeSolver(options={'solver':gmres})
         self.p.root.ln_solver = LinearBlockGS()
 
     def assertEqualArrays(self, a, b, tol=1e-3):
