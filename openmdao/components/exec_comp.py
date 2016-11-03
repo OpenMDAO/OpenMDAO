@@ -88,7 +88,7 @@ class ExecComp(ExplicitComponent):
 
     def __init__(self, exprs, inits=None, units=None, **kwargs):
         super(ExecComp, self).__init__()
-        
+
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-6
 

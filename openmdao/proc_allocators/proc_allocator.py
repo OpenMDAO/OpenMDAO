@@ -3,6 +3,8 @@ from __future__ import division
 import numpy
 from six.moves import range
 
+from openmdao.utils.generalized_dict import GeneralizedDictionary
+
 
 class ProcAllocator(object):
     """Algorithm for allocating processors to a given system's subsystems.
@@ -12,23 +14,20 @@ class ProcAllocator(object):
     _parallel : boolean
         True means the comm is split across subsystems;
         False means the comm is passed to all subsystems.
-    _kwargs : dict
-        Contains options. ### This will eventually be changed to OptionsDict.
+    options : GeneralizedDictionary
+        options dictionary.
     """
 
-    def __init__(self, parallel=False, **kwargs):
+    def __init__(self, **kwargs):
         """Initialize all attributes.
 
         Args
         ----
-        parallel : boolean
-            True means the comm is split across subsystems;
-            False means the comm is passed to all subsystems.
-        kwargs : dict
+        **kwargs : dict
             Contains options.
         """
-        self._parallel = parallel
-        self._kwargs = kwargs
+        self.options = GeneralizedDictionary(kwargs)
+        self.options.declare('parallel', typ=bool, value=False)
 
     def __call__(self, nsub, comm, proc_range):
         """Perform the allocation if parallel.
@@ -52,7 +51,7 @@ class ProcAllocator(object):
             global processor index range to pass to the subsystems.
         """
         # This is a serial group - all procs get all subsystems
-        if not self._parallel or comm.size == 1:
+        if not self.options['parallel'] or comm.size == 1:
             isubs = list(range(nsub))
             sub_comm = comm
             sub_proc_range = [proc_range[0], proc_range[1]]
