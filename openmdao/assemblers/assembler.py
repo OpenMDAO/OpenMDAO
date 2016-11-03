@@ -108,8 +108,9 @@ class Assembler(object):
             # Allocate the size arrays using var_count
             self._variable_sizes[typ] = []
             for iset in range(len(self._variable_set_IDs[typ])):
-                self._variable_sizes[typ].append(numpy.zeros((nproc, 
-                                                              var_count[iset]), int))
+                self._variable_sizes[typ].append(numpy.zeros((nproc,
+                                                              var_count[iset]),
+                                                             int))
 
         # Populate the sizes arrays
         iproc = self._comm.rank
@@ -119,7 +120,7 @@ class Assembler(object):
             ivar_all = variable_indices[typ][ivar]
             iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
             self._variable_sizes[typ][iset][iproc, ivar_set] = size
-            
+
         typ = 'output'
         for ivar, meta in enumerate(variable_metadata[typ]):
             size = numpy.prod(meta['shape'])
@@ -194,7 +195,8 @@ class Assembler(object):
             isize = numpy.prod(metadata['indices'].shape)
             ind2 += isize
             self._src_indices[ind1:ind2] = metadata['indices'].flatten()
-            self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1, ind2]
+            self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
+                                                                          ind2]
             ind1 += isize
 
     def _compute_transfers(self, nsub_allprocs, var_range,
