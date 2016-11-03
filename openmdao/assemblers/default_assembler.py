@@ -4,7 +4,7 @@ import numpy
 
 from six.moves import range
 
-from assembler import Assembler
+from openmdao.assemblers.assembler import Assembler
 
 
 class DefaultAssembler(Assembler):

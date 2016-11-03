@@ -3,7 +3,7 @@ import numpy
 from six.moves import range
 from scipy.sparse.linalg import LinearOperator
 
-from solver import LinearSolver
+from openmdao.solvers.solver import LinearSolver
 
 
 class ScipyIterativeSolver(LinearSolver):

@@ -2,9 +2,12 @@ from __future__ import division
 import numpy
 import unittest
 
-from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group
-from openmdao.parallel_api import PETScVector
-
+from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector
+try:
+    from openmdao.parallel_api import PETScVector
+except ImportError:
+    PETScVector = None
+    
 #      (A) -> x
 # x -> (B) -> f
 
@@ -38,7 +41,7 @@ class Test(unittest.TestCase):
     def setUp(self):
         group = GroupG()
         group.add_subsystems()
-        self.p = Problem(group).setup(PETScVector)
+        self.p = Problem(group).setup(DefaultVector)
         self.p.root.suppress_solver_output = True
 
     def assertEqualArrays(self, a, b):
@@ -124,6 +127,17 @@ class Test(unittest.TestCase):
                 [compB._inputs['x'],   10],
                 [compB._outputs['f'],  20],
                 ])
+
+ 
+class TestPETScVec(Test):
+
+    def setUp(self):
+        if PETScVector is None:
+            raise unittest.SkipTest("PETSc not found")
+        group = GroupG()
+        group.add_subsystems()
+        self.p = Problem(group).setup(PETScVector)
+        self.p.root.suppress_solver_output = True
 
 if __name__ == '__main__':
     unittest.main()
