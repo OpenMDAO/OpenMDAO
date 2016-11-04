@@ -665,6 +665,7 @@ class System(object):
         if jacobian is None:
             self._jacobian = DefaultJacobian()
         else:
+            jacobian._dict.update(self._jacobian._dict)
             self._jacobian = jacobian
             if is_top:
                 self._jacobian._top_name = self.path_name

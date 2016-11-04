@@ -49,7 +49,7 @@ class GeneralizedDictionary(dict):
         values = self._declared_entries[name]['values']
 
         # (1) Check the type
-        if typ is not None and type(value) == typ:
+        if typ is not None and type(value) != typ:
             raise ValueError("Entry '{}' has the wrong type".format(name))
         # (2) Check the value
         if values is not None and value not in values:
@@ -79,7 +79,7 @@ class GeneralizedDictionary(dict):
             raise ValueError("Entry '{}' already exists".format(name))
 
         self._declared_entries[name] = {
-            'type': typ,
+            'typ': typ,
             'desc': desc,
             'value': value,
             'values': values,
@@ -160,12 +160,11 @@ class GeneralizedDictionary(dict):
             value = self._declared_entries[name]['value']
             required = self._declared_entries[name]['required']
 
-            # If this is a required entry:
-            if required:
-                raise ValueError("Entry '{}' is not declared".format(name))
-
             # If a default value is available:
             if value is not None:
                 return value
+            # If not, raise an error
+            else:
+                raise ValueError("Entry '{}' is not declared".format(name))
 
         raise ValueError("Entry '{}' cannot be found".format(name))
