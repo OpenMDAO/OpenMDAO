@@ -1,5 +1,5 @@
 """Define the NewtonSolver class."""
-from solver import NonlinearSolver
+from openmdao.solvers.solver import NonlinearSolver
 
 
 class NewtonSolver(NonlinearSolver):

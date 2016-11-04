@@ -5,7 +5,7 @@ import numpy
 import numbers
 from six.moves import range
 
-from vector import Vector, Transfer
+from openmdao.vectors.vector import Vector, Transfer
 
 real_types = tuple([numbers.Real, numpy.float32, numpy.float64])
 

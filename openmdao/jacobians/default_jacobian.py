@@ -4,7 +4,7 @@ import numpy
 import scipy.sparse
 from six.moves import range
 
-from jacobian import Jacobian
+from openmdao.jacobians.jacobian import Jacobian
 
 
 class DefaultJacobian(Jacobian):

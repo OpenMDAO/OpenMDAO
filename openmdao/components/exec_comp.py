@@ -68,38 +68,6 @@ class ExecComp(ExplicitComponent):
         Initial values of variables can be set by setting a named
         arg with the var name.
 
-    Options
-    -------
-    deriv_options['type'] :  str('user')
-        Derivative calculation type ('user', 'fd', 'cs')
-        Default is 'user', where derivative is calculated from
-        user-supplied derivatives. Set to 'fd' to finite difference
-        this system. Set to 'cs' to perform the complex step
-        if your components support it.
-    deriv_options['form'] :  str('forward')
-        Finite difference mode. (forward, backward, central)
-    deriv_options['step_size'] :  float(1e-06)
-        Default finite difference stepsize
-    deriv_options['step_calc'] :  str('absolute')
-        Set to absolute, relative
-    deriv_options['check_type'] :  str('fd')
-        Type of derivative check for check_partial_derivatives. Set
-        to 'fd' to finite difference this system. Set to
-        'cs' to perform the complex step method if
-        your components support it.
-    deriv_options['check_form'] :  str('forward')
-        Finite difference mode: ("forward", "backward", "central")
-        During check_partial_derivatives, the difference form that is used
-        for the check.
-    deriv_options['check_step_calc'] : str('absolute',)
-        Set to 'absolute' or 'relative'. Default finite difference
-        step calculation for the finite difference check in check_partial_derivatives.
-    deriv_options['check_step_size'] :  float(1e-06)
-        Default finite difference stepsize for the finite difference check
-        in check_partial_derivatives"
-    deriv_options['linearize'] : bool(False)
-        Set to True if you want linearize to be called even though you are using FD.
-
     Notes
     -----
     If a variable has an initial value that is anything other than 0.0,
@@ -119,7 +87,7 @@ class ExecComp(ExplicitComponent):
     """
 
     def __init__(self, exprs, inits=None, units=None, **kwargs):
-        super(ExecComp, self).__init__(**kwargs)
+        super(ExecComp, self).__init__()
 
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-6
@@ -144,7 +112,7 @@ class ExecComp(ExplicitComponent):
             allvars.update(_parse_for_vars(expr))
 
         if inits is not None:
-            self.metadata.update(inits)
+            kwargs.update(inits)
 
         # make sure all kwargs are legit
         for kwarg in kwargs:
@@ -162,19 +130,20 @@ class ExecComp(ExplicitComponent):
                                    "not appear in the expression "
                                    "{1}".format(unit_var, exprs))
 
+        self._inits = kwargs
+
     def initialize_variables(self):
         """Add inputs and outputs based on the contents of our expression
         strings.
         """
         allvars = self._allvars
-        kwargs = self.metadata
         units_dict = self._units_dict
         outs = self._outs
         exprs = self._exprs
 
         for var in sorted(allvars):
             # if user supplied an initial value, use it, otherwise set to 0.0
-            val = kwargs.get(var, 0.0)
+            val = self._inits.get(var, 0.0)
             new_kwargs = {'units':units_dict[var]} if var in units_dict else {}
 
             if var in outs:
@@ -262,7 +231,7 @@ class ExecComp(ExplicitComponent):
         J = OrderedDict()
         non_pbo_outputs = self._non_pbo_outputs
 
-        for param in params:
+        for param in params._views:
 
             pwrap = _TmpDict(params)
 
@@ -287,7 +256,7 @@ class ExecComp(ExplicitComponent):
                 uwrap = _TmpDict(unknowns, return_complex=True)
 
                 # solve with complex param value
-                self._residuals.set_val(0.0)
+                self._residuals.set_const(0.0)
                 self.compute(pwrap, uwrap)
 
                 for u in non_pbo_outputs:

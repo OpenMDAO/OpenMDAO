@@ -31,8 +31,8 @@ class Vector(object):
         dictionary mapping variable names to the corresponding ndarray views.
     _idxs : dict
         0 or slice(None), used so that 1-sized vectors are made floats.
-    _names : [str, ...]
-        list of variables that are relevant in the current mat-vec product.
+    _names : set([str, ...])
+        set of variables that are relevant in the current mat-vec product.
     _global_vector : Vector
         pointer to the vector owned by the root system.
     _data : object
@@ -100,6 +100,41 @@ class Vector(object):
                              self._global_vector)
         vec._clone_data()
         return vec
+
+    def _combined_varset_data(self, arr=None):
+        """Combine all of the varset data members into a single array.
+
+        If an array is passed in, that array is filled with the values.
+        Otherwise, a new array is created.
+
+        Returns
+        -------
+
+        An array that combines all var set entries of our _data list.
+        """
+        if arr is None:
+            return numpy.concatenate(self._data)
+        else:
+            start = 0
+            for dat in self._data:
+                end = start + dat.size
+                arr[start:end] = dat
+                start = end
+            return arr
+
+    def _update_varset_data(self, arr):
+        """Update the data entry for each var set into the combined array.
+
+        Args
+        ----
+        arr : ndarray
+            Array to be assigned to our _data entries.
+        """
+        start = 0
+        for dat in self._data:
+            end = start + dat.size
+            dat[:] = arr[start:end]
+            start = end
 
     def __contains__(self, key):
         """Check if the variable is involved in the current mat-vec product.

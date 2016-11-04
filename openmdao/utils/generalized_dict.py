@@ -91,6 +91,13 @@ class GeneralizedDictionary(dict):
             self._check_type_and_value(name, self._dict[name])
 
     def update(self, in_dict):
+        """Update the internal dictionary with the given one.
+
+        Args
+        ----
+        in_dict : dict
+            the incoming dictionary to add to / overwrite the internal one.
+        """
         for key in in_dict:
             self[key] = in_dict[key]
 
