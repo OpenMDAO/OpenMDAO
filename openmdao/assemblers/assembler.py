@@ -166,7 +166,7 @@ class Assembler(object):
 
         self._input_var_ids = _input_var_ids
 
-    def _setup_src_indices(self, input_metadata, myproc_var_global_indices):
+    def _setup_src_indices(self, input_metadata, myproc_global_idxs):
         """Assemble global list of src_indices.
 
         Sets the following attributes:
@@ -177,7 +177,7 @@ class Assembler(object):
         ----
         input_metadata : [{}, ...]
             list of metadata dictionaries of inputs that exist on this proc.
-        myproc_var_global_indices : ndarray[:]
+        myproc_global_idxs : ndarray[:]
             integer arrays of global indices of variables on this proc.
         """
         # Compute total size of indices vector
@@ -196,8 +196,7 @@ class Assembler(object):
             isize = numpy.prod(metadata['indices'].shape)
             ind2 += isize
             self._src_indices[ind1:ind2] = metadata['indices'].flatten()
-            self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
-                                                                          ind2]
+            self._src_indices_range[myproc_global_idxs[ind], :] = [ind1, ind2]
             ind1 += isize
 
     def _compute_transfers(self, nsub_allprocs, var_range,

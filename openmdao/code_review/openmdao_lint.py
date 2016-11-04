@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import os
+import sys
 import os.path
 import subprocess
 
@@ -14,17 +15,23 @@ directories = [
     'vectors',
 ]
 
-for dir_name in directories:
-    file_names = os.listdir('../' + dir_name)
+retcode = 0
+topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    for file_name in file_names:
+for dir_name in directories:
+    dirpath = os.path.join(topdir, dir_name)
+
+    for file_name in  os.listdir(dirpath):
         if file_name != '__init__.py' and file_name[-3:] == '.py':
             for check in ['pep8', 'pep257']:
-                path = '../%s/%s' % (dir_name, file_name)
+                path = os.path.join(dirpath, file_name)
                 print ('-' * 79)
                 print (check, path)
-                subprocess.call([check, path])
+                ret = subprocess.call([check, path])
+                if retcode == 0:
+                    retcode = ret
 
 print()
 print()
 
+sys.exit(retcode)
