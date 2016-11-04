@@ -1,14 +1,19 @@
 from __future__ import division, print_function
 import numpy
 from six.moves import range
-from scipy.sparse.linalg import LinearOperator
+from scipy.sparse.linalg import LinearOperator, gmres
 
-from solver import LinearSolver
+from openmdao.solvers.solver import LinearSolver
 
 
 class ScipyIterativeSolver(LinearSolver):
 
     METHOD = 'LN: SCIPY'
+
+    def __init__(self, subsolvers=None, **kwargs):
+        super(ScipyIterativeSolver, self).__init__(subsolvers=subsolvers,
+                                                   **kwargs)
+        self.options.declare('solver', typ=object, value=gmres)
 
     def _mat_vec(self, in_vec):
         vec_name = self._vec_name
@@ -22,10 +27,9 @@ class ScipyIterativeSolver(LinearSolver):
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
-        # TODO: generalize this to multiple var_sets
-        x_vec._data[0][:] = in_vec
+        x_vec._update_varset_data(in_vec)
         system._apply_linear([vec_name], self._mode, numpy.arange(ind1, ind2))
-        return b_vec._data[0][:]
+        return b_vec._combined_varset_data()
 
     def _monitor(self, res):
         norm = numpy.linalg.norm(res)
@@ -42,11 +46,11 @@ class ScipyIterativeSolver(LinearSolver):
         self._mode = mode
 
         system = self._system
-        solver = self._options['solver']
+        solver = self.options['solver']
 
-        ilimit = self._options['ilimit']
-        atol = self._options['atol']
-        rtol = self._options['rtol']
+        ilimit = self.options['ilimit']
+        atol = self.options['atol']
+        rtol = self.options['rtol']
 
         for vec_name in self._vec_names:
             self._vec_name = vec_name
@@ -58,12 +62,12 @@ class ScipyIterativeSolver(LinearSolver):
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
-            # TODO: generalize this to multiple var_sets
-            size = x_vec._data[0].shape[0]
+            x_vec_combined = x_vec._combined_varset_data()
+            size = x_vec_combined.size
             linop = LinearOperator((size, size), dtype=float,
                                    matvec=self._mat_vec)
             self._counter = 0
-            x_vec._data[0][:] = solver(linop, numpy.array(b_vec._data[0]),
-                                       x0=numpy.array(x_vec._data[0]),
-                                       maxiter=ilimit, tol=atol,
-                                       callback=self._monitor)[0]
+            x_vec._update_varset_data(solver(linop,b_vec._combined_varset_data(),
+                                             x0=x_vec_combined,
+                                             maxiter=ilimit, tol=atol,
+                                             callback=self._monitor)[0])

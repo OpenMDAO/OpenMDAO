@@ -120,19 +120,16 @@ class Problem(object):
         # Assembler setup: variable metadata and indices
         sizes = {typ: len(root._variable_allprocs_names[typ])
                  for typ in ['input', 'output']}
-        variable_metadata = root._variable_myproc_metadata
-        variable_indices = root._variable_myproc_indices
-        assembler._setup_variables(sizes, variable_metadata, variable_indices)
+        assembler._setup_variables(sizes, root._variable_myproc_metadata,
+                                   root._variable_myproc_indices)
 
         # Assembler setup: variable connections
-        connections = root._variable_connections_indices
-        variable_allprocs_names = root._variable_allprocs_names
-        assembler._setup_connections(connections, variable_allprocs_names)
+        assembler._setup_connections(root._variable_connections_indices,
+                                     root._variable_allprocs_names)
 
         # Assembler setup: global transfer indices vector
-        input_metadata = root._variable_myproc_metadata['input']
-        var_indices = root._variable_myproc_indices['input']
-        assembler._setup_src_indices(input_metadata, var_indices)
+        assembler._setup_src_indices(root._variable_myproc_metadata['input'],
+                                     root._variable_myproc_indices['input'])
 
         # Vector setup for the basic execution vector
         self.setup_vector(None, VectorClass)

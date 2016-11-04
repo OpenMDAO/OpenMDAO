@@ -1,14 +1,11 @@
 """Define the PETSc Vector and Transfer classes."""
 from __future__ import division
 import numpy
-try:
-    from petsc4py import PETSc
-except:
-    pass
+from petsc4py import PETSc
 
 from six.moves import range
 
-from default_vector import DefaultVector, DefaultTransfer
+from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
 
 
 class PETScTransfer(DefaultTransfer):

@@ -1,7 +1,7 @@
 """Define the NonlinearBlockGS class."""
 from six.moves import range
 
-from solver import NonlinearSolver
+from openmdao.solvers.solver import NonlinearSolver
 
 
 class NonlinearBlockGS(NonlinearSolver):

@@ -349,8 +349,7 @@ class System(object):
 
         # Populate the _variable_allprocs_indices dictionary
         for typ in ['input', 'output']:
-            for ind in range(len(self._variable_allprocs_names[typ])):
-                name = self._variable_allprocs_names[typ][ind]
+            for ind, name in enumerate(self._variable_allprocs_names[typ]):
                 ivar_all = self._variable_allprocs_range[typ][0] + ind
                 self._variable_allprocs_indices[typ][name] = ivar_all
 
