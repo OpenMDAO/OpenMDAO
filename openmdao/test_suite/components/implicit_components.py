@@ -31,25 +31,27 @@ class TestImplCompNondLinear(ImplicitComponent):
         for op_name in self.metadata['op_names']:
             self.add_output(op_name, shape=var_shape)
 
+        self.coeffs = {}
+
         for re_name in self.metadata['op_names']:
             for op_name in self.metadata['op_names']:
                 mtx = numpy.random.rand(size, size)
                 numpy.fill_diagonal(mtx, 10)
-                self._jacobian[re_name, op_name] = mtx
+                self.coeffs[re_name, op_name] = mtx
             for ip_name in self.metadata['ip_names']:
                 mtx = numpy.random.rand(size, size)
-                self._jacobian[re_name, ip_name] = mtx
+                self.coeffs[re_name, ip_name] = mtx
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         for re_name in self.metadata['op_names']:
             residuals[re_name] = 0.0
             for op_name in self.metadata['op_names']:
-                mtx = self._jacobian[re_name, op_name]
+                mtx = self.coeffs[re_name, op_name]
                 re = residuals._views[re_name].flatten()
                 op = outputs[op_name].flatten()
                 re += mtx.dot(op)
             for ip_name in self.metadata['ip_names']:
-                mtx = self._jacobian[re_name, ip_name]
+                mtx = self.coeffs[re_name, ip_name]
                 re = residuals._views[re_name].flatten()
                 ip = inputs[ip_name].flatten()
                 re += mtx.dot(ip)
@@ -59,24 +61,24 @@ class TestImplCompNondLinear(ImplicitComponent):
         if mode == 'fwd':
             for re_name in d_residuals:
                 for op_name in d_outputs:
-                    mtx = self._jacobian[re_name, op_name]
+                    mtx = self.coeffs[re_name, op_name]
                     d_re = d_residuals._views[re_name].flatten()
                     d_op = d_outputs[op_name].flatten()
                     d_re += mtx.dot(d_op)
                 for ip_name in d_inputs:
-                    mtx = self._jacobian[re_name, ip_name]
+                    mtx = self.coeffs[re_name, ip_name]
                     d_re = d_residuals._views[re_name].flatten()
                     d_ip = d_inputs[ip_name].flatten()
                     d_re += mtx.dot(d_ip)
         if mode == 'fwd':
             for re_name in d_residuals:
                 for op_name in d_outputs:
-                    mtx = self._jacobian[re_name, op_name]
+                    mtx = self.coeffs[re_name, op_name]
                     d_re = d_residuals[re_name].flatten()
                     d_op = d_outputs._views[op_name].flatten()
                     d_op += mtx.T.dot(d_re)
                 for ip_name in d_inputs:
-                    mtx = self._jacobian[re_name, ip_name]
+                    mtx = self.coeffs[re_name, ip_name]
                     d_re = d_residuals[re_name].flatten()
                     d_ip = d_inputs._views[ip_name].flatten()
                     d_ip += mtx.T.dot(d_re)

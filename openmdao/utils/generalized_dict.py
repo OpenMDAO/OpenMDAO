@@ -3,7 +3,7 @@ from __future__ import division, print_function
 import numpy
 
 
-class GeneralizedDictionary(dict):
+class GeneralizedDictionary(object):
     """Dictionary with type-checking and default values of declared keys.
 
     This class is instantiated for:
@@ -124,6 +124,14 @@ class GeneralizedDictionary(dict):
 
         # Add the local entries, overwriting when there are conflicts
         self._global_dict.update(self._dict)
+
+    def __iter__(self):
+        """Provide an iterator."""
+        return iter(self._dict)
+
+    def __contain__(self, key):
+        """Check if the key is in the local dictionary."""
+        return key in self._dict
 
     def __setitem__(self, name, value):
         """Set an entry in the local dictionary.
