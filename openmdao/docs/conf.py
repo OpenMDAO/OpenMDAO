@@ -73,7 +73,7 @@ OpenMDAO User Source Documentation
     # those directories will be the openmdao packages
     # auto-generate the top-level index.rst file for srcdocs, based on
     # openmdao packages:
-    IGNORE_LIST = ['docs', 'tests', 'devtools', '__pycache__']
+    IGNORE_LIST = ['docs', 'tests', 'devtools', '__pycache__', 'code_review']
     # to improve the order that the user sees in the source docs, put
     # the important packages in this list explicitly. Any new ones that
     # get added will show up at the end.
