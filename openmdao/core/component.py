@@ -220,19 +220,6 @@ class ImplicitComponent(Component):
         pass
 
 
-
-from functools import wraps
-
-def mydecorator(f):
-    @wraps(f)
-    def wrapped(*args, **kwargs):
-        print "Before decorated function"
-        r = f(*args, **kwargs)
-        print "After decorated function"
-        return r
-    return wrapped
-
-
 class ExplicitComponent(Component):
     """Class to inherit from when all output variables are explicit."""
 
@@ -329,7 +316,6 @@ class ExplicitComponent(Component):
         """
         pass
 
-    @mydecorator
     def compute_jacobian(self, inputs, outputs, jacobian):
         """Compute sub-jacobian parts / factorization.
 
