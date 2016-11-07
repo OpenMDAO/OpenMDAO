@@ -250,25 +250,30 @@ class ExplicitComponent(Component):
                 with self._matvec_context(vec_name, var_inds, mode) as vecs:
                     d_inputs, d_outputs, d_residuals = vecs
                     self._jacobian._system = self
-                    self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
+                    self._jacobian._apply(
+                        d_inputs, d_outputs, d_residuals, mode)
         else:
             if mode == 'fwd':
                 for vec_name in vec_names:
-                    with self._matvec_context(vec_name, var_inds, mode) as vecs:
+                    with self._matvec_context(vec_name, var_inds,
+                                              mode) as vecs:
                         d_inputs, d_outputs, d_residuals = vecs
 
-                        self.compute_jacvec_product(self._inputs, self._outputs,
-                                                    d_inputs, d_residuals, mode)
+                        self.compute_jacvec_product(
+                            self._inputs, self._outputs,
+                            d_inputs, d_residuals, mode)
                         d_residuals *= -1.0
                         d_residuals += d_outputs
             elif mode == 'rev':
                 for vec_name in vec_names:
-                    with self._matvec_context(vec_name, var_inds, mode) as vecs:
+                    with self._matvec_context(vec_name, var_inds,
+                                              mode) as vecs:
                         d_inputs, d_outputs, d_residuals = vecs
 
                         d_residuals *= -1.0
-                        self.compute_jacvec_product(self._inputs, self._outputs,
-                                                    d_inputs, d_residuals, mode)
+                        self.compute_jacvec_product(
+                            self._inputs, self._outputs,
+                            d_inputs, d_residuals, mode)
                         d_residuals *= -1.0
                         d_outputs.set_vec(d_residuals)
 
