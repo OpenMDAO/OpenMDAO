@@ -97,3 +97,26 @@ Detailed docstring rules:
      Type
          description ending with a period.
      """
+
+   - Sphinx does not correctly handle decorated methods. To ensure a method's
+     call signature appears correctly in the docs, put the call signature of the method
+     into the first line of the docstring. For example:
+
+   ::
+
+     """
+     method_name(self, arg1, arg2)
+     Do something.
+
+     Paragraph 1.
+
+     Args
+     ----
+     argument_name : Type
+         description ending with a period.
+
+     Returns
+     -------
+     Type
+         description ending with a period.
+     """

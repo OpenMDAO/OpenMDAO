@@ -191,7 +191,7 @@ class ImplicitComponent(Component):
 
         If mode is:
             'fwd': d_residuals \|-> d_outputs
-            
+
             'rev': d_outputs \|-> d_residuals
 
         Args
@@ -218,6 +218,19 @@ class ImplicitComponent(Component):
             sub-jac components written to jacobian[output_name, input_name]
         """
         pass
+
+
+
+from functools import wraps
+
+def mydecorator(f):
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        print "Before decorated function"
+        r = f(*args, **kwargs)
+        print "After decorated function"
+        return r
+    return wrapped
 
 
 class ExplicitComponent(Component):
@@ -316,6 +329,7 @@ class ExplicitComponent(Component):
         """
         pass
 
+    @mydecorator
     def compute_jacobian(self, inputs, outputs, jacobian):
         """Compute sub-jacobian parts / factorization.
 
