@@ -44,7 +44,8 @@ setup(name='openmdao',
       # },
       install_requires=[
         'six', 'numpydoc', #'numpy>=1.9.2',
-        'scipy', 'sqlitedict'
+        'scipy', 'sqlitedict',
+        'pep8', 'pep257',
       ],
       #scripts=['bin/om-pylint.sh']
       entry_points="""
