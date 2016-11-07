@@ -548,7 +548,7 @@ class System(object):
 
     @contextmanager
     def _matvec_context(self, vec_name, var_inds, mode):
-        """Set up linear vectors for an apply_linear.
+        """Context manager for vectors.
 
         For the given vec_name, return vectors that use a set of
         internal variables that are relevant to the current matrix-vector
