@@ -1,12 +1,10 @@
-
+"""A crude converter for OpenMDAO v1 files to OpenMDAO v2"""
 import sys
 
 
-#TODO: auto convert component __init__ into initialize_variables()
-
 def convert():
     """A crude converter for OpenMDAO v1 files to OpenMDAO v2"""
-    
+
     cvt_map = {
         '.add(' : '.add_subsystem(',
         '.add_param(' : '.add_input(',

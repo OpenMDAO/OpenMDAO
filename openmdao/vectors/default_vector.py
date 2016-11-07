@@ -117,7 +117,7 @@ class DefaultVector(Vector):
             elif isinstance(val, numpy.ndarray):
                 idxs[name] = slice(None)
 
-        self._views = views
+        self._views = self._names = views
         self._idxs = idxs
 
     def _clone_data(self):

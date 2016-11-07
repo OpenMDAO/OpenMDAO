@@ -32,7 +32,7 @@ class Vector(object):
     _idxs : dict
         0 or slice(None), used so that 1-sized vectors are made floats.
     _names : set([str, ...])
-        set of variables that are relevant in the current mat-vec product.
+        set of variables that are relevant in the current context.
     _global_vector : Vector
         pointer to the vector owned by the root system.
     _data : object
@@ -60,7 +60,10 @@ class Vector(object):
         self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
         self._views = {}
         self._idxs = {}
-        self._names = []
+
+        # self._names will either be equivalent to self._views or to the
+        # set of variables relevant to the current matvec product.
+        self._names = self._views
 
         self._global_vector = None
         self._data = None
@@ -174,7 +177,10 @@ class Vector(object):
         float or ndarray
             variable value (not scaled, not dimensionless).
         """
-        return self._views[key][self._idxs[key]]
+        if key in self._names:
+            return self._views[key][self._idxs[key]]
+        else:
+            raise KeyError("Variable '%s' not found." % key)
 
     def __setitem__(self, key, value):
         """Set the unscaled variable value in true units.
@@ -186,7 +192,10 @@ class Vector(object):
         value : float or list or tuple or ndarray
             variable value to set (not scaled, not dimensionless).
         """
-        self._views[key][:] = value
+        if key in self._names:
+            self._views[key][:] = value
+        else:
+            raise KeyError("Variable '%s' not found." % key)
 
     def _initialize_data(self, global_vector):
         """Internally allocate vectors.
@@ -284,7 +293,7 @@ class Vector(object):
         pass
 
     def set_const(self, val):
-        """Set the value of this vector to a constant value.
+        """Set the value of this vector to a constant scalar value.
 
         Must be implemented by the subclass.
 

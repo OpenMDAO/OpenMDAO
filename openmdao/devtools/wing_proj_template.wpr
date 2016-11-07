@@ -9,7 +9,8 @@
 proj.directory-list = [{'dirloc': loc('../..'),
                         'excludes': [
                                       u'openmdao/notes',
-                                      u'openmdao/docs'
+                                      u'openmdao/docs',
+                                      u'openmdao/test_suite',
                                     ],
                         'filter': '*.py;*.rst;*.ini;*.cfg;*.js;*.html;*.css',
                         'include_hidden': False,

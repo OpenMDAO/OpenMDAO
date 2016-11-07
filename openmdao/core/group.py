@@ -100,10 +100,10 @@ class Group(System):
         """Compute jac-vec product; use global Jacobian / apply recursion."""
         if self._jacobian._top_name == self.path_name:
             for vec_name in vec_names:
-                tmp = self._get_vectors(vec_name, var_inds, mode)
-                d_inputs, d_outputs, d_residuals = tmp
-                self._jacobian._system = self
-                self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
+                with self._matvec_context(vec_name, var_inds, mode) as vecs:
+                    d_inputs, d_outputs, d_residuals = vecs
+                    self._jacobian._system = self
+                    self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
         else:
             if mode == 'fwd':
                 for vec_name in vec_names:
