@@ -66,7 +66,7 @@ class Solver(object):
         self._system = system
         self._depth = depth
 
-        for solver in self._subsolvers:
+        for solver in self._subsolvers.values():
             solver._setup_solvers(system, depth + 1)
 
     def _mpi_print(self, iteration, res, res0):

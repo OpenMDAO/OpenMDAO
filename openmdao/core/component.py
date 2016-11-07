@@ -160,11 +160,12 @@ class ImplicitComponent(Component):
 
     def apply_linear(self, inputs, outputs,
                      d_inputs, d_outputs, d_residuals, mode):
-        """Compute jac-vector product.
+        r"""Compute jac-vector product.
 
         If mode is:
-            'fwd': (d_inputs, d_outputs) -> d_residuals
-            'rev': d_residuals -> (d_inputs, d_outputs)
+            'fwd': (d_inputs, d_outputs) \|-> d_residuals
+
+            'rev': d_residuals \|-> (d_inputs, d_outputs)
 
         Args
         ----
@@ -185,11 +186,12 @@ class ImplicitComponent(Component):
         self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
 
     def solve_linear(self, d_outputs, d_residuals, mode):
-        """Apply inverse jac product.
+        r"""Apply inverse jac product.
 
         If mode is:
-            'fwd': d_residuals -> d_outputs
-            'rev': d_outputs -> d_residuals
+            'fwd': d_residuals \|-> d_outputs
+
+            'rev': d_outputs \|-> d_residuals
 
         Args
         ----
@@ -259,10 +261,9 @@ class ExplicitComponent(Component):
                                               mode) as vecs:
                         d_inputs, d_outputs, d_residuals = vecs
 
-                        self.compute_jacvec_product(self._inputs,
-                                                    self._outputs,
-                                                    d_inputs, d_residuals,
-                                                    mode)
+                        self.compute_jacvec_product(
+                            self._inputs, self._outputs,
+                            d_inputs, d_residuals, mode)
                         d_residuals *= -1.0
                         d_residuals += d_outputs
             elif mode == 'rev':
@@ -272,10 +273,9 @@ class ExplicitComponent(Component):
                         d_inputs, d_outputs, d_residuals = vecs
 
                         d_residuals *= -1.0
-                        self.compute_jacvec_product(self._inputs,
-                                                    self._outputs,
-                                                    d_inputs, d_residuals,
-                                                    mode)
+                        self.compute_jacvec_product(
+                            self._inputs, self._outputs,
+                            d_inputs, d_residuals, mode)
                         d_residuals *= -1.0
                         d_outputs.set_vec(d_residuals)
 
@@ -336,11 +336,12 @@ class ExplicitComponent(Component):
 
     def compute_jacvec_product(self, inputs, outputs,
                                d_inputs, d_outputs, mode):
-        """Compute jac-vector product.
+        r"""Compute jac-vector product.
 
         If mode is:
-            'fwd': d_inputs -> d_outputs
-            'rev': d_outputs -> d_inputs
+            'fwd': d_inputs \|-> d_outputs
+
+            'rev': d_outputs \|-> d_inputs
 
         Args
         ----

@@ -22,6 +22,7 @@ dir_excludes = [
     '_*',
     'tests',
     'test_suite',  # TODO: this should really be included, but currently has failures
+    'devtools',   # TODO: add this back after problem_viewer is fixed
 ]
 
 file_excludes = [

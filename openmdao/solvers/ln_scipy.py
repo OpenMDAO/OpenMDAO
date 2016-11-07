@@ -10,7 +10,7 @@ from openmdao.solvers.solver import LinearSolver
 class ScipyIterativeSolver(LinearSolver):
     """The Krylov iterative solvers in scipy.sparse.linalg."""
 
-    METHOD = 'LN: SCIPY'
+    SOLVER = 'LN: SCIPY'
 
     def __init__(self, subsolvers=None, **kwargs):
         """Declare the solver option.

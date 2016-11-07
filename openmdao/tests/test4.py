@@ -5,6 +5,7 @@ import scipy.sparse.linalg
 
 from openmdao.api import Problem, ImplicitComponent, Group
 from openmdao.api import ScipyIterativeSolver, LinearBlockJac, LinearBlockGS
+from openmdao.api import view_model
 
 class CompA(ImplicitComponent):
 
@@ -84,6 +85,8 @@ class Test(unittest.TestCase):
         gmres = scipy.sparse.linalg.gmres
         self.p.setup()
         self.p.root.ln_solver = LinearBlockGS()
+
+        #view_model(self.p, show_browser=False)
 
     def assertEqualArrays(self, a, b, tol=1e-3):
         self.assertTrue(numpy.linalg.norm(a-b) < tol)
