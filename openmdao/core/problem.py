@@ -3,8 +3,8 @@ from __future__ import division
 
 import sys
 
-from openmdao.assemblers.assembler import DefaultAssembler
-from openmdao.vectors.vector import DefaultVector
+from openmdao.assemblers.default_assembler import DefaultAssembler
+from openmdao.vectors.default_vector import DefaultVector
 
 
 class FakeComm(object):
@@ -54,12 +54,33 @@ class Problem(object):
 
     # TODO: getitem/setitem need to properly handle scaling/units
     def __getitem__(self, name):
+        """Get an output/input variable.
+
+        Args
+        ----
+        name : str
+            name of the variable in the root's namespace.
+
+        Returns
+        -------
+        ndarray.view
+            the requested output/input variable.
+        """
         try:
             return self.root._outputs[name]
         except KeyError:
             return self.root._inputs[name]
 
     def __setitem__(self, name, value):
+        """Set an output/input variable.
+
+        Args
+        ----
+        name : str
+            name of the output/input variable in the root's namespace.
+        value : float or ndarray or list
+            value to set this variable to.
+        """
         try:
             self.root._outputs[name] = value
         except KeyError:
@@ -67,6 +88,7 @@ class Problem(object):
 
     # TODO: once we have drivers, this should call self.driver.run() instead
     def run(self):
+        """Run the model by calling the root's solve_nonlinear."""
         self.root._solve_nonlinear()
 
     def setup(self, VectorClass=None, check=False, out_stream=sys.stdout):
@@ -94,24 +116,20 @@ class Problem(object):
         root._setup_variables()
         root._setup_variable_indices({'input': 0, 'output': 0})
         root._setup_connections()
-        root._setup_solvers()
 
         # Assembler setup: variable metadata and indices
         sizes = {typ: len(root._variable_allprocs_names[typ])
                  for typ in ['input', 'output']}
-        variable_metadata = root._variable_myproc_metadata
-        variable_indices = root._variable_myproc_indices
-        assembler._setup_variables(sizes, variable_metadata, variable_indices)
+        assembler._setup_variables(sizes, root._variable_myproc_metadata,
+                                   root._variable_myproc_indices)
 
         # Assembler setup: variable connections
-        connections = root._variable_connections_indices
-        variable_allprocs_names = root._variable_allprocs_names
-        assembler._setup_connections(connections, variable_allprocs_names)
+        assembler._setup_connections(root._variable_connections_indices,
+                                     root._variable_allprocs_names)
 
         # Assembler setup: global transfer indices vector
-        input_metadata = root._variable_myproc_metadata['input']
-        var_indices = root._variable_myproc_indices['input']
-        assembler._setup_input_indices(input_metadata, var_indices)
+        assembler._setup_src_indices(root._variable_myproc_metadata['input'],
+                                     root._variable_myproc_indices['input'])
 
         # Vector setup for the basic execution vector
         self.setup_vector(None, VectorClass)

@@ -2,8 +2,12 @@ from __future__ import division
 import numpy
 import unittest
 
-from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, PETScVector
-
+from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector
+try:
+    from openmdao.parallel_api import PETScVector
+except ImportError:
+    PETScVector = None
+    
 #      (A) -> x
 # x -> (B) -> f
 
@@ -37,8 +41,8 @@ class Test(unittest.TestCase):
     def setUp(self):
         group = GroupG()
         group.add_subsystems()
-        self.p = Problem(group).setup(PETScVector)
-        self.p.root.set_solver_print(False)
+        self.p = Problem(group).setup(DefaultVector)
+        self.p.root.suppress_solver_output = True
 
     def assertEqualArrays(self, a, b):
         self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
@@ -55,13 +59,13 @@ class Test(unittest.TestCase):
 
     def test__variable_allprocs_names(self):
         root = self.p.root
-        compA = root.get_subsystem('A')
+        compA = root.get_system('A')
         self.assertEqual(compA._variable_allprocs_names['output'], ['x'])
 
     def test__variable_myproc_indices(self):
         root_inds = self.p.root._variable_myproc_indices
-        compA_inds = self.p.root.get_subsystem('A')._variable_myproc_indices
-        compB_inds = self.p.root.get_subsystem('B')._variable_myproc_indices
+        compA_inds = self.p.root.get_system('A')._variable_myproc_indices
+        compB_inds = self.p.root.get_system('B')._variable_myproc_indices
 
         self.assertEqualArrays(root_inds['input'], numpy.array([0]))
         self.assertEqualArrays(root_inds['output'], numpy.array([0,1]))
@@ -74,8 +78,8 @@ class Test(unittest.TestCase):
 
     def test__variable_allprocs_ranges(self):
         root_rng = self.p.root._variable_allprocs_range
-        compA_rng = self.p.root.get_subsystem('A')._variable_allprocs_range
-        compB_rng = self.p.root.get_subsystem('B')._variable_allprocs_range
+        compA_rng = self.p.root.get_system('A')._variable_allprocs_range
+        compB_rng = self.p.root.get_system('B')._variable_allprocs_range
 
         self.assertEqualArrays(root_rng['input'], numpy.array([0,1]))
         self.assertEqualArrays(root_rng['output'], numpy.array([0,2]))
@@ -96,8 +100,8 @@ class Test(unittest.TestCase):
         root = self.p.root
 
         if root.comm.size == 1:
-            compA = root.get_subsystem('A')
-            compB = root.get_subsystem('B')
+            compA = root.get_system('A')
+            compB = root.get_system('B')
 
             if root.comm.rank == 0:
                 self.assertList([
@@ -123,6 +127,17 @@ class Test(unittest.TestCase):
                 [compB._inputs['x'],   10],
                 [compB._outputs['f'],  20],
                 ])
+
+ 
+class TestPETScVec(Test):
+
+    def setUp(self):
+        if PETScVector is None:
+            raise unittest.SkipTest("PETSc not found")
+        group = GroupG()
+        group.add_subsystems()
+        self.p = Problem(group).setup(PETScVector)
+        self.p.root.suppress_solver_output = True
 
 if __name__ == '__main__':
     unittest.main()

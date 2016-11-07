@@ -1,3 +1,5 @@
+"""A script wrapper for the Wing IDE."""
+
 from __future__ import print_function
 
 import os
@@ -11,8 +13,11 @@ from six.moves.configparser import ConfigParser
 from six import text_type
 from optparse import OptionParser
 
+
 def find_up(name, path=None):
-    """Search upward from the starting path (or the current directory)
+    """Find the named file or directory in a parent directory.
+
+    Search upward from the starting path (or the current directory)
     until the given file or directory is found. The given name is
     assumed to be a basename, not a path.  Returns the absolute path
     of the file or directory if found, or None otherwise.
@@ -39,6 +44,7 @@ def find_up(name, path=None):
                 return None
     return None
 
+
 def _modify_wpr_file(template, outfile, version):
     config = ConfigParser()
     config.read(template)
@@ -46,7 +52,8 @@ def _modify_wpr_file(template, outfile, version):
         config.set('user attributes', 'proj.pyexec',
                    text_type(dict({None: ('custom', sys.executable)})))
         config.set('user attributes', 'proj.pypath',
-                   text_type(dict({None: ('custom',os.pathsep.join(sys.path))})))
+                   text_type(dict({None: ('custom',
+                                          os.pathsep.join(sys.path))})))
 
     with open(outfile, 'w') as fp:
         fp.write('#!wing\n#!version=%s\n' % version)
@@ -65,7 +72,7 @@ def _find_wing():
         tdir = r'C:\Program Files'
         try:
             locs.extend([os.path.join(tdir, p, 'bin') for p in
-                    fnmatch.filter(os.listdir(tdir), r'Wing IDE ?.?')])
+                         fnmatch.filter(os.listdir(tdir), r'Wing IDE ?.?')])
         except:
             pass
     elif sys.platform == 'darwin':
@@ -93,8 +100,9 @@ def _find_wing():
     raise OSError("%s was not found in PATH or in any of the common places." %
                   wname)
 
+
 def run_wing():
-    """Runs the Wing IDE using our template project file."""
+    """Run the Wing IDE using our template project file."""
     parser = OptionParser()
     parser.add_option("-w", "--wingpath", action="store", type="string",
                       dest="wingpath", help="location of WingIDE executable")
@@ -109,7 +117,7 @@ def run_wing():
     wingpath = options.wingpath
     projpath = options.projpath
     version = options.version
-    if len(version)==1:
+    if len(version) == 1:
         version = version + '.0'
 
     if not os.path.isfile(projpath):
@@ -135,7 +143,7 @@ def run_wing():
         libpname = None
 
     if libpname:
-        libs = env.get(libpname,'').split(os.pathsep)
+        libs = env.get(libpname, '').split(os.pathsep)
         rtop = find_up('.git')
         if rtop:
             rtop = os.path.dirname(rtop)
@@ -155,7 +163,7 @@ def run_wing():
             wingpath = _find_wing()
         cmd = [wingpath, projpath]
     try:
-        print("wing command: ",' '.join(cmd))
+        print("wing command: ", ' '.join(cmd))
         Popen(cmd, env=env)
     except Exception as err:
         print("Failed to run command '%s'." % ' '.join(cmd))

@@ -2,14 +2,18 @@ from __future__ import division, print_function
 import numpy
 import unittest
 
-from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, PETScVector
-
+from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector
+try:
+    from openmdao.parallel_api import PETScVector
+    vec_impl = PETScVector
+except ImportError:
+    vec_impl = DefaultVector
 
 
 class GeneralComp(ExplicitComponent):
 
     def initialize_variables(self):
-        kwargs = self.global_kwargs
+        kwargs = self.metadata
         icomp = kwargs['icomp']
         ncomp = kwargs['ncomp']
         use_var_sets = kwargs['use_var_sets']
@@ -77,8 +81,8 @@ class GeneralProblem(object):
         self.root = current_systems[0]
         self.all_systems = all_systems
 
-        self.root.kwargs['use_var_sets'] = use_var_sets
-        self.problem = Problem(self.root).setup(PETScVector)
+        self.root.metadata['use_var_sets'] = use_var_sets
+        self.problem = Problem(self.root).setup(vec_impl)
 
     def print_all(self):
         for sys in self.all_systems[::-1]:

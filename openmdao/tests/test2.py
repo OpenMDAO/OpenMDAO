@@ -2,7 +2,7 @@ from __future__ import division
 import numpy
 import unittest
 
-from openmdao.api import Problem, ExplicitComponent, Group, PETScVector
+from openmdao.api import Problem, ExplicitComponent, Group, DefaultVector
 
 # Systems: R > C1, C2, C3, C4
 # Variables: v1, v2, v3, v4; all depend on each other
@@ -53,11 +53,11 @@ class GroupG(Group):
         self.add_subsystem('C4', Comp4(), promotes=['*'])
 
 
-class Test(unittest.TestCase):
+class TestNumpyVec(unittest.TestCase):
 
     def setUp(self):
         group = GroupG()
-        self.p = Problem(group).setup(PETScVector)
+        self.p = Problem(group).setup(DefaultVector)
         self.p.root._mpi_proc_allocator.parallel = True
 
     def assertEqualArrays(self, a, b):
@@ -88,10 +88,10 @@ class Test(unittest.TestCase):
         root = self.p.root
 
         if root.comm.size == 1:
-            comp1 = root.get_subsystem('C1')
-            comp2 = root.get_subsystem('C2')
-            comp3 = root.get_subsystem('C3')
-            comp4 = root.get_subsystem('C4')
+            comp1 = root.get_system('C1')
+            comp2 = root.get_system('C2')
+            comp3 = root.get_system('C3')
+            comp4 = root.get_system('C4')
 
             comp1._outputs['v1'] = 2.0
             comp2._outputs['v2'] = 4.0
@@ -143,6 +143,21 @@ class Test(unittest.TestCase):
             [comp2._inputs['v3'],  6.0],
             [comp2._inputs['v4'],  8.0],
             ])
+
+
+try:
+    from openmdao.parallel_api import PETScVector
+except ImportError:
+    PETScVector = None
+    
+class TestPetscVec(TestNumpyVec):
+
+    def setUp(self):
+        if PETScVector is None:
+            raise unittest.SkipTest("PETSc not found")
+        group = GroupG()
+        self.p = Problem(group).setup(PETScVector)
+        self.p.root._mpi_proc_allocator.parallel = True
 
 
 if __name__ == '__main__':
