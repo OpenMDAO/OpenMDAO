@@ -2,6 +2,7 @@
 from __future__ import division
 
 from fnmatch import fnmatchcase
+from contextlib import contextmanager
 
 import numpy
 
@@ -545,7 +546,12 @@ class System(object):
 
         return maps
 
-    def _get_vectors(self, vec_name, var_inds, mode):
+    @contextmanager
+    def _matvec_context(self, vec_name, var_inds, mode):
+        """For the given vec_name, return vectors that use a set of
+        internal variables that are relevant to the current matrix-vector
+        product.
+        """
         d_inputs = self._vectors['input'][vec_name]
         d_outputs = self._vectors['output'][vec_name]
         d_residuals = self._vectors['residual'][vec_name]
@@ -593,7 +599,12 @@ class System(object):
         d_outputs._names = set(op_names)
         d_residuals._names = set(res_names)
 
-        return d_inputs, d_outputs, d_residuals
+        yield d_inputs, d_outputs, d_residuals
+
+        # reset _names so users will see full vector contents
+        d_inputs._names = d_inputs._views
+        d_outputs._names = d_outputs._views
+        d_residuals._names = d_residuals._views
 
     @property
     def nl_solver(self):
