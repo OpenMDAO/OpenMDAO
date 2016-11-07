@@ -31,6 +31,7 @@ class Component(System):
         'var_set': 0,
     }
 
+
     def _add_variable(self, name, typ, val, kwargs):
         """Add an input/output variable to the component.
 
@@ -189,6 +190,7 @@ class ImplicitComponent(Component):
 
         If mode is:
             'fwd': d_residuals \|-> d_outputs
+            
             'rev': d_outputs \|-> d_residuals
 
         Args

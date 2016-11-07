@@ -43,6 +43,7 @@ OpenMDAO User Source Documentation
    :undoc-members:
    :private-members:
    :show-inheritance:
+   :inherited-members:
    :noindex:
 
 .. toctree::
@@ -51,8 +52,7 @@ OpenMDAO User Source Documentation
     else:
         ref_sheet_bottom = """
    :members:
-   :undoc-members:
-   :show-inheritance:
+   :noindex:
 
 .. toctree::
    :maxdepth: 2
@@ -148,6 +148,7 @@ OpenMDAO User Source Documentation
                     ref_sheet.write(filename + "\n")
                     ref_sheet.write("+" * len(filename) + "\n\n")
                     ref_sheet.write(".. automodule:: " + package_name + "." + sub_package)
+
                     # finish and close each reference sheet.
                     ref_sheet.write(ref_sheet_bottom)
                     ref_sheet.close()
@@ -173,11 +174,28 @@ def _parse(self):
         self._doc.reset()
         self._parse_summary()
 
-        for (section,content) in self._read_sections():
+        sections = list(self._read_sections())
+        section_names = set([section for section, content in sections])
+
+        has_returns = 'Returns' in section_names
+        has_yields = 'Yields' in section_names
+        # We could do more tests, but we are not. Arbitrarily.
+        if has_returns and has_yields:
+            msg = 'Docstring contains both a Returns and Yields section.'
+            raise ValueError(msg)
+
+        for (section, content) in sections:
             if not section.startswith('..'):
-                section = ' '.join([s.capitalize() for s in section.split(' ')])
-            if section in ('Args', 'Options', 'Params', 'Returns', 'Raises', 'Warns',
-                           'Other Args', 'Attributes', 'Methods'):
+                section = (s.capitalize() for s in section.split(' '))
+                section = ' '.join(section)
+                if self.get(section):
+                    msg = ("The section %s appears twice in the docstring." %
+                           section)
+                    raise ValueError(msg)
+
+            if section in ('Args', 'Options', 'Params', 'Returns', 'Yields', 'Raises',
+                           'Warns', 'Other Args', 'Attributes',
+                           'Methods'):
                 self[section] = self._parse_param_list(content)
             elif section.startswith('.. index::'):
                 self['index'] = self._parse_index(section, content)
@@ -185,7 +203,6 @@ def _parse(self):
                 self['See Also'] = self._parse_see_also(content)
             else:
                 self[section] = content
-
 
 def __str__(self, indent=0, func_role="obj"):
         out = []
@@ -235,7 +252,11 @@ def __init__(self, docstring, config={}):
             'index': {}
             }
 
-        self._parse()
+        try:
+            self._parse()
+        except ParseError as e:
+            e.docstring = orig_docstring
+            raise
 
 def _str_options(self, name):
         out = []
@@ -291,6 +312,8 @@ extensions = [
 ]
 
 numpydoc_show_class_members = False
+
+#autodoc_default_flags = ['members']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -369,3 +392,14 @@ man_pages = [
     (master_doc, 'openmdao', u'OpenMDAO Documentation',
      [author], 1)
 ]
+
+# def autodoc_skip_private_attribute(app, what, name, obj, skip, options):
+#     print "HEY:" + what + " " + name
+#     exclusions = ()
+#     if what == "attribute": exclusions = ('_sys_depth', '_**')
+#     #else: exlusions = ()
+#     exclude = name in exclusions
+#     return skip or exclude
+#
+# def setup(app):
+#     app.connect('autodoc-skip-member', autodoc_skip_private_attribute)
