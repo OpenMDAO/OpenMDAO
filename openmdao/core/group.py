@@ -103,7 +103,8 @@ class Group(System):
                 with self._matvec_context(vec_name, var_inds, mode) as vecs:
                     d_inputs, d_outputs, d_residuals = vecs
                     self._jacobian._system = self
-                    self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
+                    self._jacobian._apply(d_inputs, d_outputs, d_residuals,
+                                          mode)
         else:
             if mode == 'fwd':
                 for vec_name in vec_names:

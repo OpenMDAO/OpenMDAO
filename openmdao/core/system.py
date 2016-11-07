@@ -548,7 +548,9 @@ class System(object):
 
     @contextmanager
     def _matvec_context(self, vec_name, var_inds, mode):
-        """For the given vec_name, return vectors that use a set of
+        """Context manager for vectors.
+
+        For the given vec_name, return vectors that use a set of
         internal variables that are relevant to the current matrix-vector
         product.
         """
