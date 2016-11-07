@@ -100,7 +100,7 @@ Detailed docstring rules:
 
    - Sphinx does not correctly handle decorated methods. To ensure a method's
      call signature appears correctly in the docs, put the call signature of the method
-     into the first line of the docstring. For example:
+     into the first line of the docstring. (See :ref:`Sphinx and Decorated Methods <sphinx_decorators>` for more information.) For example:
 
    ::
 

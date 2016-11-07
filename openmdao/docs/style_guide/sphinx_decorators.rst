@@ -1,3 +1,5 @@
+.. _`sphinx_decorators`:
+
 Sphinx and Decorated Methods
 ----------------------------
 
