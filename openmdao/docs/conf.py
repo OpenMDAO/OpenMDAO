@@ -6,15 +6,9 @@ from mock import Mock
 MOCK_MODULES = ['h5py', 'petsc4py', 'mpi4py', 'pyoptsparse']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
-#------------------------begin monkeypatch-----------------------
-#monkeypatch to make our docs say "Args" instead of "Parameters"
-from numpydoc.docscrape_sphinx import SphinxDocString
-from numpydoc.docscrape import NumpyDocString, Reader
-import textwrap
-
 import openmdao
 
-def generate_docs(type):
+def generate_docs(doctype):
     index_top_dev = """.. _source_documentation_dev:
 
 =======================================
@@ -43,12 +37,13 @@ OpenMDAO User Source Documentation
 
 """
 
-    if(type == "dev"):
+    if(doctype == "dev"):
         ref_sheet_bottom = """
    :members:
    :undoc-members:
    :private-members:
    :show-inheritance:
+   :inherited-members:
    :noindex:
 
 .. toctree::
@@ -57,8 +52,7 @@ OpenMDAO User Source Documentation
     else:
         ref_sheet_bottom = """
    :members:
-   :undoc-members:
-   :show-inheritance:
+   :noindex:
 
 .. toctree::
    :maxdepth: 2
@@ -66,20 +60,20 @@ OpenMDAO User Source Documentation
 
     # need to set up the srcdocs directory structure, relative to docs.
     dir = os.path.dirname(__file__)
-    if os.path.isdir(os.path.join(dir, "srcdocs", type)):
+    if os.path.isdir(os.path.join(dir, "srcdocs", doctype)):
         import shutil
-        shutil.rmtree(os.path.join(dir, "srcdocs", type))
+        shutil.rmtree(os.path.join(dir, "srcdocs", doctype))
 
-    if not os.path.isdir(os.path.join(dir, "srcdocs", type)):
-        os.mkdir(os.path.join(dir, "srcdocs", type))
-    if not os.path.isdir(os.path.join(dir, "srcdocs", type, "packages")):
-        os.mkdir(os.path.join(dir, "srcdocs", type, "packages"))
+    if not os.path.isdir(os.path.join(dir, "srcdocs", doctype)):
+        os.mkdir(os.path.join(dir, "srcdocs", doctype))
+    if not os.path.isdir(os.path.join(dir, "srcdocs", doctype, "packages")):
+        os.mkdir(os.path.join(dir, "srcdocs", doctype, "packages"))
 
     # look for directories in the openmdao level, one up from docs
     # those directories will be the openmdao packages
     # auto-generate the top-level index.rst file for srcdocs, based on
     # openmdao packages:
-    IGNORE_LIST = ['docs', 'tests', 'devtools', '__pycache__']
+    IGNORE_LIST = ['docs', 'tests', 'devtools', '__pycache__', 'code_review']
     # to improve the order that the user sees in the source docs, put
     # the important packages in this list explicitly. Any new ones that
     # get added will show up at the end.
@@ -92,9 +86,9 @@ OpenMDAO User Source Documentation
                 packages.append(listing)
 
     # begin writing the 'srcdocs/index.rst' file at mid  level.
-    index_filename = os.path.join(dir, "srcdocs", type, "index.rst")
+    index_filename = os.path.join(dir, "srcdocs", doctype, "index.rst")
     index = open(index_filename, "w")
-    if (type == "dev"):
+    if (doctype == "dev"):
         index.write(index_top_dev)
     else:
         index.write(index_top_usr)
@@ -104,7 +98,7 @@ OpenMDAO User Source Documentation
         # a package is e.g. openmdao.core, that contains source files
         # a sub_package, is a src file, e.g. openmdao.core.component
         sub_packages = []
-        package_filename = os.path.join(dir, "srcdocs", type, "packages",
+        package_filename = os.path.join(dir, "srcdocs", doctype, "packages",
                                         "openmdao." + package + ".rst")
         package_name = "openmdao." + package
 
@@ -126,7 +120,7 @@ OpenMDAO User Source Documentation
             index.write("   packages/openmdao." + package + "\n")
 
             # make subpkg directory (e.g. srcdocs/packages/core) for ref sheets
-            package_dirname = os.path.join(dir, "srcdocs", type, "packages", package)
+            package_dirname = os.path.join(dir, "srcdocs", doctype, "packages", package)
             os.mkdir(package_dirname)
 
             # create/write a package index file: (e.g. "srcdocs/packages/openmdao.core.rst")
@@ -149,11 +143,12 @@ OpenMDAO User Source Documentation
                     ref_sheet = open(ref_sheet_filename, "w")
                     # get the meat of the ref sheet code done
                     filename = sub_package + ".py"
-                    ref_sheet.write(".. index:: " + type + "_" + filename + "\n\n")
-                    ref_sheet.write(".. _" + type + "_" + package_name + "." + filename + ":\n\n")
+                    ref_sheet.write(".. index:: " + doctype + "_" + filename + "\n\n")
+                    ref_sheet.write(".. _" + doctype + "_" + package_name + "." + filename + ":\n\n")
                     ref_sheet.write(filename + "\n")
                     ref_sheet.write("+" * len(filename) + "\n\n")
                     ref_sheet.write(".. automodule:: " + package_name + "." + sub_package)
+
                     # finish and close each reference sheet.
                     ref_sheet.write(ref_sheet_bottom)
                     ref_sheet.close()
@@ -165,20 +160,45 @@ OpenMDAO User Source Documentation
     # finish and close top-level index file
     index.close()
 
-#generate two versions of the docs, one with private members, one without.
-generate_docs("dev")
-generate_docs("usr")
+#generate docs, with private members, or without, based on doctype.
+if tags.has("dev"):
+    doctype = "dev"
+if tags.has("usr"):
+    doctype = "usr"
+generate_docs(doctype)
 
+#------------------------begin monkeypatch-----------------------
+#monkeypatch to make our docs say "Args" instead of "Parameters"
+from numpydoc.docscrape_sphinx import SphinxDocString
+from numpydoc.docscrape import NumpyDocString, Reader
+import textwrap
 
 def _parse(self):
         self._doc.reset()
         self._parse_summary()
 
-        for (section,content) in self._read_sections():
+        sections = list(self._read_sections())
+        section_names = set([section for section, content in sections])
+
+        has_returns = 'Returns' in section_names
+        has_yields = 'Yields' in section_names
+        # We could do more tests, but we are not. Arbitrarily.
+        if has_returns and has_yields:
+            msg = 'Docstring contains both a Returns and Yields section.'
+            raise ValueError(msg)
+
+        for (section, content) in sections:
             if not section.startswith('..'):
-                section = ' '.join([s.capitalize() for s in section.split(' ')])
-            if section in ('Args', 'Options', 'Params', 'Returns', 'Raises', 'Warns',
-                           'Other Args', 'Attributes', 'Methods'):
+                section = (s.capitalize() for s in section.split(' '))
+                section = ' '.join(section)
+                if self.get(section):
+                    msg = ("The section %s appears twice in the docstring." %
+                           section)
+                    raise ValueError(msg)
+
+            if section in ('Args', 'Options', 'Params', 'Returns', 'Yields', 'Raises',
+                           'Warns', 'Other Args', 'Attributes',
+                           'Methods'):
                 self[section] = self._parse_param_list(content)
             elif section.startswith('.. index::'):
                 self['index'] = self._parse_index(section, content)
@@ -186,7 +206,6 @@ def _parse(self):
                 self['See Also'] = self._parse_see_also(content)
             else:
                 self[section] = content
-
 
 def __str__(self, indent=0, func_role="obj"):
         out = []
@@ -211,7 +230,6 @@ def __str__(self, indent=0, func_role="obj"):
         return '\n'.join(out)
 
 def __init__(self, docstring, config={}):
-
         docstring = textwrap.dedent(docstring).split('\n')
 
         self._doc = Reader(docstring)
@@ -236,7 +254,16 @@ def __init__(self, docstring, config={}):
             'index': {}
             }
 
-        self._parse()
+        try:
+            self._parse()
+        except ParseError as e:
+            e.docstring = orig_docstring
+            raise
+
+        #In creation of usr docs, remove private Attributes (beginning with '_')
+        # with a crazy list comprehension
+        if tags.has("usr"):
+            self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"] if not att[0].startswith('_')]
 
 def _str_options(self, name):
         out = []
@@ -292,6 +319,8 @@ extensions = [
 ]
 
 numpydoc_show_class_members = False
+
+#autodoc_default_flags = ['members']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
