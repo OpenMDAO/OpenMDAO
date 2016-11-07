@@ -392,14 +392,3 @@ man_pages = [
     (master_doc, 'openmdao', u'OpenMDAO Documentation',
      [author], 1)
 ]
-
-# def autodoc_skip_private_attribute(app, what, name, obj, skip, options):
-#     print "HEY:" + what + " " + name
-#     exclusions = ()
-#     if what == "attribute": exclusions = ('_sys_depth', '_**')
-#     #else: exlusions = ()
-#     exclude = name in exclusions
-#     return skip or exclude
-#
-# def setup(app):
-#     app.connect('autodoc-skip-member', autodoc_skip_private_attribute)
