@@ -43,7 +43,7 @@ ignores = {
 def _get_files():
     """A generator of files to check for pep8/pep257 violations."""
     topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    print(topdir)
+
     for dirpath, dnames, fnames in os.walk(topdir):
         for dpattern in dir_excludes:
             newdn = [d for d in dnames if not fnmatch(d, dpattern)]
