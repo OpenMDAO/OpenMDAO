@@ -1,3 +1,5 @@
+"""Key OpenMDAO classes can be imported from here."""
+
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group
 from openmdao.core.component import ExplicitComponent
@@ -9,4 +11,3 @@ from openmdao.solvers.ln_bjac import LinearBlockJac
 from openmdao.solvers.ln_bgs import LinearBlockGS
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
 from openmdao.vectors.default_vector import DefaultVector
-

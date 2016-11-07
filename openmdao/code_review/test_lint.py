@@ -4,6 +4,7 @@ import unittest
 import os
 import sys
 from subprocess import Popen, PIPE, STDOUT, call
+from fnmatch import fnmatch, filter as fnfilter
 
 directories = [
     'assemblers',
@@ -15,23 +16,54 @@ directories = [
     'vectors',
 ]
 
+# fill in patterns to exclude directories here
+dir_excludes = [
+    'docs',
+    '_*',
+    'tests',
+    'test_suite',  # TODO: this should really be included, but currently has failures
+]
+
+file_excludes = [
+    'test_*',
+    '__init__.py',
+]
+
+ignores = {
+    'pep8': [
+        'E131',  # continuation line unaligned for hanging indent
+    ],
+    'pep257': [
+
+    ]
+}
+
+
 def _get_files():
     """A generator of files to check for pep8/pep257 violations."""
     topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    print(topdir)
+    for dirpath, dnames, fnames in os.walk(topdir):
+        for dpattern in dir_excludes:
+            newdn = [d for d in dnames if not fnmatch(d, dpattern)]
+            if len(newdn) != len(dnames):
+                dnames[:] = newdn # replace contents of dnames to cause pruning
 
-    for dir_name in directories:
-        dirpath = os.path.join(topdir, dir_name)
+        for fpattern in file_excludes:
+            fnames = [f for f in fnames if not fnmatch(f, fpattern)]
 
-        for file_name in  os.listdir(dirpath):
-            if file_name != '__init__.py' and file_name[-3:] == '.py':
-                yield os.path.join(dirpath, file_name)
+        for name in fnfilter(fnames, '*.py'):
+            yield os.path.join(dirpath, name)
 
 
 class LintTestCase(unittest.TestCase):
     def test_pep8(self):
+        ignore = ','.join(ignores['pep8'])
+        if ignore:
+            ignore = '--ignore=%s' % ignore
+
         for path in _get_files():
-            p = Popen(['pep8', '--show-source',
-                       path],
+            p = Popen(['pep8', '--show-source', ignore, path],
                       stdout=PIPE, stderr=STDOUT)
             output = p.communicate()[0]
 
@@ -40,8 +72,12 @@ class LintTestCase(unittest.TestCase):
                 self.fail('pep8 failure: %s' % '\n'.join(msgs))
 
     def test_pep257(self):
+        ignore = ','.join(ignores['pep257'])
+        if ignore:
+            ignore = '--ignore=%s' % ignore
+
         for path in _get_files():
-            p = Popen(['pep257', path], stdout=PIPE, stderr=STDOUT)
+            p = Popen(['pep257', ignore, path], stdout=PIPE, stderr=STDOUT)
             output = p.communicate()[0]
 
             if p.returncode:
@@ -54,7 +90,12 @@ if __name__ == '__main__':
         for check in ['pep8', 'pep257']:
             print ('-' * 79)
             print (check, path)
-            call([check, path])
+
+            ignore = ','.join(ignores[check])
+            if ignore:
+                ignore = '--ignore=%s' % ignore
+
+            call([check, ignore, path])
 
     print()
     print()

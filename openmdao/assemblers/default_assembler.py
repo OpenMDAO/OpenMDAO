@@ -85,7 +85,7 @@ class DefaultAssembler(Assembler):
 
                     ind1 = ind2 = numpy.sum(ip_sizes[:iproc, :])
                     ind1 += numpy.sum(ip_sizes[iproc, :ip_ivar_set])
-                    ind2 += numpy.sum(ip_sizes[iproc, :ip_ivar_set+1])
+                    ind2 += numpy.sum(ip_sizes[iproc, :ip_ivar_set + 1])
                     input_inds = numpy.arange(ind1, ind2)
 
                     xfer_ip_inds[ip_iset, op_iset].append(input_inds)
