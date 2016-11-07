@@ -20,9 +20,9 @@ class TestExecComp(unittest.TestCase):
         C1 = prob.root.add_subsystem('C1', ExecComp('y=numpy.sum(x)',
                                           x=np.arange(10,dtype=float)))
         prob.setup(check=False)
-        
-        self.assertTrue('x' in C1._inputs._views)
-        self.assertTrue('y' in C1._outputs._views)
+
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
 
         prob.run()
 
@@ -33,10 +33,10 @@ class TestExecComp(unittest.TestCase):
         C1 = prob.root.add_subsystem('C1', ExecComp('y=x+1.', x=2.0))
 
         prob.setup(check=False)
-        
-        self.assertTrue('x' in C1._inputs._views)
-        self.assertTrue('y' in C1._outputs._views)
-        
+
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
+
         prob.run()
 
         assert_rel_error(self, C1._outputs['y'], 3.0, 0.00001)
@@ -46,11 +46,11 @@ class TestExecComp(unittest.TestCase):
         C1 = prob.root.add_subsystem('C1', ExecComp('y = pi * x', x=2.0))
 
         prob.setup(check=False)
-        
-        self.assertTrue('x' in C1._inputs._views)
-        self.assertTrue('y' in C1._outputs._views)
-        self.assertTrue('pi' not in C1._inputs._views)
-        
+
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
+        self.assertTrue('pi' not in C1._inputs)
+
         prob.run()
 
         assert_rel_error(self, C1._outputs['y'], 2 * math.pi, 0.00001)
@@ -61,7 +61,7 @@ class TestExecComp(unittest.TestCase):
         C1 = prob.root.add_subsystem('C1', ExecComp('y=x+z+1.', x=2.0, z=2.0, units={'x':'m','y':'m'}))
 
         prob.setup(check=False)
-        
+
         self.assertTrue('units' in C1._inputs['x'])
         self.assertTrue(C1._inputs['x']['units'] == 'm')
         self.assertTrue('units' in C1._outputs['y'])
@@ -77,10 +77,10 @@ class TestExecComp(unittest.TestCase):
         C1 = prob.root.add_subsystem('C1', ExecComp('y=sin(x)', x=2.0))
 
         prob.setup(check=False)
-        
-        self.assertTrue('x' in C1._inputs._views)
-        self.assertTrue('y' in C1._outputs._views)
-    
+
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
+
         prob.run()
 
         assert_rel_error(self, C1._outputs['y'], math.sin(2.0), 0.00001)
@@ -90,10 +90,10 @@ class TestExecComp(unittest.TestCase):
         C1 = prob.root.add_subsystem('C1', ExecComp('y=x[1]', x=np.array([1.,2.,3.]), y=0.0))
 
         prob.setup(check=False)
-        
-        self.assertTrue('x' in C1._inputs._views)
-        self.assertTrue('y' in C1._outputs._views)
-        
+
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
+
         prob.run()
 
         assert_rel_error(self, C1._outputs['y'], 2.0, 0.00001)
@@ -105,8 +105,8 @@ class TestExecComp(unittest.TestCase):
 
         prob.setup(check=False)
 
-        self.assertTrue('x' in C1._inputs._views)
-        self.assertTrue('y' in C1._outputs._views)
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
 
         prob.run()
 
@@ -165,9 +165,9 @@ class TestExecComp(unittest.TestCase):
         C1 = prob.root.add_subsystem('C1', ExecComp(['y=2.0*x+1.'], x=2.0))
 
         prob.setup(check=False)
-        
-        self.assertTrue('x' in C1._inputs._views)
-        self.assertTrue('y' in C1._outputs._views)
+
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
 
         prob.run()
 
@@ -253,9 +253,9 @@ class TestExecComp(unittest.TestCase):
         prob = Problem(root=Group())
         C1 = prob.root.add_subsystem('C1', ExecComp('a:y=a:x+1.+b', inits={'a:x':2.0}, b=0.5))
         prob.setup(check=False)
-        
-        self.assertTrue('a:x' in C1._inputs._views)
-        self.assertTrue('a:y' in C1._outputs._views)
+
+        self.assertTrue('a:x' in C1._inputs)
+        self.assertTrue('a:y' in C1._outputs)
 
         prob.run()
 
@@ -266,9 +266,9 @@ class TestExecComp(unittest.TestCase):
         C1 = prob.root.add_subsystem('C1', ExecComp(['foo:y=2.0*foo:bar:x+1.'], inits={'foo:bar:x':2.0}))
 
         prob.setup(check=False)
-        
-        self.assertTrue('foo:bar:x' in C1._inputs._views)
-        self.assertTrue('foo:y' in C1._outputs._views)
+
+        self.assertTrue('foo:bar:x' in C1._inputs)
+        self.assertTrue('foo:y' in C1._outputs)
 
         prob.run()
 
