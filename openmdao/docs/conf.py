@@ -42,6 +42,7 @@ OpenMDAO User Source Documentation
    :members:
    :undoc-members:
    :private-members:
+   :special-members: __init__, __contains__, __iter__, __setitem__, __getitem__
    :show-inheritance:
    :inherited-members:
    :noindex:
@@ -52,6 +53,7 @@ OpenMDAO User Source Documentation
     else:
         ref_sheet_bottom = """
    :members:
+   :special-members: __init__, __contains__, __iter__, __setitem__, __getitem__
    :noindex:
 
 .. toctree::
