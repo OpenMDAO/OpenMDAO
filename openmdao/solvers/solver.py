@@ -67,7 +67,7 @@ class Solver(object):
         self._depth = depth
 
         for solver in self._subsolvers.values():
-            solver._setup_solvers(system, depth+1)
+            solver._setup_solvers(system, depth + 1)
 
     def _mpi_print(self, iteration, res, res0):
         """Print residuals from an iteration.
@@ -122,16 +122,16 @@ class Solver(object):
 
         norm0, norm = self._iter_initialize()
         iteration = 0
-        self._mpi_print(iteration, norm/norm0, norm0)
-        while iteration < ilimit and norm > atol and norm/norm0 > rtol:
+        self._mpi_print(iteration, norm / norm0, norm0)
+        while iteration < ilimit and norm > atol and norm / norm0 > rtol:
             self._iter_execute()
             norm = self._iter_get_norm()
             iteration += 1
-            self._mpi_print(iteration, norm/norm0, norm)
-        success = not(norm > atol and norm/norm0 > rtol)
+            self._mpi_print(iteration, norm / norm0, norm)
+        success = not(norm > atol and norm / norm0 > rtol)
         success = success and (not numpy.isinf(norm))
         success = success and (not numpy.isnan(norm))
-        return not success, norm/norm0, norm
+        return not success, norm / norm0, norm
 
     def _iter_initialize(self):
         """Perform any necessary pre-processing operations.
@@ -182,7 +182,7 @@ class Solver(object):
             the subsolver instance.
         """
         self._subsolvers[name] = solver
-        self._subsolvers[name]._setup_solvers(self._system, self._depth+1)
+        self._subsolvers[name]._setup_solvers(self._system, self._depth + 1)
 
     def get_subsolver(self, name):
         """Get a subsolver.

@@ -74,7 +74,7 @@ class DefaultVector(Vector):
             if len(data_inds) > 0:
                 sizes_array = variable_sizes[iset]
                 ind1 = numpy.sum(sizes_array[self._iproc, :data_inds[0]])
-                ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1]+1])
+                ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
                 data.append(self._global_vector._data[iset][ind1:ind2])
             else:
                 data.append(numpy.zeros(0))
@@ -108,7 +108,7 @@ class DefaultVector(Vector):
             ivar_all = variable_myproc_indices[ind]
             iset, ivar = variable_set_indices[ivar_all, :]
             ind1 = numpy.sum(variable_sizes[iset][self._iproc, :ivar])
-            ind2 = numpy.sum(variable_sizes[iset][self._iproc, :ivar+1])
+            ind2 = numpy.sum(variable_sizes[iset][self._iproc, :ivar + 1])
             views[name] = self._global_vector._data[iset][ind1:ind2]
             views[name].shape = meta[ind]['shape']
             val = meta[ind]['value']

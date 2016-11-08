@@ -25,7 +25,7 @@ class DenseJacobian(object):
             if len(ip_inds) > 0:
                 sizes_array = sizes['input'][ip_ivar_set]
                 ind1 = numpy.sum(sizes_array[iproc, :ip_inds[0]])
-                ind2 = numpy.sum(sizes_array[iproc, :ip_inds[-1]+1])
+                ind2 = numpy.sum(sizes_array[iproc, :ip_inds[-1] + 1])
                 ip_size = ind2 - ind1
             else:
                 ip_size = 0
@@ -36,7 +36,7 @@ class DenseJacobian(object):
                 if len(op_inds) > 0:
                     sizes_array = sizes['output'][op_ivar_set]
                     ind1 = numpy.sum(sizes_array[oproc, :op_inds[0]])
-                    ind2 = numpy.sum(sizes_array[oproc, :op_inds[-1]+1])
+                    ind2 = numpy.sum(sizes_array[oproc, :op_inds[-1] + 1])
                     op_size = ind2 - ind1
                 else:
                     op_size = 0
@@ -59,7 +59,7 @@ class DenseJacobian(object):
             ip_ivar_set, ip_ivar = set_indices[ip_ivar_all, :]
             sizes_array = sizes['input'][ip_ivar_set]
             ip_ind1 = numpy.sum(sizes_array[iproc, :ip_ivar])
-            ip_ind2 = numpy.sum(sizes_array[iproc, :ip_ivar+1])
+            ip_ind2 = numpy.sum(sizes_array[iproc, :ip_ivar + 1])
 
             for op_ind in range(len(names['output'])):
                 op_name = names['output'][op_ind]
@@ -67,7 +67,7 @@ class DenseJacobian(object):
                 op_ivar_set, op_ivar = set_indices[op_ivar_all, :]
                 sizes_array = sizes['output'][op_ivar_set]
                 ip_ind1 = numpy.sum(sizes_array[iproc, :op_ivar])
-                ip_ind2 = numpy.sum(sizes_array[iproc, :op_ivar+1])
+                ip_ind2 = numpy.sum(sizes_array[iproc, :op_ivar + 1])
 
                 if (op_name, ip_name) in self._dict:
                     jac = self._dict[op_name, ip_name]

@@ -32,7 +32,6 @@ class Component(System):
         'var_set': 0,
     }
 
-
     def _add_variable(self, name, typ, val, kwargs):
         """Add an input/output variable to the component.
 
@@ -161,7 +160,7 @@ class ImplicitComponent(Component):
 
     def apply_linear(self, inputs, outputs,
                      d_inputs, d_outputs, d_residuals, mode):
-        """Compute jac-vector product.
+        r"""Compute jac-vector product.
 
         If mode is:
             'fwd': (d_inputs, d_outputs) \|-> d_residuals
@@ -187,7 +186,7 @@ class ImplicitComponent(Component):
         self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
 
     def solve_linear(self, d_outputs, d_residuals, mode):
-        """Apply inverse jac product.
+        r"""Apply inverse jac product.
 
         If mode is:
             'fwd': d_residuals \|-> d_outputs
@@ -337,7 +336,7 @@ class ExplicitComponent(Component):
 
     def compute_jacvec_product(self, inputs, outputs,
                                d_inputs, d_outputs, mode):
-        """Compute jac-vector product.
+        r"""Compute jac-vector product.
 
         If mode is:
             'fwd': d_inputs \|-> d_outputs

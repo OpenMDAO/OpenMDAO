@@ -1,3 +1,5 @@
+"""Key OpenMDAO classes can be imported from here."""
+
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group
 from openmdao.core.component import ExplicitComponent

@@ -15,6 +15,7 @@ from openmdao.core.component import ExplicitComponent
 # regex to check for variable names.
 VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
 
+
 def array_idx_iter(shape):
     """Return an iterator over the indices into a n-dimensional array.
 
@@ -26,67 +27,70 @@ def array_idx_iter(shape):
     for p in product(*[range(s) for s in shape]):
         yield p
 
+
 def _parse_for_vars(s):
     return set([x.strip() for x in re.findall(VAR_RGX, s)
                 if not x.endswith('(') and x.strip() not in _expr_dict])
 
+
 def _valid_name(s, exprs):
-    """Replace colons with numbers such that the new name does not exist in any
-    of the given expressions.
-    """
+    """Generate a locally unique replacement for a dotted name."""
     i = 0
     check = ' '.join(exprs)
     while True:
-        n = s.replace(':', '%d'%i)
+        n = s.replace(':', '%d' % i)
         if n not in check:
             return n
         i += 1
 
+
 class ExecComp(ExplicitComponent):
-    """
-    Given a list of assignment statements, this component creates
-    input and output variables at construction time.  All variables
-    appearing on the left-hand side of an assignment are outputs,
-    and the rest are inputs.  Each variable is assumed to be of
-    type float unless the initial value for that variable is supplied
-    in \*\*kwargs or inits.  Derivatives are calculated using complex step.
-
-    Args
-    ----
-    exprs : str or list of str
-        An assignment statement or iter of them. These express how the
-        outputs are calculated based on the inputs.
-
-    inits : dict, optional
-        A mapping of names to initial values, primarily for variables with
-        names that are not valid python names, e.g., a:b:c.
-
-    units : dict, optional
-        A mapping of variable names to their units.
-
-    \*\*kwargs : dict of named args
-        Initial values of variables can be set by setting a named
-        arg with the var name.
-
-    Notes
-    -----
-    If a variable has an initial value that is anything other than 0.0,
-    either because it has a different type than float or just because its
-    initial value is nonzero, you must use a keyword arg or the 'inits' dict
-    to set the initial value.  For example, let's say we have an ExecComp that
-    takes an array 'x' as input and outputs a float variable 'y' which is the
-    sum of the entries in 'x'.
-
-    >>> import numpy
-    >>> from openmdao.api import ExecComp
-    >>> excomp = ExecComp('y=numpy.sum(x)', x=numpy.ones(10,dtype=float))
-
-    In this example, 'y' would be assumed to be the default type of float
-    and would be given the default initial value of 0.0, while 'x' would be
-    initialized with a size 10 float array of ones.
-    """
+    """A Component defined by an expression string."""
 
     def __init__(self, exprs, inits=None, units=None, **kwargs):
+        r"""Create a Component using only an expression string.
+
+        Given a list of assignment statements, this component creates
+        input and output variables at construction time.  All variables
+        appearing on the left-hand side of an assignment are outputs,
+        and the rest are inputs.  Each variable is assumed to be of
+        type float unless the initial value for that variable is supplied
+        in \*\*kwargs or inits.  Derivatives are calculated using complex step.
+
+        Args
+        ----
+        exprs : str or list of str
+            An assignment statement or iter of them. These express how the
+            outputs are calculated based on the inputs.
+
+        inits : dict, optional
+            A mapping of names to initial values, primarily for variables with
+            names that are not valid python names, e.g., a:b:c.
+
+        units : dict, optional
+            A mapping of variable names to their units.
+
+        \*\*kwargs : dict of named args
+            Initial values of variables can be set by setting a named
+            arg with the var name.
+
+        Notes
+        -----
+        If a variable has an initial value that is anything other than 0.0,
+        either because it has a different type than float or just because its
+        initial value is nonzero, you must use a keyword arg or the 'inits'
+        dict to set the initial value.  For example, let's say we have an
+        ExecComp that takes an array 'x' as input and outputs a float variable
+        'y' which is the sum of the entries in 'x'.
+
+        >>> import numpy
+        >>> from openmdao.api import ExecComp
+        >>> excomp = ExecComp('y=numpy.sum(x)', x=numpy.ones(10,dtype=float))
+
+        In this example, 'y' would be assumed to be the default type of float
+        and would be given the default initial value of 0.0, while 'x' would be
+        initialized with a size 10 float array of ones.
+        """
         super(ExecComp, self).__init__()
 
         # if complex step is used for derivatives, this is the stepsize
@@ -133,9 +137,7 @@ class ExecComp(ExplicitComponent):
         self._inits = kwargs
 
     def initialize_variables(self):
-        """Add inputs and outputs based on the contents of our expression
-        strings.
-        """
+        """Add variables based on the contents of our expression strings."""
         allvars = self._allvars
         units_dict = self._units_dict
         outs = self._outs
@@ -144,7 +146,10 @@ class ExecComp(ExplicitComponent):
         for var in sorted(allvars):
             # if user supplied an initial value, use it, otherwise set to 0.0
             val = self._inits.get(var, 0.0)
-            new_kwargs = {'units':units_dict[var]} if var in units_dict else {}
+            if var in units_dict:
+                new_kwargs = {'units': units_dict[var]}
+            else:
+                new_kwargs = {}
 
             if var in outs:
                 self.add_output(var, val, **new_kwargs)
@@ -177,19 +182,19 @@ class ExecComp(ExplicitComponent):
         return [compile(expr, expr, 'exec') for expr in exprs]
 
     def __getstate__(self):
-        """ Returns state as a dict. """
+        """Return state as a dict."""
         state = self.__dict__.copy()
         del state['_codes']
         return state
 
     def __setstate__(self, state):
-        """ Restore state from `state`. """
+        """Restore state from `state`."""
         self.__dict__.update(state)
         self._codes = self._compile_exprs(self._exprs)
 
     def compute(self, inputs, outputs):
         """
-        Executes this component's assignment statemens.
+        Execute this component's assignment statemens.
 
         Args
         ----
@@ -201,11 +206,11 @@ class ExecComp(ExplicitComponent):
 
         """
         for expr in self._codes:
-            exec(expr, _expr_dict, _UPDict(outputs, inputs, self._to_colons))
+            exec(expr, _expr_dict, _IODict(outputs, inputs, self._to_colons))
 
     def linearize(self, params, unknowns, resids):
         """
-        Uses complex step method to calculate a Jacobian dict.
+        Use complex step method to calculate a Jacobian dict.
 
         Args
         ----
@@ -224,7 +229,6 @@ class ExecComp(ExplicitComponent):
             Dictionary whose keys are tuples of the form ('unknown', 'param')
             and whose values are ndarrays.
         """
-
         # our complex step
         step = self.complex_stepsize * 1j
 
@@ -261,7 +265,7 @@ class ExecComp(ExplicitComponent):
 
                 for u in non_pbo_outputs:
                     jval = imag(uwrap[u] / self.complex_stepsize)
-                    if (u, param) not in J: # create the dict entry
+                    if (u, param) not in J:  # create the dict entry
                         J[(u, param)] = numpy.zeros((jval.size, psize))
 
                     # set the column in the Jacobian entry
@@ -277,22 +281,26 @@ class ExecComp(ExplicitComponent):
 
 
 class _TmpDict(object):
-    """
-    A wrapper for a dictionary that will allow getting of values
+    """Dict wrapper that allows modification without changing the wrapped dict.
+
+    It will allow getting of values
     from its inner dict unless those values get modified via
     __setitem__.  After values have been modified they are managed
     thereafter by the wrapper.  This protects the inner dict from
     modification.
-
-    Args
-    ----
-    inner : dict-like
-        The dictionary to be wrapped.
-
-    return_complex : bool, optional
-        If True, return a complex version of values from __getitem__
     """
+
     def __init__(self, inner, return_complex=False):
+        """Construct the dictionary object.
+
+        Args
+        ----
+        inner : dict-like
+            The dictionary to be wrapped.
+
+        return_complex : bool, optional
+            If True, return a complex version of values from __getitem__
+        """
         self._inner = inner
         self._changed = {}
         self._complex = return_complex
@@ -320,21 +328,24 @@ class _TmpDict(object):
         return getattr(self._inner, name)
 
 
-class _UPDict(object):
-    """
-    A dict-like wrapper for the outputs and inputs
-    objects.  Items are first looked for in the outputs
+class _IODict(object):
+    """A dict wrapper that contains 2 different dicts.
+
+    Items are first looked for in the outputs
     and then the inputs.
-
-    Args
-    ----
-    outputs : dict-like
-        The outputs object to be wrapped.
-
-    inputs : dict-like
-        The inputs object to be wrapped.
     """
+
     def __init__(self, outputs, inputs, to_colons):
+        """Create the dict wrapper.
+
+        Args
+        ----
+        outputs : dict-like
+            The outputs object to be wrapped.
+
+        inputs : dict-like
+            The inputs object to be wrapped.
+        """
         self._outputs = outputs
         self._inputs = inputs
         self._to_colons = to_colons
@@ -353,12 +364,12 @@ class _UPDict(object):
         elif name in self._inputs:
             self._inputs[name] = value
         else:
-            self._outputs[name] = value # will raise KeyError
+            self._outputs[name] = value  # will raise KeyError
 
 
 def _import_functs(mod, dct, names=None):
     """
-    Maps attributes attrs from the given module into the given dict.
+    Map attributes attrs from the given module into the given dict.
 
     Args
     ----
@@ -383,22 +394,22 @@ def _import_functs(mod, dct, names=None):
 # this dict will act as the local scope when we eval our expressions
 _expr_dict = {}
 
-# Note: no function in the math module supports complex args, so the following can only be used
-#       in ExecComps if derivatives are not required.  The functions below don't have numpy
-#       versions (which do support complex args), otherwise we'd just use those.  Some of these
-#       will be overridden if scipy is found.
+# Note: no function in the math module supports complex args, so the following
+# can only be used in ExecComps if derivatives are not required.  The functions
+# below don't have numpy versions (which do support complex args), otherwise
+# we'd just use those.  Some of these will be overridden if scipy is found.
 _import_functs(math, _expr_dict,
                names=['factorial', 'fsum', 'lgamma', 'erf', 'erfc', 'gamma'])
 
 _import_functs(numpy, _expr_dict,
                names=['cosh', 'ldexp', 'hypot', 'tan', 'isnan', 'log', 'fabs',
-                      'floor', 'sqrt', 'frexp', 'degrees', 'pi', 'log10', 'modf',
-                      'copysign', 'cos', 'ceil', 'isinf', 'sinh', 'trunc',
-                      'expm1', 'e', 'tanh', 'radians', 'sin', 'fmod', 'exp', 'log1p',
-                      ('arcsin', 'asin'), ('arcsinh', 'asinh'), ('arctanh', 'atanh'),
-                      ('arctan', 'atan'), ('arctan2', 'atan2'),
-                      ('arccosh', 'acosh'), ('arccos', 'acos'),
-                      ('power', 'pow')])
+                      'floor', 'sqrt', 'frexp', 'degrees', 'pi', 'log10',
+                      'modf', 'copysign', 'cos', 'ceil', 'isinf', 'sinh',
+                      'trunc', 'expm1', 'e', 'tanh', 'radians', 'sin', 'fmod',
+                      'exp', 'log1p', ('arcsin', 'asin'), ('arcsinh', 'asinh'),
+                      ('arctanh', 'atanh'), ('arctan', 'atan'),
+                      ('arctan2', 'atan2'), ('arccosh', 'acosh'),
+                      ('arccos', 'acos'), ('power', 'pow')])
 
 # Note: adding cmath here in case someone wants to have an ExecComp that
 # performs some complex operation during solve_nonlinear. cmath functions
@@ -423,7 +434,7 @@ else:
 
 def _cs_abs(x):
     if isinstance(x, ndarray):
-        return x*numpy.sign(x)
+        return x * numpy.sign(x)
     elif x.real < 0.0:
         return -x
     return x

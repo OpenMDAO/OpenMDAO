@@ -6,7 +6,7 @@ from math import isnan
 
 def assert_rel_error(test_case, actual, desired, tolerance):
     """Check relative error.
-    
+
     Determine that the relative error between `actual` and `desired`
     is within `tolerance`. If `desired` is zero, then use absolute error.
 

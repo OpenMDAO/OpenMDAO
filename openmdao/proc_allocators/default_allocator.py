@@ -42,7 +42,7 @@ class DefaultAllocator(ProcAllocator):
 
             isub = color[iproc]
             iproc1 = proc_range[0] + numpy.sum(num_procs[:isub])
-            iproc2 = proc_range[0] + numpy.sum(num_procs[:isub+1])
+            iproc2 = proc_range[0] + numpy.sum(num_procs[:isub + 1])
             # Result
             isubs = [isub]
             sub_comm = comm.Split(isub)

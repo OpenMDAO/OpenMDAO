@@ -218,7 +218,7 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 sub_global_dict = self.metadata._global_dict.copy()
                 subsys._setup_processors(self.path_name, sub_comm,
-                                         sub_global_dict, depth+1, assembler,
+                                         sub_global_dict, depth + 1, assembler,
                                          sub_proc_range)
 
     def _setup_variables(self, recursion=True):
@@ -322,7 +322,7 @@ class System(object):
                     # Compute the offset
                     iproc = self.comm.rank
                     nvar_myproc = local_var_size
-                    index[typ] += (numpy.sum(nvar_allprocs[:iproc+1]) -
+                    index[typ] += (numpy.sum(nvar_allprocs[:iproc + 1]) -
                                    nvar_myproc)
 
             # Perform the recursion

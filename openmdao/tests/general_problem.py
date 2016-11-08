@@ -63,7 +63,7 @@ class GeneralProblem(object):
                 group = Group()
                 group._mpi_proc_allocator.parallel = parallel_groups
                 ind1 = numpy.sum(nsub_group[:igroup])
-                ind2 = numpy.sum(nsub_group[:igroup+1])
+                ind2 = numpy.sum(nsub_group[:igroup + 1])
                 for ind in range(ind1, ind2):
                     if isinstance(current_systems[ind], Group):
                         promotes = None

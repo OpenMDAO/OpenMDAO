@@ -68,7 +68,7 @@ class ScipyIterativeSolver(LinearSolver):
                 self._norm0 = norm
             else:
                 self._norm0 = 1.0
-        self._mpi_print(self._counter, norm/self._norm0, norm)
+        self._mpi_print(self._counter, norm / self._norm0, norm)
         self._counter += 1
 
     def __call__(self, vec_names, mode):
