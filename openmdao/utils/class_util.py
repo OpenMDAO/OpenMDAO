@@ -19,6 +19,6 @@ def overrides_method(method_name, obj, base):
     """
     for klass in obj.__class__.__mro__:
         if method_name in klass.__dict__:
-            return klass is base
+            return klass is not base
 
     return False

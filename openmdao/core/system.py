@@ -240,7 +240,7 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_variables()
 
-        if overrides_method('initialize_variables', self, System):
+        if not overrides_method('initialize_variables', self, System):
             # do nothing - legacy compnent that doesn't define
             # initialize_variables
             pass
