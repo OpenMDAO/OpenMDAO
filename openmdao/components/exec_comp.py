@@ -106,8 +106,8 @@ class ExecComp(ExplicitComponent):
         self._from_colons = None
         self._colon_names = None
 
-        outs = self._outs = set()
-        self._allvars = allvars = set()
+        outs = set()
+        allvars = set()
 
         # find all of the variables and which ones are outputs
         for expr in exprs:
@@ -126,7 +126,7 @@ class ExecComp(ExplicitComponent):
                                    "expressions %s" % (kwarg, exprs))
 
         # make sure units are legit
-        self._units_dict = units_dict = units if units is not None else {}
+        units_dict = units if units is not None else {}
         for unit_var in units_dict:
             if unit_var not in allvars:
                 raise RuntimeError("Units specific for variable {0} "
@@ -134,27 +134,17 @@ class ExecComp(ExplicitComponent):
                                    "not appear in the expression "
                                    "{1}".format(unit_var, exprs))
 
-        self._inits = kwargs
-
-    def initialize_variables(self):
-        """Add variables based on the contents of our expression strings."""
-        allvars = self._allvars
-        units_dict = self._units_dict
-        outs = self._outs
         exprs = self._exprs
 
         for var in sorted(allvars):
             # if user supplied an initial value, use it, otherwise set to 0.0
-            val = self._inits.get(var, 0.0)
-            if var in units_dict:
-                new_kwargs = {'units': units_dict[var]}
-            else:
-                new_kwargs = {}
+            val = kwargs.get(var, 0.0)
+            kwargs2 = {'units': units_dict[var]} if var in units_dict else {}
 
             if var in outs:
-                self.add_output(var, val, **new_kwargs)
+                self.add_output(var, val, **kwargs2)
             else:
-                self.add_input(var, val, **new_kwargs)
+                self.add_input(var, val, **kwargs2)
 
         # need to exclude any non-pbo outputs (like case_rank in ExecComp4Test)
         # TODO: for now, assume all outputs are non-pbo

@@ -86,6 +86,37 @@ class Group(System):
         """
         self._variable_connections[ip_name] = (op_name, src_indices)
 
+    def initialize_variables(self):
+        """Set up variable name and metadata lists."""
+        for typ in ['input', 'output']:
+            for subsys in self._subsystems_myproc:
+                # Assemble the names list from subsystems
+                subsys._variable_maps[typ] = subsys._get_maps(typ)
+                for sub_name in subsys._variable_allprocs_names[typ]:
+                    name = subsys._variable_maps[typ][sub_name]
+                    self._variable_allprocs_names[typ].append(name)
+                    self._variable_myproc_names[typ].append(name)
+
+                # Assemble the metadata list from the subsystems
+                metadata = subsys._variable_myproc_metadata[typ]
+                self._variable_myproc_metadata[typ].extend(metadata)
+
+            # The names list is on all procs, allgather all names
+            if self.comm.size > 1:
+
+                # One representative proc from each sub_comm adds names
+                sub_comm = self._subsystems_myproc[0].comm
+                if sub_comm.rank == 0:
+                    names = self._variable_allprocs_names[typ]
+                else:
+                    names = []
+
+                # Every proc on this comm now has global variable names
+                raw = self.comm.allgather(names)
+                self._variable_allprocs_names[typ] = []
+                for names in raw:
+                    self._variable_allprocs_names[typ].extend(names)
+
     def _apply_nonlinear(self):
         """Compute residuals; perform recursion."""
         self._transfers[None](self._inputs, self._outputs, 'fwd')

@@ -12,6 +12,7 @@ from six.moves import range
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
+from openmdao.utils.class_util import overrides_method
 
 
 class System(object):
@@ -239,45 +240,22 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_variables()
 
-        # Empty the lists in case this is part of a reconfiguration
-        for typ in ['input', 'output']:
-            self._variable_allprocs_names[typ] = []
-            self._variable_myproc_names[typ] = []
-            self._variable_myproc_metadata[typ] = []
-
-        # If this is a component, the user calls add_input/add_output
-        if len(self._subsystems_allprocs) == 0:
-            self.initialize_variables()
-        # If this is a group, assemble the metadata and names lists
+        if overrides_method('initialize_variables', self, System):
+            # do nothing - legacy compnent that doesn't define
+            # initialize_variables
+            pass
         else:
+            # TODO: we may want to provide a way for component devs to tell
+            # the framework that they don't need to re-configure, since the
+            # majority of components won't need to be configured more than once
+
+            # Empty the lists in case this is part of a reconfiguration
             for typ in ['input', 'output']:
-                for subsys in self._subsystems_myproc:
-                    # Assemble the names list from subsystems
-                    subsys._variable_maps[typ] = subsys._get_maps(typ)
-                    for sub_name in subsys._variable_allprocs_names[typ]:
-                        name = subsys._variable_maps[typ][sub_name]
-                        self._variable_allprocs_names[typ].append(name)
-                        self._variable_myproc_names[typ].append(name)
+                self._variable_allprocs_names[typ] = []
+                self._variable_myproc_names[typ] = []
+                self._variable_myproc_metadata[typ] = []
 
-                    # Assemble the metadata list from the subsystems
-                    metadata = subsys._variable_myproc_metadata[typ]
-                    self._variable_myproc_metadata[typ].extend(metadata)
-
-                # The names list is on all procs, allgather all names
-                if self.comm.size > 1:
-
-                    # One representative proc from each sub_comm adds names
-                    sub_comm = self._subsystems_myproc[0].comm
-                    if sub_comm.rank == 0:
-                        names = self._variable_allprocs_names[typ]
-                    else:
-                        names = []
-
-                    # Every proc on this comm now has global variable names
-                    raw = self.comm.allgather(names)
-                    self._variable_allprocs_names[typ] = []
-                    for names in raw:
-                        self._variable_allprocs_names[typ].extend(names)
+            self.initialize_variables()
 
     def _setup_variable_indices(self, index, recursion=True):
         """Define the variable indices and range.
