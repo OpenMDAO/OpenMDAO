@@ -240,11 +240,7 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_variables()
 
-        if not overrides_method('initialize_variables', self, System):
-            # do nothing - legacy compnent that doesn't define
-            # initialize_variables
-            pass
-        else:
+        if overrides_method('initialize_variables', self, System):
             # TODO: we may want to provide a way for component devs to tell
             # the framework that they don't need to re-configure, since the
             # majority of components won't need to be configured more than once
