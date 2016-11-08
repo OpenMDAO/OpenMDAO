@@ -74,8 +74,10 @@ class System(object):
 
     _variable_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
-    _variable_connections_indices : [(int, int), ...]
-        _variable_connections with variable indices instead of names.
+    _variable_connections_indices : [(int, int or None, int or None), ...]
+        _variable_connections with variable indices instead of names.  If
+        src is an output, entry[2] will be None.  If src is an input,
+        entry[1] will be None.
 
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         dict of vector objects.
@@ -286,7 +288,7 @@ class System(object):
                     local_var_size = len(subsys0._variable_allprocs_names[typ])
 
                     # Compute the variable count list; 0 on rank > 0 procs
-                    sub_comm = self._subsystems_myproc[0].comm
+                    sub_comm = subsys0.comm
                     if sub_comm.rank == 0:
                         nvar_myproc = local_var_size
                     else:
@@ -324,9 +326,10 @@ class System(object):
 
         # Populate the _variable_allprocs_indices dictionary
         for typ in ['input', 'output']:
-            for ind, name in enumerate(self._variable_allprocs_names[typ]):
-                ivar_all = self._variable_allprocs_range[typ][0] + ind
-                self._variable_allprocs_indices[typ][name] = ivar_all
+            idx = self._variable_allprocs_range[typ][0]
+            for name in self._variable_allprocs_names[typ]:
+                self._variable_allprocs_indices[typ][name] = idx
+                idx += 1
 
     def _setup_connections(self):
         """Recursively assemble a list of input-output connections.
@@ -349,30 +352,42 @@ class System(object):
                 pairs.extend(sub_pairs)
 
         # Loop through user-defined connections
-        var_allprocs_names = self._variable_allprocs_names
+        allprocs_in_names = self._variable_allprocs_names['input']
+        myproc_in_names = self._variable_myproc_names['input']
+        allprocs_out_names = self._variable_allprocs_names['output']
+        input_meta = self._variable_myproc_metadata['input']
+
         for ip_name, (op_name, src_indices) \
                 in iteritems(self._variable_connections):
 
-            is_valid = (ip_name in var_allprocs_names['input'] and
-                        op_name in var_allprocs_names['output'])
-            if is_valid:
-                ip_index = var_allprocs_names['input'].index(ip_name)
-                op_index = var_allprocs_names['output'].index(op_name)
-                ip_index += self._variable_allprocs_range['input'][0]
-                op_index += self._variable_allprocs_range['output'][0]
-                pairs.append([ip_index, op_index])
+            if ip_name in allprocs_in_names:
+                if op_name in allprocs_out_names:
+                    ip_index = allprocs_in_names.index(ip_name)
+                    op_index = allprocs_out_names.index(op_name)
+                    ip_index += self._variable_allprocs_range['input'][0]
+                    op_index += self._variable_allprocs_range['output'][0]
+                    pairs.append((ip_index, op_index, None))
+
+                elif op_name in allprocs_in_names:  # input-input connection
+                    ip_index = allprocs_in_names.index(ip_name)
+                    ip_index2 = allprocs_in_names.index(op_name)
+                    ip_index += self._variable_allprocs_range['input'][0]
+                    ip_index2 += self._variable_allprocs_range['input'][0]
+                    pairs.append((ip_index, None, ip_index2))
+
+                else:
+                    continue
 
                 if src_indices is not None:
                     # set the 'indices' metadata in the input variable
                     try:
-                        input_var_names = self._variable_myproc_names['input']
-                        ip_myproc_index = input_var_names.index(ip_name)
+                        ip_myproc_index = myproc_in_names.index(ip_name)
                     except ValueError:
                         pass
                     else:
-                        input_meta = self._variable_myproc_metadata['input']
                         meta = input_meta[ip_myproc_index]
-                        meta['indices'] = numpy.array(src_indices, dtype=int)
+                        meta['indices'] = numpy.array(src_indices,
+                                                      dtype=int)
                         meta['shape'] = meta['indices'].shape
 
         self._variable_connections_indices = pairs
