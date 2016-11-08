@@ -2,6 +2,7 @@
 from __future__ import division
 import numpy
 
+from six import iteritems, itervalues
 from six.moves import range
 
 
@@ -145,24 +146,52 @@ class Assembler(object):
         Args
         ----
         connections : [(int, int), ...]
-            index pairs representing variable connections (op_ind, ip_ind).
+            index pairs representing user defined variable connections
+            (ip_ind, op_ind, ip2_ind).
         variable_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
             list of names of all owned variables, not just on current proc.
         """
-        nvar_input = len(variable_allprocs_names['input'])
+        out_names = variable_allprocs_names['output']
+        in_names = variable_allprocs_names['input']
+        nvar_input = len(in_names)
         _input_var_ids = -numpy.ones(nvar_input, int)
 
-        # Add explicit connections to the _input_var_ids vector
-        for ip_ID, op_ID in connections:
-            _input_var_ids[ip_ID] = op_ID
+        # to help track input-input connections. A dict of the form
+        # { name: conn_list }, so for each input name we get the list of
+        # all connections (either input or output) to it.
+        inconns = {n: set() for n in in_names}
+
+        # Add user defined connections to the _input_var_ids vector
+        # and inconns
+        for ip_ID, op_ID, ip2_ID in connections:
+            if ip2_ID is None:  # src is an output
+                _input_var_ids[ip_ID] = op_ID
+            else:  # src is an input (connect them both ways)
+                inconns[in_names[ip2_ID]].add(ip_ID)
+                inconns[in_names[ip_ID]].add(ip2_ID)
 
         # Loop over input variables
-        for ip_ID, name in enumerate(variable_allprocs_names['input']):
+        for ip_ID, name in enumerate(in_names):
 
             # If name is also an output variable, add this implicit connection
-            if name in variable_allprocs_names['output']:
-                op_ID = variable_allprocs_names['output'].index(name)
+            if name in out_names:
+                op_ID = out_names.index(name)
                 _input_var_ids[ip_ID] = op_ID
+
+            # collect all IDs that map to the same input name
+            inconns[name].add(ip_ID)
+
+        for ids in itervalues(inconns):
+            # more than one input ID indicates an input-input connection
+            if len(ids) > 1:
+                for inID in ids:
+                    # if a given input has an output src, then connect that
+                    # src to all of the other connected inputs.
+                    if inID in _input_var_ids:
+                        op_ID = _input_var_ids[inID]
+                        for i in ids:
+                            _input_var_ids[i] = op_ID
+                        break
 
         self._input_var_ids = _input_var_ids
 
