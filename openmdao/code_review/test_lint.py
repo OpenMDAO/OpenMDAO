@@ -6,16 +6,6 @@ import sys
 from subprocess import Popen, PIPE, STDOUT, call
 from fnmatch import fnmatch, filter as fnfilter
 
-directories = [
-    'assemblers',
-    'core',
-    'jacobians',
-    'proc_allocators',
-    'solvers',
-    'utils',
-    'vectors',
-]
-
 # fill in patterns to exclude directories here
 dir_excludes = [
     'docs',
