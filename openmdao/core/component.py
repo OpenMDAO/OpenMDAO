@@ -191,7 +191,7 @@ class ImplicitComponent(Component):
 
         If mode is:
             'fwd': d_residuals \|-> d_outputs
-            
+
             'rev': d_outputs \|-> d_residuals
 
         Args
