@@ -350,7 +350,6 @@ class System(object):
             for sub_pairs in pairs_raw:
                 pairs.extend(sub_pairs)
 
-        # Loop through user-defined connections
         allprocs_in_names = self._variable_allprocs_names['input']
         myproc_in_names = self._variable_myproc_names['input']
         allprocs_out_names = self._variable_allprocs_names['output']
@@ -359,6 +358,7 @@ class System(object):
         ip_offset = self._variable_allprocs_range['input'][0]
         op_offset = self._variable_allprocs_range['output'][0]
 
+        # Loop through user-defined connections
         for ip_name, (op_name, src_indices) \
                 in iteritems(self._variable_connections):
 
