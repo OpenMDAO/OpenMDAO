@@ -4,6 +4,7 @@ import numpy
 
 from six import iteritems, itervalues
 from six.moves import range
+import networkx as nx
 
 
 class Assembler(object):
@@ -160,15 +161,18 @@ class Assembler(object):
         # { name: conn_list }, so for each input name we get the list of
         # all connections (either input or output) to it.
         inconns = {n: set() for n in in_names}
+        graph = nx.DiGraph()
 
         # Add user defined connections to the _input_var_ids vector
         # and inconns
-        for ip_ID, op_ID, ip2_ID in connections:
+        for ip_ID, op_ID, ipsrc_ID in connections:
             if ip2_ID is None:  # src is an output
                 _input_var_ids[ip_ID] = op_ID
+                graph.add_edge(op_ID, ip_ID, src=True)
             else:  # src is an input (connect them both ways)
-                inconns[in_names[ip2_ID]].add(ip_ID)
-                inconns[in_names[ip_ID]].add(ip2_ID)
+                inconns[in_names[ipsrc_ID]].add(ip_ID)
+                inconns[in_names[ip_ID]].add(ipsrc_ID)
+                graph.add_edge(ipsrc_ID, ip_ID, src=False)
 
         # Loop over input variables
         for ip_ID, name in enumerate(in_names):
