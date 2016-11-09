@@ -27,7 +27,7 @@ class TestConnections(unittest.TestCase):
 
     def test_no_conns(self):
         self.p.setup(check=False)
-        
+
         self.p['G1.G2.C1.x'] = 111.
         self.p['G3.G4.C3.x'] = 222.
         self.p['G3.G4.C4.x'] = 333.
@@ -37,6 +37,7 @@ class TestConnections(unittest.TestCase):
         self.assertEqual(self.C4._inputs['x'], 333.)
 
     def test_inp_inp_explicit_conn_w_src(self):
+        raise unittest.SkipTest("explicit input-input connections not supported yet")
         self.p.root.connect('G3.G4.C3.x', 'G3.G4.C4.x') # connect inputs
         self.p.root.connect('G1.G2.C2.x', 'G3.G4.C3.x') # connect src to one of connected inputs
         self.p.setup(check=False)
@@ -173,7 +174,7 @@ class TestConnections(unittest.TestCase):
 
     def test_diff_conn_input_vals(self):
         raise unittest.SkipTest("no checking yet of connected inputs without a src")
-        
+
         # set different initial values
         self.C1._inputs['x'] = 7.
         self.C3._inputs['x'] = 5.
@@ -193,10 +194,10 @@ class TestConnections(unittest.TestCase):
 
     def test_diff_conn_input_units(self):
         raise unittest.SkipTest("no compatability checking of connected inputs yet")
-    
+
         # set different but compatible units
         self.setUp(c1units={'x': 'ft'}, c3units={'x': 'inch'})
-        
+
         # connect two inputs
         self.p.root.connect('G1.G2.C1.x', 'G3.G4.C3.x')
 
@@ -210,7 +211,7 @@ class TestConnections(unittest.TestCase):
 
     def test_diff_conn_input_units_swap(self):
         raise unittest.SkipTest("no compatability checking of connected inputs yet")
-    
+
         # set different but compatible units
         self.setUp(c1units={'x': 'ft'}, c3units={'x': 'inch'})
 
@@ -227,7 +228,7 @@ class TestConnections(unittest.TestCase):
 
     def test_diff_conn_input_units_w_src(self):
         raise unittest.SkipTest("no compatability checking of connected inputs yet")
-    
+
         p = Problem(root=Group())
         root = p.root
 
@@ -269,7 +270,7 @@ class TestConnectionsPromoted(unittest.TestCase):
 
     def test_inp_inp_promoted_no_src(self):
         raise unittest.SkipTest("connected inputs w/o src not supported yet")
-    
+
         p = Problem(root=Group())
         root = p.root
 

@@ -146,7 +146,7 @@ class Assembler(object):
         ----
         connections : [(int, int), ...]
             index pairs representing user defined variable connections
-            (ip_ind, op_ind, ip2_ind).
+            (ip_ind, op_ind).
         variable_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
             list of names of all owned variables, not just on current proc.
         """
@@ -157,9 +157,8 @@ class Assembler(object):
 
         # Add user defined connections to the _input_var_ids vector
         # and inconns
-        for ip_ID, op_ID, ipsrc_ID in connections:
-            if ipsrc_ID is None:  # src is an output
-                _input_var_ids[ip_ID] = op_ID
+        for ip_ID, op_ID in connections:
+            _input_var_ids[ip_ID] = op_ID
 
         # Loop over input variables
         for ip_ID, name in enumerate(in_names):

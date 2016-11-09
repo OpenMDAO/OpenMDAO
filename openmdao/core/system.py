@@ -370,7 +370,7 @@ class System(object):
                         continue
                     else:
                         pairs.append((ip_index + ip_offset,
-                                      op_index + op_offset, None))
+                                      op_index + op_offset))
 
                     if src_indices is not None:
                         # set the 'indices' metadata in the input variable
