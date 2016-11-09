@@ -145,14 +145,17 @@ class Assembler(object):
         Args
         ----
         connections : [(int, int), ...]
-            index pairs representing variable connections (op_ind, ip_ind).
+            index pairs representing user defined variable connections
+            (ip_ind, op_ind).
         variable_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
             list of names of all owned variables, not just on current proc.
         """
+        out_names = variable_allprocs_names['output']
         nvar_input = len(variable_allprocs_names['input'])
         _input_var_ids = -numpy.ones(nvar_input, int)
 
-        # Add explicit connections to the _input_var_ids vector
+        # Add user defined connections to the _input_var_ids vector
+        # and inconns
         for ip_ID, op_ID in connections:
             _input_var_ids[ip_ID] = op_ID
 
@@ -160,9 +163,10 @@ class Assembler(object):
         for ip_ID, name in enumerate(variable_allprocs_names['input']):
 
             # If name is also an output variable, add this implicit connection
-            if name in variable_allprocs_names['output']:
-                op_ID = variable_allprocs_names['output'].index(name)
-                _input_var_ids[ip_ID] = op_ID
+            for op_ID, oname in enumerate(out_names):
+                if name == oname:
+                    _input_var_ids[ip_ID] = op_ID
+                    break
 
         self._input_var_ids = _input_var_ids
 

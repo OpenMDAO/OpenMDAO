@@ -1,6 +1,8 @@
 """Define the Group class."""
 from __future__ import division
 
+from six import iteritems
+
 from openmdao.core.system import System
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
 from openmdao.solvers.ln_bgs import LinearBlockGS
@@ -85,6 +87,68 @@ class Group(System):
             transferred to the input here.
         """
         self._variable_connections[ip_name] = (op_name, src_indices)
+
+    def _setup_connections(self):
+        """Recursively assemble a list of input-output connections.
+
+        Sets the following attributes:
+            _variable_connections_indices
+        """
+        # Perform recursion and assemble pairs from subsystems
+        pairs = []
+        for subsys in self._subsystems_myproc:
+            subsys._setup_connections()
+            if subsys.comm.rank == 0:
+                pairs.extend(subsys._variable_connections_indices)
+
+        # Do an allgather to gather from root procs of all subsystems
+        if self.comm.size > 1:
+            pairs_raw = self.comm.allgather(pairs)
+            pairs = []
+            for sub_pairs in pairs_raw:
+                pairs.extend(sub_pairs)
+
+        allprocs_in_names = self._variable_allprocs_names['input']
+        myproc_in_names = self._variable_myproc_names['input']
+        allprocs_out_names = self._variable_allprocs_names['output']
+        input_meta = self._variable_myproc_metadata['input']
+
+        ip_offset = self._variable_allprocs_range['input'][0]
+        op_offset = self._variable_allprocs_range['output'][0]
+
+        # Loop through user-defined connections
+        for ip_name, (op_name, src_indices) \
+                in iteritems(self._variable_connections):
+
+            for ip_index, name in enumerate(allprocs_in_names):
+                if name == ip_name:
+                    try:
+                        op_index = allprocs_out_names.index(op_name)
+                    except ValueError:
+                        continue
+                    else:
+                        pairs.append((ip_index + ip_offset,
+                                      op_index + op_offset))
+
+                    if src_indices is not None:
+                        # set the 'indices' metadata in the input variable
+                        try:
+                            ip_myproc_index = myproc_in_names.index(ip_name)
+                        except ValueError:
+                            pass
+                        else:
+                            meta = input_meta[ip_myproc_index]
+                            meta['indices'] = numpy.array(src_indices,
+                                                          dtype=int)
+                            meta['shape'] = meta['indices'].shape
+
+                        # set src_indices to None to avoid unnecessary
+                        # repeat of setting indices and shape metadata
+                        # when we have multiple inputs promoted to the same
+                        # name.
+                        src_indices = None
+
+        self._variable_connections_indices = pairs
 
     def initialize_variables(self):
         """Set up variable name and metadata lists."""

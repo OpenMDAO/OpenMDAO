@@ -6,7 +6,6 @@ from contextlib import contextmanager
 
 import numpy
 
-from six import iteritems
 from six.moves import range
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
@@ -75,7 +74,8 @@ class System(object):
     _variable_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
     _variable_connections_indices : [(int, int), ...]
-        _variable_connections with variable indices instead of names.
+        _variable_connections with variable indices instead of names.  Entries
+        have the form (input_index, output_index).
 
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         dict of vector objects.
@@ -286,7 +286,7 @@ class System(object):
                     local_var_size = len(subsys0._variable_allprocs_names[typ])
 
                     # Compute the variable count list; 0 on rank > 0 procs
-                    sub_comm = self._subsystems_myproc[0].comm
+                    sub_comm = subsys0.comm
                     if sub_comm.rank == 0:
                         nvar_myproc = local_var_size
                     else:
@@ -324,58 +324,17 @@ class System(object):
 
         # Populate the _variable_allprocs_indices dictionary
         for typ in ['input', 'output']:
-            for ind, name in enumerate(self._variable_allprocs_names[typ]):
-                ivar_all = self._variable_allprocs_range[typ][0] + ind
-                self._variable_allprocs_indices[typ][name] = ivar_all
+            idx = self._variable_allprocs_range[typ][0]
+            for name in self._variable_allprocs_names[typ]:
+                self._variable_allprocs_indices[typ][name] = idx
+                idx += 1
 
     def _setup_connections(self):
         """Recursively assemble a list of input-output connections.
 
-        Sets the following attributes:
-            _variable_connections_indices
+        Overridden in Group.
         """
-        # Perform recursion and assemble pairs from subsystems
-        pairs = []
-        for subsys in self._subsystems_myproc:
-            subsys._setup_connections()
-            if subsys.comm.rank == 0:
-                pairs.extend(subsys._variable_connections_indices)
-
-        # Do an allgather to gather from root procs of all subsystems
-        if self.comm.size > 1:
-            pairs_raw = self.comm.allgather(pairs)
-            pairs = []
-            for sub_pairs in pairs_raw:
-                pairs.extend(sub_pairs)
-
-        # Loop through user-defined connections
-        var_allprocs_names = self._variable_allprocs_names
-        for ip_name, (op_name, src_indices) \
-                in iteritems(self._variable_connections):
-
-            is_valid = (ip_name in var_allprocs_names['input'] and
-                        op_name in var_allprocs_names['output'])
-            if is_valid:
-                ip_index = var_allprocs_names['input'].index(ip_name)
-                op_index = var_allprocs_names['output'].index(op_name)
-                ip_index += self._variable_allprocs_range['input'][0]
-                op_index += self._variable_allprocs_range['output'][0]
-                pairs.append([ip_index, op_index])
-
-                if src_indices is not None:
-                    # set the 'indices' metadata in the input variable
-                    try:
-                        input_var_names = self._variable_myproc_names['input']
-                        ip_myproc_index = input_var_names.index(ip_name)
-                    except ValueError:
-                        pass
-                    else:
-                        input_meta = self._variable_myproc_metadata['input']
-                        meta = input_meta[ip_myproc_index]
-                        meta['indices'] = numpy.array(src_indices, dtype=int)
-                        meta['shape'] = meta['indices'].shape
-
-        self._variable_connections_indices = pairs
+        pass
 
     def _setup_vector(self, vectors, vector_var_ids):
         """Add this vector and assign sub_vectors to subsystems.
