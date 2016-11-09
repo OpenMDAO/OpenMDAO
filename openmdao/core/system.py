@@ -74,10 +74,9 @@ class System(object):
 
     _variable_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
-    _variable_connections_indices : [(int, int or None, int or None), ...]
-        _variable_connections with variable indices instead of names.  If
-        src is an output, entry[2] will be None.  If src is an input,
-        entry[1] will be None.
+    _variable_connections_indices : [(int, int), ...]
+        _variable_connections with variable indices instead of names.  Entries
+        have the form (input_index, output_index).
 
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         dict of vector objects.

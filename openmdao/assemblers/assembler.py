@@ -2,7 +2,6 @@
 from __future__ import division
 import numpy
 
-from six import iteritems, itervalues
 from six.moves import range
 
 
