@@ -357,38 +357,39 @@ class System(object):
         allprocs_out_names = self._variable_allprocs_names['output']
         input_meta = self._variable_myproc_metadata['input']
 
+        ip_offset = self._variable_allprocs_range['input'][0]
+        op_offset = self._variable_allprocs_range['output'][0]
+
         for ip_name, (op_name, src_indices) \
                 in iteritems(self._variable_connections):
 
-            if ip_name in allprocs_in_names:
-                if op_name in allprocs_out_names:
-                    ip_index = allprocs_in_names.index(ip_name)
-                    op_index = allprocs_out_names.index(op_name)
-                    ip_index += self._variable_allprocs_range['input'][0]
-                    op_index += self._variable_allprocs_range['output'][0]
-                    pairs.append((ip_index, op_index, None))
-
-                elif op_name in allprocs_in_names:  # input-input connection
-                    ip_index = allprocs_in_names.index(ip_name)
-                    ip_index2 = allprocs_in_names.index(op_name)
-                    ip_index += self._variable_allprocs_range['input'][0]
-                    ip_index2 += self._variable_allprocs_range['input'][0]
-                    pairs.append((ip_index, None, ip_index2))
-
-                else:
-                    continue
-
-                if src_indices is not None:
-                    # set the 'indices' metadata in the input variable
+            for ip_index, name in enumerate(allprocs_in_names):
+                if name == ip_name:
                     try:
-                        ip_myproc_index = myproc_in_names.index(ip_name)
+                        op_index = allprocs_out_names.index(op_name)
                     except ValueError:
-                        pass
+                        continue
                     else:
-                        meta = input_meta[ip_myproc_index]
-                        meta['indices'] = numpy.array(src_indices,
-                                                      dtype=int)
-                        meta['shape'] = meta['indices'].shape
+                        pairs.append((ip_index + ip_offset,
+                                      op_index + op_offset, None))
+
+                    if src_indices is not None:
+                        # set the 'indices' metadata in the input variable
+                        try:
+                            ip_myproc_index = myproc_in_names.index(ip_name)
+                        except ValueError:
+                            pass
+                        else:
+                            meta = input_meta[ip_myproc_index]
+                            meta['indices'] = numpy.array(src_indices,
+                                                          dtype=int)
+                            meta['shape'] = meta['indices'].shape
+
+                        # set src_indices to None to avoid unnecessary
+                        # repeat of setting indices and shape metadata
+                        # when we have multiple inputs promoted to the same
+                        # name.
+                        src_indices = None
 
         self._variable_connections_indices = pairs
 

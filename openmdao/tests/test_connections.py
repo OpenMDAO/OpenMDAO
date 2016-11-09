@@ -36,7 +36,7 @@ class TestConnections(unittest.TestCase):
         self.assertEqual(self.C3._inputs['x'], 222.)
         self.assertEqual(self.C4._inputs['x'], 333.)
 
-    def test_inp_inp_conn_w_src(self):
+    def test_inp_inp_explicit_conn_w_src(self):
         self.p.root.connect('G3.G4.C3.x', 'G3.G4.C4.x') # connect inputs
         self.p.root.connect('G1.G2.C2.x', 'G3.G4.C3.x') # connect src to one of connected inputs
         self.p.setup(check=False)

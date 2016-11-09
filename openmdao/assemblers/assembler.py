@@ -4,7 +4,6 @@ import numpy
 
 from six import iteritems, itervalues
 from six.moves import range
-import networkx as nx
 
 
 class Assembler(object):
@@ -157,22 +156,11 @@ class Assembler(object):
         nvar_input = len(in_names)
         _input_var_ids = -numpy.ones(nvar_input, int)
 
-        # to help track input-input connections. A dict of the form
-        # { name: conn_list }, so for each input name we get the list of
-        # all connections (either input or output) to it.
-        inconns = {n: set() for n in in_names}
-        graph = nx.DiGraph()
-
         # Add user defined connections to the _input_var_ids vector
         # and inconns
         for ip_ID, op_ID, ipsrc_ID in connections:
-            if ip2_ID is None:  # src is an output
+            if ipsrc_ID is None:  # src is an output
                 _input_var_ids[ip_ID] = op_ID
-                graph.add_edge(op_ID, ip_ID, src=True)
-            else:  # src is an input (connect them both ways)
-                inconns[in_names[ipsrc_ID]].add(ip_ID)
-                inconns[in_names[ip_ID]].add(ipsrc_ID)
-                graph.add_edge(ipsrc_ID, ip_ID, src=False)
 
         # Loop over input variables
         for ip_ID, name in enumerate(in_names):
@@ -181,21 +169,6 @@ class Assembler(object):
             if name in out_names:
                 op_ID = out_names.index(name)
                 _input_var_ids[ip_ID] = op_ID
-
-            # collect all IDs that map to the same input name
-            inconns[name].add(ip_ID)
-
-        for ids in itervalues(inconns):
-            # more than one input ID indicates an input-input connection
-            if len(ids) > 1:
-                for inID in ids:
-                    # if a given input has an output src, then connect that
-                    # src to all of the other connected inputs.
-                    if inID in _input_var_ids:
-                        op_ID = _input_var_ids[inID]
-                        for i in ids:
-                            _input_var_ids[i] = op_ID
-                        break
 
         self._input_var_ids = _input_var_ids
 
