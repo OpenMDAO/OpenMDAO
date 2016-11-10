@@ -27,11 +27,11 @@ class Jacobian(object):
     _system : System
         pointer to the system that is currently operating on this Jacobian.
 
-    _dict : dict
+    _sub_jacs : dict
         dictionary containing the user-supplied sub-Jacobians.
-    _mtx : dict
+    _global_jacs : dict
         global Jacobians indexed by (op_iset, ip_iset).
-    _iter_list : [(op_name, ip_name), ...]
+    _oi_pairs : [(op_name, ip_name), ...]
         list of output-input pairs to iterate over.
     """
 
@@ -42,9 +42,9 @@ class Jacobian(object):
         self._assembler = None
         self._system = None
 
-        self._dict = {}
-        self._mtx = {}
-        self._iter_list = []
+        self._sub_jacs = {}
+        self._global_jacs = {}
+        self._oi_pairs = []
 
     def _process_key(self, key):
         """Map output-input pair names to indices and sizes.
@@ -97,7 +97,7 @@ class Jacobian(object):
         elif scipy.sparse.issparse(jac):
             self[key].data *= -1.0  # DOK not supported
         elif len(jac) == 3:
-            self[key][0] = -self._dict[op_ind, ip_ind][0]
+            self[key][0] = -self._sub_jacs[op_ind, ip_ind][0]
         elif len(jac) == 2:
             # In this case, negation is not necessary because sparse FD
             # works on the residuals which already contains the negation
@@ -107,15 +107,19 @@ class Jacobian(object):
         """Assemble list of output-input pairs by name."""
         system = self._system
 
-        self._iter_list = []
+        my_in_names = system._variable_myproc_names['input']
+        all_out_idxs = system._variable_allprocs_indices['output']
+        all_in_idxs = system._variable_allprocs_indices['input']
+
+        self._oi_pairs = []
         for op_name in system._variable_myproc_names['output']:
-            op_ind = system._variable_allprocs_indices['output'][op_name]
+            op_ind = all_out_idxs[op_name]
 
-            for ip_name in system._variable_myproc_names['input']:
-                ip_ind = system._variable_allprocs_indices['input'][ip_name]
+            for ip_name in my_in_names:
+                ip_ind = all_in_idxs[ip_name]
 
-                if (op_ind, ip_ind) in self._dict:
-                    self._iter_list.append((op_name, ip_name))
+                if (op_ind, ip_ind) in self._sub_jacs:
+                    self._oi_pairs.append((op_name, ip_name))
 
     def __contains__(self, key):
         """Map output-input pairs names to indices.
@@ -131,17 +135,17 @@ class Jacobian(object):
             return whether sub-Jacobian has been defined.
         """
         op_ind, ip_ind, op_size, ip_size = self._process_key(key)
-        return (op_ind, ip_ind) in self._dict
+        return (op_ind, ip_ind) in self._sub_jacs
 
     def __iter__(self):
-        """Return iterator from pre-computed _iter_list.
+        """Return iterator from pre-computed _oi_pairs.
 
         Returns
         -------
         listiterator
             iterator returning (op_name, ip_name) pairs.
         """
-        return iter(self._iter_list)
+        return iter(self._oi_pairs)
 
     def __setitem__(self, key, jac):
         """Set sub-Jacobian.
@@ -157,10 +161,10 @@ class Jacobian(object):
 
         if numpy.isscalar(jac):
             jac = numpy.array([jac]).reshape((op_size, ip_size))
-        elif type(jac) is list or type(jac) is tuple:
+        elif isinstance(jac, (list, tuple)):
             jac = numpy.array(jac).reshape((op_size, ip_size))
 
-        self._dict[op_ind, ip_ind] = jac
+        self._sub_jacs[op_ind, ip_ind] = jac
 
     def __getitem__(self, key):
         """Get sub-Jacobian.
@@ -177,7 +181,7 @@ class Jacobian(object):
         """
         op_ind, ip_ind, op_size, ip_size = self._process_key(key)
 
-        return self._dict[op_ind, ip_ind]
+        return self._sub_jacs[op_ind, ip_ind]
 
     def _initialize(self):
         """Allocate the global matrices.

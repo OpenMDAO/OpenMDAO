@@ -13,6 +13,7 @@ class DefaultJacobian(Jacobian):
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """See openmdao.jacobians.jacobian.Jacobian."""
         for op_name, ip_name in self:
+            raise RuntimeError("Jacobian has something in it!")
             jac = self[op_name, ip_name]
             if op_name in d_outputs and ip_name in d_outputs:
                 if mode == 'fwd':

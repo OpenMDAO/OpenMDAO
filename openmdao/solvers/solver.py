@@ -231,13 +231,13 @@ class LinearSolver(Solver):
         system = self._system
 
         self._rhs_vecs = {}
-        for vec_name in self._vec_names:
-            if self._mode == 'fwd':
-                b_vec = system._vectors['residual'][vec_name]
-            elif self._mode == 'rev':
-                b_vec = system._vectors['output'][vec_name]
+        if self._mode == 'fwd':
+            b_vecs = system._vectors['residual']
+        else:  # rev
+            b_vecs = system._vectors['output']
 
-            self._rhs_vecs[vec_name] = b_vec._clone()
+        for vec_name in self._vec_names:
+            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
 
         if self.options['ilimit'] > 1:
             norm = self._iter_get_norm()
@@ -254,13 +254,14 @@ class LinearSolver(Solver):
         system._apply_linear(self._vec_names, self._mode,
                              numpy.arange(ind1, ind2))
 
+        if self._mode == 'fwd':
+            b_vecs = system._vectors['residual']
+        else:  # rev
+            b_vecs = system._vectors['output']
+
         norm = 0
         for vec_name in self._vec_names:
-            if self._mode == 'fwd':
-                b_vec = system._vectors['residual'][vec_name]
-            elif self._mode == 'rev':
-                b_vec = system._vectors['output'][vec_name]
-
+            b_vec = b_vecs[vec_name]
             b_vec -= self._rhs_vecs[vec_name]
             norm += b_vec.get_norm()**2
 
