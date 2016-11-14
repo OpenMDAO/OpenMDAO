@@ -38,7 +38,17 @@ class Problem(object):
     """
 
     def __init__(self, root=None, comm=None, AssemblerClass=None):
-        """Initialize attributes."""
+        """Initialize attributes.
+
+        Args
+        ----
+        root : System or None
+            pointer to the top-level System object (root node in the tree).
+        comm : MPI.Comm or FakeComm or None
+            the global communicator; the same as that of assembler and root.
+        AssemblerClass : Assembler or None
+            pointer to the global Assembler object.
+        """
         if comm is None:
             try:
                 from mpi4py import MPI
@@ -96,8 +106,12 @@ class Problem(object):
 
         Args
         ----
-        VectorClass
+        VectorClass : type
             reference to an actual Vector class; not an instance.
+        check : boolean
+            whether to run error check after setup is complete.
+        out_stream : file
+            Output stream where report will be written if check is performed.
 
         Returns
         -------
@@ -145,9 +159,9 @@ class Problem(object):
         Args
         ----
         vec_name : str
-            name of the vector
-        VectorClass
-            reference to the actual Vector class
+            name of the vector.
+        VectorClass : type
+            reference to the actual Vector class.
         """
         root = self.root
         assembler = self._assembler

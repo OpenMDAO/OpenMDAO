@@ -39,14 +39,11 @@ class Component(System):
         ----
         name : str
             name of the variable in this component's namespace.
-
         typ : str
             either 'input' or 'output'
-
         val : object
             The value of the variable being added.
-
-        **kwargs : dict
+        kwargs : dict
             variable metadata with DEFAULTS defined above.
         """
         metadata = self.DEFAULTS.copy()
@@ -73,6 +70,7 @@ class Component(System):
         self._add_variable(name, 'output', val, kwargs)
 
     def _setup_vector(self, vectors, vector_var_ids):
+        """See openmdao.core.component.Component._setup_vector."""
         super(Component, self)._setup_vector(vectors, vector_var_ids)
 
         # Components load their initial input values into the _inputs vector
@@ -91,18 +89,18 @@ class ImplicitComponent(Component):
     """Class to inherit from when all output variables are implicit."""
 
     def _apply_nonlinear(self):
-        """Compute residuals; call user's apply_nonlinear."""
+        """See System._apply_nonlinear."""
         self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
     def _solve_nonlinear(self):
-        """Compute outputs; call user's solve_nonlinear or nonlinear solver."""
+        """See System._solve_nonlinear."""
         if self._nl_solver is not None:
             self._nl_solver(self._inputs, self._outputs)
         else:
             self.solve_nonlinear(self._inputs, self._outputs)
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """Compute jac-vec product; call user's / Jacobian's apply_linear."""
+        """See System._apply_linear."""
         for vec_name in vec_names:
             with self._matvec_context(vec_name, var_inds, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
@@ -112,7 +110,7 @@ class ImplicitComponent(Component):
                 self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
 
     def _solve_linear(self, vec_names, mode):
-        """Apply inverse jac product; linear solver / user's solve_linear."""
+        """See System._solve_linear."""
         if self._ln_solver is not None:
             return self._ln_solver(vec_names, mode)
         else:
@@ -125,7 +123,7 @@ class ImplicitComponent(Component):
             return success
 
     def _linearize(self):
-        """Compute jacobian / factorization; call user's linearize."""
+        """See System._linearize."""
         self._jacobian._system = self
         self.linearize(self._inputs, self._outputs, self._jacobian)
 
@@ -223,7 +221,7 @@ class ExplicitComponent(Component):
     """Class to inherit from when all output variables are explicit."""
 
     def _apply_nonlinear(self):
-        """Compute residuals; wrap the 'compute' method."""
+        """See System._apply_nonlinear."""
         inputs = self._inputs
         outputs = self._outputs
         residuals = self._residuals
@@ -234,7 +232,7 @@ class ExplicitComponent(Component):
         outputs += residuals
 
     def _solve_nonlinear(self):
-        """Compute outputs; wrap the 'compute' method."""
+        """See System._solve_nonlinear."""
         inputs = self._inputs
         outputs = self._outputs
         residuals = self._residuals
@@ -243,10 +241,7 @@ class ExplicitComponent(Component):
         self.compute(inputs, outputs)
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """Compute jac-vector product.
-
-        Wrap user's 'compute_jacvec_product' or Jacobian's apply method.
-        """
+        """See System._apply_linear."""
         if self._jacobian._top_name == self.path_name:
             for vec_name in vec_names:
                 with self._matvec_context(vec_name, var_inds, mode) as vecs:
@@ -280,7 +275,7 @@ class ExplicitComponent(Component):
                         d_outputs.set_vec(d_residuals)
 
     def _solve_linear(self, vec_names, mode):
-        """Apply inverse jac product; apply the identity inverse jacobian."""
+        """See System._solve_linear."""
         for vec_name in vec_names:
             d_outputs = self._vectors['output'][vec_name]
             d_residuals = self._vectors['residual'][vec_name]
@@ -290,7 +285,7 @@ class ExplicitComponent(Component):
                 d_residuals.setvec(d_outputs)
 
     def _linearize(self):
-        """Compute jacobian / factorization; wrap 'compute_jacobian'."""
+        """See System._linearize."""
         self._jacobian._system = self
         self.compute_jacobian(self._inputs, self._outputs, self._jacobian)
 
@@ -369,9 +364,9 @@ class IndepVarComp(ExplicitComponent):
         ----
         name : str or [(str, value), ...] or [(str, value, kwargs), ...]
             name of the variable or list of variables.
-        value : float or ndarray
+        val : float or ndarray
             value of the variable if a single variable is being defined.
-        **kwargs: dict
+        kwargs : dict
             keyword arguments.
         """
         super(IndepVarComp, self).__init__(**kwargs)

@@ -187,6 +187,11 @@ class Solver(object):
     def get_subsolver(self, name):
         """Get a subsolver.
 
+        Args
+        ----
+        name : str
+            name of the subsolver.
+
         Returns
         -------
         Solver

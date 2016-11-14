@@ -620,6 +620,63 @@ class System(object):
         for subsys in self._subsystems_myproc:
             subsys._set_jacobian(jacobian, False)
 
+    def _apply_nonlinear(self):
+        """Compute residuals."""
+        pass
+
+    def _solve_nonlinear(self):
+        """Compute outputs.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        pass
+
+    def _apply_linear(self, vec_names, mode, var_inds=None):
+        """Compute jac-vec product.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+        var_inds : int ndarray or None
+            list of variable IDs involved in this matrix-vector product.
+        """
+        pass
+
+    def _solve_linear(self, vec_names, mode):
+        """Apply inverse jac product.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        pass
+
+    def _linearize(self):
+        """Compute jacobian / factorization."""
+        pass
+
     def get_system(self, name):
         """Return the system called 'name' in the current namespace.
 
