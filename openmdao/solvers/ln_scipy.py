@@ -51,7 +51,13 @@ class ScipyIterativeSolver(LinearSolver):
             b_vec = system._vectors['output'][vec_name]
 
         x_vec._update_varset_data(in_vec)
-        system._apply_linear([vec_name], self._mode, numpy.arange(ind1, ind2))
+        var_inds = [
+            system._variable_allprocs_range['output'][0],
+            system._variable_allprocs_range['output'][1],
+            system._variable_allprocs_range['output'][0],
+            system._variable_allprocs_range['output'][1],
+        ]
+        system._apply_linear([vec_name], self._mode, var_inds)
         return b_vec._combined_varset_data()
 
     def _monitor(self, res):

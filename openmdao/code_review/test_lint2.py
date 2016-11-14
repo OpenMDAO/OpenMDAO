@@ -139,3 +139,7 @@ class LintTestCase(unittest.TestCase):
 
                             self.check_method(dir_name, file_name,
                                 class_name, method_name, method)
+
+
+if __name__ == '__main__':
+    unittest.main()

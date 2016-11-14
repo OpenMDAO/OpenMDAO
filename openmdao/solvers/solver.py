@@ -254,10 +254,13 @@ class LinearSolver(Solver):
     def _iter_get_norm(self):
         """See openmdao.solvers.solver.Solver."""
         system = self._system
-        ind1, ind2 = system._variable_allprocs_range['output']
-
-        system._apply_linear(self._vec_names, self._mode,
-                             numpy.arange(ind1, ind2))
+        var_inds = [
+            system._variable_allprocs_range['output'][0],
+            system._variable_allprocs_range['output'][1],
+            system._variable_allprocs_range['output'][0],
+            system._variable_allprocs_range['output'][1],
+        ]
+        system._apply_linear(self._vec_names, self._mode, var_inds)
 
         norm = 0
         for vec_name in self._vec_names:
