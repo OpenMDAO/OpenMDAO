@@ -290,7 +290,7 @@ class ExplicitComponent(Component):
         self.compute_jacobian(self._inputs, self._outputs, self._jacobian)
 
         for op_name in self._variable_myproc_names['output']:
-            size = len(self._outputs[op_name])
+            size = len(self._outputs._views[op_name])
             ones = numpy.ones(size)
             arange = numpy.arange(size)
             self._jacobian[op_name, op_name] = (ones, arange, arange)
@@ -298,7 +298,7 @@ class ExplicitComponent(Component):
         for op_name in self._variable_myproc_names['output']:
             for ip_name in self._variable_myproc_names['input']:
                 if (op_name, ip_name) in self._jacobian:
-                    self._jacobian._negate(op_name, ip_name)
+                    self._jacobian._negate((op_name, ip_name))
 
         if self._jacobian._top_name == self.path_name:
             self._jacobian._update()

@@ -98,8 +98,18 @@ class Problem(object):
 
     # TODO: once we have drivers, this should call self.driver.run() instead
     def run(self):
-        """Run the model by calling the root's solve_nonlinear."""
-        self.root._solve_nonlinear()
+        """Run the model by calling the root's solve_nonlinear.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        return self.root._solve_nonlinear()
 
     def setup(self, VectorClass=None, check=False, out_stream=sys.stdout):
         """Set up everything (root, assembler, vector, solvers, drivers).

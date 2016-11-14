@@ -12,18 +12,15 @@ class ScipyIterativeSolver(LinearSolver):
 
     SOLVER = 'LN: SCIPY'
 
-    def __init__(self, subsolvers=None, **kwargs):
+    def __init__(self, **kwargs):
         """Declare the solver option.
 
         Args
         ----
-        subsolvers : dict or None
-            dictionary of subsolvers (nest solvers).
         kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
-        super(ScipyIterativeSolver, self).__init__(subsolvers=subsolvers,
-                                                   **kwargs)
+        super(ScipyIterativeSolver, self).__init__(**kwargs)
         self.options.declare('solver', typ=object, value=gmres)
 
     def _mat_vec(self, in_vec):
