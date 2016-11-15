@@ -77,24 +77,22 @@ class Solver(object):
         res0 : float
             initial residual norm.
         """
-        rawname = self._system.name
-        name_len = 10
-        if len(rawname) > name_len:
-            sys_name = rawname[:name_len]
-        else:
-            sys_name = rawname + ' ' * (name_len - len(rawname))
+        if (self.options['iprint'] and self._system.comm.rank == 0 and 
+                not self._system._suppress_solver_output):
+            rawname = self._system.name
+            name_len = 10
+            if len(rawname) > name_len:
+                sys_name = rawname[:name_len]
+            else:
+                sys_name = rawname + ' ' * (name_len - len(rawname))
 
-        solver_name = self.SOLVER
-        name_len = 12
-        if len(solver_name) > name_len:
-            solver_name = solver_name[:name_len]
-        else:
-            solver_name = solver_name + ' ' * (name_len - len(solver_name))
+            solver_name = self.SOLVER
+            name_len = 12
+            if len(solver_name) > name_len:
+                solver_name = solver_name[:name_len]
+            else:
+                solver_name = solver_name + ' ' * (name_len - len(solver_name))
 
-        iproc = self._system.comm.rank
-        iprint = self.options['iprint']
-        suppress_solver_output = self._system._suppress_solver_output
-        if iproc == 0 and iprint and not suppress_solver_output:
             print_str = ' ' * self._system._sys_depth + '-' * self._depth
             print_str += sys_name + solver_name
             print_str += ' %3d | %.9g %.9g' % (iteration, res, res0)
@@ -124,10 +122,9 @@ class Solver(object):
             norm = self._iter_get_norm()
             iteration += 1
             self._mpi_print(iteration, norm / norm0, norm)
-        success = not(norm > atol and norm / norm0 > rtol)
-        success = success and (not numpy.isinf(norm))
-        success = success and (not numpy.isnan(norm))
-        return not success, norm / norm0, norm
+        fail = (norm > atol or norm / norm0 > rtol or numpy.isinf(norm)
+                or numpy.isnan(norm))
+        return fail, norm / norm0, norm
 
     def _iter_initialize(self):
         """Perform any necessary pre-processing operations.
