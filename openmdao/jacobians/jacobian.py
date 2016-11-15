@@ -102,14 +102,15 @@ class Jacobian(object):
         key : (str, str)
             output name, input name of sub-Jacobian.
         """
-        jac = self[key]
+        dct, op_ind, ip_ind, op_size, ip_size = self._process_key(key)
+        jac = dct[op_ind, ip_ind]
 
         if type(jac) == numpy.ndarray:
-            self[key] *= -1.0
+            dct[op_ind, ip_ind] = -jac
         elif scipy.sparse.issparse(jac):
-            self[key].data *= -1.0  # DOK not supported
+            dct[op_ind, ip_ind].data *= -1.0  # DOK not supported
         elif len(jac) == 3:
-            self[key][0] *= -1.0
+            dct[op_ind, ip_ind][0] *= -1.0
         elif len(jac) == 2:
             # In this case, negation is not necessary because sparse FD
             # works on the residuals which already contains the negation

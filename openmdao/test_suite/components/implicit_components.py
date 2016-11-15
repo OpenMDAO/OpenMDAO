@@ -88,7 +88,7 @@ class TestImplCompNondLinear(ImplicitComponent):
     def linearize(self, inputs, outputs, jacobians):
         coeffs = self.coeffs
 
-        if self.metadata['derivatives'] == 'dict':
+        if self.metadata['derivatives'] != 'matvec':
             for re_name in self.metadata['op_names']:
                 for op_name in self.metadata['op_names']:
                     jacobians[re_name, op_name] = coeffs[re_name, op_name]

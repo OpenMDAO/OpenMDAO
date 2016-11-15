@@ -19,7 +19,7 @@ class TestGroupFlat(Group):
                               values=['explicit', 'implicit'])
         self.metadata.declare('Component')
         self.metadata.declare('derivatives', value='matvec',
-                              values=['matvec', 'dict'])
+                              values=['matvec', 'dense'])
 
         num_sub = self.metadata['num_sub']
         num_var = self.metadata['num_var']
@@ -29,7 +29,6 @@ class TestGroupFlat(Group):
                 'num_input': num_var * (num_sub - 1),
                 'num_output': num_var,
                 'var_shape': self.metadata['var_shape'],
-                'derivatives': self.metadata['derivatives'],
             }
             if self.metadata['connection_type'] == 'explicit':
                 self.add_subsystem('group_%i'%isub, Component(**kwargs))
