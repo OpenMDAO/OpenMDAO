@@ -33,7 +33,6 @@ def _get_tree_dict(system):
             for ind in range(len(system._variable_myproc_names[typ])):
                 name = system._variable_myproc_names[typ][ind]
                 meta = system._variable_myproc_metadata[typ][ind]
-                shape = numpy.prod(meta['shape'])
 
                 var_dict = OrderedDict()
                 var_dict['name'] = name
@@ -202,5 +201,5 @@ def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_brows
         f.write(template % (html_begin_tags, awesomplete_css, encoded_font, display_none_attr, d3_library, awesomplete_js, tree_json, conns_json, html_end_tags))
 
     if show_browser:
-        from webview import webview
+        from openmdao.devtools.webview import webview
         webview(outfile)
