@@ -28,7 +28,9 @@ class Vector(object):
     _iproc : int
         global processor index.
     _views : dict
-        dictionary mapping variable names to the corresponding ndarray views.
+        dictionary mapping variable names to the ndarray views.
+    _views_flat : dict
+        dictionary mapping variable names to the flattened ndarray views.
     _idxs : dict
         0 or slice(None), used so that 1-sized vectors are made floats.
     _names : set([str, ...])
@@ -61,6 +63,7 @@ class Vector(object):
 
         self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
         self._views = {}
+        self._views_flat = {}
         self._idxs = {}
 
         # self._names will either be equivalent to self._views or to the
@@ -223,6 +226,7 @@ class Vector(object):
 
         Sets the following attributes:
             _views
+            _views_flat
             _idxs
         """
         pass

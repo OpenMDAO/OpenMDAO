@@ -24,6 +24,7 @@ class CompTestCase(unittest.TestCase):
     def test_comps(self):
         for key in itertools.product(
                 [TestImplCompNondLinear, TestExplCompNondLinear],
+                #[TestImplCompNondLinear],
                 [DefaultVector, PETScVector],
                 ['implicit', 'explicit'],
                 range(1, 3),
@@ -37,24 +38,32 @@ class CompTestCase(unittest.TestCase):
             num_sub = key[4]
             var_shape = key[5]
 
+            print_str = ('%s %s %s %i vars %i subs %s' % (
+                Component.__name__,
+                Vector.__name__,
+                connection_type,
+                num_var, num_sub,
+                str(var_shape),
+            ))
+
+            #print(print_str)
+
             group = TestGroupFlat(num_sub=num_sub, num_var=num_var,
                                   var_shape=var_shape,
                                   connection_type=connection_type,
-                                  Component=Component)
+                                  Component=Component,
+                                  derivatives='dict')
             prob = Problem(group).setup(Vector)
             prob.root.nl_solver = NewtonSolver(
                 subsolvers={'linear': ScipyIterativeSolver(
-                    ilimit=100
+                    ilimit=100,
                 )}
             )
             prob.root.suppress_solver_output = True
             fail, rele, abse = prob.run()
             if fail:
-                self.fail('%5s %4s %02i vars %02i subs' % (
-                    Vector.__name__,
-                    connection_type,
-                    num_var, num_sub), var_shape,
-                )
+                self.fail('re %f ; ae %f ;  ' % (rele, abse) + print_str)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -127,8 +127,8 @@ class ImplicitComponent(Component):
         self._jacobian._system = self
         self.linearize(self._inputs, self._outputs, self._jacobian)
 
-        if self._jacobian._top_name == self.path_name:
-            self._jacobian._update()
+        self._jacobian._update()
+        self._jacobian._precompute_iter()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """Compute residuals given inputs and outputs.
@@ -180,8 +180,7 @@ class ImplicitComponent(Component):
         mode : str
             either 'fwd' or 'rev'
         """
-        self._jacobian._system = self
-        self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
+        pass
 
     def solve_linear(self, d_outputs, d_residuals, mode):
         r"""Apply inverse jac product.
@@ -242,37 +241,18 @@ class ExplicitComponent(Component):
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """See System._apply_linear."""
-        if self._jacobian._top_name == self.path_name:
-            for vec_name in vec_names:
-                with self._matvec_context(vec_name, var_inds, mode) as vecs:
-                    d_inputs, d_outputs, d_residuals = vecs
-                    self._jacobian._system = self
-                    self._jacobian._apply(d_inputs, d_outputs, d_residuals,
-                                          mode)
-        else:
-            if mode == 'fwd':
-                for vec_name in vec_names:
-                    with self._matvec_context(vec_name, var_inds,
-                                              mode) as vecs:
-                        d_inputs, d_outputs, d_residuals = vecs
+        for vec_name in vec_names:
+            with self._matvec_context(vec_name, var_inds, mode) as vecs:
+                d_inputs, d_outputs, d_residuals = vecs
+                self._jacobian._system = self
+                self._jacobian._apply(d_inputs, d_outputs, d_residuals,
+                                      mode)
 
-                        self.compute_jacvec_product(
-                            self._inputs, self._outputs,
-                            d_inputs, d_residuals, mode)
-                        d_residuals *= -1.0
-                        d_residuals += d_outputs
-            elif mode == 'rev':
-                for vec_name in vec_names:
-                    with self._matvec_context(vec_name, var_inds,
-                                              mode) as vecs:
-                        d_inputs, d_outputs, d_residuals = vecs
-
-                        d_residuals *= -1.0
-                        self.compute_jacvec_product(
-                            self._inputs, self._outputs,
-                            d_inputs, d_residuals, mode)
-                        d_residuals *= -1.0
-                        d_outputs.set_vec(d_residuals)
+                d_residuals *= -1.0
+                self.compute_jacvec_product(
+                    self._inputs, self._outputs,
+                    d_inputs, d_residuals, mode)
+                d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode):
         """See System._solve_linear."""
@@ -290,7 +270,7 @@ class ExplicitComponent(Component):
         self.compute_jacobian(self._inputs, self._outputs, self._jacobian)
 
         for op_name in self._variable_myproc_names['output']:
-            size = len(self._outputs._views[op_name])
+            size = len(self._outputs._views_flat[op_name])
             ones = numpy.ones(size)
             arange = numpy.arange(size)
             self._jacobian[op_name, op_name] = (ones, arange, arange)
@@ -300,8 +280,8 @@ class ExplicitComponent(Component):
                 if (op_name, ip_name) in self._jacobian:
                     self._jacobian._negate((op_name, ip_name))
 
-        if self._jacobian._top_name == self.path_name:
-            self._jacobian._update()
+        self._jacobian._update()
+        self._jacobian._precompute_iter()
 
     def compute(self, inputs, outputs):
         """Compute outputs given inputs.

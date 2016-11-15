@@ -47,45 +47,50 @@ class TestImplCompNondLinear(ImplicitComponent):
                 self.coeffs[re_name, ip_name] = mtx
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        var_shape = self.metadata['var_shape']
-        size = numpy.prod(var_shape)
-
         for re_name in self.metadata['op_names']:
-            re = residuals._views[re_name].reshape(size)
+            re = residuals._views_flat[re_name]
             re[:] = -self.rhs_coeffs[re_name]
             for op_name in self.metadata['op_names']:
                 mtx = self.coeffs[re_name, op_name]
-                op = outputs._views[op_name].reshape(size)
+                op = outputs._views_flat[op_name]
                 re += mtx.dot(op)
             for ip_name in self.metadata['ip_names']:
                 mtx = self.coeffs[re_name, ip_name]
-                ip = inputs._views[ip_name].reshape(size)
+                ip = inputs._views_flat[ip_name]
                 re += mtx.dot(ip)
 
     def apply_linear(self, inputs, outputs,
                      d_inputs, d_outputs, d_residuals, mode):
-        var_shape = self.metadata['var_shape']
-        size = numpy.prod(var_shape)
+        if self.metadata['derivatives'] == 'matvec':
+            if mode == 'fwd':
+                for re_name in d_residuals:
+                    d_re = d_residuals._views_flat[re_name]
+                    for op_name in d_outputs:
+                        mtx = self.coeffs[re_name, op_name]
+                        d_op = d_outputs._views_flat[op_name]
+                        d_re += mtx.dot(d_op)
+                    for ip_name in d_inputs:
+                        mtx = self.coeffs[re_name, ip_name]
+                        d_ip = d_inputs._views_flat[ip_name]
+                        d_re += mtx.dot(d_ip)
+            elif mode == 'rev':
+                for re_name in d_residuals:
+                    d_re = d_residuals._views_flat[re_name]
+                    for op_name in d_outputs:
+                        mtx = self.coeffs[re_name, op_name]
+                        d_op = d_outputs._views_flat[op_name]
+                        d_op += mtx.T.dot(d_re)
+                    for ip_name in d_inputs:
+                        mtx = self.coeffs[re_name, ip_name]
+                        d_ip = d_inputs._views_flat[ip_name]
+                        d_ip += mtx.T.dot(d_re)
 
-        if mode == 'fwd':
-            for re_name in d_residuals:
-                d_re = d_residuals._views[re_name].reshape(size)
-                for op_name in d_outputs:
-                    mtx = self.coeffs[re_name, op_name]
-                    d_op = d_outputs._views[op_name].reshape(size)
-                    d_re += mtx.dot(d_op)
-                for ip_name in d_inputs:
-                    mtx = self.coeffs[re_name, ip_name]
-                    d_ip = d_inputs._views[ip_name].reshape(size)
-                    d_re += mtx.dot(d_ip)
-        elif mode == 'rev':
-            for re_name in d_residuals:
-                d_re = d_residuals._views[re_name].reshape(size)
-                for op_name in d_outputs:
-                    mtx = self.coeffs[re_name, op_name]
-                    d_op = d_outputs._views[op_name].reshape(size)
-                    d_op += mtx.T.dot(d_re)
-                for ip_name in d_inputs:
-                    mtx = self.coeffs[re_name, ip_name]
-                    d_ip = d_inputs._views[ip_name].reshape(size)
-                    d_ip += mtx.T.dot(d_re)
+    def linearize(self, inputs, outputs, jacobians):
+        coeffs = self.coeffs
+
+        if self.metadata['derivatives'] == 'dict':
+            for re_name in self.metadata['op_names']:
+                for op_name in self.metadata['op_names']:
+                    jacobians[re_name, op_name] = coeffs[re_name, op_name]
+                for ip_name in self.metadata['ip_names']:
+                    jacobians[re_name, ip_name] = coeffs[re_name, ip_name]

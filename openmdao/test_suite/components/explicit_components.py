@@ -43,33 +43,27 @@ class TestExplCompNondLinear(ExplicitComponent):
                 self.coeffs[op_name, ip_name] = mtx
 
     def compute(self, inputs, outputs):
-        var_shape = self.metadata['var_shape']
-        size = numpy.prod(var_shape)
-
         for op_name in self.metadata['op_names']:
-            op = outputs._views[op_name].reshape(size)
+            op = outputs._views_flat[op_name]
             op[:] = -self.rhs_coeffs[op_name]
             for ip_name in self.metadata['ip_names']:
                 mtx = self.coeffs[op_name, ip_name]
-                ip = inputs._views[ip_name].reshape(size)
+                ip = inputs._views_flat[ip_name]
                 op += mtx.dot(ip)
 
     def compute_jacvec_product(self, inputs, outputs,
                                d_inputs, d_outputs, mode):
-        var_shape = self.metadata['var_shape']
-        size = numpy.prod(var_shape)
-
         if mode == 'fwd':
             for op_name in d_outputs:
-                d_op = d_outputs._views[op_name].reshape(size)
+                d_op = d_outputs._views_flat[op_name]
                 for ip_name in d_inputs:
                     mtx = self.coeffs[op_name, ip_name]
-                    d_ip = d_inputs._views[ip_name].reshape(size)
+                    d_ip = d_inputs._views_flat[ip_name]
                     d_op += mtx.dot(d_ip)
         elif mode == 'rev':
             for op_name in d_outputs:
-                d_op = d_outputs._views[op_name].reshape(size)
+                d_op = d_outputs._views_flat[op_name]
                 for ip_name in d_inputs:
                     mtx = self.coeffs[op_name, ip_name]
-                    d_ip = d_inputs._views[ip_name].reshape(size)
+                    d_ip = d_inputs._views_flat[ip_name]
                     d_ip += mtx.T.dot(d_op)

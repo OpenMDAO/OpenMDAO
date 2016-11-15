@@ -480,7 +480,7 @@ class System(object):
         return maps
 
     @contextmanager
-    def _matvec_context(self, vec_name, var_inds, mode):
+    def _matvec_context(self, vec_name, var_inds, mode, clear=True):
         """Context manager for vectors.
 
         For the given vec_name, return vectors that use a set of
@@ -491,11 +491,12 @@ class System(object):
         d_outputs = self._vectors['output'][vec_name]
         d_residuals = self._vectors['residual'][vec_name]
 
-        if mode == 'fwd':
-            d_residuals.set_const(0.0)
-        elif mode == 'rev':
-            d_inputs.set_const(0.0)
-            d_outputs.set_const(0.0)
+        if clear:
+            if mode == 'fwd':
+                d_residuals.set_const(0.0)
+            elif mode == 'rev':
+                d_inputs.set_const(0.0)
+                d_outputs.set_const(0.0)
 
         # TODO: check if we can loop over myproc vars to save time
         op_names = []
@@ -590,36 +591,44 @@ class System(object):
 
     @property
     def jacobian(self):
-        """The Jacobian."""
+        """A Jacobian object or None."""
         return self._jacobian
 
     @jacobian.setter
-    def jacobian(self, jac):
+    def jacobian(self, jacobian):
         """Set the Jacobian."""
-        self._set_jacobian(jac, True)
+        self._set_jacobian(jacobian, True)
 
-    def _set_jacobian(self, jacobian, is_top=True):
+    def _set_jacobian(self, jacobian, is_top):
         """Recursively set the system's jacobian attribute.
 
         Args
         ----
         jacobian : Jacobian or None
-            Jacobian object to be set; if None, reset to the DefaultJacobian.
+            Global jacobian to be set; if None, reset to DefaultJacobian.
         is_top : boolean
-            whether this is the top; i.e., start of the recursion
+            whether this is the top; i.e., start of the recursion.
         """
         if jacobian is None:
             self._jacobian = DefaultJacobian()
         else:
-            jacobian._sub_jacs.update(self._jacobian._sub_jacs)
             self._jacobian = jacobian
-            if is_top:
-                self._jacobian._top_name = self.path_name
-                self._jacobian._top_system = self
-                self._jacobian._assembler = self._sys_assembler
+
+        if is_top and jacobian is not None:
+            self._jacobian._top_name = self.path_name
+            self._jacobian._assembler = self._sys_assembler
 
         for subsys in self._subsystems_myproc:
             subsys._set_jacobian(jacobian, False)
+
+    def setup_jacobians(self):
+        """Recursively setup all jacobians."""
+        if self._jacobian is not None and \
+                self._jacobian._top_name == self.path_name:
+            self._jacobian._initialize()
+        else:
+            for subsys in self._subsystems_myproc:
+                subsys.setup_jacobians()
 
     def _apply_nonlinear(self):
         """Compute residuals."""
