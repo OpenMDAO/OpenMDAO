@@ -39,11 +39,11 @@ class TestImplCompNondLinear(ImplicitComponent):
             mtx = numpy.ones(size)
             self.rhs_coeffs[re_name] = mtx
             for op_name in self.metadata['op_names']:
-                mtx = numpy.random.rand(size, size)
-                numpy.fill_diagonal(mtx, 10)
+                mtx = numpy.ones((size, size)) * 0.01
+                numpy.fill_diagonal(mtx, 1)
                 self.coeffs[re_name, op_name] = mtx
             for ip_name in self.metadata['ip_names']:
-                mtx = numpy.random.rand(size, size)
+                mtx = numpy.ones((size, size)) * 0.01
                 self.coeffs[re_name, ip_name] = mtx
 
     def apply_nonlinear(self, inputs, outputs, residuals):

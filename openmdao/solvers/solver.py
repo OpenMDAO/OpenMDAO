@@ -23,21 +23,17 @@ class Solver(object):
         list of right-hand-side (RHS) vector names.
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
-    _subsolvers : dict
-        dictionary of pointers to subsolvers.
     options : GeneralizedDictionary
         options dictionary.
     """
 
     SOLVER = 'base_solver'
 
-    def __init__(self, subsolvers=None, **kwargs):
+    def __init__(self, **kwargs):
         """Initialize all attributes.
 
         Args
         ----
-        subsolvers : dict
-            dictionary of pointers to subsolvers.
         **kwargs : dict
             options dictionary.
         """
@@ -45,13 +41,13 @@ class Solver(object):
         self._depth = 0
         self._vec_names = None
         self._mode = 'fwd'
-        self._subsolvers = subsolvers if subsolvers is not None else {}
 
         self.options = GeneralizedDictionary(kwargs)
         self.options.declare('ilimit', typ=int, value=10)
-        self.options.declare('atol', value=1e-6)
-        self.options.declare('rtol', value=1e-6)
+        self.options.declare('atol', value=1e-10)
+        self.options.declare('rtol', value=1e-10)
         self.options.declare('iprint', typ=int, value=1)
+        self.options.declare('subsolvers', typ=dict, value={})
 
     def _setup_solvers(self, system, depth):
         """Assign system instance, set depth, and optionally perform setup.
@@ -66,7 +62,7 @@ class Solver(object):
         self._system = system
         self._depth = depth
 
-        for solver in self._subsolvers.values():
+        for solver in self.options['subsolvers'].values():
             solver._setup_solvers(system, depth + 1)
 
     def _mpi_print(self, iteration, res, res0):
@@ -181,18 +177,24 @@ class Solver(object):
         solver : Solver
             the subsolver instance.
         """
-        self._subsolvers[name] = solver
-        self._subsolvers[name]._setup_solvers(self._system, self._depth + 1)
+        self.options['subsolvers'][name] = solver
+        self.options['subsolvers'][name]._setup_solvers(self._system,
+                                                        self._depth + 1)
 
     def get_subsolver(self, name):
         """Get a subsolver.
+
+        Args
+        ----
+        name : str
+            name of the subsolver.
 
         Returns
         -------
         Solver
             the instance of the requested subsolver.
         """
-        return self._subsolvers[name]
+        return self.options['subsolvers'][name]
 
 
 class NonlinearSolver(Solver):
@@ -249,10 +251,13 @@ class LinearSolver(Solver):
     def _iter_get_norm(self):
         """See openmdao.solvers.solver.Solver."""
         system = self._system
-        ind1, ind2 = system._variable_allprocs_range['output']
-
-        system._apply_linear(self._vec_names, self._mode,
-                             numpy.arange(ind1, ind2))
+        var_inds = [
+            system._variable_allprocs_range['output'][0],
+            system._variable_allprocs_range['output'][1],
+            system._variable_allprocs_range['output'][0],
+            system._variable_allprocs_range['output'][1],
+        ]
+        system._apply_linear(self._vec_names, self._mode, var_inds)
 
         norm = 0
         for vec_name in self._vec_names:
