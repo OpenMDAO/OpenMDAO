@@ -68,6 +68,7 @@ class DenseJacobian(object):
                 ip_ind1 = numpy.sum(sizes_array[iproc, :op_ivar])
                 ip_ind2 = numpy.sum(sizes_array[iproc, :op_ivar + 1])
 
+                key = (op_name, ip_name)
                 if key in self._sub_jacs:
                     mtx = self._global_jacs[op_ivar_set, ip_ivar_set]
                     mtx[op_ind1:op_ind2, ip_ind1:ip_ind2] = self._sub_jacs[key]
