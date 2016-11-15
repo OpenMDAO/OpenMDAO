@@ -53,17 +53,26 @@ class TestExplCompNondLinear(ExplicitComponent):
 
     def compute_jacvec_product(self, inputs, outputs,
                                d_inputs, d_outputs, mode):
-        if mode == 'fwd':
-            for op_name in d_outputs:
-                d_op = d_outputs._views_flat[op_name]
-                for ip_name in d_inputs:
-                    mtx = self.coeffs[op_name, ip_name]
-                    d_ip = d_inputs._views_flat[ip_name]
-                    d_op += mtx.dot(d_ip)
-        elif mode == 'rev':
-            for op_name in d_outputs:
-                d_op = d_outputs._views_flat[op_name]
-                for ip_name in d_inputs:
-                    mtx = self.coeffs[op_name, ip_name]
-                    d_ip = d_inputs._views_flat[ip_name]
-                    d_ip += mtx.T.dot(d_op)
+        if self.metadata['derivatives'] == 'matvec':
+            if mode == 'fwd':
+                for op_name in d_outputs:
+                    d_op = d_outputs._views_flat[op_name]
+                    for ip_name in d_inputs:
+                        mtx = self.coeffs[op_name, ip_name]
+                        d_ip = d_inputs._views_flat[ip_name]
+                        d_op += mtx.dot(d_ip)
+            elif mode == 'rev':
+                for op_name in d_outputs:
+                    d_op = d_outputs._views_flat[op_name]
+                    for ip_name in d_inputs:
+                        mtx = self.coeffs[op_name, ip_name]
+                        d_ip = d_inputs._views_flat[ip_name]
+                        d_ip += mtx.T.dot(d_op)
+
+    def compute_jacobian(self, inputs, outputs, jacobians):
+        coeffs = self.coeffs
+
+        if self.metadata['derivatives'] != 'matvec':
+            for op_name in self.metadata['op_names']:
+                for ip_name in self.metadata['ip_names']:
+                    jacobians[op_name, ip_name] = coeffs[op_name, ip_name]

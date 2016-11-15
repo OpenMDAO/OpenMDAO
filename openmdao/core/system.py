@@ -617,6 +617,7 @@ class System(object):
         if is_top and jacobian is not None:
             self._jacobian._top_name = self.path_name
             self._jacobian._assembler = self._sys_assembler
+            self._jacobian._system = self
 
         for subsys in self._subsystems_myproc:
             subsys._set_jacobian(jacobian, False)

@@ -16,6 +16,7 @@ from openmdao.test_suite.components.explicit_components \
     import TestExplCompNondLinear
 from openmdao.test_suite.groups.group import TestGroupFlat
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
+from openmdao.api import DenseJacobian
 from openmdao.parallel_api import PETScVector
 
 
@@ -26,7 +27,8 @@ class CompTestCase(unittest.TestCase):
                 [TestImplCompNondLinear, TestExplCompNondLinear],
                 #[TestImplCompNondLinear],
                 [DefaultVector, PETScVector],
-                ['implicit', 'explicit'],
+                ['implicit'],#, 'explicit'],
+                ['matvec', 'dense'],
                 range(1, 3),
                 range(1, 3),
                 [(1,), (2,), (2, 1), (1, 2)],
@@ -34,33 +36,42 @@ class CompTestCase(unittest.TestCase):
             Component = key[0]
             Vector = key[1]
             connection_type = key[2]
-            num_var = key[3]
-            num_sub = key[4]
-            var_shape = key[5]
+            derivatives = key[3]
+            num_var = key[4]
+            num_sub = key[5]
+            var_shape = key[6]
 
-            print_str = ('%s %s %s %i vars %i subs %s' % (
+            print_str = ('%s %s %s %s %i vars %i subs %s' % (
                 Component.__name__,
                 Vector.__name__,
                 connection_type,
+                derivatives,
                 num_var, num_sub,
                 str(var_shape),
             ))
 
-            #print(print_str)
+            # print(print_str)
 
             group = TestGroupFlat(num_sub=num_sub, num_var=num_var,
                                   var_shape=var_shape,
                                   connection_type=connection_type,
+                                  derivatives=derivatives,
                                   Component=Component,
-                                  derivatives='dict')
+                                  )
             prob = Problem(group).setup(Vector)
             prob.root.nl_solver = NewtonSolver(
                 subsolvers={'linear': ScipyIterativeSolver(
                     ilimit=100,
                 )}
             )
+            if derivatives == 'dense':
+                prob.root.jacobian = DenseJacobian()
+            prob.root.setup_jacobians()
             prob.root.suppress_solver_output = True
             fail, rele, abse = prob.run()
+            # if derivatives == 'dense':
+            #     print(prob.root.jacobian._int_mtx[0, 0])
+            #     print('')
             if fail:
                 self.fail('re %f ; ae %f ;  ' % (rele, abse) + print_str)
 
