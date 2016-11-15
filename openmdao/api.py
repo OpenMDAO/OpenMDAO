@@ -14,3 +14,4 @@ from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
+from openmdao.jacobians.dense_jacobian import DenseJacobian

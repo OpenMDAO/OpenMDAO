@@ -31,8 +31,10 @@ class Jacobian(object):
         dictionary containing the user-supplied internal sub-Jacobians.
     _ext_dict : dict
         dictionary containing the user-supplied external sub-Jacobians.
-    _mtx : dict
-        global Jacobians indexed by (op_iset, ip_iset).
+    _int_mtx : dict
+        global internal Jacobians indexed by (op_iset, ip_iset).
+    _ext_mtx : dict
+        global external Jacobians indexed by (op_iset, ip_iset).
     _iter_list : [(op_name, ip_name), ...]
         list of output-input pairs to iterate over.
     """
@@ -45,7 +47,8 @@ class Jacobian(object):
 
         self._int_dict = {}
         self._ext_dict = {}
-        self._mtx = {}
+        self._int_mtx = {}
+        self._ext_mtx = {}
         self._iter_list = []
 
     def _process_key(self, key):

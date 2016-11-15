@@ -16,6 +16,7 @@ from openmdao.test_suite.components.explicit_components \
     import TestExplCompNondLinear
 from openmdao.test_suite.groups.group import TestGroupFlat
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
+from openmdao.api import DenseJacobian
 from openmdao.parallel_api import PETScVector
 
 
@@ -59,6 +60,8 @@ class CompTestCase(unittest.TestCase):
                     ilimit=100,
                 )}
             )
+            prob.root.jacobian = DenseJacobian()
+            prob.root.setup_jacobians()
             prob.root.suppress_solver_output = True
             fail, rele, abse = prob.run()
             if fail:
