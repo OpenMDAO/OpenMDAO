@@ -503,7 +503,9 @@ class System(object):
         for op_name in self._variable_allprocs_names['output']:
             valid = op_ind in self._vector_var_ids[vec_name]
             if var_inds is not None:
-                valid = valid and op_ind in var_inds
+                valid = valid and \
+                    var_inds[0] <= op_ind < var_inds[1] or \
+                    var_inds[2] <= op_ind < var_inds[3]
             if valid:
                 op_names.append(op_name)
             op_ind += 1
@@ -514,7 +516,9 @@ class System(object):
             op_ind = self._sys_assembler._input_var_ids[ip_ind]
             valid = op_ind in self._vector_var_ids[vec_name]
             if var_inds is not None:
-                valid = valid and op_ind in var_inds
+                valid = valid and \
+                    var_inds[0] <= op_ind < var_inds[1] or \
+                    var_inds[2] <= op_ind < var_inds[3]
             if valid:
                 ip_names.append(ip_name)
             ip_ind += 1
@@ -526,9 +530,6 @@ class System(object):
             if valid:
                 res_names.append(op_name)
             op_ind += 1
-
-        # TODO: see if we can avoid the `in var_inds` because this is slow
-        # e.g., var_inds could be two range pairs to account for gaps
 
         d_inputs._names = set(ip_names)
         d_outputs._names = set(op_names)
@@ -619,6 +620,64 @@ class System(object):
 
         for subsys in self._subsystems_myproc:
             subsys._set_jacobian(jacobian, False)
+
+    def _apply_nonlinear(self):
+        """Compute residuals."""
+        pass
+
+    def _solve_nonlinear(self):
+        """Compute outputs.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        pass
+
+    def _apply_linear(self, vec_names, mode, var_inds=None):
+        """Compute jac-vec product.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+        var_inds : [int, int, int, int] or None
+            ranges of variable IDs involved in this matrix-vector product.
+            The ordering is [lb1, ub1, lb2, ub2].
+        """
+        pass
+
+    def _solve_linear(self, vec_names, mode):
+        """Apply inverse jac product.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        pass
+
+    def _linearize(self):
+        """Compute jacobian / factorization."""
+        pass
 
     def get_system(self, name):
         """Return the system called 'name' in the current namespace.

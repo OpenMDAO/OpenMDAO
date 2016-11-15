@@ -42,6 +42,8 @@ class Vector(object):
     def __init__(self, name, typ, system, global_vector=None):
         """Initialize all attributes.
 
+        Args
+        ----
         name : str
             right-hand-side (RHS) name.
         typ : str
@@ -107,13 +109,15 @@ class Vector(object):
     def _combined_varset_data(self, arr=None):
         """Combine all of the varset data members into a single array.
 
-        If an array is passed in, that array is filled with the values.
-        Otherwise, a new array is created.
+        Args
+        ----
+        arr : ndarray or None
+            Array to fill in with the values; otherwise new array created.
 
         Returns
         -------
-
-        An array that combines all var set entries of our _data list.
+        ndarray
+            An array that combines all var set entries of our _data list.
         """
         if arr is None:
             return numpy.concatenate(self._data)
@@ -273,10 +277,10 @@ class Vector(object):
 
         Args
         ----
-        vec : Vector
-            this vector times val is added to self.
         val : int or float
             scalar.
+        vec : Vector
+            this vector times val is added to self.
         """
         pass
 

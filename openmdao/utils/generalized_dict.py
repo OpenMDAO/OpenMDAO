@@ -130,7 +130,18 @@ class GeneralizedDictionary(object):
         return iter(self._dict)
 
     def __contain__(self, key):
-        """Check if the key is in the local dictionary."""
+        """Check if the key is in the local dictionary.
+
+        Args
+        ----
+        key : str
+            name of the entry.
+
+        Returns
+        -------
+        boolean
+            whether key is in the local dict.
+        """
         return key in self._dict
 
     def __setitem__(self, name, value):

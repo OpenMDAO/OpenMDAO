@@ -70,13 +70,13 @@ class Jacobian(object):
         inputs = self._system._inputs
         indices = self._system._variable_allprocs_indices
 
-        op_size = len(outputs[op_name])
+        op_size = len(outputs._views[op_name])
         op_ind = indices['output'][op_name]
         if ip_name in inputs:
-            ip_size = len(inputs[ip_name])
+            ip_size = len(inputs._views[ip_name])
             ip_ind = indices['input'][ip_name]
         elif ip_name in outputs:
-            ip_size = len(outputs[ip_name])
+            ip_size = len(outputs._views[ip_name])
             ip_ind = indices['output'][ip_name]
 
         return op_ind, ip_ind, op_size, ip_size
@@ -89,7 +89,7 @@ class Jacobian(object):
         key : (str, str)
             output name, input name of sub-Jacobian.
         """
-        op_size, ip_size = self._get_sizes(key)
+        op_ind, ip_ind, op_size, ip_size = self._process_key(key)
         jac = self[key]
 
         if type(jac) == numpy.ndarray:
@@ -161,8 +161,8 @@ class Jacobian(object):
 
         if numpy.isscalar(jac):
             jac = numpy.array([jac]).reshape((op_size, ip_size))
-        elif isinstance(jac, (list, tuple)):
-            jac = numpy.array(jac).reshape((op_size, ip_size))
+        elif type(jac) is tuple:
+            jac = list(jac)
 
         self._sub_jacs[op_ind, ip_ind] = jac
 
