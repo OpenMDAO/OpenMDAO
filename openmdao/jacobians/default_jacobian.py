@@ -14,14 +14,38 @@ class DefaultJacobian(Jacobian):
         """See openmdao.jacobians.jacobian.Jacobian."""
         for op_name, ip_name in self:
             jac = self[op_name, ip_name]
-            if op_name in d_outputs and ip_name in d_outputs:
-                if mode == 'fwd':
-                    d_residuals[op_name] += jac.dot(d_outputs[ip_name])
-                if mode == 'rev':
-                    d_outputs[ip_name] = jac.T.dot(d_residuals[op_name])
 
-            if op_name in d_outputs and ip_name in d_inputs:
-                if mode == 'fwd':
-                    d_residuals[op_name] += jac.dot(d_inputs[ip_name])
-                if mode == 'rev':
-                    d_inputs[ip_name] += jac.T.dot(d_residuals[op_name])
+            if type(jac) is numpy.ndarray or scipy.sparse.issparse(jac):
+                if op_name in d_residuals and ip_name in d_outputs:
+                    op = d_residuals._views_flat[op_name]
+                    ip = d_outputs._views_flat[ip_name]
+                    if mode == 'fwd':
+                        op += jac.dot(ip)
+                    if mode == 'rev':
+                        ip = jac.T.dot(op)
+
+                if op_name in d_residuals and ip_name in d_inputs:
+                    op = d_residuals._views_flat[op_name]
+                    ip = d_inputs._views_flat[ip_name]
+                    if mode == 'fwd':
+                        op += jac.dot(ip)
+                    if mode == 'rev':
+                        ip += jac.T.dot(op)
+
+            elif type(jac) is list and len(jac) == 3:
+                if op_name in d_residuals and ip_name in d_outputs:
+                    op = d_residuals._views_flat[op_name]
+                    ip = d_outputs._views_flat[ip_name]
+                    if mode == 'fwd':
+                        numpy.add.at(op, jac[1], ip[jac[2]] * jac[0])
+                    if mode == 'rev':
+                        ip[:] = 0.
+                        numpy.add.at(ip, jac[2], op[jac[1]] * jac[0])
+
+                if op_name in d_residuals and ip_name in d_inputs:
+                    op = d_residuals._views_flat[op_name]
+                    ip = d_inputs._views_flat[ip_name]
+                    if mode == 'fwd':
+                        numpy.add.at(op, jac[1], ip[jac[2]] * jac[0])
+                    if mode == 'rev':
+                        numpy.add.at(ip, jac[2], op[jac[1]] * jac[0])

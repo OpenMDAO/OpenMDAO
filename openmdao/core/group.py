@@ -12,10 +12,9 @@ class Group(System):
     """Class used to group systems together; instantiate or inherit."""
 
     def initialize(self):
-        """Add subsystems from kwargs; set block Gauss-Seidel as default."""
+        """Add subsystems from kwargs."""
         self.metadata.declare('subsystems', typ=list, value=[])
         self._subsystems_allprocs.extend(self.metadata['subsystems'])
-
         self.nl_solver = NonlinearBlockGS()
         self.ln_solver = LinearBlockGS()
 
@@ -223,3 +222,4 @@ class Group(System):
         if self._jacobian._top_name == self.path_name:
             self._jacobian._system = self
             self._jacobian._update()
+            self._jacobian._precompute_iter()

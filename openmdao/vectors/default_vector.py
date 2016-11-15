@@ -99,6 +99,7 @@ class DefaultVector(Vector):
         meta = system._variable_myproc_metadata[self._typ]
 
         views = {}
+        views_flat = {}
 
         # contains a 0 index for floats or a slice(None) for arrays so getitem
         # will return either a float or a properly shaped array respectively.
@@ -110,6 +111,7 @@ class DefaultVector(Vector):
             ind1 = numpy.sum(variable_sizes[iset][self._iproc, :ivar])
             ind2 = numpy.sum(variable_sizes[iset][self._iproc, :ivar + 1])
             views[name] = self._global_vector._data[iset][ind1:ind2]
+            views_flat[name] = self._global_vector._data[iset][ind1:ind2]
             views[name].shape = meta[ind]['shape']
             val = meta[ind]['value']
             if isinstance(val, real_types):
@@ -118,6 +120,7 @@ class DefaultVector(Vector):
                 idxs[name] = slice(None)
 
         self._views = self._names = views
+        self._views_flat = views_flat
         self._idxs = idxs
 
     def _clone_data(self):
