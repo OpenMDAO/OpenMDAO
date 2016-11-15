@@ -13,7 +13,6 @@ class DefaultJacobian(Jacobian):
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """See openmdao.jacobians.jacobian.Jacobian."""
         for op_name, ip_name in self:
-            raise RuntimeError("Jacobian has something in it!")
             jac = self[op_name, ip_name]
 
             if type(jac) is numpy.ndarray or scipy.sparse.issparse(jac):
