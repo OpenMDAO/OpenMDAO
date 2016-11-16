@@ -1,7 +1,6 @@
 """Define the scipy iterative solver class."""
 from __future__ import division, print_function
 import numpy
-from six.moves import range
 from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver

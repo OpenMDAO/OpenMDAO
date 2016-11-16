@@ -1,6 +1,5 @@
 """Define the GeneralizedDictionary class."""
 from __future__ import division, print_function
-import numpy
 
 
 class GeneralizedDictionary(object):
