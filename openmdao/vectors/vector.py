@@ -149,6 +149,17 @@ class Vector(object):
         for ind in range(len(self._data)):
             self._data[ind][:] = array[self._indices[ind]]
 
+    def iadd_data(self, array):
+        """In-place add the incoming combined array.
+
+        Args
+        ----
+        array : ndarray
+            Array to set to the data for all the varsets.
+        """
+        for ind in range(len(self._data)):
+            self._data[ind][:] += array[self._indices[ind]]
+
     def __contains__(self, key):
         """Check if the variable is involved in the current mat-vec product.
 

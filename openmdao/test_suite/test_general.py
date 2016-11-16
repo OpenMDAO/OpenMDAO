@@ -26,7 +26,7 @@ class CompTestCase(unittest.TestCase):
         for key in itertools.product(
                 [TestImplCompNondLinear, TestExplCompNondLinear],
                 [DefaultVector, PETScVector],
-                ['implicit'],#, 'explicit'],
+                ['implicit', 'explicit'],
                 ['matvec', 'dense'],
                 range(1, 3),
                 range(1, 3),
@@ -49,7 +49,7 @@ class CompTestCase(unittest.TestCase):
                 str(var_shape),
             ))
 
-            print(print_str)
+            # print(print_str)
 
             group = TestGroupFlat(num_sub=num_sub, num_var=num_var,
                                   var_shape=var_shape,
@@ -68,11 +68,27 @@ class CompTestCase(unittest.TestCase):
             prob.root.setup_jacobians()
             prob.root.suppress_solver_output = True
             fail, rele, abse = prob.run()
-            if derivatives == 'dense':
-                print(prob.root.jacobian._int_mtx[0, 0])
-                print('')
+            # if derivatives == 'dense':
+            #     print('mtx:', prob.root.jacobian._int_mtx)
+            #     print('')
             if fail:
                 self.fail('re %f ; ae %f ;  ' % (rele, abse) + print_str)
+
+            if Component == TestImplCompNondLinear and derivatives == 'dense':
+                size = numpy.prod(var_shape)
+                work = prob.root._vectors['output']['']._clone()
+                work.set_const(1.0)
+                prob.root._vectors['output'][''].set_const(1.0)
+                prob.root._apply_linear([''], 'fwd')
+                val = 1 - 0.01 + 0.01 * size * num_var * num_sub
+                # print(prob.root._vectors['residual'][''].get_data())
+                # print(work.get_data())
+                # print(val)
+                prob.root._vectors['residual'][''].add_scal_vec(-val, work)
+                # print(prob.root._vectors['residual'][''].get_data())
+                # print('')
+                self.assertEqual(
+                    prob.root._vectors['residual'][''].get_norm(), 0)
 
             if Component == TestExplCompNondLinear and derivatives == 'dense':
                 size = numpy.prod(var_shape)
@@ -80,12 +96,13 @@ class CompTestCase(unittest.TestCase):
                 work.set_const(1.0)
                 prob.root._vectors['output'][''].set_const(1.0)
                 prob.root._apply_linear([''], 'fwd')
-                print(prob.root._vectors['residual']['']._combined_varset_data())
-                print(work._combined_varset_data())
-                print(-1 + 0.01 * size * num_var * (num_sub - 1))
-                prob.root._vectors['residual'][''].add_scal_vec(
-                    -1 + 0.01 * size * num_var * (num_sub - 1), work)
-                print(prob.root._vectors['residual']['']._combined_varset_data())
+                val = 1 - 0.01 * size * num_var * (num_sub - 1)
+                # print(prob.root._vectors['residual'][''].get_data())
+                # print(work.get_data())
+                # print(val)
+                prob.root._vectors['residual'][''].add_scal_vec(-val, work)
+                # print(prob.root._vectors['residual'][''].get_data())
+                # print('')
                 self.assertEqual(
                     prob.root._vectors['residual'][''].get_norm(), 0)
 

@@ -27,9 +27,9 @@ class Jacobian(object):
     _system : System
         pointer to the system that is currently operating on this Jacobian.
 
-    _int_dict : dict
+    _op_dict : dict
         dictionary containing the user-supplied internal sub-Jacobians.
-    _ext_dict : dict
+    _ip_dict : dict
         dictionary containing the user-supplied external sub-Jacobians.
     _int_mtx : dict
         global internal Jacobians indexed by (op_iset, ip_iset).
@@ -45,8 +45,8 @@ class Jacobian(object):
         self._assembler = None
         self._system = None
 
-        self._int_dict = {}
-        self._ext_dict = {}
+        self._op_dict = {}
+        self._ip_dict = {}
         self._int_mtx = {}
         self._ext_mtx = {}
         self._iter_list = []
@@ -82,11 +82,11 @@ class Jacobian(object):
         if ip_name in inputs:
             ip_size = len(inputs._views_flat[ip_name])
             ip_ind = indices['input'][ip_name]
-            dct = self._ext_dict
+            dct = self._ip_dict
         elif ip_name in outputs:
             ip_size = len(outputs._views_flat[ip_name])
             ip_ind = indices['output'][ip_name]
-            dct = self._int_dict
+            dct = self._op_dict
         else:
             ip_size = 0
             ip_ind = -1
@@ -127,13 +127,13 @@ class Jacobian(object):
             for op_name in system._variable_myproc_names['output']:
                 op_ind = system._variable_allprocs_indices['output'][op_name]
 
-                if (re_ind, op_ind) in self._int_dict:
+                if (re_ind, op_ind) in self._op_dict:
                     self._iter_list.append((re_name, op_name))
 
             for ip_name in system._variable_myproc_names['input']:
                 ip_ind = system._variable_allprocs_indices['input'][ip_name]
 
-                if (re_ind, ip_ind) in self._ext_dict:
+                if (re_ind, ip_ind) in self._ip_dict:
                     self._iter_list.append((re_name, ip_name))
 
     def __contains__(self, key):
