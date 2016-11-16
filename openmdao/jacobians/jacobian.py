@@ -31,9 +31,11 @@ class Jacobian(object):
         dictionary containing the user-supplied internal sub-Jacobians.
     _ext_dict : dict
         dictionary containing the user-supplied external sub-Jacobians.
-    _mtx : dict
-        global Jacobians indexed by (op_iset, ip_iset).
-    _oi_pairs : [(op_name, ip_name), ...]
+    _int_mtx : dict
+        global internal Jacobians indexed by (op_iset, ip_iset).
+    _ext_mtx : dict
+        global external Jacobians indexed by (op_iset, ip_iset).
+    _iter_list : [(op_name, ip_name), ...]
         list of output-input pairs to iterate over.
     """
 
@@ -45,7 +47,8 @@ class Jacobian(object):
 
         self._int_dict = {}
         self._ext_dict = {}
-        self._mtx = {}
+        self._int_mtx = {}
+        self._ext_mtx = {}
         self._iter_list = []
 
     def _process_key(self, key):
@@ -99,14 +102,15 @@ class Jacobian(object):
         key : (str, str)
             output name, input name of sub-Jacobian.
         """
-        jac = self[key]
+        dct, op_ind, ip_ind, op_size, ip_size = self._process_key(key)
+        jac = dct[op_ind, ip_ind]
 
         if type(jac) == numpy.ndarray:
-            self[key] *= -1.0
+            dct[op_ind, ip_ind] = -jac
         elif scipy.sparse.issparse(jac):
-            self[key].data *= -1.0  # DOK not supported
+            dct[op_ind, ip_ind].data *= -1.0  # DOK not supported
         elif len(jac) == 3:
-            self[key][0] *= -1.0
+            dct[op_ind, ip_ind][0] *= -1.0
         elif len(jac) == 2:
             # In this case, negation is not necessary because sparse FD
             # works on the residuals which already contains the negation
