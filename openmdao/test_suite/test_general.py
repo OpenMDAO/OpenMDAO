@@ -49,7 +49,7 @@ class CompTestCase(unittest.TestCase):
                 str(var_shape),
             ))
 
-            # print(print_str)
+            #print(print_str)
 
             group = TestGroupFlat(num_sub=num_sub, num_var=num_var,
                                   var_shape=var_shape,
@@ -63,48 +63,54 @@ class CompTestCase(unittest.TestCase):
                     ilimit=100,
                 )}
             )
+            prob.root.ln_solver = ScipyIterativeSolver(
+                ilimit=200, atol=1e-10, rtol=1e-10)
             if derivatives == 'dense':
                 prob.root.jacobian = DenseJacobian()
             prob.root.setup_jacobians()
             prob.root.suppress_solver_output = True
             fail, rele, abse = prob.run()
-            # if derivatives == 'dense':
-            #     print('mtx:', prob.root.jacobian._int_mtx)
-            #     print('')
             if fail:
                 self.fail('re %f ; ae %f ;  ' % (rele, abse) + print_str)
 
-            if Component == TestImplCompNondLinear and derivatives == 'dense':
-                size = numpy.prod(var_shape)
-                work = prob.root._vectors['output']['']._clone()
-                work.set_const(1.0)
-                prob.root._vectors['output'][''].set_const(1.0)
-                prob.root._apply_linear([''], 'fwd')
+            # Setup for the 4 tests that follow
+            size = numpy.prod(var_shape)
+            work = prob.root._vectors['output']['']._clone()
+            work.set_const(1.0)
+            if Component == TestImplCompNondLinear:
                 val = 1 - 0.01 + 0.01 * size * num_var * num_sub
-                # print(prob.root._vectors['residual'][''].get_data())
-                # print(work.get_data())
-                # print(val)
-                prob.root._vectors['residual'][''].add_scal_vec(-val, work)
-                # print(prob.root._vectors['residual'][''].get_data())
-                # print('')
-                self.assertEqual(
-                    prob.root._vectors['residual'][''].get_norm(), 0)
-
-            if Component == TestExplCompNondLinear and derivatives == 'dense':
-                size = numpy.prod(var_shape)
-                work = prob.root._vectors['output']['']._clone()
-                work.set_const(1.0)
-                prob.root._vectors['output'][''].set_const(1.0)
-                prob.root._apply_linear([''], 'fwd')
+            if Component == TestExplCompNondLinear:
                 val = 1 - 0.01 * size * num_var * (num_sub - 1)
-                # print(prob.root._vectors['residual'][''].get_data())
-                # print(work.get_data())
-                # print(val)
-                prob.root._vectors['residual'][''].add_scal_vec(-val, work)
-                # print(prob.root._vectors['residual'][''].get_data())
-                # print('')
-                self.assertEqual(
-                    prob.root._vectors['residual'][''].get_norm(), 0)
+
+            # 1. fwd apply_linear test
+            prob.root._vectors['output'][''].set_const(1.0)
+            prob.root._apply_linear([''], 'fwd')
+            prob.root._vectors['residual'][''].add_scal_vec(-val, work)
+            self.assertAlmostEqual(
+                prob.root._vectors['residual'][''].get_norm(), 0)
+
+            # 2. rev apply_linear test
+            prob.root._vectors['residual'][''].set_const(1.0)
+            prob.root._apply_linear([''], 'rev')
+            prob.root._vectors['output'][''].add_scal_vec(-val, work)
+            self.assertAlmostEqual(
+                prob.root._vectors['output'][''].get_norm(), 0)
+
+            # 3. fwd solve_linear test
+            prob.root._vectors['output'][''].set_const(0.0)
+            prob.root._vectors['residual'][''].set_const(val)
+            prob.root._solve_linear([''], 'fwd')
+            prob.root._vectors['output'][''] -= work
+            self.assertAlmostEqual(
+                prob.root._vectors['output'][''].get_norm(), 0, delta=1e-2)
+
+            # 4. rev solve_linear test
+            prob.root._vectors['residual'][''].set_const(0.0)
+            prob.root._vectors['output'][''].set_const(val)
+            prob.root._solve_linear([''], 'rev')
+            prob.root._vectors['residual'][''] -= work
+            self.assertAlmostEqual(
+                prob.root._vectors['residual'][''].get_norm(), 0, delta=1e-2)
 
 
 
