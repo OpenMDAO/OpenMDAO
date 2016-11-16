@@ -130,8 +130,8 @@ class Jacobian(object):
                 if (re_ind, op_ind) in self._int_dict:
                     self._iter_list.append((re_name, op_name))
 
-            for ip_name in my_in_names:
-                ip_ind = all_in_idxs[ip_name]
+            for ip_name in system._variable_myproc_names['input']:
+                ip_ind = system._variable_allprocs_indices['input'][ip_name]
 
                 if (re_ind, ip_ind) in self._ext_dict:
                     self._iter_list.append((re_name, ip_name))
