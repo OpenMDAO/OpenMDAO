@@ -276,9 +276,9 @@ class ExplicitComponent(Component):
             self._jacobian[op_name, op_name] = (ones, arange, arange)
 
         for op_name in self._variable_myproc_names['output']:
-           for ip_name in self._variable_myproc_names['input']:
-               if (op_name, ip_name) in self._jacobian:
-                   self._jacobian._negate((op_name, ip_name))
+            for ip_name in self._variable_myproc_names['input']:
+                if (op_name, ip_name) in self._jacobian:
+                    self._jacobian._negate((op_name, ip_name))
 
         self._jacobian._update()
         self._jacobian._precompute_iter()
