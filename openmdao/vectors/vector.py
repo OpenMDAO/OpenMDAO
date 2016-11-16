@@ -37,8 +37,10 @@ class Vector(object):
         set of variables that are relevant in the current context.
     _global_vector : Vector
         pointer to the vector owned by the root system.
-    _data : object
-        the actual allocated data (depends on implementation).
+    _data : list
+        list of the actual allocated data (depends on implementation).
+    _indices : list
+        list of indices mapping the varset-grouped data to the global vector.
     """
 
     def __init__(self, name, typ, system, global_vector=None):
@@ -71,7 +73,8 @@ class Vector(object):
         self._names = self._views
 
         self._global_vector = None
-        self._data = None
+        self._data = []
+        self._indices = []
         if global_vector is None:
             self._global_vector = self
         else:
@@ -109,42 +112,42 @@ class Vector(object):
         vec._clone_data()
         return vec
 
-    def _combined_varset_data(self, arr=None):
-        """Combine all of the varset data members into a single array.
+    def get_data(self, array=None):
+        """Get the array combining the data of all the varsets.
 
         Args
         ----
-        arr : ndarray or None
+        array : ndarray or None
             Array to fill in with the values; otherwise new array created.
 
         Returns
         -------
         ndarray
-            An array that combines all var set entries of our _data list.
+            Array combining the data of all the varsets.
         """
-        if arr is None:
-            return numpy.concatenate(self._data)
-        else:
-            start = 0
-            for dat in self._data:
-                end = start + dat.size
-                arr[start:end] = dat
-                start = end
-            return arr
+        inds = self._system._variable_myproc_indices[self._typ]
+        sizes = self._assembler._variable_sizes_all[self._typ][self._iproc,
+                                                               inds]
 
-    def _update_varset_data(self, arr):
-        """Update the data entry for each var set into the combined array.
+        size = numpy.sum(sizes)
+        if array is None:
+            array = numpy.zeros(size)
+
+        for ind in range(len(self._data)):
+            array[self._indices[ind]] = self._data[ind]
+
+        return array
+
+    def set_data(self, array):
+        """Set the incoming array combining the data of all the varsets.
 
         Args
         ----
-        arr : ndarray
-            Array to be assigned to our _data entries.
+        array : ndarray
+            Array to set to the data for all the varsets.
         """
-        start = 0
-        for dat in self._data:
-            end = start + dat.size
-            dat[:] = arr[start:end]
-            start = end
+        for ind in range(len(self._data)):
+            self._data[ind][:] = array[self._indices[ind]]
 
     def __contains__(self, key):
         """Check if the variable is involved in the current mat-vec product.

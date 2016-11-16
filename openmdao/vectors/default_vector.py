@@ -50,8 +50,29 @@ class DefaultVector(Vector):
         [ndarray[:], ...]
             list of zeros arrays of correct size, one for each var_set.
         """
-        return [numpy.zeros(numpy.sum(sizes[self._iproc, :]))
+        data = [numpy.zeros(numpy.sum(sizes[self._iproc, :]))
                 for sizes in self._assembler._variable_sizes[self._typ]]
+        indices = [numpy.zeros(numpy.sum(sizes[self._iproc, :]), int)
+                   for sizes in self._assembler._variable_sizes[self._typ]]
+
+        variable_indices = self._system._variable_myproc_indices[self._typ]
+        variable_names = self._system._variable_myproc_names[self._typ]
+        set_indices = self._assembler._variable_set_indices[self._typ]
+        sizes_all = self._assembler._variable_sizes_all[self._typ]
+        sizes = self._assembler._variable_sizes[self._typ]
+
+        for ind in range(len(variable_indices)):
+            var_name = variable_names[ind]
+            ivar_all = variable_indices[ind]
+            ivar_set, ivar = set_indices[ivar_all, :]
+
+            ind1 = numpy.sum(sizes[ivar_set][self._iproc, :ivar])
+            ind2 = numpy.sum(sizes[ivar_set][self._iproc, :ivar + 1])
+            ind1_all = numpy.sum(sizes_all[self._iproc, :ivar_all])
+            ind2_all = numpy.sum(sizes_all[self._iproc, :ivar_all + 1])
+            indices[ivar_set][ind1:ind2] = numpy.arange(ind1_all, ind2_all)
+
+        return data, indices
 
     def _extract_data(self):
         """Extract views of arrays from global_vector.
@@ -68,6 +89,7 @@ class DefaultVector(Vector):
         sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
 
         data = []
+        indices = []
         for iset in range(len(variable_sizes)):
             bool_vector = sub_variable_set_indices[:, 0] == iset
             data_inds = sub_variable_set_indices[bool_vector, 1]
@@ -76,17 +98,19 @@ class DefaultVector(Vector):
                 ind1 = numpy.sum(sizes_array[self._iproc, :data_inds[0]])
                 ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
                 data.append(self._global_vector._data[iset][ind1:ind2])
+                indices.append(self._global_vector._indices[iset][ind1:ind2])
             else:
                 data.append(numpy.zeros(0))
+                indices.append(numpy.zeros(0, int))
 
-        return data
+        return data, indices
 
     def _initialize_data(self, global_vector):
         """See openmdao.vectors.vector.Vector."""
         if global_vector is None:
-            self._data = self._create_data()
+            self._data, self._indices = self._create_data()
         else:
-            self._data = self._extract_data()
+            self._data, self._indices = self._extract_data()
 
     def _initialize_views(self):
         """See openmdao.vectors.vector.Vector."""
