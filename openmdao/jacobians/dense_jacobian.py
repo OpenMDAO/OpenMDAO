@@ -19,6 +19,11 @@ class DenseJacobian(Jacobian):
             index of the varset.
         typ : str
             'input' or 'output'.
+
+        Returns
+        -------
+        int
+            the total size for this varset.
         """
         sizes = self._assembler._variable_sizes
         set_indices = self._assembler._variable_set_indices
@@ -45,41 +50,17 @@ class DenseJacobian(Jacobian):
         re_nvar_set = len(self._assembler._variable_set_IDs['output'])
 
         for re_ivar_set in range(re_nvar_set):
-            re_bool = set_indices['output'][:, 0] == re_ivar_set
-            re_inds = set_indices['output'][re_bool, 1]
-            if len(re_inds) > 0:
-                sizes_array = sizes['output'][re_ivar_set]
-                ind1 = numpy.sum(sizes_array[iproc, :re_inds[0]])
-                ind2 = numpy.sum(sizes_array[iproc, :re_inds[-1] + 1])
-                re_size = ind2 - ind1
-            else:
-                re_size = 0
+            re_size = self._get_varset_size(re_ivar_set, 'output')
 
             for op_ivar_set in range(op_nvar_set):
-                op_bool = set_indices['output'][:, 0] == op_ivar_set
-                op_inds = set_indices['output'][op_bool, 1]
-                if len(op_inds) > 0:
-                    sizes_array = sizes['output'][op_ivar_set]
-                    ind1 = numpy.sum(sizes_array[iproc, :op_inds[0]])
-                    ind2 = numpy.sum(sizes_array[iproc, :op_inds[-1] + 1])
-                    op_size = ind2 - ind1
-                else:
-                    op_size = 0
+                op_size = self._get_varset_size(op_ivar_set, 'output')
 
                 if re_size > 0 and op_size > 0:
                     array = numpy.zeros((re_size, op_size))
                     self._int_mtx[re_ivar_set, op_ivar_set] = array
 
             for ip_ivar_set in range(ip_nvar_set):
-                ip_bool = set_indices['input'][:, 0] == ip_ivar_set
-                ip_inds = set_indices['input'][ip_bool, 1]
-                if len(ip_inds) > 0:
-                    sizes_array = sizes['input'][ip_ivar_set]
-                    ind1 = numpy.sum(sizes_array[iproc, :ip_inds[0]])
-                    ind2 = numpy.sum(sizes_array[iproc, :ip_inds[-1] + 1])
-                    ip_size = ind2 - ind1
-                else:
-                    ip_size = 0
+                ip_size = self._get_varset_size(ip_ivar_set, 'input')
 
                 if ip_size > 0 and re_size > 0:
                     array = numpy.zeros((re_size, ip_size))
