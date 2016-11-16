@@ -150,7 +150,7 @@ class DefaultVector(Vector):
     def add_scal_vec(self, val, vec):
         """See openmdao.vectors.vector.Vector."""
         for iset in range(len(self._data)):
-            self._data[iset] *= val * vec._data[iset]
+            self._data[iset] += val * vec._data[iset]
 
     def set_vec(self, vec):
         """See openmdao.vectors.vector.Vector."""

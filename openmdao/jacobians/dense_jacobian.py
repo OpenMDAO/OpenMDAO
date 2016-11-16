@@ -10,6 +10,30 @@ from jacobian import Jacobian
 class DenseJacobian(Jacobian):
     """Assemble dense global Jacobian."""
 
+    def _get_varset_size(self, ivar_set, typ):
+        """Get total size of the variables in a varset.
+
+        Args
+        ----
+        ivar_set : int
+            index of the varset.
+        typ : str
+            'input' or 'output'.
+        """
+        sizes = self._assembler._variable_sizes
+        set_indices = self._assembler._variable_set_indices
+        iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
+
+        selector = set_indices[typ][:, 0] == ivar_set
+        inds = set_indices[typ][selector, 1]
+        if len(inds) > 0:
+            sizes_array = sizes[typ][ivar_set]
+            ind1 = numpy.sum(sizes_array[iproc, :inds[0]])
+            ind2 = numpy.sum(sizes_array[iproc, :inds[-1] + 1])
+            return ind2 - ind1
+        else:
+            return 0
+
     def _initialize(self):
         """See openmdao.jacobians.jacobian.Jacobian."""
         sizes = self._assembler._variable_sizes

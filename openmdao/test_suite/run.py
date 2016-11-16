@@ -25,7 +25,6 @@ class CompTestCase(unittest.TestCase):
     def test_comps(self):
         for key in itertools.product(
                 [TestImplCompNondLinear, TestExplCompNondLinear],
-                #[TestImplCompNondLinear],
                 [DefaultVector, PETScVector],
                 ['implicit'],#, 'explicit'],
                 ['matvec', 'dense'],
@@ -50,7 +49,7 @@ class CompTestCase(unittest.TestCase):
                 str(var_shape),
             ))
 
-            # print(print_str)
+            print(print_str)
 
             group = TestGroupFlat(num_sub=num_sub, num_var=num_var,
                                   var_shape=var_shape,
@@ -69,11 +68,28 @@ class CompTestCase(unittest.TestCase):
             prob.root.setup_jacobians()
             prob.root.suppress_solver_output = True
             fail, rele, abse = prob.run()
-            # if derivatives == 'dense':
-            #     print(prob.root.jacobian._int_mtx[0, 0])
-            #     print('')
+            if derivatives == 'dense':
+                print(prob.root.jacobian._int_mtx[0, 0])
+                print('')
             if fail:
                 self.fail('re %f ; ae %f ;  ' % (rele, abse) + print_str)
+
+            if Component == TestExplCompNondLinear and derivatives == 'dense':
+                size = numpy.prod(var_shape)
+                work = prob.root._vectors['output']['']._clone()
+                work.set_const(1.0)
+                prob.root._vectors['output'][''].set_const(1.0)
+                prob.root._apply_linear([''], 'fwd')
+                print(prob.root._vectors['residual']['']._combined_varset_data())
+                print(work._combined_varset_data())
+                print(-1 + 0.01 * size * num_var * (num_sub - 1))
+                prob.root._vectors['residual'][''].add_scal_vec(
+                    -1 + 0.01 * size * num_var * (num_sub - 1), work)
+                print(prob.root._vectors['residual']['']._combined_varset_data())
+                self.assertEqual(
+                    prob.root._vectors['residual'][''].get_norm(), 0)
+
+
 
 
 if __name__ == '__main__':
