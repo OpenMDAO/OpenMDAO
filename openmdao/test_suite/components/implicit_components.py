@@ -86,12 +86,11 @@ class TestImplCompNondLinear(ImplicitComponent):
                         d_ip = d_inputs._views_flat[ip_name]
                         d_ip += mtx.T.dot(d_re)
 
-    def linearize(self, inputs, outputs, jacobians):
-        coeffs = self.coeffs
-
+    def linearize(self, inputs, outputs, jacobian):
         if self.metadata['derivatives'] != 'matvec':
+            coeffs = self.coeffs
             for re_name in self.metadata['op_names']:
                 for op_name in self.metadata['op_names']:
-                    jacobians[re_name, op_name] = coeffs[re_name, op_name]
+                    jacobian[re_name, op_name] = coeffs[re_name, op_name]
                 for ip_name in self.metadata['ip_names']:
-                    jacobians[re_name, ip_name] = coeffs[re_name, ip_name]
+                    jacobian[re_name, ip_name] = coeffs[re_name, ip_name]

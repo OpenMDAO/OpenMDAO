@@ -122,13 +122,14 @@ class ImplicitComponent(Component):
                 success = success and tmp
             return success
 
-    def _linearize(self):
+    def _linearize(self, initial=False):
         """See System._linearize."""
         self._jacobian._system = self
         self.linearize(self._inputs, self._outputs, self._jacobian)
 
-        self._jacobian._update()
         self._jacobian._precompute_iter()
+        if not initial and self._jacobian._top_name == self.path_name:
+            self._jacobian._update()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """Compute residuals given inputs and outputs.
@@ -264,7 +265,7 @@ class ExplicitComponent(Component):
             elif mode == 'rev':
                 d_residuals.setvec(d_outputs)
 
-    def _linearize(self):
+    def _linearize(self, initial=False):
         """See System._linearize."""
         self._jacobian._system = self
         self.compute_jacobian(self._inputs, self._outputs, self._jacobian)
@@ -280,8 +281,9 @@ class ExplicitComponent(Component):
                 if (op_name, ip_name) in self._jacobian:
                     self._jacobian._negate((op_name, ip_name))
 
-        self._jacobian._update()
         self._jacobian._precompute_iter()
+        if not initial and self._jacobian._top_name == self.path_name:
+            self._jacobian._update()
 
     def compute(self, inputs, outputs):
         """Compute outputs given inputs.

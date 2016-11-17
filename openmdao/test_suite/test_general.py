@@ -49,7 +49,7 @@ class CompTestCase(unittest.TestCase):
                 str(var_shape),
             ))
 
-            #print(print_str)
+            # print(print_str)
 
             group = TestGroupFlat(num_sub=num_sub, num_var=num_var,
                                   var_shape=var_shape,
@@ -58,6 +58,10 @@ class CompTestCase(unittest.TestCase):
                                   Component=Component,
                                   )
             prob = Problem(group).setup(Vector)
+
+            if derivatives == 'dense':
+                prob.root.jacobian = DenseJacobian()
+
             prob.root.nl_solver = NewtonSolver(
                 subsolvers={'linear': ScipyIterativeSolver(
                     maxiter=100,
@@ -65,10 +69,8 @@ class CompTestCase(unittest.TestCase):
             )
             prob.root.ln_solver = ScipyIterativeSolver(
                 maxiter=200, atol=1e-10, rtol=1e-10)
-            if derivatives == 'dense':
-                prob.root.jacobian = DenseJacobian()
-            prob.root.setup_jacobians()
             prob.root.suppress_solver_output = True
+
             fail, rele, abse = prob.run()
             if fail:
                 self.fail('re %f ; ae %f ;  ' % (rele, abse) + print_str)

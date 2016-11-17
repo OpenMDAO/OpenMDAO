@@ -69,10 +69,9 @@ class TestExplCompNondLinear(ExplicitComponent):
                         d_ip = d_inputs._views_flat[ip_name]
                         d_ip += mtx.T.dot(d_op)
 
-    def compute_jacobian(self, inputs, outputs, jacobians):
-        coeffs = self.coeffs
-
+    def compute_jacobian(self, inputs, outputs, jacobian):
         if self.metadata['derivatives'] != 'matvec':
+            coeffs = self.coeffs
             for op_name in self.metadata['op_names']:
                 for ip_name in self.metadata['ip_names']:
-                    jacobians[op_name, ip_name] = coeffs[op_name, ip_name]
+                    jacobian[op_name, ip_name] = coeffs[op_name, ip_name]

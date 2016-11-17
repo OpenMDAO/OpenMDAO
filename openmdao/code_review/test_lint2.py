@@ -9,6 +9,7 @@ directories = [
     'assemblers',
     'core',
     'jacobians',
+    'matrices',
     'proc_allocators',
     'solvers',
     'utils',
