@@ -63,5 +63,5 @@ class BacktrackingLineSearch(NonlinearSolver):
         du = system._vectors['output']['']
 
         self.alpha *= 0.5
-        for i, data in enumerate(system._outputs.data):
-            data -= self.alpha * du.data[i]
+        for i, data in enumerate(system._outputs._data):
+            data -= self.alpha * du._data[i]

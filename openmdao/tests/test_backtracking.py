@@ -36,18 +36,14 @@ class TrickyComp(ImplicitComponent):
         """ This is a dummy comp that doesn't modify its state."""
         pass
 
-    def linearize(self, params, unknowns, resids):
+    def linearize(self, params, unknowns, J):
         """Analytical derivatives."""
 
         x = unknowns['x']
 
-        J = {}
-
         # State equation
         J[('x', 'y')] = -1.0
         J[('x', 'x')] = x + 2.0 - 32.0*x*exp(-16.0*x*x) - 10.0*exp(-5.0*x)
-
-        return J
 
 
 class TestBackTracking(unittest.TestCase):
