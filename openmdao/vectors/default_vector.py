@@ -98,7 +98,8 @@ class DefaultVector(Vector):
                 ind1 = numpy.sum(sizes_array[self._iproc, :data_inds[0]])
                 ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
                 data.append(self._global_vector._data[iset][ind1:ind2])
-                indices.append(self._global_vector._indices[iset][ind1:ind2]-ind1)
+                indices.append(self._global_vector._indices[iset][ind1:ind2] -
+                               ind1)
             else:
                 data.append(numpy.zeros(0))
                 indices.append(numpy.zeros(0, int))

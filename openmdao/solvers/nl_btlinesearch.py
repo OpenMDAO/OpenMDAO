@@ -1,4 +1,4 @@
-""" Backtracking line search using the Armijo-Goldstein condition."""
+"""Backtracking line search using the Armijo-Goldstein condition."""
 
 from math import isnan
 
@@ -6,22 +6,26 @@ import numpy as np
 
 from openmdao.solvers.solver import NonlinearSolver
 
+
 class BacktrackingLineSearch(NonlinearSolver):
+    """Backtracking line search using the Armijo-Goldstein condition."""
 
     SOLVER = 'NL: BK_TKG'
 
     def __init__(self):
+        """Backtracking line search using the Armijo-Goldstein condition."""
         super(BacktrackingLineSearch, self).__init__()
 
         opt = self.options
         opt['maxiter'] = 5
         opt.declare('solve_subsystems', True,
-                       desc='Set to True to solve subsystems. You may need '
-                            'this for solvers nested under Newton.')
+                    desc='Set to True to solve subsystems. You may need '
+                         'this for solvers nested under Newton.')
         opt.declare('rho', value=0.5, desc="Backtracking step.")
         opt.declare('c', value=0.5, desc="Slope check trigger.")
 
     def _iter_initialize(self):
+        """See openmdao.solvers.solver.Solver."""
         system = self._system
         self.alpha = 1.0
 
@@ -54,6 +58,7 @@ class BacktrackingLineSearch(NonlinearSolver):
         return norm0, norm
 
     def _iter_execute(self):
+        """See openmdao.solvers.solver.Solver."""
         system = self._system
         du = system._vectors['output']['']
 

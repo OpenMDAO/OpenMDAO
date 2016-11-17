@@ -88,7 +88,6 @@ class Component(System):
                 outputs[names[i]] = meta['value']
 
 
-
 class ImplicitComponent(Component):
     """Class to inherit from when all output variables are implicit."""
 

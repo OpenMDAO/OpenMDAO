@@ -122,8 +122,8 @@ class Solver(object):
             norm = self._iter_get_norm()
             iteration += 1
             self._mpi_print(iteration, norm / norm0, norm)
-        fail = (norm > atol or norm / norm0 > rtol or numpy.isinf(norm)
-                or numpy.isnan(norm))
+        fail = (norm > atol or norm / norm0 > rtol or numpy.isinf(norm) or
+                numpy.isnan(norm))
         return fail, norm / norm0, norm
 
     def _iter_initialize(self):
