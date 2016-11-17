@@ -31,7 +31,7 @@ class TestGroupFlat(Group):
                 'var_shape': self.metadata['var_shape'],
             }
             if self.metadata['connection_type'] == 'explicit':
-                self.add_subsystem('group_%i'%isub, Component(**kwargs))
+                self.add_subsystem('comp_%i'%isub, Component(**kwargs))
             elif self.metadata['connection_type'] == 'implicit':
                 renames_inputs = {}
                 renames_outputs = {}
@@ -52,7 +52,7 @@ class TestGroupFlat(Group):
                             new_name = 'var_%i' % index2
                             renames_outputs[old_name] = new_name
 
-                self.add_subsystem('group%i'%isub, Component(**kwargs),
+                self.add_subsystem('comp_%i'%isub, Component(**kwargs),
                                    renames_inputs=renames_inputs,
                                    renames_outputs=renames_outputs)
 
@@ -62,7 +62,7 @@ class TestGroupFlat(Group):
                 for isub2 in range(num_sub):
                     if isub != isub2:
                         for ivar in range(num_var):
-                            ip_name = 'group_%i.input_%i' % (isub, index)
-                            op_name = 'group_%i.output_%i' % (isub, ivar)
+                            ip_name = 'comp_%i.input_%i' % (isub, index)
+                            op_name = 'comp_%i.output_%i' % (isub2, ivar)
                             self.connect(op_name, ip_name)
                             index += 1

@@ -17,7 +17,8 @@ class LinearBlockJac(LinearSolver):
             for vec_name in vec_names:
                 d_inputs = system._vectors['input'][vec_name]
                 d_outputs = system._vectors['output'][vec_name]
-                system._transfers[None](d_inputs, d_outputs, mode)
+                system._vector_transfers[vec_name][None](
+                    d_inputs, d_outputs, mode)
             for subsys in system._subsystems_myproc:
                 var_inds = [
                     system._variable_allprocs_range['output'][0],
@@ -44,7 +45,8 @@ class LinearBlockJac(LinearSolver):
             for vec_name in vec_names:
                 d_inputs = system._vectors['input'][vec_name]
                 d_outputs = system._vectors['output'][vec_name]
-                system._transfers[None](d_inputs, d_outputs, mode)
+                system._vector_transfers[vec_name][None](
+                    d_inputs, d_outputs, mode)
 
                 b_vec = system._vectors['output'][vec_name]
                 b_vec *= -1.0

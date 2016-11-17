@@ -60,9 +60,9 @@ class PETScVector(DefaultVector):
     def _initialize_data(self, global_vector):
         """See openmdao.vectors.vector.Vector."""
         if global_vector is None:
-            self._data = self._create_data()
+            self._data, self._indices = self._create_data()
         else:
-            self._data = self._extract_data()
+            self._data, self._indices = self._extract_data()
 
         self._petsc = []
         for iset in range(len(self._data)):

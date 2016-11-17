@@ -198,7 +198,8 @@ class Group(System):
                 for vec_name in vec_names:
                     d_inputs = self._vectors['input'][vec_name]
                     d_outputs = self._vectors['output'][vec_name]
-                    self._transfers[None](d_inputs, d_outputs, mode)
+                    self._vector_transfers[vec_name][None](
+                        d_inputs, d_outputs, mode)
 
             for subsys in self._subsystems_myproc:
                 subsys._apply_linear(vec_names, mode, var_inds)
@@ -207,7 +208,8 @@ class Group(System):
                 for vec_name in vec_names:
                     d_inputs = self._vectors['input'][vec_name]
                     d_outputs = self._vectors['output'][vec_name]
-                    self._transfers[None](d_inputs, d_outputs, mode)
+                    self._vector_transfers[vec_name][None](
+                        d_inputs, d_outputs, mode)
 
     def _solve_linear(self, vec_names, mode):
         """See System._solve_linear."""
