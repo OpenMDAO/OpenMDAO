@@ -12,9 +12,9 @@ class BacktrackingLineSearch(NonlinearSolver):
 
     SOLVER = 'NL: BK_TKG'
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """Backtracking line search using the Armijo-Goldstein condition."""
-        super(BacktrackingLineSearch, self).__init__()
+        super(BacktrackingLineSearch, self).__init__(**kwargs)
 
         opt = self.options
         opt['maxiter'] = 5
@@ -53,16 +53,17 @@ class BacktrackingLineSearch(NonlinearSolver):
         norm0 = self._iter_get_norm()
         if norm0 == 0.0:
             norm0 = 1.0
-        for i, data in enumerate(u._data):
-            data += self.alpha * du._data[i]
+
+        u.add_scal_vec(self.alpha, du)
         norm = self._iter_get_norm()
         return norm0, norm
 
     def _iter_execute(self):
         """See openmdao.solvers.solver.Solver."""
         system = self._system
+        u = system._outputs
         du = system._vectors['output']['']
 
+        u.add_scal_vec(-self.alpha, du)
         self.alpha *= self.options['rho']
-        for i, data in enumerate(system._outputs._data):
-            data -= self.alpha * du._data[i]
+        u.add_scal_vec(self.alpha, du)

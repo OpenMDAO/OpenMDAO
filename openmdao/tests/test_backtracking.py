@@ -58,7 +58,7 @@ class TestBackTracking(unittest.TestCase):
 
         root.nl_solver = NewtonSolver()
         root.ln_solver = ScipyIterativeSolver()
-        ls = root.nl_solver.set_subsolver('linesearch', BacktrackingLineSearch())
+        ls = root.nl_solver.set_subsolver('linesearch', BacktrackingLineSearch(rtol=0.9))
         ls.options['maxiter'] = 100
         ls.options['c'] = 0.5
         ls.options['alpha'] = 10.0
