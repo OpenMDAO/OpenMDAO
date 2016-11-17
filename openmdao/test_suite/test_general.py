@@ -26,26 +26,23 @@ class CompTestCase(unittest.TestCase):
         for key in itertools.product(
                 [TestImplCompNondLinear, TestExplCompNondLinear],
                 [DefaultVector, PETScVector],
-                [DenseMatrix, CooMatrix],
                 ['implicit', 'explicit'],
-                ['matvec', 'dense'],
+                ['matvec', 'dense', 'sparse-coo'],
                 range(1, 3),
                 range(1, 3),
                 [(1,), (2,), (2, 1), (1, 2)],
                 ):
             Component = key[0]
             Vector = key[1]
-            Matrix = key[2]
-            connection_type = key[3]
-            derivatives = key[4]
-            num_var = key[5]
-            num_sub = key[6]
-            var_shape = key[7]
+            connection_type = key[2]
+            derivatives = key[3]
+            num_var = key[4]
+            num_sub = key[5]
+            var_shape = key[6]
 
-            print_str = ('%s %s %s %s %s %i-vars %i-comps %s' % (
+            print_str = ('%s %s %s %s %i-vars %i-comps %s' % (
                 Component.__name__,
                 Vector.__name__,
-                Matrix.__name__,
                 connection_type,
                 derivatives,
                 num_var, num_sub,
@@ -63,7 +60,9 @@ class CompTestCase(unittest.TestCase):
             prob = Problem(group).setup(Vector)
 
             if derivatives == 'dense':
-                prob.root.jacobian = GlobalJacobian(Matrix=Matrix)
+                prob.root.jacobian = GlobalJacobian(Matrix=DenseMatrix)
+            elif derivatives == 'sparse-coo':
+                prob.root.jacobian = GlobalJacobian(Matrix=CooMatrix)
 
             prob.root.nl_solver = NewtonSolver(
                 subsolvers={'linear': ScipyIterativeSolver(
