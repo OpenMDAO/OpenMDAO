@@ -14,15 +14,15 @@ class BacktrackingLineSearch(NonlinearSolver):
         super(BacktrackingLineSearch, self).__init__()
 
         opt = self.options
-        opt['ilimit'] = 5
-        opt.add_option('solve_subsystems', True,
+        opt['maxiter'] = 5
+        opt.declare('solve_subsystems', True,
                        desc='Set to True to solve subsystems. You may need '
                             'this for solvers nested under Newton.')
-        opt.add_option('rho', 0.5, desc="Backtracking step.")
-        opt.add_option('c', 0.5, desc="Slope check trigger.")
+        opt.declare('rho', value=0.5, desc="Backtracking step.")
+        opt.declare('c', value=0.5, desc="Slope check trigger.")
 
     def _iter_initialize(self):
-        system = self.system
+        system = self._system
         self.alpha = 1.0
 
         u = system._outputs
@@ -49,7 +49,7 @@ class BacktrackingLineSearch(NonlinearSolver):
         if norm0 == 0.0:
             norm0 = 1.0
         for i, data in enumerate(u._data):
-            data += self.alpha * du.data[i]
+            data += self.alpha * du._data[i]
         norm = self._iter_get_norm()
         return norm0, norm
 

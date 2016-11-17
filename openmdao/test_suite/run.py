@@ -61,7 +61,7 @@ class CompTestCase(unittest.TestCase):
             prob = Problem(group).setup(Vector)
             prob.root.nl_solver = NewtonSolver(
                 subsolvers={'linear': ScipyIterativeSolver(
-                    ilimit=100,
+                    maxiter=100,
                 )}
             )
             if derivatives == 'dense':

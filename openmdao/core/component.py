@@ -260,9 +260,9 @@ class ExplicitComponent(Component):
             d_outputs = self._vectors['output'][vec_name]
             d_residuals = self._vectors['residual'][vec_name]
             if mode == 'fwd':
-                d_outputs.setvec(d_residuals)
+                d_outputs.set_vec(d_residuals)
             elif mode == 'rev':
-                d_residuals.setvec(d_outputs)
+                d_residuals.set_vec(d_outputs)
 
     def _linearize(self):
         """See System._linearize."""

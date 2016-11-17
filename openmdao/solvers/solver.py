@@ -43,7 +43,7 @@ class Solver(object):
         self._mode = 'fwd'
 
         self.options = GeneralizedDictionary(kwargs)
-        self.options.declare('ilimit', typ=int, value=10)
+        self.options.declare('maxiter', typ=int, value=10)
         self.options.declare('atol', value=1e-10)
         self.options.declare('rtol', value=1e-10)
         self.options.declare('iprint', typ=int, value=1)
@@ -77,7 +77,7 @@ class Solver(object):
         res0 : float
             initial residual norm.
         """
-        if (self.options['iprint'] and self._system.comm.rank == 0 and 
+        if (self.options['iprint'] and self._system.comm.rank == 0 and
                 not self._system._suppress_solver_output):
             rawname = self._system.name
             name_len = 10
@@ -110,14 +110,14 @@ class Solver(object):
         float
             absolute error at termination.
         """
-        ilimit = self.options['ilimit']
+        maxiter = self.options['maxiter']
         atol = self.options['atol']
         rtol = self.options['rtol']
 
         norm0, norm = self._iter_initialize()
         iteration = 0
         self._mpi_print(iteration, norm / norm0, norm0)
-        while iteration < ilimit and norm > atol and norm / norm0 > rtol:
+        while iteration < maxiter and norm > atol and norm / norm0 > rtol:
             self._iter_execute()
             norm = self._iter_get_norm()
             iteration += 1
@@ -177,6 +177,7 @@ class Solver(object):
         self.options['subsolvers'][name] = solver
         self.options['subsolvers'][name]._setup_solvers(self._system,
                                                         self._depth + 1)
+        return solver
 
     def get_subsolver(self, name):
         """Get a subsolver.
@@ -203,7 +204,7 @@ class NonlinearSolver(Solver):
 
     def _iter_initialize(self):
         """See openmdao.solvers.solver.Solver."""
-        if self.options['ilimit'] > 1:
+        if self.options['maxiter'] > 1:
             norm = self._iter_get_norm()
         else:
             norm = 1.0
@@ -238,7 +239,7 @@ class LinearSolver(Solver):
         for vec_name in self._vec_names:
             self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
 
-        if self.options['ilimit'] > 1:
+        if self.options['maxiter'] > 1:
             norm = self._iter_get_norm()
         else:
             norm = 1.0
