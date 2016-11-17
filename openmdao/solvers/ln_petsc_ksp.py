@@ -138,15 +138,15 @@ class PetscKSP(LinearSolver):
     -------
     options['atol'] :  float(1e-12)
         Absolute convergence tolerance.
-    options['err_on_ilimit'] : bool(False)
-        If True, raise an Error if not converged at ilimit.
+    options['err_on_maxiter'] : bool(False)
+        If True, raise an Error if not converged at maxiter.
     options['iprint'] :  int(0)
         Set to 0 to print only failures, set to 1 to print iteration totals to
         stdout, set to 2 to print the residual each iteration to stdout,
         or -1 to suppress all printing.
     options['ksp_type'] :  str('fgmres')
         KSP algorithm to use. Default is 'fgmres'.
-    options['ilimit'] :  int(100)
+    options['maxiter'] :  int(100)
         Maximum number of iterations.
     options['mode'] :  str('auto')
         Derivative calculation mode 'fwd' (forward), 'rev' (reverse), 'auto'.
@@ -275,7 +275,7 @@ class PetscKSP(LinearSolver):
         self.mode = mode
 
         unknowns_mat = OrderedDict()
-        ilimit = options['ilimit']
+        maxiter = options['maxiter']
         atol = options['atol']
         rtol = options['rtol']
         iprint = self.options['iprint']
@@ -284,7 +284,7 @@ class PetscKSP(LinearSolver):
 
             ksp = self.ksp[voi]
 
-            ksp.setTolerances(max_it=ilimit, atol=atol, rtol=rtol)
+            ksp.setTolerances(max_it=maxiter, atol=atol, rtol=rtol)
 
             sol_vec = np.zeros(rhs.shape)
             # Set these in the system
@@ -313,7 +313,7 @@ class PetscKSP(LinearSolver):
                 self.print_norm(self.print_name, system, self.iter_count,
                                 mon._norm, mon._norm0, indent=1, solver='LN')
 
-            if self.iter_count >= ilimit:
+            if self.iter_count >= maxiter:
                 msg = 'FAILED to converge in %d iterations' % self.iter_count
                 fail = True
             else:
@@ -326,7 +326,7 @@ class PetscKSP(LinearSolver):
 
             unknowns_mat[voi] = sol_vec
 
-            if fail and self.options['err_on_ilimit']:
+            if fail and self.options['err_on_maxiter']:
                 raise Exception("Solve in '%s': PetscKSP %s" %
                                 (system.pathname, msg))
 
