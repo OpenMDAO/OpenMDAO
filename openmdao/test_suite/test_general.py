@@ -60,11 +60,11 @@ class CompTestCase(unittest.TestCase):
             prob = Problem(group).setup(Vector)
             prob.root.nl_solver = NewtonSolver(
                 subsolvers={'linear': ScipyIterativeSolver(
-                    ilimit=100,
+                    maxiter=100,
                 )}
             )
             prob.root.ln_solver = ScipyIterativeSolver(
-                ilimit=200, atol=1e-10, rtol=1e-10)
+                maxiter=200, atol=1e-10, rtol=1e-10)
             if derivatives == 'dense':
                 prob.root.jacobian = DenseJacobian()
             prob.root.setup_jacobians()

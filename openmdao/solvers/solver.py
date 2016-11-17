@@ -43,7 +43,7 @@ class Solver(object):
         self._mode = 'fwd'
 
         self.options = GeneralizedDictionary(kwargs)
-        self.options.declare('ilimit', typ=int, value=10)
+        self.options.declare('maxiter', typ=int, value=10)
         self.options.declare('atol', value=1e-10)
         self.options.declare('rtol', value=1e-10)
         self.options.declare('iprint', typ=int, value=1)
@@ -112,14 +112,14 @@ class Solver(object):
         float
             absolute error at termination.
         """
-        ilimit = self.options['ilimit']
+        maxiter = self.options['maxiter']
         atol = self.options['atol']
         rtol = self.options['rtol']
 
         norm0, norm = self._iter_initialize()
         iteration = 0
         self._mpi_print(iteration, norm / norm0, norm0)
-        while iteration < ilimit and norm > atol and norm / norm0 > rtol:
+        while iteration < maxiter and norm > atol and norm / norm0 > rtol:
             self._iter_execute()
             norm = self._iter_get_norm()
             iteration += 1
@@ -206,7 +206,7 @@ class NonlinearSolver(Solver):
 
     def _iter_initialize(self):
         """See openmdao.solvers.solver.Solver."""
-        if self.options['ilimit'] > 1:
+        if self.options['maxiter'] > 1:
             norm = self._iter_get_norm()
         else:
             norm = 1.0
@@ -241,7 +241,7 @@ class LinearSolver(Solver):
 
             self._rhs_vecs[vec_name] = b_vec._clone()
 
-        if self.options['ilimit'] > 1:
+        if self.options['maxiter'] > 1:
             norm = self._iter_get_norm()
         else:
             norm = 1.0

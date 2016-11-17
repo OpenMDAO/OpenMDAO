@@ -82,7 +82,7 @@ class ScipyIterativeSolver(LinearSolver):
         system = self._system
         solver = self.options['solver']
 
-        ilimit = self.options['ilimit']
+        maxiter = self.options['maxiter']
         atol = self.options['atol']
         rtol = self.options['rtol']
 
@@ -103,5 +103,5 @@ class ScipyIterativeSolver(LinearSolver):
             self._counter = 0
             x_vec.set_data(
                 solver(linop, b_vec.get_data(),
-                       x0=x_vec_combined, maxiter=ilimit, tol=atol,
+                       x0=x_vec_combined, maxiter=maxiter, tol=atol,
                        callback=self._monitor)[0])
