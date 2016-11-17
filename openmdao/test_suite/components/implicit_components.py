@@ -40,7 +40,8 @@ class TestImplCompNondLinear(ImplicitComponent):
             self.rhs_coeffs[re_name] = mtx
             for op_name in self.metadata['op_names']:
                 mtx = numpy.ones((size, size)) * 0.01
-                numpy.fill_diagonal(mtx, 1)
+                if re_name == op_name:
+                    numpy.fill_diagonal(mtx, 1)
                 self.coeffs[re_name, op_name] = mtx
             for ip_name in self.metadata['ip_names']:
                 mtx = numpy.ones((size, size)) * 0.01
