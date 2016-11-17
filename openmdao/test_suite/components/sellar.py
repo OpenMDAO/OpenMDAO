@@ -131,8 +131,8 @@ class SellarNoDerivatives(Group):
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         self.nl_solver = NonlinearBlockGS()
-        #d1.deriv_options['type'] = 'fd'
-        #d2.deriv_options['type'] = 'fd'
+        d1.deriv_options['type'] = 'fd'
+        d2.deriv_options['type'] = 'fd'
 
 
 class SellarDerivatives(Group):
