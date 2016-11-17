@@ -1,4 +1,4 @@
-"""Define the base Matrix class."""
+"""Define the DenseMatrix class."""
 from __future__ import division, print_function
 import numpy
 import scipy.sparse
@@ -40,14 +40,14 @@ class DenseMatrix(Matrix):
         if type(jac) is numpy.ndarray:
             metadata[key][:, :] = jac
         elif scipy.sparse.issparse(jac):
-            metadata[key][:, :] = jac.todense()
+            metadata[key][:, :] = jac.todense()  # TODO: improve on todense
         elif type(jac) is list:
             irows, icols = metadata[key]
             self._matrix[irows, icols] = jac[0]
 
-    def _prod(self, vec, mode):
+    def _prod(self, in_vec, mode):
         """See Matrix."""
         if mode == 'fwd':
-            return self._matrix.dot(vec)
+            return self._matrix.dot(in_vec)
         elif mode == 'rev':
-            return self._matrix.T.dot(vec)
+            return self._matrix.T.dot(in_vec)

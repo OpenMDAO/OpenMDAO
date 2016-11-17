@@ -9,14 +9,14 @@ from collections import OrderedDict
 import itertools
 import unittest
 
-from openmdao.api import Problem
 from openmdao.test_suite.components.implicit_components \
     import TestImplCompNondLinear
 from openmdao.test_suite.components.explicit_components \
     import TestExplCompNondLinear
 from openmdao.test_suite.groups.group import TestGroupFlat
+from openmdao.api import Problem
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
-from openmdao.api import DenseJacobian
+from openmdao.api import GlobalJacobian, DenseMatrix, CooMatrix
 from openmdao.parallel_api import PETScVector
 
 
@@ -26,6 +26,7 @@ class CompTestCase(unittest.TestCase):
         for key in itertools.product(
                 [TestImplCompNondLinear, TestExplCompNondLinear],
                 [DefaultVector, PETScVector],
+                [DenseMatrix, CooMatrix],
                 ['implicit', 'explicit'],
                 ['matvec', 'dense'],
                 range(1, 3),
@@ -34,15 +35,17 @@ class CompTestCase(unittest.TestCase):
                 ):
             Component = key[0]
             Vector = key[1]
-            connection_type = key[2]
-            derivatives = key[3]
-            num_var = key[4]
-            num_sub = key[5]
-            var_shape = key[6]
+            Matrix = key[2]
+            connection_type = key[3]
+            derivatives = key[4]
+            num_var = key[5]
+            num_sub = key[6]
+            var_shape = key[7]
 
-            print_str = ('%s %s %s %s %i vars %i subs %s' % (
+            print_str = ('%s %s %s %s %s %i-vars %i-comps %s' % (
                 Component.__name__,
                 Vector.__name__,
+                Matrix.__name__,
                 connection_type,
                 derivatives,
                 num_var, num_sub,
@@ -60,7 +63,7 @@ class CompTestCase(unittest.TestCase):
             prob = Problem(group).setup(Vector)
 
             if derivatives == 'dense':
-                prob.root.jacobian = DenseJacobian()
+                prob.root.jacobian = GlobalJacobian(Matrix=Matrix)
 
             prob.root.nl_solver = NewtonSolver(
                 subsolvers={'linear': ScipyIterativeSolver(

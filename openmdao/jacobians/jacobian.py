@@ -4,19 +4,14 @@ import numpy
 import scipy.sparse
 from six.moves import range
 
+from openmdao.utils.generalized_dict import GeneralizedDictionary
+
 
 class Jacobian(object):
     """Base Jacobian class.
 
     This class provides a dictionary interface for sub-Jacobians and
     performs matrix-vector products when apply_linear is called.
-
-    Implementations:
-        DefaultJacobian - dictionary of Jacobians
-        DenseJacobian - global dense matrix
-        DenseStepJacobian - global dense matrix with FD/CS derivatives
-        SparseJacobian - global sparse matrix
-        DenseStepJacobian - global sparse matrix with FD/CS derivatives
 
     Attributes
     ----------
@@ -37,10 +32,18 @@ class Jacobian(object):
         global external Jacobian.
     _iter_list : [(op_name, ip_name), ...]
         list of output-input pairs to iterate over.
+    options : GeneralizedDictionary
+        options dictionary.
     """
 
-    def __init__(self):
-        """Initialize all attributes."""
+    def __init__(self, **kwargs):
+        """Initialize all attributes.
+
+        Args
+        ----
+        **kwargs : dict
+            options dictionary.
+        """
         self._top_name = None
         self._assembler = None
         self._system = None
@@ -50,6 +53,8 @@ class Jacobian(object):
         self._int_mtx = None
         self._ext_mtx = None
         self._iter_list = []
+
+        self.options = GeneralizedDictionary(kwargs)
 
     def _process_key(self, key):
         """Map output-input pair names to indices and sizes.

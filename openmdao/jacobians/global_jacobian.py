@@ -1,4 +1,4 @@
-"""Define the DenseJacobian class."""
+"""Define the GlobalJacobian class."""
 from __future__ import division
 import numpy
 import scipy.sparse
@@ -8,7 +8,7 @@ from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 
 
-class DenseJacobian(Jacobian):
+class GlobalJacobian(Jacobian):
     """Assemble dense global Jacobian."""
 
     def _get_var_range(self, ivar_all, typ):
@@ -42,8 +42,9 @@ class DenseJacobian(Jacobian):
         indices = self._system._variable_myproc_indices
         ivar1, ivar2 = self._system._variable_allprocs_range['output']
 
-        self._int_mtx = DenseMatrix(self._system.comm)
-        self._ext_mtx = DenseMatrix(self._system.comm)
+        self.options.declare('Matrix', value=DenseMatrix)
+        self._int_mtx = self.options['Matrix'](self._system.comm)
+        self._ext_mtx = self.options['Matrix'](self._system.comm)
 
         for re_ind in range(len(indices['output'])):
             re_var_all = indices['output'][re_ind]
