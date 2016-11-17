@@ -4,19 +4,14 @@ import numpy
 import scipy.sparse
 from six.moves import range
 
+from openmdao.utils.generalized_dict import GeneralizedDictionary
+
 
 class Jacobian(object):
     """Base Jacobian class.
 
     This class provides a dictionary interface for sub-Jacobians and
     performs matrix-vector products when apply_linear is called.
-
-    Implementations:
-        DefaultJacobian - dictionary of Jacobians
-        DenseJacobian - global dense matrix
-        DenseStepJacobian - global dense matrix with FD/CS derivatives
-        SparseJacobian - global sparse matrix
-        DenseStepJacobian - global sparse matrix with FD/CS derivatives
 
     Attributes
     ----------
@@ -31,25 +26,35 @@ class Jacobian(object):
         dictionary containing the user-supplied internal sub-Jacobians.
     _ip_dict : dict
         dictionary containing the user-supplied external sub-Jacobians.
-    _int_mtx : dict
-        global internal Jacobians indexed by (op_iset, ip_iset).
-    _ext_mtx : dict
-        global external Jacobians indexed by (op_iset, ip_iset).
+    _int_mtx : Matrix
+        global internal Jacobian.
+    _ext_mtx : Matrix
+        global external Jacobian.
     _iter_list : [(op_name, ip_name), ...]
         list of output-input pairs to iterate over.
+    options : GeneralizedDictionary
+        options dictionary.
     """
 
-    def __init__(self):
-        """Initialize all attributes."""
+    def __init__(self, **kwargs):
+        """Initialize all attributes.
+
+        Args
+        ----
+        **kwargs : dict
+            options dictionary.
+        """
         self._top_name = None
         self._assembler = None
         self._system = None
 
         self._op_dict = {}
         self._ip_dict = {}
-        self._int_mtx = {}
-        self._ext_mtx = {}
+        self._int_mtx = None
+        self._ext_mtx = None
         self._iter_list = []
+
+        self.options = GeneralizedDictionary(kwargs)
 
     def _process_key(self, key):
         """Map output-input pair names to indices and sizes.
@@ -172,8 +177,8 @@ class Jacobian(object):
         ----
         key : (str, str)
             output name, input name of sub-Jacobian.
-        jac : int or float or ndarray or list[2 or 3] or tuple[2 or 3]
-            sub-Jacobian as a scalar, vector, array, or AIJ/IJ list or tuple.
+        jac : int or float or ndarray or list[3] or tuple[3]
+            sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
         dct, op_ind, ip_ind, op_size, ip_size = self._process_key(key)
 
@@ -196,7 +201,7 @@ class Jacobian(object):
 
         Returns
         -------
-        jac : ndarray or list[2 or 3] or tuple [2 or 3]
+        jac : ndarray or list[3]
             sub-Jacobian as an array, or AIJ/IJ list or tuple.
         """
         dct, op_ind, ip_ind, op_size, ip_size = self._process_key(key)

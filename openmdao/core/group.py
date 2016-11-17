@@ -215,13 +215,13 @@ class Group(System):
         """See System._solve_linear."""
         return self._ln_solver(vec_names, mode)
 
-    def _linearize(self):
+    def _linearize(self, initial=False):
         """See System._linearize."""
         for subsys in self._subsystems_myproc:
             subsys._linearize()
 
         # Update jacobian
-        if self._jacobian._top_name == self.path_name:
+        if not initial and self._jacobian._top_name == self.path_name:
             self._jacobian._system = self
             self._jacobian._update()
             self._jacobian._precompute_iter()

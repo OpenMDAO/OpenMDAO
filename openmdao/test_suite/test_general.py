@@ -9,14 +9,14 @@ from collections import OrderedDict
 import itertools
 import unittest
 
-from openmdao.api import Problem
 from openmdao.test_suite.components.implicit_components \
     import TestImplCompNondLinear
 from openmdao.test_suite.components.explicit_components \
     import TestExplCompNondLinear
 from openmdao.test_suite.groups.group import TestGroupFlat
+from openmdao.api import Problem
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
-from openmdao.api import DenseJacobian
+from openmdao.api import GlobalJacobian, DenseMatrix, CooMatrix
 from openmdao.parallel_api import PETScVector
 
 
@@ -27,7 +27,7 @@ class CompTestCase(unittest.TestCase):
                 [TestImplCompNondLinear, TestExplCompNondLinear],
                 [DefaultVector, PETScVector],
                 ['implicit', 'explicit'],
-                ['matvec', 'dense'],
+                ['matvec', 'dense', 'sparse-coo'],
                 range(1, 3),
                 range(1, 3),
                 [(1,), (2,), (2, 1), (1, 2)],
@@ -40,7 +40,7 @@ class CompTestCase(unittest.TestCase):
             num_sub = key[5]
             var_shape = key[6]
 
-            print_str = ('%s %s %s %s %i vars %i subs %s' % (
+            print_str = ('%s %s %s %s %i-vars %i-comps %s' % (
                 Component.__name__,
                 Vector.__name__,
                 connection_type,
@@ -49,7 +49,7 @@ class CompTestCase(unittest.TestCase):
                 str(var_shape),
             ))
 
-            #print(print_str)
+            # print(print_str)
 
             group = TestGroupFlat(num_sub=num_sub, num_var=num_var,
                                   var_shape=var_shape,
@@ -58,6 +58,12 @@ class CompTestCase(unittest.TestCase):
                                   Component=Component,
                                   )
             prob = Problem(group).setup(Vector)
+
+            if derivatives == 'dense':
+                prob.root.jacobian = GlobalJacobian(Matrix=DenseMatrix)
+            elif derivatives == 'sparse-coo':
+                prob.root.jacobian = GlobalJacobian(Matrix=CooMatrix)
+
             prob.root.nl_solver = NewtonSolver(
                 subsolvers={'linear': ScipyIterativeSolver(
                     maxiter=100,
@@ -65,10 +71,8 @@ class CompTestCase(unittest.TestCase):
             )
             prob.root.ln_solver = ScipyIterativeSolver(
                 maxiter=200, atol=1e-10, rtol=1e-10)
-            if derivatives == 'dense':
-                prob.root.jacobian = DenseJacobian()
-            prob.root.setup_jacobians()
             prob.root.suppress_solver_output = True
+
             fail, rele, abse = prob.run()
             if fail:
                 self.fail('re %f ; ae %f ;  ' % (rele, abse) + print_str)

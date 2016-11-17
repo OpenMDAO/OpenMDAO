@@ -19,7 +19,7 @@ class TestGroupFlat(Group):
                               values=['explicit', 'implicit'])
         self.metadata.declare('Component')
         self.metadata.declare('derivatives', value='matvec',
-                              values=['matvec', 'dense'])
+                              values=['matvec', 'dense', 'sparse-coo'])
 
         num_sub = self.metadata['num_sub']
         num_var = self.metadata['num_var']
