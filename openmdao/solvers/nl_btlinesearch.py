@@ -22,12 +22,13 @@ class BacktrackingLineSearch(NonlinearSolver):
                     desc='Set to True to solve subsystems. You may need '
                          'this for solvers nested under Newton.')
         opt.declare('rho', value=0.5, desc="Backtracking step.")
-        opt.declare('c', value=0.5, desc="Slope check trigger.")
+        opt.declare('alpha', value=1.0, desc="Backtracking multiplier.")
+        # opt.declare('c', value=0.5, desc="Slope check trigger.")
 
     def _iter_initialize(self):
         """See openmdao.solvers.solver.Solver."""
         system = self._system
-        self.alpha = 1.0
+        self.alpha = self.options['alpha']
 
         u = system._outputs
         du = system._vectors['output']['']
@@ -62,6 +63,6 @@ class BacktrackingLineSearch(NonlinearSolver):
         system = self._system
         du = system._vectors['output']['']
 
-        self.alpha *= 0.5
+        self.alpha *= self.options['rho']
         for i, data in enumerate(system._outputs._data):
             data -= self.alpha * du._data[i]
