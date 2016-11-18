@@ -51,11 +51,16 @@ class CooMatrix(Matrix):
                             irows[indr, indc] = indr
                             icols[indr, indc] = indc
                     size = numpy.prod(jac.shape)
+                    if type(jac) is numpy.ndarray:
+                        data[ind1:ind2] = jac.flatten()
+                    else:
+                        data[ind1:ind2] = jac.todense().flatten()
                     rows[ind1:ind2] = irow + irows.reshape(size)
                     cols[ind1:ind2] = icol + icols.reshape(size)
                 elif type(jac) is list:
+                    data[ind1:ind2] = jac[0]
                     rows[ind1:ind2] = irow + jac[1]
-                    cols[ind1:ind2] = irow + jac[2]
+                    cols[ind1:ind2] = icol + jac[2]
 
         self._matrix = [data, rows, cols, num_rows, num_cols]
 
