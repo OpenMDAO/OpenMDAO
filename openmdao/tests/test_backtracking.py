@@ -30,7 +30,6 @@ class TrickyComp(ImplicitComponent):
         x = unknowns['x']
 
         resids['x'] = 0.5*x*x + 2.0*x + exp(-16.0*x*x) + 2.0*exp(-5.0*x) - y
-        #print('x', x, 'res', resids['x'])
 
     def compute(params, unknowns):
         """ This is a dummy comp that doesn't modify its state."""
@@ -58,7 +57,8 @@ class TestBackTracking(unittest.TestCase):
 
         root.nl_solver = NewtonSolver()
         root.ln_solver = ScipyIterativeSolver()
-        ls = root.nl_solver.set_subsolver('linesearch', BacktrackingLineSearch(rtol=0.9))
+        ls = root.nl_solver.set_subsolver('linesearch',
+                                          BacktrackingLineSearch(rtol=0.9))
         ls.options['maxiter'] = 100
         ls.options['c'] = 0.5
         ls.options['alpha'] = 10.0

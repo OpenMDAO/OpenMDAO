@@ -49,11 +49,13 @@ class GeneralizedDictionary(object):
         values = self._declared_entries[name]['values']
 
         # (1) Check the type
-        if typ is not None and type(value) != typ:
-            raise ValueError("Entry '{}' has the wrong type".format(name))
+        if typ is not None and not isinstance(value, typ):
+            raise ValueError("Entry '{}' has the wrong type ({})".format(
+                name, typ))
         # (2) Check the value
         if values is not None and value not in values:
-            raise ValueError("Entry '{}'\'s value is invalid".format(name))
+            raise ValueError("Entry '{}'\'s value is not one of {}".format(
+                name, values))
 
     def declare(self, name, typ=None, desc='',
                 value=None, values=None, required=False):

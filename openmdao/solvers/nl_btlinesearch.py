@@ -23,7 +23,6 @@ class BacktrackingLineSearch(NonlinearSolver):
                          'this for solvers nested under Newton.')
         opt.declare('rho', value=0.5, desc="Backtracking multiplier.")
         opt.declare('alpha', value=1.0, desc="Initial line search step.")
-        opt.declare('rtol', value=0.9, desc="Relative error tolerance")
         # opt.declare('c', value=0.5, desc="Slope check trigger.")
 
     def _iter_initialize(self):
