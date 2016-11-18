@@ -3,7 +3,7 @@ import math
 
 import numpy as np
 
-from openmdao.api import IndepVarComp, Group, Problem, ExecComp, GlobalJacobian
+from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 from openmdao.devtools.testutil import assert_rel_error
 
 class TestExecComp(unittest.TestCase):
