@@ -3,7 +3,7 @@ from __future__ import division, print_function
 import numpy
 import scipy.sparse
 
-from matrix import Matrix
+from openmdao.matrices.matrix import Matrix
 
 
 class DenseMatrix(Matrix):
