@@ -42,7 +42,8 @@ class GlobalJacobian(Jacobian):
         indices = self._system._variable_myproc_indices
         ivar1, ivar2 = self._system._variable_allprocs_range['output']
 
-        self.options.declare('Matrix', value=DenseMatrix)
+        self.options.declare('Matrix', value=DenseMatrix,
+                             desc='Matrix class to use in this Jacobian.')
         self._int_mtx = self.options['Matrix'](self._system.comm)
         self._ext_mtx = self.options['Matrix'](self._system.comm)
 

@@ -43,11 +43,16 @@ class Solver(object):
         self._mode = 'fwd'
 
         self.options = GeneralizedDictionary(kwargs)
-        self.options.declare('maxiter', typ=int, value=10)
-        self.options.declare('atol', value=1e-10)
-        self.options.declare('rtol', value=1e-10)
-        self.options.declare('iprint', typ=int, value=1)
-        self.options.declare('subsolvers', typ=dict, value={})
+        self.options.declare('maxiter', typ=int, value=10,
+                             desc='maximum number of iterations')
+        self.options.declare('atol', value=1e-10,
+                             desc='absolute error tolerance')
+        self.options.declare('rtol', value=1e-10,
+                             desc='relative error tolerance')
+        self.options.declare('iprint', typ=int, value=1,
+                             desc='whether to print output')
+        self.options.declare('subsolvers', typ=dict, value={},
+                             desc='dictionary of solvers called by this one')
 
     def _setup_solvers(self, system, depth):
         """Assign system instance, set depth, and optionally perform setup.

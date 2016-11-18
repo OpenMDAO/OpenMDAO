@@ -12,9 +12,12 @@ class TestExplCompNondLinear(ExplicitComponent):
     """Test explicit component, non-distributed, linear."""
 
     def initialize(self):
-        self.metadata.declare('num_input', typ=int, value=1)
-        self.metadata.declare('num_output', typ=int, value=1)
-        self.metadata.declare('var_shape', value=(1,))
+        self.metadata.declare('num_input', typ=int, value=1,
+                              desc='number of input variables to declare')
+        self.metadata.declare('num_output', typ=int, value=1,
+                              desc='number of output variables to declare')
+        self.metadata.declare('var_shape', value=(1,),
+                              desc='input/output variable shapes')
 
     def initialize_variables(self):
         var_shape = self.metadata['var_shape']
