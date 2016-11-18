@@ -28,6 +28,7 @@ class CompTestCase(unittest.TestCase):
                 [DefaultVector, PETScVector],
                 ['implicit', 'explicit'],
                 ['matvec', 'dense', 'sparse-coo'],
+                ['array', 'sparse', 'aij'],
                 range(1, 3),
                 range(1, 3),
                 [(1,), (2,), (2, 1), (1, 2)],
@@ -35,16 +36,18 @@ class CompTestCase(unittest.TestCase):
             Component = key[0]
             Vector = key[1]
             connection_type = key[2]
-            derivatives = key[3]
-            num_var = key[4]
-            num_comp = key[5]
-            var_shape = key[6]
+            jacobian_type = key[3]
+            partial_type = key[4]
+            num_var = key[5]
+            num_comp = key[6]
+            var_shape = key[7]
 
-            print_str = ('%s %s %s %s %i-vars %i-comps %s' % (
+            print_str = ('%s %s %s %s %s %i-vars %i-comps %s' % (
                 Component.__name__,
                 Vector.__name__,
                 connection_type,
-                derivatives,
+                jacobian_type,
+                partial_type,
                 num_var, num_comp,
                 str(var_shape),
             ))
@@ -54,14 +57,15 @@ class CompTestCase(unittest.TestCase):
             group = TestGroupFlat(num_comp=num_comp, num_var=num_var,
                                   var_shape=var_shape,
                                   connection_type=connection_type,
-                                  derivatives=derivatives,
+                                  jacobian_type=jacobian_type,
+                                  partial_type=partial_type,
                                   Component=Component,
                                   )
             prob = Problem(group).setup(Vector)
 
-            if derivatives == 'dense':
+            if jacobian_type == 'dense':
                 prob.root.jacobian = GlobalJacobian(Matrix=DenseMatrix)
-            elif derivatives == 'sparse-coo':
+            elif jacobian_type == 'sparse-coo':
                 prob.root.jacobian = GlobalJacobian(Matrix=CooMatrix)
 
             prob.root.nl_solver = NewtonSolver(

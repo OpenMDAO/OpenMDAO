@@ -26,7 +26,10 @@ class DenseMatrix(Matrix):
                     icol1 = icol
                     icol2 = icol + shape[1]
                     metadata[key] = matrix[irow1:irow2, icol1:icol2]
-                    metadata[key][:, :] = jac
+                    if type(jac) is numpy.ndarray:
+                        metadata[key][:, :] = jac
+                    else:
+                        metadata[key][:, :] = jac.todense()
                 elif type(jac) is list:
                     irows = irow + jac[1]
                     icols = icol + jac[2]
