@@ -23,6 +23,7 @@ from openmdao.parallel_api import PETScVector
 class CompTestCase(unittest.TestCase):
 
     def test_comps(self):
+        counter = 0
         for key in itertools.product(
                 [TestImplCompNondLinear, TestExplCompNondLinear],
                 [DefaultVector, PETScVector],
@@ -33,6 +34,8 @@ class CompTestCase(unittest.TestCase):
                 range(1, 3),
                 [(1,), (2,), (2, 1), (1, 2)],
                 ):
+            counter += 1
+
             Component = key[0]
             Vector = key[1]
             connection_type = key[2]
@@ -120,6 +123,7 @@ class CompTestCase(unittest.TestCase):
             self.assertAlmostEqual(
                 prob.root._vectors['residual'][''].get_norm(), 0, delta=1e-2)
 
+        print('Ran %i cases' % counter)
 
 
 
