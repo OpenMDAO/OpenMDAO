@@ -74,10 +74,6 @@ class GeneralizedDictionary(object):
         required : boolean
             if True, this entry must be specified in _dict or _global_dict.
         """
-        # Check if an entry of the same name has already been declared
-        if name in self._declared_entries:
-            raise ValueError("Entry '{}' already exists".format(name))
-
         self._declared_entries[name] = {
             'typ': typ,
             'desc': desc,
