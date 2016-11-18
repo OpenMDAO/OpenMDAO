@@ -32,7 +32,7 @@ class DefaultJacobian(Jacobian):
                     if mode == 'rev':
                         ip += jac.T.dot(op)
 
-            elif type(jac) is list and len(jac) == 3:
+            elif type(jac) is list:
                 if op_name in d_residuals and ip_name in d_outputs:
                     op = d_residuals._views_flat[op_name]
                     ip = d_outputs._views_flat[ip_name]

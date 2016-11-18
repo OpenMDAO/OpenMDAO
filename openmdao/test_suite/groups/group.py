@@ -23,9 +23,12 @@ class TestGroupFlat(Group):
                               desc='how to connect variables')
         self.metadata.declare('Component',
                               desc='Component class to instantiate')
-        self.metadata.declare('derivatives', value='matvec',
+        self.metadata.declare('jacobian_type', value='matvec',
                               values=['matvec', 'dense', 'sparse-coo'],
                               desc='method of assembling derivatives')
+        self.metadata.declare('partial_type', value='array',
+                              values=['array', 'sparse', 'aij'],
+                              desc='type of partial derivatives')
 
         num_comp = self.metadata['num_comp']
         num_var = self.metadata['num_var']

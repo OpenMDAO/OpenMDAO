@@ -1,6 +1,7 @@
 """Define the test implicit component classes."""
 from __future__ import division, print_function
 import numpy
+import scipy.sparse
 
 from six import iteritems
 from six.moves import range
@@ -65,7 +66,7 @@ class TestImplCompNondLinear(ImplicitComponent):
 
     def apply_linear(self, inputs, outputs,
                      d_inputs, d_outputs, d_residuals, mode):
-        if self.metadata['derivatives'] == 'matvec':
+        if self.metadata['jacobian_type'] == 'matvec':
             if mode == 'fwd':
                 for re_name in d_residuals:
                     d_re = d_residuals._views_flat[re_name]
@@ -90,10 +91,29 @@ class TestImplCompNondLinear(ImplicitComponent):
                         d_ip += mtx.T.dot(d_re)
 
     def linearize(self, inputs, outputs, jacobian):
-        if self.metadata['derivatives'] != 'matvec':
+        def get_jac(key):
+            if self.metadata['partial_type'] == 'array':
+                jac = self.coeffs[key]
+            elif self.metadata['partial_type'] == 'sparse':
+                jac = scipy.sparse.csr_matrix(self.coeffs[key])
+            elif self.metadata['partial_type'] == 'aij':
+                shape = self.coeffs[key].shape
+                irows = numpy.zeros(shape, int)
+                icols = numpy.zeros(shape, int)
+                for indr in range(shape[0]):
+                    for indc in range(shape[1]):
+                        irows[indr, indc] = indr
+                        icols[indr, indc] = indc
+                data = self.coeffs[key].flatten()
+                rows = irows.flatten()
+                cols = icols.flatten()
+                jac = (data, rows, cols)
+            return jac
+
+        if self.metadata['jacobian_type'] != 'matvec':
             coeffs = self.coeffs
             for re_name in self.metadata['op_names']:
                 for op_name in self.metadata['op_names']:
-                    jacobian[re_name, op_name] = coeffs[re_name, op_name]
+                    jacobian[re_name, op_name] = get_jac((re_name, op_name))
                 for ip_name in self.metadata['ip_names']:
-                    jacobian[re_name, ip_name] = coeffs[re_name, ip_name]
+                    jacobian[re_name, ip_name] = get_jac((re_name, ip_name))

@@ -1,6 +1,7 @@
 """Define the test explicit component classes."""
 from __future__ import division, print_function
 import numpy
+import scipy.sparse
 
 from six import iteritems
 from six.moves import range
@@ -56,7 +57,7 @@ class TestExplCompNondLinear(ExplicitComponent):
 
     def compute_jacvec_product(self, inputs, outputs,
                                d_inputs, d_outputs, mode):
-        if self.metadata['derivatives'] == 'matvec':
+        if self.metadata['jacobian_type'] == 'matvec':
             if mode == 'fwd':
                 for op_name in d_outputs:
                     d_op = d_outputs._views_flat[op_name]
@@ -73,8 +74,27 @@ class TestExplCompNondLinear(ExplicitComponent):
                         d_ip += mtx.T.dot(d_op)
 
     def compute_jacobian(self, inputs, outputs, jacobian):
-        if self.metadata['derivatives'] != 'matvec':
+        def get_jac(key):
+            if self.metadata['partial_type'] == 'array':
+                jac = self.coeffs[key]
+            elif self.metadata['partial_type'] == 'sparse':
+                jac = scipy.sparse.csr_matrix(self.coeffs[key])
+            elif self.metadata['partial_type'] == 'aij':
+                shape = self.coeffs[key].shape
+                irows = numpy.zeros(shape, int)
+                icols = numpy.zeros(shape, int)
+                for indr in range(shape[0]):
+                    for indc in range(shape[1]):
+                        irows[indr, indc] = indr
+                        icols[indr, indc] = indc
+                data = self.coeffs[key].flatten()
+                rows = irows.flatten()
+                cols = icols.flatten()
+                jac = (data, rows, cols)
+            return jac
+
+        if self.metadata['jacobian_type'] != 'matvec':
             coeffs = self.coeffs
             for op_name in self.metadata['op_names']:
                 for ip_name in self.metadata['ip_names']:
-                    jacobian[op_name, ip_name] = coeffs[op_name, ip_name]
+                    jacobian[op_name, ip_name] = get_jac((op_name, ip_name))
