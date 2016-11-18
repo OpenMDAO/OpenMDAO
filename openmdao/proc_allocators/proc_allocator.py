@@ -27,7 +27,8 @@ class ProcAllocator(object):
             Contains options.
         """
         self.options = GeneralizedDictionary(kwargs)
-        self.options.declare('parallel', typ=bool, value=False)
+        self.options.declare('parallel', typ=bool, value=False,
+                             desc='whether to parallelize between subsystems')
 
     def __call__(self, nsub, comm, proc_range):
         """Perform the allocation if parallel.

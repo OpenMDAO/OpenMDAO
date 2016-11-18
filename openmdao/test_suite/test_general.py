@@ -37,7 +37,7 @@ class CompTestCase(unittest.TestCase):
             connection_type = key[2]
             derivatives = key[3]
             num_var = key[4]
-            num_sub = key[5]
+            num_comp = key[5]
             var_shape = key[6]
 
             print_str = ('%s %s %s %s %i-vars %i-comps %s' % (
@@ -45,13 +45,13 @@ class CompTestCase(unittest.TestCase):
                 Vector.__name__,
                 connection_type,
                 derivatives,
-                num_var, num_sub,
+                num_var, num_comp,
                 str(var_shape),
             ))
 
             # print(print_str)
 
-            group = TestGroupFlat(num_sub=num_sub, num_var=num_var,
+            group = TestGroupFlat(num_comp=num_comp, num_var=num_var,
                                   var_shape=var_shape,
                                   connection_type=connection_type,
                                   derivatives=derivatives,
@@ -82,9 +82,9 @@ class CompTestCase(unittest.TestCase):
             work = prob.root._vectors['output']['']._clone()
             work.set_const(1.0)
             if Component == TestImplCompNondLinear:
-                val = 1 - 0.01 + 0.01 * size * num_var * num_sub
+                val = 1 - 0.01 + 0.01 * size * num_var * num_comp
             if Component == TestExplCompNondLinear:
-                val = 1 - 0.01 * size * num_var * (num_sub - 1)
+                val = 1 - 0.01 * size * num_var * (num_comp - 1)
 
             # 1. fwd apply_linear test
             prob.root._vectors['output'][''].set_const(1.0)
