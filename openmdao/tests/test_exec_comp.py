@@ -204,18 +204,18 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._outputs['y'], 4.0, 0.00001)
 
-        # # any negative C1.x should give a -2.0 derivative for dy/dx
-        # C1._inputs['x'] = -1.0e-10
-        # J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
-        # assert_rel_error(self, J[('y','x')], -2.0, 0.00001)
-        #
-        # C1._inputs['x'] = 3.0
-        # J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
-        # assert_rel_error(self, J[('y','x')], 2.0, 0.00001)
-        #
-        # C1._inputs['x'] = 0.0
-        # J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
-        # assert_rel_error(self, J[('y','x')], 2.0, 0.00001)
+        # any negative C1.x should give a -2.0 derivative for dy/dx
+        C1._inputs['x'] = -1.0e-10
+        C1._linearize()
+        assert_rel_error(self, C1._jacobian[('y','x')], -2.0, 0.00001)
+
+        C1._inputs['x'] = 3.0
+        C1._linearize()
+        assert_rel_error(self, C1._jacobian[('y','x')], 2.0, 0.00001)
+
+        C1._inputs['x'] = 0.0
+        C1._linearize()
+        assert_rel_error(self, C1._jacobian[('y','x')], 2.0, 0.00001)
 
     def test_abs_array_complex_step(self):
         prob = Problem(root=Group())
