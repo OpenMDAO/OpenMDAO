@@ -9,14 +9,14 @@ from collections import OrderedDict
 import itertools
 import unittest
 
-from openmdao.api import Problem
 from openmdao.test_suite.components.implicit_components \
     import TestImplCompNondLinear
 from openmdao.test_suite.components.explicit_components \
     import TestExplCompNondLinear
 from openmdao.test_suite.groups.group import TestGroupFlat
+from openmdao.api import Problem
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
-from openmdao.api import DenseJacobian
+from openmdao.api import GlobalJacobian, DenseMatrix, CooMatrix
 from openmdao.parallel_api import PETScVector
 
 
@@ -27,7 +27,8 @@ class CompTestCase(unittest.TestCase):
                 [TestImplCompNondLinear, TestExplCompNondLinear],
                 [DefaultVector, PETScVector],
                 ['implicit', 'explicit'],
-                ['matvec', 'dense'],
+                ['matvec', 'dense', 'sparse-coo'],
+                ['array', 'sparse', 'aij'],
                 range(1, 3),
                 range(1, 3),
                 [(1,), (2,), (2, 1), (1, 2)],
@@ -35,29 +36,38 @@ class CompTestCase(unittest.TestCase):
             Component = key[0]
             Vector = key[1]
             connection_type = key[2]
-            derivatives = key[3]
-            num_var = key[4]
-            num_sub = key[5]
-            var_shape = key[6]
+            jacobian_type = key[3]
+            partial_type = key[4]
+            num_var = key[5]
+            num_comp = key[6]
+            var_shape = key[7]
 
-            print_str = ('%s %s %s %s %i vars %i subs %s' % (
+            print_str = ('%s %s %s %s %s %i-vars %i-comps %s' % (
                 Component.__name__,
                 Vector.__name__,
                 connection_type,
-                derivatives,
-                num_var, num_sub,
+                jacobian_type,
+                partial_type,
+                num_var, num_comp,
                 str(var_shape),
             ))
 
-            #print(print_str)
+            # print(print_str)
 
-            group = TestGroupFlat(num_sub=num_sub, num_var=num_var,
+            group = TestGroupFlat(num_comp=num_comp, num_var=num_var,
                                   var_shape=var_shape,
                                   connection_type=connection_type,
-                                  derivatives=derivatives,
+                                  jacobian_type=jacobian_type,
+                                  partial_type=partial_type,
                                   Component=Component,
                                   )
             prob = Problem(group).setup(Vector)
+
+            if jacobian_type == 'dense':
+                prob.root.jacobian = GlobalJacobian(Matrix=DenseMatrix)
+            elif jacobian_type == 'sparse-coo':
+                prob.root.jacobian = GlobalJacobian(Matrix=CooMatrix)
+
             prob.root.nl_solver = NewtonSolver(
                 subsolvers={'linear': ScipyIterativeSolver(
                     maxiter=100,
@@ -65,10 +75,8 @@ class CompTestCase(unittest.TestCase):
             )
             prob.root.ln_solver = ScipyIterativeSolver(
                 maxiter=200, atol=1e-10, rtol=1e-10)
-            if derivatives == 'dense':
-                prob.root.jacobian = DenseJacobian()
-            prob.root.setup_jacobians()
             prob.root.suppress_solver_output = True
+
             fail, rele, abse = prob.run()
             if fail:
                 self.fail('re %f ; ae %f ;  ' % (rele, abse) + print_str)
@@ -78,9 +86,9 @@ class CompTestCase(unittest.TestCase):
             work = prob.root._vectors['output']['']._clone()
             work.set_const(1.0)
             if Component == TestImplCompNondLinear:
-                val = 1 - 0.01 + 0.01 * size * num_var * num_sub
+                val = 1 - 0.01 + 0.01 * size * num_var * num_comp
             if Component == TestExplCompNondLinear:
-                val = 1 - 0.01 * size * num_var * (num_sub - 1)
+                val = 1 - 0.01 * size * num_var * (num_comp - 1)
 
             # 1. fwd apply_linear test
             prob.root._vectors['output'][''].set_const(1.0)

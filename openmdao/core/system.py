@@ -613,23 +613,18 @@ class System(object):
             self._jacobian = DefaultJacobian()
         else:
             self._jacobian = jacobian
-
-        if is_top and jacobian is not None:
-            self._jacobian._top_name = self.path_name
-            self._jacobian._assembler = self._sys_assembler
-            self._jacobian._system = self
+            if is_top:
+                self._jacobian._top_name = self.path_name
+                self._jacobian._system = self
+                self._jacobian._assembler = self._sys_assembler
 
         for subsys in self._subsystems_myproc:
             subsys._set_jacobian(jacobian, False)
 
-    def setup_jacobians(self):
-        """Recursively setup all jacobians."""
-        if self._jacobian is not None and \
-                self._jacobian._top_name == self.path_name:
+        if jacobian is not None and is_top:
+            self._linearize(True)
+            self._jacobian._system = self
             self._jacobian._initialize()
-        else:
-            for subsys in self._subsystems_myproc:
-                subsys.setup_jacobians()
 
     def _apply_nonlinear(self):
         """Compute residuals."""
@@ -685,8 +680,14 @@ class System(object):
         """
         pass
 
-    def _linearize(self):
-        """Compute jacobian / factorization."""
+    def _linearize(self, initial=False):
+        """Compute jacobian / factorization.
+
+        Args
+        ----
+        initial : boolean
+            whether this is the initial call to assemble the Jacobian.
+        """
         pass
 
     def get_system(self, name):

@@ -55,7 +55,7 @@ class Assembler(object):
         self._src_indices = None
         self._src_indices_range = None
 
-    def _setup_variables(self, sizes, variable_metadata, variable_indices):
+    def _setup_variables(self, nvars, variable_metadata, variable_indices):
         """Compute the variable sets and sizes.
 
         Sets the following attributes:
@@ -66,7 +66,7 @@ class Assembler(object):
 
         Args
         ----
-        sizes : {'input': int, 'output': int}
+        nvars : {'input': int, 'output': int}
             global number of variables.
         variable_metadata : {'input': list, 'output': list}
             list of metadata dictionaries of variables that exist on this proc.
@@ -77,7 +77,7 @@ class Assembler(object):
 
         for typ in ['input', 'output']:
             nvar = len(variable_metadata[typ])
-            nvar_all = sizes[typ]
+            nvar_all = nvars[typ]
 
             # Locally determine var_set for each var
             local_set_dict = {}

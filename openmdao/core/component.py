@@ -73,16 +73,19 @@ class Component(System):
         """See openmdao.core.component.Component._setup_vector."""
         super(Component, self)._setup_vector(vectors, vector_var_ids)
 
-        # Components load their initial input values into the _inputs vector
+        # Components must load their initial input and output values into the
+        # vectors.
         if vectors['input']._name is None:
             names = self._variable_myproc_names['input']
             inputs = self._inputs
-            # TODO: I don't think we really need to do this for
-            # connected inputs, but for unconnected ones, if we don't do this
-            # then the values set in add_input won't end up in
-            # the inputs vector when the component runs
             for i, meta in enumerate(self._variable_myproc_metadata['input']):
                 inputs[names[i]] = meta['value']
+
+        if vectors['output']._name is None:
+            names = self._variable_myproc_names['output']
+            outputs = self._outputs
+            for i, meta in enumerate(self._variable_myproc_metadata['output']):
+                outputs[names[i]] = meta['value']
 
 
 class ImplicitComponent(Component):
@@ -122,13 +125,14 @@ class ImplicitComponent(Component):
                 success = success and tmp
             return success
 
-    def _linearize(self):
+    def _linearize(self, initial=False):
         """See System._linearize."""
         self._jacobian._system = self
         self.linearize(self._inputs, self._outputs, self._jacobian)
 
-        self._jacobian._update()
         self._jacobian._precompute_iter()
+        if not initial and self._jacobian._top_name == self.path_name:
+            self._jacobian._update()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """Compute residuals given inputs and outputs.
@@ -260,11 +264,11 @@ class ExplicitComponent(Component):
             d_outputs = self._vectors['output'][vec_name]
             d_residuals = self._vectors['residual'][vec_name]
             if mode == 'fwd':
-                d_outputs.setvec(d_residuals)
+                d_outputs.set_vec(d_residuals)
             elif mode == 'rev':
-                d_residuals.setvec(d_outputs)
+                d_residuals.set_vec(d_outputs)
 
-    def _linearize(self):
+    def _linearize(self, initial=False):
         """See System._linearize."""
         self._jacobian._system = self
         self.compute_jacobian(self._inputs, self._outputs, self._jacobian)
@@ -280,8 +284,9 @@ class ExplicitComponent(Component):
                 if (op_name, ip_name) in self._jacobian:
                     self._jacobian._negate((op_name, ip_name))
 
-        self._jacobian._update()
         self._jacobian._precompute_iter()
+        if not initial and self._jacobian._top_name == self.path_name:
+            self._jacobian._update()
 
     def compute(self, inputs, outputs):
         """Compute outputs given inputs.

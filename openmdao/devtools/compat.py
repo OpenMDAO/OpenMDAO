@@ -11,13 +11,21 @@ def convert_file():
         '.params': '._inputs',
         '.unknowns': '._outputs',
         '.resids': '._residuals',
+        '.add_option(': '.declare(',
+        ' Newton(': ' NewtonSolver(',
         'openmdao.test.util': 'openmdao.devtools.testutil',
         'def solve_nonlinear(self, params, unknowns, resids)':
-        'def compute(params, unknowns)',
+        'def compute(self, params, unknowns)',
     }
 
     with open(sys.argv[1], 'r') as f:
         contents = f.read()
+
+        if 'add_state' in contents:
+            pass
+        else:
+            cvt_map['Component'] = 'ExplicitComponent'
+
         for old, new in cvt_map.items():
             contents = contents.replace(old, new)
 

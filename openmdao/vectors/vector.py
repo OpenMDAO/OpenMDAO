@@ -1,5 +1,5 @@
 """Define the base Vector and Transfer classes."""
-from __future__ import division
+from __future__ import division, print_function
 import numpy
 
 from six.moves import range
@@ -125,16 +125,14 @@ class Vector(object):
         ndarray
             Array combining the data of all the varsets.
         """
-        inds = self._system._variable_myproc_indices[self._typ]
-        sizes = self._assembler._variable_sizes_all[self._typ][self._iproc,
-                                                               inds]
-
-        size = numpy.sum(sizes)
         if array is None:
-            array = numpy.zeros(size)
+            inds = self._system._variable_myproc_indices[self._typ]
+            sizes = self._assembler._variable_sizes_all[self._typ][self._iproc,
+                                                                   inds]
+            array = numpy.zeros(numpy.sum(sizes))
 
-        for ind in range(len(self._data)):
-            array[self._indices[ind]] = self._data[ind]
+        for ind, data in enumerate(self._data):
+            array[self._indices[ind]] = data
 
         return array
 
@@ -146,8 +144,8 @@ class Vector(object):
         array : ndarray
             Array to set to the data for all the varsets.
         """
-        for ind in range(len(self._data)):
-            self._data[ind][:] = array[self._indices[ind]]
+        for ind, data in enumerate(self._data):
+            data[:] = array[self._indices[ind]]
 
     def iadd_data(self, array):
         """In-place add the incoming combined array.
@@ -157,8 +155,8 @@ class Vector(object):
         array : ndarray
             Array to set to the data for all the varsets.
         """
-        for ind in range(len(self._data)):
-            self._data[ind][:] += array[self._indices[ind]]
+        for ind, data in enumerate(self._data):
+            data[:] += array[self._indices[ind]]
 
     def __contains__(self, key):
         """Check if the variable is involved in the current mat-vec product.
