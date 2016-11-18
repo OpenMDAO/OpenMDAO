@@ -142,9 +142,9 @@ class Problem(object):
         root._setup_connections()
 
         # Assembler setup: variable metadata and indices
-        sizes = {typ: len(root._variable_allprocs_names[typ])
+        nvars = {typ: len(root._variable_allprocs_names[typ])
                  for typ in ['input', 'output']}
-        assembler._setup_variables(sizes, root._variable_myproc_metadata,
+        assembler._setup_variables(nvars, root._variable_myproc_metadata,
                                    root._variable_myproc_indices)
 
         # Assembler setup: variable connections

@@ -51,7 +51,7 @@ setup(name='openmdao',
       entry_points="""
       [console_scripts]
       wingproj=openmdao.devtools.wingproj:run_wing
-      1to2=openmdao.devtools.1to2:convert_file
+      1to2=openmdao.devtools.compat:convert_file
       webview=openmdao.devtools.webview:webview_argv
       """
       # view_profile=openmdao.util.profile:prof_view
