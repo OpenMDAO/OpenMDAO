@@ -3,7 +3,7 @@ import math
 
 import numpy as np
 
-from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+from openmdao.api import IndepVarComp, Group, Problem, ExecComp, GlobalJacobian
 from openmdao.devtools.testutil import assert_rel_error
 
 class TestExecComp(unittest.TestCase):
@@ -173,9 +173,9 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._outputs['y'], 5.0, 0.00001)
 
-        # J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
-        #
-        # assert_rel_error(self, J[('y','x')], 2.0, 0.00001)
+        C1._linearize(True)
+
+        assert_rel_error(self, C1._jacobian[('y','x')], 2.0, 0.00001)
 
     def test_complex_step2(self):
         raise unittest.SkipTest("problem missing calc_gradient")
