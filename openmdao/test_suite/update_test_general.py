@@ -153,6 +153,9 @@ def tst_generator():
         counter += 1
 
 def generate_test():
+    """Replace test_general.py with a new version based on the tests specified
+    in tst_generator.
+    """
     mydir = os.path.dirname(os.path.abspath(__file__))
     fname = os.path.join(mydir, 'test_general.py')
     with open(fname, 'w') as f:
