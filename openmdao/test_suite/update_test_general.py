@@ -136,7 +136,7 @@ if __name__ == '__main__':
 
 def tst_generator():
     """Specify all of your tests here."""
-    counter = 0
+
     for key in itertools.product(
             [TestImplCompNondLinear, TestExplCompNondLinear],
             [DefaultVector, PETScVector],
@@ -147,10 +147,28 @@ def tst_generator():
             range(1, 3),
             [(1,), (2,), (2, 1), (1, 2)],
             ):
-        yield tst_template.format(counter, key[0].__name__, key[1].__name__,
-                                    key[2], key[3], key[4], key[5],
-                                    key[6], key[7])
-        counter += 1
+
+        (comp_class, vec_class, connection_type, jacobian_type, partial_type,
+            num_var, num_comp, var_shape) = key
+
+        if len(var_shape) == 1:
+            shape = "%i" % var_shape[0]
+        else:
+            shape = "%ix%i" % var_shape
+
+        print_str = ('%s_%s_%s_%s_%s_v%i_c%i_s%s' % (
+            comp_class.__name__,
+            vec_class.__name__,
+            connection_type,
+            jacobian_type.replace('-', '_'),
+            partial_type,
+            num_var, num_comp,
+            shape,
+        ))
+
+        yield tst_template.format(print_str, key[0].__name__, key[1].__name__,
+                                  key[2], key[3], key[4], key[5],
+                                  key[6], key[7])
 
 def generate_test():
     """Replace test_general.py with a new version based on the tests specified
