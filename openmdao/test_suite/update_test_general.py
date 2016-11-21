@@ -29,18 +29,6 @@ class CompTestCaseBase(unittest.TestCase):
     def run_test(self, Component, Vector, connection_type, jacobian_type,
                  partial_type, num_var, num_comp, var_shape):
 
-        print_str = ('%s %s %s %s %s %i-vars %i-comps %s' % (
-            Component.__name__,
-            Vector.__name__,
-            connection_type,
-            jacobian_type,
-            partial_type,
-            num_var, num_comp,
-            str(var_shape),
-        ))
-
-        # print(print_str)
-
         group = TestGroupFlat(num_comp=num_comp, num_var=num_var,
                               var_shape=var_shape,
                               connection_type=connection_type,
@@ -66,7 +54,7 @@ class CompTestCaseBase(unittest.TestCase):
 
         fail, rele, abse = prob.run()
         if fail:
-            self.fail('re %f ; ae %f ;  ' % (rele, abse) + print_str)
+            self.fail('Problem run failed: re %f ; ae %f' % (rele, abse))
 
         # Setup for the 4 tests that follow
         size = numpy.prod(var_shape)
