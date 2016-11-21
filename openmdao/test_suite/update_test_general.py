@@ -144,7 +144,7 @@ def tst_generator():
         else:
             shape = "%ix%i" % var_shape
 
-        print_str = ('%s_%s_%s_%s_%s_v%i_c%i_s%s' % (
+        test_name = ('%s_%s_%s_%s_%s_v%i_c%i_s%s' % (
             comp_class.__name__,
             vec_class.__name__,
             connection_type,
@@ -154,7 +154,7 @@ def tst_generator():
             shape,
         ))
 
-        yield tst_template.format(print_str, key[0].__name__, key[1].__name__,
+        yield tst_template.format(test_name, key[0].__name__, key[1].__name__,
                                   key[2], key[3], key[4], key[5],
                                   key[6], key[7])
 
