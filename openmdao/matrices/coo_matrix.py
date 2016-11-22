@@ -7,7 +7,7 @@ from openmdao.matrices.matrix import Matrix
 
 
 class CooMatrix(Matrix):
-    """Sparse matrix in Coordinate list formate."""
+    """Sparse matrix in Coordinate list format."""
 
     def _build(self, num_rows, num_cols):
         """See Matrix."""

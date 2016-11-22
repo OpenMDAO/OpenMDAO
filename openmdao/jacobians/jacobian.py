@@ -110,7 +110,7 @@ class Jacobian(object):
         dct, op_ind, ip_ind, op_size, ip_size = self._process_key(key)
         jac = dct[op_ind, ip_ind]
 
-        if type(jac) == numpy.ndarray:
+        if isinstance(jac, numpy.ndarray):
             dct[op_ind, ip_ind] = -jac
         elif scipy.sparse.issparse(jac):
             dct[op_ind, ip_ind].data *= -1.0  # DOK not supported
@@ -184,9 +184,9 @@ class Jacobian(object):
 
         if numpy.isscalar(jac):
             jac = numpy.array([jac]).reshape((op_size, ip_size))
-        elif type(jac) is numpy.ndarray:
+        elif isinstance(jac, numpy.ndarray):
             jac = jac.reshape((op_size, ip_size))
-        elif type(jac) is tuple:
+        elif isinstance(jac, tuple):
             jac = list(jac)
 
         dct[op_ind, ip_ind] = jac

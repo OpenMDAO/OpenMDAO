@@ -51,8 +51,7 @@ class GlobalJacobian(Jacobian):
             re_var_all = indices['output'][re_ind]
             re_offset = self._get_var_range(re_var_all, 'output')[0]
 
-            for op_ind in range(len(indices['output'])):
-                op_var_all = indices['output'][op_ind]
+            for op_var_all in indices['output']:
                 op_offset = self._get_var_range(op_var_all, 'output')[0]
 
                 key = (re_var_all, op_var_all)
@@ -63,8 +62,7 @@ class GlobalJacobian(Jacobian):
                         key, jac, re_offset, op_offset)
 
             # TODO: make this use the input indices
-            for ip_ind in range(len(indices['input'])):
-                ip_var_all = indices['input'][ip_ind]
+            for ip_var_all in indices['input']:
                 ip_offset = self._get_var_range(ip_var_all, 'input')[0]
 
                 key = (re_var_all, ip_var_all)
@@ -100,8 +98,7 @@ class GlobalJacobian(Jacobian):
             re_var_all = indices['output'][re_ind]
             re_offset = self._get_var_range(re_var_all, 'output')[0]
 
-            for op_ind in range(len(indices['output'])):
-                op_var_all = indices['output'][op_ind]
+            for op_var_all in indices['output']:
                 op_offset = self._get_var_range(op_var_all, 'output')[0]
 
                 key = (re_var_all, op_var_all)
@@ -111,8 +108,7 @@ class GlobalJacobian(Jacobian):
                     self._int_mtx._op_update_submat(key, jac)
 
             # TODO: make this use the input indices
-            for ip_ind in range(len(indices['input'])):
-                ip_var_all = indices['input'][ip_ind]
+            for ip_var_all in indices['input']:
                 ip_offset = self._get_var_range(ip_var_all, 'input')[0]
 
                 key = (re_var_all, ip_var_all)
