@@ -6,13 +6,17 @@ from math import isnan
 import numpy as np
 
 from openmdao.api import Group, Problem, ExplicitComponent, \
-                         ExecComp, IndepVarComp, NewtonSolver
+    ExecComp, IndepVarComp, NewtonSolver
 
-try:
-    from openmdao.solvers.petsc_ksp import PetscKSP
-    from openmdao.core.petsc_impl import PetscImpl as impl
-except ImportError:
-    impl = None
+from openmdao.solvers.ln_petsc_ksp import PetscKSP
+
+from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+
+# try:
+#     from openmdao.solvers.petsc_ksp import PetscKSP
+#     from openmdao.core.petsc_impl import PetscImpl as impl
+# except ImportError:
+#     impl = None
 
 # from openmdao.solvers import LinearSolver
 
@@ -56,7 +60,7 @@ def assert_rel_error(test_case, actual, desired, tolerance):
         if abs(error) > tolerance:
             test_case.fail('actual %s, desired %s, rel error %s, tolerance %s'
                            % (actual, desired, error, tolerance))
-    else: #array values
+    else:  # array values
         if not np.all(np.isnan(actual)==np.isnan(desired)):
             test_case.fail('actual and desired values have non-matching nan values')
 
@@ -72,7 +76,7 @@ def assert_rel_error(test_case, actual, desired, tolerance):
 
 
 class SimpleComp(ExplicitComponent):
-    """ The simplest component you can imagine. """
+    """A simple multiplier component."""
 
     def __init__(self, multiplier=2.0):
         super(SimpleComp, self).__init__()
@@ -80,19 +84,23 @@ class SimpleComp(ExplicitComponent):
         self.multiplier = multiplier
 
         # Params
-        self.add_param('x', 3.0)
+        self.add_input('x', 3.0)
 
         # Unknowns
         self.add_output('y', 5.5)
 
-    def solve_nonlinear(self, params, unknowns, resids):
-        """ Doesn't do much. """
+    def compute(self, params, unknowns, resids):
+        """Multiplies the input by the multiplier"""
         unknowns['y'] = self.multiplier*params['x']
 
 
 class SimpleCompDerivMatVec(SimpleComp):
-    """ The simplest component you can imagine, this time with derivatives
-    defined using apply_linear. """
+    """A simple multiplier component with derivatives defined."""
+
+    def compute_jacobian(self, params, unknowns, J):
+        """Jacobian"""
+
+        J['y1','x'] = self.multiplier
 
     def apply_linear(self, params, unknowns, dparams, dunknowns, dresids,
                      mode):
@@ -107,16 +115,25 @@ class SimpleCompDerivMatVec(SimpleComp):
 
 class TestPetscKSPSerial(unittest.TestCase):
 
-    def setUp(self):
-        if impl is None:
-            raise unittest.SkipTest("Can't run this test (even in serial) without mpi4py and petsc4py")
+    def test_sellar_grouped(self):
+
+        prob = Problem()
+        prob.root = SellarDerivativesGrouped()
+        mda = [s for s in prob.root._subsystems_allprocs if s.name == 'mda'][0]
+        mda.nl_solver = PetscKSP()
+
+        prob.setup(check=False)
+        prob.run()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_simple(self):
         group = Group()
-        group.add('x_param', IndepVarComp('x', 1.0), promotes=['*'])
-        group.add('mycomp', SimpleCompDerivMatVec(), promotes=['x', 'y'])
+        group.add_subsystem('x_param', IndepVarComp('x', 1.0), promotes=['x'])
+        group.add_subsystem('mycomp', SimpleCompDerivMatVec(), promotes=['x', 'y'])
 
-        prob = Problem(impl=impl)
+        prob = Problem()
         prob.root = group
         prob.root.ln_solver = PetscKSP()
         prob.setup(check=False)
@@ -133,7 +150,7 @@ class TestPetscKSPSerial(unittest.TestCase):
         group.add('x_param', IndepVarComp('x', 1.0), promotes=['*'])
         group.add('mycomp', SimpleCompDerivMatVec(), promotes=['x', 'y'])
 
-        prob = Problem(impl=impl)
+        prob = Problem()
         prob.root = group
         prob.root.ln_solver = PetscKSP()
         prob.root.ln_solver.options['ksp_type'] = 'gmres'
@@ -150,7 +167,7 @@ class TestPetscKSPSerial(unittest.TestCase):
         group = Group()
         group.add('mycomp', SimpleCompDerivMatVec(), promotes=['x', 'y'])
 
-        prob = Problem(impl=impl)
+        prob = Problem()
         prob.root = Group()
         prob.root.add('x_param', IndepVarComp('x', 1.0), promotes=['*'])
         prob.root.add('sub', group, promotes=['*'])
@@ -172,7 +189,7 @@ class TestPetscKSPSerial(unittest.TestCase):
         group = Group()
         group.add('mycomp', SimpleCompDerivMatVec(), promotes=['x', 'y'])
 
-        prob = Problem(impl=impl)
+        prob = Problem()
         prob.root = Group()
         prob.root.add('sub', group, promotes=['*'])
         prob.root.sub.add('x_param', IndepVarComp('x', 1.0), promotes=['*'])
@@ -198,7 +215,7 @@ class TestPetscKSPSerial(unittest.TestCase):
     #     group.add('x_param', IndepVarComp('x', np.ones((2, 2))), promotes=['*'])
     #     group.add('mycomp', ArrayComp2D(), promotes=['x', 'y'])
 
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = group
     #     prob.root.ln_solver = PetscKSP()
     #     prob.setup(check=False)
@@ -221,7 +238,7 @@ class TestPetscKSPSerial(unittest.TestCase):
     #     group.add('x_param2', IndepVarComp('x2', np.ones((2))), promotes=['*'])
     #     group.add('mycomp', DoubleArrayComp(), promotes=['*'])
 
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = group
     #     prob.root.ln_solver = PetscKSP()
     #     prob.setup(check=False)
@@ -250,7 +267,7 @@ class TestPetscKSPSerial(unittest.TestCase):
         group.add('x_param', IndepVarComp('x', 1.0), promotes=['*'])
         sub.add('mycomp', SimpleCompDerivMatVec(), promotes=['x', 'y'])
 
-        prob = Problem(impl=impl)
+        prob = Problem()
         prob.root = group
         prob.root.ln_solver = PetscKSP()
         prob.setup(check=False)
@@ -267,7 +284,7 @@ class TestPetscKSPSerial(unittest.TestCase):
         group.add('x_param', IndepVarComp('x', 1.0), promotes=['*'])
         group.add('mycomp', ExecComp(['y=2.0*x']), promotes=['x', 'y'])
 
-        prob = Problem(impl=impl)
+        prob = Problem()
         prob.root = group
         prob.root.ln_solver = PetscKSP()
         prob.setup(check=False)
@@ -280,7 +297,7 @@ class TestPetscKSPSerial(unittest.TestCase):
         assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
 
     # def test_fan_out(self):
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = FanOut()
     #     prob.root.ln_solver = PetscKSP()
     #     prob.setup(check=False)
@@ -298,7 +315,7 @@ class TestPetscKSPSerial(unittest.TestCase):
     #     assert_rel_error(self, J['comp3.y']['p.x'][0][0], 15.0, 1e-6)
 
     # def test_fan_out_grouped(self):
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = FanOutGrouped()
     #     prob.root.ln_solver = PetscKSP()
     #     prob.setup(check=False)
@@ -316,7 +333,7 @@ class TestPetscKSPSerial(unittest.TestCase):
     #     assert_rel_error(self, J['sub.comp3.y']['p.x'][0][0], 15.0, 1e-6)
 
     # def test_fan_in(self):
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = FanIn()
     #     prob.root.ln_solver = PetscKSP()
     #     prob.setup(check=False)
@@ -334,7 +351,7 @@ class TestPetscKSPSerial(unittest.TestCase):
     #     assert_rel_error(self, J['comp3.y']['p2.x2'][0][0], 35.0, 1e-6)
 
     # def test_fan_in_grouped(self):
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = FanInGrouped()
     #     prob.root.ln_solver = PetscKSP()
 
@@ -353,7 +370,7 @@ class TestPetscKSPSerial(unittest.TestCase):
     #     assert_rel_error(self, J['comp3.y']['p2.x2'][0][0], 35.0, 1e-6)
 
     # def test_converge_diverge(self):
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = ConvergeDiverge()
     #     prob.root.ln_solver = PetscKSP()
     #     prob.setup(check=False)
@@ -377,7 +394,7 @@ class TestPetscKSPSerial(unittest.TestCase):
     #     assert_rel_error(self, J['comp7.y1']['p.x'][0][0], -40.75, 1e-6)
 
     # def test_analysis_error(self):
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = ConvergeDiverge()
     #     prob.root.ln_solver = PetscKSP()
     #     prob.root.ln_solver.options['maxiter'] = 2
@@ -403,7 +420,7 @@ class TestPetscKSPSerial(unittest.TestCase):
 
     # def test_converge_diverge_groups(self):
 
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = ConvergeDivergeGroups()
     #     prob.root.ln_solver = PetscKSP()
     #     prob.setup(check=False)
@@ -426,7 +443,7 @@ class TestPetscKSPSerial(unittest.TestCase):
 
     # def test_single_diamond(self):
 
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = SingleDiamond()
     #     prob.root.ln_solver = PetscKSP()
     #     prob.setup(check=False)
@@ -445,7 +462,7 @@ class TestPetscKSPSerial(unittest.TestCase):
 
     # def test_single_diamond_grouped(self):
 
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = SingleDiamondGrouped()
     #     prob.root.ln_solver = PetscKSP()
     #     prob.setup(check=False)
@@ -468,7 +485,7 @@ class TestPetscKSPSerial(unittest.TestCase):
 
     # def test_sellar_derivs_grouped(self):
 
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = SellarDerivativesGrouped()
     #     prob.root.ln_solver = PetscKSP()
 
@@ -517,7 +534,7 @@ class TestPetscKSPSerial(unittest.TestCase):
         # This test is just to make sure that values in the dp vector from
         # higher scopes aren't sitting there converting themselves during sub
         # iterations.
-        prob = Problem(impl=impl)
+        prob = Problem()
         root = prob.root = Group()
         root.add('p1', IndepVarComp('xx', 3.0))
         root.add('c1', ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2': 'km'}))
@@ -558,14 +575,14 @@ class TestPetscKSPSerial(unittest.TestCase):
         self.assertTrue(not np.isnan(prob['sub.cc2.y']))
 
 
-class TestPetscKSPPreconditioner(unittest.TestCase):
+# class TestPetscKSPPreconditioner(unittest.TestCase):
 
-    def setUp(self):
-        if impl is None:
-            raise unittest.SkipTest("Can't run this test (even in serial) without mpi4py and petsc4py")
+    # def setUp(self):
+    #     if impl is None:
+    #         raise unittest.SkipTest("Can't run this test (even in serial) without mpi4py and petsc4py")
 
     # def test_sellar_derivs_grouped_precon(self):
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = SellarDerivativesGrouped()
 
     #     prob.root.mda.nl_solver.options['atol'] = 1e-12
@@ -604,7 +621,7 @@ class TestPetscKSPPreconditioner(unittest.TestCase):
     #             assert_rel_error(self, J[key1][key2], val2, .00001)
 
     # def test_converge_diverge_groups(self):
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = ConvergeDivergeGroups()
     #     prob.root.ln_solver = PetscKSP()
     #     prob.root.ln_solver.preconditioner = LinearGaussSeidel()
@@ -631,7 +648,7 @@ class TestPetscKSPPreconditioner(unittest.TestCase):
     #     assert_rel_error(self, J['comp7.y1']['p.x'][0][0], -40.75, 1e-6)
 
     # def test_fan_out_all_grouped(self):
-    #     prob = Problem(impl=impl)
+    #     prob = Problem()
     #     prob.root = FanOutAllGrouped()
     #     prob.root.ln_solver = PetscKSP()
 
