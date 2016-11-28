@@ -8,11 +8,12 @@ These tutorials serve to give an initial introduction to the OpenMDAO framework.
 .. toctree::
    :maxdepth: 1
 
-   tutorials/paraboloid
-   tutorials/sellar
+   tutorials/first_analysis
+   tutorials/first_optimization
+   tutorials/first_mdao
 
 ============================
-`Tutorials`_
+`Features`_
 ============================
 .. _OpenMDAO Features: features/index.html
 
