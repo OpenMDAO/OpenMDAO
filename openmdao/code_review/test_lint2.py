@@ -17,11 +17,6 @@ directories = [
 ]
 
 
-
-
-
-
-
 class LintTestCase(unittest.TestCase):
 
     def check_method(self, dir_name, file_name,

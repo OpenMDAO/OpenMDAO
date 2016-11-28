@@ -587,6 +587,198 @@ class CompTestCase(CompTestCaseBase):
         self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-coo', 'aij', 2, 2, (1, 2))
 
 
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (1, 2))
+
+
     def test_TestImplCompNondLinear_DefaultVector_explicit_matvec_array_v1_c1_s1(self):
         self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'matvec', 'array', 1, 1, (1,))
 
@@ -1161,6 +1353,198 @@ class CompTestCase(CompTestCaseBase):
 
     def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_coo_aij_v2_c2_s1x2(self):
         self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-coo', 'aij', 2, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (1, 2))
 
 
     def test_TestImplCompNondLinear_PETScVector_implicit_matvec_array_v1_c1_s1(self):
@@ -1739,6 +2123,198 @@ class CompTestCase(CompTestCaseBase):
         self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-coo', 'aij', 2, 2, (1, 2))
 
 
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (1, 2))
+
+
     def test_TestImplCompNondLinear_PETScVector_explicit_matvec_array_v1_c1_s1(self):
         self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'matvec', 'array', 1, 1, (1,))
 
@@ -2313,6 +2889,198 @@ class CompTestCase(CompTestCaseBase):
 
     def test_TestImplCompNondLinear_PETScVector_explicit_sparse_coo_aij_v2_c2_s1x2(self):
         self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-coo', 'aij', 2, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c1_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c1_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c1_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c1_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (1, 2))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c2_s1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (1,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c2_s2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (2,))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c2_s2x1(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (2, 1))
+
+
+    def test_TestImplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c2_s1x2(self):
+        self.run_test(TestImplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (1, 2))
 
 
     def test_TestExplCompNondLinear_DefaultVector_implicit_matvec_array_v1_c1_s1(self):
@@ -2891,6 +3659,198 @@ class CompTestCase(CompTestCaseBase):
         self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-coo', 'aij', 2, 2, (1, 2))
 
 
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v1_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 1, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_array_v2_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'array', 2, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v1_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_sparse_v2_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v1_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_implicit_sparse_csr_aij_v2_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (1, 2))
+
+
     def test_TestExplCompNondLinear_DefaultVector_explicit_matvec_array_v1_c1_s1(self):
         self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'matvec', 'array', 1, 1, (1,))
 
@@ -3465,6 +4425,198 @@ class CompTestCase(CompTestCaseBase):
 
     def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_coo_aij_v2_c2_s1x2(self):
         self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-coo', 'aij', 2, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v1_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 1, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_array_v2_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'array', 2, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v1_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_sparse_v2_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v1_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_DefaultVector_explicit_sparse_csr_aij_v2_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, DefaultVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (1, 2))
 
 
     def test_TestExplCompNondLinear_PETScVector_implicit_matvec_array_v1_c1_s1(self):
@@ -4043,6 +5195,198 @@ class CompTestCase(CompTestCaseBase):
         self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-coo', 'aij', 2, 2, (1, 2))
 
 
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v1_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 1, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_array_v2_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'array', 2, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v1_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 1, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_sparse_v2_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'sparse', 2, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v1_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 1, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_implicit_sparse_csr_aij_v2_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'implicit', 'sparse-csr', 'aij', 2, 2, (1, 2))
+
+
     def test_TestExplCompNondLinear_PETScVector_explicit_matvec_array_v1_c1_s1(self):
         self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'matvec', 'array', 1, 1, (1,))
 
@@ -4617,6 +5961,198 @@ class CompTestCase(CompTestCaseBase):
 
     def test_TestExplCompNondLinear_PETScVector_explicit_sparse_coo_aij_v2_c2_s1x2(self):
         self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-coo', 'aij', 2, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v1_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 1, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_array_v2_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'array', 2, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v1_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 1, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_sparse_v2_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'sparse', 2, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v1_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 1, 2, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c1_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c1_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c1_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c1_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 1, (1, 2))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c2_s1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (1,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c2_s2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (2,))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c2_s2x1(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (2, 1))
+
+
+    def test_TestExplCompNondLinear_PETScVector_explicit_sparse_csr_aij_v2_c2_s1x2(self):
+        self.run_test(TestExplCompNondLinear, PETScVector, 'explicit', 'sparse-csr', 'aij', 2, 2, (1, 2))
 
 
 if __name__ == '__main__':

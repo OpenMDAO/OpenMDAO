@@ -17,3 +17,4 @@ from openmdao.devtools.viewconns import view_connections
 from openmdao.jacobians.global_jacobian import GlobalJacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import CooMatrix
+from openmdao.matrices.csr_matrix import CsrMatrix

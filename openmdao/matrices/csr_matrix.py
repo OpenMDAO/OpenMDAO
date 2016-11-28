@@ -1,4 +1,4 @@
-"""Define the CooMatrix class."""
+"""Define the CsrMatrix class."""
 from __future__ import division, print_function
 import numpy
 from numpy import ndarray
@@ -8,11 +8,19 @@ from six.moves import range
 from openmdao.matrices.matrix import Matrix
 
 
-class CooMatrix(Matrix):
-    """Sparse matrix in Coordinate list format."""
+class CsrMatrix(Matrix):
+    """Sparse matrix in Compressed Row Storage format."""
 
     def _build(self, num_rows, num_cols):
-        """See Matrix."""
+        """Allocate the matrix.
+
+        Args
+        ----
+        num_rows : int
+            number of rows in the matrix.
+        num_cols : int
+            number of cols in the matrix.
+        """
         counter = 0
 
         submat_meta_iter = ((self._op_submats, self._op_metadata),
@@ -20,7 +28,7 @@ class CooMatrix(Matrix):
 
         for submats, metadata in submat_meta_iter:
             for key in submats:
-                jac, irow, icol = submats[key]
+                jac = submats[key][0]
 
                 ind1 = counter
                 if isinstance(jac, ndarray):
@@ -62,21 +70,60 @@ class CooMatrix(Matrix):
                     rows[ind1:ind2] = irow + jac[1]
                     cols[ind1:ind2] = icol + jac[2]
 
+        # get a set of indices that sorts into row major order
+        idxs = numpy.lexsort((cols, rows))
+
+        data = data[idxs]
+        rows = rows[idxs]
+        cols = cols[idxs]
+
+        # data array for the CSR should be the same as for the COO since
+        # it was already in sorted order.
         self._matrix = coo_matrix((data, (rows, cols)),
-                                  shape=(num_rows, num_cols))
+                                  shape=(num_rows, num_cols)).tocsr()
+
+        # now sort these back into ascending order (our original stacked order)
+        # so we can then just extract the individual index arrays that will
+        # map each block into the combined data array.
+        self._idxs = numpy.argsort(idxs)
 
     def _update_submat(self, submats, metadata, key, jac):
-        """See Matrix."""
+        """Update the values of a sub-jacobian.
+
+        Args
+        ----
+        submats : dict
+            dictionary of sub-jacobian data keyed by (op_ind, ip_ind).
+        metadata : dict
+            implementation-specific data for the sub-jacobians.
+        key : (int, int)
+            the global output and input variable indices.
+        jac : ndarray or scipy.sparse or tuple
+            the sub-jacobian, the same format with which it was declared.
+        """
         ind1, ind2 = metadata[key]
         if isinstance(jac, ndarray):
-            self._matrix.data[ind1:ind2] = jac.flat
+            self._matrix.data[self._idxs[ind1:ind2]] = jac.flat
         elif isinstance(jac, (coo_matrix, csr_matrix)):
-            self._matrix.data[ind1:ind2] = jac.data
+            self._matrix.data[self._idxs[ind1:ind2]] = jac.data
         elif isinstance(jac, list):
-            self._matrix.data[ind1:ind2] = jac[0]
+            self._matrix.data[self._idxs[ind1:ind2]] = jac[0]
 
     def _prod(self, in_vec, mode):
-        """See Matrix."""
+        """Perform a matrix vector product.
+
+        Args
+        ----
+        in_vec : ndarray[:]
+            incoming vector to multiply.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        ndarray[:]
+            vector resulting from the product.
+        """
         if mode == 'fwd':
             return self._matrix.dot(in_vec)
         elif mode == 'rev':
