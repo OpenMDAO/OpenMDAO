@@ -33,7 +33,7 @@ class GlobalJacobian(Jacobian):
         ivar_all0 = self._system._variable_allprocs_range['output'][0]
 
         ind1 = numpy.sum(sizes_all['output'][iproc, ivar_all0:ivar_all])
-        ind2 = ind1 + sizes_all['output'][iproc, ivar_all]
+        ind2 = numpy.sum(sizes_all['output'][iproc, ivar_all0:ivar_all + 1])
 
         return ind1, ind2
 
