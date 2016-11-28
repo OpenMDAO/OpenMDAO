@@ -15,9 +15,9 @@ class Assembler(object):
     _comm : MPI.comm or FakeComm
         MPI communicator object.
 
-    _variable_sizes_all : {'input': list of ndarray[nproc, nvar],
-                           'output': list of ndarray[nproc, nvar]}
-        list of local variable size arrays, num procs x num vars.
+    _variable_sizes_all : {'input': ndarray[nproc, nvar],
+                           'output': ndarray[nproc, nvar]}
+        local variable size arrays, num procs x num vars.
     _variable_sizes : {'input': list of ndarray[nproc, nvar],
                        'output': list of ndarray[nproc, nvar]}
         list of local variable size arrays, num procs x num vars by var_set.
@@ -46,7 +46,7 @@ class Assembler(object):
         """
         self._comm = comm
 
-        self._variable_sizes_all = {'input': [], 'output': []}
+        self._variable_sizes_all = {'input': None, 'output': None}
         self._variable_sizes = {'input': [], 'output': []}
         self._variable_set_IDs = {'input': {}, 'output': {}}
         self._variable_set_indices = {'input': None, 'output': None}
