@@ -2,7 +2,6 @@
 from __future__ import division, print_function
 import numpy
 from numpy import ndarray
-import scipy.sparse
 from scipy.sparse import coo_matrix, csr_matrix, issparse
 
 from openmdao.matrices.matrix import Matrix
@@ -29,10 +28,6 @@ class CooMatrix(Matrix):
                     counter += jac.data.size
                 elif isinstance(jac, list) and len(jac) == 3:
                     counter += len(jac[0])
-                else:
-                    raise TypeError("Sub-jacobian of type '%s' for key %s is "
-                                    "not supported." % (type(jac).__name__,
-                                                        key))
                 ind2 = counter
                 metadata[key] = (ind1, ind2)
 
@@ -74,13 +69,10 @@ class CooMatrix(Matrix):
         ind1, ind2 = metadata[key]
         if isinstance(jac, ndarray):
             self._matrix.data[ind1:ind2] = jac.flat
-        elif scipy.sparse.issparse(jac):
+        elif isinstance(jac, (coo_matrix, csr_matrix)):
             self._matrix.data[ind1:ind2] = jac.data
         elif isinstance(jac, list) and len(jac) == 3:
             self._matrix.data[ind1:ind2] = jac[0]
-        else:
-            raise TypeError("Sub-jacobian of type '%s' for key %s is "
-                            "not supported." % (type(jac).__name__, key))
 
     def _prod(self, in_vec, mode):
         """See Matrix."""

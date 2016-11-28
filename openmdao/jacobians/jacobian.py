@@ -1,7 +1,7 @@
 """Define the base Jacobian class."""
 from __future__ import division
 import numpy
-import scipy.sparse
+from scipy.sparse import coo_matrix, csr_matrix
 from six.moves import range
 
 from openmdao.utils.generalized_dict import GeneralizedDictionary
@@ -112,7 +112,7 @@ class Jacobian(object):
 
         if isinstance(jac, numpy.ndarray):
             dct[op_ind, ip_ind] = -jac
-        elif scipy.sparse.issparse(jac):
+        elif isinstance(jac, (coo_matrix, csr_matrix)):
             dct[op_ind, ip_ind].data *= -1.0  # DOK not supported
         elif len(jac) == 3:
             dct[op_ind, ip_ind][0] *= -1.0
@@ -186,8 +186,18 @@ class Jacobian(object):
             jac = numpy.array([jac]).reshape((op_size, ip_size))
         elif isinstance(jac, numpy.ndarray):
             jac = jac.reshape((op_size, ip_size))
-        elif isinstance(jac, tuple):
-            jac = list(jac)
+        elif isinstance(jac, (coo_matrix, csr_matrix)):
+            pass
+        elif isinstance(jac, (tuple, list)):
+            if len(jac) != 3:
+                raise ValueError("Sub-jacobian of type '%s' for key %s has "
+                                 "the wrong size (%d)." %
+                                 (type(jac).__name__, key, len(jac)))
+            if isinstance(jac, tuple):
+                jac = list(jac)
+        else:
+            raise TypeError("Sub-jacobian of type '%s' for key %s is "
+                            "not supported." % (type(jac).__name__, key))
 
         dct[op_ind, ip_ind] = jac
 
