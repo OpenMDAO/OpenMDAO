@@ -3,7 +3,7 @@ from __future__ import division, print_function
 import numpy
 from numpy import ndarray
 import scipy.sparse
-from scipy.sparse import coo_matrix, issparse
+from scipy.sparse import coo_matrix, csr_matrix, issparse
 
 from openmdao.matrices.matrix import Matrix
 
@@ -25,13 +25,14 @@ class CooMatrix(Matrix):
                 ind1 = counter
                 if isinstance(jac, ndarray):
                     counter += jac.size
-                elif scipy.sparse.issparse(jac):
+                elif isinstance(jac, (coo_matrix, csr_matrix)):
                     counter += jac.data.size
-                elif isinstance(jac, list):
+                elif isinstance(jac, list) and len(jac) == 3:
                     counter += len(jac[0])
                 else:
-                    raise RuntimeError("unknown subjac type of %s for key %s" %
-                                       (type(jac), key))
+                    raise TypeError("Sub-jacobian of type '%s' for key %s is "
+                                    "not supported." % (type(jac).__name__,
+                                                        key))
                 ind2 = counter
                 metadata[key] = (ind1, ind2)
 
@@ -55,7 +56,7 @@ class CooMatrix(Matrix):
                     data[ind1:ind2] = jac.flatten()
                     rows[ind1:ind2] = irow + irows.reshape(size)
                     cols[ind1:ind2] = icol + icols.reshape(size)
-                elif scipy.sparse.issparse(jac):
+                elif isinstance(jac, (coo_matrix, csr_matrix)):
                     jac = jac.tocoo()
                     data[ind1:ind2] = jac.data
                     rows[ind1:ind2] = irow + jac.row
@@ -75,8 +76,11 @@ class CooMatrix(Matrix):
             self._matrix.data[ind1:ind2] = jac.flat
         elif scipy.sparse.issparse(jac):
             self._matrix.data[ind1:ind2] = jac.data
-        elif isinstance(jac, list):
+        elif isinstance(jac, list) and len(jac) == 3:
             self._matrix.data[ind1:ind2] = jac[0]
+        else:
+            raise TypeError("Sub-jacobian of type '%s' for key %s is "
+                            "not supported." % (type(jac).__name__, key))
 
     def _prod(self, in_vec, mode):
         """See Matrix."""

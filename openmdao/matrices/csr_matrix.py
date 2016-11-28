@@ -37,8 +37,9 @@ class CsrMatrix(Matrix):
                 elif isinstance(jac, list) and len(jac) == 3:
                     counter += len(jac[0])
                 else:
-                    raise TypeError("Sub-jacobian for %s of type '%s' is not "
-                                    "supported." % (key, type(jac).__name__))
+                    raise TypeError("Sub-jacobian of type '%s' for key %s is "
+                                    "not supported." % (type(jac).__name__,
+                                                        key))
                 ind2 = counter
                 metadata[key] = (ind1, ind2)
 
@@ -111,8 +112,8 @@ class CsrMatrix(Matrix):
         elif isinstance(jac, list) and len(jac) == 3:
             self._matrix.data[self._idxs[ind1:ind2]] = jac[0]
         else:
-            raise TypeError("Sub-jacobian for %s of type '%s' is not "
-                            "supported." % (key, type(jac).__name__))
+            raise TypeError("Sub-jacobian of type '%s' for key %s is "
+                            "not supported." % (type(jac).__name__, key))
 
     def _prod(self, in_vec, mode):
         """Perform a matrix vector product.
