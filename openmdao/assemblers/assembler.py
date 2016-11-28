@@ -205,7 +205,7 @@ class Assembler(object):
         for ind, metadata in enumerate(input_metadata):
             isize = numpy.prod(metadata['indices'].shape)
             ind2 += isize
-            self._src_indices[ind1:ind2] = metadata['indices'].flatten()
+            self._src_indices[ind1:ind2] = metadata['indices'].flat
             self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
                                                                           ind2]
             ind1 += isize

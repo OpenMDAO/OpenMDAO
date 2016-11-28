@@ -53,7 +53,7 @@ class CooMatrix(Matrix):
                             irows[indr, indc] = indr
                             icols[indr, indc] = indc
                     size = jac.size
-                    data[ind1:ind2] = jac.flatten()
+                    data[ind1:ind2] = jac.flat
                     rows[ind1:ind2] = irow + irows.reshape(size)
                     cols[ind1:ind2] = icol + icols.reshape(size)
                 elif isinstance(jac, (coo_matrix, csr_matrix)):
