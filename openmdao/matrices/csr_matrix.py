@@ -2,7 +2,7 @@
 from __future__ import division, print_function
 import numpy
 from numpy import ndarray
-from scipy.sparse import coo_matrix, issparse
+from scipy.sparse import coo_matrix, csr_matrix, issparse
 
 from openmdao.matrices.matrix import Matrix
 
@@ -32,13 +32,13 @@ class CsrMatrix(Matrix):
                 ind1 = counter
                 if isinstance(jac, ndarray):
                     counter += jac.size
-                elif issparse(jac):
+                elif isinstance(jac, (coo_matrix, csr_matrix)):
                     counter += jac.data.size
-                elif isinstance(jac, list):
+                elif isinstance(jac, list) and len(jac) == 3:
                     counter += len(jac[0])
                 else:
-                    raise RuntimeError("unknown subjac type of %s for key %s" %
-                                       (type(jac), key))
+                    raise TypeError("Sub-jacobian for %s of type '%s' is not "
+                                    "supported." % (key, type(jac).__name__))
                 ind2 = counter
                 metadata[key] = (ind1, ind2)
 
@@ -62,12 +62,12 @@ class CsrMatrix(Matrix):
                     data[ind1:ind2] = jac.flat
                     rows[ind1:ind2] = irow + irows.reshape(size)
                     cols[ind1:ind2] = icol + icols.reshape(size)
-                elif issparse(jac):
+                elif isinstance(jac, (coo_matrix, csr_matrix)):
                     jac = jac.tocoo()
                     data[ind1:ind2] = jac.data
                     rows[ind1:ind2] = irow + jac.row
                     cols[ind1:ind2] = icol + jac.col
-                elif isinstance(jac, list):
+                elif isinstance(jac, list) and len(jac) == 3:
                     data[ind1:ind2] = jac[0]
                     rows[ind1:ind2] = irow + jac[1]
                     cols[ind1:ind2] = icol + jac[2]
@@ -104,13 +104,15 @@ class CsrMatrix(Matrix):
             the sub-jacobian, the same format with which it was declared.
         """
         ind1, ind2 = metadata[key]
-        idxs = self._idxs[ind1:ind2]
         if isinstance(jac, ndarray):
-            self._matrix.data[idxs] = jac.flat
-        elif issparse(jac):
-            self._matrix.data[idxs] = jac.data
-        elif isinstance(jac, list):
-            self._matrix.data[idxs] = jac[0]
+            self._matrix.data[self._idxs[ind1:ind2]] = jac.flat
+        elif isinstance(jac, (coo_matrix, csr_matrix)):
+            self._matrix.data[self._idxs[ind1:ind2]] = jac.data
+        elif isinstance(jac, list) and len(jac) == 3:
+            self._matrix.data[self._idxs[ind1:ind2]] = jac[0]
+        else:
+            raise TypeError("Sub-jacobian for %s of type '%s' is not "
+                            "supported." % (key, type(jac).__name__))
 
     def _prod(self, in_vec, mode):
         """Perform a matrix vector product.
