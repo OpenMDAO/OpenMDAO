@@ -3,6 +3,7 @@ from __future__ import division, print_function
 import numpy
 from numpy import ndarray
 from scipy.sparse import coo_matrix, csr_matrix, issparse
+from six.moves import range
 
 from openmdao.matrices.matrix import Matrix
 
@@ -26,7 +27,7 @@ class CooMatrix(Matrix):
                     counter += jac.size
                 elif isinstance(jac, (coo_matrix, csr_matrix)):
                     counter += jac.data.size
-                elif isinstance(jac, list) and len(jac) == 3:
+                elif isinstance(jac, list):
                     counter += len(jac[0])
                 ind2 = counter
                 metadata[key] = (ind1, ind2)
@@ -71,7 +72,7 @@ class CooMatrix(Matrix):
             self._matrix.data[ind1:ind2] = jac.flat
         elif isinstance(jac, (coo_matrix, csr_matrix)):
             self._matrix.data[ind1:ind2] = jac.data
-        elif isinstance(jac, list) and len(jac) == 3:
+        elif isinstance(jac, list):
             self._matrix.data[ind1:ind2] = jac[0]
 
     def _prod(self, in_vec, mode):
