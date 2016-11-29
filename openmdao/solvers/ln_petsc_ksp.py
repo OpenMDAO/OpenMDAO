@@ -4,17 +4,12 @@ This solver can be used under MPI.
 """
 from __future__ import division, print_function
 
-import os
-
-# TODO: Do we have to make this solver with a factory?
 import petsc4py
 from petsc4py import PETSc
 import numpy as np
 from collections import OrderedDict
 
 from openmdao.solvers.solver import LinearSolver
-
-trace = os.environ.get("OPENMDAO_TRACE")
 
 from pprint import pprint
 
@@ -85,11 +80,11 @@ else:
     _get_petsc_vec_array = _get_petsc_vec_array_old
 
 
-#
-# Class object is given to KSP as a callback object for printing the residual.
-#
 class Monitor(object):
-    """Prints output from PETSc's KSP solvers."""
+    """Prints output from PETSc's KSP solvers.
+
+    Callable object given to KSP as a callback object for printing the residual.
+    """
 
     def __init__(self, ksp):
         """Store pointer to the ksp solver.
@@ -100,8 +95,8 @@ class Monitor(object):
             the KSP solver
         """
         self._ksp = ksp
-        self._norm0 = 1.0
         self._norm = 1.0
+        self._norm0 = 1.0
 
     def __call__(self, ksp, counter, norm):
         """Store norm if first iteration, and print norm.
@@ -117,41 +112,28 @@ class Monitor(object):
         norm : float
             the norm
         """
+        print('---------------------------')
+        print('ln_petsc_ksp Monitor, counter =', counter, 'norm:', norm)
         if counter == 0 and norm != 0.0:
             self._norm0 = norm
         self._norm = norm
 
-        ksp = self._ksp
-        ksp.iter_count += 1
-
-        if ksp.options['iprint'] == 2:
-            ksp.print_norm(ksp.print_name, ksp.system, ksp.iter_count,
-                           norm, self._norm0, indent=1, solver='LN')
+        self._ksp._mpi_print(counter, norm / self._norm0, norm)
+        self._ksp._iter_count += 1
+        print('---------------------------')
 
 
 class PetscKSP(LinearSolver):
     """LinearSolver that uses PetSC KSP to solve for a system's derivatives.
 
-    This solver can be used under MPI.
-
     Options
     -------
-    options['atol'] :  float(1e-12)
-        Absolute convergence tolerance.
     options['err_on_maxiter'] : bool(False)
         If True, raise an Error if not converged at maxiter.
-    options['iprint'] :  int(0)
-        Set to 0 to print only failures, set to 1 to print iteration totals to
-        stdout, set to 2 to print the residual each iteration to stdout,
-        or -1 to suppress all printing.
     options['ksp_type'] :  str('fgmres')
         KSP algorithm to use. Default is 'fgmres'.
-    options['maxiter'] :  int(100)
-        Maximum number of iterations.
     options['mode'] :  str('auto')
         Derivative calculation mode 'fwd' (forward), 'rev' (reverse), 'auto'.
-    options['rtol'] :  float(1e-12)
-        Relative convergence tolerance.
     """
 
     SOLVER = 'LN: PetscKSP'
@@ -166,91 +148,30 @@ class PetscKSP(LinearSolver):
         """
         super(PetscKSP, self).__init__(**kwargs)
 
+        self._print_name = 'KSP'
+
         opt = self.options
         opt.declare('ksp_type', value='fgmres', values=KSP_TYPES,
                     desc="KSP algorithm to use. Default is 'fgmres'.")
 
-        # These are defined whenever we call solve to provide info we need in
-        # the callback.
-        # self.system = None
-        # self.voi = None
-        # self.mode = None
-
+        # initialize dictionary of KSP instances (keyed on vector name)
         self.ksp = {}
-        self.print_name = 'KSP'
 
-        # User can specify another linear solver to use as a preconditioner
+        # TODO: User can specify another linear solver to use as a preconditioner
         self.preconditioner = None
 
-    def setup(self, system):
-        """Setup petsc problem just once.
-
-        Args
-        ----
-        system : `System`
-            Parent `System` object.
-        """
-        if not system.is_active():
-            return
-
-        # allocate and cache the ksp problem for each voi
-        for voi in system.dumat:
-            sizes = system._local_unknown_sizes[voi]
-            lsize = np.sum(sizes[system.comm.rank, :])
-            size = np.sum(sizes)
-
-            if trace:
-                print("creating petsc matrix of size (%d,%d)" % (lsize, size))
-            jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
-                                               comm=system.comm)
-            if trace:
-                print("petsc matrix creation DONE for %s" % voi)
-            jac_mat.setPythonContext(self)
-            jac_mat.setUp()
-
-            if trace:  # pragma: no cover
-                print("creating KSP object for system", system.path_name)
-
-            ksp = self.ksp[voi] = PETSc.KSP().create(comm=system.comm)
-            if trace:
-                print("KSP creation DONE")
-
-            ksp.setOperators(jac_mat)
-            ksp.setType(self.options['ksp_type'])
-            ksp.setGMRESRestart(1000)
-            ksp.setPCSide(PETSc.PC.Side.RIGHT)
-            ksp.setMonitor(Monitor(self))
-
-            if trace:  # pragma: no cover
-                print("ksp.getPC()")
-                print("b_vec, x_vec size: %d" % lsize)
-            pc_mat = ksp.getPC()
-            pc_mat.setType('python')
-            pc_mat.setPythonContext(self)
-
-        if trace:  # pragma: no cover
-            print("ksp setup done")
-
-        if self.preconditioner:
-            self.preconditioner.setup(system)
-
-    def print_all_convergence(self, level=2):
-        """Turn on iprint for this solver and all subsolvers.
-
-        Override if your solver has subsolvers.
-
-        Args
-        ----
-        level : int(2)
-            iprint level. Set to 2 to print residuals each iteration; set to 1
-            to print just the iteration totals.
-        """
-        self.options['iprint'] = level
-        if self.preconditioner:
-            self.preconditioner.print_all_convergence(level)
-
     def mult(self, mat, in_vec, result):
-        """KSP Callback: applies Jacobian matrix. Mode is determined by the system.
+        """Apply Jacobian matrix (KSP Callback).
+
+        The following attributes must be defined when solve is called to provide
+        info used in this callback:
+
+        _system : System
+            pointer to the owning system.
+        _vec_name : str
+            the right-hand-side (RHS) vector name.
+        _mode : str
+            'fwd' or 'rev'.
 
         Args
         ----
@@ -262,9 +183,10 @@ class PetscKSP(LinearSolver):
         """
         print('---------------------------')
         print('ln_petsc_ksp mult')
-        vec_name = self._vec_name
+
+        # assign x and b vectors based on mode
         system = self._system
-        ind1, ind2 = system._variable_allprocs_range['output']
+        vec_name = self._vec_name
 
         if self._mode == 'fwd':
             x_vec = system._vectors['output'][vec_name]
@@ -273,35 +195,19 @@ class PetscKSP(LinearSolver):
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
-        print('x_vec:', x_vec)
-        print('b_vec:', b_vec)
+        # set value of x vector to KSP provided value
+        x_vec.set_data(_get_petsc_vec_array(in_vec))
 
-        # Set incoming vector
-        in_data = _get_petsc_vec_array(in_vec)
-        print('in_data:', in_data)
-        x_vec.vec.set_data(in_data)
-
-        print('x_vec:', x_vec)
-        print('b_vec:', b_vec)
-
-        var_inds = [
-            system._variable_allprocs_range['output'][0],
-            system._variable_allprocs_range['output'][1],
-            system._variable_allprocs_range['output'][0],
-            system._variable_allprocs_range['output'][1],
-        ]
-
-        # Start with a clean slate
-        b_vec.vec[:] = 0.0
-        # system.clear_dparams()
-
-        # system._sys_apply_linear(mode, self._system._do_apply, vois=(voi,),
-        #                          rel_inputs=self.rel_inputs)
+        # apply linear
+        ind1, ind2 = system._variable_allprocs_range['output']
+        var_inds = [ind1, ind2, ind1, ind2]
         system._apply_linear([vec_name], self._mode, var_inds)
-        print('ln_petsc_ksp _mat_vec result:\n', b_vec.get_data())
-        print('---------------------------')
 
-        return b_vec.get_data()
+        # return resulting value of b vector to KSP
+        result.array[:] = b_vec.get_data()
+        print('ln_petsc_ksp mult result:\n', result.array)
+        print('---------------------------')
+        return result
 
     def __call__(self, vec_names, mode):
         """Solve the linear system for the problem in self._system.
@@ -310,17 +216,10 @@ class PetscKSP(LinearSolver):
 
         Args
         ----
-        rhs_mat : dict of ndarray
-            Dictionary containing one ndarry per top level quantity of
-            interest. Each array contains the right-hand side for the linear
-            solve.
+        vec_names : list of vector names
 
         mode : string
             Derivative mode, can be 'fwd' or 'rev'.
-
-        Returns
-        -------
-        dict of ndarray : Solution vectors
         """
         print('ln_ksp __call__', vec_names, mode)
         self._vec_names = vec_names
@@ -328,13 +227,6 @@ class PetscKSP(LinearSolver):
 
         system = self._system
         options = self.options
-
-        # print('ln_ksp __call__ system var names:')
-        # pprint(system._variable_allprocs_names)
-        # print('ln_ksp __call__ system var names, proc', system.comm.rank)
-        # pprint(system._variable_myproc_names)
-        # print('ln_ksp __call__ system vectors:')
-        # pprint(system._vectors)
 
         maxiter = options['maxiter']
         iprint = options['iprint']
@@ -345,52 +237,52 @@ class PetscKSP(LinearSolver):
 
         # for vec_name, rhs in iteritems(rhs_mat):
         for vec_name in self._vec_names:
-            print('ln_ksp __call__', system.path_name, vec_name)
-
             self._vec_name = vec_name
 
+            print('ln_ksp __call__ path_name=', system.path_name, "vec_name =", vec_name)
+
+            # assign x and b vectors based on mode
             if self._mode == 'fwd':
-                x_vec = system._vectors['output'][vec_name].get_data()
-                b_vec = system._vectors['residual'][vec_name].get_data()
+                x_vec = system._vectors['output'][vec_name]
+                b_vec = system._vectors['residual'][vec_name]
             elif self._mode == 'rev':
-                x_vec = system._vectors['residual'][vec_name].get_data()
-                b_vec = system._vectors['output'][vec_name].get_data()
+                x_vec = system._vectors['residual'][vec_name]
+                b_vec = system._vectors['output'][vec_name]
 
-            print('x_vec:', x_vec)
-            print('b_vec:', b_vec)
+            # create numpy arrays to interface with Petsc
+            sol_array = np.zeros(x_vec.get_data().size)
+            rhs_array = b_vec.get_data()
 
-            self.x_vec_petsc = PETSc.Vec().createWithArray(x_vec, comm=system.comm)
-            self.b_vec_petsc = PETSc.Vec().createWithArray(b_vec, comm=system.comm)
+            # create Petsc vectors on top of numpy arrays
+            self.sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
+            self.rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system.comm)
 
-            # Petsc can only handle one right-hand-side at a time for now
-            self.iter_count = 0
-
+            # run Petsc solver
+            self._iter_count = 0
             ksp = self._get_ksp_solver(system, vec_name)
             ksp.setTolerances(max_it=maxiter, atol=atol, rtol=rtol)
-            ksp.solve(self.b_vec_petsc, self.x_vec_petsc)
+            ksp.solve(self.rhs_petsc_vec, self.sol_petsc_vec)
+
+            # stuff the result into the x vector
+            print('result:')
+            pprint(sol_array)
+            x_vec.set_data(sol_array)
 
             # Final residual print if you only want the last one
-            if iprint == 1:
-                mon = ksp.getMonitor()[0][0]
-                self._mpi_print(self.iter_count, mon._norm, mon._norm0)
+            # if iprint == 1:
+            #     mon = ksp.getMonitor()[0][0]
+            #     self._mpi_print(self._iter_count, mon._norm, mon._norm0)
 
-            if self.iter_count >= maxiter:
-                msg = 'FAILED to converge in %d iterations' % self.iter_count
+            if self._iter_count >= maxiter:
+                msg = 'FAILED to converge in %d iterations' % self._iter_count
                 fail = True
             else:
-                msg = 'Converged in %d iterations' % self.iter_count
+                msg = 'Converged in %d iterations' % self._iter_count
                 fail = False
+            print(msg)
 
-            if iprint > 0 or (fail and iprint > -1):
-                self._mpi_print(self.iter_count, 0, 0)
-
-            # x_vec.set_data()
-
-            if fail and self.options['err_on_maxiter']:
-                raise Exception("Solve in '%s': PetscKSP %s" %
-                                (system.path_name, msg))
-
-            # print system.name, 'Linear solution vec', d_unknowns
+            # if iprint > 0 or (fail and iprint > -1):
+            #     self._mpi_print(self._iter_count, 0, 0)
 
     def apply(self, mat, in_vec, result):
         """Apply preconditioner.
@@ -431,7 +323,7 @@ class PetscKSP(LinearSolver):
             precon = self.preconditioner
             system._probdata.precon_level += 1
             if precon.options['iprint'] > 0:
-                precon.print_norm(precon.print_name, system, precon.iter_count,
+                precon.print_norm(precon.print_name, system, precon._iter_count,
                                   0, 0, indent=1, solver='LN',
                                   msg='Start Preconditioner')
 
@@ -439,7 +331,7 @@ class PetscKSP(LinearSolver):
                                 solver=precon, rel_inputs=self.rel_inputs)
 
             if precon.options['iprint'] > 0:
-                precon.print_norm(precon.print_name, system, precon.iter_count,
+                precon.print_norm(precon.print_name, system, precon._iter_count,
                                   0, 0, indent=1, solver='LN',
                                   msg='End Preconditioner')
             system._probdata.precon_level -= 1
@@ -447,7 +339,9 @@ class PetscKSP(LinearSolver):
         result.array[:] = x_vec.vec
 
     def _get_ksp_solver(self, system, vec_name):
-        """Setup petsc problem.
+        """Get an instance of the KSP solver for `vec_name` in `system`.
+
+        Instances will be created on first request and cached for future use.
 
         Args
         ----
@@ -455,37 +349,26 @@ class PetscKSP(LinearSolver):
             Parent `System` object.
 
         vec_name : string
-            name of vector (variable of interest)
+            name of vector
         """
         # use cached instance if available
         if vec_name in self.ksp:
             return self.ksp[vec_name]
 
-        print('=====================')
         rank = system.comm.rank + system._mpi_proc_range[0]
+
         lsizes = system._sys_assembler._variable_sizes_all['output'][rank]
         sizes = sum(system._sys_assembler._variable_sizes_all['output'])
-        print('_get_ksp_solver() lsizes =', lsizes, 'sizes =', sizes)
 
         lsize = sum(lsizes)
         size = sum(sizes)
-        print('_get_ksp_solver() lsize =', lsize, 'size =', size)
 
-        if trace:
-            print("creating petsc matrix of size (%d,%d)" % (lsize, size))
         jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
                                            comm=system.comm)
-        if trace:
-            print("petsc matrix creation DONE for %s" % vec_name)
         jac_mat.setPythonContext(self)
         jac_mat.setUp()
 
-        if trace:  # pragma: no cover
-            print("creating KSP object for system", system.path_name)
-
         ksp = self.ksp[vec_name] = PETSc.KSP().create(comm=system.comm)
-        if trace:
-            print("KSP creation DONE")
 
         ksp.setOperators(jac_mat)
         ksp.setType(self.options['ksp_type'])
@@ -493,13 +376,11 @@ class PetscKSP(LinearSolver):
         ksp.setPCSide(PETSc.PC.Side.RIGHT)
         ksp.setMonitor(Monitor(self))
 
-        if trace:  # pragma: no cover
-            print("ksp.getPC()")
-            print("b_vec, x_vec size: %d" % lsize)
         pc_mat = ksp.getPC()
         pc_mat.setType('python')
         pc_mat.setPythonContext(self)
 
-        print('=====================')
+        # if self.preconditioner:
+        #     self.preconditioner.setup(system)
 
         return ksp
