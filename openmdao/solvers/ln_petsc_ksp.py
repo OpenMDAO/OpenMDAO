@@ -6,8 +6,6 @@ from __future__ import division, print_function
 
 import petsc4py
 from petsc4py import PETSc
-import numpy as np
-from collections import OrderedDict
 
 from openmdao.solvers.solver import LinearSolver
 
@@ -16,45 +14,45 @@ from pprint import pprint
 
 KSP_TYPES = [
     "richardson",
-     "chebyshev",
-     "cg",
-     "groppcg",
-     "pipecg",
-     "pipecgrr",
-     "cgne",
-     "nash",
-     "stcg",
-     "gltr",
-     "fcg",
-     "pipefcg",
-     "gmres",
-     "pipefgmres",
-     "fgmres",
-     "lgmres",
-     "dgmres",
-     "pgmres",
-     "tcqmr",
-     "bcgs",
-     "ibcgs",
-     "fbcgs",
-     "fbcgsr",
-     "bcgsl",
-     "cgs",
-     "tfqmr",
-     "cr",
-     "pipecr",
-     "lsqr",
-     "preonly",
-     "qcg",
-     "bicg",
-     "minres",
-     "symmlq",
-     "lcd",
-     "python",
-     "gcr",
-     "pipegcr",
-     "tsirm",
-     "cgls"
+    "chebyshev",
+    "cg",
+    "groppcg",
+    "pipecg",
+    "pipecgrr",
+    "cgne",
+    "nash",
+    "stcg",
+    "gltr",
+    "fcg",
+    "pipefcg",
+    "gmres",
+    "pipefgmres",
+    "fgmres",
+    "lgmres",
+    "dgmres",
+    "pgmres",
+    "tcqmr",
+    "bcgs",
+    "ibcgs",
+    "fbcgs",
+    "fbcgsr",
+    "bcgsl",
+    "cgs",
+    "tfqmr",
+    "cr",
+    "pipecr",
+    "lsqr",
+    "preonly",
+    "qcg",
+    "bicg",
+    "minres",
+    "symmlq",
+    "lcd",
+    "python",
+    "gcr",
+    "pipegcr",
+    "tsirm",
+    "cgls"
 ]
 
 
@@ -128,12 +126,8 @@ class PetscKSP(LinearSolver):
 
     Options
     -------
-    options['err_on_maxiter'] : bool(False)
-        If True, raise an Error if not converged at maxiter.
     options['ksp_type'] :  str('fgmres')
         KSP algorithm to use. Default is 'fgmres'.
-    options['mode'] :  str('auto')
-        Derivative calculation mode 'fwd' (forward), 'rev' (reverse), 'auto'.
     """
 
     SOLVER = 'LN: PetscKSP'
@@ -150,6 +144,7 @@ class PetscKSP(LinearSolver):
 
         self._print_name = 'KSP'
 
+        # additional option to specify KSP algorithm to use
         opt = self.options
         opt.declare('ksp_type', value='fgmres', values=KSP_TYPES,
                     desc="KSP algorithm to use. Default is 'fgmres'.")
@@ -204,10 +199,9 @@ class PetscKSP(LinearSolver):
         system._apply_linear([vec_name], self._mode, var_inds)
 
         # return resulting value of b vector to KSP
-        result.array[:] = b_vec.get_data()
+        b_vec.get_data(result.array)
         print('ln_petsc_ksp mult result:\n', result.array)
         print('---------------------------')
-        return result
 
     def __call__(self, vec_names, mode):
         """Solve the linear system for the problem in self._system.
@@ -229,7 +223,6 @@ class PetscKSP(LinearSolver):
         options = self.options
 
         maxiter = options['maxiter']
-        iprint = options['iprint']
         atol = options['atol']
         rtol = options['rtol']
 
@@ -250,7 +243,7 @@ class PetscKSP(LinearSolver):
                 b_vec = system._vectors['output'][vec_name]
 
             # create numpy arrays to interface with Petsc
-            sol_array = np.zeros(x_vec.get_data().size)
+            sol_array = x_vec.get_data()
             rhs_array = b_vec.get_data()
 
             # create Petsc vectors on top of numpy arrays
@@ -268,22 +261,6 @@ class PetscKSP(LinearSolver):
             pprint(sol_array)
             x_vec.set_data(sol_array)
 
-            # Final residual print if you only want the last one
-            # if iprint == 1:
-            #     mon = ksp.getMonitor()[0][0]
-            #     self._mpi_print(self._iter_count, mon._norm, mon._norm0)
-
-            if self._iter_count >= maxiter:
-                msg = 'FAILED to converge in %d iterations' % self._iter_count
-                fail = True
-            else:
-                msg = 'Converged in %d iterations' % self._iter_count
-                fail = False
-            print(msg)
-
-            # if iprint > 0 or (fail and iprint > -1):
-            #     self._mpi_print(self._iter_count, 0, 0)
-
     def apply(self, mat, in_vec, result):
         """Apply preconditioner.
 
@@ -298,45 +275,9 @@ class PetscKSP(LinearSolver):
         if self.preconditioner is None:
             result.array[:] = _get_petsc_vec_array(in_vec)
             return
-
-        system = self._system
-        mode = self.mode
-
-        voi = self.voi
-        if mode == 'fwd':
-            x_vec, b_vec = system.dumat[voi], system.drmat[voi]
         else:
-            x_vec, b_vec = system.drmat[voi], system.dumat[voi]
-
-        # Set incoming vector
-        b_vec.vec[:] = _get_petsc_vec_array(in_vec)
-
-        # Start with a clean slate
-        system.clear_dparams()
-
-        dumat = OrderedDict()
-        dumat[voi] = system.dumat[voi]
-        drmat = OrderedDict()
-        drmat[voi] = system.drmat[voi]
-
-        with system._dircontext:
-            precon = self.preconditioner
-            system._probdata.precon_level += 1
-            if precon.options['iprint'] > 0:
-                precon.print_norm(precon.print_name, system, precon._iter_count,
-                                  0, 0, indent=1, solver='LN',
-                                  msg='Start Preconditioner')
-
-            system.solve_linear(dumat, drmat, (voi, ), mode=mode,
-                                solver=precon, rel_inputs=self.rel_inputs)
-
-            if precon.options['iprint'] > 0:
-                precon.print_norm(precon.print_name, system, precon._iter_count,
-                                  0, 0, indent=1, solver='LN',
-                                  msg='End Preconditioner')
-            system._probdata.precon_level -= 1
-
-        result.array[:] = x_vec.vec
+            # TODO
+            pass
 
     def _get_ksp_solver(self, system, vec_name):
         """Get an instance of the KSP solver for `vec_name` in `system`.
@@ -379,8 +320,5 @@ class PetscKSP(LinearSolver):
         pc_mat = ksp.getPC()
         pc_mat.setType('python')
         pc_mat.setPythonContext(self)
-
-        # if self.preconditioner:
-        #     self.preconditioner.setup(system)
 
         return ksp
