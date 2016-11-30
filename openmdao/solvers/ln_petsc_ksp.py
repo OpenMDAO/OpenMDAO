@@ -151,9 +151,6 @@ class PetscKSP(LinearSolver):
         # initialize dictionary of KSP instances (keyed on vector name)
         self.ksp = {}
 
-        # TODO: User can specify another linear solver to use as a preconditioner
-        self.preconditioner = None
-
     def mult(self, mat, in_vec, result):
         """Apply Jacobian matrix (KSP Callback).
 
@@ -197,7 +194,7 @@ class PetscKSP(LinearSolver):
         var_inds = [ind1, ind2, ind1, ind2]
         system._apply_linear([vec_name], self._mode, var_inds)
 
-        # return resulting value of b vector to KSP
+        # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
         print('ln_petsc_ksp mult result:\n', result.array)
         print('---------------------------')
@@ -227,7 +224,6 @@ class PetscKSP(LinearSolver):
 
         print('ln_ksp __call__ vec_names=', self._vec_names)
 
-        # for vec_name, rhs in iteritems(rhs_mat):
         for vec_name in self._vec_names:
             self._vec_name = vec_name
 
@@ -245,7 +241,7 @@ class PetscKSP(LinearSolver):
             sol_array = x_vec.get_data()
             rhs_array = b_vec.get_data()
 
-            # create Petsc vectors on top of numpy arrays
+            # create Petsc vectors from numpy arrays
             self.sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
             self.rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system.comm)
 
@@ -271,12 +267,30 @@ class PetscKSP(LinearSolver):
         result : PetSC Vector
             Empty vector into which we return the preconditioned in_vec
         """
-        if self.preconditioner is None:
-            result.array[:] = _get_petsc_vec_array(in_vec)
-            return
+        if 'precon' in self.options['subsolvers']:
+            precon = self.options['subsolvers']['precon']
+
+            system = self._system
+            vec_name = self._vec_name
+
+            # assign x and b vectors based on mode
+            if self._mode == 'fwd':
+                x_vec = system._vectors['output'][vec_name]
+                b_vec = system._vectors['residual'][vec_name]
+            elif self._mode == 'rev':
+                x_vec = system._vectors['residual'][vec_name]
+                b_vec = system._vectors['output'][vec_name]
+
+            # set value of b vector to KSP provided value
+            b_vec.set_data(_get_petsc_vec_array(in_vec))
+
+            # call the preconditioner
+            precon([vec_name], self._mode)
+
+            # stuff resulting value of x vector into result for KSP
+            x_vec.get_data(result.array)
         else:
-            # TODO
-            pass
+            result.array[:] = _get_petsc_vec_array(in_vec)
 
     def _get_ksp_solver(self, system, vec_name):
         """Get an instance of the KSP solver for `vec_name` in `system`.
