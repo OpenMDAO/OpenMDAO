@@ -81,18 +81,18 @@ else:
 class Monitor(object):
     """Prints output from PETSc's KSP solvers.
 
-    Callable object given to KSP as a callback object for printing the residual.
+    Callable object given to KSP as a callback for printing the residual.
     """
 
-    def __init__(self, ksp):
-        """Store pointer to the ksp solver.
+    def __init__(self, solver):
+        """Store pointer to the openmdao solver and initialize norms.
 
         Args
         ----
         ksp : object
-            the KSP solver
+            the openmdao solver
         """
-        self._ksp = ksp
+        self._solver = solver
         self._norm = 1.0
         self._norm0 = 1.0
 
@@ -116,8 +116,8 @@ class Monitor(object):
             self._norm0 = norm
         self._norm = norm
 
-        self._ksp._mpi_print(counter, norm / self._norm0, norm)
-        self._ksp._iter_count += 1
+        self._solver._mpi_print(counter, norm / self._norm0, norm)
+        self._solver._iter_count += 1
         print('---------------------------')
 
 
@@ -145,9 +145,8 @@ class PetscKSP(LinearSolver):
         self._print_name = 'KSP'
 
         # additional option to specify KSP algorithm to use
-        opt = self.options
-        opt.declare('ksp_type', value='fgmres', values=KSP_TYPES,
-                    desc="KSP algorithm to use. Default is 'fgmres'.")
+        self.options.declare('ksp_type', value='fgmres', values=KSP_TYPES,
+                             desc="KSP algorithm to use. Default is 'fgmres'.")
 
         # initialize dictionary of KSP instances (keyed on vector name)
         self.ksp = {}

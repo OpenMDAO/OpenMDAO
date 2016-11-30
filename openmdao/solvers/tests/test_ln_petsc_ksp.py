@@ -89,7 +89,8 @@ class Comp(ImplicitComponent):
 
 class Prob(Problem):
 
-    def __init__(self, LinearSolverClass=ScipyIterativeSolver, use_varsets=True):
+    def __init__(self, lnSolverClass=ScipyIterativeSolver,
+                       nlSolverClass=NonlinearBlockGS, use_varsets=True):
         root = Group()
 
         root.add_subsystem("C1", Comp(use_varsets))
@@ -104,19 +105,24 @@ class Prob(Problem):
         root.connect("C2.y", "C1.c")
         root.connect("C2.z", "C1.d")
 
-        root.ln_solver = LinearSolverClass()
-        root.nl_solver = NonlinearBlockGS()
+        root.ln_solver = lnSolverClass()
+        root.nl_solver = nlSolverClass()
+
+        self.expected_output = [
+            [ 1./4.,  1./5.,  1./4.,  1./5. ],
+            [ 1./3.,  1./6.,  1./3.,  1./6. ]
+        ]
 
         super(Prob, self).__init__(root)
 
 
-class TestSolver(unittest.TestCase):
+class TestPetscKSP(unittest.TestCase):
 
     def assertEqualArrays(self, a, b):
         self.assertTrue(np.linalg.norm(a-b) < 1e-15)
 
     def test_solve_linear_scipy(self):
-        p = Prob(LinearSolverClass=ScipyIterativeSolver)
+        p = Prob(lnSolverClass=ScipyIterativeSolver)
         p.setup()
 
         # forward
@@ -125,8 +131,8 @@ class TestSolver(unittest.TestCase):
         root._vectors['output'][''].set_const(0.0)
         root._solve_linear([''], 'fwd')
         output = root._vectors['output']['']._data
-        self.assertEqualArrays(output[0], [ 1./4.,  1./5.,  1./4.,  1./5. ])
-        self.assertEqualArrays(output[1], [ 1./3.,  1./6.,  1./3.,  1./6. ])
+        self.assertEqualArrays(output[0], p.expected_output[0])
+        self.assertEqualArrays(output[1], p.expected_output[1])
 
         # reverse
         root = p.root
@@ -134,13 +140,12 @@ class TestSolver(unittest.TestCase):
         root._vectors['residual'][''].set_const(0.0)
         root._solve_linear([''], 'rev')
         output = root._vectors['residual']['']._data
-        self.assertEqualArrays(output[0], [ 1./4.,  1./5., 1./4.,  1./5. ])
-        self.assertEqualArrays(output[1], [ 1./3.,  1./6.,  1./3.,  1./6. ])
+        self.assertEqualArrays(output[0], p.expected_output[0])
+        self.assertEqualArrays(output[1], p.expected_output[1])
 
     def test_solve_linear_ksp(self):
-        p = Prob(LinearSolverClass=PetscKSP)
+        p = Prob(lnSolverClass=PetscKSP)
         p.setup(VectorClass=PETScVector)
-        p.root.ln_solver.options['iprint'] = 2
 
         # forward
         root = p.root
@@ -148,8 +153,8 @@ class TestSolver(unittest.TestCase):
         root._vectors['output'][''].set_const(0.0)
         root._solve_linear([''], 'fwd')
         output = root._vectors['output']['']._data
-        self.assertEqualArrays(output[0], [ 1./4.,  1./5.,  1./4.,  1./5. ])
-        self.assertEqualArrays(output[1], [ 1./3.,  1./6.,  1./3.,  1./6. ])
+        self.assertEqualArrays(output[0], p.expected_output[0])
+        self.assertEqualArrays(output[1], p.expected_output[1])
 
         # reverse
         root = p.root
@@ -157,8 +162,8 @@ class TestSolver(unittest.TestCase):
         root._vectors['residual'][''].set_const(0.0)
         root._solve_linear([''], 'rev')
         output = root._vectors['residual']['']._data
-        self.assertEqualArrays(output[0], [ 1./4.,  1./5.,  1./4.,  1./5. ])
-        self.assertEqualArrays(output[1], [ 1./3.,  1./6.,  1./3.,  1./6. ])
+        self.assertEqualArrays(output[0], p.expected_output[0])
+        self.assertEqualArrays(output[1], p.expected_output[1])
 
 
 if __name__ == "__main__":
