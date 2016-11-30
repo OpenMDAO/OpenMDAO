@@ -20,36 +20,64 @@ class DenseMatrix(Matrix):
                 jac, irow, icol, src_indices = submats[key]
 
                 if isinstance(jac, numpy.ndarray):
-                    shape = jac.shape
-                    irow1 = irow
-                    irow2 = irow + shape[0]
-                    icol1 = icol
-                    icol2 = icol + shape[1]
-                    metadata[key] = (slice(irow1, irow2), slice(icol1, icol2))
-                    matrix[irow1:irow2, icol1:icol2] = jac
+                    nrows, ncols = jac.shape
+                    irow2 = irow + nrows
+                    if src_indices is None:
+                        icol2 = icol + ncols
+                        metadata[key] = (slice(irow, irow2),
+                                         slice(icol, icol2),
+                                         (slice(None), slice(None)))
+                    else:
+                        metadata[key] = (slice(irow, irow2),
+                                         src_indices + icol,
+                                         (slice(None),
+                                          slice(src_indices.size)))
+                    irows, icols, jidxs = metadata[key]
+                    matrix[irows, icols] = jac[jidxs]
                 elif isinstance(jac, (coo_matrix, csr_matrix)):
                     jac = jac.tocoo()
-                    irows = irow + jac.row
-                    icols = icol + jac.col
-                    matrix[irows, icols] = jac.data
-                    metadata[key] = (irows, icols)
+                    if src_indices is None:
+                        irows = irow + jac.row
+                        icols = icol + jac.col
+                        metadata[key] = (irows, icols, slice(None))
+                        matrix[irows, icols] = jac.data
+                    else:
+                        irows, icols, idxs = _compute_index_map(jac.row,
+                                                                jac.col,
+                                                                irow, icol,
+                                                                src_indices)
+
+                        metadata[key] = (irows, icols, idxs)
+                        matrix[irows, icols] = jac.data[idxs]
+
                 elif isinstance(jac, list):
-                    irows = irow + jac[1]
-                    icols = icol + jac[2]
+                    if src_indices is None:
+                        irows = jac[1] + irow
+                        icols = jac[2] + icol
+                        idxs = None
+                    else:
+                        irows, icols, idxs = _compute_index_map(jac[1], jac[2],
+                                                                irow, icol,
+                                                                src_indices)
+                    metadata[key] = (irows, icols, idxs)
                     matrix[irows, icols] = jac[0]
-                    metadata[key] = (irows, icols)
 
         self._matrix = matrix
 
     def _update_submat(self, submats, metadata, key, jac):
         """See Matrix."""
-        irows, icols = metadata[key]
+        irows, icols, jidxs = metadata[key]
         if isinstance(jac, numpy.ndarray):
-            self._matrix[irows, icols] = jac
+            self._matrix[irows, icols] = jac[jidxs]
         elif isinstance(jac, (coo_matrix, csr_matrix)):
-            self._matrix[irows, icols] = jac.data
+            self._matrix[irows, icols] = jac.data[jidxs]
         elif isinstance(jac, list):
-            self._matrix[irows, icols] = jac[0]
+            # can't just use slice(None) as jidxs because for lists
+            # that actually makes a copy
+            if jidxs is None:
+                self._matrix[irows, icols] = jac[0]
+            else:
+                self._matrix[irows, icols] = jac[0][jidxs]
 
     def _prod(self, in_vec, mode):
         """See Matrix."""
@@ -57,3 +85,43 @@ class DenseMatrix(Matrix):
             return self._matrix.dot(in_vec)
         elif mode == 'rev':
             return self._matrix.T.dot(in_vec)
+
+
+def _compute_index_map(jrows, jcols, irow, icol, src_indices):
+    """Return row/column indices or slices to map sub-jacobian to global jac.
+
+    Args
+    ----
+    jrows : index array
+        Array of row indices.
+    jcols : index array
+        Array of column indices.
+    irow : int
+        Row index for start of sub-jacobian.
+    icol : int
+        Column index for start of sub-jacobian.
+    src_indices : index array
+        Index array of which values to pull from a source into an input
+        variable.
+    """
+    icols = []
+    irows = []
+    idxs = []
+
+    for i, idx in enumerate(src_indices):
+        # pull out columns that match each index
+        idxarr = numpy.nonzero(jcols == i)[0]
+        idxs.append(idxarr)
+        icols.append(numpy.full(idxarr.shape, idx,
+                                dtype=int))
+        irows.append(jrows[idxarr])
+
+    idxs = numpy.hstack(idxs)
+    irows = numpy.hstack(irows) + irow
+    icols = numpy.hstack(icols) + icol
+
+    # get the indices to get us back to our original
+    # data order
+    idxs = numpy.argsort(idxs)
+
+    return (irows, icols, idxs)
