@@ -123,12 +123,9 @@ class Assembler(object):
         iproc = self._comm.rank
         for typ in ['input', 'output']:
             for ivar, meta in enumerate(variable_metadata[typ]):
-                if typ == 'input':
-                    size = numpy.prod(meta['indices'].shape)
-                elif typ == 'output':
-                    size = numpy.prod(meta['shape'])
                 ivar_all = variable_indices[typ][ivar]
                 iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
+                size = meta['size']
                 self._variable_sizes[typ][iset][iproc, ivar_set] = size
                 self._variable_sizes_all[typ][iproc, ivar_all] = size
 
@@ -193,7 +190,7 @@ class Assembler(object):
         # Compute total size of indices vector
         total_idx_size = 0
         for ind, metadata in enumerate(input_metadata):
-            total_idx_size += numpy.prod(metadata['indices'].shape)
+            total_idx_size += metadata['size']
 
         # Allocate arrays
         self._src_indices = numpy.zeros(total_idx_size, int)
@@ -203,9 +200,12 @@ class Assembler(object):
         # Populate arrays
         ind1, ind2 = 0, 0
         for ind, metadata in enumerate(input_metadata):
-            isize = numpy.prod(metadata['indices'].shape)
+            isize = metadata['size']
             ind2 += isize
-            self._src_indices[ind1:ind2] = metadata['indices'].flat
+            indices = metadata['indices']
+            if indices is None:
+                indices = numpy.arange(isize, dtype=int)
+            self._src_indices[ind1:ind2] = indices.flat
             self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
                                                                           ind2]
             ind1 += isize

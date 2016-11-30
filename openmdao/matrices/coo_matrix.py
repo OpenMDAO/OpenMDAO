@@ -20,7 +20,7 @@ class CooMatrix(Matrix):
 
         for submats, metadata in submat_meta_iter:
             for key in submats:
-                jac, irow, icol = submats[key]
+                jac = submats[key][0]
 
                 ind1 = counter
                 if isinstance(jac, ndarray):
@@ -38,7 +38,7 @@ class CooMatrix(Matrix):
 
         for submats, metadata in submat_meta_iter:
             for key in submats:
-                jac, irow, icol = submats[key]
+                jac, irow, icol, src_indices = submats[key]
                 ind1, ind2 = metadata[key]
 
                 if isinstance(jac, ndarray):

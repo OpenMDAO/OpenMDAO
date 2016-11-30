@@ -40,6 +40,7 @@ class GlobalJacobian(Jacobian):
     def _initialize(self):
         """See openmdao.jacobians.jacobian.Jacobian."""
         indices = self._system._variable_myproc_indices
+        meta = self._system._variable_myproc_metadata['input']
         ivar1, ivar2 = self._system._variable_allprocs_range['output']
 
         self.options.declare('Matrix', value=DenseMatrix,
@@ -51,6 +52,8 @@ class GlobalJacobian(Jacobian):
                        for i in indices['output']}
         in_offsets = {i: self._get_var_range(i, 'input')[0]
                       for i in indices['input']}
+        src_indices = {i: meta[j]['indices']
+                       for j, i in enumerate(indices['input'])}
 
         for re_var_all in indices['output']:
             re_offset = out_offsets[re_var_all]
@@ -65,7 +68,6 @@ class GlobalJacobian(Jacobian):
                     self._int_mtx._op_add_submat(
                         key, jac, re_offset, op_offset)
 
-            # TODO: make this use the input indices
             for ip_var_all in indices['input']:
                 ip_offset = in_offsets[ip_var_all]
 
@@ -77,10 +79,12 @@ class GlobalJacobian(Jacobian):
                     op_offset = out_offsets[op_var_all]
                     if ivar1 <= op_var_all < ivar2:
                         self._int_mtx._ip_add_submat(
-                            key, jac, re_offset, op_offset)
+                            key, jac, re_offset, op_offset,
+                            src_indices[ip_var_all])
                     else:
                         self._ext_mtx._ip_add_submat(
-                            key, jac, re_offset, ip_offset)
+                            key, jac, re_offset, ip_offset,
+                            src_indices[ip_var_all])
 
         ind1, ind2 = self._system._variable_allprocs_range['output']
         op_size = numpy.sum(
@@ -104,7 +108,6 @@ class GlobalJacobian(Jacobian):
                 if key in self._op_dict:
                     self._int_mtx._op_update_submat(key, self._op_dict[key])
 
-            # TODO: make this use the input indices
             for ip_var_all in indices['input']:
                 key = (re_var_all, ip_var_all)
                 if key in self._ip_dict:

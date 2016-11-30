@@ -1,7 +1,7 @@
 """Define the DenseMatrix class."""
 from __future__ import division, print_function
 import numpy
-import scipy.sparse
+from scipy.sparse import coo_matrix, csr_matrix
 
 from openmdao.matrices.matrix import Matrix
 
@@ -17,20 +17,23 @@ class DenseMatrix(Matrix):
             metadata = [self._op_metadata, self._ip_metadata][ind]
 
             for key in submats:
-                jac, irow, icol = submats[key]
+                jac, irow, icol, src_indices = submats[key]
 
-                if type(jac) is numpy.ndarray or scipy.sparse.issparse(jac):
+                if isinstance(jac, numpy.ndarray):
                     shape = jac.shape
                     irow1 = irow
                     irow2 = irow + shape[0]
                     icol1 = icol
                     icol2 = icol + shape[1]
-                    metadata[key] = matrix[irow1:irow2, icol1:icol2]
-                    if type(jac) is numpy.ndarray:
-                        metadata[key][:, :] = jac
-                    else:
-                        metadata[key][:, :] = jac.todense()
-                elif type(jac) is list:
+                    metadata[key] = (slice(irow1, irow2), slice(icol1, icol2))
+                    matrix[irow1:irow2, icol1:icol2] = jac
+                elif isinstance(jac, (coo_matrix, csr_matrix)):
+                    jac = jac.tocoo()
+                    irows = irow + jac.row
+                    icols = icol + jac.col
+                    matrix[irows, icols] = jac.data
+                    metadata[key] = (irows, icols)
+                elif isinstance(jac, list):
                     irows = irow + jac[1]
                     icols = icol + jac[2]
                     matrix[irows, icols] = jac[0]
@@ -40,12 +43,12 @@ class DenseMatrix(Matrix):
 
     def _update_submat(self, submats, metadata, key, jac):
         """See Matrix."""
-        if type(jac) is numpy.ndarray:
-            metadata[key][:, :] = jac
-        elif scipy.sparse.issparse(jac):
-            metadata[key][:, :] = jac.todense()  # TODO: improve on todense
-        elif type(jac) is list:
-            irows, icols = metadata[key]
+        irows, icols = metadata[key]
+        if isinstance(jac, numpy.ndarray):
+            self._matrix[irows, icols] = jac
+        elif isinstance(jac, (coo_matrix, csr_matrix)):
+            self._matrix[irows, icols] = jac.data
+        elif isinstance(jac, list):
             self._matrix[irows, icols] = jac[0]
 
     def _prod(self, in_vec, mode):

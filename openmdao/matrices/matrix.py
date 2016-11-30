@@ -96,9 +96,9 @@ class Matrix(object):
         icol : int
             the starting col index (offset) for this sub-jacobian.
         """
-        self._op_submats[key] = (jac, irow, icol)
+        self._op_submats[key] = (jac, irow, icol, None)
 
-    def _ip_add_submat(self, key, jac, irow, icol):
+    def _ip_add_submat(self, key, jac, irow, icol, src_indices):
         """Declare a sub-jacobian.
 
         Args
@@ -111,8 +111,11 @@ class Matrix(object):
             the starting row index (offset) for this sub-jacobian.
         icol : int
             the starting col index (offset) for this sub-jacobian.
+        src_indices : ndarray
+            indices from the source variable that an input variable
+            connects to.
         """
-        self._ip_submats[key] = (jac, irow, icol)
+        self._ip_submats[key] = (jac, irow, icol, src_indices)
 
     def _op_update_submat(self, key, jac):
         """Update the values of a sub-jacobian.
