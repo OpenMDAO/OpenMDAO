@@ -101,7 +101,7 @@ class ScipyIterativeSolver(LinearSolver):
             linop = LinearOperator((size, size), dtype=float,
                                    matvec=self._mat_vec)
             self._counter = 0
-            result = solver(linop, b_vec.get_data(),
-                            x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                            callback=self._monitor)
-            x_vec.set_data(result[0])
+            x_vec.set_data(
+                solver(linop, b_vec.get_data(),
+                       x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                       callback=self._monitor)[0])
