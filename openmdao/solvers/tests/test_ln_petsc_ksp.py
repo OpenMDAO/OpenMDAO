@@ -1,17 +1,37 @@
 """test the KSP iterative solver class."""
+from __future__ import division, print_function
 
 import unittest
 
 import numpy as np
 
 from openmdao.solvers.ln_petsc_ksp import PetscKSP
+from openmdao.solvers.ln_direct import DirectSolver
 
 from openmdao.api import Problem, Group
 from openmdao.api import ImplicitComponent, ScipyIterativeSolver
-from openmdao.api import NonlinearBlockGS
+from openmdao.api import LinearBlockGS, NonlinearBlockGS
+
 
 from openmdao.vectors.petsc_vector import PETScVector
 
+from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+
+from openmdao.devtools.testutil import assert_rel_error
+from openmdao.solvers.ln_bjac import LinearBlockJac
+
+
+#
+# utility function to check arrays (move to devtools.testutil)
+#
+
+def assertEqualArrays(test, a, b, msg='Arrays not equal'):
+    norm = np.linalg.norm(a-b)
+    test.assertTrue(norm < 1e-15, msg + ':\n%s\n%s' % (str(a), str(b)))
+
+#
+# implicit problem from test_varsets (move to testsuite?)
+#
 
 class Comp(ImplicitComponent):
 
@@ -116,54 +136,237 @@ class Prob(Problem):
         super(Prob, self).__init__(root)
 
 
+#
+# PetscKSP tests
+#
+
 class TestPetscKSP(unittest.TestCase):
 
-    def assertEqualArrays(self, a, b):
-        self.assertTrue(np.linalg.norm(a-b) < 1e-15)
+    def test_solve_linear_ksp_default(self):
+        """Solve implicit system with PetscKSP using default method."""
 
-    def test_solve_linear_scipy(self):
-        p = Prob(lnSolverClass=ScipyIterativeSolver)
-        p.setup()
-
-        # forward
-        root = p.root
-        root._vectors['residual'][''].set_const(1.0)
-        root._vectors['output'][''].set_const(0.0)
-        root._solve_linear([''], 'fwd')
-        output = root._vectors['output']['']._data
-        self.assertEqualArrays(output[0], p.expected_output[0])
-        self.assertEqualArrays(output[1], p.expected_output[1])
-
-        # reverse
-        root = p.root
-        root._vectors['output'][''].set_const(1.0)
-        root._vectors['residual'][''].set_const(0.0)
-        root._solve_linear([''], 'rev')
-        output = root._vectors['residual']['']._data
-        self.assertEqualArrays(output[0], p.expected_output[0])
-        self.assertEqualArrays(output[1], p.expected_output[1])
-
-    def test_solve_linear_ksp(self):
         p = Prob(lnSolverClass=PetscKSP)
         p.setup(VectorClass=PETScVector)
 
-        # forward
         root = p.root
+
+        # forward
         root._vectors['residual'][''].set_const(1.0)
         root._vectors['output'][''].set_const(0.0)
         root._solve_linear([''], 'fwd')
         output = root._vectors['output']['']._data
-        self.assertEqualArrays(output[0], p.expected_output[0])
-        self.assertEqualArrays(output[1], p.expected_output[1])
+        assertEqualArrays(self, output[0], p.expected_output[0])
+        assertEqualArrays(self, output[1], p.expected_output[1])
 
         # reverse
-        root = p.root
         root._vectors['output'][''].set_const(1.0)
         root._vectors['residual'][''].set_const(0.0)
         root._solve_linear([''], 'rev')
         output = root._vectors['residual']['']._data
-        self.assertEqualArrays(output[0], p.expected_output[0])
-        self.assertEqualArrays(output[1], p.expected_output[1])
+        assertEqualArrays(self, output[0], p.expected_output[0])
+        assertEqualArrays(self, output[1], p.expected_output[1])
+
+    def test_solve_linear_ksp_gmres(self):
+        """Solve implicit system with PetscKSP using 'gmres' method."""
+
+        p = Prob(lnSolverClass=PetscKSP)
+        p.setup(VectorClass=PETScVector)
+
+        root = p.root
+        root.ln_solver.options['ksp_type'] = 'gmres'
+
+        # forward
+        root._vectors['residual'][''].set_const(1.0)
+        root._vectors['output'][''].set_const(0.0)
+        root._solve_linear([''], 'fwd')
+        output = root._vectors['output']['']._data
+        assertEqualArrays(self, output[0], p.expected_output[0])
+        assertEqualArrays(self, output[1], p.expected_output[1])
+
+        # reverse
+        root._vectors['output'][''].set_const(1.0)
+        root._vectors['residual'][''].set_const(0.0)
+        root._solve_linear([''], 'rev')
+        output = root._vectors['residual']['']._data
+        assertEqualArrays(self, output[0], p.expected_output[0])
+        assertEqualArrays(self, output[1], p.expected_output[1])
+
+    def test_solve_linear_ksp_maxiter(self):
+        """Verify that PetscKSP abides by the 'maxiter' option."""
+
+        p = Prob(lnSolverClass=PetscKSP)
+        p.setup(VectorClass=PETScVector)
+
+        root = p.root
+        root.ln_solver.options['maxiter'] = 2
+
+        # forward
+        root._vectors['residual'][''].set_const(1.0)
+        root._vectors['output'][''].set_const(0.0)
+        root._solve_linear([''], 'fwd')
+        self.assertTrue(root.ln_solver._iter_count == 3)
+
+        # reverse
+        root._vectors['output'][''].set_const(1.0)
+        root._vectors['residual'][''].set_const(0.0)
+        root._solve_linear([''], 'rev')
+        self.assertTrue(root.ln_solver._iter_count == 3)
+
+    def test_solve_linear_ksp_precon(self):
+        """Solve implicit system with PetscKSP using a preconditioner."""
+
+        p = Prob(lnSolverClass=PetscKSP)
+
+        root = p.root
+        root.ln_solver.set_subsolver('precon', LinearBlockGS())
+
+        p.setup(VectorClass=PETScVector)
+
+        # forward
+        root._vectors['residual'][''].set_const(1.0)
+        root._vectors['output'][''].set_const(0.0)
+        root._solve_linear([''], 'fwd')
+        output = root._vectors['output']['']._data
+        assertEqualArrays(self, output[0], p.expected_output[0])
+        assertEqualArrays(self, output[1], p.expected_output[1])
+
+        # reverse
+        root._vectors['output'][''].set_const(1.0)
+        root._vectors['residual'][''].set_const(0.0)
+        root._solve_linear([''], 'rev')
+        output = root._vectors['residual']['']._data
+        assertEqualArrays(self, output[0], p.expected_output[0])
+        assertEqualArrays(self, output[1], p.expected_output[1])
+
+    def test_sellar_derivs_grouped_precon(self):
+        """Solve Sellar problem with PetscKSP using a preconditioner."""
+
+        p = Problem(SellarDerivativesGrouped())
+
+        root = p.root
+
+        # set root linear solver to PetscKSP with preconditioner
+        root.ln_solver = PetscKSP()
+        root.ln_solver.set_subsolver('precon', LinearBlockGS())
+
+        # set mda linear solver to LinearBlockJac
+        for subsys in root._subsystems_allprocs:
+            if subsys.name == 'mda':
+                subsys.ln_solver = LinearBlockJac()
+                subsys.ln_solver.options['maxiter'] = 2
+
+        p.setup(VectorClass=PETScVector)
+        p.run()
+
+        # just make sure we are at the right answer
+        assert_rel_error(self, p['y1'], 25.58830273, .00001)
+        assert_rel_error(self, p['y2'], 12.05848819, .00001)
+
+    def test_sellar_derivs_grouped_precon_mda(self):
+        """Solve Sellar MDA sub-problem with PetscKSP using a preconditioner."""
+
+        p = Problem(SellarDerivativesGrouped())
+
+        root = p.root
+
+        # set mda linear solver to PetscKSP with preconditioner
+        for subsys in root._subsystems_allprocs:
+            if subsys.name == 'mda':
+                subsys.ln_solver = PetscKSP()
+                subsys.ln_solver.set_subsolver('precon', LinearBlockGS())
+
+        p.setup(VectorClass=PETScVector)
+        p.run()
+
+        # just make sure we are at the right answer
+        assert_rel_error(self, p['y1'], 25.58830273, .00001)
+        assert_rel_error(self, p['y2'], 12.05848819, .00001)
+
+#
+# ScipyIterativeSolver tests (delete or move)
+#
+
+class TestScipyIterativeSolver(unittest.TestCase):
+
+    def test_solve_linear_scipy(self):
+        """Solve implicit system with ScipyIterativeSolver."""
+
+        p = Prob()
+        p.setup()
+
+        root = p.root
+
+        # forward
+        root._vectors['residual'][''].set_const(1.0)
+        root._vectors['output'][''].set_const(0.0)
+        root._solve_linear([''], 'fwd')
+        output = root._vectors['output']['']._data
+        assertEqualArrays(self, output[0], p.expected_output[0])
+        assertEqualArrays(self, output[1], p.expected_output[1])
+
+        # reverse
+        root._vectors['output'][''].set_const(1.0)
+        root._vectors['residual'][''].set_const(0.0)
+        root._solve_linear([''], 'rev')
+        output = root._vectors['residual']['']._data
+        assertEqualArrays(self, output[0], p.expected_output[0])
+        assertEqualArrays(self, output[1], p.expected_output[1])
+
+
+#
+# DirectSolver tests (delete or move)
+#
+
+class TestDirectSolver(unittest.TestCase):
+
+    def test_solve_linear_direct_default(self):
+        """Solve implicit system with DirectSolver."""
+
+        p = Prob(lnSolverClass=DirectSolver)
+        p.setup()
+
+        root = p.root
+
+        # forward
+        root._vectors['residual'][''].set_const(1.0)
+        root._vectors['output'][''].set_const(0.0)
+        root._solve_linear([''], 'fwd')
+        output = root._vectors['output']['']._data
+        assertEqualArrays(self, output[0], p.expected_output[0])
+        assertEqualArrays(self, output[1], p.expected_output[1])
+
+        # reverse
+        root._vectors['output'][''].set_const(1.0)
+        root._vectors['residual'][''].set_const(0.0)
+        root._solve_linear([''], 'rev')
+        output = root._vectors['residual']['']._data
+        assertEqualArrays(self, output[0], p.expected_output[0])
+        assertEqualArrays(self, output[1], p.expected_output[1])
+
+    def test_solve_linear_direct_LU(self):
+        """Solve implicit system with DirectSolver using 'LU' method."""
+
+        p = Prob(lnSolverClass=DirectSolver)
+        p.setup()
+
+        root = p.root
+        root.ln_solver.options['method'] = 'LU'
+
+        # forward
+        root._vectors['residual'][''].set_const(1.0)
+        root._vectors['output'][''].set_const(0.0)
+        root._solve_linear([''], 'fwd')
+        output = root._vectors['output']['']._data
+        assertEqualArrays(self, output[0], p.expected_output[0])
+        assertEqualArrays(self, output[1], p.expected_output[1])
+
+        # reverse
+        root._vectors['output'][''].set_const(1.0)
+        root._vectors['residual'][''].set_const(0.0)
+        root._solve_linear([''], 'rev')
+        output = root._vectors['residual']['']._data
+        assertEqualArrays(self, output[0], p.expected_output[0])
+        assertEqualArrays(self, output[1], p.expected_output[1])
 
 
 if __name__ == "__main__":

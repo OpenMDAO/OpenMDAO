@@ -1,6 +1,4 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives.
-
-This solver can be used under MPI.
 """
 from __future__ import division, print_function
 
@@ -8,8 +6,6 @@ import petsc4py
 from petsc4py import PETSc
 
 from openmdao.solvers.solver import LinearSolver
-
-from pprint import pprint
 
 
 KSP_TYPES = [
@@ -110,15 +106,12 @@ class Monitor(object):
         norm : float
             the norm
         """
-        print('---------------------------')
-        print('ln_petsc_ksp Monitor, counter =', counter, 'norm:', norm)
         if counter == 0 and norm != 0.0:
             self._norm0 = norm
         self._norm = norm
 
         self._solver._mpi_print(counter, norm / self._norm0, norm)
         self._solver._iter_count += 1
-        print('---------------------------')
 
 
 class PetscKSP(LinearSolver):
@@ -126,7 +119,7 @@ class PetscKSP(LinearSolver):
 
     Options
     -------
-    options['ksp_type'] :  str('fgmres')
+    options['ksp_type'] :  str
         KSP algorithm to use. Default is 'fgmres'.
     """
 
@@ -172,8 +165,6 @@ class PetscKSP(LinearSolver):
         result : PetSC Vector
             Empty array into which we place the matrix-vector product.
         """
-        print('---------------------------')
-        print('ln_petsc_ksp mult')
 
         # assign x and b vectors based on mode
         system = self._system
@@ -196,8 +187,6 @@ class PetscKSP(LinearSolver):
 
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
-        print('ln_petsc_ksp mult result:\n', result.array)
-        print('---------------------------')
 
     def __call__(self, vec_names, mode):
         """Solve the linear system for the problem in self._system.
@@ -211,7 +200,6 @@ class PetscKSP(LinearSolver):
         mode : string
             Derivative mode, can be 'fwd' or 'rev'.
         """
-        print('ln_ksp __call__', vec_names, mode)
         self._vec_names = vec_names
         self._mode = mode
 
@@ -222,12 +210,8 @@ class PetscKSP(LinearSolver):
         atol = options['atol']
         rtol = options['rtol']
 
-        print('ln_ksp __call__ vec_names=', self._vec_names)
-
         for vec_name in self._vec_names:
             self._vec_name = vec_name
-
-            print('ln_ksp __call__ path_name=', system.path_name, "vec_name =", vec_name)
 
             # assign x and b vectors based on mode
             if self._mode == 'fwd':
@@ -252,8 +236,6 @@ class PetscKSP(LinearSolver):
             ksp.solve(self.rhs_petsc_vec, self.sol_petsc_vec)
 
             # stuff the result into the x vector
-            print('result:')
-            pprint(sol_array)
             x_vec.set_data(sol_array)
 
     def apply(self, mat, in_vec, result):
@@ -272,12 +254,13 @@ class PetscKSP(LinearSolver):
 
             system = self._system
             vec_name = self._vec_name
+            mode = self._mode
 
             # assign x and b vectors based on mode
-            if self._mode == 'fwd':
+            if mode == 'fwd':
                 x_vec = system._vectors['output'][vec_name]
                 b_vec = system._vectors['residual'][vec_name]
-            elif self._mode == 'rev':
+            elif mode == 'rev':
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
@@ -285,7 +268,7 @@ class PetscKSP(LinearSolver):
             b_vec.set_data(_get_petsc_vec_array(in_vec))
 
             # call the preconditioner
-            precon([vec_name], self._mode)
+            precon([vec_name], mode)
 
             # stuff resulting value of x vector into result for KSP
             x_vec.get_data(result.array)
