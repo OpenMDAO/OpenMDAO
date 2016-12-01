@@ -1,5 +1,6 @@
-"""Define LinearSolver that explicitly solves the linear system using
+"""LinearSolver that explicitly solves the linear system using
 linalg.solve or scipy LU factor/solve."""
+
 from __future__ import division, print_function
 
 import numpy
@@ -10,7 +11,7 @@ from openmdao.solvers.solver import LinearSolver
 
 
 class DirectSolver(LinearSolver):
-    """Define LinearSolver that explicitly solves the linear system using
+    """LinearSolver that explicitly solves the linear system using
     linalg.solve or scipy LU factor/solve."""
 
     SOLVER = 'LN: Direct'

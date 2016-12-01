@@ -1,5 +1,5 @@
-"""LinearSolver that uses PetSC KSP to solve for a system's derivatives.
-"""
+"""LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
+
 from __future__ import division, print_function
 
 import petsc4py

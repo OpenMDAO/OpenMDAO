@@ -1,4 +1,5 @@
-"""test the KSP iterative solver class."""
+"""Test the PetsKSP linear solver class."""
+
 from __future__ import division, print_function
 
 import unittest
