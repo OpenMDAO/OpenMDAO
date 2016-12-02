@@ -14,10 +14,9 @@ class Assembler(object):
     ----------
     _comm : MPI.comm or FakeComm
         MPI communicator object.
-
-    _variable_sizes_all : {'input': list of ndarray[nproc, nvar],
-                           'output': list of ndarray[nproc, nvar]}
-        list of local variable size arrays, num procs x num vars.
+    _variable_sizes_all : {'input': ndarray[nproc, nvar],
+                           'output': ndarray[nproc, nvar]}
+        local variable size arrays, num procs x num vars.
     _variable_sizes : {'input': list of ndarray[nproc, nvar],
                        'output': list of ndarray[nproc, nvar]}
         list of local variable size arrays, num procs x num vars by var_set.
@@ -27,7 +26,6 @@ class Assembler(object):
                              'output': ndarray[nvar_all, 2]}
         the first column is the var_set ID and
         the second column is the variable index within the var_set.
-
     _input_var_ids : int ndarray[num_input_var]
         the output variable ID for each input variable ID.
     _src_indices : int ndarray[:]
@@ -46,7 +44,7 @@ class Assembler(object):
         """
         self._comm = comm
 
-        self._variable_sizes_all = {'input': [], 'output': []}
+        self._variable_sizes_all = {'input': None, 'output': None}
         self._variable_sizes = {'input': [], 'output': []}
         self._variable_set_IDs = {'input': {}, 'output': {}}
         self._variable_set_indices = {'input': None, 'output': None}
@@ -205,7 +203,7 @@ class Assembler(object):
         for ind, metadata in enumerate(input_metadata):
             isize = numpy.prod(metadata['indices'].shape)
             ind2 += isize
-            self._src_indices[ind1:ind2] = metadata['indices'].flatten()
+            self._src_indices[ind1:ind2] = metadata['indices'].flat
             self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
                                                                           ind2]
             ind1 += isize

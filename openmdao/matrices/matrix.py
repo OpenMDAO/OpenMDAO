@@ -80,10 +80,9 @@ class Matrix(object):
             in_vec[:row_range[0]] = 0.
             in_vec[row_range[1]:] = 0.
 
-        out_vec = self._prod(in_vec, 'rev')
-        return out_vec
+        return self._prod(in_vec, 'rev')
 
-    def _op_add_submat(self, key, jac, irow=0, icol=0):
+    def _op_add_submat(self, key, jac, irow, icol):
         """Declare a sub-jacobian.
 
         Args
@@ -99,7 +98,7 @@ class Matrix(object):
         """
         self._op_submats[key] = (jac, irow, icol)
 
-    def _ip_add_submat(self, key, jac, irow=0, icol=0):
+    def _ip_add_submat(self, key, jac, irow, icol):
         """Declare a sub-jacobian.
 
         Args

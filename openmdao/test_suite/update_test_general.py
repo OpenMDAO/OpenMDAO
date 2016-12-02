@@ -20,7 +20,7 @@ from openmdao.test_suite.components.explicit_components \
 from openmdao.test_suite.groups.group import TestGroupFlat
 from openmdao.api import Problem
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
-from openmdao.api import GlobalJacobian, DenseMatrix, CooMatrix
+from openmdao.api import GlobalJacobian, DenseMatrix, CooMatrix, CsrMatrix
 from openmdao.parallel_api import PETScVector
 
 
@@ -42,6 +42,8 @@ class CompTestCaseBase(unittest.TestCase):
             prob.root.jacobian = GlobalJacobian(Matrix=DenseMatrix)
         elif jacobian_type == 'sparse-coo':
             prob.root.jacobian = GlobalJacobian(Matrix=CooMatrix)
+        elif jacobian_type == 'sparse-csr':
+            prob.root.jacobian = GlobalJacobian(Matrix=CsrMatrix)
 
         prob.root.nl_solver = NewtonSolver(
             subsolvers={'linear': ScipyIterativeSolver(
@@ -129,7 +131,7 @@ def tst_generator():
             [TestImplCompNondLinear, TestExplCompNondLinear],
             [DefaultVector, PETScVector],
             ['implicit', 'explicit'],
-            ['matvec', 'dense', 'sparse-coo'],
+            ['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
             ['array', 'sparse', 'aij'],
             range(1, 3),
             range(1, 3),
@@ -165,9 +167,7 @@ def generate_test():
     mydir = os.path.dirname(os.path.abspath(__file__))
     fname = os.path.join(mydir, 'test_general.py')
     with open(fname, 'w') as f:
-        test_lines = [t for t in tst_generator()]
-        modstr = tstmod_template.format('\n'.join(test_lines))
-        f.write(modstr)
+        f.write(tstmod_template.format('\n'.join(tst_generator())))
 
 
 if __name__ == '__main__':

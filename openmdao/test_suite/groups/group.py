@@ -22,7 +22,8 @@ class TestGroupFlat(Group):
         self.metadata.declare('Component',
                               desc='Component class to instantiate')
         self.metadata.declare('jacobian_type', value='matvec',
-                              values=['matvec', 'dense', 'sparse-coo'],
+                              values=['matvec', 'dense', 'sparse-coo',
+                                      'sparse-csr'],
                               desc='method of assembling derivatives')
         self.metadata.declare('partial_type', value='array',
                               values=['array', 'sparse', 'aij'],
