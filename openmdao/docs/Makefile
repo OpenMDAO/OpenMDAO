@@ -51,10 +51,16 @@ help:
 
 clean:
 	rm -rf $(BUILDDIR)/*
+	rm -rf srcdocs/usr
+	rm -rf srcdocs/dev
 
 html:
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "dev"
+	rm -rf $(BUILDDIR)/*
+	rm -rf srcdocs/usr
+	rm -rf srcdocs/dev
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr"
+	#rm -rf srcdocs/usr
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "dev"
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
