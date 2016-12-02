@@ -1,4 +1,4 @@
-"""Define the test group classes."""
+"""Define a `Group` with two interconnected `ImplicitComponent`s for testing"""
 from __future__ import division, print_function
 
 from openmdao.api import Group, ImplicitComponent
@@ -81,7 +81,8 @@ class TestImplicitGroup(Group):
     """A `Group` with two interconnected `ImplicitComponent`s."""
 
     def __init__(self, lnSolverClass=LinearBlockGS,
-                       nlSolverClass=NonlinearBlockGS, use_varsets=True):
+                       nlSolverClass=NonlinearBlockGS,
+                       use_varsets=True):
 
         super(TestImplicitGroup, self).__init__()
 
@@ -102,6 +103,6 @@ class TestImplicitGroup(Group):
         self.nl_solver = nlSolverClass()
 
         self.expected_solution = [
-            [ 1./4.,  1./5.,  1./4.,  1./5. ],
-            [ 1./3.,  1./6.,  1./3.,  1./6. ]
+            [1./4., 1./5., 1./4., 1./5.],
+            [1./3., 1./6., 1./3., 1./6.]
         ]
