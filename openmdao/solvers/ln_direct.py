@@ -1,5 +1,4 @@
-"""LinearSolver that explicitly solves the linear system using
-linalg.solve or scipy LU factor/solve."""
+"""LinearSolver that uses linalg.solve or LU factor/solve."""
 
 from __future__ import division, print_function
 
@@ -11,8 +10,7 @@ from openmdao.solvers.solver import LinearSolver
 
 
 class DirectSolver(LinearSolver):
-    """LinearSolver that explicitly solves the linear system using
-    linalg.solve or scipy LU factor/solve."""
+    """LinearSolver that uses linalg.solve or LU factor/solve."""
 
     SOLVER = 'LN: Direct'
 
@@ -29,8 +27,9 @@ class DirectSolver(LinearSolver):
         self._print_name = 'Direct'
 
         self.options.declare('method', value='solve', values=['LU', 'solve'],
-                             desc="Solution method, either 'solve' for linalg.solve, " +
-                                  "or 'LU' for linalg.lu_factor and linalg.lu_solve.")
+                             desc="Solution method, either 'solve' for " +
+                             "linalg.solve, or 'LU' for linalg.lu_factor " +
+                             "and linalg.lu_solve.")
 
     def _mat_vec(self, in_vec):
         """Compute matrix-vector product.

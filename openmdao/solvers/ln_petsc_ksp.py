@@ -98,13 +98,13 @@ class Monitor(object):
         Args
         ----
         ksp : object
-            the KSP solver
+            the KSP solver.
 
         counter : int
-            the counter
+            the counter.
 
         norm : float
-            the norm
+            the norm.
         """
         if counter == 0 and norm != 0.0:
             self._norm0 = norm
@@ -147,8 +147,8 @@ class PetscKSP(LinearSolver):
     def mult(self, mat, in_vec, result):
         """Apply Jacobian matrix (KSP Callback).
 
-        The following attributes must be defined when solve is called to provide
-        info used in this callback:
+        The following attributes must be defined when solve is called to
+        provide information used in this callback:
 
         _system : System
             pointer to the owning system.
@@ -160,12 +160,11 @@ class PetscKSP(LinearSolver):
         Args
         ----
         in_vec : PetSC Vector
-            Incoming vector
+            Incoming vector.
 
         result : PetSC Vector
             Empty array into which we place the matrix-vector product.
         """
-
         # assign x and b vectors based on mode
         system = self._system
         vec_name = self._vec_name
@@ -226,8 +225,10 @@ class PetscKSP(LinearSolver):
             rhs_array = b_vec.get_data()
 
             # create Petsc vectors from numpy arrays
-            self.sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
-            self.rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system.comm)
+            self.sol_petsc_vec = PETSc.Vec().createWithArray(sol_array,
+                                                             comm=system.comm)
+            self.rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array,
+                                                             comm=system.comm)
 
             # run Petsc solver
             self._iter_count = 0
