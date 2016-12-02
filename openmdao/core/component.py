@@ -346,7 +346,7 @@ class IndepVarComp(ExplicitComponent):
     ----------
     _indep : tuple
         Tuple (arg1, arg2), where arg1 is str or [(str, value), ...]
-        or [(str, value, kwargs), …] and arg 2 is value.
+        or [(str, value, kwargs), ...] and arg 2 is value.
         The value can be float or ndarray
     """
 
