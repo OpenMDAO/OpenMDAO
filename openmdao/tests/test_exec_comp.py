@@ -113,7 +113,6 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], np.array([2.,1.]), 0.00001)
 
     def test_simple_array_model(self):
-        raise unittest.SkipTest("no check_partial_derivatives function")
         prob = Problem()
         prob.root = Group()
         prob.root.add_subsystem('comp', ExecComp(['y[0]=2.0*x[0]+7.0*x[1]',
@@ -127,6 +126,7 @@ class TestExecComp(unittest.TestCase):
         prob.setup(check=False)
         prob.run()
 
+        raise unittest.SkipTest("no check_partial_derivatives function")
         data = prob.check_partial_derivatives(out_stream=None)
 
         assert_rel_error(self, data['comp'][('y','x')]['abs error'][0], 0.0, 1e-5)
@@ -137,7 +137,6 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, data['comp'][('y','x')]['rel error'][2], 0.0, 1e-5)
 
     def test_simple_array_model2(self):
-        raise unittest.SkipTest("no check_partial_derivatives function")
         prob = Problem()
         prob.root = Group()
         comp = prob.root.add_subsystem('comp', ExecComp('y = mat.dot(x)',
@@ -151,6 +150,7 @@ class TestExecComp(unittest.TestCase):
         prob.setup(check=False)
         prob.run()
 
+        raise unittest.SkipTest("no check_partial_derivatives function")
         data = prob.check_partial_derivatives(out_stream=None)
 
         assert_rel_error(self, data['comp'][('y','x')]['abs error'][0], 0.0, 1e-5)
@@ -173,22 +173,20 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._outputs['y'], 5.0, 0.00001)
 
-        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
+        C1._linearize(True)
 
-        assert_rel_error(self, J[('y','x')], 2.0, 0.00001)
+        assert_rel_error(self, C1._jacobian[('y','x')], -2.0, 0.00001)
 
     def test_complex_step2(self):
-        raise unittest.SkipTest("problem missing calc_gradient")
         prob = Problem(Group())
         comp = prob.root.add_subsystem('comp', ExecComp('y=x*x + x*2.0'))
         prob.root.add_subsystem('p1', IndepVarComp('x', 2.0))
         prob.root.connect('p1.x', 'comp.x')
 
-        comp.deriv_options['type'] = 'user'
-
         prob.setup(check=False)
         prob.run()
 
+        raise unittest.SkipTest("problem missing calc_gradient")
         J = prob.calc_gradient(['p1.x'], ['comp.y'], mode='fwd', return_format='dict')
         assert_rel_error(self, J['comp.y']['p1.x'], np.array([6.0]), 0.00001)
 
@@ -204,18 +202,18 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._outputs['y'], 4.0, 0.00001)
 
-        # any negative C1.x should give a -2.0 derivative for dy/dx
+        # any negative C1.x should give a 2.0 derivative for dy/dx
         C1._inputs['x'] = -1.0e-10
-        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
-        assert_rel_error(self, J[('y','x')], -2.0, 0.00001)
+        C1._linearize()
+        assert_rel_error(self, C1._jacobian[('y','x')], 2.0, 0.00001)
 
         C1._inputs['x'] = 3.0
-        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
-        assert_rel_error(self, J[('y','x')], 2.0, 0.00001)
+        C1._linearize()
+        assert_rel_error(self, C1._jacobian[('y','x')], -2.0, 0.00001)
 
         C1._inputs['x'] = 0.0
-        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
-        assert_rel_error(self, J[('y','x')], 2.0, 0.00001)
+        C1._linearize()
+        assert_rel_error(self, C1._jacobian[('y','x')], -2.0, 0.00001)
 
     def test_abs_array_complex_step(self):
         prob = Problem(root=Group())
@@ -227,31 +225,32 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._outputs['y'], np.ones(3)*4.0, 0.00001)
 
-        # any negative C1.x should give a -2.0 derivative for dy/dx
+        # any negative C1.x should give a 2.0 derivative for dy/dx
         C1._inputs['x'] = np.ones(3)*-1.0e-10
-        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
-        assert_rel_error(self, J[('y','x')], np.eye(3)*-2.0, 0.00001)
+        C1._linearize()
+        assert_rel_error(self, C1._jacobian[('y','x')], np.eye(3)*2.0, 0.00001)
 
         C1._inputs['x'] = np.ones(3)*3.0
-        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
-        assert_rel_error(self, J[('y','x')], np.eye(3)*2.0, 0.00001)
+        C1._linearize()
+        assert_rel_error(self, C1._jacobian[('y','x')], np.eye(3)*-2.0, 0.00001)
 
         C1._inputs['x'] = np.zeros(3)
-        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
-        assert_rel_error(self, J[('y','x')], np.eye(3)*2.0, 0.00001)
+        C1._linearize()
+        assert_rel_error(self, C1._jacobian[('y','x')], np.eye(3)*-2.0, 0.00001)
 
         C1._inputs['x'] = np.array([1.5, -0.6, 2.4])
-        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
+        C1._linearize()
         expect = np.zeros((3,3))
-        expect[0,0] = 2.0
-        expect[1,1] = -2.0
-        expect[2,2] = 2.0
+        expect[0,0] = -2.0
+        expect[1,1] = 2.0
+        expect[2,2] = -2.0
 
-        assert_rel_error(self, J[('y','x')], expect, 0.00001)
+        assert_rel_error(self, C1._jacobian[('y','x')], expect, 0.00001)
 
     def test_colon_names(self):
         prob = Problem(root=Group())
-        C1 = prob.root.add_subsystem('C1', ExecComp('a:y=a:x+1.+b', inits={'a:x':2.0}, b=0.5))
+        C1 = prob.root.add_subsystem('C1', ExecComp('a:y=a:x+1.+b',
+                                     inits={'a:x':2.0}, b=0.5))
         prob.setup(check=False)
 
         self.assertTrue('a:x' in C1._inputs)
@@ -274,22 +273,20 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._outputs['foo:y'], 5.0, 0.00001)
 
-        J = C1.linearize(C1._inputs, C1._outputs, C1._residuals)
+        C1._linearize()
 
-        assert_rel_error(self, J[('foo:y','foo:bar:x')], 2.0, 0.00001)
+        assert_rel_error(self, C1._jacobian[('foo:y','foo:bar:x')], -2.0, 0.00001)
 
     def test_complex_step2_colons(self):
-        raise unittest.SkipTest("problem missing calc_gradient")
         prob = Problem(Group())
         comp = prob.root.add_subsystem('comp', ExecComp('foo:y=foo:x*foo:x + foo:x*2.0'))
         prob.root.add_subsystem('p1', IndepVarComp('x', 2.0))
         prob.root.connect('p1.x', 'comp.foo:x')
 
-        comp.deriv_options['type'] = 'user'
-
         prob.setup(check=False)
         prob.run()
 
+        raise unittest.SkipTest("problem missing calc_gradient")
         J = prob.calc_gradient(['p1.x'], ['comp.foo:y'], mode='fwd', return_format='dict')
         assert_rel_error(self, J['comp.foo:y']['p1.x'], np.array([6.0]), 0.00001)
 
@@ -297,7 +294,6 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, J['comp.foo:y']['p1.x'], np.array([6.0]), 0.00001)
 
     def test_simple_array_model2_colons(self):
-        raise unittest.SkipTest("no check_partial_derivatives function")
         prob = Problem()
         prob.root = Group()
         comp = prob.root.add_subsystem('comp', ExecComp('foo:y = foo:mat.dot(x)',
@@ -312,6 +308,7 @@ class TestExecComp(unittest.TestCase):
         prob.setup(check=False)
         prob.run()
 
+        raise unittest.SkipTest("no check_partial_derivatives function")
         data = prob.check_partial_derivatives(out_stream=None)
 
         assert_rel_error(self, data['comp'][('foo:y','x')]['abs error'][0], 0.0, 1e-5)

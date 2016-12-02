@@ -30,38 +30,32 @@ class System(object):
         MPI communicator object.
     metadata : GeneralizedDictionary
         dictionary of user-defined arguments.
-
     _sys_depth : int
         distance from the root node in the hierarchy tree.
     _sys_assembler: Assembler
         pointer to the global assembler object.
-
     _mpi_proc_allocator : ProcAllocator
         object that distributes procs among subsystems.
     _mpi_proc_range : [int, int]
         indices of procs owned by comm with respect to COMM_WORLD.
-
     _subsystems_allprocs : [System, ...]
         list of all subsystems (children of this system).
     _subsystems_myproc : [System, ...]
         list of local subsystems that exist on this proc.
     _subsystems_inds : [int, ...]
         list of indices of subsystems on this proc among all subsystems.
-
     _variable_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
         list of names of all owned variables, not just on current proc.
     _variable_allprocs_range : {'input': [int, int], 'output': [int, int]}
         index range of owned variables with respect to all problem variables.
     _variable_allprocs_indices : {'input': dict, 'output': dict}
         dictionary of global indices keyed by the variable name.
-
     _variable_myproc_names : {'input': [str, ...], 'output': [str, ...]}
         list of names of owned variables on current proc.
     _variable_myproc_metadata : {'input': list, 'output': list}
         list of metadata dictionaries of variables that exist on this proc.
     _variable_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
         integer arrays of global indices of variables on this proc.
-
     _variable_maps : {'input': dict, 'output': dict}
         dictionary of variable names and their aliases (for promotes/renames).
     _variable_promotes : { 'any': set(), 'input': set(), 'output': set() }
@@ -70,20 +64,17 @@ class System(object):
     _variable_renames : { 'input': {}, 'output': {} }
         dictionary of mappings used to specify variables to be renamed in the
         parent group. (used to calculate _variable_maps)
-
     _variable_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
     _variable_connections_indices : [(int, int), ...]
         _variable_connections with variable indices instead of names.  Entries
         have the form (input_index, output_index).
-
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         dict of vector objects.
     _vector_transfers : dict
         dict of transfer objects.
     _vector_var_ids : dict
         dictionary of index arrays of relevant variables for this vector
-
     _inputs : Vector
         inputs vector; points to _vectors['input'][None].
     _outputs : Vector
@@ -92,10 +83,8 @@ class System(object):
         residuals vector; points to _vectors['residual'][None].
     _transfers : dict of Transfer
         transfer object; points to _vector_transfers[None].
-
     _jacobian : Jacobian
         global Jacobian object to be used in apply_linear
-
     _nl_solver : NonlinearSolver
         nonlinear solver to be used for solve_nonlinear.
     _ln_solver : LinearSolver
@@ -480,7 +469,7 @@ class System(object):
         return maps
 
     @contextmanager
-    def _matvec_context(self, vec_name, var_inds, mode):
+    def _matvec_context(self, vec_name, var_inds, mode, clear=True):
         """Context manager for vectors.
 
         For the given vec_name, return vectors that use a set of
@@ -491,11 +480,12 @@ class System(object):
         d_outputs = self._vectors['output'][vec_name]
         d_residuals = self._vectors['residual'][vec_name]
 
-        if mode == 'fwd':
-            d_residuals.set_const(0.0)
-        elif mode == 'rev':
-            d_inputs.set_const(0.0)
-            d_outputs.set_const(0.0)
+        if clear:
+            if mode == 'fwd':
+                d_residuals.set_const(0.0)
+            elif mode == 'rev':
+                d_inputs.set_const(0.0)
+                d_outputs.set_const(0.0)
 
         # TODO: check if we can loop over myproc vars to save time
         op_names = []
@@ -503,7 +493,9 @@ class System(object):
         for op_name in self._variable_allprocs_names['output']:
             valid = op_ind in self._vector_var_ids[vec_name]
             if var_inds is not None:
-                valid = valid and op_ind in var_inds
+                valid = valid and \
+                    var_inds[0] <= op_ind < var_inds[1] or \
+                    var_inds[2] <= op_ind < var_inds[3]
             if valid:
                 op_names.append(op_name)
             op_ind += 1
@@ -514,7 +506,9 @@ class System(object):
             op_ind = self._sys_assembler._input_var_ids[ip_ind]
             valid = op_ind in self._vector_var_ids[vec_name]
             if var_inds is not None:
-                valid = valid and op_ind in var_inds
+                valid = valid and \
+                    var_inds[0] <= op_ind < var_inds[1] or \
+                    var_inds[2] <= op_ind < var_inds[3]
             if valid:
                 ip_names.append(ip_name)
             ip_ind += 1
@@ -526,9 +520,6 @@ class System(object):
             if valid:
                 res_names.append(op_name)
             op_ind += 1
-
-        # TODO: see if we can avoid the `in var_inds` because this is slow
-        # e.g., var_inds could be two range pairs to account for gaps
 
         d_inputs._names = set(ip_names)
         d_outputs._names = set(op_names)
@@ -589,36 +580,104 @@ class System(object):
 
     @property
     def jacobian(self):
-        """The Jacobian."""
+        """A Jacobian object or None."""
         return self._jacobian
 
     @jacobian.setter
-    def jacobian(self, jac):
+    def jacobian(self, jacobian):
         """Set the Jacobian."""
-        self._set_jacobian(jac, True)
+        self._set_jacobian(jacobian, True)
 
-    def _set_jacobian(self, jacobian, is_top=True):
+    def _set_jacobian(self, jacobian, is_top):
         """Recursively set the system's jacobian attribute.
 
         Args
         ----
         jacobian : Jacobian or None
-            Jacobian object to be set; if None, reset to the DefaultJacobian.
+            Global jacobian to be set; if None, reset to DefaultJacobian.
         is_top : boolean
-            whether this is the top; i.e., start of the recursion
+            whether this is the top; i.e., start of the recursion.
         """
         if jacobian is None:
             self._jacobian = DefaultJacobian()
         else:
-            jacobian._dict.update(self._jacobian._dict)
             self._jacobian = jacobian
             if is_top:
                 self._jacobian._top_name = self.path_name
-                self._jacobian._top_system = self
+                self._jacobian._system = self
                 self._jacobian._assembler = self._sys_assembler
 
         for subsys in self._subsystems_myproc:
             subsys._set_jacobian(jacobian, False)
+
+        if jacobian is not None and is_top:
+            self._linearize(True)
+            self._jacobian._system = self
+            self._jacobian._initialize()
+
+    def _apply_nonlinear(self):
+        """Compute residuals."""
+        pass
+
+    def _solve_nonlinear(self):
+        """Compute outputs.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        pass
+
+    def _apply_linear(self, vec_names, mode, var_inds=None):
+        """Compute jac-vec product.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+        var_inds : [int, int, int, int] or None
+            ranges of variable IDs involved in this matrix-vector product.
+            The ordering is [lb1, ub1, lb2, ub2].
+        """
+        pass
+
+    def _solve_linear(self, vec_names, mode):
+        """Apply inverse jac product.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        pass
+
+    def _linearize(self, initial=False):
+        """Compute jacobian / factorization.
+
+        Args
+        ----
+        initial : boolean
+            whether this is the initial call to assemble the Jacobian.
+        """
+        pass
 
     def get_system(self, name):
         """Return the system called 'name' in the current namespace.

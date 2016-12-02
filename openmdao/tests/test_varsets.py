@@ -3,8 +3,9 @@ import unittest
 import numpy as np
 import scipy
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ImplicitComponent, \
-                         ScipyIterativeSolver, NonlinearBlockGS
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+from openmdao.api import ImplicitComponent, ScipyIterativeSolver
+from openmdao.api import NonlinearBlockGS
 
 class Comp(ImplicitComponent):
 
@@ -140,11 +141,11 @@ class TestVarSets(unittest.TestCase):
 
         # for no varsets, number should be the same, but reordered
         root = self.p_no_varsets.root
-    
+
         root._vectors['output'][''].set_const(1.0)
         root._apply_linear([''], 'fwd')
         output_novs = root._vectors['residual']['']._data
-    
+
         expected = np.array([output[i][j]
                                  for i,j in self.p._assembler._variable_set_indices['output']])
         self.assertEqualArrays(output_novs, expected)
@@ -201,4 +202,3 @@ class TestVarSets(unittest.TestCase):
         expected = np.array([output[i][j]
                                  for i,j in self.p._assembler._variable_set_indices['output']])
         self.assertEqualArrays(output_novs, expected)
-        

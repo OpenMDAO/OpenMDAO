@@ -14,7 +14,9 @@ class Assembler(object):
     ----------
     _comm : MPI.comm or FakeComm
         MPI communicator object.
-
+    _variable_sizes_all : {'input': ndarray[nproc, nvar],
+                           'output': ndarray[nproc, nvar]}
+        local variable size arrays, num procs x num vars.
     _variable_sizes : {'input': list of ndarray[nproc, nvar],
                        'output': list of ndarray[nproc, nvar]}
         list of local variable size arrays, num procs x num vars by var_set.
@@ -24,7 +26,6 @@ class Assembler(object):
                              'output': ndarray[nvar_all, 2]}
         the first column is the var_set ID and
         the second column is the variable index within the var_set.
-
     _input_var_ids : int ndarray[num_input_var]
         the output variable ID for each input variable ID.
     _src_indices : int ndarray[:]
@@ -43,6 +44,7 @@ class Assembler(object):
         """
         self._comm = comm
 
+        self._variable_sizes_all = {'input': None, 'output': None}
         self._variable_sizes = {'input': [], 'output': []}
         self._variable_set_IDs = {'input': {}, 'output': {}}
         self._variable_set_indices = {'input': None, 'output': None}
@@ -51,17 +53,18 @@ class Assembler(object):
         self._src_indices = None
         self._src_indices_range = None
 
-    def _setup_variables(self, sizes, variable_metadata, variable_indices):
+    def _setup_variables(self, nvars, variable_metadata, variable_indices):
         """Compute the variable sets and sizes.
 
         Sets the following attributes:
+            _variable_sizes_all
             _variable_sizes
             _variable_set_IDs
             _variable_set_indices
 
         Args
         ----
-        sizes : {'input': int, 'output': int}
+        nvars : {'input': int, 'output': int}
             global number of variables.
         variable_metadata : {'input': list, 'output': list}
             list of metadata dictionaries of variables that exist on this proc.
@@ -72,7 +75,7 @@ class Assembler(object):
 
         for typ in ['input', 'output']:
             nvar = len(variable_metadata[typ])
-            nvar_all = sizes[typ]
+            nvar_all = nvars[typ]
 
             # Locally determine var_set for each var
             local_set_dict = {}
@@ -108,25 +111,24 @@ class Assembler(object):
             # Allocate the size arrays using var_count
             self._variable_sizes[typ] = []
             for iset in range(len(self._variable_set_IDs[typ])):
-                self._variable_sizes[typ].append(numpy.zeros((nproc,
-                                                              var_count[iset]),
-                                                             int))
+                self._variable_sizes[typ].append(
+                    numpy.zeros((nproc, var_count[iset]), int))
+
+            self._variable_sizes_all[typ] = numpy.zeros(
+                (nproc, numpy.sum(var_count)), int)
 
         # Populate the sizes arrays
         iproc = self._comm.rank
-        typ = 'input'
-        for ivar, meta in enumerate(variable_metadata[typ]):
-            size = numpy.prod(meta['indices'].shape)
-            ivar_all = variable_indices[typ][ivar]
-            iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
-            self._variable_sizes[typ][iset][iproc, ivar_set] = size
-
-        typ = 'output'
-        for ivar, meta in enumerate(variable_metadata[typ]):
-            size = numpy.prod(meta['shape'])
-            ivar_all = variable_indices[typ][ivar]
-            iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
-            self._variable_sizes[typ][iset][iproc, ivar_set] = size
+        for typ in ['input', 'output']:
+            for ivar, meta in enumerate(variable_metadata[typ]):
+                if typ == 'input':
+                    size = numpy.prod(meta['indices'].shape)
+                elif typ == 'output':
+                    size = numpy.prod(meta['shape'])
+                ivar_all = variable_indices[typ][ivar]
+                iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
+                self._variable_sizes[typ][iset][iproc, ivar_set] = size
+                self._variable_sizes_all[typ][iproc, ivar_all] = size
 
         # Do an allgather on the sizes arrays
         if self._comm.size > 1:
@@ -135,6 +137,8 @@ class Assembler(object):
                 for iset in range(nset):
                     array = self._variable_sizes[typ][iset]
                     self._comm.Allgather(array[iproc, :], array)
+                self._comm.Allgather(self._variable_sizes_all[typ][iproc, :],
+                                     self._variable_sizes_all[typ])
 
     def _setup_connections(self, connections, variable_allprocs_names):
         """Identify implicit connections and combine with explicit ones.
@@ -199,7 +203,7 @@ class Assembler(object):
         for ind, metadata in enumerate(input_metadata):
             isize = numpy.prod(metadata['indices'].shape)
             ind2 += isize
-            self._src_indices[ind1:ind2] = metadata['indices'].flatten()
+            self._src_indices[ind1:ind2] = metadata['indices'].flat
             self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
                                                                           ind2]
             ind1 += isize

@@ -2,7 +2,6 @@ from __future__ import print_function
 
 import unittest
 import os
-import sys
 from subprocess import Popen, PIPE, STDOUT, call
 from fnmatch import fnmatch, filter as fnfilter
 
@@ -38,7 +37,7 @@ def _get_files():
         for dpattern in dir_excludes:
             newdn = [d for d in dnames if not fnmatch(d, dpattern)]
             if len(newdn) != len(dnames):
-                dnames[:] = newdn # replace contents of dnames to cause pruning
+                dnames[:] = newdn  # replace contents of dnames to cause pruning
 
         for fpattern in file_excludes:
             fnames = [f for f in fnames if not fnmatch(f, fpattern)]
@@ -59,7 +58,7 @@ class LintTestCase(unittest.TestCase):
             output = p.communicate()[0]
 
             if p.returncode:
-                msgs = [line for line in output.split('\n') if ':' in line]
+                msgs = [line for line in str(output).split('\n') if ':' in line]
                 self.fail('pep8 failure: %s' % '\n'.join(msgs))
 
     def test_pep257(self):

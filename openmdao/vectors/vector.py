@@ -1,5 +1,5 @@
 """Define the base Vector and Transfer classes."""
-from __future__ import division
+from __future__ import division, print_function
 import numpy
 
 from six.moves import range
@@ -28,20 +28,26 @@ class Vector(object):
     _iproc : int
         global processor index.
     _views : dict
-        dictionary mapping variable names to the corresponding ndarray views.
+        dictionary mapping variable names to the ndarray views.
+    _views_flat : dict
+        dictionary mapping variable names to the flattened ndarray views.
     _idxs : dict
         0 or slice(None), used so that 1-sized vectors are made floats.
     _names : set([str, ...])
         set of variables that are relevant in the current context.
     _global_vector : Vector
         pointer to the vector owned by the root system.
-    _data : object
-        the actual allocated data (depends on implementation).
+    _data : list
+        list of the actual allocated data (depends on implementation).
+    _indices : list
+        list of indices mapping the varset-grouped data to the global vector.
     """
 
     def __init__(self, name, typ, system, global_vector=None):
         """Initialize all attributes.
 
+        Args
+        ----
         name : str
             right-hand-side (RHS) name.
         typ : str
@@ -59,6 +65,7 @@ class Vector(object):
 
         self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
         self._views = {}
+        self._views_flat = {}
         self._idxs = {}
 
         # self._names will either be equivalent to self._views or to the
@@ -66,7 +73,8 @@ class Vector(object):
         self._names = self._views
 
         self._global_vector = None
-        self._data = None
+        self._data = []
+        self._indices = []
         if global_vector is None:
             self._global_vector = self
         else:
@@ -104,40 +112,51 @@ class Vector(object):
         vec._clone_data()
         return vec
 
-    def _combined_varset_data(self, arr=None):
-        """Combine all of the varset data members into a single array.
-
-        If an array is passed in, that array is filled with the values.
-        Otherwise, a new array is created.
-
-        Returns
-        -------
-
-        An array that combines all var set entries of our _data list.
-        """
-        if arr is None:
-            return numpy.concatenate(self._data)
-        else:
-            start = 0
-            for dat in self._data:
-                end = start + dat.size
-                arr[start:end] = dat
-                start = end
-            return arr
-
-    def _update_varset_data(self, arr):
-        """Update the data entry for each var set into the combined array.
+    def get_data(self, array=None):
+        """Get the array combining the data of all the varsets.
 
         Args
         ----
-        arr : ndarray
-            Array to be assigned to our _data entries.
+        array : ndarray or None
+            Array to fill in with the values; otherwise new array created.
+
+        Returns
+        -------
+        ndarray
+            Array combining the data of all the varsets.
         """
-        start = 0
-        for dat in self._data:
-            end = start + dat.size
-            dat[:] = arr[start:end]
-            start = end
+        if array is None:
+            inds = self._system._variable_myproc_indices[self._typ]
+            sizes = self._assembler._variable_sizes_all[self._typ][self._iproc,
+                                                                   inds]
+            array = numpy.zeros(numpy.sum(sizes))
+
+        for ind, data in enumerate(self._data):
+            array[self._indices[ind]] = data
+
+        return array
+
+    def set_data(self, array):
+        """Set the incoming array combining the data of all the varsets.
+
+        Args
+        ----
+        array : ndarray
+            Array to set to the data for all the varsets.
+        """
+        for ind, data in enumerate(self._data):
+            data[:] = array[self._indices[ind]]
+
+    def iadd_data(self, array):
+        """In-place add the incoming combined array.
+
+        Args
+        ----
+        array : ndarray
+            Array to set to the data for all the varsets.
+        """
+        for ind, data in enumerate(self._data):
+            data[:] += array[self._indices[ind]]
 
     def __contains__(self, key):
         """Check if the variable is involved in the current mat-vec product.
@@ -219,6 +238,7 @@ class Vector(object):
 
         Sets the following attributes:
             _views
+            _views_flat
             _idxs
         """
         pass
@@ -273,10 +293,10 @@ class Vector(object):
 
         Args
         ----
-        vec : Vector
-            this vector times val is added to self.
         val : int or float
             scalar.
+        vec : Vector
+            this vector times val is added to self.
         """
         pass
 

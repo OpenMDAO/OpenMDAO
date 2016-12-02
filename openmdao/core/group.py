@@ -12,10 +12,10 @@ class Group(System):
     """Class used to group systems together; instantiate or inherit."""
 
     def initialize(self):
-        """Add subsystems from kwargs; set block Gauss-Seidel as default."""
-        self.metadata.declare('subsystems', typ=list, value=[])
+        """Add subsystems from kwargs."""
+        self.metadata.declare('subsystems', typ=list, value=[],
+                              desc='list of subsystems')
         self._subsystems_allprocs.extend(self.metadata['subsystems'])
-
         self.nl_solver = NonlinearBlockGS()
         self.ln_solver = LinearBlockGS()
 
@@ -28,31 +28,24 @@ class Group(System):
         ----
         name : str
             Name of the subsystem being added
-
         subsys : System
             An instantiated, but not-yet-set up system object.
-
         promotes : iter of str, optional
             A list of variable names specifying which subsystem variables
             to 'promote' up to this group. This is for backwards compatibility
             with older versions of OpenMDAO.
-
         promotes_inputs : iter of str, optional
             A list of input variable names specifying which subsystem input
             variables to 'promote' up to this group.
-
         promotes_outputs : iter of str, optional
             A list of output variable names specifying which subsystem output
             variables to 'promote' up to this group.
-
         renames_inputs : list of (str, str) or dict, optional
             A dict mapping old name to new name for any subsystem
             input variables that should be renamed in this group.
-
         renames_outputs : list of (str, str) or dict, optional
             A dict mapping old name to new name for any subsystem
             output variables that should be renamed in this group.
-
         """
         self._subsystems_allprocs.append(subsys)
         subsys.name = name
@@ -77,10 +70,8 @@ class Group(System):
         ----
         op_name : str
             name of the output (source) variable to connect
-
         ip_name : str
             name of the input (target) variable to connect
-
         src_indices : collection of int, optional
             When an input variable connects to some subset of an array output
             variable, you can specify which indices of the source to be
@@ -182,17 +173,19 @@ class Group(System):
                     self._variable_allprocs_names[typ].extend(names)
 
     def _apply_nonlinear(self):
-        """Compute residuals; perform recursion."""
+        """See System._apply_nonlinear."""
         self._transfers[None](self._inputs, self._outputs, 'fwd')
+        # Apply recursion
         for subsys in self._subsystems_myproc:
             subsys._apply_nonlinear()
 
     def _solve_nonlinear(self):
-        """Compute outputs; run nonlinear solver."""
+        """See System._solve_nonlinear."""
         return self._nl_solver()
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """Compute jac-vec product; use global Jacobian / apply recursion."""
+        """See System._apply_linear."""
+        # Use global Jacobian
         if self._jacobian._top_name == self.path_name:
             for vec_name in vec_names:
                 with self._matvec_context(vec_name, var_inds, mode) as vecs:
@@ -200,12 +193,14 @@ class Group(System):
                     self._jacobian._system = self
                     self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                           mode)
+        # Apply recursion
         else:
             if mode == 'fwd':
                 for vec_name in vec_names:
                     d_inputs = self._vectors['input'][vec_name]
                     d_outputs = self._vectors['output'][vec_name]
-                    self._transfers[None](d_inputs, d_outputs, mode)
+                    self._vector_transfers[vec_name][None](
+                        d_inputs, d_outputs, mode)
 
             for subsys in self._subsystems_myproc:
                 subsys._apply_linear(vec_names, mode, var_inds)
@@ -214,17 +209,20 @@ class Group(System):
                 for vec_name in vec_names:
                     d_inputs = self._vectors['input'][vec_name]
                     d_outputs = self._vectors['output'][vec_name]
-                    self._transfers[None](d_inputs, d_outputs, mode)
+                    self._vector_transfers[vec_name][None](
+                        d_inputs, d_outputs, mode)
 
     def _solve_linear(self, vec_names, mode):
-        """Apply inverse jac product; run linear solver."""
+        """See System._solve_linear."""
         return self._ln_solver(vec_names, mode)
 
-    def _linearize(self):
-        """Compute jacobian / factorization; apply recursion."""
+    def _linearize(self, initial=False):
+        """See System._linearize."""
         for subsys in self._subsystems_myproc:
             subsys._linearize()
 
-        if self._jacobian._top_name == self.path_name:
+        # Update jacobian
+        if not initial and self._jacobian._top_name == self.path_name:
             self._jacobian._system = self
             self._jacobian._update()
+            self._jacobian._precompute_iter()

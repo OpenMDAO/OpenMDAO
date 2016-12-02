@@ -198,9 +198,9 @@ class ExecComp(ExplicitComponent):
         for expr in self._codes:
             exec(expr, _expr_dict, _IODict(outputs, inputs, self._to_colons))
 
-    def linearize(self, params, unknowns, resids):
+    def compute_jacobian(self, params, unknowns, jacobian):
         """
-        Use complex step method to calculate a Jacobian dict.
+        Use complex step method to update the given Jacobian.
 
         Args
         ----
@@ -210,19 +210,13 @@ class ExecComp(ExplicitComponent):
         unknowns : `VecWrapper`
             `VecWrapper` containing outputs and states. (u)
 
-        resids : `VecWrapper`
-            `VecWrapper` containing residuals. (r)
+        jacobians : `Jacobian`
+            Contains sub-jacobians.
 
-        Returns
-        -------
-        dict
-            Dictionary whose keys are tuples of the form ('unknown', 'param')
-            and whose values are ndarrays.
         """
         # our complex step
         step = self.complex_stepsize * 1j
 
-        J = OrderedDict()
         non_pbo_outputs = self._non_pbo_outputs
 
         for param in params._views:
@@ -255,19 +249,17 @@ class ExecComp(ExplicitComponent):
 
                 for u in non_pbo_outputs:
                     jval = imag(uwrap[u] / self.complex_stepsize)
-                    if (u, param) not in J:  # create the dict entry
-                        J[(u, param)] = numpy.zeros((jval.size, psize))
+                    if (u, param) not in jacobian:  # create the dict entry
+                        jacobian[(u, param)] = numpy.zeros((jval.size, psize))
 
                     # set the column in the Jacobian entry
-                    J[(u, param)][:, i] = jval.flat
+                    jacobian[(u, param)][:, i] = jval.flat
 
                 # restore old param value
                 if idx is None:
                     pwrap[param] -= step
                 else:
                     pwrap[param][idx] -= step
-
-        return J
 
 
 class _TmpDict(object):

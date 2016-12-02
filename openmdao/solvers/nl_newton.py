@@ -7,14 +7,29 @@ class NewtonSolver(NonlinearSolver):
 
     SOLVER = 'NL: Newton'
 
+    def _setup_solvers(self, system, depth):
+        """Assign system instance, set depth, and optionally perform setup.
+
+        Args
+        ----
+        system : System
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super(NewtonSolver, self)._setup_solvers(system, depth)
+
+        if 'linear' not in self.options['subsolvers']:
+            self.set_subsolver('linear', system.ln_solver)
+
     def _iter_execute(self):
         """See openmdao.solvers.solver.Solver."""
         system = self._system
         system._vectors['residual'][''].set_vec(system._residuals)
         system._vectors['residual'][''] *= -1.0
         system._linearize()
-        self._subsolvers['linear']([''], 'fwd')
-        if 'linesearch' in self._subsolvers:
-            self._subsolvers['linesearch']()
+        self.options['subsolvers']['linear']([''], 'fwd')
+        if 'linesearch' in self.options['subsolvers']:
+            self.options['subsolvers']['linesearch']()
         else:
             system._outputs += system._vectors['output']['']

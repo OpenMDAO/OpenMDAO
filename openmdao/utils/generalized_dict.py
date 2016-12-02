@@ -49,11 +49,13 @@ class GeneralizedDictionary(object):
         values = self._declared_entries[name]['values']
 
         # (1) Check the type
-        if typ is not None and type(value) != typ:
-            raise ValueError("Entry '{}' has the wrong type".format(name))
+        if typ is not None and not isinstance(value, typ):
+            raise ValueError("Entry '{}' has the wrong type ({})".format(
+                name, typ))
         # (2) Check the value
         if values is not None and value not in values:
-            raise ValueError("Entry '{}'\'s value is invalid".format(name))
+            raise ValueError("Entry '{}'\'s value is not one of {}".format(
+                name, values))
 
     def declare(self, name, typ=None, desc='',
                 value=None, values=None, required=False):
@@ -74,10 +76,6 @@ class GeneralizedDictionary(object):
         required : boolean
             if True, this entry must be specified in _dict or _global_dict.
         """
-        # Check if an entry of the same name has already been declared
-        if name in self._declared_entries:
-            raise ValueError("Entry '{}' already exists".format(name))
-
         self._declared_entries[name] = {
             'typ': typ,
             'desc': desc,
@@ -130,7 +128,18 @@ class GeneralizedDictionary(object):
         return iter(self._dict)
 
     def __contain__(self, key):
-        """Check if the key is in the local dictionary."""
+        """Check if the key is in the local dictionary.
+
+        Args
+        ----
+        key : str
+            name of the entry.
+
+        Returns
+        -------
+        boolean
+            whether key is in the local dict.
+        """
         return key in self._dict
 
     def __setitem__(self, name, value):

@@ -12,19 +12,17 @@ class ScipyIterativeSolver(LinearSolver):
 
     SOLVER = 'LN: SCIPY'
 
-    def __init__(self, subsolvers=None, **kwargs):
+    def __init__(self, **kwargs):
         """Declare the solver option.
 
         Args
         ----
-        subsolvers : dict or None
-            dictionary of subsolvers (nest solvers).
         kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
-        super(ScipyIterativeSolver, self).__init__(subsolvers=subsolvers,
-                                                   **kwargs)
-        self.options.declare('solver', typ=object, value=gmres)
+        super(ScipyIterativeSolver, self).__init__(**kwargs)
+        self.options.declare('solver', typ=object, value=gmres,
+                             desc='function handle for actual solver')
 
     def _mat_vec(self, in_vec):
         """Compute matrix-vector product.
@@ -50,9 +48,15 @@ class ScipyIterativeSolver(LinearSolver):
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
-        x_vec._update_varset_data(in_vec)
-        system._apply_linear([vec_name], self._mode, numpy.arange(ind1, ind2))
-        return b_vec._combined_varset_data()
+        x_vec.set_data(in_vec)
+        var_inds = [
+            system._variable_allprocs_range['output'][0],
+            system._variable_allprocs_range['output'][1],
+            system._variable_allprocs_range['output'][0],
+            system._variable_allprocs_range['output'][1],
+        ]
+        system._apply_linear([vec_name], self._mode, var_inds)
+        return b_vec.get_data()
 
     def _monitor(self, res):
         """Print the residual and iteration number (callback from SciPy).
@@ -79,7 +83,7 @@ class ScipyIterativeSolver(LinearSolver):
         system = self._system
         solver = self.options['solver']
 
-        ilimit = self.options['ilimit']
+        maxiter = self.options['maxiter']
         atol = self.options['atol']
         rtol = self.options['rtol']
 
@@ -93,12 +97,12 @@ class ScipyIterativeSolver(LinearSolver):
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
-            x_vec_combined = x_vec._combined_varset_data()
+            x_vec_combined = x_vec.get_data()
             size = x_vec_combined.size
             linop = LinearOperator((size, size), dtype=float,
                                    matvec=self._mat_vec)
             self._counter = 0
-            x_vec._update_varset_data(
-                solver(linop, b_vec._combined_varset_data(),
-                       x0=x_vec_combined, maxiter=ilimit, tol=atol,
+            x_vec.set_data(
+                solver(linop, b_vec.get_data(),
+                       x0=x_vec_combined, maxiter=maxiter, tol=atol,
                        callback=self._monitor)[0])

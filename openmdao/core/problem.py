@@ -38,7 +38,17 @@ class Problem(object):
     """
 
     def __init__(self, root=None, comm=None, AssemblerClass=None):
-        """Initialize attributes."""
+        """Initialize attributes.
+
+        Args
+        ----
+        root : System or None
+            pointer to the top-level System object (root node in the tree).
+        comm : MPI.Comm or FakeComm or None
+            the global communicator; the same as that of assembler and root.
+        AssemblerClass : Assembler or None
+            pointer to the global Assembler object.
+        """
         if comm is None:
             try:
                 from mpi4py import MPI
@@ -88,16 +98,30 @@ class Problem(object):
 
     # TODO: once we have drivers, this should call self.driver.run() instead
     def run(self):
-        """Run the model by calling the root's solve_nonlinear."""
-        self.root._solve_nonlinear()
+        """Run the model by calling the root's solve_nonlinear.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        return self.root._solve_nonlinear()
 
     def setup(self, VectorClass=None, check=False, out_stream=sys.stdout):
         """Set up everything (root, assembler, vector, solvers, drivers).
 
         Args
         ----
-        VectorClass
+        VectorClass : type
             reference to an actual Vector class; not an instance.
+        check : boolean
+            whether to run error check after setup is complete.
+        out_stream : file
+            Output stream where report will be written if check is performed.
 
         Returns
         -------
@@ -118,9 +142,9 @@ class Problem(object):
         root._setup_connections()
 
         # Assembler setup: variable metadata and indices
-        sizes = {typ: len(root._variable_allprocs_names[typ])
+        nvars = {typ: len(root._variable_allprocs_names[typ])
                  for typ in ['input', 'output']}
-        assembler._setup_variables(sizes, root._variable_myproc_metadata,
+        assembler._setup_variables(nvars, root._variable_myproc_metadata,
                                    root._variable_myproc_indices)
 
         # Assembler setup: variable connections
@@ -145,9 +169,9 @@ class Problem(object):
         Args
         ----
         vec_name : str
-            name of the vector
-        VectorClass
-            reference to the actual Vector class
+            name of the vector.
+        VectorClass : type
+            reference to the actual Vector class.
         """
         root = self.root
         assembler = self._assembler
