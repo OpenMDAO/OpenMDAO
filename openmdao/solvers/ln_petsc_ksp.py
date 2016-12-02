@@ -137,12 +137,15 @@ class PetscKSP(LinearSolver):
 
         self._print_name = 'KSP'
 
-        # additional option to specify KSP algorithm to use
+        # add option to specify which KSP algorithm to use
         self.options.declare('ksp_type', value='fgmres', values=KSP_TYPES,
                              desc="KSP algorithm to use. Default is 'fgmres'.")
 
         # initialize dictionary of KSP instances (keyed on vector name)
         self.ksp = {}
+
+        # initialize preconditioner to None
+        self.precon = None
 
     def mult(self, mat, in_vec, result):
         """Apply Jacobian matrix (KSP Callback).
@@ -199,6 +202,9 @@ class PetscKSP(LinearSolver):
         mode : string
             Derivative mode, can be 'fwd' or 'rev'.
         """
+        if 'precon' in self.options['subsolvers']:
+            self.precon = self.options['subsolvers']['precon']
+
         self._vec_names = vec_names
         self._mode = mode
 
@@ -250,9 +256,7 @@ class PetscKSP(LinearSolver):
         result : PetSC Vector
             Empty vector into which we return the preconditioned in_vec
         """
-        if 'precon' in self.options['subsolvers']:
-            precon = self.options['subsolvers']['precon']
-
+        if self.precon:
             system = self._system
             vec_name = self._vec_name
             mode = self._mode
@@ -269,11 +273,12 @@ class PetscKSP(LinearSolver):
             b_vec.set_data(_get_petsc_vec_array(in_vec))
 
             # call the preconditioner
-            precon([vec_name], mode)
+            self.precon([vec_name], mode)
 
             # stuff resulting value of x vector into result for KSP
             x_vec.get_data(result.array)
         else:
+            # no preconditioner, just pass back the incoming vector
             result.array[:] = _get_petsc_vec_array(in_vec)
 
     def _get_ksp_solver(self, system, vec_name):
