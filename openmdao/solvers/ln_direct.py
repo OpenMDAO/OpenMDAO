@@ -79,13 +79,13 @@ class DirectSolver(LinearSolver):
             # assign x and b vectors based on mode
             if self._mode == 'fwd':
                 x_vec = system._vectors['output'][vec_name]
-                b_vec = system._vectors['residual'][vec_name]
+                b_data = system._vectors['residual'][vec_name].get_data()
             elif self._mode == 'rev':
                 x_vec = system._vectors['residual'][vec_name]
-                b_vec = system._vectors['output'][vec_name]
+                b_data = system._vectors['output'][vec_name].get_data()
 
             # assemble jacobian
-            n_edge = x_vec.get_data().size
+            n_edge = b_data.size
             ident = numpy.eye(n_edge)
             jacobian = numpy.empty((n_edge, n_edge))
             for i in range(n_edge):
@@ -94,8 +94,8 @@ class DirectSolver(LinearSolver):
             # solve
             if self.options['method'] == 'LU':
                 lup = lu_factor(jacobian)
-                result = lu_solve(lup, b_vec.get_data())
+                result = lu_solve(lup, b_data)
             else:
-                result = numpy.linalg.solve(jacobian, b_vec.get_data())
+                result = numpy.linalg.solve(jacobian, b_data)
 
             x_vec.set_data(result)

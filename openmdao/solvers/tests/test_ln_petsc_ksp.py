@@ -33,16 +33,16 @@ class TestPetscKSP(unittest.TestCase):
         group._vectors['output'][''].set_const(0.0)
         group._solve_linear([''], 'fwd')
         output = group._vectors['output']['']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output[0], group.expected_solution[0], 2e-15)
+        assert_rel_error(self, output[1], group.expected_solution[1], 2e-15)
 
         # reverse
         group._vectors['output'][''].set_const(1.0)
         group._vectors['residual'][''].set_const(0.0)
         group._solve_linear([''], 'rev')
         output = group._vectors['residual']['']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output[0], group.expected_solution[0], 2e-15)
+        assert_rel_error(self, output[1], group.expected_solution[1], 2e-15)
 
     def test_solve_linear_ksp_gmres(self):
         """Solve implicit system with PetscKSP using 'gmres' method."""
@@ -58,16 +58,16 @@ class TestPetscKSP(unittest.TestCase):
         group._vectors['output'][''].set_const(0.0)
         group._solve_linear([''], 'fwd')
         output = group._vectors['output']['']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output[0], group.expected_solution[0], 2e-15)
+        assert_rel_error(self, output[1], group.expected_solution[1], 2e-15)
 
         # reverse
         group._vectors['output'][''].set_const(1.0)
         group._vectors['residual'][''].set_const(0.0)
         group._solve_linear([''], 'rev')
         output = group._vectors['residual']['']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output[0], group.expected_solution[0], 2e-15)
+        assert_rel_error(self, output[1], group.expected_solution[1], 2e-15)
 
     def test_solve_linear_ksp_maxiter(self):
         """Verify that PetscKSP abides by the 'maxiter' option."""
@@ -104,16 +104,16 @@ class TestPetscKSP(unittest.TestCase):
         group._vectors['output'][''].set_const(0.0)
         group._solve_linear([''], 'fwd')
         output = group._vectors['output']['']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output[0], group.expected_solution[0], 2e-15)
+        assert_rel_error(self, output[1], group.expected_solution[1], 2e-15)
 
         # reverse
         group._vectors['output'][''].set_const(1.0)
         group._vectors['residual'][''].set_const(0.0)
         group._solve_linear([''], 'rev')
         output = group._vectors['residual']['']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output[0], group.expected_solution[0], 2e-15)
+        assert_rel_error(self, output[1], group.expected_solution[1], 2e-15)
 
     def test_sellar_derivs_grouped_precon(self):
         """Solve Sellar problem with PetscKSP using a preconditioner."""

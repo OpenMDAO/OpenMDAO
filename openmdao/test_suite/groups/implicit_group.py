@@ -76,6 +76,17 @@ class Comp(ImplicitComponent):
                 if 'd' in d_inputs:
                     d_inputs['d'] += 5 * d_residuals['z']
 
+    def solve_linear(self, d_outputs, d_residuals, mode):
+        if mode == 'fwd':
+            out_vec = d_outputs
+            in_vec = d_residuals
+        elif mode == 'rev':
+            in_vec = d_outputs
+            out_vec = d_residuals
+
+        for var in ['w', 'x', 'y', 'z']:
+            out_vec[var] = in_vec[var]
+
 
 class TestImplicitGroup(Group):
     """A `Group` with two interconnected `ImplicitComponent`s."""
