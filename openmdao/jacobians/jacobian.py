@@ -76,6 +76,8 @@ class Jacobian(object):
             local size of the output variable.
         ip_size : int
             local size of the input variable.
+        typ : str
+            'input' or 'output'.
         """
         op_name, ip_name = key
         outputs = self._system._outputs
@@ -88,16 +90,19 @@ class Jacobian(object):
             ip_size = len(inputs._views_flat[ip_name])
             ip_ind = indices['input'][ip_name]
             dct = self._ip_dict
+            typ = 'input'
         elif ip_name in outputs:
             ip_size = len(outputs._views_flat[ip_name])
             ip_ind = indices['output'][ip_name]
             dct = self._op_dict
+            typ = 'output'
         else:
             ip_size = 0
             ip_ind = -1
             dct = None
+            typ = ''
 
-        return dct, op_ind, ip_ind, op_size, ip_size
+        return dct, op_ind, ip_ind, op_size, ip_size, typ
 
     def _negate(self, key):
         """Multiply this sub-Jacobian by -1.0, for explicit variables.
@@ -107,7 +112,7 @@ class Jacobian(object):
         key : (str, str)
             output name, input name of sub-Jacobian.
         """
-        dct, op_ind, ip_ind, op_size, ip_size = self._process_key(key)
+        dct, op_ind, ip_ind, op_size, ip_size, typ = self._process_key(key)
         jac = dct[op_ind, ip_ind]
 
         if isinstance(jac, numpy.ndarray):
@@ -154,7 +159,7 @@ class Jacobian(object):
         boolean
             return whether sub-Jacobian has been defined.
         """
-        dct, op_ind, ip_ind, op_size, ip_size = self._process_key(key)
+        dct, op_ind, ip_ind, op_size, ip_size, typ = self._process_key(key)
         if dct is None:
             return False
         else:
@@ -180,7 +185,8 @@ class Jacobian(object):
         jac : int or float or ndarray or list[3] or tuple[3]
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        dct, op_ind, ip_ind, op_size, ip_size = self._process_key(key)
+        system = self._system
+        dct, op_ind, ip_ind, op_size, ip_size, typ = self._process_key(key)
 
         if numpy.isscalar(jac):
             jac = numpy.array([jac]).reshape((op_size, ip_size))
@@ -199,6 +205,19 @@ class Jacobian(object):
             raise TypeError("Sub-jacobian of type '%s' for key %s is "
                             "not supported." % (type(jac).__name__, key))
 
+        ind = system._variable_myproc_names['output'].index(key[0])
+        r_factor = system._scaling_to_norm['residual'][ind, 1]
+
+        ind = system._variable_myproc_names[typ].index(key[1])
+        c_factor = system._scaling_to_norm[typ][ind, 1]
+
+        if isinstance(jac, numpy.ndarray):
+            jac *= r_factor / c_factor
+        elif isinstance(jac, (coo_matrix, csr_matrix)):
+            jac.data *= r_factor / c_factor
+        elif len(jac) == 3:
+            jac[0] *= r_factor / c_factor
+
         dct[op_ind, ip_ind] = jac
 
     def __getitem__(self, key):
@@ -211,12 +230,27 @@ class Jacobian(object):
 
         Returns
         -------
-        jac : ndarray or list[3]
-            sub-Jacobian as an array, or AIJ/IJ list or tuple.
+        jac : ndarray or spmatrix or list[3]
+            sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        dct, op_ind, ip_ind, op_size, ip_size = self._process_key(key)
+        system = self._system
+        dct, op_ind, ip_ind, op_size, ip_size, typ = self._process_key(key)
+        jac = dct[op_ind, ip_ind]
 
-        return dct[op_ind, ip_ind]
+        ind = system._variable_myproc_names['output'].index(key[0])
+        r_factor = system._scaling_to_phys['residual'][ind, 1]
+
+        ind = system._variable_myproc_names[typ].index(key[1])
+        c_factor = system._scaling_to_phys[typ][ind, 1]
+
+        if isinstance(jac, numpy.ndarray):
+            jac *= r_factor / c_factor
+        elif isinstance(jac, (coo_matrix, csr_matrix)):
+            jac.data *= r_factor / c_factor
+        elif len(jac) == 3:
+            jac[0] *= r_factor / c_factor
+
+        return jac
 
     def _initialize(self):
         """Allocate the global matrices."""
