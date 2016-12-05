@@ -21,57 +21,81 @@ from openmdao.core.system import System
 class Component(System):
     """Base Component class; not to be directly instantiated."""
 
-    DEFAULTS = {
-        'indices': [0],
+    INPUT_DEFAULTS = {
         'shape': (1,),
         'units': '',
-        'value': 1.0,
-        'scale': 1.0,
-        'lower': None,
-        'upper': None,
         'var_set': 0,
+        'indices': [0],
     }
 
-    def _add_variable(self, name, typ, val, kwargs):
-        """Add an input/output variable to the component.
+    OUTPUT_DEFAULTS = {
+        'shape': (1,),
+        'units': '',
+        'var_set': 0,
+        'lower': None,
+        'upper': None,
+        'ref': 1.0,
+        'ref0': 0.0,
+        'res_units': '',
+        'res_ref': 1.0,
+        'res_ref0': 0.0,
+    }
+
+    def add_input(self, name, val=1.0, **kwargs):
+        """Add an input variable to the component.
 
         Args
         ----
         name : str
             name of the variable in this component's namespace.
-        typ : str
-            either 'input' or 'output'
         val : object
             The value of the variable being added.
-        kwargs : dict
-            variable metadata with DEFAULTS defined above.
+        **kwargs : dict
+            additional args, documented [INSERT REF].
         """
-        metadata = self.DEFAULTS.copy()
+        metadata = self.INPUT_DEFAULTS.copy()
         metadata.update(kwargs)
+
+        if isinstance(val, numpy.ndarray) and 'indices' not in kwargs:
+            metadata['indices'] = numpy.arange(0, val.size, dtype=int)
+        else:
+            metadata['indices'] = numpy.array(metadata['indices'])
+
         metadata['value'] = val
         if isinstance(val, numpy.ndarray):
             metadata['shape'] = val.shape
-            if typ == 'input' and 'indices' not in kwargs:
-                metadata['indices'] = numpy.arange(0, val.size, dtype=int)
 
-        if typ == 'input':
-            metadata['indices'] = numpy.array(metadata['indices'])
-
-        self._variable_allprocs_names[typ].append(name)
-        self._variable_myproc_names[typ].append(name)
-        self._variable_myproc_metadata[typ].append(metadata)
-
-    def add_input(self, name, val=1.0, **kwargs):
-        """See openmdao.core.component.Component._add_variable."""
-        self._add_variable(name, 'input', val, kwargs)
+        self._variable_allprocs_names['input'].append(name)
+        self._variable_myproc_names['input'].append(name)
+        self._variable_myproc_metadata['input'].append(metadata)
 
     def add_output(self, name, val=1.0, **kwargs):
-        """See openmdao.core.component.Component._add_variable."""
-        self._add_variable(name, 'output', val, kwargs)
+        """Add an output variable to the component.
 
-    def _setup_vector(self, vectors, vector_var_ids):
+        Args
+        ----
+        name : str
+            name of the variable in this component's namespace.
+        val : object
+            The value of the variable being added.
+        **kwargs : dict
+            additional args, documented [INSERT REF].
+        """
+        metadata = self.OUTPUT_DEFAULTS.copy()
+        metadata.update(kwargs)
+
+        metadata['value'] = val
+        if isinstance(val, numpy.ndarray):
+            metadata['shape'] = val.shape
+
+        self._variable_allprocs_names['output'].append(name)
+        self._variable_myproc_names['output'].append(name)
+        self._variable_myproc_metadata['output'].append(metadata)
+
+    def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
         """See openmdao.core.component.Component._setup_vector."""
-        super(Component, self)._setup_vector(vectors, vector_var_ids)
+        super(Component, self)._setup_vector(vectors, vector_var_ids,
+                                             use_ref_vector)
 
         # Components must load their initial input and output values into the
         # vectors.
@@ -93,22 +117,52 @@ class ImplicitComponent(Component):
 
     def _apply_nonlinear(self):
         """See System._apply_nonlinear."""
+        self._inputs.scale(self._scaling_to_phys['input'])
+        self._outputs.scale(self._scaling_to_phys['output'])
+        self._residuals.scale(self._scaling_to_phys['residual'])
+
         self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
+
+        self._inputs.scale(self._scaling_to_norm['input'])
+        self._outputs.scale(self._scaling_to_norm['output'])
+        self._residuals.scale(self._scaling_to_norm['residual'])
 
     def _solve_nonlinear(self):
         """See System._solve_nonlinear."""
         if self._nl_solver is not None:
             self._nl_solver(self._inputs, self._outputs)
         else:
+            self._inputs.scale(self._scaling_to_phys['input'])
+            self._outputs.scale(self._scaling_to_phys['output'])
+            self._residuals.scale(self._scaling_to_phys['residual'])
+
             self.solve_nonlinear(self._inputs, self._outputs)
+
+            self._inputs.scale(self._scaling_to_norm['input'])
+            self._outputs.scale(self._scaling_to_norm['output'])
+            self._residuals.scale(self._scaling_to_norm['residual'])
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """See System._apply_linear."""
         for vec_name in vec_names:
             with self._matvec_context(vec_name, var_inds, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
+
+                self._inputs.scale(self._scaling_to_phys['input'])
+                self._outputs.scale(self._scaling_to_phys['output'])
+                d_inputs.scale(self._scaling_to_phys['input'])
+                d_outputs.scale(self._scaling_to_phys['output'])
+                d_residuals.scale(self._scaling_to_phys['residual'])
+
                 self.apply_linear(self._inputs, self._outputs,
                                   d_inputs, d_outputs, d_residuals, mode)
+
+                self._inputs.scale(self._scaling_to_norm['input'])
+                self._outputs.scale(self._scaling_to_norm['output'])
+                d_inputs.scale(self._scaling_to_norm['input'])
+                d_outputs.scale(self._scaling_to_norm['output'])
+                d_residuals.scale(self._scaling_to_norm['residual'])
+
                 self._jacobian._system = self
                 self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
 
@@ -121,14 +175,29 @@ class ImplicitComponent(Component):
             for vec_name in vec_names:
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
+
+                d_outputs.scale(self._scaling_to_phys['output'])
+                d_residuals.scale(self._scaling_to_phys['residual'])
+
                 tmp = self.solve_linear(d_outputs, d_residuals, mode)
+
+                d_outputs.scale(self._scaling_to_norm['output'])
+                d_residuals.scale(self._scaling_to_norm['residual'])
+
                 success = success and tmp
             return success
 
     def _linearize(self, initial=False):
         """See System._linearize."""
         self._jacobian._system = self
+
+        self._inputs.scale(self._scaling_to_phys['input'])
+        self._outputs.scale(self._scaling_to_phys['output'])
+
         self.linearize(self._inputs, self._outputs, self._jacobian)
+
+        self._inputs.scale(self._scaling_to_norm['input'])
+        self._outputs.scale(self._scaling_to_norm['output'])
 
         self._jacobian._precompute_iter()
         if not initial and self._jacobian._top_name == self.path_name:
@@ -230,7 +299,15 @@ class ExplicitComponent(Component):
         residuals = self._residuals
 
         residuals.set_vec(outputs)
+
+        self._inputs.scale(self._scaling_to_phys['input'])
+        self._outputs.scale(self._scaling_to_phys['output'])
+
         self.compute(inputs, outputs)
+
+        self._inputs.scale(self._scaling_to_norm['input'])
+        self._outputs.scale(self._scaling_to_norm['output'])
+
         residuals -= outputs
         outputs += residuals
 
@@ -241,7 +318,14 @@ class ExplicitComponent(Component):
         residuals = self._residuals
 
         residuals.set_const(0.0)
+
+        self._inputs.scale(self._scaling_to_phys['input'])
+        self._outputs.scale(self._scaling_to_phys['output'])
+
         self.compute(inputs, outputs)
+
+        self._inputs.scale(self._scaling_to_norm['input'])
+        self._outputs.scale(self._scaling_to_norm['output'])
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """See System._apply_linear."""
@@ -253,9 +337,21 @@ class ExplicitComponent(Component):
                                       mode)
 
                 d_residuals *= -1.0
+
+                self._inputs.scale(self._scaling_to_phys['input'])
+                self._outputs.scale(self._scaling_to_phys['output'])
+                d_inputs.scale(self._scaling_to_phys['input'])
+                d_residuals.scale(self._scaling_to_phys['residual'])
+                #
                 self.compute_jacvec_product(
                     self._inputs, self._outputs,
                     d_inputs, d_residuals, mode)
+                #
+                self._inputs.scale(self._scaling_to_norm['input'])
+                self._outputs.scale(self._scaling_to_norm['output'])
+                d_inputs.scale(self._scaling_to_norm['input'])
+                d_residuals.scale(self._scaling_to_norm['residual'])
+
                 d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode):
@@ -271,7 +367,12 @@ class ExplicitComponent(Component):
     def _linearize(self, initial=False):
         """See System._linearize."""
         self._jacobian._system = self
+
+        self._inputs.scale(self._scaling_to_phys['input'])
+        self._outputs.scale(self._scaling_to_phys['output'])
         self.compute_jacobian(self._inputs, self._outputs, self._jacobian)
+        self._inputs.scale(self._scaling_to_norm['input'])
+        self._outputs.scale(self._scaling_to_norm['output'])
 
         for op_name in self._variable_myproc_names['output']:
             size = len(self._outputs._views_flat[op_name])

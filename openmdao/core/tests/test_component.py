@@ -107,3 +107,7 @@ class TestIndepVarComp(unittest.TestCase):
 
         self.assertEqual(prob['indep_var_1'], 1.0)
         self.assertEqual(prob['indep_var_2'], 2.0)
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -4,6 +4,8 @@ import numpy
 
 from six.moves import range
 
+from openmdao.utils.units import get_units, convert_units
+
 
 class Assembler(object):
     """Base Assembler class.
@@ -209,6 +211,54 @@ class Assembler(object):
             self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
                                                                           ind2]
             ind1 += isize
+
+    def _setup_src_data(self, variable_metadata, variable_indices):
+        """Compute and store unit/scaling information for inputs.
+
+        Args
+        ----
+        variable_metadata : list of dict
+            list of metadata dictionaries for outputs of root system.
+        variable_indices : int ndarray
+            global indices of outputs that exist on this processor.
+        """
+        nvar_out = len(variable_metadata)
+        # Column 0 is ivar_out, column 1 is unit_type ID
+        src_std_nrm_int = numpy.empty((nvar_out, 2), int)
+        # The two columns correspond to ref0 and ref
+        src_std_nrm_flt = numpy.empty((nvar_out, 2))
+
+        # Get unit type as well as ref0 and ref in standard units
+        src_std_nrm_int[:, 0] = variable_indices
+        for ivar_out, meta in enumerate(variable_metadata):
+            src_std_nrm_int[ivar_out, 1] = get_units(meta['units'])[0]
+            src_std_nrm_flt[ivar_out, 0] = \
+                convert_units(meta['ref0'], meta['units'])
+            src_std_nrm_flt[ivar_out, 1] = \
+                convert_units(meta['ref'] - meta['ref0'], meta['units'])
+
+        # Broadcast to all procs
+        if self._comm.size > 1:
+            src_std_nrm_int_raw = self.comm.allgather(src_std_nrm_int)
+            src_std_nrm_flt_raw = self.comm.allgather(src_std_nrm_flt)
+            src_std_nrm_int = numpy.vstack(src_std_nrm_int_raw)
+            src_std_nrm_flt = numpy.vstack(src_std_nrm_flt_raw)
+
+        # Now, we can store ref0 and ref for each input
+        nvar_in = len(self._input_var_ids)
+        self._scal_std_nrm_i = numpy.empty(nvar_in, int)
+        self._scal_std_nrm_0 = numpy.empty(nvar_in)
+        self._scal_std_nrm_1 = numpy.empty(nvar_in)
+        for ivar_in, ivar_out in enumerate(self._input_var_ids):
+            if ivar_out != -1:
+                ind = numpy.where(src_std_nrm_int[:, 0] == ivar_out)[0][0]
+                self._scal_std_nrm_i[ivar_in] = src_std_nrm_int[ind, 1]
+                self._scal_std_nrm_0[ivar_in] = src_std_nrm_flt[ind, 0]
+                self._scal_std_nrm_1[ivar_in] = src_std_nrm_flt[ind, 1]
+            else:
+                self._scal_std_nrm_i[ivar_in] = -1
+                self._scal_std_nrm_0[ivar_in] = 0.
+                self._scal_std_nrm_1[ivar_in] = 1.
 
     def _compute_transfers(self, nsub_allprocs, var_range,
                            subsystems_myproc, subsystems_inds):
