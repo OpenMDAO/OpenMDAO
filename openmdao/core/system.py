@@ -409,19 +409,20 @@ class System(object):
 
         # Initialize scaling arrays
         for scaling in [self._scaling_to_norm, self._scaling_to_phys]:
-            scaling['input'] = numpy.empty((nvar_in, 2), int)
-            scaling['output'] = numpy.empty((nvar_out, 2), int)
-            scaling['residual'] = numpy.empty((nvar_out, 2), int)
+            scaling['input'] = numpy.empty((nvar_in, 2))
+            scaling['output'] = numpy.empty((nvar_out, 2))
+            scaling['residual'] = numpy.empty((nvar_out, 2))
 
         # Scaling coefficients from the src output
-        a0 = self._sys_assembler._scal_std_nrm_0
-        a1 = self._sys_assembler._scal_std_nrm_1
+        src_type = self._sys_assembler._scal_std_nrm_i
+        src_0 = self._sys_assembler._scal_std_nrm_0
+        src_1 = self._sys_assembler._scal_std_nrm_1
         # Compute scaling arrays for inputs using a0 and a1
         for ind, meta in enumerate(self._variable_myproc_metadata['input']):
             self._scaling_to_phys['input'][ind, 0] = \
-                convert_units(a0[ind], '', meta['units'])
+                convert_units(src_0[ind], '', meta['units'])
             self._scaling_to_phys['input'][ind, 1] = \
-                convert_units(a1[ind], '', meta['units'])
+                convert_units(src_1[ind], '', meta['units'])
 
         # Compute scaling arrays for outputs; no unit conversion needed
         for ind, meta in enumerate(self._variable_myproc_metadata['output']):

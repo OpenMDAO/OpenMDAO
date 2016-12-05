@@ -342,11 +342,11 @@ class ExplicitComponent(Component):
                 self._outputs.scale(self._scaling_to_phys['output'])
                 d_inputs.scale(self._scaling_to_phys['input'])
                 d_residuals.scale(self._scaling_to_phys['residual'])
-                #
+
                 self.compute_jacvec_product(
                     self._inputs, self._outputs,
                     d_inputs, d_residuals, mode)
-                #
+
                 self._inputs.scale(self._scaling_to_norm['input'])
                 self._outputs.scale(self._scaling_to_norm['output'])
                 d_inputs.scale(self._scaling_to_norm['input'])
@@ -370,7 +370,9 @@ class ExplicitComponent(Component):
 
         self._inputs.scale(self._scaling_to_phys['input'])
         self._outputs.scale(self._scaling_to_phys['output'])
+
         self.compute_jacobian(self._inputs, self._outputs, self._jacobian)
+
         self._inputs.scale(self._scaling_to_norm['input'])
         self._outputs.scale(self._scaling_to_norm['output'])
 
