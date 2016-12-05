@@ -1,13 +1,12 @@
-"""Test the PetsKSP linear solver class.
-"""
+"""Test the PetsKSP linear solver class."""
 
 from __future__ import division, print_function
 
 import unittest
 
-from openmdao.api import Problem
-
 from openmdao.solvers.ln_direct import DirectSolver
+
+from openmdao.core.problem import Problem
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 

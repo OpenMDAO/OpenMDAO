@@ -66,13 +66,13 @@ class ScipyIterativeSolver(LinearSolver):
             the current residual vector.
         """
         norm = numpy.linalg.norm(res)
-        if self._counter == 0:
+        if self._iter_count == 0:
             if norm != 0.0:
                 self._norm0 = norm
             else:
                 self._norm0 = 1.0
-        self._mpi_print(self._counter, norm / self._norm0, norm)
-        self._counter += 1
+        self._mpi_print(self._iter_count, norm / self._norm0, norm)
+        self._iter_count += 1
 
     def __call__(self, vec_names, mode):
         """See LinearSolver."""
@@ -100,7 +100,7 @@ class ScipyIterativeSolver(LinearSolver):
             size = x_vec_combined.size
             linop = LinearOperator((size, size), dtype=float,
                                    matvec=self._mat_vec)
-            self._counter = 0
+            self._iter_count = 0
             x_vec.set_data(
                 solver(linop, b_vec.get_data(),
                        x0=x_vec_combined, maxiter=maxiter, tol=atol,

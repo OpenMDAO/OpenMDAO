@@ -78,6 +78,15 @@ class Monitor(object):
     """Prints output from PETSc's KSP solvers.
 
     Callable object given to KSP as a callback for printing the residual.
+
+    Attributes
+    ----------
+    _solver : _solver
+        the openmdao solver.
+    _norm : float
+        the current norm.
+    _norm0 : float
+        the norm for the first iteration.
     """
 
     def __init__(self, solver):
@@ -121,6 +130,15 @@ class PetscKSP(LinearSolver):
     -------
     options['ksp_type'] :  str
         KSP algorithm to use. Default is 'fgmres'.
+
+    Attributes
+    ----------
+    _print_name : str ('KSP')
+        print name.
+    _ksp : dist
+        dictionary of KSP instances (keyed on vector name).
+    _precon : Solver
+        preconditioner.
     """
 
     SOLVER = 'LN: PetscKSP'
@@ -142,10 +160,10 @@ class PetscKSP(LinearSolver):
                              desc="KSP algorithm to use. Default is 'fgmres'.")
 
         # initialize dictionary of KSP instances (keyed on vector name)
-        self.ksp = {}
+        self._ksp = {}
 
         # initialize preconditioner to None
-        self.precon = None
+        self._precon = None
 
     def mult(self, mat, in_vec, result):
         """Apply Jacobian matrix (KSP Callback).
@@ -203,7 +221,7 @@ class PetscKSP(LinearSolver):
             Derivative mode, can be 'fwd' or 'rev'.
         """
         if 'precon' in self.options['subsolvers']:
-            self.precon = self.options['subsolvers']['precon']
+            self._precon = self.options['subsolvers']['precon']
 
         self._vec_names = vec_names
         self._mode = mode
@@ -256,7 +274,7 @@ class PetscKSP(LinearSolver):
         result : PetSC Vector
             Empty vector into which we return the preconditioned in_vec
         """
-        if self.precon:
+        if self._precon:
             system = self._system
             vec_name = self._vec_name
             mode = self._mode
@@ -273,7 +291,7 @@ class PetscKSP(LinearSolver):
             b_vec.set_data(_get_petsc_vec_array(in_vec))
 
             # call the preconditioner
-            self.precon([vec_name], mode)
+            self._precon([vec_name], mode)
 
             # stuff resulting value of x vector into result for KSP
             x_vec.get_data(result.array)
@@ -295,8 +313,8 @@ class PetscKSP(LinearSolver):
             name of vector
         """
         # use cached instance if available
-        if vec_name in self.ksp:
-            return self.ksp[vec_name]
+        if vec_name in self._ksp:
+            return self._ksp[vec_name]
 
         rank = system.comm.rank + system._mpi_proc_range[0]
 
@@ -311,7 +329,7 @@ class PetscKSP(LinearSolver):
         jac_mat.setPythonContext(self)
         jac_mat.setUp()
 
-        ksp = self.ksp[vec_name] = PETSc.KSP().create(comm=system.comm)
+        ksp = self._ksp[vec_name] = PETSc.KSP().create(comm=system.comm)
 
         ksp.setOperators(jac_mat)
         ksp.setType(self.options['ksp_type'])

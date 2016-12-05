@@ -113,7 +113,13 @@ class TestImplicitGroup(Group):
         self.ln_solver = lnSolverClass()
         self.nl_solver = nlSolverClass()
 
-        self.expected_solution = [
-            [1./4., 1./5., 1./4., 1./5.],
-            [1./3., 1./6., 1./3., 1./6.]
-        ]
+        if use_varsets:
+            self.expected_solution = [
+                [1./4., 1./5., 1./4., 1./5.],
+                [1./3., 1./6., 1./3., 1./6.]
+            ]
+        else:
+            self.expected_solution = [
+                [1./3., 1./4., 1./5., 1./6.,
+                 1./3., 1./4., 1./5., 1./6.]
+            ]

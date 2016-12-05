@@ -10,7 +10,13 @@ from openmdao.solvers.solver import LinearSolver
 
 
 class DirectSolver(LinearSolver):
-    """LinearSolver that uses linalg.solve or LU factor/solve."""
+    """LinearSolver that uses linalg.solve or LU factor/solve.
+
+    Attributes
+    ----------
+    _print_name : str ('Direct')
+        print name.
+    """
 
     SOLVER = 'LN: Direct'
 
