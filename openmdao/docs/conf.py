@@ -80,8 +80,8 @@ OpenMDAO User Source Documentation
     # to improve the order that the user sees in the source docs, put
     # the important packages in this list explicitly. Any new ones that
     # get added will show up at the end.
-    packages = ['assemblers','core', 'drivers', 'jacobians', 'solvers',
-                'proc_allocators', 'vectors']
+    packages = ['assemblers','core', 'components', 'drivers', 'jacobians', 'matrices', 'solvers',
+                'test_suite', 'proc_allocators', 'utils', 'vectors']
     # Everything in dir that isn't discarded is appended as a source package.
     for listing in os.listdir(os.path.join(dir, "..")):
         if os.path.isdir(os.path.join("..", listing)):
@@ -348,17 +348,24 @@ def om_process_docstring(app, what, name, obj, options, lines):
                     split_match = m.split('.')
                     justclass = split_match[0]
                     justmeth =  split_match[1]
-                    classfullpath = om_classes[justclass]
-                    #construct a link  :meth:`class.method <openmdao.core.class.method>`
-                    line =  ":meth:`" + m + " <" + classfullpath + "." + justmeth + ">`"
-                    #replace the <link> text with the constructed line.
-                    lines[i] = lines[i].replace(ma, line)
+                    if justclass in om_classes:
+                        classfullpath = om_classes[justclass]
+                        #construct a link  :meth:`class.method <openmdao.core.class.method>`
+                        link =  ":meth:`" + m + " <" + classfullpath + "." + justmeth + ">`"
+                        #replace the <link> text with the constructed line.
+                        nolink = ""
+                        lines[i] = lines[i].replace(ma, link)
+                    else:
+                        print( "WARNING: {} not found in dictionary of OpenMDAO methods".format(justclass) )
+                        lines[i] = lines[i].replace(ma, m)
                 #otherwise, it's a class
                 else:
-                    classfullpath = om_classes[m]
-                    lines[i] = lines[i].replace(ma, ":class:`~"+classfullpath+"`")
-                    print lines[i]
-
+                    if m in om_classes:
+                        classfullpath = om_classes[m]
+                        lines[i] = lines[i].replace(ma, ":class:`~"+classfullpath+"`")
+                    else:
+                        print( "WARNING: {} not found in dictionary of OpenMDAO classes".format(m) )
+                        lines[i] = lines[i].replace(ma, m)
 #This is the crux of the extension--connecting an internal
 #Sphinx event with our own custom function.
 def setup(app):

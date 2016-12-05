@@ -17,21 +17,21 @@ class Jacobian(object):
     ----------
     _top_name : str
         name of the system at which we allocate the global Jacobian.
-    _assembler : Assembler
+    _assembler : <Assembler>
         pointer to the assembler.
-    _system : System
+    _system : <System>
         pointer to the system that is currently operating on this Jacobian.
     _op_dict : dict
         dictionary containing the user-supplied internal sub-Jacobians.
     _ip_dict : dict
         dictionary containing the user-supplied external sub-Jacobians.
-    _int_mtx : Matrix
+    _int_mtx : <Matrix>
         global internal Jacobian.
-    _ext_mtx : Matrix
+    _ext_mtx : <Matrix>
         global external Jacobian.
     _iter_list : [(op_name, ip_name), ...]
         list of output-input pairs to iterate over.
-    options : GeneralizedDictionary
+    options : <GeneralizedDictionary>
         options dictionary.
     """
 

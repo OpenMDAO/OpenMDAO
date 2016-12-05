@@ -28,7 +28,7 @@ class Group(System):
         ----
         name : str
             Name of the subsystem being added
-        subsys : System
+        subsys : <System>
             An instantiated, but not-yet-set up system object.
         promotes : iter of str, optional
             A list of variable names specifying which subsystem variables

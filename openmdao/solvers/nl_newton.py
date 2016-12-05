@@ -12,7 +12,7 @@ class NewtonSolver(NonlinearSolver):
 
         Args
         ----
-        system : System
+        system : <System>
             pointer to the owning system.
         depth : int
             depth of the current system (already incremented).

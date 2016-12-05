@@ -15,7 +15,7 @@ class Solver(object):
 
     Attributes
     ----------
-    _system : System
+    _system : <System>
         pointer to the owning system.
     _depth : int
         how many subsolvers deep this solver is (0 means not a subsolver).
@@ -23,7 +23,7 @@ class Solver(object):
         list of right-hand-side (RHS) vector names.
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
-    options : GeneralizedDictionary
+    options : <GeneralizedDictionary>
         options dictionary.
     """
 
@@ -59,7 +59,7 @@ class Solver(object):
 
         Args
         ----
-        system : System
+        system : <System>
             pointer to the owning system.
         depth : int
             depth of the current system (already incremented).
@@ -176,7 +176,7 @@ class Solver(object):
         ----
         name : str
             name of the subsolver.
-        solver : Solver
+        solver : <Solver>
             the subsolver instance.
         """
         self.options['subsolvers'][name] = solver
@@ -194,7 +194,7 @@ class Solver(object):
 
         Returns
         -------
-        Solver
+        <Solver>
             the instance of the requested subsolver.
         """
         return self.options['subsolvers'][name]

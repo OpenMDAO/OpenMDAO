@@ -45,10 +45,10 @@ def _valid_name(s, exprs):
 
 
 class ExecComp(ExplicitComponent):
-    """A Component defined by an expression string."""
+    """A <Component> defined by an expression string."""
 
     def __init__(self, exprs, inits=None, units=None, **kwargs):
-        r"""Create a Component using only an expression string.
+        r"""Create a <Component> using only an expression string.
 
         Given a list of assignment statements, this component creates
         input and output variables at construction time.  All variables
@@ -208,7 +208,7 @@ class ExecComp(ExplicitComponent):
             `VecWrapper` containing parameters. (p)
 
         unknowns : `VecWrapper`
-            `VecWrapper` containing outputs and states. (u)
+            `<VecWrapper>` containing outputs and states. (u)
 
         jacobians : `Jacobian`
             Contains sub-jacobians.

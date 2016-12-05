@@ -17,7 +17,7 @@ from openmdao.utils.class_util import overrides_method
 class System(object):
     """Base class for all systems in OpenMDAO.
 
-    Never instantiated; subclassed by Group or Component.
+    Never instantiated; subclassed by <Group> or <Component>.
     All subclasses have their attributes defined here.
 
     Attributes
@@ -26,21 +26,21 @@ class System(object):
         name of the system, must be different from siblings.
     path_name : str
         global name of the system, including the path.
-    comm : MPI.Comm or FakeComm
+    comm : MPI.Comm or <FakeComm>
         MPI communicator object.
     metadata : GeneralizedDictionary
         dictionary of user-defined arguments.
     _sys_depth : int
         distance from the root node in the hierarchy tree.
-    _sys_assembler: Assembler
+    _sys_assembler: <Assembler>
         pointer to the global assembler object.
-    _mpi_proc_allocator : ProcAllocator
+    _mpi_proc_allocator : <ProcAllocator>
         object that distributes procs among subsystems.
     _mpi_proc_range : [int, int]
         indices of procs owned by comm with respect to COMM_WORLD.
-    _subsystems_allprocs : [System, ...]
+    _subsystems_allprocs : [<System>, ...]
         list of all subsystems (children of this system).
-    _subsystems_myproc : [System, ...]
+    _subsystems_myproc : [<System>, ...]
         list of local subsystems that exist on this proc.
     _subsystems_inds : [int, ...]
         list of indices of subsystems on this proc among all subsystems.
@@ -75,19 +75,19 @@ class System(object):
         dict of transfer objects.
     _vector_var_ids : dict
         dictionary of index arrays of relevant variables for this vector
-    _inputs : Vector
+    _inputs : <Vector>
         inputs vector; points to _vectors['input'][None].
-    _outputs : Vector
+    _outputs : <Vector>
         outputs vector; points to _vectors['output'][None].
-    _residuals : Vector
+    _residuals : <Vector>
         residuals vector; points to _vectors['residual'][None].
-    _transfers : dict of Transfer
+    _transfers : dict of <Transfer>
         transfer object; points to _vector_transfers[None].
-    _jacobian : Jacobian
-        global Jacobian object to be used in apply_linear
-    _nl_solver : NonlinearSolver
+    _jacobian : <Jacobian>
+        global <Jacobian> object to be used in apply_linear
+    _nl_solver : <NonlinearSolver>
         nonlinear solver to be used for solve_nonlinear.
-    _ln_solver : LinearSolver
+    _ln_solver : <LinearSolver>
         linear solver to be used for solve_linear; not the Newton system.
     _suppress_solver_output : boolean
         global overriding flag that turns off all solver output if 'False'.
@@ -168,7 +168,7 @@ class System(object):
         ----
         path : str
             parent names to prepend to name to get the pathname
-        comm : MPI.Comm or FakeComm
+        comm : MPI.Comm or <FakeComm>
             communicator for this system (already split, if applicable).
         global_dict : dict
             dictionary with kwargs of all parents assembled in it.
@@ -321,7 +321,7 @@ class System(object):
     def _setup_connections(self):
         """Recursively assemble a list of input-output connections.
 
-        Overridden in Group.
+        Overridden in <Group>.
         """
         pass
 
@@ -379,11 +379,11 @@ class System(object):
         Args
         ----
         vectors : {'input': Vector, 'output': Vector, 'residual': Vector}
-            dictionary of Vector objects
+            dictionary of <Vector> objects
 
         Returns
         -------
-        dict of Transfer
+        dict of <Transfer>
             dictionary of full and partial Transfer objects.
         """
         Transfer = vectors['output'].TRANSFER
@@ -593,8 +593,8 @@ class System(object):
 
         Args
         ----
-        jacobian : Jacobian or None
-            Global jacobian to be set; if None, reset to DefaultJacobian.
+        jacobian : <Jacobian> or None
+            Global jacobian to be set; if None, reset to <DefaultJacobian>.
         is_top : boolean
             whether this is the top; i.e., start of the recursion.
         """

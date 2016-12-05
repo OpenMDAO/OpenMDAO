@@ -8,7 +8,7 @@ from openmdao.jacobians.jacobian import Jacobian
 
 
 class DefaultJacobian(Jacobian):
-    """No global Jacobian; use dictionary of user-supplied sub-Jacobians."""
+    """No global <Jacobian>; use dictionary of user-supplied sub-Jacobians."""
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """See openmdao.jacobians.jacobian.Jacobian."""

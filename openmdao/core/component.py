@@ -2,10 +2,10 @@
 
 Classes
 -------
-Component - base Component class
-ImplicitComponent - used to define output variables that are all implicit
-ExplicitComponent - used to define output variables that are all explicit
-IndepVarComp - used to define output variables that are all independent
+<Component> - base Component class
+<ImplicitComponent> - used to define output variables that are all implicit
+<ExplicitComponent> - used to define output variables that are all explicit
+<IndepVarComp> - used to define output variables that are all independent
 """
 
 from __future__ import division
@@ -139,11 +139,11 @@ class ImplicitComponent(Component):
 
         Args
         ----
-        inputs : Vector
+        inputs : <Vector>
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs : <Vector>
             unscaled, dimensional output variables read via outputs[key]
-        residuals : Vector
+        residuals : <Vector>
             unscaled, dimensional residuals written to via residuals[key]
         """
         pass
@@ -153,9 +153,9 @@ class ImplicitComponent(Component):
 
         Args
         ----
-        inputs : Vector
+        inputs : <Vector>
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs : <Vector>
             unscaled, dimensional output variables read via outputs[key]
         """
         pass
@@ -171,15 +171,15 @@ class ImplicitComponent(Component):
 
         Args
         ----
-        inputs : Vector
+        inputs : <Vector>
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs : <Vector>
             unscaled, dimensional output variables read via outputs[key]
-        d_inputs : Vector
+        d_inputs : <Vector>
             see inputs; product must be computed only if var_name in d_inputs
-        d_outputs : Vector
+        d_outputs : <Vector>
             see outputs; product must be computed only if var_name in d_outputs
-        d_residuals : Vector
+        d_residuals : <Vector>
             see outputs
         mode : str
             either 'fwd' or 'rev'
@@ -196,9 +196,9 @@ class ImplicitComponent(Component):
 
         Args
         ----
-        d_outputs : Vector
+        d_outputs : <Vector>
             unscaled, dimensional quantities read via d_outputs[key]
-        d_residuals : Vector
+        d_residuals : <Vector>
             unscaled, dimensional quantities read via d_residuals[key]
         mode : str
             either 'fwd' or 'rev'
@@ -210,11 +210,11 @@ class ImplicitComponent(Component):
 
         Args
         ----
-        inputs : Vector
+        inputs : <Vector>
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs : <Vector>
             unscaled, dimensional output variables read via outputs[key]
-        jacobian : Jacobian
+        jacobian : <Jacobian>
             sub-jac components written to jacobian[output_name, input_name]
         """
         pass
@@ -293,9 +293,9 @@ class ExplicitComponent(Component):
 
         Args
         ----
-        inputs : Vector
+        inputs : <Vector>
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs : <Vector>
             unscaled, dimensional output variables read via outputs[key]
         """
         pass
@@ -305,11 +305,11 @@ class ExplicitComponent(Component):
 
         Args
         ----
-        inputs : Vector
+        inputs : <Vector>
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs : <Vector>
             unscaled, dimensional output variables read via outputs[key]
-        jacobian : Jacobian
+        jacobian : <Jacobian>
             sub-jac components written to jacobian[output_name, input_name]
         """
         pass
@@ -325,13 +325,13 @@ class ExplicitComponent(Component):
 
         Args
         ----
-        inputs : Vector
+        inputs : <Vector>
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs : <Vector>
             unscaled, dimensional output variables read via outputs[key]
-        d_inputs : Vector
+        d_inputs : <Vector>
             see inputs; product must be computed only if var_name in d_inputs
-        d_outputs : Vector
+        d_outputs : <Vector>
             see outputs; product must be computed only if var_name in d_outputs
         mode : str
             either 'fwd' or 'rev'

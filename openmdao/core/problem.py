@@ -29,12 +29,12 @@ class Problem(object):
 
     Attributes
     ----------
-    root : System
-        pointer to the top-level System object (root node in the tree).
-    comm : MPI.Comm or FakeComm
+    root : <System>
+        pointer to the top-level <System> object (root node in the tree).
+    comm : MPI.Comm or <FakeComm>
         the global communicator; the same as that of assembler and root.
-    _assembler : Assembler
-        pointer to the global Assembler object.
+    _assembler : <Assembler>
+        pointer to the global <Assembler> object.
     """
 
     def __init__(self, root=None, comm=None, AssemblerClass=None):
@@ -42,12 +42,12 @@ class Problem(object):
 
         Args
         ----
-        root : System or None
-            pointer to the top-level System object (root node in the tree).
-        comm : MPI.Comm or FakeComm or None
+        root : <System> or None
+            pointer to the top-level <System> object (root node in the tree).
+        comm : MPI.Comm or <FakeComm> or None
             the global communicator; the same as that of assembler and root.
-        AssemblerClass : Assembler or None
-            pointer to the global Assembler object.
+        AssemblerClass : <Assembler> or None
+            pointer to the global <Assembler> object.
         """
         if comm is None:
             try:
@@ -117,7 +117,7 @@ class Problem(object):
         Args
         ----
         VectorClass : type
-            reference to an actual Vector class; not an instance.
+            reference to an actual <Vector> class; not an instance.
         check : boolean
             whether to run error check after setup is complete.
         out_stream : file
@@ -125,7 +125,7 @@ class Problem(object):
 
         Returns
         -------
-        self : Problem
+        self : <Problem>
             this enables the user to instantiate and setup in one line.
         """
         root = self.root
@@ -164,14 +164,14 @@ class Problem(object):
         return self
 
     def setup_vector(self, vec_name, VectorClass):
-        """Set up the 'vec_name' Vector.
+        """Set up the 'vec_name' <Vector>.
 
         Args
         ----
         vec_name : str
             name of the vector.
         VectorClass : type
-            reference to the actual Vector class.
+            reference to the actual <Vector> class.
         """
         root = self.root
         assembler = self._assembler

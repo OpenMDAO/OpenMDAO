@@ -9,10 +9,10 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 
 
 class GlobalJacobian(Jacobian):
-    """Assemble dense global Jacobian."""
+    """Assemble dense global <Jacobian>."""
 
     def _get_var_range(self, ivar_all, typ):
-        """Look up the variable name and Jacobian index range.
+        """Look up the variable name and <Jacobian> index range.
 
         Args
         ----
@@ -43,7 +43,7 @@ class GlobalJacobian(Jacobian):
         ivar1, ivar2 = self._system._variable_allprocs_range['output']
 
         self.options.declare('Matrix', value=DenseMatrix,
-                             desc='Matrix class to use in this Jacobian.')
+                             desc='<Matrix> class to use in this <Jacobian>.')
         self._int_mtx = self.options['Matrix'](self._system.comm)
         self._ext_mtx = self.options['Matrix'](self._system.comm)
 
