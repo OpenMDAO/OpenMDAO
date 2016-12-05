@@ -1,4 +1,4 @@
-"""Test the PetsKSP linear solver class."""
+"""Test the ScipyIterativeSolver linear solver class."""
 
 from __future__ import division, print_function
 
