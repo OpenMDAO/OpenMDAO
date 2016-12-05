@@ -2,9 +2,9 @@
 import unittest
 import numpy as np
 
-from openmdao.api import Problem
-from openmdao.api import ScipyIterativeSolver
-from openmdao.api import NonlinearBlockGS
+from openmdao.core.problem import Problem
+from openmdao.solvers.ln_scipy import ScipyIterativeSolver
+from openmdao.solvers.nl_bgs import NonlinearBlockGS
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
