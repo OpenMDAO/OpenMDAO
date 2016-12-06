@@ -4,11 +4,13 @@ import numpy
 from six.moves import range
 class Vector(object):
     """Base Vector class.
+
     This class is instantiated for inputs, outputs, and residuals.
     It provides a dictionary interface and an arithmetic operations interface.
     Implementations:
         <DefaultVector>
         <PETScVector>
+
     Attributes
     ----------
     _name : str
@@ -35,9 +37,11 @@ class Vector(object):
         list of the actual allocated data (depends on implementation).
     _indices : list
         list of indices mapping the varset-grouped data to the global vector.
+
     """
     def __init__(self, name, typ, system, global_vector=None):
         """Initialize all attributes.
+
         Args
         ----
         name : str
@@ -48,6 +52,7 @@ class Vector(object):
             pointer to the owning system.
         global_vector : <Vector>
             pointer to the vector owned by the root system.
+
         """
         self._name = name
         self._typ = typ
@@ -71,19 +76,23 @@ class Vector(object):
         self._initialize_views()
     def _create_subvector(self, system):
         """Return a smaller vector for a subsystem.
+
         Args
         ----
         system : <System>
             system for the subvector that is a subsystem of self._system.
+
         Returns
         -------
         <Vector>
             subvector instance.
+
         """
         return self.__class__(self._name, self._typ, system,
                               self._global_vector)
     def _clone(self):
         """Return a copy that does not provide view access to its data.
+
         Returns
         -------
         Vector
@@ -95,14 +104,17 @@ class Vector(object):
         return vec
     def get_data(self, array=None):
         """Get the array combining the data of all the varsets.
+
         Args
         ----
         array : ndarray or None
             Array to fill in with the values; otherwise new array created.
+
         Returns
         -------
         ndarray
             Array combining the data of all the varsets.
+
         """
         if array is None:
             inds = self._system._variable_myproc_indices[self._typ]
@@ -114,66 +126,70 @@ class Vector(object):
         return array
     def set_data(self, array):
         """Set the incoming array combining the data of all the varsets.
+
         Args
         ----
         array : ndarray
             Array to set to the data for all the varsets.
+
         """
         for ind, data in enumerate(self._data):
             data[:] = array[self._indices[ind]]
     def iadd_data(self, array):
         """In-place add the incoming combined array.
+
         Args
         ----
         array : ndarray
             Array to set to the data for all the varsets.
+
         """
         for ind, data in enumerate(self._data):
             data[:] += array[self._indices[ind]]
     def __contains__(self, key):
         """Check if the variable is involved in the current mat-vec product.
+
         Args
         ----
         key : str
             variable name in the owning system's namespace.
+
         Returns
         -------
         boolean
             True or False.
+
         """
         return key in self._names
     def __iter__(self):
         """Iterator over variables involved in the current mat-vec product.
+
         Returns
         -------
         listiterator
             iterator over the variable names.
+
         """
         return iter(self._names)
     def __getitem__(self, key):
         """Get the unscaled variable value in true units.
+
         Args
         ----
         key : str
             variable name in the owning system's namespace.
+
         Returns
         -------
         float or ndarray
             variable value (not scaled, not dimensionless).
+
         """
         if key in self._names:
             return self._views[key][self._idxs[key]]
         else:
             raise KeyError("Variable '%s' not found." % key)
     def __setitem__(self, key, value):
-        """Set the unscaled variable value in true units.
-        Args
-        ----
-        key : str
-            variable name in the owning system's namespace.
-        value : float or list or tuple or ndarray
-            variable value to set (not scaled, not dimensionless).
-        """
         if key in self._names:
             self._views[key][:] = value
         else:
@@ -183,10 +199,12 @@ class Vector(object):
         Must be implemented by the subclass.
         Sets the following attributes:
             _data
+
         Args
         ----
         global_vector : Vector or None
             the root's vector instance or None, if we are at the root.
+
         """
         pass
     def _initialize_views(self):
@@ -206,73 +224,89 @@ class Vector(object):
     def __iadd__(self, vec):
         """Perform in-place vector addition.
         Must be implemented by the subclass.
+
         Args
         ----
         vec : <Vector>
             vector to add to self.
+
         """
         pass
     def __isub__(self, vec):
         """Perform in-place vector substraction.
         Must be implemented by the subclass.
+
         Args
         ----
         vec : <Vector>
             vector to subtract from self.
+
         """
         pass
     def __imul__(self, val):
         """Perform in-place scalar multiplication.
         Must be implemented by the subclass.
+
         Args
         ----
         val : int or float
             scalar to multiply self.
+
         """
         pass
     def add_scal_vec(self, val, vec):
         """Perform in-place addition of a vector times a scalar.
         Must be implemented by the subclass.
+
         Args
         ----
         val : int or float
             scalar.
         vec : <Vector>
             this vector times val is added to self.
+
         """
         pass
     def set_vec(self, vec):
         """Set the value of this vector to that of the incoming vector.
         Must be implemented by the subclass.
+
         Args
         ----
         vec : <Vector>
             the vector whose values self is set to.
+
         """
         pass
     def set_const(self, val):
         """Set the value of this vector to a constant scalar value.
         Must be implemented by the subclass.
+
         Args
         ----
         val : int or float
             scalar to set self to.
+
         """
         pass
     def get_norm(self):
         """Return the norm of this vector.
         Must be implemented by the subclass.
+
         Returns
         -------
         float
             norm of this vector.
+
         """
         pass
 class Transfer(object):
     """Base Transfer class.
+
     Implementations:
         <DefaultTransfer>
         <PETScTransfer>
+
     Attributes
     ----------
     _ip_vec : Vector
@@ -285,9 +319,11 @@ class Transfer(object):
         output indices for the transfer.
     _comm : MPI.Comm or FakeComm
         communicator of the system that owns this transfer.
+
     """
     def __init__(self, ip_vec, op_vec, ip_inds, op_inds, comm):
         """Initialize all attributes.
+
         Args
         ----
         ip_vec : <Vector>
@@ -300,6 +336,7 @@ class Transfer(object):
             output indices for the transfer.
         comm : MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
+
         """
         self._ip_vec = ip_vec
         self._op_vec = op_vec
@@ -315,6 +352,7 @@ class Transfer(object):
     def __call__(self, ip_vec, op_vec, mode='fwd'):
         """Perform transfer.
         Must be implemented by the subclass.
+
         Args
         ----
         ip_vec : <Vector>
@@ -323,5 +361,6 @@ class Transfer(object):
             pointer to the output vector.
         mode : str
             'fwd' or 'rev'.
+            
         """
         pass
