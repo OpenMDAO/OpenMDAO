@@ -1,5 +1,6 @@
-"""This module provides a data type that represents a physical
-quantity together with its unit. It is possible to add and
+"""
+Classes and functions to support unit conversion.
+It is possible to add and
 subtract these quantities if the units are compatible and
 a quantity can be converted to another compatible unit.
 Multiplication, subtraction, and raising to integer powers
@@ -12,11 +13,10 @@ in its built-in library; however, it also supports generation of
 personal libararies which can be saved and reused.
 This module is based on the PhysicalQuantities module
 in Scientific Python, by Konrad Hinsen. Modifications by
-Justin Gray."""
+Justin Gray.
+"""
 
 from __future__ import division, print_function
-
-
 
 
 import re
@@ -82,7 +82,7 @@ class NumberDict(OrderedDict):
     def __mul__(self, other):
         new = NumberDict()
         for key, value in iteritems(self):
-            new[key] = other*value
+            new[key] = other * value
         return new
 
     __rmul__ = __mul__
@@ -90,7 +90,7 @@ class NumberDict(OrderedDict):
     def __div__(self, other):
         new = NumberDict()
         for key, value in iteritems(self):
-            new[key] = value/other
+            new[key] = value / other
         return new
 
     __truediv__ = __div__  # for python 3
@@ -134,8 +134,8 @@ class PhysicalUnit(object):
         self.powers = powers
 
     def __repr__(self):
-        return 'PhysicalUnit(%s,%s,%s,%s)'% (self.names, self.factor,
-                                             self.powers, self.offset)
+        return 'PhysicalUnit(%s,%s,%s,%s)' % (self.names, self.factor,
+                                              self.powers, self.offset)
 
     def __str__(self):
         return '<PhysicalUnit ' + self.name() + '>'
@@ -146,43 +146,45 @@ class PhysicalUnit(object):
         return cmp(self.factor, other.factor)
 
     def __eq__(self, other):
-        return (self.factor == other.factor and 
-                self.offset == other.offset and 
+        return (self.factor == other.factor and
+                self.offset == other.offset and
                 self.powers == other.powers)
 
     def __mul__(self, other):
-        if self.offset != 0 or (isinstance(other, PhysicalUnit) and 
+        if self.offset != 0 or (isinstance(other, PhysicalUnit) and
                                 other.offset != 0):
             raise TypeError("cannot multiply units with non-zero offset")
         if isinstance(other, PhysicalUnit):
-            return PhysicalUnit(self.names+other.names,
-                                self.factor*other.factor,
-                                [a+b for (a, b) in zip(self.powers, other.powers)])
+            return PhysicalUnit(self.names + other.names,
+                                self.factor * other.factor,
+                                [a + b for (a, b) in zip(self.powers,
+                                                         other.powers)])
         else:
-            return PhysicalUnit(self.names+{str(other): 1},
-                                self.factor*other,
+            return PhysicalUnit(self.names + {str(other): 1},
+                                self.factor * other,
                                 self.powers,
                                 self.offset * other)
 
     __rmul__ = __mul__
 
     def __div__(self, other):
-        if self.offset != 0 or (isinstance(other, PhysicalUnit) and 
+        if self.offset != 0 or (isinstance(other, PhysicalUnit) and
                                 other.offset != 0):
             raise TypeError("cannot divide units with non-zero offset")
         if isinstance(other, PhysicalUnit):
-            return PhysicalUnit(self.names-other.names,
-                                self.factor/other.factor,
-                                [a-b for (a, b) in zip(self.powers, other.powers)])
+            return PhysicalUnit(self.names - other.names,
+                                self.factor / other.factor,
+                                [a - b for (a, b) in zip(self.powers,
+                                                         other.powers)])
         else:
-            return PhysicalUnit(self.names+{str(other): -1},
-                                self.factor/float(other), self.powers)
+            return PhysicalUnit(self.names + {str(other): -1},
+                                self.factor / float(other), self.powers)
 
     __truediv__ = __div__   # for python 3
 
     def __rdiv__(self, other):
-        return PhysicalUnit({str(other): 1}-self.names,
-                            float(other)/self.factor,
+        return PhysicalUnit({str(other): 1} - self.names,
+                            float(other) / self.factor,
                             [-x for x in self.powers])
 
     __rtruediv__ = __rdiv__
@@ -191,18 +193,18 @@ class PhysicalUnit(object):
         if self.offset != 0:
             raise TypeError("cannot exponentiate units with non-zero offset")
         if isinstance(other, int):
-            return PhysicalUnit(other*self.names, pow(self.factor, other),
-                                [x*other for x in self.powers])
+            return PhysicalUnit(other * self.names, pow(self.factor, other),
+                                [x * other for x in self.powers])
         if isinstance(other, float):
-            inv_exp = 1./other
-            rounded = int(floor(inv_exp+0.5))
-            if abs(inv_exp-rounded) < 1.e-10:
+            inv_exp = 1. / other
+            rounded = int(floor(inv_exp + 0.5))
+            if abs(inv_exp - rounded) < 1.e-10:
 
-                if all([x % rounded==0 for x in self.powers]):
+                if all([x % rounded == 0 for x in self.powers]):
                     f = self.factor**other
-                    p = [x/rounded for x in self.powers]
-                    if all([x % rounded==0 for x in self.names.values()]):
-                        names = self.names/rounded
+                    p = [x / rounded for x in self.powers]
+                    if all([x % rounded == 0 for x in self.names.values()]):
+                        names = self.names / rounded
                     else:
                         names = NumberDict()
                         if f != 1.:
@@ -280,10 +282,13 @@ class PhysicalUnit(object):
 
     def is_compatible(self, other):
         """
-        @param other: Another unit.
-        @type other: L{PhysicalUnit}.
-        @returns: C{True} If the units are compatible, i.e., if the powers of the base units are the same.
-        @rtype: C{bool}.
+        checks for compatibility with another unit
+
+        Args
+        ----
+        other : PhysicalUnit
+            Another unit.
+
         """
         return self.powers == other.powers
 
@@ -293,7 +298,7 @@ class PhysicalUnit(object):
 
     def is_angle(self):
         """Checks if this PQ is an Angle."""
-        return (self.powers[_UNIT_LIB.base_types['angle']] == 1 and 
+        return (self.powers[_UNIT_LIB.base_types['angle']] == 1 and
                 sum(self.powers) == 1)
 
     def set_name(self, name):
@@ -336,14 +341,14 @@ def add_offset_unit(name, baseunit, factor, offset, comment=''):
         baseunit = _find_unit(baseunit)
     # else, baseunit should be a instance of PhysicalUnit
     # names, factor, powers, offset=0
-    unit = PhysicalUnit(baseunit.names, baseunit.factor*factor,
+    unit = PhysicalUnit(baseunit.names, baseunit.factor * factor,
                         baseunit.powers, offset)
     unit.set_name(name)
     if name in _UNIT_LIB.unit_table:
-        if (_UNIT_LIB.unit_table[name].factor!=unit.factor or 
-            _UNIT_LIB.unit_table[name].powers!=unit.powers):
+        if (_UNIT_LIB.unit_table[name].factor != unit.factor or
+                _UNIT_LIB.unit_table[name].powers != unit.powers):
             raise KeyError("Unit %s already defined with " % name +
-                            "different factor or powers")
+                           "different factor or powers")
     _UNIT_LIB.unit_table[name] = unit
     _UNIT_LIB.set('units', name, unit)
     if comment:
@@ -359,16 +364,17 @@ def add_unit(name, unit, comment=''):
                     _UNIT_LIB.unit_table)
     unit.set_name(name)
     if name in _UNIT_LIB.unit_table:
-        if (_UNIT_LIB.unit_table[name].factor!=unit.factor or 
-            _UNIT_LIB.unit_table[name].powers!=unit.powers):
+        if (_UNIT_LIB.unit_table[name].factor != unit.factor or
+                _UNIT_LIB.unit_table[name].powers != unit.powers):
             raise KeyError("Unit %s already defined with " % name +
-                            "different factor or powers")
+                           "different factor or powers")
 
     _UNIT_LIB.unit_table[name] = unit
     _UNIT_LIB.set('units', name, unit)
 
 
 _UNIT_LIB = ConfigParser()
+
 
 def _do_nothing(string):
     """Makes the ConfigParser case sensitive."""
@@ -411,7 +417,7 @@ def import_library(libfilepointer):
 
     # test for required base types
     missing = [utype for utype in required_base_types
-               if not utype in _UNIT_LIB.base_types]
+               if utype not in _UNIT_LIB.base_types]
     if missing:
         raise ValueError('Not all required base type were present in the'
                          ' config file. missing: %s, at least %s required'
@@ -515,21 +521,22 @@ def _find_unit(unit):
                 regex = re.compile('[A-Z,a-z]{1}[A-Z,a-z,0-9]*')
 
                 for item in regex.findall(name):
-                    # check if this was a compound unit, so each substring might
-                    # be a unit
+                    # check if this was a compound unit, so each
+                    # substring might be a unit
                     try:
-                        eval(item, {'__builtins__': None}, _UNIT_LIB.unit_table)
+                        eval(item, {'__builtins__': None},
+                             _UNIT_LIB.unit_table)
                     except Exception:  # maybe is a prefixed unit then
                         # check for single letter prefix before unit
-                        if(item[0] in _UNIT_LIB.prefixes and 
+                        if(item[0] in _UNIT_LIB.prefixes and
                            item[1:] in _UNIT_LIB.unit_table):
-                            add_unit(item, _UNIT_LIB.prefixes[item[0]]* 
+                            add_unit(item, _UNIT_LIB.prefixes[item[0]] *
                                      _UNIT_LIB.unit_table[item[1:]])
 
                         # check for double letter prefix before unit
-                        elif(item[0:2] in _UNIT_LIB.prefixes and 
+                        elif(item[0:2] in _UNIT_LIB.prefixes and
                              item[2:] in _UNIT_LIB.unit_table):
-                            add_unit(item, _UNIT_LIB.prefixes[item[0:2]]* 
+                            add_unit(item, _UNIT_LIB.prefixes[item[0:2]] *
                                      _UNIT_LIB.unit_table[item[2:]])
 
                         # no prefixes found, unknown unit
@@ -606,8 +613,9 @@ def convert_units(val, old_units, new_units=''):
         value in original units.
     old_units : str
         original units as a string.
-    new_units : str 
-        new units to return the value in; if empty str, return in standard units.
+    new_units : str
+        new units to return the value in; if empty str,
+        return in standard units.
 
     Returns
     -------
@@ -619,9 +627,9 @@ def convert_units(val, old_units, new_units=''):
         return val
 
     old_unit = _find_unit(old_units)
-    if new_units: 
+    if new_units:
         new_unit = _find_unit(new_units)
-    else: 
+    else:
         new_unit = old_unit.in_base_units()
 
     (factor, offset) = old_unit.conversion_tuple_to(new_unit)
@@ -629,8 +637,10 @@ def convert_units(val, old_units, new_units=''):
 
 
 # Load in the default unit library
-with open(os.path.join(os.path.dirname(__file__), 'unit_library.ini')) as default_lib:
-    import_library(default_lib)    
+file_path = open(os.path.join(os.path.dirname(__file__),
+                 'unit_library.ini'))
+with file_path as default_lib:
+    import_library(default_lib)
 
 
 if __name__ == '__main__':
