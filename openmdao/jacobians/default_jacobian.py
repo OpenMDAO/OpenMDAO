@@ -11,7 +11,19 @@ class DefaultJacobian(Jacobian):
     """No global <Jacobian>; use dictionary of user-supplied sub-Jacobians."""
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
-        """See openmdao.jacobians.jacobian.Jacobian."""
+        """Compute matrix-vector product.
+
+        Args
+        ----
+        d_inputs : Vector
+            inputs linear vector.
+        d_outputs : Vector
+            outputs linear vector.
+        d_residuals : Vector
+            residuals linear vector.
+        mode : str
+            'fwd' or 'rev'.
+        """
         for op_name, ip_name in self:
             jac = self[op_name, ip_name]
 

@@ -10,7 +10,7 @@ class NonlinearBlockGS(NonlinearSolver):
     SOLVER = 'NL: NLBGS'
 
     def _iter_execute(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Perform the operations in the iteration loop."""
         system = self._system
         for isub in range(len(system._subsystems_allprocs)):
             system._transfers['fwd', isub](system._inputs,

@@ -12,7 +12,15 @@ class CooMatrix(Matrix):
     """Sparse matrix in <Coordinate> list format."""
 
     def _build(self, num_rows, num_cols):
-        """See Matrix."""
+        """Allocate the matrix.
+
+        Args
+        ----
+        num_rows : int
+            number of rows in the matrix.
+        num_cols : int
+            number of cols in the matrix.
+        """
         counter = 0
 
         submat_meta_iter = ((self._op_submats, self._op_metadata),
@@ -66,7 +74,19 @@ class CooMatrix(Matrix):
                                   shape=(num_rows, num_cols))
 
     def _update_submat(self, submats, metadata, key, jac):
-        """See Matrix."""
+        """Update the values of a sub-jacobian.
+
+        Args
+        ----
+        submats : dict
+            dictionary of sub-jacobian data keyed by (op_ind, ip_ind).
+        metadata : dict
+            implementation-specific data for the sub-jacobians.
+        key : (int, int)
+            the global output and input variable indices.
+        jac : ndarray or scipy.sparse or tuple
+            the sub-jacobian, the same format with which it was declared.
+        """
         ind1, ind2 = metadata[key]
         if isinstance(jac, ndarray):
             self._matrix.data[ind1:ind2] = jac.flat
@@ -76,7 +96,20 @@ class CooMatrix(Matrix):
             self._matrix.data[ind1:ind2] = jac[0]
 
     def _prod(self, in_vec, mode):
-        """See Matrix."""
+        """Perform a matrix vector product.
+
+        Args
+        ----
+        vec : ndarray[:]
+            incoming vector to multiply.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        ndarray[:]
+            vector resulting from the product.
+        """
         if mode == 'fwd':
             return self._matrix.dot(in_vec)
         elif mode == 'rev':

@@ -23,7 +23,7 @@ class NewtonSolver(NonlinearSolver):
             self.set_subsolver('linear', system.ln_solver)
 
     def _iter_execute(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Perform the operations in the iteration loop."""
         system = self._system
         system._vectors['residual'][''].set_vec(system._residuals)
         system._vectors['residual'][''] *= -1.0
