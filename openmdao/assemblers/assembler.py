@@ -8,7 +8,8 @@ from openmdao.utils.units import conversion_to_base_units, convert_units
 
 
 class Assembler(object):
-    """Base Assembler class.
+    """
+    Base Assembler class.
 
     The primary purpose of the Assembler class is to set up transfers.
 
