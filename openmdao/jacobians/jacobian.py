@@ -30,6 +30,9 @@ class Jacobian(object):
         global internal Jacobian.
     _ext_mtx : Matrix
         global external Jacobian.
+    _keymap : dict
+        Mapping of original (output, input) key to (output, source) in cases
+        where the input has src_indices.
     _iter_list : [(op_name, ip_name), ...]
         list of output-input pairs to iterate over.
     options : GeneralizedDictionary
@@ -50,8 +53,7 @@ class Jacobian(object):
 
         self._op_dict = {}
         self._ip_dict = {}
-        self._int_mtx = None
-        self._ext_mtx = None
+        self._keymap = {}
         self._iter_list = []
 
         self.options = GeneralizedDictionary(kwargs)
@@ -185,7 +187,8 @@ class Jacobian(object):
         if numpy.isscalar(jac):
             jac = numpy.array([jac]).reshape((op_size, ip_size))
         elif isinstance(jac, numpy.ndarray):
-            jac = jac.reshape((op_size, ip_size))
+            pass
+            # jac = jac.reshape((op_size, ip_size))
         elif isinstance(jac, (coo_matrix, csr_matrix)):
             pass
         elif isinstance(jac, (tuple, list)):

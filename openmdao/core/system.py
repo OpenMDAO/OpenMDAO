@@ -514,7 +514,7 @@ class System(object):
         ip_names = []
         ip_ind = self._variable_allprocs_range['input'][0]
         for ip_name in self._variable_allprocs_names['input']:
-            op_ind = self._sys_assembler._input_var_ids[ip_ind]
+            op_ind = self._sys_assembler._input_src_ids[ip_ind]
             valid = op_ind in self._vector_var_ids[vec_name]
             if var_inds is not None:
                 valid = valid and \

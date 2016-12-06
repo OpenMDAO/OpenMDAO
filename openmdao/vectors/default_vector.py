@@ -3,7 +3,7 @@ from __future__ import division
 import numpy
 
 import numbers
-from six.moves import range
+from six.moves import range, zip
 
 from openmdao.vectors.vector import Vector, Transfer
 
@@ -156,14 +156,14 @@ class DefaultVector(Vector):
 
     def __iadd__(self, vec):
         """See openmdao.vectors.vector.Vector."""
-        for iset in range(len(self._data)):
-            self._data[iset] += vec._data[iset]
+        for data, vec_data in zip(self._data, vec._data):
+            data += vec_data
         return self
 
     def __isub__(self, vec):
         """See openmdao.vectors.vector.Vector."""
-        for iset in range(len(self._data)):
-            self._data[iset] -= vec._data[iset]
+        for data, vec_data in zip(self._data, vec._data):
+            data -= vec_data
         return self
 
     def __imul__(self, val):
@@ -174,13 +174,13 @@ class DefaultVector(Vector):
 
     def add_scal_vec(self, val, vec):
         """See openmdao.vectors.vector.Vector."""
-        for iset in range(len(self._data)):
-            self._data[iset] += val * vec._data[iset]
+        for data, vec_data in zip(self._data, vec._data):
+            data += val * vec_data
 
     def set_vec(self, vec):
         """See openmdao.vectors.vector.Vector."""
-        for iset in range(len(self._data)):
-            self._data[iset][:] = vec._data[iset]
+        for data, vec_data in zip(self._data, vec._data):
+            data[:] = vec_data
 
     def set_const(self, val):
         """See openmdao.vectors.vector.Vector."""
