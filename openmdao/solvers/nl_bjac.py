@@ -8,7 +8,7 @@ class NonlinearBlockJac(NonlinearSolver):
     METHOD = 'NL: NLBJ'
 
     def _iter_execute(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Perform the operations in the iteration loop."""
         system = self._system
         system._transfers[None](system._inputs, system._outputs, 'fwd')
         for subsys in system._subsystems_myproc:
