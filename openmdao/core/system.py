@@ -12,7 +12,7 @@ from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.units import get_units, convert_units
+from openmdao.utils.units import conversion_to_base_units, convert_units
 
 
 class System(object):

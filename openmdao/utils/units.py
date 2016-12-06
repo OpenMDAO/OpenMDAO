@@ -37,7 +37,6 @@ from math import sin, cos, tan, floor, pi
 class NumberDict(OrderedDict):
     """
     Dictionary storing numerical values.
-    Constructor: NumberDict()
     An instance of this class acts like an array of numbers with
     generalized (non-integer) indices. A value of zero is assumed
     for undefined entries. NumberDict instances support addition
@@ -538,6 +537,7 @@ def _find_unit(unit):
                             raise ValueError("no unit named '%s' is defined"
                                              % item)
 
+                print("foo", name)
                 unit = eval(name, {'__builtins__': None}, _UNIT_LIB.unit_table)
 
             _UNIT_CACHE[name] = unit
@@ -562,6 +562,9 @@ def conversion_to_base_units(units):
     float
         Mult. factor to get to default unit: m (length), s(time), etc.
     """
+
+    if not units:  # dimensionless
+        return 0., 1.
     unit = _find_unit(units)
 
     return unit.offset, unit.factor
@@ -585,13 +588,16 @@ def is_compatible(old_units, new_units):
         whether the units are compatible.
     """
 
+    if not old_units and not new_units:  # dimensionless
+        return True
+
     old_unit = _find_unit(old_units)
     new_unit = _find_unit(new_units)
 
     return old_unit.is_compatible(new_unit)
 
 
-def convert_units(val, old_units, new_units=None):
+def convert_units(val, old_units, new_units=''):
     """Take a given quantity and return in different units.
 
     Args
@@ -600,8 +606,8 @@ def convert_units(val, old_units, new_units=None):
         value in original units.
     old_units : str
         original units as a string.
-    new_units : str or None
-        new units to return the value in; if None, return in standard units.
+    new_units : str 
+        new units to return the value in; if empty str, return in standard units.
 
     Returns
     -------
@@ -609,8 +615,11 @@ def convert_units(val, old_units, new_units=None):
         value in new units.
     """
 
+    if not old_units and not new_units:  # dimensionless
+        return val
+
     old_unit = _find_unit(old_units)
-    if new_units is not None: 
+    if new_units: 
         new_unit = _find_unit(new_units)
     else: 
         new_unit = old_unit.in_base_units()

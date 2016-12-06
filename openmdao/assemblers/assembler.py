@@ -4,7 +4,7 @@ import numpy
 
 from six.moves import range
 
-from openmdao.utils.units import get_units, convert_units
+from openmdao.utils.units import conversion_to_base_units, convert_units
 
 
 class Assembler(object):
