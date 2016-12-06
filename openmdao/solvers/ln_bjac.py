@@ -8,7 +8,7 @@ class LinearBlockJac(LinearSolver):
     SOLVER = 'LN: LNBJ'
 
     def _iter_execute(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Perform the operations in the iteration loop."""
         system = self._system
         mode = self._mode
         vec_names = self._vec_names
