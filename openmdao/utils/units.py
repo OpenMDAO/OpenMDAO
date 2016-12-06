@@ -1,13 +1,6 @@
 """
 Classes and functions to support unit conversion.
-It is possible to add and
-subtract these quantities if the units are compatible and
-a quantity can be converted to another compatible unit.
-Multiplication, subtraction, and raising to integer powers
-are allowed without restriction, and the result will have
-the correct unit. A quantity can be raised to a non-integer
-power only if the result can be represented by integer powers
-of the base units.
+
 The module provides a basic set of predefined physical quantities
 in its built-in library; however, it also supports generation of
 personal libararies which can be saved and reused.
