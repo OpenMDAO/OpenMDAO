@@ -14,7 +14,6 @@ class Assembler(object):
     ----------
     _comm : MPI.comm or FakeComm
         MPI communicator object.
-
     _variable_sizes_all : {'input': ndarray[nproc, nvar],
                            'output': ndarray[nproc, nvar]}
         local variable size arrays, num procs x num vars.
@@ -27,7 +26,6 @@ class Assembler(object):
                              'output': ndarray[nvar_all, 2]}
         the first column is the var_set ID and
         the second column is the variable index within the var_set.
-
     _input_src_ids : int ndarray[num_input_var]
         the output variable ID for each input variable ID.
     _src_indices : int ndarray[:]

@@ -351,7 +351,15 @@ class ExplicitComponent(Component):
 
 
 class IndepVarComp(ExplicitComponent):
-    """Class to inherit from when all output variables are independent."""
+    """Class to inherit from when all output variables are independent.
+
+    Attributes
+    ----------
+    _indep : tuple
+        Tuple (arg1, arg2), where arg1 is str or [(str, value), ...]
+        or [(str, value, kwargs), ...] and arg 2 is value.
+        The value can be float or ndarray
+    """
 
     def __init__(self, name, val=1.0, **kwargs):
         """Initialize all attributes.
