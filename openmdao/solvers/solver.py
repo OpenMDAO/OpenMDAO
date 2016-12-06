@@ -1,8 +1,6 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 from __future__ import division, print_function
 import numpy
-from six.moves import range
-from scipy.sparse.linalg import LinearOperator
 
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 
@@ -23,6 +21,8 @@ class Solver(object):
         list of right-hand-side (RHS) vector names.
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
+    _iter_count : int
+        number of iterations for the current invocation of the solver.
     options : <GeneralizedDictionary>
         options dictionary.
     """
@@ -41,6 +41,7 @@ class Solver(object):
         self._depth = 0
         self._vec_names = None
         self._mode = 'fwd'
+        self._iter_count = 0
 
         self.options = GeneralizedDictionary(kwargs)
         self.options.declare('maxiter', typ=int, value=10,
@@ -120,13 +121,14 @@ class Solver(object):
         rtol = self.options['rtol']
 
         norm0, norm = self._iter_initialize()
-        iteration = 0
-        self._mpi_print(iteration, norm / norm0, norm0)
-        while iteration < maxiter and norm > atol and norm / norm0 > rtol:
+        self._iter_count = 0
+        self._mpi_print(self._iter_count, norm / norm0, norm0)
+        while self._iter_count < maxiter and \
+                norm > atol and norm / norm0 > rtol:
             self._iter_execute()
             norm = self._iter_get_norm()
-            iteration += 1
-            self._mpi_print(iteration, norm / norm0, norm)
+            self._iter_count += 1
+            self._mpi_print(self._iter_count, norm / norm0, norm)
         fail = (numpy.isinf(norm) or numpy.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
         return fail, norm / norm0, norm

@@ -84,16 +84,16 @@ class GeneralProblem(object):
         self.root.metadata['use_var_sets'] = use_var_sets
         self.problem = Problem(self.root).setup(vec_impl)
 
-    def print_all(self):
-        for sys in self.all_systems[::-1]:
-            print(sys.name, ':', end=' ')
-            for subsys in sys._subsystems_allprocs:
-                print(subsys.name, end=' ')
-            print()
-        print()
+    # def print_all(self):
+    #     for sys in self.all_systems[::-1]:
+    #         print(sys.name, ':', end=' ')
+    #         for subsys in sys._subsystems_allprocs:
+    #             print(subsys.name, end=' ')
+    #         print()
+    #     print()
 
 if __name__ == '__main__':
 
     ngroup_level = [4,2,1]
     gp = GeneralProblem(ngroup_level)
-    gp.print_all()
+    #gp.print_all()
