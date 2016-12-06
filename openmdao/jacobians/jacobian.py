@@ -21,7 +21,6 @@ class Jacobian(object):
         pointer to the assembler.
     _system : System
         pointer to the system that is currently operating on this Jacobian.
-
     _op_dict : dict
         dictionary containing the user-supplied internal sub-Jacobians.
     _ip_dict : dict

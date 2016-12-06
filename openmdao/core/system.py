@@ -31,38 +31,32 @@ class System(object):
         MPI communicator object.
     metadata : GeneralizedDictionary
         dictionary of user-defined arguments.
-
     _sys_depth : int
         distance from the root node in the hierarchy tree.
     _sys_assembler: Assembler
         pointer to the global assembler object.
-
     _mpi_proc_allocator : ProcAllocator
         object that distributes procs among subsystems.
     _mpi_proc_range : [int, int]
         indices of procs owned by comm with respect to COMM_WORLD.
-
     _subsystems_allprocs : [System, ...]
         list of all subsystems (children of this system).
     _subsystems_myproc : [System, ...]
         list of local subsystems that exist on this proc.
     _subsystems_inds : [int, ...]
         list of indices of subsystems on this proc among all subsystems.
-
     _variable_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
         list of names of all owned variables, not just on current proc.
     _variable_allprocs_range : {'input': [int, int], 'output': [int, int]}
         index range of owned variables with respect to all problem variables.
     _variable_allprocs_indices : {'input': dict, 'output': dict}
         dictionary of global indices keyed by the variable name.
-
     _variable_myproc_names : {'input': [str, ...], 'output': [str, ...]}
         list of names of owned variables on current proc.
     _variable_myproc_metadata : {'input': list, 'output': list}
         list of metadata dictionaries of variables that exist on this proc.
     _variable_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
         integer arrays of global indices of variables on this proc.
-
     _variable_maps : {'input': dict, 'output': dict}
         dictionary of variable names and their aliases (for promotes/renames).
     _variable_promotes : { 'any': set(), 'input': set(), 'output': set() }
@@ -71,25 +65,21 @@ class System(object):
     _variable_renames : { 'input': {}, 'output': {} }
         dictionary of mappings used to specify variables to be renamed in the
         parent group. (used to calculate _variable_maps)
-
     _variable_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
     _variable_connections_indices : [(int, int), ...]
         _variable_connections with variable indices instead of names.  Entries
         have the form (input_index, output_index).
-
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         dict of vector objects.
     _vector_transfers : dict
         dict of transfer objects.
     _vector_var_ids : dict
         dictionary of index arrays of relevant variables for this vector
-
     _scaling_to_norm : dict of ndarray
         coefficients to convert vectors to normalized values.
     _scaling_to_phys : dict of ndarray
         coefficients to convert vectors to physical values.
-
     _inputs : Vector
         inputs vector; points to _vectors['input'][None].
     _outputs : Vector
@@ -98,10 +88,8 @@ class System(object):
         residuals vector; points to _vectors['residual'][None].
     _transfers : dict of Transfer
         transfer object; points to _vector_transfers[None].
-
     _jacobian : Jacobian
         global Jacobian object to be used in apply_linear
-
     _nl_solver : NonlinearSolver
         nonlinear solver to be used for solve_nonlinear.
     _ln_solver : LinearSolver
