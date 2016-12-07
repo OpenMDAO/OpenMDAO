@@ -1,12 +1,4 @@
-"""Define the core Component classes.
-
-Classes
--------
-Component - base Component class
-ImplicitComponent - used to define output variables that are all implicit
-ExplicitComponent - used to define output variables that are all explicit
-IndepVarComp - used to define output variables that are all independent
-"""
+"""Define the Component class."""
 
 from __future__ import division
 
