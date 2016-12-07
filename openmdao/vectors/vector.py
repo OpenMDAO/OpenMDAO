@@ -8,8 +8,9 @@ class Vector(object):
     This class is instantiated for inputs, outputs, and residuals.
     It provides a dictionary interface and an arithmetic operations interface.
     Implementations:
-        <DefaultVector>
-        <PETScVector>
+
+    - <DefaultVector>
+    - <PETScVector>
 
     Attributes
     ----------
@@ -39,6 +40,7 @@ class Vector(object):
         list of indices mapping the varset-grouped data to the global vector.
 
     """
+
     def __init__(self, name, typ, system, global_vector=None):
         """Initialize all attributes.
 
@@ -74,6 +76,7 @@ class Vector(object):
             self._global_vector = global_vector
         self._initialize_data(global_vector)
         self._initialize_views()
+
     def _create_subvector(self, system):
         """Return a smaller vector for a subsystem.
 
@@ -95,13 +98,14 @@ class Vector(object):
 
         Returns
         -------
-        Vector
+        <Vector>
             instance of the clone; the data is copied.
         """
         vec = self.__class__(self._name, self._typ, self._system,
                              self._global_vector)
         vec._clone_data()
         return vec
+
     def get_data(self, array=None):
         """Get the array combining the data of all the varsets.
 
@@ -124,6 +128,7 @@ class Vector(object):
         for ind, data in enumerate(self._data):
             array[self._indices[ind]] = data
         return array
+
     def set_data(self, array):
         """Set the incoming array combining the data of all the varsets.
 
@@ -135,6 +140,7 @@ class Vector(object):
         """
         for ind, data in enumerate(self._data):
             data[:] = array[self._indices[ind]]
+
     def iadd_data(self, array):
         """In-place add the incoming combined array.
 
@@ -146,6 +152,7 @@ class Vector(object):
         """
         for ind, data in enumerate(self._data):
             data[:] += array[self._indices[ind]]
+
     def __contains__(self, key):
         """Check if the variable is involved in the current mat-vec product.
 
@@ -161,6 +168,7 @@ class Vector(object):
 
         """
         return key in self._names
+
     def __iter__(self):
         """Iterator over variables involved in the current mat-vec product.
 
@@ -171,6 +179,7 @@ class Vector(object):
 
         """
         return iter(self._names)
+
     def __getitem__(self, key):
         """Get the unscaled variable value in true units.
 
@@ -189,11 +198,13 @@ class Vector(object):
             return self._views[key][self._idxs[key]]
         else:
             raise KeyError("Variable '%s' not found." % key)
+
     def __setitem__(self, key, value):
         if key in self._names:
             self._views[key][:] = value
         else:
             raise KeyError("Variable '%s' not found." % key)
+
     def _initialize_data(self, global_vector):
         """Internally allocate vectors.
         Must be implemented by the subclass.
@@ -202,25 +213,31 @@ class Vector(object):
 
         Args
         ----
-        global_vector : Vector or None
+        global_vector : <Vector> or None
             the root's vector instance or None, if we are at the root.
 
         """
         pass
+
     def _initialize_views(self):
         """Internally assemble views onto the vectors.
         Must be implemented by the subclass.
         Sets the following attributes:
-            _views
-            _views_flat
-            _idxs
+
+        - _views
+        - _views_flat
+        - _idxs
+        - <Vector>
+
         """
         pass
+
     def _clone_data(self):
         """For each item in _data, replace it with a copy of the data.
         Must be implemented by the subclass.
         """
         pass
+
     def __iadd__(self, vec):
         """Perform in-place vector addition.
         Must be implemented by the subclass.
@@ -232,6 +249,7 @@ class Vector(object):
 
         """
         pass
+
     def __isub__(self, vec):
         """Perform in-place vector substraction.
         Must be implemented by the subclass.
@@ -243,6 +261,7 @@ class Vector(object):
 
         """
         pass
+
     def __imul__(self, val):
         """Perform in-place scalar multiplication.
         Must be implemented by the subclass.
@@ -254,6 +273,7 @@ class Vector(object):
 
         """
         pass
+
     def add_scal_vec(self, val, vec):
         """Perform in-place addition of a vector times a scalar.
         Must be implemented by the subclass.
@@ -267,6 +287,7 @@ class Vector(object):
 
         """
         pass
+
     def set_vec(self, vec):
         """Set the value of this vector to that of the incoming vector.
         Must be implemented by the subclass.
@@ -278,6 +299,7 @@ class Vector(object):
 
         """
         pass
+
     def set_const(self, val):
         """Set the value of this vector to a constant scalar value.
         Must be implemented by the subclass.
@@ -289,6 +311,7 @@ class Vector(object):
 
         """
         pass
+
     def get_norm(self):
         """Return the norm of this vector.
         Must be implemented by the subclass.
@@ -300,12 +323,14 @@ class Vector(object):
 
         """
         pass
+
 class Transfer(object):
     """Base Transfer class.
 
     Implementations:
-        <DefaultTransfer>
-        <PETScTransfer>
+
+    - <DefaultTransfer>
+    - <PETScTransfer>
 
     Attributes
     ----------
@@ -321,6 +346,7 @@ class Transfer(object):
         communicator of the system that owns this transfer.
 
     """
+
     def __init__(self, ip_vec, op_vec, ip_inds, op_inds, comm):
         """Initialize all attributes.
 
@@ -344,11 +370,13 @@ class Transfer(object):
         self._op_inds = op_inds
         self._comm = comm
         self._initialize_transfer()
+
     def _initialize_transfer(self):
         """Set up the transfer; do any necessary pre-computation.
         Optionally implemented by the subclass.
         """
         pass
+
     def __call__(self, ip_vec, op_vec, mode='fwd'):
         """Perform transfer.
         Must be implemented by the subclass.
@@ -361,6 +389,6 @@ class Transfer(object):
             pointer to the output vector.
         mode : str
             'fwd' or 'rev'.
-            
+
         """
         pass

@@ -26,7 +26,7 @@ class System(object):
         name of the system, must be different from siblings.
     path_name : str
         global name of the system, including the path.
-    comm : MPI.Comm or <FakeComm> 
+    comm : MPI.Comm or <FakeComm>
         MPI communicator object.
     metadata : GeneralizedDictionary
         dictionary of user-defined arguments.

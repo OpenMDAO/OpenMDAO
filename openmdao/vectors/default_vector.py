@@ -4,7 +4,9 @@ import numpy
 import numbers
 from six.moves import range
 from openmdao.vectors.vector import Vector, Transfer
+
 real_types = tuple([numbers.Real, numpy.float32, numpy.float64])
+
 class DefaultTransfer(Transfer):
     """Default NumPy transfer."""
     def __call__(self, ip_vec, op_vec, mode='fwd'):
@@ -40,9 +42,11 @@ class DefaultTransfer(Transfer):
                     tmp = ip_vec._global_vector._data[ip_iset][ip_inds]
                     numpy.add.at(op_vec._global_vector._data[op_iset],
                                  op_inds, tmp)
+
 class DefaultVector(Vector):
     """Default NumPy vector."""
     TRANSFER = DefaultTransfer
+
     def _create_data(self):
         """Allocate list of arrays, one for each var_set.
 
@@ -71,6 +75,7 @@ class DefaultVector(Vector):
             ind2_all = numpy.sum(sizes_all[self._iproc, :ivar_all + 1])
             indices[ivar_set][ind1:ind2] = numpy.arange(ind1_all, ind2_all)
         return data, indices
+
     def _extract_data(self):
         """Extract views of arrays from global_vector.
 
@@ -100,6 +105,7 @@ class DefaultVector(Vector):
                 data.append(numpy.zeros(0))
                 indices.append(numpy.zeros(0, int))
         return data, indices
+
     def _initialize_data(self, global_vector):
         """Internally allocate vectors.
         Must be implemented by the subclass.
@@ -116,13 +122,16 @@ class DefaultVector(Vector):
             self._data, self._indices = self._create_data()
         else:
             self._data, self._indices = self._extract_data()
+
     def _initialize_views(self):
         """Internally assemble views onto the vectors.
         Must be implemented by the subclass.
         Sets the following attributes:
-            _views
-            _views_flat
-            _idxs
+
+        - _views
+        - _views_flat
+        - _idxs
+
         """
         variable_sizes = self._assembler._variable_sizes[self._typ]
         variable_set_indices = self._assembler._variable_set_indices[self._typ]
@@ -151,6 +160,7 @@ class DefaultVector(Vector):
         self._views = self._names = views
         self._views_flat = views_flat
         self._idxs = idxs
+
     def _clone_data(self):
         """For each item in _data, replace it with a copy of the data.
         Must be implemented by the subclass.
@@ -158,6 +168,7 @@ class DefaultVector(Vector):
         for iset in range(len(self._data)):
             data = self._data[iset]
             self._data[iset] = numpy.array(data)
+
     def __iadd__(self, vec):
         """Perform in-place vector addition.
         Must be implemented by the subclass.
@@ -170,6 +181,7 @@ class DefaultVector(Vector):
         for iset in range(len(self._data)):
             self._data[iset] += vec._data[iset]
         return self
+
     def __isub__(self, vec):
         """Perform in-place vector substraction.
         Must be implemented by the subclass.
@@ -182,6 +194,7 @@ class DefaultVector(Vector):
         for iset in range(len(self._data)):
             self._data[iset] -= vec._data[iset]
         return self
+
     def __imul__(self, val):
         """Perform in-place scalar multiplication.
         Must be implemented by the subclass.
@@ -194,6 +207,7 @@ class DefaultVector(Vector):
         for data in self._data:
             data *= val
         return self
+
     def add_scal_vec(self, val, vec):
         """Perform in-place addition of a vector times a scalar.
         Must be implemented by the subclass.
@@ -207,6 +221,7 @@ class DefaultVector(Vector):
         """
         for iset in range(len(self._data)):
             self._data[iset] += val * vec._data[iset]
+
     def set_vec(self, vec):
         """Set the value of this vector to that of the incoming vector.
         Must be implemented by the subclass.
@@ -218,6 +233,7 @@ class DefaultVector(Vector):
         """
         for iset in range(len(self._data)):
             self._data[iset][:] = vec._data[iset]
+
     def set_const(self, val):
         """Set the value of this vector to a constant scalar value.
         Must be implemented by the subclass.
@@ -229,10 +245,11 @@ class DefaultVector(Vector):
         """
         for data in self._data:
             data[:] = val
+            
     def get_norm(self):
         """Return the norm of this vector.
         Must be implemented by the subclass.
-        
+
         Returns
         -------
         float

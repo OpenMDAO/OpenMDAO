@@ -208,7 +208,7 @@ class ExecComp(ExplicitComponent):
             `VecWrapper` containing parameters. (p)
 
         unknowns : `VecWrapper`
-            `<VecWrapper>` containing outputs and states. (u)
+            `VecWrapper` containing outputs and states. (u)
 
         jacobians : `Jacobian`
             Contains sub-jacobians.

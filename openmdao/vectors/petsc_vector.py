@@ -75,7 +75,7 @@ class PETScVector(DefaultVector):
         """Internally allocate vectors.
         Must be implemented by the subclass.
         Sets the following attributes:
-            _data
+             _data
 
         Args
         ----
@@ -97,7 +97,7 @@ class PETScVector(DefaultVector):
     def get_norm(self):
         """Return the norm of this vector.
         Must be implemented by the subclass.
-        
+
         Returns
         -------
         float
