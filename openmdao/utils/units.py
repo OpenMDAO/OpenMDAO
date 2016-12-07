@@ -666,7 +666,6 @@ def _find_unit(unit):
                             raise ValueError("no unit named '%s' is defined"
                                              % item)
 
-                print("foo", name)
                 unit = eval(name, {'__builtins__': None}, _UNIT_LIB.unit_table)
 
             _UNIT_CACHE[name] = unit
