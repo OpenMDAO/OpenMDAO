@@ -11,7 +11,15 @@ from openmdao.core.component import Component as BaseComponent
 
 
 class Component(BaseComponent):
-    """Class to inherit from when all output variables are explicit."""
+    """Class to inherit from when all output variables are explicit.
+
+    Attributes
+    ----------
+    _state_names : [str, ...]
+        list of names of the states (deprecated OpenMDAO 1.0 concept).
+    _output_names : [str, ...]
+        list of names of the outputs (deprecated OpenMDAO 1.0 concept).
+    """
 
     def __init__(self, **kwargs):
         """Add a few more attributes."""
@@ -20,9 +28,31 @@ class Component(BaseComponent):
         self._output_names = []
 
     def add_param(self, name, val=1.0, **kwargs):
+        """Add an input variable to the component.
+
+        Args
+        ----
+        name : str
+            name of the variable in this component's namespace.
+        val : object
+            The value of the variable being added.
+        **kwargs : dict
+            additional args, documented [INSERT REF].
+        """
         self._add_variable(name, 'input', val, kwargs)
 
     def add_state(self, name, val=1.0, **kwargs):
+        """Add a state variable to the component.
+
+        Args
+        ----
+        name : str
+            name of the variable in this component's namespace.
+        val : object
+            The value of the variable being added.
+        **kwargs : dict
+            additional args, documented [INSERT REF].
+        """
         if 'resid_scaler' in kwargs:
             kwargs['res_ref'] = kwargs['resid_scaler']
 
@@ -30,6 +60,17 @@ class Component(BaseComponent):
         self._state_names.append(name)
 
     def add_output(self, name, val=1.0, **kwargs):
+        """Add an output variable to the component.
+
+        Args
+        ----
+        name : str
+            name of the variable in this component's namespace.
+        val : object
+            The value of the variable being added.
+        **kwargs : dict
+            additional args, documented [INSERT REF].
+        """
         if 'resid_scaler' in kwargs:
             kwargs['res_ref'] = kwargs['resid_scaler']
 
@@ -105,7 +146,7 @@ class Component(BaseComponent):
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
-                d_outputs.scale(self._scaling_to_phys['output'])
+                dxw_outputs.scale(self._scaling_to_phys['output'])
                 d_residuals.scale(self._scaling_to_phys['residual'])
 
                 tmp = self.solve_linear(d_outputs, d_residuals, mode)
