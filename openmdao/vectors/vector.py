@@ -227,7 +227,6 @@ class Vector(object):
         - _views
         - _views_flat
         - _idxs
-        - <Vector>
 
         """
         pass

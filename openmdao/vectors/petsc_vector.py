@@ -75,7 +75,8 @@ class PETScVector(DefaultVector):
         """Internally allocate vectors.
         Must be implemented by the subclass.
         Sets the following attributes:
-             _data
+
+        - _data
 
         Args
         ----

@@ -81,7 +81,7 @@ OpenMDAO User Source Documentation
     # the important packages in this list explicitly. Any new ones that
     # get added will show up at the end.
     packages = ['assemblers','core', 'components', 'drivers', 'jacobians', 'matrices', 'solvers',
-                'test_suite', 'proc_allocators', 'utils', 'vectors']
+                'proc_allocators', 'utils', 'vectors']
     # Everything in dir that isn't discarded is appended as a source package.
     for listing in os.listdir(os.path.join(dir, "..")):
         if os.path.isdir(os.path.join("..", listing)):
@@ -303,7 +303,8 @@ import pkgutil, inspect
 package=openmdao
 om_classes = {}
 for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
-                                                      prefix=package.__name__+'.',                                                      onerror=lambda x: None):
+                                                      prefix=package.__name__+'.',
+                                                      onerror=lambda x: None):
     if not ispkg:
         if 'docs' not in modname:
             module = importer.find_module(modname).load_module(modname)

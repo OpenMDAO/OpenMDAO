@@ -28,11 +28,11 @@ class System(object):
         global name of the system, including the path.
     comm : MPI.Comm or <FakeComm>
         MPI communicator object.
-    metadata : GeneralizedDictionary
+    metadata : <GeneralizedDictionary>
         dictionary of user-defined arguments.
     _sys_depth : int
         distance from the root node in the hierarchy tree.
-    _sys_assembler: <Assembler>
+    _sys_assembler : <Assembler>
         pointer to the global assembler object.
     _mpi_proc_allocator : <ProcAllocator>
         object that distributes procs among subsystems.

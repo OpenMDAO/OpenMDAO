@@ -110,7 +110,8 @@ class DefaultVector(Vector):
         """Internally allocate vectors.
         Must be implemented by the subclass.
         Sets the following attributes:
-            _data
+        
+        - _data
 
         Args
         ----
@@ -245,7 +246,7 @@ class DefaultVector(Vector):
         """
         for data in self._data:
             data[:] = val
-            
+
     def get_norm(self):
         """Return the norm of this vector.
         Must be implemented by the subclass.
