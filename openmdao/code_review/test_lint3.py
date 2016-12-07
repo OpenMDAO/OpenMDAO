@@ -81,7 +81,8 @@ class LintAttributesTestCase(unittest.TestCase):
 
 
                         # There is a valid __init__ section in the class
-                        if('__init__' in clss.__dict__ and '__init__' in dir(clss) and inspect.isfunction(getattr(clss, '__init__'))):
+                        # if('__init__' in clss.__dict__ and '__init__' in dir(clss) and inspect.isfunction(getattr(clss, '__init__'))):
+                        if '__init__' in clss.__dict__ and '__init__' in dir(clss):
                             method = getattr(clss, '__init__')
                             mysrc = inspect.getsource(method)
                             all_member_vars = list(set([m.strip() for m in member_var_re.findall(mysrc) if ("." not in m)]))
