@@ -5,7 +5,7 @@ import numpy
 import unittest
 
 from openmdao.core.problem import Problem
-from openmdao.core.component import IndepVarComp
+from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple

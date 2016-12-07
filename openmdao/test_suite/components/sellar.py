@@ -9,8 +9,9 @@ From Sellar's analytic problem.
 import numpy as np
 
 from openmdao.components.exec_comp import ExecComp
-from openmdao.core.component import IndepVarComp
-from openmdao.core.component import ExplicitComponent, ImplicitComponent
+from openmdao.core.indepvarcomp import IndepVarComp
+from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.group import Group
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
