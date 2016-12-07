@@ -115,7 +115,7 @@ class ImplicitComponent(Component):
     """Class to inherit from when all output variables are implicit."""
 
     def _apply_nonlinear(self):
-        """See System._apply_nonlinear."""
+        """Compute residuals."""
         self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
     def _solve_nonlinear(self):
