@@ -10,7 +10,7 @@ from numpy import ndarray, imag, complex as npcomplex
 
 from six import string_types
 
-from openmdao.core.component import ExplicitComponent
+from openmdao.core.explicitcomponent import ExplicitComponent
 
 # regex to check for variable names.
 VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')

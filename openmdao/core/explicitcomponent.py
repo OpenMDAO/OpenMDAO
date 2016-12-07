@@ -57,23 +57,23 @@ class ExplicitComponent(Component):
                 self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                       mode)
 
-                d_residuals *= -1.0
-
                 self._inputs.scale(self._scaling_to_phys['input'])
                 self._outputs.scale(self._scaling_to_phys['output'])
                 d_inputs.scale(self._scaling_to_phys['input'])
                 d_residuals.scale(self._scaling_to_phys['residual'])
 
+                d_residuals *= -1.0
+
                 self.compute_jacvec_product(
                     self._inputs, self._outputs,
                     d_inputs, d_residuals, mode)
+
+                d_residuals *= -1.0
 
                 self._inputs.scale(self._scaling_to_norm['input'])
                 self._outputs.scale(self._scaling_to_norm['output'])
                 d_inputs.scale(self._scaling_to_norm['input'])
                 d_residuals.scale(self._scaling_to_norm['residual'])
-
-                d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode):
         """See System._solve_linear."""
