@@ -40,7 +40,6 @@ class Vector(object):
         list of the actual allocated data (depends on implementation).
     _indices : list
         list of indices mapping the varset-grouped data to the global vector.
-
     """
 
     def __init__(self, name, typ, system, global_vector=None):
@@ -77,7 +76,6 @@ class Vector(object):
         self._indices = []
         if global_vector is None:
             self._global_vector = self
-
         else:
             self._global_vector = global_vector
 
@@ -209,7 +207,6 @@ class Vector(object):
         ----
         key : str
             variable name in the owning system's namespace.
-
         value : float or list or tuple or ndarray
             variable value to set (not scaled, not dimensionless)
         """
@@ -379,7 +376,6 @@ class Transfer(object):
             output indices for the transfer.
         comm : MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
-
         """
         self._ip_vec = ip_vec
         self._op_vec = op_vec
