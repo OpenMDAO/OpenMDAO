@@ -1,4 +1,4 @@
-"""Define the ExplicitComponent class."""
+"""Define a deprecated Component class for backwards compatibility."""
 
 from __future__ import division
 
