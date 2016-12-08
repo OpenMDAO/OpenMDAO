@@ -61,8 +61,6 @@ class Component(System):
         self._variable_myproc_names['input'].append(name)
         self._variable_myproc_metadata['input'].append(metadata)
 
-        print "foobar"
-
     def add_output(self, name, val=1.0, **kwargs):
         """Add an output variable to the component.
 

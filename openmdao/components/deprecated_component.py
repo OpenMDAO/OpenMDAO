@@ -61,7 +61,7 @@ class Component(BaseComponent):
         if 'resid_scaler' in kwargs:
             kwargs['res_ref'] = kwargs['resid_scaler']
 
-        self.add_output(name, val, **kwargs)
+        super(Component, self).add_output(name, val, **kwargs)
         self._state_names.append(name)
 
     def add_output(self, name, val=1.0, **kwargs):
@@ -79,7 +79,7 @@ class Component(BaseComponent):
         if 'resid_scaler' in kwargs:
             kwargs['res_ref'] = kwargs['resid_scaler']
 
-        self.add_output(name, val, **kwargs)
+        super(Component, self).add_output(name, val, **kwargs)
         self._output_names.append(name)
 
     def _apply_nonlinear(self):
@@ -103,7 +103,7 @@ class Component(BaseComponent):
             self._outputs.scale(self._scaling_to_phys['output'])
             self._residuals.scale(self._scaling_to_phys['residual'])
 
-            self.solve_nonlinear(self._inputs, self._outputs)
+            self.solve_nonlinear(self._inputs, self._outputs, self._residuals)
 
             self._inputs.scale(self._scaling_to_norm['input'])
             self._outputs.scale(self._scaling_to_norm['output'])
