@@ -27,8 +27,10 @@ class Component(BaseComponent):
         self._output_names = []
 
         warnings.simplefilter('always', DeprecationWarning)
-        warnings.warn("'low' and 'high' are deprecated. "
-                      "Use 'lower' and 'upper' instead.",
+        warnings.warn('Components should inherit from ImplicitComponent '
+                      'or ExplicitComponent. This class provides '
+                      'backwards compabitibility with OpenMDAO <= 1.x as '
+                      'this Component class is deprecated',
                       DeprecationWarning, stacklevel=2)
         warnings.simplefilter('ignore', DeprecationWarning)
 
