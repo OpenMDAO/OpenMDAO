@@ -103,3 +103,7 @@ class TestVarSets(unittest.TestCase):
         expected = np.array([output[i][j]
                                  for i,j in self.p._assembler._variable_set_indices['output']])
         assert_rel_error(self, output_novs, expected, 1e-15)
+
+
+if __name__ == "__main__": 
+    unittest.main()

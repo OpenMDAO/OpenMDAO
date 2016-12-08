@@ -14,8 +14,6 @@ class DefaultAssembler(Assembler):
                            subsystems_myproc, subsystems_inds):
         """Compute the transfer indices.
 
-        Must be implemented by the subclass.
-
         Args
         ----
         nsub_allprocs : int

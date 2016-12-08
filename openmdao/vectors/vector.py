@@ -40,6 +40,8 @@ class Vector(object):
         list of the actual allocated data (depends on implementation).
     _indices : list
         list of indices mapping the varset-grouped data to the global vector.
+    _ivar_map : list[nvar_set] of int ndarray[size]
+        list of index arrays mapping each entry to its variable index.
     """
 
     def __init__(self, name, typ, system, global_vector=None):
@@ -74,6 +76,7 @@ class Vector(object):
         self._global_vector = None
         self._data = []
         self._indices = []
+        self._ivar_map = []
         if global_vector is None:
             self._global_vector = self
         else:
@@ -110,6 +113,59 @@ class Vector(object):
                              self._global_vector)
         vec._clone_data()
         return vec
+
+    def _compute_ivar_map(self, ivar_map=None):
+        """Compute the ivar_map.
+
+        The ivar_map index vector is the same length as data and indices,
+        and it yields the index of the local variable.
+
+        Args
+        ----
+        ivar_map : list or None
+            if not None, we can just set the attribute to this arg.
+        """
+        if ivar_map is not None:
+            self._ivar_map = ivar_map
+            return
+
+        variable_sizes = self._assembler._variable_sizes[self._typ]
+        variable_set_indices = self._assembler._variable_set_indices[self._typ]
+
+        ind1, ind2 = self._system._variable_allprocs_range[self._typ]
+        sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
+
+        variable_indices = self._system._variable_myproc_indices[self._typ]
+
+        # Create the index arrays for each var_set for ivar_map.
+        # Also store the starting points in the data/index vector.
+        ivar_map = []
+        ind1_list = []
+        for iset in range(len(variable_sizes)):
+            bool_vector = sub_variable_set_indices[:, 0] == iset
+            data_inds = sub_variable_set_indices[bool_vector, 1]
+            if len(data_inds) > 0:
+                sizes_array = variable_sizes[iset]
+                ind1 = numpy.sum(sizes_array[self._iproc, :data_inds[0]])
+                ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
+                ivar_map.append(numpy.empty(ind2 - ind1, int))
+                ind1_list.append(ind1)
+            else:
+                ivar_map.append(numpy.zeros(0, int))
+                ind1_list.append(0)
+
+        # Populate ivar_map by looping over local variables in the system.
+        for ind in range(len(variable_indices)):
+            ivar_all = variable_indices[ind]
+            iset, ivar = variable_set_indices[ivar_all, :]
+            sizes_array = variable_sizes[iset]
+            ind1 = numpy.sum(sizes_array[self._iproc, :ivar]) - \
+                ind1_list[iset]
+            ind2 = numpy.sum(sizes_array[self._iproc, :ivar + 1]) - \
+                ind1_list[iset]
+            ivar_map[iset][ind1:ind2] = ind
+
+        self._ivar_map = ivar_map
 
     def get_data(self, array=None):
         """Get the array combining the data of all the varsets.
@@ -335,6 +391,18 @@ class Vector(object):
         -------
         float
             norm of this vector.
+        """
+        pass
+
+    def change_scaling_state(self, c0, c1):
+        """Change the scaling state.
+
+        Args
+        ----
+        c0 : int ndarray[nvar_myproc]
+            0th order coefficients for scaling/unscaling.
+        c1 : int ndarray[nvar_myproc]
+            1st order coefficients for scaling/unscaling.
         """
         pass
 

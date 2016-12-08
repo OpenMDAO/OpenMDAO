@@ -5,7 +5,7 @@ import numpy
 import unittest
 
 from openmdao.core.problem import Problem
-from openmdao.core.component import IndepVarComp
+from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
@@ -107,3 +107,7 @@ class TestIndepVarComp(unittest.TestCase):
 
         self.assertEqual(prob['indep_var_1'], 1.0)
         self.assertEqual(prob['indep_var_2'], 2.0)
+
+
+if __name__ == '__main__':
+    unittest.main()
