@@ -406,8 +406,9 @@ class System(object):
 
         # Scaling coefficients from the src output
         src_units = self._sys_assembler._src_units
-        src_0 = self._sys_assembler._scal_std_nrm_0
-        src_1 = self._sys_assembler._scal_std_nrm_1
+        src_0 = self._sys_assembler._src_scaling_0
+        src_1 = self._sys_assembler._src_scaling_1
+
         # Compute scaling arrays for inputs using a0 and a1
         for ind, meta in enumerate(self._variable_myproc_metadata['input']):
             self._scaling_to_phys['input'][ind, 0] = \
