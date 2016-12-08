@@ -1,7 +1,9 @@
 """Define the base Vector and Transfer classes."""
 from __future__ import division, print_function
 import numpy
+
 from six.moves import range
+
 class Vector(object):
     """Base Vector class.
 
@@ -58,22 +60,28 @@ class Vector(object):
         """
         self._name = name
         self._typ = typ
+
         self._assembler = system._sys_assembler
         self._system = system
+
         self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
         self._views = {}
         self._views_flat = {}
         self._idxs = {}
+
         # self._names will either be equivalent to self._views or to the
         # set of variables relevant to the current matvec product.
         self._names = self._views
+
         self._global_vector = None
         self._data = []
         self._indices = []
         if global_vector is None:
             self._global_vector = self
+
         else:
             self._global_vector = global_vector
+
         self._initialize_data(global_vector)
         self._initialize_views()
 
@@ -93,6 +101,7 @@ class Vector(object):
         """
         return self.__class__(self._name, self._typ, system,
                               self._global_vector)
+
     def _clone(self):
         """Return a copy that does not provide view access to its data.
 
@@ -125,8 +134,10 @@ class Vector(object):
             sizes = self._assembler._variable_sizes_all[self._typ][self._iproc,
                                                                    inds]
             array = numpy.zeros(numpy.sum(sizes))
+
         for ind, data in enumerate(self._data):
             array[self._indices[ind]] = data
+
         return array
 
     def set_data(self, array):
@@ -200,6 +211,16 @@ class Vector(object):
             raise KeyError("Variable '%s' not found." % key)
 
     def __setitem__(self, key, value):
+        """Set the unscaled variable value in true units.
+
+        Args
+        ----
+        key : str
+            variable name in the owning system's namespace.
+
+        value : float or list or tuple or ndarray
+            variable value to set (not scaled, not dimensionless)
+        """
         if key in self._names:
             self._views[key][:] = value
         else:
@@ -207,7 +228,9 @@ class Vector(object):
 
     def _initialize_data(self, global_vector):
         """Internally allocate vectors.
+
         Must be implemented by the subclass.
+
         Sets the following attributes:
 
         - _data
@@ -222,7 +245,9 @@ class Vector(object):
 
     def _initialize_views(self):
         """Internally assemble views onto the vectors.
+
         Must be implemented by the subclass.
+
         Sets the following attributes:
 
         - _views
@@ -234,12 +259,14 @@ class Vector(object):
 
     def _clone_data(self):
         """For each item in _data, replace it with a copy of the data.
+
         Must be implemented by the subclass.
         """
         pass
 
     def __iadd__(self, vec):
         """Perform in-place vector addition.
+
         Must be implemented by the subclass.
 
         Args
@@ -252,6 +279,7 @@ class Vector(object):
 
     def __isub__(self, vec):
         """Perform in-place vector substraction.
+
         Must be implemented by the subclass.
 
         Args
@@ -264,6 +292,7 @@ class Vector(object):
 
     def __imul__(self, val):
         """Perform in-place scalar multiplication.
+
         Must be implemented by the subclass.
 
         Args
@@ -276,6 +305,7 @@ class Vector(object):
 
     def add_scal_vec(self, val, vec):
         """Perform in-place addition of a vector times a scalar.
+
         Must be implemented by the subclass.
 
         Args
@@ -290,6 +320,7 @@ class Vector(object):
 
     def set_vec(self, vec):
         """Set the value of this vector to that of the incoming vector.
+
         Must be implemented by the subclass.
 
         Args
@@ -302,6 +333,7 @@ class Vector(object):
 
     def set_const(self, val):
         """Set the value of this vector to a constant scalar value.
+
         Must be implemented by the subclass.
 
         Args
@@ -314,6 +346,7 @@ class Vector(object):
 
     def get_norm(self):
         """Return the norm of this vector.
+
         Must be implemented by the subclass.
 
         Returns
@@ -323,6 +356,7 @@ class Vector(object):
 
         """
         pass
+
 
 class Transfer(object):
     """Base Transfer class.
@@ -369,16 +403,19 @@ class Transfer(object):
         self._ip_inds = ip_inds
         self._op_inds = op_inds
         self._comm = comm
+
         self._initialize_transfer()
 
     def _initialize_transfer(self):
         """Set up the transfer; do any necessary pre-computation.
+
         Optionally implemented by the subclass.
         """
         pass
 
     def __call__(self, ip_vec, op_vec, mode='fwd'):
         """Perform transfer.
+        
         Must be implemented by the subclass.
 
         Args
