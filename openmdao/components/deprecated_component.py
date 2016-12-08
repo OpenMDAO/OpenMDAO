@@ -44,7 +44,7 @@ class Component(BaseComponent):
         **kwargs : dict
             additional args, documented [INSERT REF].
         """
-        self._add_variable(name, 'input', val, kwargs)
+        self.add_input(name, val, **kwargs)
 
     def add_state(self, name, val=1.0, **kwargs):
         """Add a state variable to the component.
@@ -61,7 +61,7 @@ class Component(BaseComponent):
         if 'resid_scaler' in kwargs:
             kwargs['res_ref'] = kwargs['resid_scaler']
 
-        self._add_variable(name, 'output', val, kwargs)
+        self.add_output(name, val, **kwargs)
         self._state_names.append(name)
 
     def add_output(self, name, val=1.0, **kwargs):
@@ -79,7 +79,7 @@ class Component(BaseComponent):
         if 'resid_scaler' in kwargs:
             kwargs['res_ref'] = kwargs['resid_scaler']
 
-        self._add_variable(name, 'output', val, kwargs)
+        self.add_output(name, val, **kwargs)
         self._output_names.append(name)
 
     def _apply_nonlinear(self):
@@ -176,7 +176,10 @@ class Component(BaseComponent):
         self._inputs.scale(self._scaling_to_phys['input'])
         self._outputs.scale(self._scaling_to_phys['output'])
 
-        self.linearize(self._inputs, self._outputs, self._jacobian)
+        J = self.linearize(self._inputs, self._outputs, self._residuals)
+        if J is not None: 
+            for k, v in J: 
+                self._jacobian[k] = v
 
         self._inputs.scale(self._scaling_to_norm['input'])
         self._outputs.scale(self._scaling_to_norm['output'])

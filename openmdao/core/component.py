@@ -38,7 +38,7 @@ class Component(System):
 
         Args
         ----
-        name : str
+        name : str60
             name of the variable in this component's namespace.
         val : object
             The value of the variable being added.
@@ -60,6 +60,8 @@ class Component(System):
         self._variable_allprocs_names['input'].append(name)
         self._variable_myproc_names['input'].append(name)
         self._variable_myproc_metadata['input'].append(metadata)
+
+        print "foobar"
 
     def add_output(self, name, val=1.0, **kwargs):
         """Add an output variable to the component.

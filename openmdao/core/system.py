@@ -161,6 +161,9 @@ class System(object):
 
         self.initialize()
 
+        print "foobar"
+
+
     def _setup_processors(self, path, comm, global_dict,
                           depth, assembler, proc_range):
         """Recursively split comms and define local subsystems.
