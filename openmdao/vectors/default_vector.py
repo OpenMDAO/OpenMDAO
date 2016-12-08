@@ -1,14 +1,18 @@
 """Define the default Vector and Transfer classes."""
 from __future__ import division
 import numpy
+
 import numbers
 from six.moves import range
+
 from openmdao.vectors.vector import Vector, Transfer
 
 real_types = tuple([numbers.Real, numpy.float32, numpy.float64])
 
+
 class DefaultTransfer(Transfer):
     """Default NumPy transfer."""
+
     def __call__(self, ip_vec, op_vec, mode='fwd'):
         """Perform transfer.
         Must be implemented by the subclass.
@@ -54,7 +58,6 @@ class DefaultVector(Vector):
         -------
         [ndarray[:], ...]
             list of zeros arrays of correct size, one for each var_set.
-
         """
         data = [numpy.zeros(numpy.sum(sizes[self._iproc, :]))
                 for sizes in self._assembler._variable_sizes[self._typ]]
@@ -87,7 +90,6 @@ class DefaultVector(Vector):
         -------
         [ndarray[:], ...]
             list of zeros arrays of correct size, one for each var_set.
-
         """
         variable_sizes = self._assembler._variable_sizes[self._typ]
         variable_set_indices = self._assembler._variable_set_indices[self._typ]

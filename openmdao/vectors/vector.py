@@ -56,7 +56,6 @@ class Vector(object):
             pointer to the owning system.
         global_vector : <Vector>
             pointer to the vector owned by the root system.
-
         """
         self._name = name
         self._typ = typ
@@ -97,7 +96,6 @@ class Vector(object):
         -------
         <Vector>
             subvector instance.
-
         """
         return self.__class__(self._name, self._typ, system,
                               self._global_vector)
@@ -127,7 +125,6 @@ class Vector(object):
         -------
         ndarray
             Array combining the data of all the varsets.
-
         """
         if array is None:
             inds = self._system._variable_myproc_indices[self._typ]
@@ -147,7 +144,6 @@ class Vector(object):
         ----
         array : ndarray
             Array to set to the data for all the varsets.
-
         """
         for ind, data in enumerate(self._data):
             data[:] = array[self._indices[ind]]
@@ -159,7 +155,6 @@ class Vector(object):
         ----
         array : ndarray
             Array to set to the data for all the varsets.
-
         """
         for ind, data in enumerate(self._data):
             data[:] += array[self._indices[ind]]
@@ -176,7 +171,6 @@ class Vector(object):
         -------
         boolean
             True or False.
-
         """
         return key in self._names
 
@@ -187,7 +181,6 @@ class Vector(object):
         -------
         listiterator
             iterator over the variable names.
-
         """
         return iter(self._names)
 
@@ -203,7 +196,6 @@ class Vector(object):
         -------
         float or ndarray
             variable value (not scaled, not dimensionless).
-
         """
         if key in self._names:
             return self._views[key][self._idxs[key]]
@@ -239,7 +231,6 @@ class Vector(object):
         ----
         global_vector : <Vector> or None
             the root's vector instance or None, if we are at the root.
-
         """
         pass
 
@@ -273,7 +264,6 @@ class Vector(object):
         ----
         vec : <Vector>
             vector to add to self.
-
         """
         pass
 
@@ -286,7 +276,6 @@ class Vector(object):
         ----
         vec : <Vector>
             vector to subtract from self.
-
         """
         pass
 
@@ -299,7 +288,6 @@ class Vector(object):
         ----
         val : int or float
             scalar to multiply self.
-
         """
         pass
 
@@ -314,7 +302,6 @@ class Vector(object):
             scalar.
         vec : <Vector>
             this vector times val is added to self.
-
         """
         pass
 
@@ -327,7 +314,6 @@ class Vector(object):
         ----
         vec : <Vector>
             the vector whose values self is set to.
-
         """
         pass
 
@@ -340,7 +326,6 @@ class Vector(object):
         ----
         val : int or float
             scalar to set self to.
-
         """
         pass
 
@@ -353,7 +338,6 @@ class Vector(object):
         -------
         float
             norm of this vector.
-
         """
         pass
 
@@ -378,7 +362,6 @@ class Transfer(object):
         output indices for the transfer.
     _comm : MPI.Comm or FakeComm
         communicator of the system that owns this transfer.
-
     """
 
     def __init__(self, ip_vec, op_vec, ip_inds, op_inds, comm):
@@ -415,7 +398,7 @@ class Transfer(object):
 
     def __call__(self, ip_vec, op_vec, mode='fwd'):
         """Perform transfer.
-        
+
         Must be implemented by the subclass.
 
         Args
@@ -426,6 +409,5 @@ class Transfer(object):
             pointer to the output vector.
         mode : str
             'fwd' or 'rev'.
-
         """
         pass
