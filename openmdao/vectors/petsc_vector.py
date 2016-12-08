@@ -43,7 +43,6 @@ class PETScTransfer(DefaultTransfer):
             pointer to the output vector.
         mode : str
             'fwd' or 'rev'.
-
         """
         if mode == 'fwd':
             for ip_iset, op_iset in self._ip_inds:
@@ -82,7 +81,6 @@ class PETScVector(DefaultVector):
         ----
         global_vector : Vector or None
             the root's vector instance or None, if we are at the root.
-
         """
         if global_vector is None:
             self._data, self._indices = self._create_data()
