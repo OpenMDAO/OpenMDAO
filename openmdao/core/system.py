@@ -12,6 +12,7 @@ from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.units import conversion_to_base_units, convert_units
 
 
 class System(object):
@@ -75,6 +76,10 @@ class System(object):
         dict of transfer objects.
     _vector_var_ids : dict
         dictionary of index arrays of relevant variables for this vector
+    _scaling_to_norm : dict of ndarray
+        coefficients to convert vectors to normalized values.
+    _scaling_to_phys : dict of ndarray
+        coefficients to convert vectors to physical values.
     _inputs : Vector
         inputs vector; points to _vectors['input'][None].
     _outputs : Vector
@@ -137,6 +142,11 @@ class System(object):
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._vector_transfers = {}
         self._vector_var_ids = {}
+
+        self._scaling_to_norm = {
+            'input': None, 'output': None, 'residual': None}
+        self._scaling_to_phys = {
+            'input': None, 'output': None, 'residual': None}
 
         self._inputs = None
         self._outputs = None
@@ -325,7 +335,7 @@ class System(object):
         """
         pass
 
-    def _setup_vector(self, vectors, vector_var_ids):
+    def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
         """Add this vector and assign sub_vectors to subsystems.
 
         Sets the following attributes:
@@ -344,12 +354,19 @@ class System(object):
             Vector objects corresponding to 'name'.
         vector_var_ids : ndarray[:]
             integer array of all relevant variables for this vector.
+        use_ref_vector : bool
+            if True, allocate vectors to store ref. values.
         """
         vec_name = vectors['output']._name
 
         # Set the incoming _vectors in the appropriate attribute
         for key in ['input', 'output', 'residual']:
             self._vectors[key][vec_name] = vectors[key]
+
+        if use_ref_vector:
+            vectors['input']._compute_ivar_map()
+            vectors['output']._compute_ivar_map()
+            vectors['residual']._compute_ivar_map(vectors['output']._ivar_map)
 
         # Compute the transfer for this vector set
         self._vector_transfers[vec_name] = self._get_transfers(vectors)
@@ -371,7 +388,56 @@ class System(object):
             for key in ['input', 'output', 'residual']:
                 sub_vectors[key] = vectors[key]._create_subvector(subsys)
 
-            subsys._setup_vector(sub_vectors, vector_var_ids)
+            subsys._setup_vector(sub_vectors, vector_var_ids, use_ref_vector)
+
+    def _setup_scaling(self):
+        """Set up scaling vectors."""
+        nvar_in = len(self._variable_myproc_metadata['input'])
+        nvar_out = len(self._variable_myproc_metadata['output'])
+
+        # Initialize scaling arrays
+        for scaling in [self._scaling_to_norm, self._scaling_to_phys]:
+            scaling['input'] = numpy.empty((nvar_in, 2))
+            scaling['output'] = numpy.empty((nvar_out, 2))
+            scaling['residual'] = numpy.empty((nvar_out, 2))
+
+        # ref0 and ref are the values of the variable in the specified
+        # units at which the scaled values are 0 and 1, respectively
+
+        # Scaling coefficients from the src output
+        src_units = self._sys_assembler._scal_std_nrm_units
+        src_0 = self._sys_assembler._scal_std_nrm_0
+        src_1 = self._sys_assembler._scal_std_nrm_1
+        # Compute scaling arrays for inputs using a0 and a1
+        for ind, meta in enumerate(self._variable_myproc_metadata['input']):
+            self._scaling_to_phys['input'][ind, 0] = \
+                convert_units(src_0[ind], src_units[ind], meta['units'])
+            self._scaling_to_phys['input'][ind, 1] = \
+                convert_units(src_1[ind], src_units[ind], meta['units'])
+
+        # Compute scaling arrays for outputs; no unit conversion needed
+        for ind, meta in enumerate(self._variable_myproc_metadata['output']):
+            self._scaling_to_phys['output'][ind, 0] = meta['ref0']
+            self._scaling_to_phys['output'][ind, 1] = \
+                meta['ref'] - meta['ref0']
+
+        # Compute scaling arrays for outputs; convert units
+        for ind, meta in enumerate(self._variable_myproc_metadata['output']):
+            self._scaling_to_phys['residual'][ind, 0] = \
+                convert_units(meta['ref0'], meta['units'], meta['res_units'])
+            self._scaling_to_phys['residual'][ind, 1] = \
+                convert_units(meta['ref'] - meta['ref0'],
+                              meta['units'], meta['res_units'])
+
+        # Compute inverse scaling arrays
+        for key in ['input', 'output', 'residual']:
+            a = self._scaling_to_phys[key][:, 0]
+            b = self._scaling_to_phys[key][:, 1]
+            self._scaling_to_norm[key][:, 0] = -a / b
+            self._scaling_to_norm[key][:, 1] = 1.0 / b
+
+        for subsys in self._subsystems_myproc:
+            subsys._setup_scaling()
 
     def _get_transfers(self, vectors):
         """Compute transfers.
