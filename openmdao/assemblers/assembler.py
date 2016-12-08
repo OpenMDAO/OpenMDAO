@@ -35,12 +35,12 @@ class Assembler(object):
         all the input indices vectors concatenated together.
     _src_indices_range : int ndarray[num_input_var_all, 2]
         the initial and final indices for the indices vector for each input.
-    _scal_std_nrm_units : [str, ...]
+    _src_units : [str, ...]
         list of src units whose length is the number of input variables.
-    _scal_std_nrm_0 : ndarray(nvar_in)
-        list of 0th order coefficients.
-    _scal_std_nrm_1 : ndarray(nvar_in)
-        list of 1st order coefficients.
+    _src_scaling_0 : ndarray(nvar_in)
+        list of 0th order scaling coefficients (i.e., a0: in y = a1 * x + a0).
+    _src_scaling_1 : ndarray(nvar_in)
+        list of 1st order scaling coefficients (i.e., a1: in y = a1 * x + a0).
     """
 
     def __init__(self, comm):
@@ -62,9 +62,10 @@ class Assembler(object):
         self._src_indices = None
         self._src_indices_range = None
 
-        self._scal_std_nrm_units = []
-        self._scal_std_nrm_0 = None
-        self._scal_std_nrm_1 = None
+        #
+        self._src_units = []
+        self._src_scaling_0 = None
+        self._src_scaling_1 = None
 
     def _setup_variables(self, nvars, variable_metadata, variable_indices):
         """Compute the variable sets and sizes.
@@ -234,48 +235,48 @@ class Assembler(object):
         nvar_out = len(variable_metadata)
 
         # List of src units; to check compatability with input units
-        src_std_nrm_units = [None for ind in range(nvar_out)]
+        op_units = [None for ind in range(nvar_out)]
         # List of unit_type IDs
-        src_std_nrm_int = numpy.empty(nvar_out, int)
+        op_int = numpy.empty(nvar_out, int)
         # The two columns correspond to ref0 and ref
-        src_std_nrm_flt = numpy.empty((nvar_out, 2))
+        op_flt = numpy.empty((nvar_out, 2))
 
         # Get unit type as well as ref0 and ref in standard units
-        src_std_nrm_int[:] = variable_indices
+        op_int[:] = variable_indices
         for ivar_out, meta in enumerate(variable_metadata):
             # ref0 and ref are the values of the variable in the specified
             # units at which the scaled values are 0 and 1, respectively
-            src_std_nrm_units[ivar_out] = meta['units']
-            src_std_nrm_flt[ivar_out, 0] = meta['ref0']
-            src_std_nrm_flt[ivar_out, 1] = meta['ref'] - meta['ref0']
+            op_units[ivar_out] = meta['units']
+            op_flt[ivar_out, 0] = meta['ref0']
+            op_flt[ivar_out, 1] = meta['ref'] - meta['ref0']
 
         # Broadcast to all procs
         if self._comm.size > 1:
-            src_std_nrm_units_raw = self.comm.allgather(src_std_nrm_units)
-            src_std_nrm_int_raw = self.comm.allgather(src_std_nrm_int)
-            src_std_nrm_flt_raw = self.comm.allgather(src_std_nrm_flt)
+            op_units_raw = self.comm.allgather(op_units)
+            op_int_raw = self.comm.allgather(op_int)
+            op_flt_raw = self.comm.allgather(op_flt)
 
-            src_std_nrm_units = []
-            for str_list in src_std_nrm_units_raw:
-                src_std_nrm_units.extend(str_list)
-            src_std_nrm_int = numpy.vstack(src_std_nrm_int_raw)
-            src_std_nrm_flt = numpy.vstack(src_std_nrm_flt_raw)
+            op_units = []
+            for str_list in op_units_raw:
+                op_units.extend(str_list)
+            op_int = numpy.vstack(op_int_raw)
+            op_flt = numpy.vstack(op_flt_raw)
 
         # Now, we can store ref0 and ref for each input
         nvar_in = len(self._input_var_ids)
-        self._scal_std_nrm_units = [None for ind in range(nvar_in)]
-        self._scal_std_nrm_0 = numpy.empty(nvar_in)
-        self._scal_std_nrm_1 = numpy.empty(nvar_in)
+        self._src_units = [None for ind in range(nvar_in)]
+        self._src_scaling_0 = numpy.empty(nvar_in)
+        self._src_scaling_1 = numpy.empty(nvar_in)
         for ivar_in, ivar_out in enumerate(self._input_var_ids):
             if ivar_out != -1:
-                ind = numpy.where(src_std_nrm_int == ivar_out)[0][0]
-                self._scal_std_nrm_units[ivar_in] = src_std_nrm_units[ind]
-                self._scal_std_nrm_0[ivar_in] = src_std_nrm_flt[ind, 0]
-                self._scal_std_nrm_1[ivar_in] = src_std_nrm_flt[ind, 1]
+                ind = numpy.where(op_int == ivar_out)[0][0]
+                self._src_units[ivar_in] = op_units[ind]
+                self._src_scaling_0[ivar_in] = op_flt[ind, 0]
+                self._src_scaling_1[ivar_in] = op_flt[ind, 1]
             else:
-                self._scal_std_nrm_units[ivar_in] = ''
-                self._scal_std_nrm_0[ivar_in] = 0.
-                self._scal_std_nrm_1[ivar_in] = 1.
+                self._src_units[ivar_in] = ''
+                self._src_scaling_0[ivar_in] = 0.
+                self._src_scaling_1[ivar_in] = 1.
 
     def _compute_transfers(self, nsub_allprocs, var_range,
                            subsystems_myproc, subsystems_inds):
