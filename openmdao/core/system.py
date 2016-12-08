@@ -161,7 +161,6 @@ class System(object):
 
         self.initialize()
 
-
     def _setup_processors(self, path, comm, global_dict,
                           depth, assembler, proc_range):
         """Recursively split comms and define local subsystems.
@@ -401,6 +400,9 @@ class System(object):
             scaling['input'] = numpy.empty((nvar_in, 2))
             scaling['output'] = numpy.empty((nvar_out, 2))
             scaling['residual'] = numpy.empty((nvar_out, 2))
+
+        # ref0 and ref are the values of the variable in the specified
+        # units at which the scaled values are 0 and 1, respectively
 
         # Scaling coefficients from the src output
         src_units = self._sys_assembler._scal_std_nrm_units

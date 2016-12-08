@@ -243,6 +243,8 @@ class Assembler(object):
         # Get unit type as well as ref0 and ref in standard units
         src_std_nrm_int[:] = variable_indices
         for ivar_out, meta in enumerate(variable_metadata):
+            # ref0 and ref are the values of the variable in the specified
+            # units at which the scaled values are 0 and 1, respectively
             src_std_nrm_units[ivar_out] = meta['units']
             src_std_nrm_flt[ivar_out, 0] = meta['ref0']
             src_std_nrm_flt[ivar_out, 1] = meta['ref'] - meta['ref0']

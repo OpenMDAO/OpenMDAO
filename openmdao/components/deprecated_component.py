@@ -10,7 +10,7 @@ from openmdao.core.component import Component as BaseComponent
 
 
 class Component(BaseComponent):
-    """Class to inherit from when all output variables are explicit.
+    """Component Class for backwards compatibility.
 
     Attributes
     ----------

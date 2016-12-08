@@ -43,6 +43,21 @@ class TestComp(Component):
 
 class DepCompTestCase(unittest.TestCase):
 
+    def test_run(self):
+        group = Group()
+        group.add_subsystem('sys1', IndepVarComp('x', val=4.))
+        group.add_subsystem('sys2', IndepVarComp('y', val=3.))
+        group.add_subsystem('sys3', TestComp())
+
+        p = Problem()
+        p.root = group
+        p.setup()
+
+        p.run()
+
+        assert_rel_error(self, p['sys3.z1'], 8., 1e-10)
+        assert_rel_error(self, p['sys3.z2'], 24, 1e-10)
+
     def test_run_with_linearize(self):
         group = Group()
         group.add_subsystem('sys1', IndepVarComp('x', val=4.))
@@ -60,8 +75,8 @@ class DepCompTestCase(unittest.TestCase):
 
         p.run()
 
-        assert_rel_error(self, p['z1'], 8., 1e-10)
-        assert_rel_error(self, p['z2'], 24, 1e-10)
+        assert_rel_error(self, p['sys3.z1'], 8., 1e-10)
+        assert_rel_error(self, p['sys3.z2'], 24, 1e-10)
 
 
 if __name__ == "__main__":

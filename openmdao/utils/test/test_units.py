@@ -7,9 +7,9 @@ import unittest
 from openmdao.utils.units import NumberDict, PhysicalUnit, _find_unit, import_library, add_unit, add_offset_unit
 
 
-class test_NumberDict(unittest.TestCase):
+class TestNumberDict(unittest.TestCase):
 
-    def test__UnknownKeyGives0(self):
+    def test_UnknownKeyGives0(self):
         # a NumberDict instance should initilize using integer and non-integer indices
         # a NumberDict instance should initilize all entries with an initial
         # value of 0
@@ -79,7 +79,7 @@ def _get_powers(**powdict):
     return powers
 
 
-class test__PhysicalUnit(unittest.TestCase):
+class TestPhysicalUnit(unittest.TestCase):
 
     def test_repr_str(self):
         # __repr__should return a string which could be used to contruct the
@@ -245,7 +245,7 @@ class test__PhysicalUnit(unittest.TestCase):
         self.assertEqual(y.name(), 'kg/m**2')
 
 
-class test__moduleFunctions(unittest.TestCase):
+class TestModuleFunctions(unittest.TestCase):
     def test_add_unit(self):
         try:
             add_unit('ft', '20*m')
