@@ -346,8 +346,8 @@ def om_process_docstring(app, what, name, obj, options, lines):
                 if '.' in m:
                     #need to grab the class name and method name separately
                     split_match = m.split('.')
-                    justclass = split_match[0]
-                    justmeth =  split_match[1]
+                    justclass = split_match[0] #class
+                    justmeth =  split_match[1] #method
                     if justclass in om_classes:
                         classfullpath = om_classes[justclass]
                         #construct a link  :meth:`class.method <openmdao.core.class.method>`
@@ -355,7 +355,9 @@ def om_process_docstring(app, what, name, obj, options, lines):
                         #replace the <link> text with the constructed line.
                         lines[i] = lines[i].replace(ma, link)
                     else:
+                        #the class isn't in the class table!
                         print( "WARNING: {} not found in dictionary of OpenMDAO methods".format(justclass) )
+                        #replace instances of <class> with just class in docstring (strip angle brackets)
                         lines[i] = lines[i].replace(ma, m)
                 #otherwise, it's a class
                 else:
@@ -363,12 +365,15 @@ def om_process_docstring(app, what, name, obj, options, lines):
                         classfullpath = om_classes[m]
                         lines[i] = lines[i].replace(ma, ":class:`~"+classfullpath+"`")
                     else:
+                        #the class isn't in the class table!
                         print( "WARNING: {} not found in dictionary of OpenMDAO classes".format(m) )
+                        #replace instances of <class> with class in docstring (strip angle brackets)
                         lines[i] = lines[i].replace(ma, m)
 #This is the crux of the extension--connecting an internal
 #Sphinx event with our own custom function.
 def setup(app):
     app.connect('autodoc-process-docstring', om_process_docstring)
+
 #--------------end sphinx extension---------------------
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -376,8 +381,7 @@ def setup(app):
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('.'))
-#absp = os.path.join('.', 'srcdocs')
-#sys.path.insert(0, os.path.abspath(absp))
+
 if (type == "usr"):
     absp = os.path.join('.', 'srcdocs', 'usr')
     sys.path.insert(0, os.path.abspath(absp))
