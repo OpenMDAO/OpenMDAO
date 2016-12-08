@@ -50,39 +50,84 @@ class TestSparseJacobian(unittest.TestCase):
 
         prob.run()
 
+        # if we multiply our jacobian by our work vec of 1's, we get [1.0, 1.0, 1.0, -7.0]
+        fwd_check = np.array([1.0, 1.0, -7.])
+
+        # if we multiply our jacobian's transpose by our work vec of 1's,
+        # we get [-10., 1., 4., 1.]
+        rev_check = np.array([4., -10., 1.])
+
+        self._check_fwd(prob, fwd_check)
+        self._check_rev(prob, rev_check)
+
+    def test_src_indices(self):
+        # same as test_simple except indep.a is now size 3 instead of 2 and we connect
+        # it to C1.x using src_indices=[2,0] (note this changes the order of the entries)
+        prob = Problem(root=Group())
+        prob.root.add_subsystem('indep',
+                                IndepVarComp((
+                                    ('a', np.ones(3)),
+                                )))
+        C1 = prob.root.add_subsystem('C1', MyExplicitComp())
+        prob.root.connect('indep.a', 'C1.x', src_indices=[2,0])
+        prob.setup(check=False)
+        prob.root.jacobian = GlobalJacobian(Matrix=DenseMatrix)
+        prob.root.nl_solver = NewtonSolver(
+            subsolvers={'linear': ScipyIterativeSolver(
+                maxiter=100,
+            )}
+        )
+        prob.root.ln_solver = ScipyIterativeSolver(
+            maxiter=200, atol=1e-10, rtol=1e-10)
+        prob.root.suppress_solver_output = True
+
+        prob.run()
+        
+        # if we multiply our jacobian by our work vec of 1's, we get [1.0, 1.0, 1.0, -7.0]
+        fwd_check = np.array([1.0, 1.0, 1.0, -7.])
+
+        # if we multiply our jacobian's transpose by our work vec of 1's,
+        # we get [-10., 1., 4., 1.]
+        rev_check = np.array([-10., 1., 4., 1.])
+        
+        self._check_fwd(prob, fwd_check)
+        self._check_rev(prob, rev_check)
+
+    def _check_fwd(self, prob, check_vec):
         work = prob.root._vectors['output']['']._clone()
         work.set_const(1.0)
 
-        # 1. fwd apply_linear test
+        # fwd apply_linear test
         prob.root._vectors['output'][''].set_const(1.0)
         prob.root._apply_linear([''], 'fwd')
         res = prob.root._vectors['residual']['']
-        # if we multiply our jacobian by our work vec of 1's, we get [1.0, 1.0, -7.0]
-        res.set_data(res.get_data()-np.array([1.0, 1.0, -7.]))
+        res.set_data(res.get_data() - check_vec)
         self.assertAlmostEqual(
             prob.root._vectors['residual'][''].get_norm(), 0)
 
-        # 2. rev apply_linear test
-        prob.root._vectors['residual'][''].set_const(1.0)
-        prob.root._apply_linear([''], 'rev')
-        outs = prob.root._vectors['output']['']
-        # if we multiply our jacobian's transpose by our work vec of 1's, 
-        # we get [4., -10., 1.]
-        outs.set_data(outs.get_data()-np.array([4., -10., 1.]))
-        self.assertAlmostEqual(
-            prob.root._vectors['output'][''].get_norm(), 0)
-
-        # 3. fwd solve_linear test
+        # fwd solve_linear test
         prob.root._vectors['output'][''].set_const(0.0)
-        prob.root._vectors['residual'][''].set_data(np.array([1.0, 1.0, -7.]))
+        prob.root._vectors['residual'][''].set_data(check_vec)
         prob.root._solve_linear([''], 'fwd')
         prob.root._vectors['output'][''] -= work
         self.assertAlmostEqual(
             prob.root._vectors['output'][''].get_norm(), 0, delta=1e-6)
 
-        # 4. rev solve_linear test
+    def _check_rev(self, prob, check_vec):
+        work = prob.root._vectors['output']['']._clone()
+        work.set_const(1.0)
+
+        # rev apply_linear test
+        prob.root._vectors['residual'][''].set_const(1.0)
+        prob.root._apply_linear([''], 'rev')
+        outs = prob.root._vectors['output']['']
+        outs.set_data(outs.get_data() - check_vec)
+        self.assertAlmostEqual(
+            prob.root._vectors['output'][''].get_norm(), 0)
+
+        # rev solve_linear test
         prob.root._vectors['residual'][''].set_const(0.0)
-        prob.root._vectors['output'][''].set_data(np.array([4., -10., 1.]))
+        prob.root._vectors['output'][''].set_data(check_vec)
         prob.root._solve_linear([''], 'rev')
         prob.root._vectors['residual'][''] -= work
         self.assertAlmostEqual(

@@ -1,6 +1,7 @@
 """Define the Group class."""
 from __future__ import division
 
+import numpy
 from six import iteritems
 
 from openmdao.core.system import System
