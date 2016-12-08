@@ -10,7 +10,7 @@ from openmdao.core.component import Component as BaseComponent
 
 
 class Component(BaseComponent):
-    """Class to inherit from when all output variables are explicit.
+    """Component Class for backwards compatibility.
 
     Attributes
     ----------
@@ -177,8 +177,8 @@ class Component(BaseComponent):
         self._outputs.scale(self._scaling_to_phys['output'])
 
         J = self.linearize(self._inputs, self._outputs, self._residuals)
-        if J is not None: 
-            for k, v in J: 
+        if J is not None:
+            for k, v in J:
                 self._jacobian[k] = v
 
         self._inputs.scale(self._scaling_to_norm['input'])
