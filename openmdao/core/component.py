@@ -63,23 +63,17 @@ class Component(System):
 
     def add_output(self, name, val=1.0, **kwargs):
         """Add an output variable to the component.
-
         Args
         ----
         name : str
             name of the variable in this component's namespace.
         val : object
             The value of the variable being added.
-        kwargs : dict
-            variable metadata with DEFAULTS defined above.
+        **kwargs : dict
+            additional args, documented [INSERT REF].
         """
         metadata = self.OUTPUT_DEFAULTS.copy()
         metadata.update(kwargs)
-
-        if isinstance(val, numpy.ndarray) and 'indices' not in kwargs:
-            metadata['indices'] = numpy.arange(0, val.size, dtype=int)
-        else:
-            metadata['indices'] = numpy.array(metadata['indices'])
 
         metadata['value'] = val
         if isinstance(val, numpy.ndarray):
@@ -93,6 +87,7 @@ class Component(System):
         """Add this vector and assign sub_vectors to subsystems.
 
         Sets the following attributes:
+
         - _vectors
         - _vector_transfers
         - _inputs*
@@ -100,7 +95,7 @@ class Component(System):
         - _residuals*
         - _transfers*
 
-        * If vec_name is None - i.e., we are setting up the nonlinear vector
+        \* If vec_name is None - i.e., we are setting up the nonlinear vector
 
         Args
         ----

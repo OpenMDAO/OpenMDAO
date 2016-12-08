@@ -405,7 +405,7 @@ class System(object):
         # units at which the scaled values are 0 and 1, respectively
 
         # Scaling coefficients from the src output
-        src_units = self._sys_assembler._scal_std_nrm_units
+        src_units = self._sys_assembler._src_units
         src_0 = self._sys_assembler._scal_std_nrm_0
         src_1 = self._sys_assembler._scal_std_nrm_1
         # Compute scaling arrays for inputs using a0 and a1
