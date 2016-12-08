@@ -3,7 +3,7 @@ from __future__ import division, print_function
 import numpy
 from scipy.sparse import coo_matrix, csr_matrix
 
-from openmdao.matrices.matrix import Matrix
+from openmdao.matrices.matrix import Matrix, _compute_index_map
 
 
 class DenseMatrix(Matrix):
@@ -12,10 +12,10 @@ class DenseMatrix(Matrix):
     def _build(self, num_rows, num_cols):
         """See Matrix."""
         matrix = numpy.zeros((num_rows, num_cols))
-        for ind in range(2):
-            submats = [self._op_submats, self._ip_submats][ind]
-            metadata = [self._op_metadata, self._ip_metadata][ind]
+        submat_meta_iter = ((self._op_submats, self._op_metadata),
+                            (self._ip_submats, self._ip_metadata))
 
+        for submats, metadata in submat_meta_iter:
             for key in submats:
                 jac, irow, icol, src_indices = submats[key]
 
@@ -47,6 +47,10 @@ class DenseMatrix(Matrix):
                                                                 irow, icol,
                                                                 src_indices)
 
+                        # get the indices to get us back to our original
+                        # data order
+                        idxs = numpy.argsort(idxs)
+
                         metadata[key] = (irows, icols, idxs)
                         matrix[irows, icols] = jac.data[idxs]
 
@@ -59,6 +63,10 @@ class DenseMatrix(Matrix):
                         irows, icols, idxs = _compute_index_map(jac[1], jac[2],
                                                                 irow, icol,
                                                                 src_indices)
+                        # get the indices to get us back to our original
+                        # data order
+                        idxs = numpy.argsort(idxs)
+
                     metadata[key] = (irows, icols, idxs)
                     matrix[irows, icols] = jac[0]
 
@@ -85,43 +93,3 @@ class DenseMatrix(Matrix):
             return self._matrix.dot(in_vec)
         elif mode == 'rev':
             return self._matrix.T.dot(in_vec)
-
-
-def _compute_index_map(jrows, jcols, irow, icol, src_indices):
-    """Return row/column indices or slices to map sub-jacobian to global jac.
-
-    Args
-    ----
-    jrows : index array
-        Array of row indices.
-    jcols : index array
-        Array of column indices.
-    irow : int
-        Row index for start of sub-jacobian.
-    icol : int
-        Column index for start of sub-jacobian.
-    src_indices : index array
-        Index array of which values to pull from a source into an input
-        variable.
-    """
-    icols = []
-    irows = []
-    idxs = []
-
-    for i, idx in enumerate(src_indices):
-        # pull out columns that match each index
-        idxarr = numpy.nonzero(jcols == i)[0]
-        idxs.append(idxarr)
-        icols.append(numpy.full(idxarr.shape, idx,
-                                dtype=int))
-        irows.append(jrows[idxarr])
-
-    idxs = numpy.hstack(idxs)
-    irows = numpy.hstack(irows) + irow
-    icols = numpy.hstack(icols) + icol
-
-    # get the indices to get us back to our original
-    # data order
-    idxs = numpy.argsort(idxs)
-
-    return (irows, icols, idxs)

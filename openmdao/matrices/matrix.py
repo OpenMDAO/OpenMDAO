@@ -141,6 +141,18 @@ class Matrix(object):
         """
         self._update_submat(self._ip_submats, self._ip_metadata, key, jac)
 
+    def _build(self, num_rows, num_cols):
+        """Allocate the matrix.
+
+        Args
+        ----
+        num_rows : int
+            number of rows in the matrix.
+        num_cols : int
+            number of cols in the matrix.
+        """
+        pass
+
     def _update_submat(self, submats, metadata, key, jac):
         """Update the values of a sub-jacobian.
 
@@ -154,18 +166,6 @@ class Matrix(object):
             the global output and input variable indices.
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
-        """
-        pass
-
-    def _build(self, num_rows, num_cols):
-        """Allocate the matrix.
-
-        Args
-        ----
-        num_rows : int
-            number of rows in the matrix.
-        num_cols : int
-            number of cols in the matrix.
         """
         pass
 
@@ -185,3 +185,39 @@ class Matrix(object):
             vector resulting from the product.
         """
         pass
+
+
+def _compute_index_map(jrows, jcols, irow, icol, src_indices):
+    """Return row/column indices or slices to map sub-jacobian to global jac.
+
+    Args
+    ----
+    jrows : index array
+        Array of row indices.
+    jcols : index array
+        Array of column indices.
+    irow : int
+        Row index for start of sub-jacobian.
+    icol : int
+        Column index for start of sub-jacobian.
+    src_indices : index array
+        Index array of which values to pull from a source into an input
+        variable.
+    """
+    icols = []
+    irows = []
+    idxs = []
+
+    for i, idx in enumerate(src_indices):
+        # pull out columns that match each index
+        idxarr = numpy.nonzero(jcols == i)[0]
+        idxs.append(idxarr)
+        icols.append(numpy.full(idxarr.shape, idx,
+                                dtype=int))
+        irows.append(jrows[idxarr])
+
+    idxs = numpy.hstack(idxs)
+    irows = numpy.hstack(irows) + irow
+    icols = numpy.hstack(icols) + icol
+
+    return (irows, icols, idxs)
