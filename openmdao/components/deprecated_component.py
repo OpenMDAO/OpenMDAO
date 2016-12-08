@@ -154,8 +154,8 @@ class Component(BaseComponent):
                 d_residuals.scale(self._scaling_to_phys['residual'])
 
             success = self.solve_linear(self._vectors['output'],
-                                    self._vectors['residual'],
-                                    vec_names, mode)
+                                        self._vectors['residual'],
+                                        vec_names, mode)
 
             for vec_name in vec_names:
                 for name in d_outputs:
