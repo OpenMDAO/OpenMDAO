@@ -354,7 +354,6 @@ def om_process_docstring(app, what, name, obj, options, lines):
                         #construct a link  :meth:`class.method <openmdao.core.class.method>`
                         link =  ":meth:`" + m + " <" + classfullpath + "." + justmeth + ">`"
                         #replace the <link> text with the constructed line.
-                        nolink = ""
                         lines[i] = lines[i].replace(ma, link)
                     else:
                         print( "WARNING: {} not found in dictionary of OpenMDAO methods".format(justclass) )
