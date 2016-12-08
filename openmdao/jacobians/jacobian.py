@@ -188,7 +188,7 @@ class Jacobian(object):
         dct, op_ind, ip_ind, op_size, ip_size, typ = self._process_key(key)
 
         if numpy.isscalar(jac):
-            jac = numpy.array([jac]).reshape((op_size, ip_size))
+            jac = numpy.array([jac], float).reshape((op_size, ip_size))
         elif isinstance(jac, numpy.ndarray):
             jac = jac.reshape((op_size, ip_size))
         elif isinstance(jac, (coo_matrix, csr_matrix)):

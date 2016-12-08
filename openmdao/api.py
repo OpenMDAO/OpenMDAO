@@ -5,6 +5,7 @@ from openmdao.core.group import Group
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
+from openmdao.components.deprecated_component import Component
 from openmdao.components.exec_comp import ExecComp
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
 from openmdao.solvers.ln_bjac import LinearBlockJac
