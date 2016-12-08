@@ -2,10 +2,9 @@
 
 from __future__ import division
 
-import collections
-
 import numpy
-from six import string_types
+
+import warnings
 
 from openmdao.core.component import Component as BaseComponent
 
@@ -26,6 +25,12 @@ class Component(BaseComponent):
         super(Component, self).__init__(**kwargs)
         self._state_names = []
         self._output_names = []
+
+        warnings.simplefilter('always', DeprecationWarning)
+        warnings.warn("'low' and 'high' are deprecated. "
+                      "Use 'lower' and 'upper' instead.",
+                      DeprecationWarning, stacklevel=2)
+        warnings.simplefilter('ignore', DeprecationWarning)
 
     def add_param(self, name, val=1.0, **kwargs):
         """Add an input variable to the component.
@@ -146,7 +151,7 @@ class Component(BaseComponent):
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
-                dxw_outputs.scale(self._scaling_to_phys['output'])
+                d_outputs.scale(self._scaling_to_phys['output'])
                 d_residuals.scale(self._scaling_to_phys['residual'])
 
                 tmp = self.solve_linear(d_outputs, d_residuals, mode)
