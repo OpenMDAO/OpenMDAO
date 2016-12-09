@@ -252,6 +252,13 @@ class LinearSolver(Solver):
     def __call__(self, vec_names, mode):
         """Run the solver.
 
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
         Returns
         -------
         float
