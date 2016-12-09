@@ -583,10 +583,6 @@ class System(object):
         op_ind = self._variable_allprocs_range['output'][0]
         for op_name in self._variable_allprocs_names['output']:
             valid = op_ind in self._vector_var_ids[vec_name]
-            if var_inds is not None:
-                valid = valid and \
-                    var_inds[0] <= op_ind < var_inds[1] or \
-                    var_inds[2] <= op_ind < var_inds[3]
             if valid:
                 res_names.append(op_name)
             op_ind += 1
