@@ -34,7 +34,6 @@ class TestParallelGroups(unittest.TestCase):
         prob.setup(check=False)
         prob.run()
 
-        print(prob['c3.y'])
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
     def test_diamond(self):
@@ -44,8 +43,6 @@ class TestParallelGroups(unittest.TestCase):
         prob.setup(check=False)
         prob.run()
 
-        print(prob['c4.y1'])
-        print(prob['c4.y2'])
         assert_rel_error(self, prob['c4.y1'], 46.0, 1e-6)
         assert_rel_error(self, prob['c4.y2'], -93.0, 1e-6)
 
@@ -56,7 +53,6 @@ class TestParallelGroups(unittest.TestCase):
         prob.setup(check=False)
         prob.run()
 
-        print(prob['c7.y1'])
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
 if __name__ == "__main__":

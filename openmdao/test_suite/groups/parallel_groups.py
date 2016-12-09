@@ -71,7 +71,7 @@ class Diamond(Group):
             'y2 = 3.0*x1'
         ]))
 
-        sub = self.add_subsystem('sub', Group())  # Parallel
+        sub = self.add_subsystem('sub', Group())  # ParallelGroup
         sub.add_subsystem('c2', ExecComp('y1 = 0.5*x1'))
         sub.add_subsystem('c3', ExecComp('y1 = 3.5*x1'))
 
@@ -122,7 +122,7 @@ class ConvergeDiverge(Group):
         self.add_subsystem('c7', ExecComp('y1 = x1 + 3.0*x2'))
 
         # make connections
-        self.connect('iv.x',     'c1.x1')
+        self.connect('iv.x', 'c1.x1')
 
         self.connect('c1.y1', 'g1.c2.x1')
         self.connect('c1.y2', 'g1.c3.x1')
