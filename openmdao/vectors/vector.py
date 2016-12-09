@@ -10,10 +10,10 @@ class Vector(object):
 
     This class is instantiated for inputs, outputs, and residuals.
     It provides a dictionary interface and an arithmetic operations interface.
-
     Implementations:
-        DefaultVector
-        PETScVector
+
+    - <DefaultVector>
+    - <PETScVector>
 
     Attributes
     ----------
@@ -54,9 +54,9 @@ class Vector(object):
             right-hand-side (RHS) name.
         typ : str
             'input' for input vectors; 'output' for output/residual vectors.
-        system : System
+        system : <System>
             pointer to the owning system.
-        global_vector : Vector
+        global_vector : <Vector>
             pointer to the vector owned by the root system.
         """
         self._name = name
@@ -91,12 +91,12 @@ class Vector(object):
 
         Args
         ----
-        system : System
+        system : <System>
             system for the subvector that is a subsystem of self._system.
 
         Returns
         -------
-        Vector
+        <Vector>
             subvector instance.
         """
         return self.__class__(self._name, self._typ, system,
@@ -107,7 +107,7 @@ class Vector(object):
 
         Returns
         -------
-        Vector
+        <Vector>
             instance of the clone; the data is copied.
         """
         vec = self.__class__(self._name, self._typ, self._system,
@@ -265,7 +265,7 @@ class Vector(object):
         key : str
             variable name in the owning system's namespace.
         value : float or list or tuple or ndarray
-            variable value to set (not scaled, not dimensionless).
+            variable value to set (not scaled, not dimensionless)
         """
         if key in self._names:
             self._views[key][:] = value
@@ -278,11 +278,12 @@ class Vector(object):
         Must be implemented by the subclass.
 
         Sets the following attributes:
-            _data
+
+        - _data
 
         Args
         ----
-        global_vector : Vector or None
+        global_vector : <Vector> or None
             the root's vector instance or None, if we are at the root.
         """
         pass
@@ -293,9 +294,11 @@ class Vector(object):
         Must be implemented by the subclass.
 
         Sets the following attributes:
-            _views
-            _views_flat
-            _idxs
+
+        - _views
+        - _views_flat
+        - _idxs
+
         """
         pass
 
@@ -313,7 +316,7 @@ class Vector(object):
 
         Args
         ----
-        vec : Vector
+        vec : <Vector>
             vector to add to self.
         """
         pass
@@ -325,7 +328,7 @@ class Vector(object):
 
         Args
         ----
-        vec : Vector
+        vec : <Vector>
             vector to subtract from self.
         """
         pass
@@ -351,7 +354,7 @@ class Vector(object):
         ----
         val : int or float
             scalar.
-        vec : Vector
+        vec : <Vector>
             this vector times val is added to self.
         """
         pass
@@ -363,7 +366,7 @@ class Vector(object):
 
         Args
         ----
-        vec : Vector
+        vec : <Vector>
             the vector whose values self is set to.
         """
         pass
@@ -409,8 +412,9 @@ class Transfer(object):
     """Base Transfer class.
 
     Implementations:
-        DefaultTransfer
-        PETScTransfer
+
+    - <DefaultTransfer>
+    - <PETScTransfer>
 
     Attributes
     ----------
@@ -431,15 +435,15 @@ class Transfer(object):
 
         Args
         ----
-        ip_vec : Vector
+        ip_vec : <Vector>
             pointer to the input vector.
-        op_vec : Vector
+        op_vec : <Vector>
             pointer to the output vector.
         ip_inds : int ndarray
             input indices for the transfer.
         op_inds : int ndarray
             output indices for the transfer.
-        comm : MPI.Comm or FakeComm
+        comm : MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
         """
         self._ip_vec = ip_vec
@@ -464,9 +468,9 @@ class Transfer(object):
 
         Args
         ----
-        ip_vec : Vector
+        ip_vec : <Vector>
             pointer to the input vector.
-        op_vec : Vector
+        op_vec : <Vector>
             pointer to the output vector.
         mode : str
             'fwd' or 'rev'.

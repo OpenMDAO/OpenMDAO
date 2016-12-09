@@ -26,7 +26,15 @@ class BacktrackingLineSearch(NonlinearSolver):
         # opt.declare('c', value=0.5, desc="Slope check trigger.")
 
     def _iter_initialize(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Perform any necessary pre-processing operations.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
         system = self._system
         self.alpha = self.options['alpha']
 
@@ -59,7 +67,7 @@ class BacktrackingLineSearch(NonlinearSolver):
         return norm0, norm
 
     def _iter_execute(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Perform the operations in the iteration loop."""
         system = self._system
         u = system._outputs
         du = system._vectors['output']['']

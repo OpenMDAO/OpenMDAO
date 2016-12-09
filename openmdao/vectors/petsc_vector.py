@@ -12,7 +12,10 @@ class PETScTransfer(DefaultTransfer):
     """PETSc Transfer implementation for running in parallel."""
 
     def _initialize_transfer(self):
-        """See openmdao.vectors.vector.Transfer."""
+        """Set up the transfer; do any necessary pre-computation.
+
+        Optionally implemented by the subclass.
+        """
         self._transfers = {}
         for ip_iset, op_iset in self._ip_inds:
             key = (ip_iset, op_iset)
@@ -30,7 +33,19 @@ class PETScTransfer(DefaultTransfer):
                 self._transfers[key] = transfer
 
     def __call__(self, ip_vec, op_vec, mode='fwd'):
-        """See openmdao.vectors.vector.Transfer."""
+        """Perform transfer.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        ip_vec : <Vector>
+            pointer to the input vector.
+        op_vec : <Vector>
+            pointer to the output vector.
+        mode : str
+            'fwd' or 'rev'.
+        """
         if mode == 'fwd':
             for ip_iset, op_iset in self._ip_inds:
                 key = (ip_iset, op_iset)
@@ -58,7 +73,18 @@ class PETScVector(DefaultVector):
     TRANSFER = PETScTransfer
 
     def _initialize_data(self, global_vector):
-        """See openmdao.vectors.vector.Vector."""
+        """Internally allocate vectors.
+
+        Must be implemented by the subclass.
+        Sets the following attributes:
+
+        - _data
+
+        Args
+        ----
+        global_vector : Vector or None
+            the root's vector instance or None, if we are at the root.
+        """
         if global_vector is None:
             self._data, self._indices = self._create_data()
         else:
@@ -71,7 +97,15 @@ class PETScVector(DefaultVector):
             self._petsc.append(petsc)
 
     def get_norm(self):
-        """See openmdao.vectors.vector.Vector."""
+        """Return the norm of this vector.
+
+        Must be implemented by the subclass.
+
+        Returns
+        -------
+        float
+            norm of this vector.
+        """
         global_sum = 0
         for iset in range(len(self._data)):
             global_sum += numpy.sum(self._data[iset]**2)

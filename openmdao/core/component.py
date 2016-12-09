@@ -98,7 +98,28 @@ class Component(System):
         self._variable_myproc_metadata['output'].append(metadata)
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
-        """See openmdao.core.component.Component._setup_vector."""
+        r"""Add this vector and assign sub_vectors to subsystems.
+
+        Sets the following attributes:
+
+        - _vectors
+        - _vector_transfers
+        - _inputs*
+        - _outputs*
+        - _residuals*
+        - _transfers*
+
+        \* If vec_name is None - i.e., we are setting up the nonlinear vector
+
+        Args
+        ----
+        vectors : {'input': <Vector>, 'output': <Vector>, 'residual': <Vector>}
+            <Vector> objects corresponding to 'name'.
+        vector_var_ids : ndarray[:]
+            integer array of all relevant variables for this vector.
+        use_ref_vector : bool
+            if True, allocate vectors to store ref. values.
+        """
         super(Component, self)._setup_vector(vectors, vector_var_ids,
                                              use_ref_vector)
 

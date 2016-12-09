@@ -15,7 +15,7 @@ class Assembler(object):
 
     Attributes
     ----------
-    _comm : MPI.comm or FakeComm
+    _comm : MPI.comm or <FakeComm>
         MPI communicator object.
     _variable_sizes_all : {'input': ndarray[nproc, nvar],
                            'output': ndarray[nproc, nvar]}
@@ -48,8 +48,8 @@ class Assembler(object):
 
         Args
         ----
-        comm : MPI.Comm or FakeComm
-            same instance as the Problem's communicator.
+        comm : MPI.Comm or <FakeComm>
+            same instance as the <Problem>'s communicator.
         """
         self._comm = comm
 
