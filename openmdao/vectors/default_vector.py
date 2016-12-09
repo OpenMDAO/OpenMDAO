@@ -139,9 +139,12 @@ class DefaultVector(Vector):
             views_flat[name] = self._global_vector._data[iset][ind1:ind2]
             views[name].shape = meta[ind]['shape']
             val = meta[ind]['value']
-            if isinstance(val, real_types):
+
+            # The shape entry overrides value's shape, which is why we don't
+            # use the shape of val as the reference
+            if numpy.prod(meta[ind]['shape']) == 1:
                 idxs[name] = 0
-            elif isinstance(val, numpy.ndarray):
+            else:
                 idxs[name] = slice(None)
 
         self._views = self._names = views
