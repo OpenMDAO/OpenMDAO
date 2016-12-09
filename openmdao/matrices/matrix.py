@@ -203,6 +203,12 @@ def _compute_index_map(jrows, jcols, irow, icol, src_indices):
     src_indices : index array
         Index array of which values to pull from a source into an input
         variable.
+
+    Returns
+    -------
+    tuple of (ndarray, ndarray, ndarray)
+        Row indices, column indices, and indices of columns matching
+        src_indices.
     """
     icols = []
     irows = []

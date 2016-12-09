@@ -77,6 +77,13 @@ class ScipyIterativeSolver(LinearSolver):
     def __call__(self, vec_names, mode):
         """Run the solver.
 
+        Args
+        ----
+        vec_names : list of str
+            Names of vectors involved in the linear solution.
+        mode : str
+            Direction of derivatives ('fwd' or 'rev')
+
         Returns
         -------
         float

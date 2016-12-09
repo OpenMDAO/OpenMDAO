@@ -5,7 +5,7 @@ from numpy import ndarray
 from scipy.sparse import coo_matrix, csr_matrix, issparse
 from six.moves import range
 
-from openmdao.matrices.matrix import Matrix
+from openmdao.matrices.matrix import Matrix, _compute_index_map
 
 
 class CooMatrix(Matrix):
@@ -50,25 +50,70 @@ class CooMatrix(Matrix):
                 ind1, ind2 = metadata[key]
 
                 if isinstance(jac, ndarray):
-                    irows = numpy.empty(jac.shape, int)
-                    icols = numpy.empty(jac.shape, int)
-                    for indr in range(jac.shape[0]):
-                        for indc in range(jac.shape[1]):
-                            irows[indr, indc] = indr
-                            icols[indr, indc] = indc
-                    size = jac.size
+                    rowrange = numpy.arange(jac.shape[0], dtype=int)
+
+                    if src_indices is None:
+                        colrange = numpy.arange(jac.shape[1], dtype=int)
+                    else:
+                        colrange = numpy.array(src_indices, dtype=int)
+
+                    ncols = colrange.size
+                    subrows = numpy.empty(rowrange.size * ncols,
+                                          dtype=int)
+                    subcols = numpy.empty(subrows.size, dtype=int)
+
+                    for i, row in enumerate(rowrange):
+                        subrows[i * ncols: (i + 1) * ncols] = row
+                        subcols[i * ncols: (i + 1) * ncols] = colrange
+
+                    rows[ind1:ind2] = subrows + irow
+                    cols[ind1:ind2] = subcols + icol
                     data[ind1:ind2] = jac.flat
-                    rows[ind1:ind2] = irow + irows.reshape(size)
-                    cols[ind1:ind2] = icol + icols.reshape(size)
+
+                    idxs = slice(None)
+
                 elif isinstance(jac, (coo_matrix, csr_matrix)):
-                    jac = jac.tocoo()
-                    data[ind1:ind2] = jac.data
-                    rows[ind1:ind2] = irow + jac.row
-                    cols[ind1:ind2] = icol + jac.col
+                    coojac = jac.tocoo()
+                    if src_indices is None:
+                        data[ind1:ind2] = coojac.data
+                        rows[ind1:ind2] = coojac.row + irow
+                        cols[ind1:ind2] = coojac.col + icol
+                        idxs = slice(None)
+                    else:
+                        irows, icols, idxs = _compute_index_map(coojac.row,
+                                                                coojac.col,
+                                                                irow, icol,
+                                                                src_indices)
+
+                        # get the indices to get us back to our original
+                        # data order.
+                        idxs = numpy.argsort(idxs)
+
+                        data[ind1:ind2] = jac.data[idxs]
+                        rows[ind1:ind2] = irows
+                        cols[ind1:ind2] = icols
+
                 elif isinstance(jac, list):
-                    data[ind1:ind2] = jac[0]
-                    rows[ind1:ind2] = irow + jac[1]
-                    cols[ind1:ind2] = icol + jac[2]
+                    if src_indices is None:
+                        data[ind1:ind2] = jac[0]
+                        rows[ind1:ind2] = irow + jac[1]
+                        cols[ind1:ind2] = icol + jac[2]
+                        idxs = slice(None)
+                    else:
+                        irows, icols, idxs = _compute_index_map(jac[1],
+                                                                jac[2],
+                                                                irow, icol,
+                                                                src_indices)
+
+                        # get the indices to get us back to our original
+                        # data order.
+                        idxs = numpy.argsort(idxs)
+
+                        data[ind1:ind2] = jac[0][idxs]
+                        rows[ind1:ind2] = irows
+                        cols[ind1:ind2] = icols
+
+                metadata[key] = (ind1, ind2, idxs)
 
         self._matrix = coo_matrix((data, (rows, cols)),
                                   shape=(num_rows, num_cols))
@@ -87,13 +132,13 @@ class CooMatrix(Matrix):
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
-        ind1, ind2 = metadata[key]
+        ind1, ind2, idxs = metadata[key]
         if isinstance(jac, ndarray):
             self._matrix.data[ind1:ind2] = jac.flat
         elif isinstance(jac, (coo_matrix, csr_matrix)):
-            self._matrix.data[ind1:ind2] = jac.data
+            self._matrix.data[ind1:ind2] = jac.data[idxs]
         elif isinstance(jac, list):
-            self._matrix.data[ind1:ind2] = jac[0]
+            self._matrix.data[ind1:ind2] = jac[0][idxs]
 
     def _prod(self, in_vec, mode):
         """Perform a matrix vector product.

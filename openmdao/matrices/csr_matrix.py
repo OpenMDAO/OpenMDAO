@@ -70,17 +70,25 @@ class CsrMatrix(Matrix):
                     rows[ind1:ind2] = subrows + irow
                     cols[ind1:ind2] = subcols + icol
                     data[ind1:ind2] = jac.flat
+
+                    idxs = slice(None)
+
                 elif isinstance(jac, (coo_matrix, csr_matrix)):
-                    jac = jac.tocoo()
+                    coojac = jac.tocoo()
                     if src_indices is None:
-                        data[ind1:ind2] = jac.data
-                        rows[ind1:ind2] = jac.row + irow
-                        cols[ind1:ind2] = jac.col + icol
+                        data[ind1:ind2] = coojac.data
+                        rows[ind1:ind2] = coojac.row + irow
+                        cols[ind1:ind2] = coojac.col + icol
+                        idxs = slice(None)
                     else:
-                        irows, icols, idxs = _compute_index_map(jac.row,
-                                                                jac.col,
+                        irows, icols, idxs = _compute_index_map(coojac.row,
+                                                                coojac.col,
                                                                 irow, icol,
                                                                 src_indices)
+
+                        # get the indices to get us back to our original
+                        # data order.
+                        idxs = numpy.argsort(idxs)
 
                         data[ind1:ind2] = jac.data[idxs]
                         rows[ind1:ind2] = irows
@@ -91,15 +99,22 @@ class CsrMatrix(Matrix):
                         data[ind1:ind2] = jac[0]
                         rows[ind1:ind2] = irow + jac[1]
                         cols[ind1:ind2] = icol + jac[2]
+                        idxs = slice(None)
                     else:
                         irows, icols, idxs = _compute_index_map(jac[1],
                                                                 jac[2],
                                                                 irow, icol,
                                                                 src_indices)
 
+                        # get the indices to get us back to our original
+                        # data order.
+                        idxs = numpy.argsort(idxs)
+
                         data[ind1:ind2] = jac[0][idxs]
                         rows[ind1:ind2] = irows
                         cols[ind1:ind2] = icols
+
+                metadata[key] = (ind1, ind2, idxs)
 
         # get a set of indices that sorts into row major order
         idxs = numpy.lexsort((cols, rows))
@@ -132,13 +147,13 @@ class CsrMatrix(Matrix):
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
-        ind1, ind2 = metadata[key]
+        ind1, ind2, idxs = metadata[key]
         if isinstance(jac, ndarray):
             self._matrix.data[self._idxs[ind1:ind2]] = jac.flat
         elif isinstance(jac, (coo_matrix, csr_matrix)):
-            self._matrix.data[self._idxs[ind1:ind2]] = jac.data
+            self._matrix.data[self._idxs[ind1:ind2]] = jac.data[idxs]
         elif isinstance(jac, list):
-            self._matrix.data[self._idxs[ind1:ind2]] = jac[0]
+            self._matrix.data[self._idxs[ind1:ind2]] = jac[0][idxs]
 
     def _prod(self, in_vec, mode):
         """Perform a matrix vector product.
