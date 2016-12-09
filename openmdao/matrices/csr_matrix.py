@@ -55,16 +55,17 @@ class CsrMatrix(Matrix):
                     if src_indices is None:
                         colrange = numpy.arange(jac.shape[1], dtype=int)
                     else:
-                        colrange = numpy.array(src_indices, dtype=int) + icol
+                        colrange = numpy.array(src_indices, dtype=int)
 
                     ncols = colrange.size
 
-                    subrows = numpy.empty(rowrange.size*colrange.size, dtype=int)
+                    subrows = numpy.empty(rowrange.size * colrange.size,
+                                          dtype=int)
                     subcols = numpy.empty(subrows.size, dtype=int)
 
                     for i, row in enumerate(rowrange):
-                        subrows[i*ncols: (i+1)*ncols] = row
-                        subcols[i*ncols: (i+1)*ncols] = colrange
+                        subrows[i * ncols: (i + 1) * ncols] = row
+                        subcols[i * ncols: (i + 1) * ncols] = colrange
 
                     rows[ind1:ind2] = subrows + irow
                     cols[ind1:ind2] = subcols + icol
@@ -81,10 +82,6 @@ class CsrMatrix(Matrix):
                                                                 irow, icol,
                                                                 src_indices)
 
-                        # get the indices to get us back to our original
-                        # data order
-                        idxs = numpy.argsort(idxs)
-
                         data[ind1:ind2] = jac.data[idxs]
                         rows[ind1:ind2] = irows
                         cols[ind1:ind2] = icols
@@ -100,21 +97,16 @@ class CsrMatrix(Matrix):
                                                                 irow, icol,
                                                                 src_indices)
 
-                        # get the indices to get us back to our original
-                        # data order
-                        idxs = numpy.argsort(idxs)
-
                         data[ind1:ind2] = jac[0][idxs]
                         rows[ind1:ind2] = irows
                         cols[ind1:ind2] = icols
-
 
         # get a set of indices that sorts into row major order
         idxs = numpy.lexsort((cols, rows))
 
         # now sort these back into ascending order (our original stacked order)
-        # so in _update_submat() we can just extract the individual index arrays that will
-        # map each block into the combined data array.
+        # so in _update_submat() we can just extract the individual index
+        # arrays that will map each block into the combined data array.
         self._idxs = numpy.argsort(idxs)
 
         data = data[idxs]
@@ -125,7 +117,6 @@ class CsrMatrix(Matrix):
         # it was already in sorted order.
         self._matrix = coo_matrix((data, (rows, cols)),
                                   shape=(num_rows, num_cols)).tocsr()
-
 
     def _update_submat(self, submats, metadata, key, jac):
         """Update the values of a sub-jacobian.
