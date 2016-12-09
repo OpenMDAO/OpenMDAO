@@ -63,6 +63,7 @@ class Component(System):
 
     def add_output(self, name, val=1.0, **kwargs):
         """Add an output variable to the component.
+
         Args
         ----
         name : str
@@ -84,7 +85,7 @@ class Component(System):
         self._variable_myproc_metadata['output'].append(metadata)
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
-        """Add this vector and assign sub_vectors to subsystems.
+        r"""Add this vector and assign sub_vectors to subsystems.
 
         Sets the following attributes:
 

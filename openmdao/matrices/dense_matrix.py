@@ -73,7 +73,7 @@ class DenseMatrix(Matrix):
 
         Args
         ----
-        vec : ndarray[:]
+        in_vec : ndarray[:]
             incoming vector to multiply.
         mode : str
             'fwd' or 'rev'.

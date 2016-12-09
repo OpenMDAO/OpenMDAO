@@ -4,6 +4,7 @@ import numpy
 
 from six.moves import range
 
+
 class Vector(object):
     """Base Vector class.
 

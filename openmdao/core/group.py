@@ -46,6 +46,13 @@ class Group(System):
         renames_outputs : list of (str, str) or dict, optional
             A dict mapping old name to new name for any subsystem
             output variables that should be renamed in this group.
+
+        Returns
+        -------
+        <System>
+            the subsystem that was passed in. This is returned to
+            enable users to instantiate and add a subsystem at the
+            same time, and get the pointer back.
         """
         self._subsystems_allprocs.append(subsys)
         subsys.name = name
