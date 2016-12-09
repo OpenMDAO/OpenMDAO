@@ -133,10 +133,22 @@ class TestJacobianSrcIndicesDenseCoo(TestJacobianSrcIndicesDenseDense):
 class TestJacobianSrcIndicesDenseCsr(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(DenseMatrix, csr_matrix)
+        
+class TestJacobianSrcIndicesDenseCoo(TestJacobianSrcIndicesDenseDense):
+    def setUp(self):
+        self.prob = self._setup_model(DenseMatrix, coo_matrix)
+
+class TestJacobianSrcIndicesDenseList(TestJacobianSrcIndicesDenseDense):
+    def setUp(self):
+        self.prob = self._setup_model(DenseMatrix, arr2list)
 
 class TestJacobianSrcIndicesCsrCsr(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CsrMatrix, csr_matrix)
+        
+class TestJacobianSrcIndicesCsrCoo(TestJacobianSrcIndicesDenseDense):
+    def setUp(self):
+        self.prob = self._setup_model(CsrMatrix, coo_matrix)
 
 class TestJacobianSrcIndicesCsrDense(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
