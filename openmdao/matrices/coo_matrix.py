@@ -1,8 +1,9 @@
 """Define the CooMatrix class."""
-from __future__ import division, print_function
+from __future__ import division
+
 import numpy
 from numpy import ndarray
-from scipy.sparse import coo_matrix, csr_matrix, issparse
+from scipy.sparse import coo_matrix, csr_matrix
 from six.moves import range
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map

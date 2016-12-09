@@ -1,14 +1,14 @@
 """Define the CsrMatrix class."""
-from __future__ import division, print_function
+from __future__ import division
+
 import numpy
 from numpy import ndarray
-from scipy.sparse import coo_matrix, csr_matrix, issparse
-from six.moves import range
+from scipy.sparse import coo_matrix, csr_matrix
 
-from openmdao.matrices.matrix import Matrix, _compute_index_map
+from openmdao.matrices.coo_matrix import CooMatrix
 
 
-class CsrMatrix(Matrix):
+class CsrMatrix(CooMatrix):
     """Sparse matrix in Compressed Row Storage format."""
 
     def _build(self, num_rows, num_cols):
@@ -21,100 +21,11 @@ class CsrMatrix(Matrix):
         num_cols : int
             number of cols in the matrix.
         """
-        counter = 0
+        super(CsrMatrix, self)._build(num_rows, num_cols)
 
-        submat_meta_iter = ((self._op_submats, self._op_metadata),
-                            (self._ip_submats, self._ip_metadata))
-
-        for submats, metadata in submat_meta_iter:
-            for key in submats:
-                jac = submats[key][0]
-
-                ind1 = counter
-                if isinstance(jac, ndarray):
-                    counter += jac.size
-                elif isinstance(jac, (coo_matrix, csr_matrix)):
-                    counter += jac.data.size
-                elif isinstance(jac, list):
-                    counter += len(jac[0])
-                ind2 = counter
-                metadata[key] = (ind1, ind2)
-
-        data = numpy.zeros(counter)
-        rows = numpy.zeros(counter, int)
-        cols = numpy.zeros(counter, int)
-
-        for submats, metadata in submat_meta_iter:
-            for key in submats:
-                jac, irow, icol, src_indices = submats[key]
-                ind1, ind2 = metadata[key]
-
-                if isinstance(jac, ndarray):
-                    rowrange = numpy.arange(jac.shape[0], dtype=int)
-
-                    if src_indices is None:
-                        colrange = numpy.arange(jac.shape[1], dtype=int)
-                    else:
-                        colrange = numpy.array(src_indices, dtype=int)
-
-                    ncols = colrange.size
-
-                    subrows = numpy.empty(rowrange.size * colrange.size,
-                                          dtype=int)
-                    subcols = numpy.empty(subrows.size, dtype=int)
-
-                    for i, row in enumerate(rowrange):
-                        subrows[i * ncols: (i + 1) * ncols] = row
-                        subcols[i * ncols: (i + 1) * ncols] = colrange
-
-                    rows[ind1:ind2] = subrows + irow
-                    cols[ind1:ind2] = subcols + icol
-                    data[ind1:ind2] = jac.flat
-
-                    idxs = slice(None)
-
-                elif isinstance(jac, (coo_matrix, csr_matrix)):
-                    coojac = jac.tocoo()
-                    if src_indices is None:
-                        data[ind1:ind2] = coojac.data
-                        rows[ind1:ind2] = coojac.row + irow
-                        cols[ind1:ind2] = coojac.col + icol
-                        idxs = slice(None)
-                    else:
-                        irows, icols, idxs = _compute_index_map(coojac.row,
-                                                                coojac.col,
-                                                                irow, icol,
-                                                                src_indices)
-
-                        # get the indices to get us back to our original
-                        # data order.
-                        idxs = numpy.argsort(idxs)
-
-                        data[ind1:ind2] = jac.data[idxs]
-                        rows[ind1:ind2] = irows
-                        cols[ind1:ind2] = icols
-
-                elif isinstance(jac, list):
-                    if src_indices is None:
-                        data[ind1:ind2] = jac[0]
-                        rows[ind1:ind2] = irow + jac[1]
-                        cols[ind1:ind2] = icol + jac[2]
-                        idxs = slice(None)
-                    else:
-                        irows, icols, idxs = _compute_index_map(jac[1],
-                                                                jac[2],
-                                                                irow, icol,
-                                                                src_indices)
-
-                        # get the indices to get us back to our original
-                        # data order.
-                        idxs = numpy.argsort(idxs)
-
-                        data[ind1:ind2] = jac[0][idxs]
-                        rows[ind1:ind2] = irows
-                        cols[ind1:ind2] = icols
-
-                metadata[key] = (ind1, ind2, idxs)
+        rows = self._matrix.row
+        cols = self._matrix.col
+        data = self._matrix.data
 
         # get a set of indices that sorts into row major order
         idxs = numpy.lexsort((cols, rows))
@@ -154,23 +65,3 @@ class CsrMatrix(Matrix):
             self._matrix.data[self._idxs[ind1:ind2]] = jac.data[idxs]
         elif isinstance(jac, list):
             self._matrix.data[self._idxs[ind1:ind2]] = jac[0][idxs]
-
-    def _prod(self, in_vec, mode):
-        """Perform a matrix vector product.
-
-        Args
-        ----
-        in_vec : ndarray[:]
-            incoming vector to multiply.
-        mode : str
-            'fwd' or 'rev'.
-
-        Returns
-        -------
-        ndarray[:]
-            vector resulting from the product.
-        """
-        if mode == 'fwd':
-            return self._matrix.dot(in_vec)
-        elif mode == 'rev':
-            return self._matrix.T.dot(in_vec)
