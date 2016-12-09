@@ -24,7 +24,7 @@ ignores = {
         'E131',  # continuation line unaligned for hanging indent
     ],
     'pep257': [
-
+        'D203' # 1 blank required before class docstrings
     ]
 }
 
