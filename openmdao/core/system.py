@@ -495,6 +495,11 @@ class System(object):
         ----
         typ : str
             Either 'input' or 'output'.
+
+        Returns
+        -------
+        dict of str
+            A dictionary of local names keyed to promoted names or renames.
         """
         maps = {}
 
@@ -556,13 +561,17 @@ class System(object):
             If True, zero out residuals (in fwd mode) or inputs and outputs
             (in rev mode).
 
-        Yields
-        ------
+        Returns
+        -------
         (d_inputs, d_outputs, d_residuals) : tuple of Vectors
             Yields the three Vectors configured internally to deal only
             with variables relevant to the current matrix vector product.
 
         """
+        # TODO: The 'Returns' in the docstring above should be 'Yields', but
+        #  our linter currently isn't smart enough to know that, so for now we
+        #  put 'Returns' in there.
+
         d_inputs = self._vectors['input'][vec_name]
         d_outputs = self._vectors['output'][vec_name]
         d_residuals = self._vectors['residual'][vec_name]

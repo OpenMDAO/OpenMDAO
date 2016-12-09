@@ -262,11 +262,11 @@ class Assembler(object):
             op_flt = numpy.vstack(op_flt_raw)
 
         # Now, we can store ref0 and ref for each input
-        nvar_in = len(self._input_var_ids)
+        nvar_in = len(self._input_src_ids)
         self._src_units = [None for ind in range(nvar_in)]
         self._src_scaling_0 = numpy.empty(nvar_in)
         self._src_scaling_1 = numpy.empty(nvar_in)
-        for ivar_in, ivar_out in enumerate(self._input_var_ids):
+        for ivar_in, ivar_out in enumerate(self._input_src_ids):
             if ivar_out != -1:
                 ind = numpy.where(op_int == ivar_out)[0][0]
                 self._src_units[ivar_in] = op_units[ind]
