@@ -541,6 +541,27 @@ class System(object):
         For the given vec_name, return vectors that use a set of
         internal variables that are relevant to the current matrix-vector
         product.
+
+        Args
+        ----
+        vec_name : str
+            Name of the vector to use.
+        var_inds : [int, int, int, int] or None
+            ranges of variable IDs involved in this matrix-vector product.
+            The ordering is [lb1, ub1, lb2, ub2].
+        mode : str
+            Key for specifying derivative direction. Values are 'fwd'
+            or 'rev'.
+        clear : bool(True)
+            If True, zero out residuals (in fwd mode) or inputs and outputs
+            (in rev mode).
+
+        Yields
+        ------
+        (d_inputs, d_outputs, d_residuals) : tuple of Vectors
+            Yields the three Vectors configured internally to deal only
+            with variables relevant to the current matrix vector product.
+
         """
         d_inputs = self._vectors['input'][vec_name]
         d_outputs = self._vectors['output'][vec_name]

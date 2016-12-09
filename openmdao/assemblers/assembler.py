@@ -62,7 +62,6 @@ class Assembler(object):
         self._src_indices = None
         self._src_indices_range = None
 
-        #
         self._src_units = []
         self._src_scaling_0 = None
         self._src_scaling_1 = None
