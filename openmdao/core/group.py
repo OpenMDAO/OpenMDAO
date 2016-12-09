@@ -51,7 +51,7 @@ class Group(System):
         ----
         name : str
             Name of the subsystem being added
-        subsys : System
+        subsys : <System>
             An instantiated, but not-yet-set up system object.
         promotes : iter of str, optional
             A list of variable names specifying which subsystem variables
@@ -69,6 +69,13 @@ class Group(System):
         renames_outputs : list of (str, str) or dict, optional
             A dict mapping old name to new name for any subsystem
             output variables that should be renamed in this group.
+
+        Returns
+        -------
+        <System>
+            the subsystem that was passed in. This is returned to
+            enable users to instantiate and add a subsystem at the
+            same time, and get the pointer back.
         """
         self._subsystems_allprocs.append(subsys)
         subsys.name = name
@@ -196,18 +203,39 @@ class Group(System):
                     self._variable_allprocs_names[typ].extend(names)
 
     def _apply_nonlinear(self):
-        """See System._apply_nonlinear."""
+        """Compute residuals."""
         self._transfers[None](self._inputs, self._outputs, 'fwd')
         # Apply recursion
         for subsys in self._subsystems_myproc:
             subsys._apply_nonlinear()
 
     def _solve_nonlinear(self):
-        """See System._solve_nonlinear."""
+        """Compute outputs.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
         return self._nl_solver()
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """See System._apply_linear."""
+        """Compute jac-vec product.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+        var_inds : [int, int, int, int] or None
+            ranges of variable IDs involved in this matrix-vector product.
+            The ordering is [lb1, ub1, lb2, ub2].
+        """
         # Use global Jacobian
         if self._jacobian._top_name == self.path_name:
             for vec_name in vec_names:
@@ -236,11 +264,34 @@ class Group(System):
                         d_inputs, d_outputs, mode)
 
     def _solve_linear(self, vec_names, mode):
-        """See System._solve_linear."""
+        """Apply inverse jac product.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
         return self._ln_solver(vec_names, mode)
 
     def _linearize(self, initial=False):
-        """See System._linearize."""
+        """Compute jacobian / factorization.
+
+        Args
+        ----
+        initial : boolean
+            whether this is the initial call to assemble the Jacobian.
+        """
         for subsys in self._subsystems_myproc:
             subsys._linearize()
 

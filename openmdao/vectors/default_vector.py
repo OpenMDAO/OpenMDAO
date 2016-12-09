@@ -14,10 +14,22 @@ class DefaultTransfer(Transfer):
     """Default NumPy transfer."""
 
     def __call__(self, ip_vec, op_vec, mode='fwd'):
-        """See openmdao.vectors.vector.Transfer."""
+        """Perform transfer.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        ip_vec : <Vector>
+            pointer to the input vector.
+        op_vec : <Vector>
+            pointer to the output vector.
+        mode : str
+            'fwd' or 'rev'.
+
+        """
         ip_inds = self._ip_inds
         op_inds = self._op_inds
-
         if mode == 'fwd':
             for ip_iset, op_iset in self._ip_inds:
                 key = (ip_iset, op_iset)
@@ -107,14 +119,34 @@ class DefaultVector(Vector):
         return data, indices
 
     def _initialize_data(self, global_vector):
-        """See openmdao.vectors.vector.Vector."""
+        """Internally allocate vectors.
+
+        Must be implemented by the subclass.
+        Sets the following attributes:
+
+        - _data
+
+        Args
+        ----
+        global_vector : Vector or None
+            the root's vector instance or None, if we are at the root.
+        """
         if global_vector is None:
             self._data, self._indices = self._create_data()
         else:
             self._data, self._indices = self._extract_data()
 
     def _initialize_views(self):
-        """See openmdao.vectors.vector.Vector."""
+        """Internally assemble views onto the vectors.
+
+        Must be implemented by the subclass.
+        Sets the following attributes:
+
+        - _views
+        - _views_flat
+        - _idxs
+
+        """
         variable_sizes = self._assembler._variable_sizes[self._typ]
         variable_set_indices = self._assembler._variable_set_indices[self._typ]
 
@@ -152,46 +184,107 @@ class DefaultVector(Vector):
         self._idxs = idxs
 
     def _clone_data(self):
-        """See openmdao.vectors.vector.Vector."""
+        """For each item in _data, replace it with a copy of the data.
+
+        Must be implemented by the subclass.
+        """
         for iset in range(len(self._data)):
             data = self._data[iset]
             self._data[iset] = numpy.array(data)
 
     def __iadd__(self, vec):
-        """See openmdao.vectors.vector.Vector."""
+        """Perform in-place vector addition.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        vec : <Vector>
+            vector to add to self.
+        """
         for iset in range(len(self._data)):
             self._data[iset] += vec._data[iset]
         return self
 
     def __isub__(self, vec):
-        """See openmdao.vectors.vector.Vector."""
+        """Perform in-place vector substraction.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        vec : <Vector>
+            vector to subtract from self.
+        """
         for iset in range(len(self._data)):
             self._data[iset] -= vec._data[iset]
         return self
 
     def __imul__(self, val):
-        """See openmdao.vectors.vector.Vector."""
+        """Perform in-place scalar multiplication.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        val : int or float
+            scalar to multiply self.
+        """
         for data in self._data:
             data *= val
         return self
 
     def add_scal_vec(self, val, vec):
-        """See openmdao.vectors.vector.Vector."""
+        """Perform in-place addition of a vector times a scalar.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        val : int or float
+            scalar.
+        vec : <Vector>
+            this vector times val is added to self.
+        """
         for iset in range(len(self._data)):
             self._data[iset] += val * vec._data[iset]
 
     def set_vec(self, vec):
-        """See openmdao.vectors.vector.Vector."""
+        """Set the value of this vector to that of the incoming vector.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        vec : <Vector>
+            the vector whose values self is set to.
+        """
         for iset in range(len(self._data)):
             self._data[iset][:] = vec._data[iset]
 
     def set_const(self, val):
-        """See openmdao.vectors.vector.Vector."""
+        """Set the value of this vector to a constant scalar value.
+
+        Must be implemented by the subclass.
+
+        Args
+        ----
+        val : int or float
+            scalar to set self to.
+        """
         for data in self._data:
             data[:] = val
 
     def get_norm(self):
-        """See openmdao.vectors.vector.Vector."""
+        """Return the norm of this vector.
+
+        Must be implemented by the subclass.
+
+        Returns
+        -------
+        float
+            norm of this vector.
+        """
         global_sum = 0
         for data in self._data:
             global_sum += numpy.sum(data**2)
