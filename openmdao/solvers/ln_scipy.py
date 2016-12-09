@@ -79,10 +79,10 @@ class ScipyIterativeSolver(LinearSolver):
 
         Args
         ----
-        vec_names : list of str
-            Names of vectors involved in the linear solution.
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
         mode : str
-            Direction of derivatives ('fwd' or 'rev')
+            'fwd' or 'rev'.
 
         Returns
         -------
