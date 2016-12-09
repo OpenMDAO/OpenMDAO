@@ -1,8 +1,11 @@
 """Define the base Assembler class."""
+
 from __future__ import division
 import numpy
 
 from six.moves import range
+
+from openmdao.utils.units import conversion_to_base_units, convert_units
 
 
 class Assembler(object):
@@ -32,6 +35,12 @@ class Assembler(object):
         all the input indices vectors concatenated together.
     _src_indices_range : int ndarray[num_input_var_all, 2]
         the initial and final indices for the indices vector for each input.
+    _src_units : [str, ...]
+        list of src units whose length is the number of input variables.
+    _src_scaling_0 : ndarray(nvar_in)
+        list of 0th order scaling coefficients (i.e., a0: in y = a1 * x + a0).
+    _src_scaling_1 : ndarray(nvar_in)
+        list of 1st order scaling coefficients (i.e., a1: in y = a1 * x + a0).
     """
 
     def __init__(self, comm):
@@ -52,6 +61,11 @@ class Assembler(object):
         self._input_src_ids = None
         self._src_indices = None
         self._src_indices_range = None
+
+        #
+        self._src_units = []
+        self._src_scaling_0 = None
+        self._src_scaling_1 = None
 
     def _setup_variables(self, nvars, variable_metadata, variable_indices):
         """Compute the variable sets and sizes.
@@ -207,6 +221,62 @@ class Assembler(object):
             self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
                                                                           ind2]
             ind1 += isize
+
+    def _setup_src_data(self, variable_metadata, variable_indices):
+        """Compute and store unit/scaling information for inputs.
+
+        Args
+        ----
+        variable_metadata : list of dict
+            list of metadata dictionaries for outputs of root system.
+        variable_indices : int ndarray
+            global indices of outputs that exist on this processor.
+        """
+        nvar_out = len(variable_metadata)
+
+        # List of src units; to check compatability with input units
+        op_units = [None for ind in range(nvar_out)]
+        # List of unit_type IDs
+        op_int = numpy.empty(nvar_out, int)
+        # The two columns correspond to ref0 and ref
+        op_flt = numpy.empty((nvar_out, 2))
+
+        # Get unit type as well as ref0 and ref in standard units
+        op_int[:] = variable_indices
+        for ivar_out, meta in enumerate(variable_metadata):
+            # ref0 and ref are the values of the variable in the specified
+            # units at which the scaled values are 0 and 1, respectively
+            op_units[ivar_out] = meta['units']
+            op_flt[ivar_out, 0] = meta['ref0']
+            op_flt[ivar_out, 1] = meta['ref'] - meta['ref0']
+
+        # Broadcast to all procs
+        if self._comm.size > 1:
+            op_units_raw = self.comm.allgather(op_units)
+            op_int_raw = self.comm.allgather(op_int)
+            op_flt_raw = self.comm.allgather(op_flt)
+
+            op_units = []
+            for str_list in op_units_raw:
+                op_units.extend(str_list)
+            op_int = numpy.vstack(op_int_raw)
+            op_flt = numpy.vstack(op_flt_raw)
+
+        # Now, we can store ref0 and ref for each input
+        nvar_in = len(self._input_var_ids)
+        self._src_units = [None for ind in range(nvar_in)]
+        self._src_scaling_0 = numpy.empty(nvar_in)
+        self._src_scaling_1 = numpy.empty(nvar_in)
+        for ivar_in, ivar_out in enumerate(self._input_var_ids):
+            if ivar_out != -1:
+                ind = numpy.where(op_int == ivar_out)[0][0]
+                self._src_units[ivar_in] = op_units[ind]
+                self._src_scaling_0[ivar_in] = op_flt[ind, 0]
+                self._src_scaling_1[ivar_in] = op_flt[ind, 1]
+            else:
+                self._src_units[ivar_in] = ''
+                self._src_scaling_0[ivar_in] = 0.
+                self._src_scaling_1[ivar_in] = 1.
 
     def _compute_transfers(self, nsub_allprocs, var_range,
                            subsystems_myproc, subsystems_inds):

@@ -87,6 +87,9 @@ class LintReturnsTestCase(unittest.TestCase):
                             method_doc = inspect.getdoc(method)
                             method_src = inspect.getsource(method)
 
+                            # Check if docstring references another method
+                            if method_doc[:3] == 'See':
+                                return
 
                             methoddoc_matches = methoddoc_re.findall(method_doc)
                             if(len(methoddoc_matches) > 1):

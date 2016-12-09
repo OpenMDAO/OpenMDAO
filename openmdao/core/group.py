@@ -3,6 +3,7 @@ from __future__ import division
 
 import numpy
 from six import iteritems
+import warnings
 
 from openmdao.core.system import System
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
@@ -19,6 +20,28 @@ class Group(System):
         self._subsystems_allprocs.extend(self.metadata['subsystems'])
         self.nl_solver = NonlinearBlockGS()
         self.ln_solver = LinearBlockGS()
+
+    def add(self, name, subsys, promotes=None):
+        """Deprecated version of <Group.add_subsystem>.
+
+        Args
+        ----
+        name : str
+            Name of the subsystem being added
+        subsys : System
+            An instantiated, but not-yet-set up system object.
+        promotes : iter of str, optional
+            A list of variable names specifying which subsystem variables
+            to 'promote' up to this group. This is for backwards compatibility
+            with older versions of OpenMDAO.
+        """
+        warnings.simplefilter('always', DeprecationWarning)
+        warnings.warn('This method provides backwards compabitibility with '
+                      'OpenMDAO <= 1.x ; use add_subsystem instead.',
+                      DeprecationWarning, stacklevel=2)
+        warnings.simplefilter('ignore', DeprecationWarning)
+
+        self.add_subsystem(name, subsys, promotes=promotes)
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,

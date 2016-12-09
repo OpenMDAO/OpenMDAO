@@ -193,3 +193,15 @@ class DefaultVector(Vector):
         for data in self._data:
             global_sum += numpy.sum(data**2)
         return global_sum ** 0.5
+
+    def scale(self, coeffs):
+        """Change the scaling state.
+
+        Args
+        ----
+        coeffs : int ndarray[nvar_myproc, 2]
+            0th and 1st order coefficients for scaling/unscaling.
+        """
+        for iset, data in enumerate(self._data):
+            data[:] = coeffs[self._ivar_map[iset], 0] + \
+                coeffs[self._ivar_map[iset], 1] * data

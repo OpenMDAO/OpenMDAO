@@ -35,9 +35,12 @@ class Problem(object):
         the global communicator; the same as that of assembler and root.
     _assembler : Assembler
         pointer to the global Assembler object.
+    _use_ref_vector : bool
+        if True, allocate vectors to store ref. values.
     """
 
-    def __init__(self, root=None, comm=None, AssemblerClass=None):
+    def __init__(self, root=None, comm=None, AssemblerClass=None,
+                 use_ref_vector=True):
         """Initialize attributes.
 
         Args
@@ -48,6 +51,8 @@ class Problem(object):
             the global communicator; the same as that of assembler and root.
         AssemblerClass : Assembler or None
             pointer to the global Assembler object.
+        use_ref_vector : bool
+            if True, allocate vectors to store ref. values.
         """
         if comm is None:
             try:
@@ -61,6 +66,7 @@ class Problem(object):
         self.root = root
         self.comm = comm
         self._assembler = AssemblerClass(comm)
+        self._use_ref_vector = use_ref_vector
 
     # TODO: getitem/setitem need to properly handle scaling/units
     def __getitem__(self, name):
@@ -73,13 +79,18 @@ class Problem(object):
 
         Returns
         -------
-        ndarray.view
+        float or ndarray
             the requested output/input variable.
         """
         try:
-            return self.root._outputs[name]
+            self.root._outputs[name]
+            ind = self.root._variable_myproc_names['output'].index(name)
+            c0, c1 = self.root._scaling_to_phys['output'][ind, :]
+            return c0 + c1 * self.root._outputs[name]
         except KeyError:
-            return self.root._inputs[name]
+            ind = self.root._variable_myproc_names['input'].index(name)
+            c0, c1 = self.root._scaling_to_phys['input'][ind, :]
+            return c0 + c1 * self.root._inputs[name]
 
     def __setitem__(self, name, value):
         """Set an output/input variable.
@@ -92,9 +103,14 @@ class Problem(object):
             value to set this variable to.
         """
         try:
-            self.root._outputs[name] = value
+            self.root._outputs[name]
+            ind = self.root._variable_myproc_names['output'].index(name)
+            c0, c1 = self.root._scaling_to_norm['output'][ind, :]
+            self.root._outputs[name] = c0 + c1 * value
         except KeyError:
-            self.root._inputs[name] = value
+            ind = self.root._variable_myproc_names['input'].index(name)
+            c0, c1 = self.root._scaling_to_norm['input'][ind, :]
+            self.root._inputs[name] = c0 + c1 * value
 
     # TODO: once we have drivers, this should call self.driver.run() instead
     def run(self):
@@ -155,15 +171,23 @@ class Problem(object):
         assembler._setup_src_indices(root._variable_myproc_metadata['input'],
                                      root._variable_myproc_indices['input'])
 
+        # Assembler setup: compute data required for units/scaling
+        assembler._setup_src_data(root._variable_myproc_metadata['output'],
+                                  root._variable_myproc_indices['output'])
+
+        root._setup_scaling()
+
         # Vector setup for the basic execution vector
-        self.setup_vector(None, VectorClass)
+        self.setup_vector(None, VectorClass, self._use_ref_vector)
 
         # Vector setup for the linear vector
-        self.setup_vector('', VectorClass)
+        self.setup_vector('', VectorClass, self._use_ref_vector)
+
+        # Vector setup for the
 
         return self
 
-    def setup_vector(self, vec_name, VectorClass):
+    def setup_vector(self, vec_name, VectorClass, use_ref_vector):
         """Set up the 'vec_name' Vector.
 
         Args
@@ -172,6 +196,8 @@ class Problem(object):
             name of the vector.
         VectorClass : type
             reference to the actual Vector class.
+        use_ref_vector : bool
+            if True, allocate vectors to store ref. values.
         """
         root = self.root
         assembler = self._assembler
@@ -190,4 +216,4 @@ class Problem(object):
         import numpy
         vector_var_ids = numpy.arange(ind1, ind2)
 
-        self.root._setup_vector(vectors, vector_var_ids)
+        self.root._setup_vector(vectors, vector_var_ids, use_ref_vector)

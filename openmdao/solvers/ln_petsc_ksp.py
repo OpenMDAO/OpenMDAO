@@ -94,8 +94,8 @@ class Monitor(object):
 
         Args
         ----
-        ksp : object
-            the openmdao solver
+        solver : object
+            the openmdao solver.
         """
         self._solver = solver
         self._norm = 1.0
@@ -108,10 +108,8 @@ class Monitor(object):
         ----
         ksp : object
             the KSP solver.
-
         counter : int
             the counter.
-
         norm : float
             the norm.
         """
@@ -180,9 +178,10 @@ class PetscKSP(LinearSolver):
 
         Args
         ----
+        mat : PETSc.Mat
+            PETSc matrix object.
         in_vec : PetSC Vector
             Incoming vector.
-
         result : PetSC Vector
             Empty array into which we place the matrix-vector product.
         """
@@ -215,8 +214,8 @@ class PetscKSP(LinearSolver):
 
         Args
         ----
-        vec_names : list of vector names
-
+        vec_names : list
+            list of vector names.
         mode : string
             Derivative mode, can be 'fwd' or 'rev'.
         """
@@ -268,10 +267,11 @@ class PetscKSP(LinearSolver):
 
         Args
         ----
-        in_vec : PetSC Vector
+        mat : PETSc.Mat
+            PETSc matrix object.
+        in_vec : PETSc.Vector
             Incoming vector
-
-        result : PetSC Vector
+        result : PETSc.Vector
             Empty vector into which we return the preconditioned in_vec
         """
         if self._precon:
@@ -308,9 +308,8 @@ class PetscKSP(LinearSolver):
         ----
         system : `System`
             Parent `System` object.
-
         vec_name : string
-            name of vector
+            name of vector.
         """
         # use cached instance if available
         if vec_name in self._ksp:
