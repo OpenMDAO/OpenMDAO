@@ -211,19 +211,16 @@ def _compute_index_map(jrows, jcols, irow, icol, src_indices):
         src_indices.
     """
     icols = []
-    irows = []
     idxs = []
 
     for i, idx in enumerate(src_indices):
         # pull out columns that match each index
         idxarr = numpy.nonzero(jcols == i)[0]
         idxs.append(idxarr)
-        icols.append(numpy.full(idxarr.shape, idx,
-                                dtype=int))
-        irows.append(jrows[idxarr])
+        icols.append(numpy.full(idxarr.shape, idx, dtype=int))
 
     idxs = numpy.hstack(idxs)
-    irows = numpy.hstack(irows) + irow
     icols = numpy.hstack(icols) + icol
+    irows = jrows[idxs] + irow
 
     return (irows, icols, idxs)

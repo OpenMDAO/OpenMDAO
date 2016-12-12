@@ -23,6 +23,7 @@ class CooMatrix(Matrix):
             number of cols in the matrix.
         """
         counter = 0
+        full_slice = slice(None)
 
         submat_meta_iter = ((self._op_submats, self._op_metadata),
                             (self._ip_submats, self._ip_metadata))
@@ -41,9 +42,9 @@ class CooMatrix(Matrix):
                 ind2 = counter
                 metadata[key] = (ind1, ind2)
 
-        data = numpy.zeros(counter)
-        rows = numpy.zeros(counter, int)
-        cols = numpy.zeros(counter, int)
+        data = numpy.empty(counter)
+        rows = numpy.empty(counter, int)
+        cols = numpy.empty(counter, int)
 
         for submats, metadata in submat_meta_iter:
             for key in submats:
@@ -70,7 +71,7 @@ class CooMatrix(Matrix):
                     cols[ind1:ind2] += icol
                     data[ind1:ind2] = jac.flat
 
-                    idxs = slice(None)
+                    idxs = full_slice
 
                 elif isinstance(jac, (coo_matrix, csr_matrix)):
                     coojac = jac.tocoo()
@@ -78,17 +79,12 @@ class CooMatrix(Matrix):
                         data[ind1:ind2] = coojac.data
                         rows[ind1:ind2] = coojac.row + irow
                         cols[ind1:ind2] = coojac.col + icol
-                        idxs = slice(None)
+                        idxs = full_slice
                     else:
                         irows, icols, idxs = _compute_index_map(coojac.row,
                                                                 coojac.col,
                                                                 irow, icol,
                                                                 src_indices)
-
-                        # get the indices to get us back to our original
-                        # data order.
-                        idxs = numpy.argsort(idxs)
-
                         data[ind1:ind2] = jac.data[idxs]
                         rows[ind1:ind2] = irows
                         cols[ind1:ind2] = icols
@@ -98,22 +94,21 @@ class CooMatrix(Matrix):
                         data[ind1:ind2] = jac[0]
                         rows[ind1:ind2] = irow + jac[1]
                         cols[ind1:ind2] = icol + jac[2]
-                        idxs = slice(None)
+                        idxs = full_slice
                     else:
                         irows, icols, idxs = _compute_index_map(jac[1],
                                                                 jac[2],
                                                                 irow, icol,
                                                                 src_indices)
-
-                        # get the indices to get us back to our original
-                        # data order.
-                        idxs = numpy.argsort(idxs)
-
                         data[ind1:ind2] = jac[0][idxs]
                         rows[ind1:ind2] = irows
                         cols[ind1:ind2] = icols
 
-                metadata[key] = (ind1, ind2, idxs)
+                if (metadata is self._ip_metadata and not isinstance(idxs,
+                                                                     slice)):
+                    metadata[key] = numpy.argsort(idxs) + ind1
+                else:
+                    metadata[key] = slice(ind1, ind2)
 
         self._matrix = coo_matrix((data, (rows, cols)),
                                   shape=(num_rows, num_cols))
@@ -132,13 +127,12 @@ class CooMatrix(Matrix):
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
-        ind1, ind2, idxs = metadata[key]
         if isinstance(jac, ndarray):
-            self._matrix.data[ind1:ind2] = jac.flat
+            self._matrix.data[metadata[key]] = jac.flat
         elif isinstance(jac, (coo_matrix, csr_matrix)):
-            self._matrix.data[ind1:ind2] = jac.data[idxs]
+            self._matrix.data[metadata[key]] = jac.data
         elif isinstance(jac, list):
-            self._matrix.data[ind1:ind2] = jac[0][idxs]
+            self._matrix.data[metadata[key]] = jac[0]
 
     def _prod(self, in_vec, mode):
         """Perform a matrix vector product.

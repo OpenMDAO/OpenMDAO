@@ -125,6 +125,11 @@ def arr2list(arr):
     
     return [np.array(data), np.array(rows), np.array(cols)]
 
+def arr2revlist(arr):
+    """Convert a numpy array to a 'sparse' list in reverse order."""
+    lst = arr2list(arr)
+    return [lst[0][::-1], lst[1][::-1], lst[2][::-1]]
+
 def inverted_coo(arr):
     """Convert an ordered coo matrix into one with columns in reverse order
     so we can test unsorted coo matrices.
@@ -132,6 +137,13 @@ def inverted_coo(arr):
     shape = arr.shape
     arr = coo_matrix(arr)
     return coo_matrix((arr.data[::-1], (arr.row[::-1], arr.col[::-1])), shape=shape)
+
+def inverted_csr(arr):
+    """Convert an ordered coo matrix into a csr with columns in reverse order
+    so we can test unsorted csr matrices.
+    """
+    return inverted_coo(arr).tocsr()
+
 
 class TestJacobianSrcIndicesDenseCoo(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
@@ -144,10 +156,18 @@ class TestJacobianSrcIndicesDenseCsr(TestJacobianSrcIndicesDenseDense):
 class TestJacobianSrcIndicesDenseInvCoo(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(DenseMatrix, inverted_coo)
+        
+class TestJacobianSrcIndicesDenseInvCsr(TestJacobianSrcIndicesDenseDense):
+    def setUp(self):
+        self.prob = self._setup_model(DenseMatrix, inverted_csr)
 
 class TestJacobianSrcIndicesDenseList(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(DenseMatrix, arr2list)
+
+class TestJacobianSrcIndicesDenseRevList(TestJacobianSrcIndicesDenseDense):
+    def setUp(self):
+        self.prob = self._setup_model(DenseMatrix, arr2revlist)
 
 class TestJacobianSrcIndicesCsrCsr(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
@@ -160,6 +180,10 @@ class TestJacobianSrcIndicesCsrCoo(TestJacobianSrcIndicesDenseDense):
 class TestJacobianSrcIndicesCsrInvCoo(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CsrMatrix, inverted_coo)
+        
+class TestJacobianSrcIndicesCsrInvCsr(TestJacobianSrcIndicesDenseDense):
+    def setUp(self):
+        self.prob = self._setup_model(CsrMatrix, inverted_csr)
 
 class TestJacobianSrcIndicesCsrDense(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
@@ -168,6 +192,10 @@ class TestJacobianSrcIndicesCsrDense(TestJacobianSrcIndicesDenseDense):
 class TestJacobianSrcIndicesCsrList(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CsrMatrix, arr2list)
+
+class TestJacobianSrcIndicesCsrRevList(TestJacobianSrcIndicesDenseDense):
+    def setUp(self):
+        self.prob = self._setup_model(CsrMatrix, arr2revlist)
 
 class TestJacobianSrcIndicesCooCsr(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
@@ -180,6 +208,10 @@ class TestJacobianSrcIndicesCooCoo(TestJacobianSrcIndicesDenseDense):
 class TestJacobianSrcIndicesCooInvCoo(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CooMatrix, inverted_coo)
+        
+class TestJacobianSrcIndicesCooInvCsr(TestJacobianSrcIndicesDenseDense):
+    def setUp(self):
+        self.prob = self._setup_model(CooMatrix, inverted_csr)
 
 class TestJacobianSrcIndicesCooDense(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
@@ -188,3 +220,7 @@ class TestJacobianSrcIndicesCooDense(TestJacobianSrcIndicesDenseDense):
 class TestJacobianSrcIndicesCooList(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CooMatrix, arr2list)
+
+class TestJacobianSrcIndicesCooRevList(TestJacobianSrcIndicesDenseDense):
+    def setUp(self):
+        self.prob = self._setup_model(CooMatrix, arr2revlist)
