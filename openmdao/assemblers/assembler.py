@@ -215,8 +215,9 @@ class Assembler(object):
             ind2 += isize
             indices = metadata['indices']
             if indices is None:
-                indices = numpy.arange(isize, dtype=int)
-            self._src_indices[ind1:ind2] = indices.flat
+                self._src_indices[ind1:ind2] = numpy.arange(isize, dtype=int)
+            else:
+                self._src_indices[ind1:ind2] = indices.flat
             self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
                                                                           ind2]
             ind1 += isize

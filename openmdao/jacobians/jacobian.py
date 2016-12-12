@@ -191,10 +191,7 @@ class Jacobian(object):
 
         if numpy.isscalar(jac):
             jac = numpy.array([jac], float).reshape((op_size, ip_size))
-        elif isinstance(jac, numpy.ndarray):
-            pass
-            # jac = jac.reshape((op_size, ip_size))
-        elif isinstance(jac, (coo_matrix, csr_matrix)):
+        elif isinstance(jac, (numpy.ndarray, coo_matrix, csr_matrix)):
             pass
         elif isinstance(jac, (tuple, list)):
             if len(jac) != 3:
