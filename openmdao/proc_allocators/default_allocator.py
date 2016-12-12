@@ -10,7 +10,26 @@ class DefaultAllocator(ProcAllocator):
     """Default processor allocator."""
 
     def _divide_procs(self, nsub, comm, proc_range):
-        """See openmdao.proc_allocators.proc_allocator.ProcAllocator."""
+        """Perform the parallel processor allocation.
+
+        Args
+        ----
+        nsub : int
+            Number of subsystems.
+        comm : MPI.Comm or <FakeComm>
+            communicator of the owning system.
+        proc_range : [int, int]
+            global processor index range.
+
+        Returns
+        -------
+        isubs : [int, ...]
+            indices of the owned local subsystems.
+        sub_comm : MPI.Comm or <FakeComm>
+            communicator to pass to the subsystems.
+        sub_proc_range : [int, int]
+            global processor index range to pass to the subsystems.
+        """
         iproc = comm.rank
         nproc = comm.size
 

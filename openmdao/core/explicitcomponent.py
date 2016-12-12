@@ -14,7 +14,7 @@ class ExplicitComponent(Component):
     """Class to inherit from when all output variables are explicit."""
 
     def _apply_nonlinear(self):
-        """See System._apply_nonlinear."""
+        """Compute residuals."""
         inputs = self._inputs
         outputs = self._outputs
         residuals = self._residuals
@@ -33,7 +33,17 @@ class ExplicitComponent(Component):
         outputs += residuals
 
     def _solve_nonlinear(self):
-        """See System._solve_nonlinear."""
+        """Compute outputs.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
         inputs = self._inputs
         outputs = self._outputs
         residuals = self._residuals
@@ -49,7 +59,18 @@ class ExplicitComponent(Component):
         self._outputs.scale(self._scaling_to_norm['output'])
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """See System._apply_linear."""
+        """Compute jac-vec product.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+        var_inds : [int, int, int, int] or None
+            ranges of variable IDs involved in this matrix-vector product.
+            The ordering is [lb1, ub1, lb2, ub2].
+        """
         for vec_name in vec_names:
             with self._matvec_context(vec_name, var_inds, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
@@ -76,7 +97,24 @@ class ExplicitComponent(Component):
                 d_residuals.scale(self._scaling_to_norm['residual'])
 
     def _solve_linear(self, vec_names, mode):
-        """See System._solve_linear."""
+        """Apply inverse jac product.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
         for vec_name in vec_names:
             d_outputs = self._vectors['output'][vec_name]
             d_residuals = self._vectors['residual'][vec_name]
@@ -86,7 +124,13 @@ class ExplicitComponent(Component):
                 d_residuals.set_vec(d_outputs)
 
     def _linearize(self, initial=False):
-        """See System._linearize."""
+        """Compute jacobian / factorization.
+
+        Args
+        ----
+        initial : boolean
+            whether this is the initial call to assemble the Jacobian.
+        """
         self._jacobian._system = self
 
         self._inputs.scale(self._scaling_to_phys['input'])

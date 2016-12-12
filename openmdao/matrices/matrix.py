@@ -10,8 +10,8 @@ class Matrix(object):
 
     Attributes
     ----------
-    _comm : MPI.Comm or FakeComm
-        communicator of the top-level system that owns the Jacobian.
+    _comm : MPI.Comm or <FakeComm>
+        communicator of the top-level system that owns the <Jacobian>.
     _matrix : object
         implementation-specific representation of the actual matrix.
     _op_submats : dict
@@ -29,8 +29,8 @@ class Matrix(object):
 
         Args
         ----
-        comm : MPI.Comm or FakeComm
-            communicator of the top-level system that owns the Jacobian.
+        comm : MPI.Comm or <FakeComm>
+            communicator of the top-level system that owns the <Jacobian>.
         """
         self._comm = comm
         self._matrix = None

@@ -75,7 +75,22 @@ class ScipyIterativeSolver(LinearSolver):
         self._iter_count += 1
 
     def __call__(self, vec_names, mode):
-        """See LinearSolver."""
+        """Run the solver.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
         self._vec_names = vec_names
         self._mode = mode
 
