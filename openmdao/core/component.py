@@ -50,19 +50,12 @@ class Component(System):
         metadata = self.INPUT_DEFAULTS.copy()
         metadata.update(kwargs)
 
-        # if isinstance(val, numpy.ndarray) and 'indices' not in kwargs:
-        #     metadata['indices'] = numpy.arange(0, val.size, dtype=int)
-        # else:
-        #     metadata['indices'] = numpy.array(metadata['indices'])
-
         metadata['value'] = val
         if 'indices' in kwargs:
             metadata['indices'] = numpy.array(kwargs['indices'])
             metadata['size'] = metadata['indices'].size
             metadata['shape'] = metadata['indices'].shape
-        elif 'shape' in kwargs:
-            metadata['size'] = numpy.prod(kwargs['shape'])
-        elif isinstance(val, numpy.ndarray):
+        elif 'shape' not in kwargs and isinstance(val, numpy.ndarray):
             metadata['shape'] = val.shape
             metadata['size'] = val.size
         else:
@@ -88,7 +81,7 @@ class Component(System):
         metadata.update(kwargs)
 
         metadata['value'] = val
-        if isinstance(val, numpy.ndarray):
+        if 'shape' not in kwargs and isinstance(val, numpy.ndarray):
             metadata['shape'] = val.shape
             metadata['size'] = val.size
         else:

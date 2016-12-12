@@ -52,6 +52,8 @@ class Jacobian(object):
 
         self._op_dict = {}
         self._ip_dict = {}
+        self._int_mtx = None
+        self._ext_mtx = None
         self._keymap = {}
         self._iter_list = []
 
