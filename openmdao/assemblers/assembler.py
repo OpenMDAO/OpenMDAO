@@ -29,7 +29,7 @@ class Assembler(object):
                              'output': ndarray[nvar_all, 2]}
         the first column is the var_set ID and
         the second column is the variable index within the var_set.
-    _input_src_ids : int ndarray[num_input_var]
+    _input_var_ids : int ndarray[num_input_var]
         the output variable ID for each input variable ID.
     _src_indices : int ndarray[:]
         all the input indices vectors concatenated together.
@@ -58,7 +58,7 @@ class Assembler(object):
         self._variable_set_IDs = {'input': {}, 'output': {}}
         self._variable_set_indices = {'input': None, 'output': None}
 
-        self._input_src_ids = None
+        self._input_var_ids = None
         self._src_indices = None
         self._src_indices_range = None
 
@@ -154,7 +154,7 @@ class Assembler(object):
         """Identify implicit connections and combine with explicit ones.
 
         Sets the following attributes:
-            _input_src_ids
+            _input_var_ids
 
         Args
         ----
@@ -166,12 +166,12 @@ class Assembler(object):
         """
         out_names = variable_allprocs_names['output']
         nvar_input = len(variable_allprocs_names['input'])
-        _input_src_ids = -numpy.ones(nvar_input, int)
+        _input_var_ids = -numpy.ones(nvar_input, int)
 
-        # Add user defined connections to the _input_src_ids vector
+        # Add user defined connections to the _input_var_ids vector
         # and inconns
         for ip_ID, op_ID in connections:
-            _input_src_ids[ip_ID] = op_ID
+            _input_var_ids[ip_ID] = op_ID
 
         # Loop over input variables
         for ip_ID, name in enumerate(variable_allprocs_names['input']):
@@ -179,10 +179,10 @@ class Assembler(object):
             # If name is also an output variable, add this implicit connection
             for op_ID, oname in enumerate(out_names):
                 if name == oname:
-                    _input_src_ids[ip_ID] = op_ID
+                    _input_var_ids[ip_ID] = op_ID
                     break
 
-        self._input_src_ids = _input_src_ids
+        self._input_var_ids = _input_var_ids
 
     def _setup_src_indices(self, input_metadata, myproc_var_global_indices):
         """Assemble global list of src_indices.
@@ -263,11 +263,11 @@ class Assembler(object):
             op_flt = numpy.vstack(op_flt_raw)
 
         # Now, we can store ref0 and ref for each input
-        nvar_in = len(self._input_src_ids)
+        nvar_in = len(self._input_var_ids)
         self._src_units = [None for ind in range(nvar_in)]
         self._src_scaling_0 = numpy.empty(nvar_in)
         self._src_scaling_1 = numpy.empty(nvar_in)
-        for ivar_in, ivar_out in enumerate(self._input_src_ids):
+        for ivar_in, ivar_out in enumerate(self._input_var_ids):
             if ivar_out != -1:
                 ind = numpy.where(op_int == ivar_out)[0][0]
                 self._src_units[ivar_in] = op_units[ind]
