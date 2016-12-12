@@ -180,6 +180,11 @@ class Solver(object):
             name of the subsolver.
         solver : <Solver>
             the subsolver instance.
+
+        Returns
+        -------
+        <Solver>
+            the subsolver instance.
         """
         self.options['subsolvers'][name] = solver
         self.options['subsolvers'][name]._setup_solvers(self._system,

@@ -3,7 +3,7 @@
 from __future__ import division, print_function
 
 from openmdao.core.group import Group
-from openmdao.core.component import IndepVarComp
+from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.components.exec_comp import ExecComp
 
 
