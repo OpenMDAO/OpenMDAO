@@ -13,7 +13,7 @@ class Solver(object):
 
     Attributes
     ----------
-    _system : System
+    _system : <System>
         pointer to the owning system.
     _depth : int
         how many subsolvers deep this solver is (0 means not a subsolver).
@@ -23,7 +23,7 @@ class Solver(object):
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
         number of iterations for the current invocation of the solver.
-    options : GeneralizedDictionary
+    options : <GeneralizedDictionary>
         options dictionary.
     """
 
@@ -60,7 +60,7 @@ class Solver(object):
 
         Args
         ----
-        system : System
+        system : <System>
             pointer to the owning system.
         depth : int
             depth of the current system (already incremented).
@@ -178,7 +178,12 @@ class Solver(object):
         ----
         name : str
             name of the subsolver.
-        solver : Solver
+        solver : <Solver>
+            the subsolver instance.
+
+        Returns
+        -------
+        <Solver>
             the subsolver instance.
         """
         self.options['subsolvers'][name] = solver
@@ -196,7 +201,7 @@ class Solver(object):
 
         Returns
         -------
-        Solver
+        <Solver>
             the instance of the requested subsolver.
         """
         return self.options['subsolvers'][name]
@@ -206,11 +211,27 @@ class NonlinearSolver(Solver):
     """Base class for nonlinear solvers."""
 
     def __call__(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Run the solver.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
         return self._run_iterator()
 
     def _iter_initialize(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Perform any necessary pre-processing operations.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
         if self.options['maxiter'] > 1:
             norm = self._iter_get_norm()
         else:
@@ -219,7 +240,13 @@ class NonlinearSolver(Solver):
         return norm0, norm
 
     def _iter_get_norm(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Return the norm of the residual.
+
+        Returns
+        -------
+        float
+            norm.
+        """
         self._system._apply_nonlinear()
         return self._system._residuals.get_norm()
 
@@ -228,13 +255,36 @@ class LinearSolver(Solver):
     """Base class for linear solvers."""
 
     def __call__(self, vec_names, mode):
-        """See openmdao.solvers.solver.Solver."""
+        """Run the solver.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
         self._vec_names = vec_names
         self._mode = mode
         return self._run_iterator()
 
     def _iter_initialize(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Perform any necessary pre-processing operations.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
         system = self._system
 
         self._rhs_vecs = {}
@@ -254,7 +304,13 @@ class LinearSolver(Solver):
         return norm0, norm
 
     def _iter_get_norm(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Return the norm of the residual.
+
+        Returns
+        -------
+        float
+            norm.
+        """
         system = self._system
         var_inds = [
             system._variable_allprocs_range['output'][0],

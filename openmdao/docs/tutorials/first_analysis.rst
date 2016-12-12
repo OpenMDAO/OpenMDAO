@@ -1,10 +1,10 @@
-Setting up your first analysis 
+Setting up your first analysis
 =================================================
 
 This tutorial illustrates how to build, run, and optimize a very simple model in
 OpenMDAO. It will introduce the basic types of OpenMDAO classes, and the
 sequence in which they must be created and used and show you how to set up
-design variables, objective, and constraints for optimization. 
+design variables, objective, and constraints for optimization.
 
 Consider a paraboloid function, defined by the explicit function
 
@@ -79,21 +79,22 @@ Preamble
     from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp
 
 At the top of any script you'll see these lines (or lines very similar to these) which import needed classes and functions. On the first import line the `print_function` is used so the code in the script will work in python 2.0 or 3.0. If you want to know whats going on with the division operator, check out this `detailed explanation <https://www.python.org/dev/peps/pep-0238/>`_. The second import line brings in OpenMDAO classes that are needed to build and run a model.
-As you progress to more complex models you can expect to import more classes from `openmdao.api`, but for now we only need these 4. 
+As you progress to more complex models you can expect to import more classes from `openmdao.api`, but for now we only need these 4.
 
 Defining a component
 ---------------------
-The component is the basic building block of a model. You will always define components as a sub-class of either `ExplicitComponent` or `ImplicitComponent`. Since our simple paraboloid function is explicit, we'll use the `ExplicitComponent`. You see three methods defined:  
+The component is the basic building block of a model. You will always define components as a sub-class of either `ExplicitComponent` or `ImplicitComponent`. Since our simple paraboloid function is explicit, we'll use the `ExplicitComponent`. You see three methods defined:
+
     - `initialize_variables`: define all your inputs and outputs here
     - `compute`: calculation of all output values for the given inputs
     - `compute_jacobian`: derivatives of all the outputs values with respect to all the inputs
 
-.. note:: 
+.. note::
 
     What about implicit functions? Check out this tutorial about using an `ImplicitComponent`[LINK]
 
 
-:: 
+::
 
     class Paraboloid(ExplicitComponent):
 
@@ -129,7 +130,7 @@ of the `Paraboloid` class that we just defined.
 
 As part of the the model hierarchy, you will also define any connections
 to move data between components in the relevant group. Here, we connect
-the design variables to the inputs on the paraboloid component. 
+the design variables to the inputs on the paraboloid component.
 
 Once the model hierarchy is defined, we pass it to the constructor of the
 `Problem` class then call the `setup()` method on that problem which tells the
@@ -138,7 +139,7 @@ execution. Then we call `run()` to actually perform the computation.
 
 Here we called run twice. The first times with the initial values of 3.0 and -4.0 for `x` and `y`. The second time we changed those values and re-ran. There are a few details to note here. First, notice the way we printed the outputs via :code:`prob['parab_comp.f']` and similarly how we set the new values for `x` and `y`. You can both get and set values using the problem, which works with dimensional values in the units of the source variable. In this case, there are no units on the source (i.e. `des_vars.x`). You can read more about how OpenMDAO handles units and scaling here[LINK TO FEATURE DOC].
 
-:: 
+::
 
     if __name__ == '__main__':
         model = Group()
@@ -160,5 +161,3 @@ Here we called run twice. The first times with the initial values of 3.0 and -4.
         prob['des_vars.y'] = -2.0
         prob.run()
         print(prob['parab_comp.f'])
-
-

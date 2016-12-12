@@ -15,7 +15,7 @@ class Assembler(object):
 
     Attributes
     ----------
-    _comm : MPI.comm or FakeComm
+    _comm : MPI.comm or <FakeComm>
         MPI communicator object.
     _variable_sizes_all : {'input': ndarray[nproc, nvar],
                            'output': ndarray[nproc, nvar]}
@@ -48,8 +48,8 @@ class Assembler(object):
 
         Args
         ----
-        comm : MPI.Comm or FakeComm
-            same instance as the Problem's communicator.
+        comm : MPI.Comm or <FakeComm>
+            same instance as the <Problem>'s communicator.
         """
         self._comm = comm
 
@@ -252,9 +252,9 @@ class Assembler(object):
 
         # Broadcast to all procs
         if self._comm.size > 1:
-            op_units_raw = self.comm.allgather(op_units)
-            op_int_raw = self.comm.allgather(op_int)
-            op_flt_raw = self.comm.allgather(op_flt)
+            op_units_raw = self._comm.allgather(op_units)
+            op_int_raw = self._comm.allgather(op_int)
+            op_flt_raw = self._comm.allgather(op_flt)
 
             op_units = []
             for str_list in op_units_raw:

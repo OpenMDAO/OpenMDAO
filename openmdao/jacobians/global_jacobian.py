@@ -9,10 +9,10 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 
 
 class GlobalJacobian(Jacobian):
-    """Assemble dense global Jacobian."""
+    """Assemble dense global <Jacobian>."""
 
     def _get_var_range(self, ivar_all, typ):
-        """Look up the variable name and Jacobian index range.
+        """Look up the variable name and <Jacobian> index range.
 
         Args
         ----
@@ -38,12 +38,12 @@ class GlobalJacobian(Jacobian):
         return ind1, ind2
 
     def _initialize(self):
-        """See openmdao.jacobians.jacobian.Jacobian."""
+        """Allocate the global matrices."""
         indices = self._system._variable_myproc_indices
         ivar1, ivar2 = self._system._variable_allprocs_range['output']
 
         self.options.declare('Matrix', value=DenseMatrix,
-                             desc='Matrix class to use in this Jacobian.')
+                             desc='<Matrix> class to use in this <Jacobian>.')
         self._int_mtx = self.options['Matrix'](self._system.comm)
         self._ext_mtx = self.options['Matrix'](self._system.comm)
 
@@ -94,7 +94,7 @@ class GlobalJacobian(Jacobian):
         self._ext_mtx._build(op_size, ip_size)
 
     def _update(self):
-        """See openmdao.jacobians.jacobian.Jacobian."""
+        """Read the user's sub-Jacobians and set into the global matrix."""
         indices = self._system._variable_myproc_indices
         ivar1, ivar2 = self._system._variable_allprocs_range['output']
 
@@ -117,7 +117,19 @@ class GlobalJacobian(Jacobian):
                                                         self._ip_dict[key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
-        """See openmdao.jacobians.jacobian.Jacobian."""
+        """Compute matrix-vector product.
+
+        Args
+        ----
+        d_inputs : Vector
+            inputs linear vector.
+        d_outputs : Vector
+            outputs linear vector.
+        d_residuals : Vector
+            residuals linear vector.
+        mode : str
+            'fwd' or 'rev'.
+        """
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx
 
