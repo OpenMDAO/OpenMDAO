@@ -1,0 +1,74 @@
+branches:
+  only:
+    - master
+
+sudo: false
+
+os:
+  - linux
+  - osx
+
+language: generic
+
+env:
+- PY=2.7 MPI=1
+- PY=3.4 MPI=1
+
+
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - gfortran
+    - libblas-dev
+    - liblapack-dev
+    - libopenmpi-dev
+    - openmpi-bin
+
+notifications:
+  email: false
+  slack:
+    on_success: never
+    secure: kFjjqTmuOMfXQRe4XuAyJhbx6eJRVu3IdBaBtEHHQOyNVfEaXaoRCNiZxaq8gEGfJB58g0J3C2/rwCgA5Cgpu4AMHiL7gm0iFMYpez2F8RDHtDAaIZkRcxuTmebSIazdWCSwdJL3/QnsebrwyaQMVkq9NXXd30r7Gi9vahFIcTuT0riWNTvNzjzkL/MV6RCh0QSfvR1k7DZjKC76lKtvNMRB/1kLBmU1w5jxr5w+Gf/hcDX+RPr+uD2JY9t3JrAc3tzgI+wftVx8JGE2ynJvBeR+v4BSWpydM55MGmLARWlRWRCSJGojMTay3fhw8ZfKT5cYtaSvu2O1+U41Vw2BOv6HA/t8R75jhNP3SebvqsTwY4n1e3H+qISz2T8DtZnrqRKr5VnygpwLrgLbzmpnmfqAaFZIFqOWNPcXd08Mz7ocQXQbwA4xtn4Bx6D0nzeue+OE+GazWHputHsArYPIcV48WquJxszpB6blJy27xtUNbqRiio2AK54EB+hy2M66W34PQNNN2ScUf8ksJF5s34C2PGcqfgqpTw8pvfB1md4ecIUIYaA9AaNNcIv4hRliFpOaVeDm+UuQHOjEwoUXok2ktVI9iwZfOrKKgD9zE/tt1faV9OYpleoQoTgNLc3hHnQ3p7ysQi2cjjoyjvfWE7qpmnivva2NX/DUEjmtF74=
+
+before_install:
+- OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
+- if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then brew install openmpi; fi
+- wget "https://repo.continuum.io/miniconda/Miniconda-latest-$OS-x86_64.sh" -O miniconda.sh
+- chmod +x miniconda.sh
+- if [ "$OS" = "Linux" ]; then
+    ./miniconda.sh -b  -p /home/travis/miniconda;
+  fi
+- if [ "$OS" = "MacOSX" ]; then
+    ./miniconda.sh -b  -p /Users/travis/miniconda;
+  fi
+- PATHPREFIX=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "/Users/travis/miniconda/bin"; else echo "/home/travis/miniconda/bin"; fi)
+- export PATH=$PATHPREFIX:$PATH
+- export OPENMDAO_TEST_DOCS=1
+
+install:
+- conda install --yes python=$PY numpy scipy nose sphinx==1.3.1 mock swig
+- if [ "$OS" = "Linux" ]; then
+    if [ "$PY" = "2.7" ]; then
+        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
+    elif [ "$PY" = "3.4" ]; then
+        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-cp34m-linux_x86_64.whl;
+    fi
+  fi
+- if [ "$OS" = "MacOSX" ]; then
+    if [ "$PY" = "2.7" ]; then
+        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-macosx_10_5_x86_64.whl;
+    elif [ "$PY" = "3.4" ]; then
+        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-none-macosx_10_5_x86_64.whl;
+    fi
+  fi
+- if [ "$MPI" ]; then
+    pip install mpi4py;
+    pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
+  fi
+- pip install git+https://github.com/OpenMDAO/testflo.git
+- pip install -e .
+
+script:
+- testflo . -n 1
