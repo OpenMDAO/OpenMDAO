@@ -162,7 +162,6 @@ class Group(System):
                             meta = input_meta[ip_myproc_index]
                             meta['indices'] = numpy.array(src_indices,
                                                           dtype=int)
-                            meta['shape'] = meta['indices'].shape
 
                         # set src_indices to None to avoid unnecessary
                         # repeat of setting indices and shape metadata

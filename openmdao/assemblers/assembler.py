@@ -134,9 +134,12 @@ class Assembler(object):
         iproc = self._comm.rank
         for typ in ['input', 'output']:
             for ivar, meta in enumerate(variable_metadata[typ]):
+                if typ == 'input' and meta['indices'] is not None:
+                    size = numpy.prod(meta['indices'].shape)
+                else:
+                    size = numpy.prod(meta['shape'])
                 ivar_all = variable_indices[typ][ivar]
                 iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
-                size = numpy.prod(meta['shape'])
                 self._variable_sizes[typ][iset][iproc, ivar_set] = size
                 self._variable_sizes_all[typ][iproc, ivar_all] = size
 
@@ -200,8 +203,16 @@ class Assembler(object):
         """
         # Compute total size of indices vector
         total_idx_size = 0
+        sizes = numpy.zeros(len(input_metadata), dtype=int)
+
         for ind, metadata in enumerate(input_metadata):
-            total_idx_size += numpy.prod(metadata['shape'])
+            indices = metadata['indices']
+            if indices is None:
+                sizes[ind] = numpy.prod(metadata['shape'])
+            else:
+                sizes[ind] = numpy.prod(indices.shape)
+
+        total_idx_size = numpy.sum(sizes)
 
         # Allocate arrays
         self._src_indices = numpy.zeros(total_idx_size, int)
@@ -211,7 +222,7 @@ class Assembler(object):
         # Populate arrays
         ind1, ind2 = 0, 0
         for ind, metadata in enumerate(input_metadata):
-            isize = numpy.prod(metadata['shape'])
+            isize = sizes[ind]
             ind2 += isize
             indices = metadata['indices']
             if indices is None:
