@@ -10,7 +10,7 @@ from numpy import ndarray, imag, complex as npcomplex
 
 from six import string_types
 
-from openmdao.core.component import ExplicitComponent
+from openmdao.core.explicitcomponent import ExplicitComponent
 
 # regex to check for variable names.
 VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
@@ -45,10 +45,10 @@ def _valid_name(s, exprs):
 
 
 class ExecComp(ExplicitComponent):
-    """A Component defined by an expression string."""
+    """A <Component> defined by an expression string."""
 
     def __init__(self, exprs, inits=None, units=None, **kwargs):
-        r"""Create a Component using only an expression string.
+        r"""Create a <Component> using only an expression string.
 
         Given a list of assignment statements, this component creates
         input and output variables at construction time.  All variables

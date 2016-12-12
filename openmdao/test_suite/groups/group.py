@@ -1,8 +1,6 @@
 """Define the test group classes."""
 from __future__ import division, print_function
-import numpy
 
-from six import iteritems
 from six.moves import range
 
 from openmdao.api import Group
@@ -24,7 +22,8 @@ class TestGroupFlat(Group):
         self.metadata.declare('Component',
                               desc='Component class to instantiate')
         self.metadata.declare('jacobian_type', value='matvec',
-                              values=['matvec', 'dense', 'sparse-coo'],
+                              values=['matvec', 'dense', 'sparse-coo',
+                                      'sparse-csr'],
                               desc='method of assembling derivatives')
         self.metadata.declare('partial_type', value='array',
                               values=['array', 'sparse', 'aij'],
@@ -40,7 +39,7 @@ class TestGroupFlat(Group):
                 'var_shape': self.metadata['var_shape'],
             }
             if self.metadata['connection_type'] == 'explicit':
-                self.add_subsystem('comp_%i'%icomp, Component(**kwargs))
+                self.add_subsystem('comp_%i' % icomp, Component(**kwargs))
             elif self.metadata['connection_type'] == 'implicit':
                 renames_inputs = {}
                 renames_outputs = {}
@@ -61,7 +60,7 @@ class TestGroupFlat(Group):
                             new_name = 'var_%i' % index2
                             renames_outputs[old_name] = new_name
 
-                self.add_subsystem('comp_%i'%icomp, Component(**kwargs),
+                self.add_subsystem('comp_%i' % icomp, Component(**kwargs),
                                    renames_inputs=renames_inputs,
                                    renames_outputs=renames_outputs)
 

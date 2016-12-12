@@ -2,9 +2,10 @@
 
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group
-from openmdao.core.component import ExplicitComponent
-from openmdao.core.component import ImplicitComponent
-from openmdao.core.component import IndepVarComp
+from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.core.implicitcomponent import ImplicitComponent
+from openmdao.core.indepvarcomp import IndepVarComp
+from openmdao.components.deprecated_component import Component
 from openmdao.components.exec_comp import ExecComp
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
 from openmdao.solvers.ln_bjac import LinearBlockJac
@@ -17,3 +18,4 @@ from openmdao.devtools.viewconns import view_connections
 from openmdao.jacobians.global_jacobian import GlobalJacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import CooMatrix
+from openmdao.matrices.csr_matrix import CsrMatrix

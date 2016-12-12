@@ -24,7 +24,7 @@ ignores = {
         'E131',  # continuation line unaligned for hanging indent
     ],
     'pep257': [
-
+        'D203' # 1 blank required before class docstrings
     ]
 }
 
@@ -71,7 +71,7 @@ class LintTestCase(unittest.TestCase):
             output = p.communicate()[0]
 
             if p.returncode:
-                msgs = [line for line in output.split('\n') if ':' in line]
+                msgs = [line for line in str(output).split('\n') if ':' in line]
                 self.fail('pep257 failure: %s' % '\n'.join(msgs))
 
 

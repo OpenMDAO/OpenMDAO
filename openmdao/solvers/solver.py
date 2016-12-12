@@ -1,8 +1,6 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 from __future__ import division, print_function
 import numpy
-from six.moves import range
-from scipy.sparse.linalg import LinearOperator
 
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 
@@ -15,7 +13,7 @@ class Solver(object):
 
     Attributes
     ----------
-    _system : System
+    _system : <System>
         pointer to the owning system.
     _depth : int
         how many subsolvers deep this solver is (0 means not a subsolver).
@@ -23,7 +21,9 @@ class Solver(object):
         list of right-hand-side (RHS) vector names.
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
-    options : GeneralizedDictionary
+    _iter_count : int
+        number of iterations for the current invocation of the solver.
+    options : <GeneralizedDictionary>
         options dictionary.
     """
 
@@ -41,6 +41,7 @@ class Solver(object):
         self._depth = 0
         self._vec_names = None
         self._mode = 'fwd'
+        self._iter_count = 0
 
         self.options = GeneralizedDictionary(kwargs)
         self.options.declare('maxiter', typ=int, value=10,
@@ -59,7 +60,7 @@ class Solver(object):
 
         Args
         ----
-        system : System
+        system : <System>
             pointer to the owning system.
         depth : int
             depth of the current system (already incremented).
@@ -120,13 +121,14 @@ class Solver(object):
         rtol = self.options['rtol']
 
         norm0, norm = self._iter_initialize()
-        iteration = 0
-        self._mpi_print(iteration, norm / norm0, norm0)
-        while iteration < maxiter and norm > atol and norm / norm0 > rtol:
+        self._iter_count = 0
+        self._mpi_print(self._iter_count, norm / norm0, norm0)
+        while self._iter_count < maxiter and \
+                norm > atol and norm / norm0 > rtol:
             self._iter_execute()
             norm = self._iter_get_norm()
-            iteration += 1
-            self._mpi_print(iteration, norm / norm0, norm)
+            self._iter_count += 1
+            self._mpi_print(self._iter_count, norm / norm0, norm)
         fail = (numpy.isinf(norm) or numpy.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
         return fail, norm / norm0, norm
@@ -176,7 +178,7 @@ class Solver(object):
         ----
         name : str
             name of the subsolver.
-        solver : Solver
+        solver : <Solver>
             the subsolver instance.
         """
         self.options['subsolvers'][name] = solver
@@ -194,7 +196,7 @@ class Solver(object):
 
         Returns
         -------
-        Solver
+        <Solver>
             the instance of the requested subsolver.
         """
         return self.options['subsolvers'][name]
@@ -204,11 +206,27 @@ class NonlinearSolver(Solver):
     """Base class for nonlinear solvers."""
 
     def __call__(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Run the solver.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
         return self._run_iterator()
 
     def _iter_initialize(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Perform any necessary pre-processing operations.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
         if self.options['maxiter'] > 1:
             norm = self._iter_get_norm()
         else:
@@ -217,7 +235,13 @@ class NonlinearSolver(Solver):
         return norm0, norm
 
     def _iter_get_norm(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Return the norm of the residual.
+
+        Returns
+        -------
+        float
+            norm.
+        """
         self._system._apply_nonlinear()
         return self._system._residuals.get_norm()
 
@@ -226,13 +250,36 @@ class LinearSolver(Solver):
     """Base class for linear solvers."""
 
     def __call__(self, vec_names, mode):
-        """See openmdao.solvers.solver.Solver."""
+        """Run the solver.
+
+        Args
+        ----
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
         self._vec_names = vec_names
         self._mode = mode
         return self._run_iterator()
 
     def _iter_initialize(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Perform any necessary pre-processing operations.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
         system = self._system
 
         self._rhs_vecs = {}
@@ -252,7 +299,13 @@ class LinearSolver(Solver):
         return norm0, norm
 
     def _iter_get_norm(self):
-        """See openmdao.solvers.solver.Solver."""
+        """Return the norm of the residual.
+
+        Returns
+        -------
+        float
+            norm.
+        """
         system = self._system
         var_inds = [
             system._variable_allprocs_range['output'][0],

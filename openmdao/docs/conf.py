@@ -8,6 +8,8 @@ sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 import openmdao
 
+#this function is used to create the entire directory structure
+# of our source docs, as well as writing out each individual rst file.
 def generate_docs(doctype):
     index_top_dev = """.. _source_documentation_dev:
 
@@ -37,27 +39,26 @@ OpenMDAO User Source Documentation
 
 """
 
-    if(doctype == "dev"):
+    if(doctype == "usr"):
         ref_sheet_bottom = """
    :members:
    :undoc-members:
-   :private-members:
    :special-members: __init__, __contains__, __iter__, __setitem__, __getitem__
    :show-inheritance:
    :inherited-members:
-   :noindex:
 
 .. toctree::
    :maxdepth: 1
 """
-    else:
+    elif(doctype == "dev"):
         ref_sheet_bottom = """
    :members:
+   :show-inheritance:
+   :private-members:
    :special-members: __init__, __contains__, __iter__, __setitem__, __getitem__
-   :noindex:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 """
 
     # need to set up the srcdocs directory structure, relative to docs.
@@ -75,12 +76,12 @@ OpenMDAO User Source Documentation
     # those directories will be the openmdao packages
     # auto-generate the top-level index.rst file for srcdocs, based on
     # openmdao packages:
-    IGNORE_LIST = ['docs', 'tests', 'devtools', '__pycache__', 'code_review']
+    IGNORE_LIST = ['docs', 'tests', 'devtools', '__pycache__', 'code_review', 'test_suite' ]
     # to improve the order that the user sees in the source docs, put
     # the important packages in this list explicitly. Any new ones that
     # get added will show up at the end.
-    packages = ['assemblers','core', 'drivers', 'jacobians', 'solvers',
-                'proc_allocators', 'vectors']
+    packages = ['assemblers','core', 'components', 'drivers', 'jacobians', 'matrices', 'solvers',
+                'proc_allocators', 'utils', 'vectors']
     # Everything in dir that isn't discarded is appended as a source package.
     for listing in os.listdir(os.path.join(dir, "..")):
         if os.path.isdir(os.path.join("..", listing)):
@@ -163,6 +164,7 @@ OpenMDAO User Source Documentation
     index.close()
 
 #generate docs, with private members, or without, based on doctype.
+#type is passed in from the Makefile via the -t tags argument to sphinxbuild
 if tags.has("dev"):
     doctype = "dev"
 if tags.has("usr"):
@@ -291,15 +293,102 @@ SphinxDocString._parse = _parse
 SphinxDocString.__str__ = __str__
 #--------------end monkeypatch---------------------
 
+#--------------begin sphinx extension---------------------
+#a short sphinx extension to take care of hyperlinking in docs
+# where a syntax of <linktext> is employed.
+import pkgutil, inspect
 
+#first, we will need a dict that contains full pathnames to every class.
+#we construct that here, once, then use it for lookups in om_process_docstring
+package=openmdao
+om_classes = {}
+for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
+                                                      prefix=package.__name__+'.',
+                                                      onerror=lambda x: None):
+    if not ispkg:
+        if 'docs' not in modname:
+            module = importer.find_module(modname).load_module(modname)
+            for classname, class_object in inspect.getmembers(module, inspect.isclass):
+                if class_object.__module__.startswith("openmdao"):
+                    om_classes[classname] = class_object.__module__ + "." + classname
+
+#this is used to go get a docstring from a base class.
+def get_first_documented_method(method):
+    method_name = method.__name__
+    import types
+    for cls in method.im_class.__mro__[1:]: # skip the first one since it is the class itself
+        if cls.__name__ != 'object':
+            inherited_method = getattr(cls, method_name)
+            inherited_doc = inherited_method.__doc__
+            if inherited_doc:
+                return inherited_doc.splitlines()
+    return ''
+
+def om_process_docstring(app, what, name, obj, options, lines):
+    import re
+
+    if what == 'method':
+        if len(lines) == 0:
+            new_lines = get_first_documented_method(obj)
+            lines.extend(new_lines)
+    # loop through each line in the docstring
+    for i in xrange(len(lines)):
+        #create a regex pattern to match <linktext>
+        pat = r'(<.*?>)'
+        #find all matches of the pattern in a line
+        match = re.findall(pat, lines[i])
+        if match:
+            for ma in match:
+                #strip off the angle brackets `<>`
+                m = ma[1:-1]
+                #if there's a dot in the pattern, it's a method
+                # e.g. <classname.method_name>
+                if '.' in m:
+                    #need to grab the class name and method name separately
+                    split_match = m.split('.')
+                    justclass = split_match[0] #class
+                    justmeth =  split_match[1] #method
+                    if justclass in om_classes:
+                        classfullpath = om_classes[justclass]
+                        #construct a link  :meth:`class.method <openmdao.core.class.method>`
+                        link =  ":meth:`" + m + " <" + classfullpath + "." + justmeth + ">`"
+                        #replace the <link> text with the constructed line.
+                        lines[i] = lines[i].replace(ma, link)
+                    else:
+                        #the class isn't in the class table!
+                        print( "WARNING: {} not found in dictionary of OpenMDAO methods".format(justclass) )
+                        #replace instances of <class> with just class in docstring (strip angle brackets)
+                        lines[i] = lines[i].replace(ma, m)
+                #otherwise, it's a class
+                else:
+                    if m in om_classes:
+                        classfullpath = om_classes[m]
+                        lines[i] = lines[i].replace(ma, ":class:`~"+classfullpath+"`")
+                    else:
+                        #the class isn't in the class table!
+                        print( "WARNING: {} not found in dictionary of OpenMDAO classes".format(m) )
+                        #replace instances of <class> with class in docstring (strip angle brackets)
+                        lines[i] = lines[i].replace(ma, m)
+#This is the crux of the extension--connecting an internal
+#Sphinx event with our own custom function.
+def setup(app):
+    app.connect('autodoc-process-docstring', om_process_docstring)
+
+#--------------end sphinx extension---------------------
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('.'))
-absp = os.path.join('..', 'srcdocs')
-sys.path.insert(0, os.path.abspath(absp))
+
+if (type == "usr"):
+    absp = os.path.join('.', 'srcdocs', 'usr')
+    sys.path.insert(0, os.path.abspath(absp))
+elif (type == "dev"):
+    absp = os.path.join('.', 'srcdocs', 'dev')
+    sys.path.insert(0, os.path.abspath(absp))
+
 
 # -- General configuration ------------------------------------------------
 
@@ -359,7 +448,11 @@ language = None
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+if tags.has("usr"):
+    exclude_patterns = ['_build', 'srcdocs/dev']
+
+if tags.has("dev"):
+    exclude_patterns = ['_build', 'srcdocs/usr']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'

@@ -10,10 +10,10 @@ class Vector(object):
 
     This class is instantiated for inputs, outputs, and residuals.
     It provides a dictionary interface and an arithmetic operations interface.
-
     Implementations:
-        DefaultVector
-        PETScVector
+
+    - <DefaultVector>
+    - <PETScVector>
 
     Attributes
     ----------
@@ -41,6 +41,8 @@ class Vector(object):
         list of the actual allocated data (depends on implementation).
     _indices : list
         list of indices mapping the varset-grouped data to the global vector.
+    _ivar_map : list[nvar_set] of int ndarray[size]
+        list of index arrays mapping each entry to its variable index.
     """
 
     def __init__(self, name, typ, system, global_vector=None):
@@ -52,9 +54,9 @@ class Vector(object):
             right-hand-side (RHS) name.
         typ : str
             'input' for input vectors; 'output' for output/residual vectors.
-        system : System
+        system : <System>
             pointer to the owning system.
-        global_vector : Vector
+        global_vector : <Vector>
             pointer to the vector owned by the root system.
         """
         self._name = name
@@ -75,6 +77,7 @@ class Vector(object):
         self._global_vector = None
         self._data = []
         self._indices = []
+        self._ivar_map = []
         if global_vector is None:
             self._global_vector = self
         else:
@@ -88,12 +91,12 @@ class Vector(object):
 
         Args
         ----
-        system : System
+        system : <System>
             system for the subvector that is a subsystem of self._system.
 
         Returns
         -------
-        Vector
+        <Vector>
             subvector instance.
         """
         return self.__class__(self._name, self._typ, system,
@@ -104,13 +107,66 @@ class Vector(object):
 
         Returns
         -------
-        Vector
+        <Vector>
             instance of the clone; the data is copied.
         """
         vec = self.__class__(self._name, self._typ, self._system,
                              self._global_vector)
         vec._clone_data()
         return vec
+
+    def _compute_ivar_map(self, ivar_map=None):
+        """Compute the ivar_map.
+
+        The ivar_map index vector is the same length as data and indices,
+        and it yields the index of the local variable.
+
+        Args
+        ----
+        ivar_map : list or None
+            if not None, we can just set the attribute to this arg.
+        """
+        if ivar_map is not None:
+            self._ivar_map = ivar_map
+            return
+
+        variable_sizes = self._assembler._variable_sizes[self._typ]
+        variable_set_indices = self._assembler._variable_set_indices[self._typ]
+
+        ind1, ind2 = self._system._variable_allprocs_range[self._typ]
+        sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
+
+        variable_indices = self._system._variable_myproc_indices[self._typ]
+
+        # Create the index arrays for each var_set for ivar_map.
+        # Also store the starting points in the data/index vector.
+        ivar_map = []
+        ind1_list = []
+        for iset in range(len(variable_sizes)):
+            bool_vector = sub_variable_set_indices[:, 0] == iset
+            data_inds = sub_variable_set_indices[bool_vector, 1]
+            if len(data_inds) > 0:
+                sizes_array = variable_sizes[iset]
+                ind1 = numpy.sum(sizes_array[self._iproc, :data_inds[0]])
+                ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
+                ivar_map.append(numpy.empty(ind2 - ind1, int))
+                ind1_list.append(ind1)
+            else:
+                ivar_map.append(numpy.zeros(0, int))
+                ind1_list.append(0)
+
+        # Populate ivar_map by looping over local variables in the system.
+        for ind in range(len(variable_indices)):
+            ivar_all = variable_indices[ind]
+            iset, ivar = variable_set_indices[ivar_all, :]
+            sizes_array = variable_sizes[iset]
+            ind1 = numpy.sum(sizes_array[self._iproc, :ivar]) - \
+                ind1_list[iset]
+            ind2 = numpy.sum(sizes_array[self._iproc, :ivar + 1]) - \
+                ind1_list[iset]
+            ivar_map[iset][ind1:ind2] = ind
+
+        self._ivar_map = ivar_map
 
     def get_data(self, array=None):
         """Get the array combining the data of all the varsets.
@@ -209,7 +265,7 @@ class Vector(object):
         key : str
             variable name in the owning system's namespace.
         value : float or list or tuple or ndarray
-            variable value to set (not scaled, not dimensionless).
+            variable value to set (not scaled, not dimensionless)
         """
         if key in self._names:
             self._views[key][:] = value
@@ -222,11 +278,12 @@ class Vector(object):
         Must be implemented by the subclass.
 
         Sets the following attributes:
-            _data
+
+        - _data
 
         Args
         ----
-        global_vector : Vector or None
+        global_vector : <Vector> or None
             the root's vector instance or None, if we are at the root.
         """
         pass
@@ -237,9 +294,11 @@ class Vector(object):
         Must be implemented by the subclass.
 
         Sets the following attributes:
-            _views
-            _views_flat
-            _idxs
+
+        - _views
+        - _views_flat
+        - _idxs
+
         """
         pass
 
@@ -257,7 +316,7 @@ class Vector(object):
 
         Args
         ----
-        vec : Vector
+        vec : <Vector>
             vector to add to self.
         """
         pass
@@ -269,7 +328,7 @@ class Vector(object):
 
         Args
         ----
-        vec : Vector
+        vec : <Vector>
             vector to subtract from self.
         """
         pass
@@ -295,7 +354,7 @@ class Vector(object):
         ----
         val : int or float
             scalar.
-        vec : Vector
+        vec : <Vector>
             this vector times val is added to self.
         """
         pass
@@ -307,7 +366,7 @@ class Vector(object):
 
         Args
         ----
-        vec : Vector
+        vec : <Vector>
             the vector whose values self is set to.
         """
         pass
@@ -336,13 +395,26 @@ class Vector(object):
         """
         pass
 
+    def change_scaling_state(self, c0, c1):
+        """Change the scaling state.
+
+        Args
+        ----
+        c0 : int ndarray[nvar_myproc]
+            0th order coefficients for scaling/unscaling.
+        c1 : int ndarray[nvar_myproc]
+            1st order coefficients for scaling/unscaling.
+        """
+        pass
+
 
 class Transfer(object):
     """Base Transfer class.
 
     Implementations:
-        DefaultTransfer
-        PETScTransfer
+
+    - <DefaultTransfer>
+    - <PETScTransfer>
 
     Attributes
     ----------
@@ -363,15 +435,15 @@ class Transfer(object):
 
         Args
         ----
-        ip_vec : Vector
+        ip_vec : <Vector>
             pointer to the input vector.
-        op_vec : Vector
+        op_vec : <Vector>
             pointer to the output vector.
         ip_inds : int ndarray
             input indices for the transfer.
         op_inds : int ndarray
             output indices for the transfer.
-        comm : MPI.Comm or FakeComm
+        comm : MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
         """
         self._ip_vec = ip_vec
@@ -396,9 +468,9 @@ class Transfer(object):
 
         Args
         ----
-        ip_vec : Vector
+        ip_vec : <Vector>
             pointer to the input vector.
-        op_vec : Vector
+        op_vec : <Vector>
             pointer to the output vector.
         mode : str
             'fwd' or 'rev'.

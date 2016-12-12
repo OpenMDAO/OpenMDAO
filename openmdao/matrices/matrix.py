@@ -10,8 +10,8 @@ class Matrix(object):
 
     Attributes
     ----------
-    _comm : MPI.Comm or FakeComm
-        communicator of the top-level system that owns the Jacobian.
+    _comm : MPI.Comm or <FakeComm>
+        communicator of the top-level system that owns the <Jacobian>.
     _matrix : object
         implementation-specific representation of the actual matrix.
     _op_submats : dict
@@ -29,8 +29,8 @@ class Matrix(object):
 
         Args
         ----
-        comm : MPI.Comm or FakeComm
-            communicator of the top-level system that owns the Jacobian.
+        comm : MPI.Comm or <FakeComm>
+            communicator of the top-level system that owns the <Jacobian>.
         """
         self._comm = comm
         self._matrix = None
@@ -80,10 +80,9 @@ class Matrix(object):
             in_vec[:row_range[0]] = 0.
             in_vec[row_range[1]:] = 0.
 
-        out_vec = self._prod(in_vec, 'rev')
-        return out_vec
+        return self._prod(in_vec, 'rev')
 
-    def _op_add_submat(self, key, jac, irow=0, icol=0):
+    def _op_add_submat(self, key, jac, irow, icol):
         """Declare a sub-jacobian.
 
         Args
@@ -99,7 +98,7 @@ class Matrix(object):
         """
         self._op_submats[key] = (jac, irow, icol)
 
-    def _ip_add_submat(self, key, jac, irow=0, icol=0):
+    def _ip_add_submat(self, key, jac, irow, icol):
         """Declare a sub-jacobian.
 
         Args

@@ -3,7 +3,6 @@ from __future__ import division, print_function
 import numpy
 import scipy.sparse
 
-from six import iteritems
 from six.moves import range
 
 from openmdao.api import ImplicitComponent

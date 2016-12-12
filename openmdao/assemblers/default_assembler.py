@@ -8,11 +8,38 @@ from openmdao.assemblers.assembler import Assembler
 
 
 class DefaultAssembler(Assembler):
-    """Default Assembler implementation."""
+    """Default <Assembler> implementation."""
 
     def _compute_transfers(self, nsub_allprocs, var_range,
                            subsystems_myproc, subsystems_inds):
-        """See openmdao.assemblers.assembler.Assembler."""
+        """Compute the transfer indices.
+
+        Args
+        ----
+        nsub_allprocs : int
+            number of subsystems on all procs.
+        var_range : [int, int]
+            variable index range for the current system.
+        subsystems_myproc : [System, ...]
+            list of subsystems on my proc.
+        subsystems_inds : [int, ...]
+            list of indices of subsystems on this proc among all subsystems.
+
+        Returns
+        -------
+        xfer_ip_inds : dict of int ndarray[:]
+            input indices of global transfer.
+        xfer_op_inds : dict of int ndarray[:]
+            output indices of global transfer.
+        fwd_xfer_ip_inds : [dict of int ndarray[:], ...]
+            list of input indices of forward transfers.
+        fwd_xfer_op_inds : [dict of int ndarray[:], ...]
+            list of output indices of forward transfers.
+        rev_xfer_ip_inds : [dict of int ndarray[:], ...]
+            list of input indices of reverse transfers.
+        rev_xfer_op_inds : [dict of int ndarray[:], ...]
+            list of output indices of reverse transfers.
+        """
         ip_set_indices = self._variable_set_indices['input']
         op_set_indices = self._variable_set_indices['output']
 

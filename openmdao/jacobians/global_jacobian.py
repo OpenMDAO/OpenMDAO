@@ -9,10 +9,10 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 
 
 class GlobalJacobian(Jacobian):
-    """Assemble dense global Jacobian."""
+    """Assemble dense global <Jacobian>."""
 
     def _get_var_range(self, ivar_all, typ):
-        """Look up the variable name and Jacobian index range.
+        """Look up the variable name and <Jacobian> index range.
 
         Args
         ----
@@ -38,22 +38,25 @@ class GlobalJacobian(Jacobian):
         return ind1, ind2
 
     def _initialize(self):
-        """See openmdao.jacobians.jacobian.Jacobian."""
+        """Allocate the global matrices."""
         indices = self._system._variable_myproc_indices
         ivar1, ivar2 = self._system._variable_allprocs_range['output']
 
         self.options.declare('Matrix', value=DenseMatrix,
-                             desc='Matrix class to use in this Jacobian.')
+                             desc='<Matrix> class to use in this <Jacobian>.')
         self._int_mtx = self.options['Matrix'](self._system.comm)
         self._ext_mtx = self.options['Matrix'](self._system.comm)
 
-        for re_ind in range(len(indices['output'])):
-            re_var_all = indices['output'][re_ind]
-            re_offset = self._get_var_range(re_var_all, 'output')[0]
+        out_offsets = {i: self._get_var_range(i, 'output')[0]
+                       for i in indices['output']}
+        in_offsets = {i: self._get_var_range(i, 'input')[0]
+                      for i in indices['input']}
 
-            for op_ind in range(len(indices['output'])):
-                op_var_all = indices['output'][op_ind]
-                op_offset = self._get_var_range(op_var_all, 'output')[0]
+        for re_var_all in indices['output']:
+            re_offset = out_offsets[re_var_all]
+
+            for op_var_all in indices['output']:
+                op_offset = out_offsets[op_var_all]
 
                 key = (re_var_all, op_var_all)
                 if key in self._op_dict:
@@ -63,16 +66,15 @@ class GlobalJacobian(Jacobian):
                         key, jac, re_offset, op_offset)
 
             # TODO: make this use the input indices
-            for ip_ind in range(len(indices['input'])):
-                ip_var_all = indices['input'][ip_ind]
-                ip_offset = self._get_var_range(ip_var_all, 'input')[0]
+            for ip_var_all in indices['input']:
+                ip_offset = in_offsets[ip_var_all]
 
                 key = (re_var_all, ip_var_all)
                 if key in self._ip_dict:
                     jac = self._ip_dict[key]
 
                     op_var_all = self._assembler._input_var_ids[ip_var_all]
-                    op_offset = self._get_var_range(op_var_all, 'output')[0]
+                    op_offset = out_offsets[op_var_all]
                     if ivar1 <= op_var_all < ivar2:
                         self._int_mtx._ip_add_submat(
                             key, jac, re_offset, op_offset)
@@ -92,42 +94,42 @@ class GlobalJacobian(Jacobian):
         self._ext_mtx._build(op_size, ip_size)
 
     def _update(self):
-        """See openmdao.jacobians.jacobian.Jacobian."""
+        """Read the user's sub-Jacobians and set into the global matrix."""
         indices = self._system._variable_myproc_indices
         ivar1, ivar2 = self._system._variable_allprocs_range['output']
 
-        for re_ind in range(len(indices['output'])):
-            re_var_all = indices['output'][re_ind]
-            re_offset = self._get_var_range(re_var_all, 'output')[0]
-
-            for op_ind in range(len(indices['output'])):
-                op_var_all = indices['output'][op_ind]
-                op_offset = self._get_var_range(op_var_all, 'output')[0]
-
+        for re_var_all in indices['output']:
+            for op_var_all in indices['output']:
                 key = (re_var_all, op_var_all)
                 if key in self._op_dict:
-                    jac = self._op_dict[key]
-
-                    self._int_mtx._op_update_submat(key, jac)
+                    self._int_mtx._op_update_submat(key, self._op_dict[key])
 
             # TODO: make this use the input indices
-            for ip_ind in range(len(indices['input'])):
-                ip_var_all = indices['input'][ip_ind]
-                ip_offset = self._get_var_range(ip_var_all, 'input')[0]
-
+            for ip_var_all in indices['input']:
                 key = (re_var_all, ip_var_all)
                 if key in self._ip_dict:
-                    jac = self._ip_dict[key]
-
                     op_var_all = self._assembler._input_var_ids[ip_var_all]
-                    op_offset = self._get_var_range(op_var_all, 'output')[0]
                     if ivar1 <= op_var_all < ivar2:
-                        self._int_mtx._ip_update_submat(key, jac)
+                        self._int_mtx._ip_update_submat(key,
+                                                        self._ip_dict[key])
                     else:
-                        self._ext_mtx._ip_update_submat(key, jac)
+                        self._ext_mtx._ip_update_submat(key,
+                                                        self._ip_dict[key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
-        """See openmdao.jacobians.jacobian.Jacobian."""
+        """Compute matrix-vector product.
+
+        Args
+        ----
+        d_inputs : Vector
+            inputs linear vector.
+        d_outputs : Vector
+            outputs linear vector.
+        d_residuals : Vector
+            residuals linear vector.
+        mode : str
+            'fwd' or 'rev'.
+        """
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx
 

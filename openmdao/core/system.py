@@ -12,12 +12,13 @@ from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.units import conversion_to_base_units, convert_units
 
 
 class System(object):
     """Base class for all systems in OpenMDAO.
 
-    Never instantiated; subclassed by Group or Component.
+    Never instantiated; subclassed by <Group> or <Component>.
     All subclasses have their attributes defined here.
 
     Attributes
@@ -26,42 +27,36 @@ class System(object):
         name of the system, must be different from siblings.
     path_name : str
         global name of the system, including the path.
-    comm : MPI.Comm or FakeComm
+    comm : MPI.Comm or <FakeComm>
         MPI communicator object.
-    metadata : GeneralizedDictionary
+    metadata : <GeneralizedDictionary>
         dictionary of user-defined arguments.
-
     _sys_depth : int
         distance from the root node in the hierarchy tree.
-    _sys_assembler: Assembler
+    _sys_assembler : <Assembler>
         pointer to the global assembler object.
-
-    _mpi_proc_allocator : ProcAllocator
+    _mpi_proc_allocator : <ProcAllocator>
         object that distributes procs among subsystems.
     _mpi_proc_range : [int, int]
         indices of procs owned by comm with respect to COMM_WORLD.
-
-    _subsystems_allprocs : [System, ...]
+    _subsystems_allprocs : [<System>, ...]
         list of all subsystems (children of this system).
-    _subsystems_myproc : [System, ...]
+    _subsystems_myproc : [<System>, ...]
         list of local subsystems that exist on this proc.
     _subsystems_inds : [int, ...]
         list of indices of subsystems on this proc among all subsystems.
-
     _variable_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
         list of names of all owned variables, not just on current proc.
     _variable_allprocs_range : {'input': [int, int], 'output': [int, int]}
         index range of owned variables with respect to all problem variables.
     _variable_allprocs_indices : {'input': dict, 'output': dict}
         dictionary of global indices keyed by the variable name.
-
     _variable_myproc_names : {'input': [str, ...], 'output': [str, ...]}
         list of names of owned variables on current proc.
     _variable_myproc_metadata : {'input': list, 'output': list}
         list of metadata dictionaries of variables that exist on this proc.
     _variable_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
         integer arrays of global indices of variables on this proc.
-
     _variable_maps : {'input': dict, 'output': dict}
         dictionary of variable names and their aliases (for promotes/renames).
     _variable_promotes : { 'any': set(), 'input': set(), 'output': set() }
@@ -70,35 +65,34 @@ class System(object):
     _variable_renames : { 'input': {}, 'output': {} }
         dictionary of mappings used to specify variables to be renamed in the
         parent group. (used to calculate _variable_maps)
-
     _variable_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
     _variable_connections_indices : [(int, int), ...]
         _variable_connections with variable indices instead of names.  Entries
         have the form (input_index, output_index).
-
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         dict of vector objects.
     _vector_transfers : dict
         dict of transfer objects.
     _vector_var_ids : dict
         dictionary of index arrays of relevant variables for this vector
-
-    _inputs : Vector
+    _scaling_to_norm : dict of ndarray
+        coefficients to convert vectors to normalized values.
+    _scaling_to_phys : dict of ndarray
+        coefficients to convert vectors to physical values.
+    _inputs : <Vector>
         inputs vector; points to _vectors['input'][None].
-    _outputs : Vector
+    _outputs : <Vector>
         outputs vector; points to _vectors['output'][None].
-    _residuals : Vector
+    _residuals : <Vector>
         residuals vector; points to _vectors['residual'][None].
-    _transfers : dict of Transfer
+    _transfers : dict of <Transfer>
         transfer object; points to _vector_transfers[None].
-
-    _jacobian : Jacobian
-        global Jacobian object to be used in apply_linear
-
-    _nl_solver : NonlinearSolver
+    _jacobian : <Jacobian>
+        global <Jacobian> object to be used in apply_linear
+    _nl_solver : <NonlinearSolver>
         nonlinear solver to be used for solve_nonlinear.
-    _ln_solver : LinearSolver
+    _ln_solver : <LinearSolver>
         linear solver to be used for solve_linear; not the Newton system.
     _suppress_solver_output : boolean
         global overriding flag that turns off all solver output if 'False'.
@@ -149,6 +143,11 @@ class System(object):
         self._vector_transfers = {}
         self._vector_var_ids = {}
 
+        self._scaling_to_norm = {
+            'input': None, 'output': None, 'residual': None}
+        self._scaling_to_phys = {
+            'input': None, 'output': None, 'residual': None}
+
         self._inputs = None
         self._outputs = None
         self._residuals = None
@@ -179,7 +178,7 @@ class System(object):
         ----
         path : str
             parent names to prepend to name to get the pathname
-        comm : MPI.Comm or FakeComm
+        comm : MPI.Comm or <FakeComm>
             communicator for this system (already split, if applicable).
         global_dict : dict
             dictionary with kwargs of all parents assembled in it.
@@ -332,11 +331,11 @@ class System(object):
     def _setup_connections(self):
         """Recursively assemble a list of input-output connections.
 
-        Overridden in Group.
+        Overridden in <Group>.
         """
         pass
 
-    def _setup_vector(self, vectors, vector_var_ids):
+    def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
         """Add this vector and assign sub_vectors to subsystems.
 
         Sets the following attributes:
@@ -355,12 +354,19 @@ class System(object):
             Vector objects corresponding to 'name'.
         vector_var_ids : ndarray[:]
             integer array of all relevant variables for this vector.
+        use_ref_vector : bool
+            if True, allocate vectors to store ref. values.
         """
         vec_name = vectors['output']._name
 
         # Set the incoming _vectors in the appropriate attribute
         for key in ['input', 'output', 'residual']:
             self._vectors[key][vec_name] = vectors[key]
+
+        if use_ref_vector:
+            vectors['input']._compute_ivar_map()
+            vectors['output']._compute_ivar_map()
+            vectors['residual']._compute_ivar_map(vectors['output']._ivar_map)
 
         # Compute the transfer for this vector set
         self._vector_transfers[vec_name] = self._get_transfers(vectors)
@@ -382,7 +388,57 @@ class System(object):
             for key in ['input', 'output', 'residual']:
                 sub_vectors[key] = vectors[key]._create_subvector(subsys)
 
-            subsys._setup_vector(sub_vectors, vector_var_ids)
+            subsys._setup_vector(sub_vectors, vector_var_ids, use_ref_vector)
+
+    def _setup_scaling(self):
+        """Set up scaling vectors."""
+        nvar_in = len(self._variable_myproc_metadata['input'])
+        nvar_out = len(self._variable_myproc_metadata['output'])
+
+        # Initialize scaling arrays
+        for scaling in [self._scaling_to_norm, self._scaling_to_phys]:
+            scaling['input'] = numpy.empty((nvar_in, 2))
+            scaling['output'] = numpy.empty((nvar_out, 2))
+            scaling['residual'] = numpy.empty((nvar_out, 2))
+
+        # ref0 and ref are the values of the variable in the specified
+        # units at which the scaled values are 0 and 1, respectively
+
+        # Scaling coefficients from the src output
+        src_units = self._sys_assembler._src_units
+        src_0 = self._sys_assembler._src_scaling_0
+        src_1 = self._sys_assembler._src_scaling_1
+
+        # Compute scaling arrays for inputs using a0 and a1
+        for ind, meta in enumerate(self._variable_myproc_metadata['input']):
+            self._scaling_to_phys['input'][ind, 0] = \
+                convert_units(src_0[ind], src_units[ind], meta['units'])
+            self._scaling_to_phys['input'][ind, 1] = \
+                convert_units(src_1[ind], src_units[ind], meta['units'])
+
+        # Compute scaling arrays for outputs; no unit conversion needed
+        for ind, meta in enumerate(self._variable_myproc_metadata['output']):
+            self._scaling_to_phys['output'][ind, 0] = meta['ref0']
+            self._scaling_to_phys['output'][ind, 1] = \
+                meta['ref'] - meta['ref0']
+
+        # Compute scaling arrays for outputs; convert units
+        for ind, meta in enumerate(self._variable_myproc_metadata['output']):
+            self._scaling_to_phys['residual'][ind, 0] = \
+                convert_units(meta['ref0'], meta['units'], meta['res_units'])
+            self._scaling_to_phys['residual'][ind, 1] = \
+                convert_units(meta['ref'] - meta['ref0'],
+                              meta['units'], meta['res_units'])
+
+        # Compute inverse scaling arrays
+        for key in ['input', 'output', 'residual']:
+            a = self._scaling_to_phys[key][:, 0]
+            b = self._scaling_to_phys[key][:, 1]
+            self._scaling_to_norm[key][:, 0] = -a / b
+            self._scaling_to_norm[key][:, 1] = 1.0 / b
+
+        for subsys in self._subsystems_myproc:
+            subsys._setup_scaling()
 
     def _get_transfers(self, vectors):
         """Compute transfers.
@@ -390,11 +446,11 @@ class System(object):
         Args
         ----
         vectors : {'input': Vector, 'output': Vector, 'residual': Vector}
-            dictionary of Vector objects
+            dictionary of <Vector> objects
 
         Returns
         -------
-        dict of Transfer
+        dict of <Transfer>
             dictionary of full and partial Transfer objects.
         """
         Transfer = vectors['output'].TRANSFER
@@ -440,6 +496,12 @@ class System(object):
         ----
         typ : str
             Either 'input' or 'output'.
+
+        Returns
+        -------
+        dict of {str:str, ...}
+            dictionary mapping input/output variable names
+            to promoted or renamed variable names.
         """
         maps = {}
 
@@ -486,6 +548,27 @@ class System(object):
         For the given vec_name, return vectors that use a set of
         internal variables that are relevant to the current matrix-vector
         product.
+
+        Args
+        ----
+        vec_name : str
+            Name of the vector to use.
+        var_inds : [int, int, int, int] or None
+            ranges of variable IDs involved in this matrix-vector product.
+            The ordering is [lb1, ub1, lb2, ub2].
+        mode : str
+            Key for specifying derivative direction. Values are 'fwd'
+            or 'rev'.
+        clear : bool(True)
+            If True, zero out residuals (in fwd mode) or inputs and outputs
+            (in rev mode).
+
+        Returns
+        -------
+        (d_inputs, d_outputs, d_residuals) : tuple of Vectors
+            Yields the three Vectors configured internally to deal only
+            with variables relevant to the current matrix vector product.
+
         """
         d_inputs = self._vectors['input'][vec_name]
         d_outputs = self._vectors['output'][vec_name]
@@ -604,8 +687,8 @@ class System(object):
 
         Args
         ----
-        jacobian : Jacobian or None
-            Global jacobian to be set; if None, reset to DefaultJacobian.
+        jacobian : <Jacobian> or None
+            Global jacobian to be set; if None, reset to <DefaultJacobian>.
         is_top : boolean
             whether this is the top; i.e., start of the recursion.
         """
