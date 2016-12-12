@@ -104,6 +104,8 @@ class CooMatrix(Matrix):
                         rows[ind1:ind2] = irows
                         cols[ind1:ind2] = icols
 
+                # store reverse indices to avoid copying subjac data during
+                # update_submat.
                 if (metadata is self._ip_metadata and not isinstance(idxs,
                                                                      slice)):
                     metadata[key] = numpy.argsort(idxs) + ind1
