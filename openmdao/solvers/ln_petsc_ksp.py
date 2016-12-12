@@ -272,7 +272,7 @@ class PetscKSP(LinearSolver):
         in_vec : PETSc.Vector
             Incoming vector
         result : PETSc.Vector
-            Empty vector into which we return the preconditioned in_vec
+            Empty vector in which the preconditioned in_vec is stored.
         """
         if self._precon:
             system = self._system
@@ -310,6 +310,11 @@ class PetscKSP(LinearSolver):
             Parent `System` object.
         vec_name : string
             name of vector.
+
+        Returns
+        -------
+        KSP
+            the KSP solver instance.
         """
         # use cached instance if available
         if vec_name in self._ksp:

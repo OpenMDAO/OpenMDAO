@@ -76,12 +76,12 @@ OpenMDAO User Source Documentation
     # those directories will be the openmdao packages
     # auto-generate the top-level index.rst file for srcdocs, based on
     # openmdao packages:
-    IGNORE_LIST = ['docs', 'tests', 'devtools', '__pycache__', 'code_review']
+    IGNORE_LIST = ['docs', 'tests', 'devtools', '__pycache__', 'code_review', 'test_suite' ]
     # to improve the order that the user sees in the source docs, put
     # the important packages in this list explicitly. Any new ones that
     # get added will show up at the end.
-    packages = ['assemblers','core', 'drivers', 'jacobians', 'solvers',
-                'proc_allocators', 'vectors']
+    packages = ['assemblers','core', 'components', 'drivers', 'jacobians', 'matrices', 'solvers',
+                'proc_allocators', 'utils', 'vectors']
     # Everything in dir that isn't discarded is appended as a source package.
     for listing in os.listdir(os.path.join(dir, "..")):
         if os.path.isdir(os.path.join("..", listing)):
@@ -303,7 +303,8 @@ import pkgutil, inspect
 package=openmdao
 om_classes = {}
 for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
-                                                      prefix=package.__name__+'.',                                                      onerror=lambda x: None):
+                                                      prefix=package.__name__+'.',
+                                                      onerror=lambda x: None):
     if not ispkg:
         if 'docs' not in modname:
             module = importer.find_module(modname).load_module(modname)
@@ -332,7 +333,6 @@ def om_process_docstring(app, what, name, obj, options, lines):
             lines.extend(new_lines)
     # loop through each line in the docstring
     for i in xrange(len(lines)):
-        s = lines[i]
         #create a regex pattern to match <linktext>
         pat = r'(<.*?>)'
         #find all matches of the pattern in a line
@@ -346,23 +346,34 @@ def om_process_docstring(app, what, name, obj, options, lines):
                 if '.' in m:
                     #need to grab the class name and method name separately
                     split_match = m.split('.')
-                    justclass = split_match[0]
-                    justmeth =  split_match[1]
-                    classfullpath = om_classes[justclass]
-                    #construct a link  :meth:`class.method <openmdao.core.class.method>`
-                    line =  ":meth:`" + m + " <" + classfullpath + "." + justmeth + ">`"
-                    #replace the <link> text with the constructed line.
-                    lines[i] = lines[i].replace(ma, line)
+                    justclass = split_match[0] #class
+                    justmeth =  split_match[1] #method
+                    if justclass in om_classes:
+                        classfullpath = om_classes[justclass]
+                        #construct a link  :meth:`class.method <openmdao.core.class.method>`
+                        link =  ":meth:`" + m + " <" + classfullpath + "." + justmeth + ">`"
+                        #replace the <link> text with the constructed line.
+                        lines[i] = lines[i].replace(ma, link)
+                    else:
+                        #the class isn't in the class table!
+                        print( "WARNING: {} not found in dictionary of OpenMDAO methods".format(justclass) )
+                        #replace instances of <class> with just class in docstring (strip angle brackets)
+                        lines[i] = lines[i].replace(ma, m)
                 #otherwise, it's a class
                 else:
-                    classfullpath = om_classes[m]
-                    lines[i] = lines[i].replace(ma, ":class:`~"+classfullpath+"`")
-                    print lines[i]
-
+                    if m in om_classes:
+                        classfullpath = om_classes[m]
+                        lines[i] = lines[i].replace(ma, ":class:`~"+classfullpath+"`")
+                    else:
+                        #the class isn't in the class table!
+                        print( "WARNING: {} not found in dictionary of OpenMDAO classes".format(m) )
+                        #replace instances of <class> with class in docstring (strip angle brackets)
+                        lines[i] = lines[i].replace(ma, m)
 #This is the crux of the extension--connecting an internal
 #Sphinx event with our own custom function.
 def setup(app):
     app.connect('autodoc-process-docstring', om_process_docstring)
+
 #--------------end sphinx extension---------------------
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -370,8 +381,7 @@ def setup(app):
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('.'))
-#absp = os.path.join('.', 'srcdocs')
-#sys.path.insert(0, os.path.abspath(absp))
+
 if (type == "usr"):
     absp = os.path.join('.', 'srcdocs', 'usr')
     sys.path.insert(0, os.path.abspath(absp))

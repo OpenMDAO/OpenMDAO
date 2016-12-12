@@ -14,7 +14,7 @@ class ProcAllocator(object):
     _parallel : boolean
         True means the comm is split across subsystems;
         False means the comm is passed to all subsystems.
-    options : GeneralizedDictionary
+    options : <GeneralizedDictionary>
         options dictionary.
     """
 
@@ -37,7 +37,7 @@ class ProcAllocator(object):
         ----
         nsub : int
             Number of subsystems.
-        comm : MPI.Comm or FakeComm
+        comm : MPI.Comm or <FakeComm>
             communicator of the owning system.
         proc_range : [int, int]
             global processor index range.
@@ -46,7 +46,7 @@ class ProcAllocator(object):
         -------
         isubs : [int, ...]
             indices of the owned local subsystems.
-        sub_comm : MPI.Comm or FakeComm
+        sub_comm : MPI.Comm or <FakeComm>
             communicator to pass to the subsystems.
         sub_proc_range : [int, int]
             global processor index range to pass to the subsystems.
@@ -68,7 +68,7 @@ class ProcAllocator(object):
         ----
         nsub : int
             Number of subsystems.
-        comm : MPI.Comm or FakeComm
+        comm : MPI.Comm or <FakeComm>
             communicator of the owning system.
         proc_range : [int, int]
             global processor index range.
@@ -77,7 +77,7 @@ class ProcAllocator(object):
         -------
         isubs : [int, ...]
             indices of the owned local subsystems.
-        sub_comm : MPI.Comm or FakeComm
+        sub_comm : MPI.Comm or <FakeComm>
             communicator to pass to the subsystems.
         sub_proc_range : [int, int]
             global processor index range to pass to the subsystems.
