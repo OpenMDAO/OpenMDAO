@@ -16,8 +16,6 @@ class DefaultTransfer(Transfer):
     def __call__(self, ip_vec, op_vec, mode='fwd'):
         """Perform transfer.
 
-        Must be implemented by the subclass.
-
         Args
         ----
         ip_vec : <Vector>
@@ -121,7 +119,6 @@ class DefaultVector(Vector):
     def _initialize_data(self, global_vector):
         """Internally allocate vectors.
 
-        Must be implemented by the subclass.
         Sets the following attributes:
 
         - _data
@@ -139,7 +136,6 @@ class DefaultVector(Vector):
     def _initialize_views(self):
         """Internally assemble views onto the vectors.
 
-        Must be implemented by the subclass.
         Sets the following attributes:
 
         - _views
@@ -184,10 +180,7 @@ class DefaultVector(Vector):
         self._idxs = idxs
 
     def _clone_data(self):
-        """For each item in _data, replace it with a copy of the data.
-
-        Must be implemented by the subclass.
-        """
+        """For each item in _data, replace it with a copy of the data."""
         for iset in range(len(self._data)):
             data = self._data[iset]
             self._data[iset] = numpy.array(data)
@@ -195,12 +188,15 @@ class DefaultVector(Vector):
     def __iadd__(self, vec):
         """Perform in-place vector addition.
 
-        Must be implemented by the subclass.
-
         Args
         ----
         vec : <Vector>
             vector to add to self.
+
+        Returns
+        -------
+        <Vector>
+            self + vec
         """
         for iset in range(len(self._data)):
             self._data[iset] += vec._data[iset]
@@ -209,12 +205,15 @@ class DefaultVector(Vector):
     def __isub__(self, vec):
         """Perform in-place vector substraction.
 
-        Must be implemented by the subclass.
-
         Args
         ----
         vec : <Vector>
             vector to subtract from self.
+
+        Returns
+        -------
+        <Vector>
+            self - vec
         """
         for iset in range(len(self._data)):
             self._data[iset] -= vec._data[iset]
@@ -223,12 +222,15 @@ class DefaultVector(Vector):
     def __imul__(self, val):
         """Perform in-place scalar multiplication.
 
-        Must be implemented by the subclass.
-
         Args
         ----
         val : int or float
             scalar to multiply self.
+
+        Returns
+        -------
+        <Vector>
+            self * val
         """
         for data in self._data:
             data *= val
@@ -236,8 +238,6 @@ class DefaultVector(Vector):
 
     def add_scal_vec(self, val, vec):
         """Perform in-place addition of a vector times a scalar.
-
-        Must be implemented by the subclass.
 
         Args
         ----
@@ -252,8 +252,6 @@ class DefaultVector(Vector):
     def set_vec(self, vec):
         """Set the value of this vector to that of the incoming vector.
 
-        Must be implemented by the subclass.
-
         Args
         ----
         vec : <Vector>
@@ -265,8 +263,6 @@ class DefaultVector(Vector):
     def set_const(self, val):
         """Set the value of this vector to a constant scalar value.
 
-        Must be implemented by the subclass.
-
         Args
         ----
         val : int or float
@@ -277,8 +273,6 @@ class DefaultVector(Vector):
 
     def get_norm(self):
         """Return the norm of this vector.
-
-        Must be implemented by the subclass.
 
         Returns
         -------
