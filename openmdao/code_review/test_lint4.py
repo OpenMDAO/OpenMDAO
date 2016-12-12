@@ -64,6 +64,9 @@ class LintReturnsTestCase(unittest.TestCase):
         # Regex to find any nested functions and match their names (will need whitespace trim)
         def_name_re = re.compile('(?<=\\bdef\\b)\\s+[_A-Za-z][_A-Za-z0-9]*')
 
+        # Count number of methods checked and print it out later
+        num_methods_checked = 0
+
         # Loop over directories
         for dir_name in directories:
             dirpath = os.path.join(topdir, dir_name)
@@ -96,9 +99,10 @@ class LintReturnsTestCase(unittest.TestCase):
 
                         # Loop over methods
                         methods = [x for x in dir(clss)
-                                   if( (inspect.isfunction(getattr(clss, x)) or inspect.ismethod(getattr(clss, x))) and x in clss.__dict__ )]
+                                   if(inspect.isroutine(getattr(clss, x)) and x in clss.__dict__ )]
                         for method_name in methods:
                             if print_info: print('   Method:', method_name)
+                            num_methods_checked += 1
                             method = getattr(clss, method_name)
 
                             method_doc = inspect.getdoc(method)
@@ -143,7 +147,7 @@ class LintReturnsTestCase(unittest.TestCase):
 
 
                             if(len(methodsrc_returnvar_matches) > 0 and len(methoddoc_matches) == 0):
-                                self.fail('%s/%s : Class %s : Method %s... method returns value(s) %s but no \'Returns\' section in docstring'
+                                self.fail('%s/%s : Class %s : Method %s... method returns value(s) %s but no \'Returns\' section in docstring..\nDoes your docstring have an empty line followed by Returns followed by exactly 7 dashes?'
                                     % (dir_name, file_name, class_name, method_name, methodsrc_returnvar_matches))
 
                             pass_lines = method_pass_re.findall(method_src)
@@ -156,6 +160,7 @@ class LintReturnsTestCase(unittest.TestCase):
                             elif(len(methodsrc_returnvar_matches) == 0 and len(methoddoc_matches) == 0):
                                 if(print_info): print("    no return statements nor `Returns` docstring section.. skipping method")
 
+        if print_info : print("Checked %d methods" % (num_methods_checked))
 
 if __name__ == '__main__':
     unittest.main()
