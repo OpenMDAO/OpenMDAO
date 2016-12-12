@@ -265,7 +265,7 @@ class PhysicalUnit(object):
         """
         return '<PhysicalUnit ' + self.name() + '>'
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         """compare myself to other.
 
         Args
@@ -275,14 +275,30 @@ class PhysicalUnit(object):
 
         Returns
         -------
-        int
-            negative if self._factor < other._factor,
-            zero if self._factor == other._factor
-            and strictly positive if self._factor > other._factor
+        bool
+            self._factor < other._factor
+        """
+        if self._powers != other._powers or self._offset != other._offset:
+            raise TypeError('Incompatible units')
+
+        return self._factor < other._factor
+
+    def __gt__(self, other):
+        """compare myself to other.
+
+        Args
+        ----
+        other : PhysicalUnit
+            The other physical unit to be compared to
+
+        Returns
+        -------
+        bool
+            self._factor > other._factor
         """
         if self._powers != other._powers:
             raise TypeError('Incompatible units')
-        return cmp(self._factor, other._factor)
+        return self._factor > other._factor
 
     def __eq__(self, other):
         """test for equality.
