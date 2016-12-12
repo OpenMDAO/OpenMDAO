@@ -122,3 +122,14 @@ Detailed docstring rules:
      Type
          description ending with a period.
      """
+
+4. Auto-hyper-linking a class or a method:
+
+  ::
+
+    """Summary line.
+
+    To auto-link to a <Class>, simply put its name in angle brackets,
+    and the link to that page will be generated in the resulting docs. 
+    To auto-link to a method's docs, use <Class.method_name>.
+    """
