@@ -35,8 +35,6 @@ class PETScTransfer(DefaultTransfer):
     def __call__(self, ip_vec, op_vec, mode='fwd'):
         """Perform transfer.
 
-        Must be implemented by the subclass.
-
         Args
         ----
         ip_vec : <Vector>
@@ -75,7 +73,6 @@ class PETScVector(DefaultVector):
     def _initialize_data(self, global_vector):
         """Internally allocate vectors.
 
-        Must be implemented by the subclass.
         Sets the following attributes:
 
         - _data
@@ -98,8 +95,6 @@ class PETScVector(DefaultVector):
 
     def get_norm(self):
         """Return the norm of this vector.
-
-        Must be implemented by the subclass.
 
         Returns
         -------

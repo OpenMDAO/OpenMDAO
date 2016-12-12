@@ -123,7 +123,13 @@ class GeneralizedDictionary(object):
         self._global_dict.update(self._dict)
 
     def __iter__(self):
-        """Provide an iterator."""
+        """Provide an iterator.
+
+        Returns
+        -------
+        iterable
+            iterator over the keys in the dictions
+        """
         return iter(self._dict)
 
     def __contain__(self, key):
