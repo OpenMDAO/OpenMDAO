@@ -15,7 +15,6 @@ class Component(System):
 
     INPUT_DEFAULTS = {
         'shape': (1,),
-        'size': 1,
         'units': '',
         'var_set': 0,
         'indices': None,
@@ -23,7 +22,6 @@ class Component(System):
 
     OUTPUT_DEFAULTS = {
         'shape': (1,),
-        'size': 1,
         'units': '',
         'var_set': 0,
         'lower': None,
@@ -53,13 +51,9 @@ class Component(System):
         metadata['value'] = val
         if 'indices' in kwargs:
             metadata['indices'] = numpy.array(kwargs['indices'])
-            metadata['size'] = metadata['indices'].size
             metadata['shape'] = metadata['indices'].shape
         elif 'shape' not in kwargs and isinstance(val, numpy.ndarray):
             metadata['shape'] = val.shape
-            metadata['size'] = val.size
-        else:
-            metadata['size'] = numpy.prod(metadata['shape'])
 
         self._variable_allprocs_names['input'].append(name)
         self._variable_myproc_names['input'].append(name)
@@ -83,9 +77,6 @@ class Component(System):
         metadata['value'] = val
         if 'shape' not in kwargs and isinstance(val, numpy.ndarray):
             metadata['shape'] = val.shape
-            metadata['size'] = val.size
-        else:
-            metadata['size'] = numpy.prod(metadata['shape'])
 
         self._variable_allprocs_names['output'].append(name)
         self._variable_myproc_names['output'].append(name)

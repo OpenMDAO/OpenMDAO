@@ -136,7 +136,7 @@ class Assembler(object):
             for ivar, meta in enumerate(variable_metadata[typ]):
                 ivar_all = variable_indices[typ][ivar]
                 iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
-                size = meta['size']
+                size = numpy.prod(meta['shape'])
                 self._variable_sizes[typ][iset][iproc, ivar_set] = size
                 self._variable_sizes_all[typ][iproc, ivar_all] = size
 
@@ -201,7 +201,7 @@ class Assembler(object):
         # Compute total size of indices vector
         total_idx_size = 0
         for ind, metadata in enumerate(input_metadata):
-            total_idx_size += metadata['size']
+            total_idx_size += numpy.prod(metadata['shape'])
 
         # Allocate arrays
         self._src_indices = numpy.zeros(total_idx_size, int)
@@ -211,7 +211,7 @@ class Assembler(object):
         # Populate arrays
         ind1, ind2 = 0, 0
         for ind, metadata in enumerate(input_metadata):
-            isize = metadata['size']
+            isize = numpy.prod(metadata['shape'])
             ind2 += isize
             indices = metadata['indices']
             if indices is None:

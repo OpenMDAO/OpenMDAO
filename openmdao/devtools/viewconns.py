@@ -80,7 +80,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             tmeta = tmetas[t]
             idxs = tmeta['indices']
             if idxs is None:
-                idxs = numpy.arange(tmeta['size'], dtype=int)
+                idxs = numpy.arange(numpy.prod(tmeta['shape']), dtype=int)
 
             if t in connections:
                 s = connections[t]
