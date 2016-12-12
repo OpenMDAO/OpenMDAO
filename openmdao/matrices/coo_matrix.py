@@ -59,16 +59,15 @@ class CooMatrix(Matrix):
                         colrange = numpy.array(src_indices, dtype=int)
 
                     ncols = colrange.size
-                    subrows = numpy.empty(rowrange.size * ncols,
-                                          dtype=int)
-                    subcols = numpy.empty(subrows.size, dtype=int)
+                    subrows = rows[ind1:ind2]
+                    subcols = cols[ind1:ind2]
 
                     for i, row in enumerate(rowrange):
                         subrows[i * ncols: (i + 1) * ncols] = row
                         subcols[i * ncols: (i + 1) * ncols] = colrange
 
-                    rows[ind1:ind2] = subrows + irow
-                    cols[ind1:ind2] = subcols + icol
+                    rows[ind1:ind2] += irow
+                    cols[ind1:ind2] += icol
                     data[ind1:ind2] = jac.flat
 
                     idxs = slice(None)

@@ -110,7 +110,7 @@ class Component(System):
         # Components must load their initial input and output values into the
         # vectors.
 
-        # TODO: currently it's possible for meta['value'] to not match
+        # Note: It's possible for meta['value'] to not match
         #       meta['shape'], and input and output vectors are sized according
         #       to shape, so if, for example, value is not specified it
         #       defaults to 1.0 and the shape can be anything, resulting in the
