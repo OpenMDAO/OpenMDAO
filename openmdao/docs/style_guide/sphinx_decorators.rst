@@ -1,3 +1,5 @@
+:orphan:
+
 .. _`sphinx_decorators`:
 
 Sphinx and Decorated Methods
@@ -79,4 +81,3 @@ The documentation that results shows the correct call signature:
 .. figure:: images/decorated_method_correct_docs.png
    :alt: The Sphinx generated documentation for a method that is decorated and has the correct c
          all string in the docstring.
-

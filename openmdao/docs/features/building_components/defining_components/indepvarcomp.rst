@@ -1,3 +1,5 @@
+:orphan:
+
 .. `Defining independent variables`
 
 Defining independent variables

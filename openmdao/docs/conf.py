@@ -11,7 +11,9 @@ import openmdao
 #this function is used to create the entire directory structure
 # of our source docs, as well as writing out each individual rst file.
 def generate_docs(doctype):
-    index_top_dev = """.. _source_documentation_dev:
+    index_top_dev = """:orphan:
+
+.. _source_documentation_dev:
 
 =======================================
 OpenMDAO Developer Source Documentation
@@ -22,7 +24,9 @@ OpenMDAO Developer Source Documentation
    :maxdepth: 1
 
 """
-    index_top_usr = """.. _source_documentation_usr:
+    index_top_usr = """:orphan:
+
+.. _source_documentation_usr:
 
 ==================================
 OpenMDAO User Source Documentation
