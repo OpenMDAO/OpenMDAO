@@ -5,6 +5,7 @@ import numpy
 from numpy import ndarray
 from scipy.sparse import coo_matrix, csr_matrix
 from six.moves import range
+from six import iteritems
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map
 
@@ -12,8 +13,8 @@ from openmdao.matrices.matrix import Matrix, _compute_index_map
 class CooMatrix(Matrix):
     """Sparse matrix in Coordinate list format."""
 
-    def _build(self, num_rows, num_cols):
-        """Allocate the matrix.
+    def _build_sparse(self, num_rows, num_cols):
+        """Allocate the data, rows, and cols for the sparse matrix.
 
         Args
         ----
@@ -21,6 +22,11 @@ class CooMatrix(Matrix):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
+
+        Returns
+        -------
+        (ndarray, ndarray, ndarray)
+            data, rows, cols that can be used to construct a sparse matrix.
         """
         counter = 0
 
@@ -100,12 +106,33 @@ class CooMatrix(Matrix):
                         rows[ind1:ind2] = irows
                         cols[ind1:ind2] = icols
 
-                # store reverse indices to avoid copying subjac data during
-                # update_submat.
-                if (metadata is self._ip_metadata and idxs is not None):
-                    metadata[key] = numpy.argsort(idxs) + ind1
+                if metadata is self._ip_metadata:
+                    metadata[key] = (ind1, ind2, idxs)
                 else:
                     metadata[key] = slice(ind1, ind2)
+
+        return data, rows, cols
+
+    def _build(self, num_rows, num_cols):
+        """Allocate the matrix.
+
+        Args
+        ----
+        num_rows : int
+            number of rows in the matrix.
+        num_cols : int
+            number of cols in the matrix.
+        """
+        data, rows, cols = self._build_sparse(num_rows, num_cols)
+
+        # store reverse indices to avoid copying subjac data during
+        # update_submat.
+        for key in self._ip_metadata:
+            ind1, ind2, idxs = self._ip_metadata[key]
+            if idxs is None:
+                self._ip_metadata[key] = slice(ind1, ind2)
+            else:
+                self._ip_metadata[key] = numpy.argsort(idxs) + ind1
 
         self._matrix = coo_matrix((data, (rows, cols)),
                                   shape=(num_rows, num_cols))
