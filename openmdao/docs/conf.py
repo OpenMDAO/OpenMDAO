@@ -332,7 +332,7 @@ def om_process_docstring(app, what, name, obj, options, lines):
             new_lines = get_first_documented_method(obj)
             lines.extend(new_lines)
     # loop through each line in the docstring
-    for i in range(len(lines)):
+    for i in xrange(len(lines)):
         #create a regex pattern to match <linktext>
         pat = r'(<.*?>)'
         #find all matches of the pattern in a line

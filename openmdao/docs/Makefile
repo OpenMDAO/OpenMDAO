@@ -55,9 +55,10 @@ clean:
 	rm -rf srcdocs/dev
 
 mock:
-	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package is required to build the docs.\n Install with: 'pip install mock'"; exit 1)
+	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
+	is required to build the docs. Install with:\n pip install mock"; exit 1)
 
-html: mock
+html:   mock
 	rm -rf $(BUILDDIR)/*
 	rm -rf srcdocs/usr
 	rm -rf srcdocs/dev
