@@ -16,19 +16,28 @@ class MyExplicitComp(ExplicitComponent):
 
     def initialize_variables(self):
         self.add_input('x', val=np.zeros(2))
+        self.add_input('y', val=np.zeros(3))
         self.add_output('f', val=0.0)
 
     def compute(self, inputs, outputs):
         x = inputs['x']
-        outputs['f'] = (x[0]-3.0)**2 + x[0]*x[1] + (x[1]+4.0)**2 - 3.0
+        y = inputs['y']
+        outputs['f'] = (x[0]-3.0)**2 + x[0]*x[1] + (x[1]+4.0)**2 - 3.0 + \
+                        y[2]*7. + y[0]*17. - y[2]*y[1] + 2.*y[1]
 
     def compute_jacobian(self, inputs, outputs, jacobian):
         x = inputs['x']
+        y = inputs['y']
         jacobian['f', 'x'] = self._jac_type(np.array([[
             2.0*x[0] - 6.0 + x[1],
             2.0*x[1] + 8.0 + x[0]
         ]]))
 
+        jacobian['f', 'y'] = self._jac_type(np.array([[
+            17.,
+            2.-y[2],
+            7.-y[1]
+        ]]))
 
 class TestJacobianSrcIndicesDenseDense(unittest.TestCase):
 
@@ -37,12 +46,13 @@ class TestJacobianSrcIndicesDenseDense(unittest.TestCase):
 
     def test_src_indices(self):
 
-        # if we multiply our jacobian by our work vec of 1's, we get [1.0, 1.0, 1.0, -7.0]
-        fwd_check = np.array([1.0, 1.0, 1.0, -7.])
+        # if we multiply our jacobian (at x,y = ones) by our work vec of 1's,
+        # we get [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -31.]
+        fwd_check = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -31.])
 
         # if we multiply our jacobian's transpose by our work vec of 1's,
-        # we get [-10., 1., 4., 1.]
-        rev_check = np.array([-10., 1., 4., 1.])
+        # we get [-10., 1., 4., -16., -5., 0., 1.]
+        rev_check = np.array([-10., 1., 4., -16., -5., 0., 1.])
 
         self._check_fwd(self.prob, fwd_check)
         self._check_rev(self.prob, rev_check)
@@ -52,9 +62,11 @@ class TestJacobianSrcIndicesDenseDense(unittest.TestCase):
         prob.root.add_subsystem('indep',
                                 IndepVarComp((
                                     ('a', np.ones(3)),
+                                    ('b', np.ones(3)),
                                 )))
         C1 = prob.root.add_subsystem('C1', MyExplicitComp(comp_jac_class))
         prob.root.connect('indep.a', 'C1.x', src_indices=[2,0])
+        prob.root.connect('indep.b', 'C1.y', src_indices=[0,2,1])
         prob.setup(check=False)
         prob.root.jacobian = GlobalJacobian(Matrix=mat_class)
         prob.root.nl_solver = NewtonSolver(
@@ -116,13 +128,13 @@ def arr2list(arr):
     data = []
     rows = []
     cols = []
-    
+
     for row in range(arr.shape[0]):
         for col in range(arr.shape[1]):
             rows.append(row)
             cols.append(col)
             data.append(arr[row, col])
-    
+
     return [np.array(data), np.array(rows), np.array(cols)]
 
 def arr2revlist(arr):
@@ -152,11 +164,11 @@ class TestJacobianSrcIndicesDenseCoo(TestJacobianSrcIndicesDenseDense):
 class TestJacobianSrcIndicesDenseCsr(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(DenseMatrix, csr_matrix)
-        
+
 class TestJacobianSrcIndicesDenseInvCoo(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(DenseMatrix, inverted_coo)
-        
+
 class TestJacobianSrcIndicesDenseInvCsr(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(DenseMatrix, inverted_csr)
@@ -172,15 +184,15 @@ class TestJacobianSrcIndicesDenseRevList(TestJacobianSrcIndicesDenseDense):
 class TestJacobianSrcIndicesCsrCsr(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CsrMatrix, csr_matrix)
-        
+
 class TestJacobianSrcIndicesCsrCoo(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CsrMatrix, coo_matrix)
-        
+
 class TestJacobianSrcIndicesCsrInvCoo(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CsrMatrix, inverted_coo)
-        
+
 class TestJacobianSrcIndicesCsrInvCsr(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CsrMatrix, inverted_csr)
@@ -200,15 +212,15 @@ class TestJacobianSrcIndicesCsrRevList(TestJacobianSrcIndicesDenseDense):
 class TestJacobianSrcIndicesCooCsr(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CooMatrix, csr_matrix)
-        
+
 class TestJacobianSrcIndicesCooCoo(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CooMatrix, coo_matrix)
-        
+
 class TestJacobianSrcIndicesCooInvCoo(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CooMatrix, inverted_coo)
-        
+
 class TestJacobianSrcIndicesCooInvCsr(TestJacobianSrcIndicesDenseDense):
     def setUp(self):
         self.prob = self._setup_model(CooMatrix, inverted_csr)
