@@ -36,14 +36,14 @@ class CsrMatrix(CooMatrix):
         # arrays that will map each block into the combined data array.
         revidxs = numpy.argsort(srtidxs)
 
-        # now apply the reverse index to each part of self._idxs so that
-        # we can avoid copying the index array during updates.
         metadata = self._ip_metadata
         for key in metadata:
             ind1, ind2, idxs = metadata[key]
             if idxs is None:
                 metadata[key] = revidxs[ind1:ind2]
             else:
+                # apply the reverse index to each part of revidxs so that
+                # we can avoid copying the index array during updates.
                 metadata[key] = revidxs[ind1:ind2][numpy.argsort(idxs)]
 
         metadata = self._op_metadata

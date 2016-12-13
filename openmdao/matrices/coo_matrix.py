@@ -125,13 +125,13 @@ class CooMatrix(Matrix):
         """
         data, rows, cols = self._build_sparse(num_rows, num_cols)
 
-        # store reverse indices to avoid copying subjac data during
-        # update_submat.
         for key in self._ip_metadata:
             ind1, ind2, idxs = self._ip_metadata[key]
             if idxs is None:
                 self._ip_metadata[key] = slice(ind1, ind2)
             else:
+                # store reverse indices to avoid copying subjac data during
+                # update_submat.
                 self._ip_metadata[key] = numpy.argsort(idxs) + ind1
 
         self._matrix = coo_matrix((data, (rows, cols)),
