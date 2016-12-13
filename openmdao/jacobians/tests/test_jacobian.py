@@ -16,27 +16,55 @@ class MyExplicitComp(ExplicitComponent):
 
     def initialize_variables(self):
         self.add_input('x', val=np.zeros(2))
-        self.add_input('y', val=np.zeros(3))
-        self.add_output('f', val=0.0)
+        self.add_input('y', val=np.zeros(2))
+        self.add_output('f', val=np.zeros(2))
 
     def compute(self, inputs, outputs):
         x = inputs['x']
         y = inputs['y']
-        outputs['f'] = (x[0]-3.0)**2 + x[0]*x[1] + (x[1]+4.0)**2 - 3.0 + \
-                        y[2]*7. + y[0]*17. - y[2]*y[1] + 2.*y[1]
+        outputs['f'][0] = (x[0]-3.0)**2 + x[0]*x[1] + (x[1]+4.0)**2 - 3.0 + \
+                           y[0]*17. - y[0]*y[1] + 2.*y[1]
+        outputs['f'][1] = outputs['f'][0]*3.0
 
     def compute_jacobian(self, inputs, outputs, jacobian):
         x = inputs['x']
         y = inputs['y']
-        jacobian['f', 'x'] = self._jac_type(np.array([[
-            2.0*x[0] - 6.0 + x[1],
-            2.0*x[1] + 8.0 + x[0]
+        jacobian['f', 'x'] = self._jac_type(np.array([
+            [2.0*x[0] - 6.0 + x[1], 2.0*x[1] + 8.0 + x[0]],
+            [(2.0*x[0] - 6.0 + x[1])*3., (2.0*x[1] + 8.0 + x[0])*3.]
+        ]))
+
+        jacobian['f', 'y'] = self._jac_type(np.array([
+            [17.-y[1], 2.-y[0]],
+            [(17.-y[1])*3., (2.-y[0])*3.]
+        ]))
+
+class MyExplicitComp2(ExplicitComponent):
+    def __init__(self, jac_type):
+        super(MyExplicitComp2, self).__init__()
+        self._jac_type = jac_type
+
+    def initialize_variables(self):
+        self.add_input('w', val=np.zeros(3))
+        self.add_input('z', val=0.0)
+        self.add_output('f', val=0.0)
+
+    def compute(self, inputs, outputs):
+        w = inputs['w']
+        z = inputs['z']
+        outputs['f'] = (w[0]-5.0)**2 + (w[1]+1.0)**2 + w[2]*6. + z*7.
+
+    def compute_jacobian(self, inputs, outputs, jacobian):
+        w = inputs['w']
+        z = inputs['z']
+        jacobian['f', 'w'] = self._jac_type(np.array([[
+            2.0*w[0] - 10.0,
+            2.0*w[1] + 2.0,
+            6.
         ]]))
 
-        jacobian['f', 'y'] = self._jac_type(np.array([[
-            17.,
-            2.-y[2],
-            7.-y[1]
+        jacobian['f', 'z'] = self._jac_type(np.array([[
+            7.
         ]]))
 
 class TestJacobianSrcIndicesDenseDense(unittest.TestCase):
@@ -47,12 +75,12 @@ class TestJacobianSrcIndicesDenseDense(unittest.TestCase):
     def test_src_indices(self):
 
         # if we multiply our jacobian (at x,y = ones) by our work vec of 1's,
-        # we get [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -31.]
-        fwd_check = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -31.])
+        # we get fwd_check
+        fwd_check = np.array([1.0, 1.0, 1.0, 1.0, 1.0, -24., -74., -8.])
 
         # if we multiply our jacobian's transpose by our work vec of 1's,
-        # we get [-10., 1., 4., -16., -5., 0., 1.]
-        rev_check = np.array([-10., 1., 4., -16., -5., 0., 1.])
+        # we get rev_check
+        rev_check = np.array([-35., -5., 9., -63., -3., 1., -6., 1.])
 
         self._check_fwd(self.prob, fwd_check)
         self._check_rev(self.prob, rev_check)
@@ -62,11 +90,15 @@ class TestJacobianSrcIndicesDenseDense(unittest.TestCase):
         prob.root.add_subsystem('indep',
                                 IndepVarComp((
                                     ('a', np.ones(3)),
-                                    ('b', np.ones(3)),
+                                    ('b', np.ones(2)),
                                 )))
         C1 = prob.root.add_subsystem('C1', MyExplicitComp(comp_jac_class))
+        C2 = prob.root.add_subsystem('C2', MyExplicitComp2(comp_jac_class))
         prob.root.connect('indep.a', 'C1.x', src_indices=[2,0])
-        prob.root.connect('indep.b', 'C1.y', src_indices=[0,2,1])
+        prob.root.connect('indep.b', 'C1.y')
+        prob.root.connect('indep.a', 'C2.w', src_indices=[0,2,1])
+        prob.root.connect('C1.f', 'C2.z', src_indices=[1])
+
         prob.setup(check=False)
         prob.root.jacobian = GlobalJacobian(Matrix=mat_class)
         prob.root.nl_solver = NewtonSolver(
