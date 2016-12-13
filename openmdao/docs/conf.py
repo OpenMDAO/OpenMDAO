@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
 # This file is execfile()d with the current directory set to its
 # containing dir.
-import sys, os
+import sys
+import os
+
+
 from mock import Mock
 MOCK_MODULES = ['h5py', 'petsc4py', 'mpi4py', 'pyoptsparse']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 import openmdao
 
-#this function is used to create the entire directory structure
+
+# this function is used to create the entire directory structure
 # of our source docs, as well as writing out each individual rst file.
 def generate_docs(doctype):
     index_top_dev = """:orphan:
@@ -66,34 +70,44 @@ OpenMDAO User Source Documentation
 """
 
     # need to set up the srcdocs directory structure, relative to docs.
-    dir = os.path.dirname(__file__)
-    if os.path.isdir(os.path.join(dir, "srcdocs", doctype)):
-        import shutil
-        shutil.rmtree(os.path.join(dir, "srcdocs", doctype))
+    docs_dir = os.path.dirname(__file__)
 
-    if not os.path.isdir(os.path.join(dir, "srcdocs", doctype)):
-        os.mkdir(os.path.join(dir, "srcdocs", doctype))
-    if not os.path.isdir(os.path.join(dir, "srcdocs", doctype, "packages")):
-        os.mkdir(os.path.join(dir, "srcdocs", doctype, "packages"))
+    doc_dir = os.path.join(docs_dir, "srcdocs", doctype)
+    if os.path.isdir(doc_dir):
+        import shutil
+        shutil.rmtree(doc_dir)
+
+    if not os.path.isdir(doc_dir):
+        os.mkdir(doc_dir)
+
+    packages_dir = os.path.join(doc_dir, "packages")
+    if not os.path.isdir(packages_dir):
+        os.mkdir(packages_dir)
 
     # look for directories in the openmdao level, one up from docs
     # those directories will be the openmdao packages
     # auto-generate the top-level index.rst file for srcdocs, based on
     # openmdao packages:
-    IGNORE_LIST = ['docs', 'tests', 'devtools', '__pycache__', 'code_review', 'test_suite' ]
+    IGNORE_LIST = [
+        'docs', 'tests', 'devtools', '__pycache__', 'code_review', 'test_suite'
+    ]
+
     # to improve the order that the user sees in the source docs, put
     # the important packages in this list explicitly. Any new ones that
     # get added will show up at the end.
-    packages = ['assemblers','core', 'components', 'drivers', 'jacobians', 'matrices', 'solvers',
-                'proc_allocators', 'utils', 'vectors']
-    # Everything in dir that isn't discarded is appended as a source package.
-    for listing in os.listdir(os.path.join(dir, "..")):
+    packages = [
+        'assemblers', 'core', 'components', 'drivers', 'jacobians',
+        'matrices', 'solvers', 'proc_allocators', 'utils', 'vectors'
+    ]
+
+    # everything in openmdao dir that isn't discarded is appended as a source package.
+    for listing in os.listdir(os.path.join(docs_dir, "..")):
         if os.path.isdir(os.path.join("..", listing)):
             if listing not in IGNORE_LIST and listing not in packages:
                 packages.append(listing)
 
     # begin writing the 'srcdocs/index.rst' file at mid  level.
-    index_filename = os.path.join(dir, "srcdocs", doctype, "index.rst")
+    index_filename = os.path.join(doc_dir, "index.rst")
     index = open(index_filename, "w")
     if (doctype == "dev"):
         index.write(index_top_dev)
@@ -105,7 +119,7 @@ OpenMDAO User Source Documentation
         # a package is e.g. openmdao.core, that contains source files
         # a sub_package, is a src file, e.g. openmdao.core.component
         sub_packages = []
-        package_filename = os.path.join(dir, "srcdocs", doctype, "packages",
+        package_filename = os.path.join(packages_dir,
                                         "openmdao." + package + ".rst")
         package_name = "openmdao." + package
 
@@ -122,13 +136,13 @@ OpenMDAO User Source Documentation
             # only document non-empty packages -- to avoid errors
             # (e.g. at time of writing, doegenerators, drivers, are empty dirs)
 
-            #specifically don't use os.path.join here.  Even windows wants the
-            #stuff in the file to have fwd slashes.
+            # specifically don't use os.path.join here.  Even windows wants the
+            # stuff in the file to have fwd slashes.
             index.write("   packages/openmdao." + package + "\n")
 
             # make subpkg directory (e.g. srcdocs/packages/core) for ref sheets
-            package_dirname = os.path.join(dir, "srcdocs", doctype, "packages", package)
-            os.mkdir(package_dirname)
+            package_dir = os.path.join(packages_dir, package)
+            os.mkdir(package_dir)
 
             # create/write a package index file: (e.g. "srcdocs/packages/openmdao.core.rst")
             package_file = open(package_filename, "w")
@@ -141,13 +155,14 @@ OpenMDAO User Source Documentation
                 # this line writes subpackage name e.g. "core/component.py"
                 # into the corresponding package index file (e.g. "openmdao.core.rst")
                 if sub_package not in SKIP_SUBPACKAGES:
-                    #specifically don't use os.path.join here.  Even windows wants the
-                    #stuff in the file to have fwd slashes.
+                    # specifically don't use os.path.join here.  Even windows wants the
+                    # stuff in the file to have fwd slashes.
                     package_file.write("    " + package + "/" + sub_package + "\n")
 
                     # creates and writes out one reference sheet (e.g. core/component.rst)
-                    ref_sheet_filename = os.path.join(package_dirname, sub_package + ".rst")
+                    ref_sheet_filename = os.path.join(package_dir, sub_package + ".rst")
                     ref_sheet = open(ref_sheet_filename, "w")
+
                     # get the meat of the ref sheet code done
                     filename = sub_package + ".py"
                     ref_sheet.write(".. index:: " + doctype + "_" + filename + "\n\n")
@@ -160,26 +175,31 @@ OpenMDAO User Source Documentation
                     ref_sheet.write(ref_sheet_bottom)
                     ref_sheet.close()
 
-
             # finish and close each package file
             package_file.close()
 
     # finish and close top-level index file
     index.close()
 
-#generate docs, with private members, or without, based on doctype.
-#type is passed in from the Makefile via the -t tags argument to sphinxbuild
+
+# generate docs, with private members, or without, based on doctype.
+# type is passed in from the Makefile via the -t tags argument to sphinxbuild
 if tags.has("dev"):
     doctype = "dev"
 if tags.has("usr"):
     doctype = "usr"
-generate_docs(doctype)
+else:
+    doctype = None
 
-#------------------------begin monkeypatch-----------------------
-#monkeypatch to make our docs say "Args" instead of "Parameters"
+if doctype:
+    generate_docs(doctype)
+
+# ------------------------begin monkeypatch-----------------------
+# monkeypatch to make our docs say "Args" instead of "Parameters"
 from numpydoc.docscrape_sphinx import SphinxDocString
 from numpydoc.docscrape import NumpyDocString, Reader
 import textwrap
+
 
 def _parse(self):
         self._doc.reset()
@@ -215,6 +235,7 @@ def _parse(self):
             else:
                 self[section] = content
 
+
 def __str__(self, indent=0, func_role="obj"):
         out = []
         out += self._str_signature()
@@ -234,8 +255,9 @@ def __str__(self, indent=0, func_role="obj"):
         out += self._str_examples()
         for param_list in ('Attributes', 'Methods'):
             out += self._str_member_list(param_list)
-        out = self._str_indent(out,indent)
+        out = self._str_indent(out, indent)
         return '\n'.join(out)
+
 
 def __init__(self, docstring, config={}):
         docstring = textwrap.dedent(docstring).split('\n')
@@ -268,10 +290,11 @@ def __init__(self, docstring, config={}):
             e.docstring = orig_docstring
             raise
 
-        #In creation of usr docs, remove private Attributes (beginning with '_')
+        # In creation of usr docs, remove private Attributes (beginning with '_')
         # with a crazy list comprehension
         if tags.has("usr"):
             self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"] if not att[0].startswith('_')]
+
 
 def _str_options(self, name):
         out = []
@@ -290,21 +313,22 @@ def _str_options(self, name):
                 out += ['']
         return out
 
-#Do the actual patch switchover to these local versions
+# Do the actual patch switchover to these local versions
 NumpyDocString.__init__ = __init__
 SphinxDocString._str_options = _str_options
 SphinxDocString._parse = _parse
 SphinxDocString.__str__ = __str__
-#--------------end monkeypatch---------------------
+# --------------end monkeypatch---------------------
 
-#--------------begin sphinx extension---------------------
-#a short sphinx extension to take care of hyperlinking in docs
+# --------------begin sphinx extension---------------------
+# a short sphinx extension to take care of hyperlinking in docs
 # where a syntax of <linktext> is employed.
-import pkgutil, inspect
+import pkgutil
+import inspect
 
-#first, we will need a dict that contains full pathnames to every class.
-#we construct that here, once, then use it for lookups in om_process_docstring
-package=openmdao
+# first, we will need a dict that contains full pathnames to every class.
+# we construct that here, once, then use it for lookups in om_process_docstring
+package = openmdao
 om_classes = {}
 for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
                                                       prefix=package.__name__+'.',
@@ -316,65 +340,51 @@ for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
                 if class_object.__module__.startswith("openmdao"):
                     om_classes[classname] = class_object.__module__ + "." + classname
 
-#this is used to go get a docstring from a base class.
-def get_first_documented_method(method):
-    method_name = method.__name__
-    import types
-    for cls in method.im_class.__mro__[1:]: # skip the first one since it is the class itself
-        if cls.__name__ != 'object':
-            inherited_method = getattr(cls, method_name)
-            inherited_doc = inherited_method.__doc__
-            if inherited_doc:
-                return inherited_doc.splitlines()
-    return ''
 
 def om_process_docstring(app, what, name, obj, options, lines):
     import re
 
-    if what == 'method':
-        if len(lines) == 0:
-            new_lines = get_first_documented_method(obj)
-            lines.extend(new_lines)
-    # loop through each line in the docstring
-    for i in xrange(len(lines)):
-        #create a regex pattern to match <linktext>
+    for i in range(len(lines)):
+        # create a regex pattern to match <linktext>
         pat = r'(<.*?>)'
-        #find all matches of the pattern in a line
+        # find all matches of the pattern in a line
         match = re.findall(pat, lines[i])
         if match:
             for ma in match:
-                #strip off the angle brackets `<>`
+                # strip off the angle brackets `<>`
                 m = ma[1:-1]
-                #if there's a dot in the pattern, it's a method
+                # if there's a dot in the pattern, it's a method
                 # e.g. <classname.method_name>
                 if '.' in m:
-                    #need to grab the class name and method name separately
+                    # need to grab the class name and method name separately
                     split_match = m.split('.')
-                    justclass = split_match[0] #class
-                    justmeth =  split_match[1] #method
+                    justclass = split_match[0]  # class
+                    justmeth = split_match[1]   # method
                     if justclass in om_classes:
                         classfullpath = om_classes[justclass]
-                        #construct a link  :meth:`class.method <openmdao.core.class.method>`
-                        link =  ":meth:`" + m + " <" + classfullpath + "." + justmeth + ">`"
-                        #replace the <link> text with the constructed line.
+                        # construct a link  :meth:`class.method <openmdao.core.class.method>`
+                        link = ":meth:`" + m + " <" + classfullpath + "." + justmeth + ">`"
+                        # replace the <link> text with the constructed line.
                         lines[i] = lines[i].replace(ma, link)
                     else:
-                        #the class isn't in the class table!
-                        print( "WARNING: {} not found in dictionary of OpenMDAO methods".format(justclass) )
-                        #replace instances of <class> with just class in docstring (strip angle brackets)
+                        # the class isn't in the class table!
+                        print("WARNING: {} not found in dictionary of OpenMDAO methods".format(justclass))
+                        # replace instances of <class> with just class in docstring (strip angle brackets)
                         lines[i] = lines[i].replace(ma, m)
-                #otherwise, it's a class
+                # otherwise, it's a class
                 else:
                     if m in om_classes:
                         classfullpath = om_classes[m]
                         lines[i] = lines[i].replace(ma, ":class:`~"+classfullpath+"`")
                     else:
-                        #the class isn't in the class table!
-                        print( "WARNING: {} not found in dictionary of OpenMDAO classes".format(m) )
-                        #replace instances of <class> with class in docstring (strip angle brackets)
+                        # the class isn't in the class table!
+                        print("WARNING: {} not found in dictionary of OpenMDAO classes".format(m))
+                        # replace instances of <class> with class in docstring (strip angle brackets)
                         lines[i] = lines[i].replace(ma, m)
-#This is the crux of the extension--connecting an internal
-#Sphinx event with our own custom function.
+
+
+# This is the crux of the extension--connecting an internal
+# Sphinx event with our own custom function.
 def setup(app):
     app.connect('autodoc-process-docstring', om_process_docstring)
 
@@ -397,7 +407,7 @@ elif (type == "dev"):
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-#needs_sphinx = '1.0'
+needs_sphinx = '1.5'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
@@ -415,7 +425,7 @@ extensions = [
 
 numpydoc_show_class_members = False
 
-#autodoc_default_flags = ['members']
+# autodoc_default_flags = ['members']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -438,10 +448,10 @@ author = u'openmdao.org'
 # built documents.
 #
 # The short X.Y version.
-#version = openmdao.__version__
+# version = openmdao.__version__
 version = "2.0.0"
 # The full version, including alpha/beta/rc tags.
-#release = openmdao.__version__ + ' Alpha'
+# release = openmdao.__version__ + ' Alpha'
 
 # The language for content autogenerated by Sphinx. Refer to documentation
 # for a list of supported languages.
