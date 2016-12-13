@@ -184,7 +184,11 @@ if tags.has("dev"):
     doctype = "dev"
 if tags.has("usr"):
     doctype = "usr"
-generate_docs(doctype)
+else:
+    doctype = None
+
+if doctype:
+    generate_docs(doctype)
 
 # ------------------------begin monkeypatch-----------------------
 # monkeypatch to make our docs say "Args" instead of "Parameters"
