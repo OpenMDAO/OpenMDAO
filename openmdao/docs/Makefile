@@ -13,6 +13,11 @@ ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
 $(error The '$(SPHINXBUILD)' command was not found. Make sure you have Sphinx installed, then set the SPHINXBUILD environment variable to point to the full path of the '$(SPHINXBUILD)' executable. Alternatively you can add the directory with the executable to your PATH. If you don't have Sphinx installed, grab it from http://sphinx-doc.org/)
 endif
 
+SPHINX_VERSION := $(shell $(SPHINXBUILD) --version)
+ifeq (,$(findstring 1.5, $(SPHINX_VERSION)))
+$(error Version 1.5 of Sphinx is required, but $(SPHINX_VERSION) was found.  Upgrade via 'pip install --upgrade sphinx' or get the latest from http://sphinx-doc.org/)
+endif
+
 # Internal variables.
 PAPEROPT_a4     = -D latex_paper_size=a4
 PAPEROPT_letter = -D latex_paper_size=letter
@@ -23,7 +28,7 @@ I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 .PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext
 
 help:
-	@echo "Please use \`make <target>' where <target> is one of"
+	@echo "Please use 'make <target>' where <target> is one of"
 	@echo "  html       to make standalone HTML files"
 	@echo "  dirhtml    to make HTML files named index.html in directories"
 	@echo "  singlehtml to make a single large HTML file"
@@ -54,7 +59,11 @@ clean:
 	rm -rf srcdocs/usr
 	rm -rf srcdocs/dev
 
-html:
+mock:
+	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
+	is required to build the docs. Install with:\n pip install mock"; exit 1)
+
+html: mock
 	rm -rf $(BUILDDIR)/*
 	rm -rf srcdocs/usr
 	rm -rf srcdocs/dev
@@ -124,8 +133,8 @@ latex:
 	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) $(BUILDDIR)/latex
 	@echo
 	@echo "Build finished; the LaTeX files are in $(BUILDDIR)/latex."
-	@echo "Run \`make' in that directory to run these through (pdf)latex" \
-	      "(use \`make latexpdf' here to do that automatically)."
+	@echo "Run 'make' in that directory to run these through (pdf)latex" \
+	      "(use 'make latexpdf' here to do that automatically)."
 
 latexpdf:
 	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) $(BUILDDIR)/latex
@@ -153,8 +162,8 @@ texinfo:
 	$(SPHINXBUILD) -b texinfo $(ALLSPHINXOPTS) $(BUILDDIR)/texinfo
 	@echo
 	@echo "Build finished. The Texinfo files are in $(BUILDDIR)/texinfo."
-	@echo "Run \`make' in that directory to run these through makeinfo" \
-	      "(use \`make info' here to do that automatically)."
+	@echo "Run 'make' in that directory to run these through makeinfo" \
+	      "(use 'make info' here to do that automatically)."
 
 info:
 	$(SPHINXBUILD) -b texinfo $(ALLSPHINXOPTS) $(BUILDDIR)/texinfo

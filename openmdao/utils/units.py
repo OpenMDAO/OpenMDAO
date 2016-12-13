@@ -45,6 +45,11 @@ class NumberDict(OrderedDict):
         ----
         item : key
             key to get the item
+
+        Returns
+        -------
+        int
+            value of the given key
         """
         try:
             return dict.__getitem__(self, item)
@@ -59,6 +64,11 @@ class NumberDict(OrderedDict):
         ----
         other : Dict
             the dict instance to be coerced
+
+        Returns
+        -------
+        NumberDict
+            new NumberDict with keys/values from original
         """
         if isinstance(other, dict):
             other = NumberDict(other)
@@ -72,6 +82,11 @@ class NumberDict(OrderedDict):
         ----
         other : NumberDict
             the other NumberDict Instance
+
+        Returns
+        -------
+        NumberDict
+            new NumberDict with self+other values
         """
         sum_dict = NumberDict()
         for k, v in iteritems(self):
@@ -88,6 +103,11 @@ class NumberDict(OrderedDict):
         ----
         other : NumberDict
             the other NumberDict Instance
+
+        Returns
+        -------
+        NumberDict
+            new NumberDict instance, with self-other values
         """
         sum_dict = NumberDict()
         for k, v in iteritems(self):
@@ -104,6 +124,11 @@ class NumberDict(OrderedDict):
         ----
         other : NumberDict
             the other NumberDict Instance
+
+        Returns
+        -------
+        NumberDict
+            new NumberDict instance, with other-self values
         """
         sum_dict = NumberDict()
         for k, v in iteritems(other):
@@ -120,6 +145,11 @@ class NumberDict(OrderedDict):
         ----
         other : NumberDict
             the other NumberDict Instance
+
+        Returns
+        -------
+        NumberDict
+            new NumberDict instance, with other*self values
         """
         new = NumberDict()
         for key, value in iteritems(self):
@@ -134,8 +164,13 @@ class NumberDict(OrderedDict):
 
         Args
         ----
-        other : NumberDict
-            the other NumberDict Instance
+        other : int
+            value to divide by
+
+        Returns
+        -------
+        NumberDict
+            new NumberDict instance, with self/other values
         """
         new = NumberDict()
         for key, value in iteritems(self):
@@ -152,6 +187,11 @@ class NumberDict(OrderedDict):
         ----
         other : NumberDict
             the other NumberDict Instance
+
+        Returns
+        -------
+        str
+            str representation for the creation of this NumberDict
         """
         return repr(dict(self))
 
@@ -205,25 +245,60 @@ class PhysicalUnit(object):
         self._powers = powers
 
     def __repr__(self):
-        """string representation of myself."""
+        """string representation of myself.
+
+        Returns
+        -------
+        str
+            str representation of how to instantiate this PhysicalUnit
+        """
         return 'PhysicalUnit(%s,%s,%s,%s)' % (self._names, self._factor,
                                               self._powers, self._offset)
 
     def __str__(self):
-        """convert myself to string."""
+        """convert myself to string.
+
+        Returns
+        -------
+        str
+            str representation of a PhysicalUnit
+        """
         return '<PhysicalUnit ' + self.name() + '>'
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         """compare myself to other.
 
         Args
         ----
         other : PhysicalUnit
             The other physical unit to be compared to
+
+        Returns
+        -------
+        bool
+            self._factor < other._factor
+        """
+        if self._powers != other._powers or self._offset != other._offset:
+            raise TypeError('Incompatible units')
+
+        return self._factor < other._factor
+
+    def __gt__(self, other):
+        """compare myself to other.
+
+        Args
+        ----
+        other : PhysicalUnit
+            The other physical unit to be compared to
+
+        Returns
+        -------
+        bool
+            self._factor > other._factor
         """
         if self._powers != other._powers:
             raise TypeError('Incompatible units')
-        return cmp(self._factor, other._factor)
+        return self._factor > other._factor
 
     def __eq__(self, other):
         """test for equality.
@@ -232,6 +307,11 @@ class PhysicalUnit(object):
         ----
         other : PhysicalUnit
             The other physical unit to be compared to
+
+        Returns
+        -------
+        bool
+            true if _factor, _offset, and _powers all match
         """
         return (self._factor == other._factor and
                 self._offset == other._offset and
@@ -244,6 +324,11 @@ class PhysicalUnit(object):
         ----
         other : PhysicalUnit
             The other physical unit to be compared to
+
+        Returns
+        -------
+        PhysicalUnit
+            new PhysicalUnit instance representing the product of two units
         """
         if self._offset != 0 or (isinstance(other, PhysicalUnit) and
                                  other._offset != 0):
@@ -267,7 +352,12 @@ class PhysicalUnit(object):
         Args
         ----
         other : PhysicalUnit
-            The other physical unit to be compared to
+            The other physical unit to be operated on
+
+        Returns
+        -------
+        PhysicalUnit
+            new PhysicalUnit instance representing the self/other
         """
         if self._offset != 0 or (isinstance(other, PhysicalUnit) and
                                  other._offset != 0):
@@ -289,7 +379,12 @@ class PhysicalUnit(object):
         Args
         ----
         other : PhysicalUnit
-            The other physical unit to be compared to
+            The other physical unit to be operated on
+
+        Returns
+        -------
+        PhysicalUnit
+            new PhysicalUnit instance representing the other/self
         """
         return PhysicalUnit({str(other): 1} - self._names,
                             float(other) / self._factor,
@@ -302,8 +397,13 @@ class PhysicalUnit(object):
 
         Args
         ----
-        other : float or PhysicalUnit
-            The other physical unit to be compared to
+        other : float or int
+            power to raise self by
+
+        Returns
+        -------
+        PhysicalUnit
+            new PhysicalUnit of self^other
         """
         if self._offset != 0:
             raise TypeError("cannot exponentiate units with non-zero offset")
@@ -334,9 +434,9 @@ class PhysicalUnit(object):
         """
         Return the base unit equivalent of this unit.
 
-        Return
+        Returns
         -------
-        str
+        PhysicalUnit
             the equivalent base unit
         """
         num = ''
@@ -403,15 +503,31 @@ class PhysicalUnit(object):
         other : PhysicalUnit
             Another unit.
 
+        Returns
+        -------
+        bool
+            indicates if two units are compatible
         """
         return self._powers == other._powers
 
     def is_dimensionless(self):
-        """Dimensionless PQ."""
+        """Dimensionless PQ.
+
+        Returns
+        -------
+        bool
+            indicates if this is dimensionless
+        """
         return not any(self._powers)
 
     def is_angle(self):
-        """Check if this PQ is an Angle."""
+        """Check if this PQ is an Angle.
+
+        Returns
+        -------
+        bool
+            indicates if this an angle type
+        """
         return (self._powers[_UNIT_LIB.base_types['angle']] == 1 and
                 sum(self._powers) == 1)
 
@@ -427,7 +543,13 @@ class PhysicalUnit(object):
         self._names[name] = 1
 
     def name(self):
-        """compute the name of this unit."""
+        """compute the name of this unit.
+
+        Returns
+        -------
+        str
+            str representation of the unit
+        """
         num = ''
         denom = ''
         for unit, power in iteritems(self._names):
@@ -451,12 +573,31 @@ class PhysicalUnit(object):
 ####################################
 
 def _new_unit(name, factor, powers):
-    """Create new Unit."""
+    """Create new Unit.
+
+    Args
+    ----
+    factor : float
+        conversion factor to base units
+    powers : [int, ...]
+        power of base units
+
+    """
     _UNIT_LIB.unit_table[name] = PhysicalUnit(name, factor, powers)
 
 
 def add_offset_unit(name, baseunit, factor, offset, comment=''):
-    """Adding Offset Unit."""
+    """Adding Offset Unit.
+
+    Args
+    ----
+    unit : str
+        newly defined unit
+    offset : float
+        zero offset for new unit
+    comment : str
+        optional comment to describe unit
+    """
     if isinstance(baseunit, str):
         baseunit = _find_unit(baseunit)
     # else, baseunit should be a instance of PhysicalUnit
@@ -476,7 +617,15 @@ def add_offset_unit(name, baseunit, factor, offset, comment=''):
 
 
 def add_unit(name, unit, comment=''):
-    """Adding Unit."""
+    """Adding Unit.
+
+    Args
+    ----
+    unit : str
+        newly defined unit
+    comment : str
+        optional comment to describe unit
+    """
     if comment:
         _UNIT_LIB.help.append((name, comment, unit))
     if isinstance(unit, str):
@@ -505,7 +654,18 @@ _UNIT_LIB.optionxform = _do_nothing
 
 
 def import_library(libfilepointer):
-    """Import a units library, replacing any existing definitions."""
+    """Import a units library, replacing any existing definitions.
+
+    Args
+    ----
+    libfilepointer : file
+        new library file to work with
+
+    Returns
+    -------
+    ConfigParser
+        newly updated units library for the module
+    """
     global _UNIT_LIB
     global _UNIT_CACHE
     _UNIT_CACHE = {}
@@ -572,7 +732,13 @@ def update_library(filename):
 
 
 def _update_library(cfg):
-    """Update library from :class:`ConfigParser` `cfg`."""
+    """Update library from :class:`ConfigParser` `cfg`.
+
+    Args
+    ----
+    cfg: ConfigParser
+        ConfigParser loaded with unit_lib.ini data
+    """
     retry1 = set()
     for name, unit in cfg.items('units'):
         data = [item.strip() for item in unit.split(',')]
@@ -624,7 +790,18 @@ _UNIT_CACHE = {}
 
 
 def _find_unit(unit):
-    """Find unit helper function."""
+    """Find unit helper function.
+
+    Args
+    ----
+    unit: str
+        str representing the desired unit
+
+    Returns
+    -------
+    PhysicalUnit
+        The actual unit object
+    """
     if isinstance(unit, str):
         name = unit.strip()
         try:

@@ -263,9 +263,9 @@ class Assembler(object):
 
         # Broadcast to all procs
         if self._comm.size > 1:
-            op_units_raw = self.comm.allgather(op_units)
-            op_int_raw = self.comm.allgather(op_int)
-            op_flt_raw = self.comm.allgather(op_flt)
+            op_units_raw = self._comm.allgather(op_units)
+            op_int_raw = self._comm.allgather(op_int)
+            op_flt_raw = self._comm.allgather(op_flt)
 
             op_units = []
             for str_list in op_units_raw:
