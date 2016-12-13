@@ -188,7 +188,7 @@ class Matrix(object):
 
 
 def _compute_index_map(jrows, jcols, irow, icol, src_indices):
-    """Return row/column indices or slices to map sub-jacobian to global jac.
+    """Return row/column indices to map sub-jacobian to global jac.
 
     Args
     ----

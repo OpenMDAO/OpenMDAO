@@ -23,7 +23,6 @@ class CooMatrix(Matrix):
             number of cols in the matrix.
         """
         counter = 0
-        full_slice = slice(None)
 
         submat_meta_iter = ((self._op_submats, self._op_metadata),
                             (self._ip_submats, self._ip_metadata))
@@ -50,6 +49,7 @@ class CooMatrix(Matrix):
             for key in submats:
                 jac, irow, icol, src_indices = submats[key]
                 ind1, ind2 = metadata[key]
+                idxs = None
 
                 if isinstance(jac, ndarray):
                     rowrange = numpy.arange(jac.shape[0], dtype=int)
@@ -71,15 +71,12 @@ class CooMatrix(Matrix):
                     cols[ind1:ind2] += icol
                     data[ind1:ind2] = jac.flat
 
-                    idxs = full_slice
-
                 elif isinstance(jac, (coo_matrix, csr_matrix)):
                     coojac = jac.tocoo()
                     if src_indices is None:
                         data[ind1:ind2] = coojac.data
                         rows[ind1:ind2] = coojac.row + irow
                         cols[ind1:ind2] = coojac.col + icol
-                        idxs = full_slice
                     else:
                         irows, icols, idxs = _compute_index_map(coojac.row,
                                                                 coojac.col,
@@ -94,7 +91,6 @@ class CooMatrix(Matrix):
                         data[ind1:ind2] = jac[0]
                         rows[ind1:ind2] = irow + jac[1]
                         cols[ind1:ind2] = icol + jac[2]
-                        idxs = full_slice
                     else:
                         irows, icols, idxs = _compute_index_map(jac[1],
                                                                 jac[2],
@@ -106,8 +102,7 @@ class CooMatrix(Matrix):
 
                 # store reverse indices to avoid copying subjac data during
                 # update_submat.
-                if (metadata is self._ip_metadata and not isinstance(idxs,
-                                                                     slice)):
+                if (metadata is self._ip_metadata and idxs is not None):
                     metadata[key] = numpy.argsort(idxs) + ind1
                 else:
                     metadata[key] = slice(ind1, ind2)

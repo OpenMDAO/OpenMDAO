@@ -22,7 +22,6 @@ class CsrMatrix(Matrix):
             number of cols in the matrix.
         """
         counter = 0
-        full_slice = slice(None)
 
         submat_meta_iter = ((self._op_submats, self._op_metadata),
                             (self._ip_submats, self._ip_metadata))
@@ -49,6 +48,7 @@ class CsrMatrix(Matrix):
             for key in submats:
                 jac, irow, icol, src_indices = submats[key]
                 ind1, ind2 = metadata[key]
+                idxs = None
 
                 if isinstance(jac, ndarray):
                     rowrange = numpy.arange(jac.shape[0], dtype=int)
@@ -71,15 +71,12 @@ class CsrMatrix(Matrix):
                     cols[ind1:ind2] += icol
                     data[ind1:ind2] = jac.flat
 
-                    idxs = full_slice
-
                 elif isinstance(jac, (coo_matrix, csr_matrix)):
                     coojac = jac.tocoo()
                     if src_indices is None:
                         data[ind1:ind2] = coojac.data
                         rows[ind1:ind2] = coojac.row + irow
                         cols[ind1:ind2] = coojac.col + icol
-                        idxs = full_slice
                     else:
                         irows, icols, idxs = _compute_index_map(coojac.row,
                                                                 coojac.col,
@@ -99,7 +96,6 @@ class CsrMatrix(Matrix):
                         data[ind1:ind2] = jac[0]
                         rows[ind1:ind2] = irow + jac[1]
                         cols[ind1:ind2] = icol + jac[2]
-                        idxs = full_slice
                     else:
                         irows, icols, idxs = _compute_index_map(jac[1],
                                                                 jac[2],
@@ -133,7 +129,8 @@ class CsrMatrix(Matrix):
         # we can avoid copying the index array during updates.
         for key in self._ip_metadata:
             ind1, ind2, idxs = self._ip_metadata[key]
-            self._idxs[ind1:ind2] = self._idxs[ind1:ind2][idxs]
+            if idxs is not None:
+                self._idxs[ind1:ind2] = self._idxs[ind1:ind2][idxs]
             self._ip_metadata[key] = (ind1, ind2)  # don't need idxs any more
 
         # data array for the CSR should be the same as for the COO since
