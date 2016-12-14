@@ -13,7 +13,7 @@ environment:
 init:
   #Uncomment the following line to gain RDP access to an appveyor machine.
   #Login info will appear in the console
-  #- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
   - set CONDA=Miniconda
   - if "%PYTHON%" == "3.4" (set CONDA=%CONDA%3)
   - if "%PLATFORM%" == "x64" (set CONDA=%CONDA%-x64)
@@ -45,7 +45,6 @@ install:
   - if "%CONDA%" == "Miniconda3-x64" (pip install http://openmdao.org/dists/petsc4py-3.6.0-cp34-none-win_amd64.whl)
 
   #Return back to continue install of OpenMDAO
-  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
   - cd C:\projects\openmdao*
   - pip install -e .
 
