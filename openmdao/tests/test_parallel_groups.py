@@ -6,7 +6,10 @@ import unittest
 
 from openmdao.core.problem import Problem
 
-from openmdao.vectors.petsc_vector import PETScVector
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 from openmdao.test_suite.groups.parallel_groups import \
     FanOutGrouped, FanInGrouped, Diamond, ConvergeDiverge
@@ -17,6 +20,10 @@ from openmdao.devtools.testutil import assert_rel_error
 class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2
+
+    def setUp(self):
+        if PETScVector is None:
+            raise unittest.SkipTest("PETSc is required.")
 
     def test_fan_out_grouped(self):
 

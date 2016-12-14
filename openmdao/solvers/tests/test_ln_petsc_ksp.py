@@ -10,7 +10,10 @@ from openmdao.solvers.ln_bgs import LinearBlockGS
 
 from openmdao.core.problem import Problem
 
-from openmdao.vectors.petsc_vector import PETScVector
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
@@ -18,6 +21,9 @@ from openmdao.devtools.testutil import assert_rel_error
 
 
 class TestPetscKSP(unittest.TestCase):
+    def setUp(self):
+        if PETScVector is None:
+            raise unittest.SkipTest("PETSc is required.")
 
     def test_solve_linear_ksp_default(self):
         """Solve implicit system with PetscKSP using default method."""
