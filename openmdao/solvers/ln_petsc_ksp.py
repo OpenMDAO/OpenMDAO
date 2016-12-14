@@ -2,8 +2,11 @@
 
 from __future__ import division, print_function
 
-import petsc4py
-from petsc4py import PETSc
+try:
+    import petsc4py
+    from petsc4py import PETSc
+except ImportError:
+    PETSc = None
 
 from openmdao.solvers.solver import LinearSolver
 
@@ -62,13 +65,14 @@ def _get_petsc_vec_array_old(vec):
     return vec.getArray()
 
 
-try:
-    petsc_version = petsc4py.__version__
-except AttributeError:  # hack to fix doc-tests
-    petsc_version = "3.5"
+if PETSc:
+    try:
+        petsc_version = petsc4py.__version__
+    except AttributeError:  # hack to fix doc-tests
+        petsc_version = "3.5"
 
 
-if int((petsc_version).split('.')[1]) >= 6:
+if PETSc and int((petsc_version).split('.')[1]) >= 6:
     _get_petsc_vec_array = _get_petsc_vec_array_new
 else:
     _get_petsc_vec_array = _get_petsc_vec_array_old
@@ -149,6 +153,9 @@ class PetscKSP(LinearSolver):
         kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
+        if PETSc is None:
+            raise RuntimeError("PETSc is not available.")
+
         super(PetscKSP, self).__init__(**kwargs)
 
         self._print_name = 'KSP'

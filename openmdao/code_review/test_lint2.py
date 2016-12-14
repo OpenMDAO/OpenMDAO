@@ -114,8 +114,14 @@ class LintTestCase(unittest.TestCase):
             for file_name in os.listdir(dirpath):
                 if file_name != '__init__.py' and file_name[-3:] == '.py':
                     if print_info: print(file_name)
+
                     module_name = 'openmdao.%s.%s' % (dir_name, file_name[:-3])
-                    mod = importlib.import_module(module_name)
+                    try:
+                        mod = importlib.import_module(module_name)
+                    except ImportError as err:
+                        if print_info: print('Skipped:', err)
+                        # e.g. PETSc is not installed
+                        continue
 
                     # Loop over classes
                     classes = [x for x in dir(mod)
