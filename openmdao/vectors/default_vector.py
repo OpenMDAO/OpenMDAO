@@ -3,7 +3,7 @@ from __future__ import division
 import numpy
 
 import numbers
-from six.moves import range
+from six.moves import range, zip
 
 from openmdao.vectors.vector import Vector, Transfer
 
@@ -198,8 +198,8 @@ class DefaultVector(Vector):
         <Vector>
             self + vec
         """
-        for iset in range(len(self._data)):
-            self._data[iset] += vec._data[iset]
+        for data, vec_data in zip(self._data, vec._data):
+            data += vec_data
         return self
 
     def __isub__(self, vec):
@@ -215,8 +215,8 @@ class DefaultVector(Vector):
         <Vector>
             self - vec
         """
-        for iset in range(len(self._data)):
-            self._data[iset] -= vec._data[iset]
+        for data, vec_data in zip(self._data, vec._data):
+            data -= vec_data
         return self
 
     def __imul__(self, val):
@@ -246,8 +246,8 @@ class DefaultVector(Vector):
         vec : <Vector>
             this vector times val is added to self.
         """
-        for iset in range(len(self._data)):
-            self._data[iset] += val * vec._data[iset]
+        for data, vec_data in zip(self._data, vec._data):
+            data += val * vec_data
 
     def set_vec(self, vec):
         """Set the value of this vector to that of the incoming vector.
@@ -257,8 +257,8 @@ class DefaultVector(Vector):
         vec : <Vector>
             the vector whose values self is set to.
         """
-        for iset in range(len(self._data)):
-            self._data[iset][:] = vec._data[iset]
+        for data, vec_data in zip(self._data, vec._data):
+            data[:] = vec_data
 
     def set_const(self, val):
         """Set the value of this vector to a constant scalar value.

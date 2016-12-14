@@ -570,6 +570,10 @@ class System(object):
             with variables relevant to the current matrix vector product.
 
         """
+        # TODO: The 'Returns' in the docstring above should be 'Yields', but
+        #  our linter currently isn't smart enough to know that, so for now we
+        #  put 'Returns' in there.
+
         d_inputs = self._vectors['input'][vec_name]
         d_outputs = self._vectors['output'][vec_name]
         d_residuals = self._vectors['residual'][vec_name]
@@ -583,37 +587,25 @@ class System(object):
 
         # TODO: check if we can loop over myproc vars to save time
         op_names = []
+        res_names = []
         op_ind = self._variable_allprocs_range['output'][0]
         for op_name in self._variable_allprocs_names['output']:
-            valid = op_ind in self._vector_var_ids[vec_name]
-            if var_inds is not None:
-                valid = valid and \
-                    var_inds[0] <= op_ind < var_inds[1] or \
-                    var_inds[2] <= op_ind < var_inds[3]
-            if valid:
-                op_names.append(op_name)
+            if op_ind in self._vector_var_ids[vec_name]:
+                res_names.append(op_name)
+                if var_inds is None or (var_inds[0] <= op_ind < var_inds[1] or
+                                        var_inds[2] <= op_ind < var_inds[3]):
+                    op_names.append(op_name)
             op_ind += 1
 
         ip_names = []
         ip_ind = self._variable_allprocs_range['input'][0]
         for ip_name in self._variable_allprocs_names['input']:
             op_ind = self._sys_assembler._input_var_ids[ip_ind]
-            valid = op_ind in self._vector_var_ids[vec_name]
-            if var_inds is not None:
-                valid = valid and \
-                    var_inds[0] <= op_ind < var_inds[1] or \
-                    var_inds[2] <= op_ind < var_inds[3]
-            if valid:
-                ip_names.append(ip_name)
+            if op_ind in self._vector_var_ids[vec_name]:
+                if var_inds is None or (var_inds[0] <= op_ind < var_inds[1] or
+                                        var_inds[2] <= op_ind < var_inds[3]):
+                    ip_names.append(ip_name)
             ip_ind += 1
-
-        res_names = []
-        op_ind = self._variable_allprocs_range['output'][0]
-        for op_name in self._variable_allprocs_names['output']:
-            valid = op_ind in self._vector_var_ids[vec_name]
-            if valid:
-                res_names.append(op_name)
-            op_ind += 1
 
         d_inputs._names = set(ip_names)
         d_outputs._names = set(op_names)

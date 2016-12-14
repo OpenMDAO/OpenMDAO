@@ -62,7 +62,6 @@ class Assembler(object):
         self._src_indices = None
         self._src_indices_range = None
 
-        #
         self._src_units = []
         self._src_scaling_0 = None
         self._src_scaling_1 = None
@@ -135,10 +134,7 @@ class Assembler(object):
         iproc = self._comm.rank
         for typ in ['input', 'output']:
             for ivar, meta in enumerate(variable_metadata[typ]):
-                if typ == 'input':
-                    size = numpy.prod(meta['indices'].shape)
-                elif typ == 'output':
-                    size = numpy.prod(meta['shape'])
+                size = numpy.prod(meta['shape'])
                 ivar_all = variable_indices[typ][ivar]
                 iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
                 self._variable_sizes[typ][iset][iproc, ivar_set] = size
@@ -204,8 +200,12 @@ class Assembler(object):
         """
         # Compute total size of indices vector
         total_idx_size = 0
+        sizes = numpy.zeros(len(input_metadata), dtype=int)
+
         for ind, metadata in enumerate(input_metadata):
-            total_idx_size += numpy.prod(metadata['indices'].shape)
+            sizes[ind] = numpy.prod(metadata['shape'])
+
+        total_idx_size = numpy.sum(sizes)
 
         # Allocate arrays
         self._src_indices = numpy.zeros(total_idx_size, int)
@@ -215,9 +215,13 @@ class Assembler(object):
         # Populate arrays
         ind1, ind2 = 0, 0
         for ind, metadata in enumerate(input_metadata):
-            isize = numpy.prod(metadata['indices'].shape)
+            isize = sizes[ind]
             ind2 += isize
-            self._src_indices[ind1:ind2] = metadata['indices'].flat
+            indices = metadata['indices']
+            if indices is None:
+                self._src_indices[ind1:ind2] = numpy.arange(isize, dtype=int)
+            else:
+                self._src_indices[ind1:ind2] = indices.flat
             self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
                                                                           ind2]
             ind1 += isize
