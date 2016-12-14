@@ -13,6 +13,8 @@ language: generic
 env:
 - PY=2.7 MPI=1
 - PY=3.4 MPI=1
+- PY=2.7 MPI=
+- PY=3.4 MPI=
 
 
 addons:
