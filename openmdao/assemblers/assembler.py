@@ -134,10 +134,7 @@ class Assembler(object):
         iproc = self._comm.rank
         for typ in ['input', 'output']:
             for ivar, meta in enumerate(variable_metadata[typ]):
-                if typ == 'input' and meta['indices'] is not None:
-                    size = numpy.prod(meta['indices'].shape)
-                else:
-                    size = numpy.prod(meta['shape'])
+                size = numpy.prod(meta['shape'])
                 ivar_all = variable_indices[typ][ivar]
                 iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
                 self._variable_sizes[typ][iset][iproc, ivar_set] = size
@@ -206,11 +203,7 @@ class Assembler(object):
         sizes = numpy.zeros(len(input_metadata), dtype=int)
 
         for ind, metadata in enumerate(input_metadata):
-            indices = metadata['indices']
-            if indices is None:
-                sizes[ind] = numpy.prod(metadata['shape'])
-            else:
-                sizes[ind] = numpy.prod(indices.shape)
+            sizes[ind] = numpy.prod(metadata['shape'])
 
         total_idx_size = numpy.sum(sizes)
 

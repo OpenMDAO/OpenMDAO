@@ -51,6 +51,7 @@ class Component(System):
         metadata['value'] = val
         if 'indices' in kwargs:
             metadata['indices'] = numpy.array(kwargs['indices'])
+            metadata['shape'] = metadata['indices'].shape
         elif 'shape' not in kwargs and isinstance(val, numpy.ndarray):
             metadata['shape'] = val.shape
 
