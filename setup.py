@@ -55,6 +55,7 @@ setup(name='openmdao',
         'sqlitedict',
         'pep8', 'pep257',
         'testflo',
+        'nose-parameterized',
       ],
       #scripts=['bin/om-pylint.sh']
       entry_points="""
