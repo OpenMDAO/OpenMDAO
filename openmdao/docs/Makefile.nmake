@@ -54,16 +54,13 @@ clean:
 	IF EXIST srcdocs rmdir /s /q srcdocs
 
 mock:
-	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
+	@(python -c "import mock") || (echo "The 'mock' package \
 	is required to build the docs. Install with:\n pip install mock"; exit 1)
 
 html: mock
   rd /s /q $(BUILDDIR)/*
 	rd /s /q srcdocs/usr
 	rd /s /q srcdocs/dev
-	#rm -rf $(BUILDDIR)/*
-	#rm -rf srcdocs/usr
-	#rm -rf srcdocs/dev
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "usr"
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "dev"
 	@echo
