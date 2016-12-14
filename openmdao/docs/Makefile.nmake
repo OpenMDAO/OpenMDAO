@@ -53,11 +53,7 @@ clean:
 	IF EXIST $(BUILDDIR) rmdir /s /q $(BUILDDIR)
 	IF EXIST srcdocs rmdir /s /q srcdocs
 
-mock:
-	@(python -c "import mock") || (echo "The 'mock' package \
-	is required to build the docs. Install with:\n pip install mock"; exit 1)
-
-html: mock
+html:
   rd /s /q $(BUILDDIR)/*
 	rd /s /q srcdocs/usr
 	rd /s /q srcdocs/dev
