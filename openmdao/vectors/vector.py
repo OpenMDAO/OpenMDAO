@@ -35,7 +35,7 @@ class Vector(object):
         0 or slice(None), used so that 1-sized vectors are made floats.
     _names : set([str, ...])
         set of variables that are relevant in the current context.
-    _global_vector : Vector
+    _root_vector : Vector
         pointer to the vector owned by the root system.
     _data : list
         list of the actual allocated data (depends on implementation).
@@ -45,7 +45,7 @@ class Vector(object):
         list of index arrays mapping each entry to its variable index.
     """
 
-    def __init__(self, name, typ, system, global_vector=None):
+    def __init__(self, name, typ, system, root_vector=None):
         """Initialize all attributes.
 
         Args
@@ -56,7 +56,7 @@ class Vector(object):
             'input' for input vectors; 'output' for output/residual vectors.
         system : <System>
             pointer to the owning system.
-        global_vector : <Vector>
+        root_vector : <Vector>
             pointer to the vector owned by the root system.
         """
         self._name = name
@@ -74,16 +74,16 @@ class Vector(object):
         # set of variables relevant to the current matvec product.
         self._names = self._views
 
-        self._global_vector = None
+        self._root_vector = None
         self._data = []
         self._indices = []
         self._ivar_map = []
-        if global_vector is None:
-            self._global_vector = self
+        if root_vector is None:
+            self._root_vector = self
         else:
-            self._global_vector = global_vector
+            self._root_vector = root_vector
 
-        self._initialize_data(global_vector)
+        self._initialize_data(root_vector)
         self._initialize_views()
 
     def _create_subvector(self, system):
@@ -100,7 +100,7 @@ class Vector(object):
             subvector instance.
         """
         return self.__class__(self._name, self._typ, system,
-                              self._global_vector)
+                              self._root_vector)
 
     def _clone(self):
         """Return a copy that does not provide view access to its data.
@@ -111,25 +111,17 @@ class Vector(object):
             instance of the clone; the data is copied.
         """
         vec = self.__class__(self._name, self._typ, self._system,
-                             self._global_vector)
+                             self._root_vector)
         vec._clone_data()
         return vec
 
-    def _compute_ivar_map(self, ivar_map=None):
+    def _compute_ivar_map(self):
         """Compute the ivar_map.
 
         The ivar_map index vector is the same length as data and indices,
         and it yields the index of the local variable.
 
-        Args
-        ----
-        ivar_map : list or None
-            if not None, we can just set the attribute to this arg.
         """
-        if ivar_map is not None:
-            self._ivar_map = ivar_map
-            return
-
         variable_sizes = self._assembler._variable_sizes[self._typ]
         variable_set_indices = self._assembler._variable_set_indices[self._typ]
 
@@ -272,7 +264,7 @@ class Vector(object):
         else:
             raise KeyError("Variable '%s' not found." % key)
 
-    def _initialize_data(self, global_vector):
+    def _initialize_data(self, root_vector):
         """Internally allocate vectors.
 
         Must be implemented by the subclass.
@@ -283,7 +275,7 @@ class Vector(object):
 
         Args
         ----
-        global_vector : <Vector> or None
+        root_vector : <Vector> or None
             the root's vector instance or None, if we are at the root.
         """
         pass

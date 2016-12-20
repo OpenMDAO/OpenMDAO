@@ -79,7 +79,7 @@ class DefaultAssembler(Assembler):
         ip_ind1, ip_ind2 = var_range['input']
         op_ind1, op_ind2 = var_range['output']
         for ip_ind in range(ip_ind1, ip_ind2):
-            op_ind = self._input_var_ids[ip_ind]
+            op_ind = self._input_src_ids[ip_ind]
             if op_ind1 <= op_ind < op_ind2:
 
                 ip_isub = ip_isub_var[ip_ind - ip_ind1]
