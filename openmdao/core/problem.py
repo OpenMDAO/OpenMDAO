@@ -5,6 +5,7 @@ import sys
 
 from openmdao.assemblers.default_assembler import DefaultAssembler
 from openmdao.vectors.default_vector import DefaultVector
+from openmdao.error_checking.check_config import check_config
 
 
 class FakeComm(object):
@@ -127,7 +128,7 @@ class Problem(object):
         """
         return self.root._solve_nonlinear()
 
-    def setup(self, VectorClass=None, check=False, out_stream=sys.stdout):
+    def setup(self, VectorClass=None, check=False, logger=None):
         """Set up everything (root, assembler, vector, solvers, drivers).
 
         Args
@@ -136,8 +137,8 @@ class Problem(object):
             reference to an actual <Vector> class; not an instance.
         check : boolean
             whether to run error check after setup is complete.
-        out_stream : file
-            Output stream where report will be written if check is performed.
+        logger : object
+            Object for logging config checks if check is True.
 
         Returns
         -------
@@ -183,7 +184,8 @@ class Problem(object):
         # Vector setup for the linear vector
         self.setup_vector('', VectorClass, self._use_ref_vector)
 
-        # Vector setup for the
+        if check:
+            check_config(self, logger)
 
         return self
 
