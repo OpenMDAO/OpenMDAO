@@ -20,7 +20,7 @@ class TestCheckConfig(unittest.TestCase):
         C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0+v'))
 
         testlogger = TestLogger()
-        p.setup(check=True, logger=testlogger)
+        p.setup(logger=testlogger)
 
         self.assertEqual(len(testlogger.get('warning')), 1)
 

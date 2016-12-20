@@ -128,14 +128,14 @@ class Problem(object):
         """
         return self.root._solve_nonlinear()
 
-    def setup(self, VectorClass=None, check=False, logger=None):
+    def setup(self, VectorClass=DefaultVector, check=True, logger=None):
         """Set up everything (root, assembler, vector, solvers, drivers).
 
         Args
         ----
-        VectorClass : type
+        VectorClass : type (DefaultVector)
             reference to an actual <Vector> class; not an instance.
-        check : boolean
+        check : boolean (True)
             whether to run error check after setup is complete.
         logger : object
             Object for logging config checks if check is True.
@@ -148,9 +148,6 @@ class Problem(object):
         root = self.root
         comm = self.comm
         assembler = self._assembler
-
-        if VectorClass is None:
-            VectorClass = DefaultVector
 
         # Recursive system setup
         root._setup_processors('', comm, {}, 0, assembler, [0, comm.size])
