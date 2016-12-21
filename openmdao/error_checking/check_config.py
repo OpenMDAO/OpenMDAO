@@ -34,8 +34,10 @@ def check_config(problem, logger=None):
         console.setLevel(logging.INFO)
         logger.addHandler(console)
 
+    root = problem.root
+
     _check_hanging_inputs(problem, logger)
-    _check_cycles(problem, logger)
+    _check_cycles(root, logger)
 
 
 def compute_sys_graph(group, input_src_ids):
@@ -118,28 +120,23 @@ def get_cycles(group):
     return sccs
 
 
-def _check_cycles(problem, logger):
+def _check_cycles(group, logger):
     """Report any cycles found in any Group to the logger.
 
     Args
     ----
-    problem : <Problem>
-        The Problem to be checked for cycles.
+    group : <Group>
+        The Group being checked for cycles.
 
     logger : object
         The object that managers logging output.
     """
-    group_sccs = {}
-    for system in system_iter(problem.root, include_self=True, recurse=True):
+    for system in system_iter(group, include_self=True, recurse=True):
         if isinstance(system, Group):
             sccs = get_cycles(system)
             if sccs:
-                group_sccs[system.path_name] = sccs
-
-    if group_sccs:
-        for gname, gsccs in iteritems(group_sccs):
-            logger.warning("Group '%s' has the following cycles: %s" % (gname,
-                                                                        gsccs))
+                logger.warning("Group '%s' has the following cycles: %s" %
+                               (system.path_name, sccs))
 
 
 def _check_hanging_inputs(problem, logger):
