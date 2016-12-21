@@ -64,11 +64,13 @@ mock:
 	is required to build the docs. Install with:\n pip install mock"; exit 1)
 
 html: mock
+	python ../devtools/create_feature_docs_unit_test_db.py
 	rm -rf $(BUILDDIR)/*
 	rm -rf srcdocs/usr
 	rm -rf srcdocs/dev
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr"
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "dev"
+	rm feature_docs_unit_test_db.sqlite
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 

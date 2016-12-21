@@ -395,6 +395,7 @@ def setup(app):
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('./exts'))
 
 if (type == "usr"):
     absp = os.path.join('.', 'srcdocs', 'usr')
@@ -420,7 +421,8 @@ extensions = [
     'sphinx.ext.coverage',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'numpydoc'
+    'numpydoc',
+    'showUnitTestExamples'
 ]
 
 numpydoc_show_class_members = False
