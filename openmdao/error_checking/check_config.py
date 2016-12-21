@@ -9,6 +9,7 @@ from scipy.sparse.csgraph import connected_components
 from six import iteritems
 
 from openmdao.core.group import Group
+from openmdao.core.component import Component
 from openmdao.devtools.compat import abs_varname_iter, system_iter
 
 
@@ -40,7 +41,7 @@ def check_config(problem, logger=None):
     _check_cycles(root, logger)
 
 
-def compute_sys_graph(group, input_src_ids):
+def compute_sys_graph(group, input_src_ids, recurse=False):
     """Compute a dependency graph for subsystems in the given group.
 
     Args
@@ -52,13 +53,27 @@ def compute_sys_graph(group, input_src_ids):
         Array containing global variable ids for sources of the inputs
         indicated by the index into the array.
 
+    recurse : bool (False)
+        If True, return a graph of all components within the given group
+        or any of its descendants.  Otherwise, a graph containing only
+        direct children of the group will be returned.
+
     Returns
     -------
     csr_matrix
         A graph in the form of a sparse (CSR) adjacency matrix.
 
+    list of <System>
+        A list of subsystems of the given group, either direct children
+        or all directly or indirectly contained Components, depending
+        upon the value of the 'recurse' arg.
+
     """
-    subsystems = group._subsystems_allprocs
+    if recurse:
+        subsystems = list(system_iter(group, recurse=True, typ=Component))
+    else:
+        subsystems = group._subsystems_allprocs
+
     nsubs = len(subsystems)
 
     i_start, i_end = group._variable_allprocs_range['input']
@@ -87,10 +102,10 @@ def compute_sys_graph(group, input_src_ids):
 
     data = numpy.ones(len(rows))
 
-    return csr_matrix((data, (rows, cols)), shape=(nsubs, nsubs))
+    return csr_matrix((data, (rows, cols)), shape=(nsubs, nsubs)), subsystems
 
 
-def get_cycles(group):
+def get_cycles(group, recurse=False):
     """Return all system cycles found in the given group.
 
     Args
@@ -98,14 +113,19 @@ def get_cycles(group):
     group : <Group>
         The Group being checked for cycles.
 
+    recurse : bool (False)
+        If True, return cycles between all components within the given group
+        or any of its descendants.  Otherwise, only cycles involving
+        direct children of the group will be returned.
+
     Returns
     -------
     list of lists of str
         List of all cycles found. Each cycle is a list of subsystem pathnames
         of systems belonging to that cycle.
     """
-    subs = group._subsystems_allprocs
-    graph = compute_sys_graph(group, group._sys_assembler._input_src_ids)
+    graph, subs = compute_sys_graph(group, group._sys_assembler._input_src_ids,
+                                    recurse=recurse)
     num_sccs, labels = connected_components(graph, connection='strong')
 
     sccs = []
