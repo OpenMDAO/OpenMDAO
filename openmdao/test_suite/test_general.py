@@ -18,7 +18,11 @@ from openmdao.parallel_api import PETScVector
 from nose_parameterized import parameterized
 
 def custom_name(testcase_func, param_num, param):
-    return 'test_' + '_'.join(p.__name__ for p in param.args[:2]) + '_' + '_'.join(str(p) for p in param.args[2:])
+    return ''.join(('test_',
+                    '_'.join(p.__name__ for p in param.args[:2]),
+                    '_',
+                    '_'.join(str(p) for p in param.args[2:]))
+                   )
 
 class CompTestCaseBase(unittest.TestCase):
     """The TestCase that actually runs all of the cases inherits from this."""
