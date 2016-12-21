@@ -22,7 +22,7 @@ class TestDirectSolver(unittest.TestCase):
         group = TestImplicitGroup(lnSolverClass=DirectSolver)
 
         p = Problem(group)
-        p.setup()
+        p.setup(check=False)
 
         # forward
         group._vectors['residual'][''].set_const(1.0)
@@ -48,7 +48,7 @@ class TestDirectSolver(unittest.TestCase):
         group.ln_solver.options['method'] = 'LU'
 
         p = Problem(group)
-        p.setup()
+        p.setup(check=False)
 
         # forward
         group._vectors['residual'][''].set_const(1.0)
