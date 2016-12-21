@@ -4,25 +4,27 @@ from sphinx.util.compat import Directive
 from subprocess import call
 import os
 
-# class unittest (nodes.General, nodes.Element):
-#     pass
-#
 
 class showUnitTestExamplesDirective(Directive):
     """directive to allow unit test examples to be shown in feature doc"""
     required_arguments = 1
-    optional_arguments = 0
-    has_content = True ###########
+    optional_arguments = 10
+    has_content = True
 
     def run(self):
-        print ( self.content)
+        literals = []
         from openmdao.docs.utils.get_test_source_code_for_feature import get_test_source_code_for_feature
-        #code = get_test_source_code_for_feature(self.content)##############
-        code = get_test_source_code_for_feature("indepvarcomp")##############
-        print (code)
-        literal = nodes.literal_block(code, code)
-        literal['language'] = 'python'
-        return [literal]
+        for arg in self.arguments:
+            code = get_test_source_code_for_feature(arg)
+            if not code:
+                continue
+            else:
+                print code                    
+                literal = nodes.literal_block(code, code)
+                literal['language'] = 'python'
+                literals.append(literal)
+
+        return literals
 
 def setup(app):
     """Setup directive"""

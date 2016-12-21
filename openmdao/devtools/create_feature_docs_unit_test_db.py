@@ -118,7 +118,6 @@ for t in suite:
                 class_name = cls.__name__
                 method_name = q._testMethodName
                 method_path = '.'.join([module_path, class_name, method_name])
-                print (method_path)
                 test_doc = getattr(cls,method_name).__doc__
                 if test_doc:
                     test_doc_numpy = NumpyDocString(test_doc)
