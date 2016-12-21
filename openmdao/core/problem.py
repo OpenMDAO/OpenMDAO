@@ -128,7 +128,7 @@ class Problem(object):
         """
         return self.root._solve_nonlinear()
 
-    def setup(self, VectorClass=DefaultVector, check=True, logger=None):
+    def setup(self, vector_class=DefaultVector, check=True, logger=None):
         """Set up everything (root, assembler, vector, solvers, drivers).
 
         Args

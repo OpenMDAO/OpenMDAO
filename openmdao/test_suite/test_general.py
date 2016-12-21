@@ -44,7 +44,7 @@ class CompTestCaseBase(unittest.TestCase):
         range(1, 3),
         [(1,), (2,), (2, 1), (1, 2)],
     ), testcase_func_name=custom_name)
-    def test_openmdao(self, component, vector, connection_type, global_jac, jacobian_type,
+    def test_openmdao(self, component_class, vector_class, connection_type, global_jac, jacobian_type,
                       partial_type, num_var, num_comp, var_shape):
 
         group = TestGroupFlat(num_comp=num_comp, num_var=num_var,
@@ -52,9 +52,9 @@ class CompTestCaseBase(unittest.TestCase):
                               connection_type=connection_type,
                               jacobian_type=jacobian_type,
                               partial_type=partial_type,
-                              component=component,
+                              component_class=component_class,
                               )
-        prob = Problem(group).setup(vector, check=False)
+        prob = Problem(group).setup(vector_class, check=False)
 
         if global_jac:
             if jacobian_type == 'dense':
@@ -81,9 +81,9 @@ class CompTestCaseBase(unittest.TestCase):
         size = numpy.prod(var_shape)
         work = prob.root._vectors['output']['']._clone()
         work.set_const(1.0)
-        if component == TestImplCompNondLinear:
+        if component_class == TestImplCompNondLinear:
             val = 1 - 0.01 + 0.01 * size * num_var * num_comp
-        elif component == TestExplCompNondLinear:
+        elif component_class == TestExplCompNondLinear:
             val = 1 - 0.01 * size * num_var * (num_comp - 1)
 
         # 1. fwd apply_linear test

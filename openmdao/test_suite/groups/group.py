@@ -19,7 +19,7 @@ class TestGroupFlat(Group):
         self.metadata.declare('connection_type', typ=str, value='explicit',
                               values=['explicit', 'implicit'],
                               desc='how to connect variables')
-        self.metadata.declare('component',
+        self.metadata.declare('component_class',
                               desc='Component class to instantiate')
         self.metadata.declare('jacobian_type', value='matvec',
                               values=['matvec', 'dense', 'sparse-coo',
