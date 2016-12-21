@@ -49,7 +49,7 @@ class CompTestCaseBase(unittest.TestCase):
                               partial_type=partial_type,
                               Component=Component,
                               )
-        prob = Problem(group).setup(Vector)
+        prob = Problem(group).setup(Vector, check=False)
 
         if jacobian_type == 'dense':
             prob.root.jacobian = GlobalJacobian(Matrix=DenseMatrix)

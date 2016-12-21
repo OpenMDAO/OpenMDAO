@@ -306,6 +306,7 @@ class TestConnectionsPromoted(unittest.TestCase):
         C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0'), promotes=['x'])
 
         p.setup(check=False)
+        p.root.suppress_solver_output = True
 
         # setting promoted name will set the value into the outputs, but will
         # not propagate it to the inputs. That will happen during run().
@@ -333,6 +334,7 @@ class TestConnectionsPromoted(unittest.TestCase):
 
         p.root.connect('G1.x', 'G3.x')
         p.setup(check=False)
+        p.root.suppress_solver_output = True
 
         # setting promoted name will set the value into the outputs, but will
         # not propagate it to the inputs. That will happen during run().

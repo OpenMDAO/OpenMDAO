@@ -22,6 +22,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
 
         p = Problem(group)
         p.setup(check=False)
+        p.root.suppress_solver_output = True
 
         # forward
         group._vectors['residual'][''].set_const(1.0)
@@ -47,6 +48,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
 
         p = Problem(group)
         p.setup(check=False)
+        p.root.suppress_solver_output = True
 
         # forward
         group._vectors['residual'][''].set_const(1.0)

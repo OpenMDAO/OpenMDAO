@@ -31,7 +31,7 @@ def convert_file():
 
     sys.stdout.write(contents)
 
-def system_iter(system, local=True, include_self=False, recurse=True):
+def system_iter(system, local=True, include_self=False, recurse=True, typ=None):
     """A generator of ancestor systems of the given system.
 
     Args
@@ -49,6 +49,9 @@ def system_iter(system, local=True, include_self=False, recurse=True):
     recurse : bool (True)
         If True, iterate over the whole tree under system.
 
+    typ : type
+        If not None, only yield Systems that match that are instances of the
+        given type.
     """
     if local:
         sysiter = system._subsystems_myproc
@@ -56,12 +59,14 @@ def system_iter(system, local=True, include_self=False, recurse=True):
         sysiter = system._subsystems_allprocs
 
     if include_self:
-        yield system
+        if typ is None or isinstance(system, typ):
+            yield system
 
     for s in sysiter:
-        yield s
+        if typ is None or isinstance(s, typ):
+            yield s
         if recurse:
-            for sub in system_iter(s, local=local, recurse=True):
+            for sub in system_iter(s, local=local, recurse=True, typ=typ):
                 yield sub
 
 def abs_varname_iter(system, typ, local=True):
