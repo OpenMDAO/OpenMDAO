@@ -54,7 +54,11 @@ clean:
 	IF EXIST srcdocs rmdir /s /q srcdocs
 
 html:
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html
+  rd /s /q $(BUILDDIR)/*
+	rd /s /q srcdocs/usr
+	rd /s /q srcdocs/dev
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "usr"
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "dev"
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)\html."
 

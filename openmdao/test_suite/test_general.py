@@ -13,9 +13,14 @@ from openmdao.test_suite.groups.group import TestGroupFlat
 from openmdao.api import Problem
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
 from openmdao.api import GlobalJacobian, DenseMatrix, CooMatrix, CsrMatrix
-from openmdao.parallel_api import PETScVector
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 from nose_parameterized import parameterized
+
 
 def custom_name(testcase_func, param_num, param):
     return ''.join(('test_',
@@ -24,12 +29,13 @@ def custom_name(testcase_func, param_num, param):
                     '_'.join(str(p) for p in param.args[2:]))
                    )
 
+
 class CompTestCaseBase(unittest.TestCase):
     """The TestCase that actually runs all of the cases inherits from this."""
 
     @parameterized.expand(itertools.product(
         [TestImplCompNondLinear, TestExplCompNondLinear],
-        [DefaultVector, PETScVector],
+        [DefaultVector, PETScVector] if PETScVector else [DefaultVector],
         ['implicit', 'explicit'],
         [True, False],
         ['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
@@ -48,7 +54,7 @@ class CompTestCaseBase(unittest.TestCase):
                               partial_type=partial_type,
                               component=component,
                               )
-        prob = Problem(group).setup(vector)
+        prob = Problem(group).setup(vector, check=False)
 
         if global_jac:
             if jacobian_type == 'dense':

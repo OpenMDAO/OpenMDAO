@@ -1,6 +1,7 @@
 """Define the Group class."""
 from __future__ import division
 
+import numpy
 from six import iteritems
 import warnings
 
@@ -107,6 +108,11 @@ class Group(System):
             variable, you can specify which indices of the source to be
             transferred to the input here.
         """
+        if ip_name in self._variable_connections:
+            srcname = self._variable_connections[ip_name][0]
+            raise RuntimeError("Input '%s' is already connected to '%s'" %
+                               (ip_name, srcname))
+
         self._variable_connections[ip_name] = (op_name, src_indices)
 
     def _setup_connections(self):
@@ -161,7 +167,6 @@ class Group(System):
                             meta = input_meta[ip_myproc_index]
                             meta['indices'] = numpy.array(src_indices,
                                                           dtype=int)
-                            meta['shape'] = meta['indices'].shape
 
                         # set src_indices to None to avoid unnecessary
                         # repeat of setting indices and shape metadata

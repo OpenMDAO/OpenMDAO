@@ -366,7 +366,7 @@ class System(object):
         if use_ref_vector:
             vectors['input']._compute_ivar_map()
             vectors['output']._compute_ivar_map()
-            vectors['residual']._compute_ivar_map(vectors['output']._ivar_map)
+            vectors['residual']._ivar_map = vectors['output']._ivar_map
 
         # Compute the transfer for this vector set
         self._vector_transfers[vec_name] = self._get_transfers(vectors)
@@ -385,7 +385,7 @@ class System(object):
         for subsys in self._subsystems_myproc:
 
             sub_vectors = {}
-            for key in ['input', 'output', 'residual']:
+            for key in ('input', 'output', 'residual'):
                 sub_vectors[key] = vectors[key]._create_subvector(subsys)
 
             subsys._setup_vector(sub_vectors, vector_var_ids, use_ref_vector)
@@ -396,7 +396,7 @@ class System(object):
         nvar_out = len(self._variable_myproc_metadata['output'])
 
         # Initialize scaling arrays
-        for scaling in [self._scaling_to_norm, self._scaling_to_phys]:
+        for scaling in (self._scaling_to_norm, self._scaling_to_phys):
             scaling['input'] = numpy.empty((nvar_in, 2))
             scaling['output'] = numpy.empty((nvar_out, 2))
             scaling['residual'] = numpy.empty((nvar_out, 2))
@@ -416,14 +416,13 @@ class System(object):
             self._scaling_to_phys['input'][ind, 1] = \
                 convert_units(src_1[ind], src_units[ind], meta['units'])
 
-        # Compute scaling arrays for outputs; no unit conversion needed
         for ind, meta in enumerate(self._variable_myproc_metadata['output']):
+            # Compute scaling arrays for outputs; no unit conversion needed
             self._scaling_to_phys['output'][ind, 0] = meta['ref0']
             self._scaling_to_phys['output'][ind, 1] = \
                 meta['ref'] - meta['ref0']
 
-        # Compute scaling arrays for outputs; convert units
-        for ind, meta in enumerate(self._variable_myproc_metadata['output']):
+            # Compute scaling arrays for residuals; convert units
             self._scaling_to_phys['residual'][ind, 0] = \
                 convert_units(meta['ref0'], meta['units'], meta['res_units'])
             self._scaling_to_phys['residual'][ind, 1] = \
@@ -464,9 +463,9 @@ class System(object):
         compute_transfers = self._sys_assembler._compute_transfers
         xfer_indices = compute_transfers(nsub_allprocs, var_range,
                                          subsystems_myproc, subsystems_inds)
-        [xfer_ip_inds, xfer_op_inds,
+        (xfer_ip_inds, xfer_op_inds,
          fwd_xfer_ip_inds, fwd_xfer_op_inds,
-         rev_xfer_ip_inds, rev_xfer_op_inds] = xfer_indices
+         rev_xfer_ip_inds, rev_xfer_op_inds) = xfer_indices
 
         # Create Transfer objects from the raw indices
         transfers = {}
@@ -570,6 +569,10 @@ class System(object):
             with variables relevant to the current matrix vector product.
 
         """
+        # TODO: The 'Returns' in the docstring above should be 'Yields', but
+        #  our linter currently isn't smart enough to know that, so for now we
+        #  put 'Returns' in there.
+
         d_inputs = self._vectors['input'][vec_name]
         d_outputs = self._vectors['output'][vec_name]
         d_residuals = self._vectors['residual'][vec_name]
@@ -583,37 +586,25 @@ class System(object):
 
         # TODO: check if we can loop over myproc vars to save time
         op_names = []
+        res_names = []
         op_ind = self._variable_allprocs_range['output'][0]
         for op_name in self._variable_allprocs_names['output']:
-            valid = op_ind in self._vector_var_ids[vec_name]
-            if var_inds is not None:
-                valid = valid and \
-                    var_inds[0] <= op_ind < var_inds[1] or \
-                    var_inds[2] <= op_ind < var_inds[3]
-            if valid:
-                op_names.append(op_name)
+            if op_ind in self._vector_var_ids[vec_name]:
+                res_names.append(op_name)
+                if var_inds is None or (var_inds[0] <= op_ind < var_inds[1] or
+                                        var_inds[2] <= op_ind < var_inds[3]):
+                    op_names.append(op_name)
             op_ind += 1
 
         ip_names = []
         ip_ind = self._variable_allprocs_range['input'][0]
         for ip_name in self._variable_allprocs_names['input']:
-            op_ind = self._sys_assembler._input_var_ids[ip_ind]
-            valid = op_ind in self._vector_var_ids[vec_name]
-            if var_inds is not None:
-                valid = valid and \
-                    var_inds[0] <= op_ind < var_inds[1] or \
-                    var_inds[2] <= op_ind < var_inds[3]
-            if valid:
-                ip_names.append(ip_name)
+            op_ind = self._sys_assembler._input_src_ids[ip_ind]
+            if op_ind in self._vector_var_ids[vec_name]:
+                if var_inds is None or (var_inds[0] <= op_ind < var_inds[1] or
+                                        var_inds[2] <= op_ind < var_inds[3]):
+                    ip_names.append(ip_name)
             ip_ind += 1
-
-        res_names = []
-        op_ind = self._variable_allprocs_range['output'][0]
-        for op_name in self._variable_allprocs_names['output']:
-            valid = op_ind in self._vector_var_ids[vec_name]
-            if valid:
-                res_names.append(op_name)
-            op_ind += 1
 
         d_inputs._names = set(ip_names)
         d_outputs._names = set(op_names)
@@ -659,7 +650,9 @@ class System(object):
     def suppress_solver_output(self, value):
         """Recursively set the solver print suppression toggle."""
         self._suppress_solver_output = value
-        for subsys in self._subsystems_myproc:
+        # loop over _subsystems_allprocs here because _subsystems_myprocs
+        # is empty until setup
+        for subsys in self._subsystems_allprocs:
             subsys.suppress_solver_output = value
 
     @property

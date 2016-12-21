@@ -17,7 +17,7 @@ class Component(System):
         'shape': (1,),
         'units': '',
         'var_set': 0,
-        'indices': [0],
+        'indices': None,
     }
 
     OUTPUT_DEFAULTS = {
@@ -48,13 +48,11 @@ class Component(System):
         metadata = self.INPUT_DEFAULTS.copy()
         metadata.update(kwargs)
 
-        if isinstance(val, numpy.ndarray) and 'indices' not in kwargs:
-            metadata['indices'] = numpy.arange(0, val.size, dtype=int)
-        else:
-            metadata['indices'] = numpy.array(metadata['indices'])
-
         metadata['value'] = val
-        if isinstance(val, numpy.ndarray):
+        if 'indices' in kwargs:
+            metadata['indices'] = numpy.array(kwargs['indices'])
+            metadata['shape'] = metadata['indices'].shape
+        elif 'shape' not in kwargs and isinstance(val, numpy.ndarray):
             metadata['shape'] = val.shape
 
         self._variable_allprocs_names['input'].append(name)
@@ -77,7 +75,7 @@ class Component(System):
         metadata.update(kwargs)
 
         metadata['value'] = val
-        if isinstance(val, numpy.ndarray):
+        if 'shape' not in kwargs and isinstance(val, numpy.ndarray):
             metadata['shape'] = val.shape
 
         self._variable_allprocs_names['output'].append(name)
@@ -112,6 +110,13 @@ class Component(System):
 
         # Components must load their initial input and output values into the
         # vectors.
+
+        # Note: It's possible for meta['value'] to not match
+        #       meta['shape'], and input and output vectors are sized according
+        #       to shape, so if, for example, value is not specified it
+        #       defaults to 1.0 and the shape can be anything, resulting in the
+        #       value of 1.0 being broadcast into all values in the vector
+        #       that were allocated according to the shape.
         if vectors['input']._name is None:
             names = self._variable_myproc_names['input']
             inputs = self._inputs

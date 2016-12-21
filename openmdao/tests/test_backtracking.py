@@ -65,6 +65,7 @@ class TestBackTracking(unittest.TestCase):
         root.nl_solver.set_subsolver('linear', root.ln_solver)
 
         top.setup(check=False)
+        root.suppress_solver_output = True
         top['comp.x'] = 1.0
         top.run()
 

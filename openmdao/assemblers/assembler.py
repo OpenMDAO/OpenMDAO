@@ -29,7 +29,7 @@ class Assembler(object):
                              'output': ndarray[nvar_all, 2]}
         the first column is the var_set ID and
         the second column is the variable index within the var_set.
-    _input_var_ids : int ndarray[num_input_var]
+    _input_src_ids : int ndarray[num_input_var]
         the output variable ID for each input variable ID.
     _src_indices : int ndarray[:]
         all the input indices vectors concatenated together.
@@ -58,11 +58,10 @@ class Assembler(object):
         self._variable_set_IDs = {'input': {}, 'output': {}}
         self._variable_set_indices = {'input': None, 'output': None}
 
-        self._input_var_ids = None
+        self._input_src_ids = None
         self._src_indices = None
         self._src_indices_range = None
 
-        #
         self._src_units = []
         self._src_scaling_0 = None
         self._src_scaling_1 = None
@@ -135,10 +134,7 @@ class Assembler(object):
         iproc = self._comm.rank
         for typ in ['input', 'output']:
             for ivar, meta in enumerate(variable_metadata[typ]):
-                if typ == 'input':
-                    size = numpy.prod(meta['indices'].shape)
-                elif typ == 'output':
-                    size = numpy.prod(meta['shape'])
+                size = numpy.prod(meta['shape'])
                 ivar_all = variable_indices[typ][ivar]
                 iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
                 self._variable_sizes[typ][iset][iproc, ivar_set] = size
@@ -158,7 +154,7 @@ class Assembler(object):
         """Identify implicit connections and combine with explicit ones.
 
         Sets the following attributes:
-            _input_var_ids
+            _input_src_ids
 
         Args
         ----
@@ -170,12 +166,12 @@ class Assembler(object):
         """
         out_names = variable_allprocs_names['output']
         nvar_input = len(variable_allprocs_names['input'])
-        _input_var_ids = -numpy.ones(nvar_input, int)
+        _input_src_ids = -numpy.ones(nvar_input, int)
 
-        # Add user defined connections to the _input_var_ids vector
+        # Add user defined connections to the _input_src_ids vector
         # and inconns
         for ip_ID, op_ID in connections:
-            _input_var_ids[ip_ID] = op_ID
+            _input_src_ids[ip_ID] = op_ID
 
         # Loop over input variables
         for ip_ID, name in enumerate(variable_allprocs_names['input']):
@@ -183,10 +179,10 @@ class Assembler(object):
             # If name is also an output variable, add this implicit connection
             for op_ID, oname in enumerate(out_names):
                 if name == oname:
-                    _input_var_ids[ip_ID] = op_ID
+                    _input_src_ids[ip_ID] = op_ID
                     break
 
-        self._input_var_ids = _input_var_ids
+        self._input_src_ids = _input_src_ids
 
     def _setup_src_indices(self, input_metadata, myproc_var_global_indices):
         """Assemble global list of src_indices.
@@ -204,8 +200,12 @@ class Assembler(object):
         """
         # Compute total size of indices vector
         total_idx_size = 0
+        sizes = numpy.zeros(len(input_metadata), dtype=int)
+
         for ind, metadata in enumerate(input_metadata):
-            total_idx_size += numpy.prod(metadata['indices'].shape)
+            sizes[ind] = numpy.prod(metadata['shape'])
+
+        total_idx_size = numpy.sum(sizes)
 
         # Allocate arrays
         self._src_indices = numpy.zeros(total_idx_size, int)
@@ -215,9 +215,13 @@ class Assembler(object):
         # Populate arrays
         ind1, ind2 = 0, 0
         for ind, metadata in enumerate(input_metadata):
-            isize = numpy.prod(metadata['indices'].shape)
+            isize = sizes[ind]
             ind2 += isize
-            self._src_indices[ind1:ind2] = metadata['indices'].flat
+            indices = metadata['indices']
+            if indices is None:
+                self._src_indices[ind1:ind2] = numpy.arange(isize, dtype=int)
+            else:
+                self._src_indices[ind1:ind2] = indices.flat
             self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
                                                                           ind2]
             ind1 += isize
@@ -263,11 +267,11 @@ class Assembler(object):
             op_flt = numpy.vstack(op_flt_raw)
 
         # Now, we can store ref0 and ref for each input
-        nvar_in = len(self._input_var_ids)
+        nvar_in = len(self._input_src_ids)
         self._src_units = [None for ind in range(nvar_in)]
         self._src_scaling_0 = numpy.empty(nvar_in)
         self._src_scaling_1 = numpy.empty(nvar_in)
-        for ivar_in, ivar_out in enumerate(self._input_var_ids):
+        for ivar_in, ivar_out in enumerate(self._input_src_ids):
             if ivar_out != -1:
                 ind = numpy.where(op_int == ivar_out)[0][0]
                 self._src_units[ivar_in] = op_units[ind]

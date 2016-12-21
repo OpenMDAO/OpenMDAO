@@ -3,7 +3,7 @@ from __future__ import division
 import numpy
 
 import numbers
-from six.moves import range
+from six.moves import range, zip
 
 from openmdao.vectors.vector import Vector, Transfer
 
@@ -34,16 +34,16 @@ class DefaultTransfer(Transfer):
                 if len(self._ip_inds[key]) > 0:
                     ip_inds = self._ip_inds[key]
                     op_inds = self._op_inds[key]
-                    tmp = op_vec._global_vector._data[op_iset][op_inds]
-                    ip_vec._global_vector._data[ip_iset][ip_inds] = tmp
+                    tmp = op_vec._root_vector._data[op_iset][op_inds]
+                    ip_vec._root_vector._data[ip_iset][ip_inds] = tmp
         elif mode == 'rev':
             for ip_iset, op_iset in self._ip_inds:
                 key = (ip_iset, op_iset)
                 if len(self._ip_inds[key]) > 0:
                     ip_inds = self._ip_inds[key]
                     op_inds = self._op_inds[key]
-                    tmp = ip_vec._global_vector._data[ip_iset][ip_inds]
-                    numpy.add.at(op_vec._global_vector._data[op_iset],
+                    tmp = ip_vec._root_vector._data[ip_iset][ip_inds]
+                    numpy.add.at(op_vec._root_vector._data[op_iset],
                                  op_inds, tmp)
 
 
@@ -71,9 +71,8 @@ class DefaultVector(Vector):
         sizes_all = self._assembler._variable_sizes_all[self._typ]
         sizes = self._assembler._variable_sizes[self._typ]
 
-        for ind in range(len(variable_indices)):
+        for ind, ivar_all in enumerate(variable_indices):
             var_name = variable_names[ind]
-            ivar_all = variable_indices[ind]
             ivar_set, ivar = set_indices[ivar_all, :]
 
             ind1 = numpy.sum(sizes[ivar_set][self._iproc, :ivar])
@@ -85,7 +84,7 @@ class DefaultVector(Vector):
         return data, indices
 
     def _extract_data(self):
-        """Extract views of arrays from global_vector.
+        """Extract views of arrays from root_vector.
 
         Returns
         -------
@@ -107,8 +106,8 @@ class DefaultVector(Vector):
                 sizes_array = variable_sizes[iset]
                 ind1 = numpy.sum(sizes_array[self._iproc, :data_inds[0]])
                 ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
-                data.append(self._global_vector._data[iset][ind1:ind2])
-                indices.append(self._global_vector._indices[iset][ind1:ind2] -
+                data.append(self._root_vector._data[iset][ind1:ind2])
+                indices.append(self._root_vector._indices[iset][ind1:ind2] -
                                ind1)
             else:
                 data.append(numpy.zeros(0))
@@ -116,7 +115,7 @@ class DefaultVector(Vector):
 
         return data, indices
 
-    def _initialize_data(self, global_vector):
+    def _initialize_data(self, root_vector):
         """Internally allocate vectors.
 
         Sets the following attributes:
@@ -125,10 +124,10 @@ class DefaultVector(Vector):
 
         Args
         ----
-        global_vector : Vector or None
+        root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
-        if global_vector is None:
+        if root_vector is None:
             self._data, self._indices = self._create_data()
         else:
             self._data, self._indices = self._extract_data()
@@ -163,8 +162,8 @@ class DefaultVector(Vector):
             iset, ivar = variable_set_indices[ivar_all, :]
             ind1 = numpy.sum(variable_sizes[iset][self._iproc, :ivar])
             ind2 = numpy.sum(variable_sizes[iset][self._iproc, :ivar + 1])
-            views[name] = self._global_vector._data[iset][ind1:ind2]
-            views_flat[name] = self._global_vector._data[iset][ind1:ind2]
+            views[name] = self._root_vector._data[iset][ind1:ind2]
+            views_flat[name] = self._root_vector._data[iset][ind1:ind2]
             views[name].shape = meta[ind]['shape']
             val = meta[ind]['value']
 
@@ -198,8 +197,8 @@ class DefaultVector(Vector):
         <Vector>
             self + vec
         """
-        for iset in range(len(self._data)):
-            self._data[iset] += vec._data[iset]
+        for data, vec_data in zip(self._data, vec._data):
+            data += vec_data
         return self
 
     def __isub__(self, vec):
@@ -215,8 +214,8 @@ class DefaultVector(Vector):
         <Vector>
             self - vec
         """
-        for iset in range(len(self._data)):
-            self._data[iset] -= vec._data[iset]
+        for data, vec_data in zip(self._data, vec._data):
+            data -= vec_data
         return self
 
     def __imul__(self, val):
@@ -246,8 +245,8 @@ class DefaultVector(Vector):
         vec : <Vector>
             this vector times val is added to self.
         """
-        for iset in range(len(self._data)):
-            self._data[iset] += val * vec._data[iset]
+        for data, vec_data in zip(self._data, vec._data):
+            data += val * vec_data
 
     def set_vec(self, vec):
         """Set the value of this vector to that of the incoming vector.
@@ -257,8 +256,8 @@ class DefaultVector(Vector):
         vec : <Vector>
             the vector whose values self is set to.
         """
-        for iset in range(len(self._data)):
-            self._data[iset][:] = vec._data[iset]
+        for data, vec_data in zip(self._data, vec._data):
+            data[:] = vec_data
 
     def set_const(self, val):
         """Set the value of this vector to a constant scalar value.

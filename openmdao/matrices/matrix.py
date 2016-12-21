@@ -96,9 +96,9 @@ class Matrix(object):
         icol : int
             the starting col index (offset) for this sub-jacobian.
         """
-        self._op_submats[key] = (jac, irow, icol)
+        self._op_submats[key] = (jac, irow, icol, None)
 
-    def _ip_add_submat(self, key, jac, irow, icol):
+    def _ip_add_submat(self, key, jac, irow, icol, src_indices):
         """Declare a sub-jacobian.
 
         Args
@@ -111,8 +111,11 @@ class Matrix(object):
             the starting row index (offset) for this sub-jacobian.
         icol : int
             the starting col index (offset) for this sub-jacobian.
+        src_indices : ndarray
+            indices from the source variable that an input variable
+            connects to.
         """
-        self._ip_submats[key] = (jac, irow, icol)
+        self._ip_submats[key] = (jac, irow, icol, src_indices)
 
     def _op_update_submat(self, key, jac):
         """Update the values of a sub-jacobian.
@@ -138,6 +141,18 @@ class Matrix(object):
         """
         self._update_submat(self._ip_submats, self._ip_metadata, key, jac)
 
+    def _build(self, num_rows, num_cols):
+        """Allocate the matrix.
+
+        Args
+        ----
+        num_rows : int
+            number of rows in the matrix.
+        num_cols : int
+            number of cols in the matrix.
+        """
+        pass
+
     def _update_submat(self, submats, metadata, key, jac):
         """Update the values of a sub-jacobian.
 
@@ -151,18 +166,6 @@ class Matrix(object):
             the global output and input variable indices.
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
-        """
-        pass
-
-    def _build(self, num_rows, num_cols):
-        """Allocate the matrix.
-
-        Args
-        ----
-        num_rows : int
-            number of rows in the matrix.
-        num_cols : int
-            number of cols in the matrix.
         """
         pass
 
@@ -182,3 +185,42 @@ class Matrix(object):
             vector resulting from the product.
         """
         pass
+
+
+def _compute_index_map(jrows, jcols, irow, icol, src_indices):
+    """Return row/column indices to map sub-jacobian to global jac.
+
+    Args
+    ----
+    jrows : index array
+        Array of row indices.
+    jcols : index array
+        Array of column indices.
+    irow : int
+        Row index for start of sub-jacobian.
+    icol : int
+        Column index for start of sub-jacobian.
+    src_indices : index array
+        Index array of which values to pull from a source into an input
+        variable.
+
+    Returns
+    -------
+    tuple of (ndarray, ndarray, ndarray)
+        Row indices, column indices, and indices of columns matching
+        src_indices.
+    """
+    icols = []
+    idxs = []
+
+    for i, idx in enumerate(src_indices):
+        # pull out columns that match each index
+        idxarr = numpy.nonzero(jcols == i)[0]
+        idxs.append(idxarr)
+        icols.append(numpy.full(idxarr.shape, idx, dtype=int))
+
+    idxs = numpy.hstack(idxs)
+    icols = numpy.hstack(icols) + icol
+    irows = jrows[idxs] + irow
+
+    return (irows, icols, idxs)

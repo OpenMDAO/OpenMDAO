@@ -26,8 +26,8 @@ class PETScTransfer(DefaultTransfer):
                                                        comm=self._comm)
                 op_indexset = PETSc.IS().createGeneral(op_inds,
                                                        comm=self._comm)
-                ip_petsc = self._ip_vec._global_vector._petsc[ip_iset]
-                op_petsc = self._op_vec._global_vector._petsc[op_iset]
+                ip_petsc = self._ip_vec._root_vector._petsc[ip_iset]
+                op_petsc = self._op_vec._root_vector._petsc[op_iset]
                 transfer = PETSc.Scatter().create(op_petsc, op_indexset,
                                                   ip_petsc, ip_indexset)
                 self._transfers[key] = transfer
@@ -48,16 +48,16 @@ class PETScTransfer(DefaultTransfer):
             for ip_iset, op_iset in self._ip_inds:
                 key = (ip_iset, op_iset)
                 if len(self._ip_inds[key]) > 0:
-                    ip_petsc = self._ip_vec._global_vector._petsc[ip_iset]
-                    op_petsc = self._op_vec._global_vector._petsc[op_iset]
+                    ip_petsc = self._ip_vec._root_vector._petsc[ip_iset]
+                    op_petsc = self._op_vec._root_vector._petsc[op_iset]
                     self._transfers[key].scatter(op_petsc, ip_petsc,
                                                  addv=False, mode=False)
         elif mode == 'rev':
             for ip_iset, op_iset in self._ip_inds:
                 key = (ip_iset, op_iset)
                 if len(self._ip_inds[key]) > 0:
-                    ip_petsc = self._ip_vec._global_vector._petsc[ip_iset]
-                    op_petsc = self._op_vec._global_vector._petsc[op_iset]
+                    ip_petsc = self._ip_vec._root_vector._petsc[ip_iset]
+                    op_petsc = self._op_vec._root_vector._petsc[op_iset]
                     self._transfers[key].scatter(ip_petsc, op_petsc,
                                                  addv=True, mode=True)
 
@@ -70,7 +70,7 @@ class PETScVector(DefaultVector):
 
     TRANSFER = PETScTransfer
 
-    def _initialize_data(self, global_vector):
+    def _initialize_data(self, root_vector):
         """Internally allocate vectors.
 
         Sets the following attributes:
@@ -79,10 +79,10 @@ class PETScVector(DefaultVector):
 
         Args
         ----
-        global_vector : Vector or None
+        root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
-        if global_vector is None:
+        if root_vector is None:
             self._data, self._indices = self._create_data()
         else:
             self._data, self._indices = self._extract_data()
