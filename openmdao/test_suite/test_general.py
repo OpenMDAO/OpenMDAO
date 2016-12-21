@@ -18,7 +18,7 @@ from openmdao.parallel_api import PETScVector
 from nose_parameterized import parameterized
 
 def custom_name(testcase_func, param_num, param):
-    return 'test' + '_'.join(p.__name__ for p in param.args[:2]) + '_'.join(str(p) for p in param.args[2:])
+    return 'test_' + '_'.join(p.__name__ for p in param.args[:2]) + '_' + '_'.join(str(p) for p in param.args[2:])
 
 class CompTestCaseBase(unittest.TestCase):
     """The TestCase that actually runs all of the cases inherits from this."""
@@ -27,30 +27,32 @@ class CompTestCaseBase(unittest.TestCase):
         [TestImplCompNondLinear, TestExplCompNondLinear],
         [DefaultVector, PETScVector],
         ['implicit', 'explicit'],
+        [True, False],
         ['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
         ['array', 'sparse', 'aij'],
         range(1, 3),
         range(1, 3),
         [(1,), (2,), (2, 1), (1, 2)],
     ), testcase_func_name=custom_name)
-    def test_openmdao(self, Component, Vector, connection_type, jacobian_type,
-                 partial_type, num_var, num_comp, var_shape):
+    def test_openmdao(self, component, vector, connection_type, global_jac, jacobian_type,
+                      partial_type, num_var, num_comp, var_shape):
 
         group = TestGroupFlat(num_comp=num_comp, num_var=num_var,
                               var_shape=var_shape,
                               connection_type=connection_type,
                               jacobian_type=jacobian_type,
                               partial_type=partial_type,
-                              Component=Component,
+                              component=component,
                               )
-        prob = Problem(group).setup(Vector)
+        prob = Problem(group).setup(vector)
 
-        if jacobian_type == 'dense':
-            prob.root.jacobian = GlobalJacobian(Matrix=DenseMatrix)
-        elif jacobian_type == 'sparse-coo':
-            prob.root.jacobian = GlobalJacobian(Matrix=CooMatrix)
-        elif jacobian_type == 'sparse-csr':
-            prob.root.jacobian = GlobalJacobian(Matrix=CsrMatrix)
+        if global_jac:
+            if jacobian_type == 'dense':
+                prob.root.jacobian = GlobalJacobian(Matrix=DenseMatrix)
+            elif jacobian_type == 'sparse-coo':
+                prob.root.jacobian = GlobalJacobian(Matrix=CooMatrix)
+            elif jacobian_type == 'sparse-csr':
+                prob.root.jacobian = GlobalJacobian(Matrix=CsrMatrix)
 
         prob.root.nl_solver = NewtonSolver(
             subsolvers={'linear': ScipyIterativeSolver(
@@ -69,9 +71,9 @@ class CompTestCaseBase(unittest.TestCase):
         size = numpy.prod(var_shape)
         work = prob.root._vectors['output']['']._clone()
         work.set_const(1.0)
-        if Component == TestImplCompNondLinear:
+        if component == TestImplCompNondLinear:
             val = 1 - 0.01 + 0.01 * size * num_var * num_comp
-        if Component == TestExplCompNondLinear:
+        elif component == TestExplCompNondLinear:
             val = 1 - 0.01 * size * num_var * (num_comp - 1)
 
         # 1. fwd apply_linear test

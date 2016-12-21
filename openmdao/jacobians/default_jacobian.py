@@ -34,7 +34,7 @@ class DefaultJacobian(Jacobian):
                     if mode == 'fwd':
                         op += jac.dot(ip)
                     if mode == 'rev':
-                        ip = jac.T.dot(op)
+                        ip[:] = jac.T.dot(op)
 
                 if op_name in d_residuals and ip_name in d_inputs:
                     op = d_residuals._views_flat[op_name]
