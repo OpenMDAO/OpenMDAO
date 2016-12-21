@@ -6,6 +6,8 @@ import numpy
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
+from six import iteritems
+
 from openmdao.core.group import Group
 from openmdao.devtools.compat import abs_varname_iter, system_iter
 
@@ -23,7 +25,7 @@ def check_config(problem, logger=None):
 
     """
     if logger is None:
-        logger = logging.getLogger()
+        logger = logging.getLogger("config_check")
         console = logging.StreamHandler()
         # set a format which is simpler for console use
         formatter = logging.Formatter('%(levelname)s: %(message)s')
@@ -36,7 +38,7 @@ def check_config(problem, logger=None):
     _check_cycles(problem, logger)
 
 
-def compute_group_sys_graph(group, input_src_ids):
+def compute_sys_graph(group, input_src_ids):
     """Compute a dependency graph for subsystems in the given group.
 
     Args
@@ -67,6 +69,7 @@ def compute_group_sys_graph(group, input_src_ids):
     for i, s in enumerate(subsystems):
         start, end = s._variable_allprocs_range['input']
         invar2sys[start - i_start:end - i_start] = i
+
         start, end = s._variable_allprocs_range['output']
         outvar2sys[start - o_start:end - o_start] = i
 
@@ -85,24 +88,51 @@ def compute_group_sys_graph(group, input_src_ids):
     return csr_matrix((data, (rows, cols)), shape=(nsubs, nsubs))
 
 
+def get_cycles(group):
+    """Return all system cycles found in the given group.
+
+    Args
+    ----
+    group : <Group>
+        The Group being checked for cycles.
+
+    Returns
+    -------
+    list of lists of str
+        List of all cycles found. Each cycle is a list of subsystem pathnames
+        of systems belonging to that cycle.
+    """
+    subs = group._subsystems_allprocs
+    graph = compute_sys_graph(group, group._sys_assembler._input_src_ids)
+    num_sccs, labels = connected_components(graph, connection='strong')
+
+    sccs = []
+    for i in range(num_sccs):
+        # find systems in SCC i
+        connected_systems = numpy.where(labels == i)[0]
+        if connected_systems.size > 1:
+            sccs.append([
+                subs[i].path_name for i in connected_systems
+            ])
+
+    return sccs
+
+
 def _check_cycles(problem, logger):
+    """Report any cycles found in any Group to the logger.
+
+    Args
+    ----
+    problem : <Problem>
+        The Problem to be checked for cycles.
+
+    logger : object
+        The object that managers logging output.
+    """
     group_sccs = {}
     for system in system_iter(problem.root, include_self=True, recurse=True):
         if isinstance(system, Group):
-            sccs = []
-            subs = system._subsystems_allprocs
-            graph = compute_group_sys_graph(system,
-                                            problem._assembler._input_src_ids)
-            num_sccs, labels = connected_components(graph, connection='strong')
-
-            for i in range(num_sccs):
-                # find systems in SCC i
-                connected_systems = numpy.where(labels == i)[0]
-                if connected_systems.size > 1:
-                    sccs.append([
-                        subs[i].path_name for i in connected_systems
-                    ])
-
+            sccs = get_cycles(system)
             if sccs:
                 group_sccs[system.path_name] = sccs
 
@@ -113,7 +143,17 @@ def _check_cycles(problem, logger):
 
 
 def _check_hanging_inputs(problem, logger):
-    """Warn if any inputs are not connected."""
+    """Issue a logger warning if any inputs are not connected.
+
+    Args
+    ----
+    problem : <Problem>
+        The problem being checked.
+
+    logger : object
+        The object that managers logging output.
+
+    """
     input_src_ids = problem._assembler._input_src_ids
 
     hanging = sorted([

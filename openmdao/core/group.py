@@ -108,6 +108,11 @@ class Group(System):
             variable, you can specify which indices of the source to be
             transferred to the input here.
         """
+        if ip_name in self._variable_connections:
+            srcname = self._variable_connections[ip_name][0]
+            raise RuntimeError("Input '%s' is already connected to '%s'" %
+                               (ip_name, srcname))
+
         self._variable_connections[ip_name] = (op_name, src_indices)
 
     def _setup_connections(self):
