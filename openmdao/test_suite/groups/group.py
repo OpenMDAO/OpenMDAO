@@ -31,7 +31,7 @@ class TestGroupFlat(Group):
 
         num_comp = self.metadata['num_comp']
         num_var = self.metadata['num_var']
-        component = self.metadata['component']
+        component = self.metadata['component_class']
         for icomp in range(num_comp):
             kwargs = {
                 'num_input': num_var * (num_comp - 1),

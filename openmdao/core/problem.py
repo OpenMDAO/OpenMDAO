@@ -133,7 +133,7 @@ class Problem(object):
 
         Args
         ----
-        VectorClass : type (DefaultVector)
+        vector_class : type (DefaultVector)
             reference to an actual <Vector> class; not an instance.
         check : boolean (True)
             whether to run error check after setup is complete.
@@ -176,10 +176,10 @@ class Problem(object):
         root._setup_scaling()
 
         # Vector setup for the basic execution vector
-        self.setup_vector(None, VectorClass, self._use_ref_vector)
+        self.setup_vector(None, vector_class, self._use_ref_vector)
 
         # Vector setup for the linear vector
-        self.setup_vector('', VectorClass, self._use_ref_vector)
+        self.setup_vector('', vector_class, self._use_ref_vector)
 
         if check:
             check_config(self, logger)

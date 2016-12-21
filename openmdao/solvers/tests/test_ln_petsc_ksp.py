@@ -31,7 +31,7 @@ class TestPetscKSP(unittest.TestCase):
         group = TestImplicitGroup(lnSolverClass=PetscKSP)
 
         p = Problem(group)
-        p.setup(VectorClass=PETScVector, check=False)
+        p.setup(vector_class=PETScVector, check=False)
         p.root.suppress_solver_output = True
 
         # forward
@@ -59,7 +59,7 @@ class TestPetscKSP(unittest.TestCase):
         group.ln_solver.options['ksp_type'] = 'gmres'
 
         p = Problem(group)
-        p.setup(VectorClass=PETScVector, check=False)
+        p.setup(vector_class=PETScVector, check=False)
         p.root.suppress_solver_output = True
 
         # forward
@@ -85,7 +85,7 @@ class TestPetscKSP(unittest.TestCase):
         group.ln_solver.options['maxiter'] = 2
 
         p = Problem(group)
-        p.setup(VectorClass=PETScVector, check=False)
+        p.setup(vector_class=PETScVector, check=False)
         p.root.suppress_solver_output = True
 
         # forward
@@ -109,7 +109,7 @@ class TestPetscKSP(unittest.TestCase):
         precon = group.ln_solver.set_subsolver('precon', LinearBlockGS())
 
         p = Problem(group)
-        p.setup(VectorClass=PETScVector, check=False)
+        p.setup(vector_class=PETScVector, check=False)
         p.root.suppress_solver_output = True
 
         # forward
