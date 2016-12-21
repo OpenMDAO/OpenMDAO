@@ -2,6 +2,11 @@ import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 from openmdao.devtools.testutil import TestLogger
+from openmdao.error_checking.check_config import get_cycles
+
+class MyComp(ExecComp):
+    def __init__(self):
+        super(MyComp, self).__init__(["y = 2.0*a", "z = 3.0*b"])
 
 class TestCheckConfig(unittest.TestCase):
 
@@ -36,6 +41,74 @@ class TestCheckConfig(unittest.TestCase):
         actual = [a.strip().strip("'") for a in actual]
 
         self.assertEqual(expected, actual)
+
+    def test_cycles_1_level(self):
+
+        p = Problem(root=Group())
+        root = p.root
+
+        indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
+        C1 = root.add_subsystem("C1", MyComp())
+        C2 = root.add_subsystem("C2", MyComp())
+        C3 = root.add_subsystem("C3", MyComp())
+        C4 = root.add_subsystem("C4", MyComp())
+
+        root.connect("C4.y", "C2.a")
+        root.connect("C4.y", "C3.a")
+        root.connect("C2.y", "C1.a")
+        root.connect("C1.y", "C4.a")
+
+        # make sure no system has dangling inputs so we avoid that warning
+        root.connect("indep.x", "C1.b")
+        root.connect("indep.x", "C2.b")
+        root.connect("indep.x", "C3.b")
+        root.connect("indep.x", "C4.b")
+
+        testlogger = TestLogger()
+        p.setup(logger=testlogger)
+
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 1)
+
+        self.assertEqual(warnings[0] ,"Group '' has the following cycles: [['C1', 'C2', 'C4']]")
+
+    def test_cycles_multi_level(self):
+
+        p = Problem(root=Group())
+        root = p.root
+
+        indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
+
+        G1 = root.add_subsystem("G1", Group())
+
+        C1 = G1.add_subsystem("C1", MyComp())
+        C2 = G1.add_subsystem("C2", MyComp())
+
+        C3 = root.add_subsystem("C3", MyComp())
+        C4 = root.add_subsystem("C4", MyComp())
+
+        root.connect("C4.y", "G1.C2.a")
+        root.connect("C4.y", "C3.a")
+        root.connect("G1.C2.y", "G1.C1.a")
+        root.connect("G1.C1.y", "C4.a")
+
+        # make sure no system has dangling inputs so we avoid that warning
+        root.connect("indep.x", "G1.C1.b")
+        root.connect("indep.x", "G1.C2.b")
+        root.connect("indep.x", "C3.b")
+        root.connect("indep.x", "C4.b")
+
+        testlogger = TestLogger()
+        p.setup(logger=testlogger)
+
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 1)
+
+        self.assertEqual(warnings[0] ,"Group '' has the following cycles: [['G1', 'C4']]")
+
+        # test recursive cycle check
+        sccs = get_cycles(root, recurse=True)
+        self.assertEqual([['G1.C1', 'G1.C2', 'C4']], sccs)
 
 
 if __name__ == "__main__":
