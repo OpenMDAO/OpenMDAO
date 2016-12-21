@@ -650,7 +650,9 @@ class System(object):
     def suppress_solver_output(self, value):
         """Recursively set the solver print suppression toggle."""
         self._suppress_solver_output = value
-        for subsys in self._subsystems_myproc:
+        # loop over _subsystems_allprocs here because _subsystems_myprocs
+        # is empty until setup
+        for subsys in self._subsystems_allprocs:
             subsys.suppress_solver_output = value
 
     @property
