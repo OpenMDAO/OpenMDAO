@@ -86,6 +86,9 @@ class CompTestCaseBase(unittest.TestCase):
         elif component_class == TestExplCompNondLinear:
             val = 1 - 0.01 * size * num_var * (num_comp - 1)
 
+        prob.root._apply_nonlinear()
+        prob.root._linearize()
+
         # 1. fwd apply_linear test
         prob.root._vectors['output'][''].set_const(1.0)
         prob.root._apply_linear([''], 'fwd')
