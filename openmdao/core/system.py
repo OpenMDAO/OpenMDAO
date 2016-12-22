@@ -452,7 +452,7 @@ class System(object):
         dict of <Transfer>
             dictionary of full and partial Transfer objects.
         """
-        Transfer = vectors['output'].TRANSFER
+        transfer_class = vectors['output'].TRANSFER
 
         nsub_allprocs = len(self._subsystems_allprocs)
         var_range = self._variable_allprocs_range
@@ -469,23 +469,20 @@ class System(object):
 
         # Create Transfer objects from the raw indices
         transfers = {}
-        transfers[None] = Transfer(vectors['input'],
-                                   vectors['output'],
-                                   xfer_ip_inds,
-                                   xfer_op_inds,
-                                   self.comm)
+        transfers[None] = transfer_class(vectors['input'], vectors['output'],
+                                         xfer_ip_inds, xfer_op_inds, self.comm)
         for isub in range(len(fwd_xfer_ip_inds)):
-            transfers['fwd', isub] = Transfer(vectors['input'],
-                                              vectors['output'],
-                                              fwd_xfer_ip_inds[isub],
-                                              fwd_xfer_op_inds[isub],
-                                              self.comm)
+            transfers['fwd', isub] = transfer_class(vectors['input'],
+                                                    vectors['output'],
+                                                    fwd_xfer_ip_inds[isub],
+                                                    fwd_xfer_op_inds[isub],
+                                                    self.comm)
         for isub in range(len(rev_xfer_ip_inds)):
-            transfers['rev', isub] = Transfer(vectors['input'],
-                                              vectors['output'],
-                                              rev_xfer_ip_inds[isub],
-                                              rev_xfer_op_inds[isub],
-                                              self.comm)
+            transfers['rev', isub] = transfer_class(vectors['input'],
+                                                    vectors['output'],
+                                                    rev_xfer_ip_inds[isub],
+                                                    rev_xfer_op_inds[isub],
+                                                    self.comm)
         return transfers
 
     def _get_maps(self, typ):
