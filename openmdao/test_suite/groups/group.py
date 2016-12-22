@@ -19,7 +19,7 @@ class TestGroupFlat(Group):
         self.metadata.declare('connection_type', typ=str, value='explicit',
                               values=['explicit', 'implicit'],
                               desc='how to connect variables')
-        self.metadata.declare('Component',
+        self.metadata.declare('component_class',
                               desc='Component class to instantiate')
         self.metadata.declare('jacobian_type', value='matvec',
                               values=['matvec', 'dense', 'sparse-coo',
@@ -31,7 +31,7 @@ class TestGroupFlat(Group):
 
         num_comp = self.metadata['num_comp']
         num_var = self.metadata['num_var']
-        Component = self.metadata['Component']
+        component_class = self.metadata['component_class']
         for icomp in range(num_comp):
             kwargs = {
                 'num_input': num_var * (num_comp - 1),
@@ -39,7 +39,7 @@ class TestGroupFlat(Group):
                 'var_shape': self.metadata['var_shape'],
             }
             if self.metadata['connection_type'] == 'explicit':
-                self.add_subsystem('comp_%i' % icomp, Component(**kwargs))
+                self.add_subsystem('comp_%i' % icomp, component_class(**kwargs))
             elif self.metadata['connection_type'] == 'implicit':
                 renames_inputs = {}
                 renames_outputs = {}
@@ -60,7 +60,7 @@ class TestGroupFlat(Group):
                             new_name = 'var_%i' % index2
                             renames_outputs[old_name] = new_name
 
-                self.add_subsystem('comp_%i' % icomp, Component(**kwargs),
+                self.add_subsystem('comp_%i' % icomp, component_class(**kwargs),
                                    renames_inputs=renames_inputs,
                                    renames_outputs=renames_outputs)
 

@@ -34,7 +34,7 @@ class DefaultJacobian(Jacobian):
                     if mode == 'fwd':
                         op += jac.dot(ip)
                     if mode == 'rev':
-                        ip = jac.T.dot(op)
+                        ip += jac.T.dot(op)
 
                 if op_name in d_residuals and ip_name in d_inputs:
                     op = d_residuals._views_flat[op_name]
@@ -51,7 +51,6 @@ class DefaultJacobian(Jacobian):
                     if mode == 'fwd':
                         numpy.add.at(op, jac[1], ip[jac[2]] * jac[0])
                     if mode == 'rev':
-                        ip[:] = 0.
                         numpy.add.at(ip, jac[2], op[jac[1]] * jac[0])
 
                 if op_name in d_residuals and ip_name in d_inputs:
