@@ -197,3 +197,27 @@ class GeneralizedDictionary(object):
                 raise ValueError("Entry '{}' is not declared".format(name))
 
         raise ValueError("Entry '{}' cannot be found".format(name))
+
+
+class OptionsDictionary(GeneralizedDictionary):
+    def __init__(self, in_dict=None):
+        if in_dict is not None:
+            raise ValueError('Initial dictionaries cannot be used with OptionsDictionary '
+                             'declare options and use update.')
+        super(OptionsDictionary, self).__init__(self, in_dict)
+
+    def __setitem__(self, name, value):
+        """Set an entry in the local dictionary.
+
+        Args
+        ----
+        name : str
+            name of the entry.
+        value : -
+            value of the entry to be value- and type-checked if declared.
+        """
+        if name not in self._declared_entries:
+            raise KeyError("Option '{}' is not declared.".format(name))
+
+        self._check_type_and_value(name, value)
+        self._dict[name] = value
