@@ -21,7 +21,7 @@ class LintTestCase(unittest.TestCase):
 
     def check_method(self, dir_name, file_name,
                      class_name, method_name, method):
-        argspec = inspect.getargspec(method)
+        argspec = inspect.signature(method)
         doc = inspect.getdoc(method)
 
         # Check if docstring is missing
