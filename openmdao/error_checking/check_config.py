@@ -6,7 +6,6 @@ import numpy
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
-from six import iteritems
 import networkx as nx
 
 from openmdao.core.group import Group
@@ -157,7 +156,7 @@ def _check_dataflow(group, logger):
         ubcs = _get_out_of_order_subs(system,
                                       system._sys_assembler._input_src_ids)
 
-        for tgt_system, src_systems in iteritems(ubcs):
+        for tgt_system, src_systems in sorted(ubcs.items()):
             keep_srcs = []
 
             for src_system in src_systems:

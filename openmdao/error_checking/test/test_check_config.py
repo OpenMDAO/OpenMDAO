@@ -156,8 +156,8 @@ class TestCheckConfig(unittest.TestCase):
 
         self.assertTrue("The following inputs are not connected:" in warnings[0])
         self.assertEqual(warnings[1] ,"Group '' has the following cycles: [['C11', 'C12', 'C13'], ['C21', 'C22', 'C23'], ['C1', 'C2', 'C3']]")
-        self.assertEqual(warnings[2] ,"System 'C3' executes out-of-order with respect to its source systems ['C11']")
-        self.assertEqual(warnings[3] ,"System 'C2' executes out-of-order with respect to its source systems ['N3']")
+        self.assertEqual(warnings[2] ,"System 'C2' executes out-of-order with respect to its source systems ['N3']")
+        self.assertEqual(warnings[3] ,"System 'C3' executes out-of-order with respect to its source systems ['C11']")
 
 
 if __name__ == "__main__":
