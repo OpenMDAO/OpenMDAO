@@ -7,6 +7,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
 from six import iteritems
+import networkx as nx
 
 from openmdao.core.group import Group
 from openmdao.core.component import Component
@@ -41,7 +42,7 @@ def check_config(problem, logger=None):
     _check_cycles(root, logger)
 
 
-def compute_sys_graph(group, input_src_ids, recurse=False):
+def compute_sys_graph(group, input_src_ids, comps_only=False):
     """Compute a dependency graph for subsystems in the given group.
 
     Args
@@ -53,23 +54,19 @@ def compute_sys_graph(group, input_src_ids, recurse=False):
         Array containing global variable ids for sources of the inputs
         indicated by the index into the array.
 
-    recurse : bool (False)
-        If True, return a graph of all components within the given group
-        or any of its descendants.  Otherwise, a graph containing only
-        direct children of the group will be returned.
+    comps_only : bool (False)
+        If True, return a graph of all Components within the given group
+        or any of its descendants. No sub-groups will be included. Otherwise,
+        a graph containing only direct children (both Components and Groups)
+        of the group will be returned.
 
     Returns
     -------
-    csr_matrix
-        A graph in the form of a sparse (CSR) adjacency matrix.
-
-    list of <System>
-        A list of subsystems of the given group, either direct children
-        or all directly or indirectly contained Components, depending
-        upon the value of the 'recurse' arg.
+    DiGraph
+        A directed graph containing names of subsystems and their connections.
 
     """
-    if recurse:
+    if comps_only:
         subsystems = list(system_iter(group, recurse=True, typ=Component))
     else:
         subsystems = group._subsystems_allprocs
@@ -90,53 +87,45 @@ def compute_sys_graph(group, input_src_ids, recurse=False):
         start, end = s._variable_allprocs_range['output']
         outvar2sys[start - o_start:end - o_start] = i
 
-    rows = []
-    cols = []
+    graph = nx.DiGraph()
 
     for in_id, src_id in enumerate(input_src_ids):
         if (src_id != -1 and (o_start <= src_id < o_end) and
                 (i_start <= in_id < i_end)):
             # offset the ids to index into our var2sys arrays
-            rows.append(outvar2sys[src_id - o_start])
-            cols.append(invar2sys[in_id - i_start])
+            graph.add_edge(subsystems[outvar2sys[src_id - o_start]].path_name,
+                           subsystems[invar2sys[in_id - i_start]].path_name)
 
-    data = numpy.ones(len(rows))
-
-    return csr_matrix((data, (rows, cols)), shape=(nsubs, nsubs)), subsystems
+    return graph
 
 
-def get_cycles(group, recurse=False):
-    """Return all system cycles found in the given group.
+def get_sccs(group, comps_only=False):
+    """Return strongly connected subsystems of the given Group.
 
     Args
     ----
     group : <Group>
-        The Group being checked for cycles.
+        The strongly connected components will be computed for this Group.
 
-    recurse : bool (False)
-        If True, return cycles between all components within the given group
-        or any of its descendants.  Otherwise, only cycles involving
-        direct children of the group will be returned.
+    comps_only : bool (False)
+        If True, the graph used to compute strongly connected components
+        will contain all Components within the given group or any of its
+        descendants and no sub-groups will be included. Otherwise, the graph
+        used will contain only direct children (both Components and Groups)
+        of the given group.
 
     Returns
     -------
-    list of lists of str
-        List of all cycles found. Each cycle is a list of subsystem pathnames
-        of systems belonging to that cycle.
+    list of sets of str
+        A list of strongly connected components in topological order.
     """
-    graph, subs = compute_sys_graph(group, group._sys_assembler._input_src_ids,
-                                    recurse=recurse)
-    num_sccs, labels = connected_components(graph, connection='strong')
+    graph = compute_sys_graph(group, group._sys_assembler._input_src_ids,
+                              comps_only=comps_only)
 
-    sccs = []
-    for i in range(num_sccs):
-        # find systems in SCC i
-        connected_systems = numpy.where(labels == i)[0]
-        if connected_systems.size > 1:
-            sccs.append([
-                subs[i].path_name for i in connected_systems
-            ])
-
+    # Tarjan's algorithm returns SCCs in reverse topological order, so
+    # the list returned here is reversed.
+    sccs = list(nx.strongly_connected_components(graph))
+    sccs.reverse()
     return sccs
 
 
@@ -149,14 +138,27 @@ def _check_cycles(group, logger):
         The Group being checked for cycles.
 
     logger : object
-        The object that managers logging output.
+        The object that manages logging output.
+
+    Returns
+    -------
+    list of sets
+        A list of strongly connected components of the system
+        dependency grapy of the given group. SCCs are sorted in
+        topological order.
+
     """
-    for system in system_iter(group, include_self=True, recurse=True):
-        if isinstance(system, Group):
-            sccs = get_cycles(system)
-            if sccs:
-                logger.warning("Group '%s' has the following cycles: %s" %
-                               (system.path_name, sccs))
+    for system in system_iter(group, include_self=True, recurse=True,
+                              typ=Group):
+        sccs = get_sccs(system)
+        cycles = [sorted(s) for s in sccs if len(s) > 1]
+        if cycles:
+            logger.warning("Group '%s' has the following cycles: %s" %
+                           (system.path_name, cycles))
+
+    # in case the sccs are needed elsewhere, just return it so it doesn't
+    # need to be recomuted.
+    return sccs
 
 
 def _check_hanging_inputs(problem, logger):

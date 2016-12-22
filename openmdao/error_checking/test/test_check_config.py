@@ -2,7 +2,7 @@ import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 from openmdao.devtools.testutil import TestLogger
-from openmdao.error_checking.check_config import get_cycles
+from openmdao.error_checking.check_config import get_sccs
 
 class MyComp(ExecComp):
     def __init__(self):
@@ -104,11 +104,11 @@ class TestCheckConfig(unittest.TestCase):
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 1)
 
-        self.assertEqual(warnings[0] ,"Group '' has the following cycles: [['G1', 'C4']]")
+        self.assertEqual(warnings[0] ,"Group '' has the following cycles: [['C4', 'G1']]")
 
-        # test recursive cycle check
-        sccs = get_cycles(root, recurse=True)
-        self.assertEqual([['G1.C1', 'G1.C2', 'C4']], sccs)
+        # test comps_only cycle check
+        sccs = [sorted(s) for s in get_sccs(root, comps_only=True) if len(s) > 1]
+        self.assertEqual([['C4', 'G1.C1', 'G1.C2']], sccs)
 
 
 if __name__ == "__main__":
