@@ -16,8 +16,8 @@ class TestCheckConfig(unittest.TestCase):
 
         G1 = root.add_subsystem("G1", Group(), promotes=['*'])
         G2 = G1.add_subsystem("G2", Group(), promotes=['*'])
-        C1 = G2.add_subsystem("C1", ExecComp('y=x*2.0+w'), promotes=['*'])
         C2 = G2.add_subsystem("C2", IndepVarComp('x', 1.0), promotes=['*'])
+        C1 = G2.add_subsystem("C1", ExecComp('y=x*2.0+w'), promotes=['*'])
 
         G3 = root.add_subsystem("G3", Group())
         G4 = G3.add_subsystem("G4", Group())
@@ -42,7 +42,7 @@ class TestCheckConfig(unittest.TestCase):
 
         self.assertEqual(expected, actual)
 
-    def test_cycles_1_level(self):
+    def test_dataflow_1_level(self):
 
         p = Problem(root=Group())
         root = p.root
@@ -68,11 +68,12 @@ class TestCheckConfig(unittest.TestCase):
         p.setup(logger=testlogger)
 
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
+        self.assertEqual(len(warnings), 2)
 
         self.assertEqual(warnings[0] ,"Group '' has the following cycles: [['C1', 'C2', 'C4']]")
+        self.assertEqual(warnings[1] ,"System 'C3' executes out-of-order with respect to its source systems ['C4']")
 
-    def test_cycles_multi_level(self):
+    def test_dataflow_multi_level(self):
 
         p = Problem(root=Group())
         root = p.root
@@ -102,9 +103,11 @@ class TestCheckConfig(unittest.TestCase):
         p.setup(logger=testlogger)
 
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
+        self.assertEqual(len(warnings), 3)
 
         self.assertEqual(warnings[0] ,"Group '' has the following cycles: [['C4', 'G1']]")
+        self.assertEqual(warnings[1] ,"System 'C3' executes out-of-order with respect to its source systems ['C4']")
+        self.assertEqual(warnings[2] ,"System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']")
 
         # test comps_only cycle check
         sccs = [sorted(s) for s in get_sccs(root, comps_only=True) if len(s) > 1]
