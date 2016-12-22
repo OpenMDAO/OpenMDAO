@@ -470,22 +470,22 @@ class System(object):
         # Create Transfer objects from the raw indices
         transfers = {}
         transfers[None] = transfer_class(vectors['input'],
-                                   vectors['output'],
-                                   xfer_ip_inds,
-                                   xfer_op_inds,
-                                   self.comm)
+                                         vectors['output'],
+                                         xfer_ip_inds,
+                                         xfer_op_inds,
+                                         self.comm)
         for isub in range(len(fwd_xfer_ip_inds)):
             transfers['fwd', isub] = transfer_class(vectors['input'],
-                                              vectors['output'],
-                                              fwd_xfer_ip_inds[isub],
-                                              fwd_xfer_op_inds[isub],
-                                              self.comm)
+                                                    vectors['output'],
+                                                    fwd_xfer_ip_inds[isub],
+                                                    fwd_xfer_op_inds[isub],
+                                                    self.comm)
         for isub in range(len(rev_xfer_ip_inds)):
             transfers['rev', isub] = transfer_class(vectors['input'],
-                                              vectors['output'],
-                                              rev_xfer_ip_inds[isub],
-                                              rev_xfer_op_inds[isub],
-                                              self.comm)
+                                                    vectors['output'],
+                                                    rev_xfer_ip_inds[isub],
+                                                    rev_xfer_op_inds[isub],
+                                                    self.comm)
         return transfers
 
     def _get_maps(self, typ):
