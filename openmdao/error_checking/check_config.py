@@ -128,7 +128,7 @@ def get_sccs(group, comps_only=False):
 
 
 def _check_dataflow(group, logger):
-    """Report any cycles and out of order Systemsto the logger.
+    """Report any cycles and out of order Systems to the logger.
 
     Args
     ----
