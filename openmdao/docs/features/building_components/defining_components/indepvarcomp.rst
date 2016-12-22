@@ -66,3 +66,4 @@ Define two independent variables at once.
 
 .. showunittestexamples::
     indepvarcomp
+    

@@ -101,30 +101,34 @@ except OSError:
 # Prepare to write to the sqlite database file
 conn = sqlite3.connect(sqlite_file)
 cur = conn.cursor()
-cur.execute("CREATE TABLE feature_tests(method_name TEXT, feature TEXT)")
+cur.execute("CREATE TABLE feature_tests(method_name TEXT, feature TEXT, title TEXT)")
 
 
 # Search for all the unit tests
 test_loader = unittest.TestLoader()
-suite = test_loader.discover('..', pattern = "test_*.py")
+suite = test_loader.discover('..', pattern = "test*.py")
 
 for t in suite:
     # print type(t)
     for s in t:
         if isinstance(s, unittest.suite.TestSuite):
+        # if not isinstance(s, ModuleImportFailure):
             for q in s:
                 cls = q.__class__
                 module_path = cls.__module__
                 class_name = cls.__name__
                 method_name = q._testMethodName
                 method_path = '.'.join([module_path, class_name, method_name])
+                # print method_path
                 test_doc = getattr(cls,method_name).__doc__
                 if test_doc:
                     test_doc_numpy = NumpyDocString(test_doc)
                     if test_doc_numpy['Features']:
                         for feature in [ f.strip() for f in test_doc_numpy['Features']]:
-                            # print 'qqq', method_path, feature
-                            cur.execute('insert into feature_tests values (?,?)', (method_path,feature))
+                            print 'qqq', method_path, feature
+                            title = test_doc_numpy['Summary'][0]
+                            print method_path, title
+                            cur.execute('insert into feature_tests values (?,?,?)', (method_path,feature,title))
 
 conn.commit()
 conn.close()

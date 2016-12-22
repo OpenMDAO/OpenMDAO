@@ -3,7 +3,10 @@ import importlib
 import inspect
 import unittest
 import cStringIO, tokenize
+
 from redbaron import RedBaron
+
+
 def remove_docstrings(source):
     """
     Returns 'source' minus docstrings.
@@ -56,6 +59,8 @@ def remove_docstrings(source):
         last_col = end_col
         last_lineno = end_line
     return out
+
+
 def remove_redbaron_node(node,index):
     '''Utility function for removing a node using RedBaron.
     If the assert call is on multiple lines, RedBaron throws an Exception, but it actually
@@ -69,12 +74,14 @@ def remove_redbaron_node(node,index):
         else:
             raise
 
+
 def replace_asserts_with_prints(source_code):
     '''Using RedBaron, replace some assert statements with
     print statements that print the actual value in the asserts, which are
     assumed to be the first value. The expected is second'''
 
     rd3 = RedBaron(source_code) # convert to RedBaron internal structure
+
     for assert_type in ['assertAlmostEqual', 'assertLess', 'assertGreater', 'assertEqual', 'assertEqualArrays']:
         fa = rd3.findAll("NameNode", value=assert_type)
         for f in fa:
@@ -82,6 +89,7 @@ def replace_asserts_with_prints(source_code):
             remove_redbaron_node(assert_node,0) # remove 'self' from the call
             assert_node.value[0].replace('print')
             remove_redbaron_node(assert_node.value[1],1) # remove the expected value argument
+
     fa = rd3.findAll("NameNode", value='assert_rel_error')
     for f in fa:
         assert_node = f.parent
@@ -89,8 +97,10 @@ def replace_asserts_with_prints(source_code):
         remove_redbaron_node(assert_node.value[1],-1) # remove the expected value
         remove_redbaron_node(assert_node.value[1],0) # remove the first argument which is the TestCase
         assert_node.value[0].replace("print")
+
     source_code_with_prints = rd3.dumps() # get back the string representation of the code
     return source_code_with_prints
+
 def get_method_body(method_code):
     '''
     Using RedBaron module, just get the method body. Do not want the
@@ -99,19 +109,27 @@ def get_method_body(method_code):
     method_code = '\n' + method_code
     rbmc = RedBaron(method_code)
     def_node = rbmc.findAll("DefNode")[0] # Look for the 'def' node. Should only be one!
+    def_node.value.decrease_indentation(8)
     return def_node.value.dumps()
+
 sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
 table_name = 'feature_tests'   # name of the table to be queried
+
+
 def get_test_source_code_for_feature(feature_name):
     conn = sqlite3.connect(sqlite_file)
     cur = conn.cursor()
+
     test_source_code_for_feature = []
-    cur.execute('SELECT method_name FROM {tn} WHERE feature="{fn}"'.\
+
+    cur.execute('SELECT method_name, title FROM {tn} WHERE feature="{fn}"'.\
             format(tn=table_name, fn=feature_name))
     all_rows = cur.fetchall()
+    print "HERE"
     for r in all_rows:
         method_path = r[0]
-        print 'method_path', method_path
+        title = r[1]
+        print 'method_path, title', method_path, title
         # get lines that look like this
         # openmdao.tests.test_backtracking_copy.TestBackTrackingCopy.test_newton_with_backtracking_2
         # openmdao.tests.test_exec_comp.TestExecComp.test_complex_step
@@ -123,19 +141,29 @@ def get_test_source_code_for_feature(feature_name):
         meth = getattr(cls,method_name)
         # source = inspect.getsource( meth )
         source = inspect.getsource( meth )
+
         # Remove docstring from source code
         source_minus_docstrings = remove_docstrings(source)
+
         # We are using the RedBaron module in the next two function calls
         #    to get the code in the way we want it.
         # For some reason, RedBaron wants a blank first line. So we give it one
         source_minus_docstrings = '\n' + source_minus_docstrings
+
         # Only want the method body. Do not want the 'def' line
         method_body_source = get_method_body(source_minus_docstrings)
+
         # Replace some of the asserts with prints of the actual values
         source_minus_docstrings_with_prints = replace_asserts_with_prints(method_body_source)
-        test_source_code_for_feature.append(source_minus_docstrings_with_prints)
+
+        run_outputs = \
+'''
+3.14 88.2
+898.8 7768
+'''
+        test_source_code_for_feature.append((title, source_minus_docstrings_with_prints, run_outputs))
     return test_source_code_for_feature
-    
+
 if __name__ == "__main__":
     for scf in get_test_source_code_for_feature('derivatives'):
         print(scf)

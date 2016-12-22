@@ -15,12 +15,19 @@ class showUnitTestExamplesDirective(Directive):
         literals = []
         from openmdao.docs.utils.get_test_source_code_for_feature import get_test_source_code_for_feature
         for arg in self.arguments:
-            code = get_test_source_code_for_feature(arg)
-            if not code:
-                continue
-            else:
-                print code                    
-                literal = nodes.literal_block(code, code)
+            codelist = get_test_source_code_for_feature(arg)
+            print ("CODELIST", codelist)
+            for code in codelist:
+                (title, src, output) = code
+                print ("TITLE: ", title)
+                print ("SOURCE: ", src)
+                print ("OUTPUT: ", output)
+                # for chunk in src:
+                #     if not chunk:
+                #         continue
+                #     else:
+                #         print ("CHUNK: ", chunk)
+                literal = nodes.literal_block(src, src)
                 literal['language'] = 'python'
                 literals.append(literal)
 
