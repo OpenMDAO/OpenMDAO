@@ -469,11 +469,8 @@ class System(object):
 
         # Create Transfer objects from the raw indices
         transfers = {}
-        transfers[None] = transfer_class(vectors['input'],
-                                         vectors['output'],
-                                         xfer_ip_inds,
-                                         xfer_op_inds,
-                                         self.comm)
+        transfers[None] = transfer_class(vectors['input'], vectors['output'],
+                                         xfer_ip_inds, xfer_op_inds, self.comm)
         for isub in range(len(fwd_xfer_ip_inds)):
             transfers['fwd', isub] = transfer_class(vectors['input'],
                                                     vectors['output'],
