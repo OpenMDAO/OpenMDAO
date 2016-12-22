@@ -28,7 +28,7 @@ class TestParallelGroups(unittest.TestCase):
     def test_fan_out_grouped(self):
 
         prob = Problem(FanOutGrouped())
-        prob.setup(VectorClass=PETScVector, check=False)
+        prob.setup(vector_class=PETScVector, check=False)
         prob.root.suppress_solver_output = True
         prob.run()
 
@@ -39,7 +39,7 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.root = FanInGrouped()
-        prob.setup(VectorClass=PETScVector, check=False)
+        prob.setup(vector_class=PETScVector, check=False)
         prob.root.suppress_solver_output = True
         prob.run()
 
@@ -49,7 +49,7 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.root = Diamond()
-        prob.setup(VectorClass=PETScVector, check=False)
+        prob.setup(vector_class=PETScVector, check=False)
         prob.root.suppress_solver_output = True
         prob.run()
 
@@ -60,7 +60,7 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.root = ConvergeDiverge()
-        prob.setup(VectorClass=PETScVector, check=False)
+        prob.setup(vector_class=PETScVector, check=False)
         prob.root.suppress_solver_output = True
         prob.run()
 

@@ -97,7 +97,7 @@ class Solver(object):
             if len(solver_name) > name_len:
                 solver_name = solver_name[:name_len]
             else:
-                solver_name = solver_name + ' ' * (name_len - len(solver_name))
+                solver_name = solver_name.ljust(name_len)
 
             print_str = ' ' * self._system._sys_depth + '-' * self._depth
             print_str += sys_name + solver_name
