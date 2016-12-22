@@ -452,7 +452,7 @@ class System(object):
         dict of <Transfer>
             dictionary of full and partial Transfer objects.
         """
-        transfer = vectors['output'].TRANSFER
+        transfer_class = vectors['output'].TRANSFER
 
         nsub_allprocs = len(self._subsystems_allprocs)
         var_range = self._variable_allprocs_range
@@ -469,19 +469,19 @@ class System(object):
 
         # Create Transfer objects from the raw indices
         transfers = {}
-        transfers[None] = transfer(vectors['input'],
+        transfers[None] = transfer_class(vectors['input'],
                                    vectors['output'],
                                    xfer_ip_inds,
                                    xfer_op_inds,
                                    self.comm)
         for isub in range(len(fwd_xfer_ip_inds)):
-            transfers['fwd', isub] = transfer(vectors['input'],
+            transfers['fwd', isub] = transfer_class(vectors['input'],
                                               vectors['output'],
                                               fwd_xfer_ip_inds[isub],
                                               fwd_xfer_op_inds[isub],
                                               self.comm)
         for isub in range(len(rev_xfer_ip_inds)):
-            transfers['rev', isub] = transfer(vectors['input'],
+            transfers['rev', isub] = transfer_class(vectors['input'],
                                               vectors['output'],
                                               rev_xfer_ip_inds[isub],
                                               rev_xfer_op_inds[isub],
