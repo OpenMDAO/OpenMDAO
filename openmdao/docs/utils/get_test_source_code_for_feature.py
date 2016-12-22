@@ -82,13 +82,14 @@ def replace_asserts_with_prints(source_code):
 
     rd3 = RedBaron(source_code) # convert to RedBaron internal structure
 
-    for assert_type in ['assertAlmostEqual', 'assertLess', 'assertGreater', 'assertEqual', 'assertEqualArrays']:
+    for assert_type in ['assertAlmostEqual', 'assertLess', 'assertGreater', 'assertEqual', 'assertEqualArrays','assertTrue','assertFalse']:
         fa = rd3.findAll("NameNode", value=assert_type)
         for f in fa:
             assert_node = f.parent
             remove_redbaron_node(assert_node,0) # remove 'self' from the call
             assert_node.value[0].replace('print')
-            remove_redbaron_node(assert_node.value[1],1) # remove the expected value argument
+            if assert_type not in ['assertTrue','assertFalse']:
+                remove_redbaron_node(assert_node.value[1],1) # remove the expected value argument
 
     fa = rd3.findAll("NameNode", value='assert_rel_error')
     for f in fa:
@@ -112,11 +113,36 @@ def get_method_body(method_code):
     def_node.value.decrease_indentation(8)
     return def_node.value.dumps()
 
+
+def get_code_from_test_suite_method(test_suite_class, method_name):
+    md = get_method_body(inspect.getsource( getattr(test_suite_class,method_name) ))
+    return md
+
+def get_top_lines(code):
+    '''Only get the top part of the test file including imports and other class definitions'''
+
+    # tc4[5].inherit_from[0]
+
+
+    top_code = ''
+    rbt = RedBaron(code)
+    for r in rbt:
+        if r.type == 'string':
+            continue
+        if r.type == 'class':
+            # check to see if any of the inherited classes are unittest.TestCase
+            if 'unittest.TestCase' in r.inherit_from.dumps() :
+                    break
+        top_code += r.dumps() + '\n'
+    return top_code
+
+
 sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
 table_name = 'feature_tests'   # name of the table to be queried
 
 
 def get_test_source_code_for_feature(feature_name):
+
     conn = sqlite3.connect(sqlite_file)
     cur = conn.cursor()
 
@@ -125,11 +151,10 @@ def get_test_source_code_for_feature(feature_name):
     cur.execute('SELECT method_name, title FROM {tn} WHERE feature="{fn}"'.\
             format(tn=table_name, fn=feature_name))
     all_rows = cur.fetchall()
-    print "HERE"
     for r in all_rows:
         method_path = r[0]
         title = r[1]
-        print 'method_path, title', method_path, title
+        # print 'method_path, title', method_path, title
         # get lines that look like this
         # openmdao.tests.test_backtracking_copy.TestBackTrackingCopy.test_newton_with_backtracking_2
         # openmdao.tests.test_exec_comp.TestExecComp.test_complex_step
@@ -156,14 +181,70 @@ def get_test_source_code_for_feature(feature_name):
         # Replace some of the asserts with prints of the actual values
         source_minus_docstrings_with_prints = replace_asserts_with_prints(method_body_source)
 
-        run_outputs = \
-'''
-3.14 88.2
-898.8 7768
-'''
-        test_source_code_for_feature.append((title, source_minus_docstrings_with_prints, run_outputs))
+        # Run the code
+        module_source_code = inspect.getsource(m)
+        top_lines = get_top_lines(module_source_code)
+        setup_source_code = get_method_body(inspect.getsource( getattr(cls,'setUp') ))
+        teardown_source_code = get_method_body(inspect.getsource( getattr(cls,'tearDown') ))
+
+        code_to_run = top_lines + '\n' + setup_source_code + '\n' + source_minus_docstrings_with_prints + '\n' + teardown_source_code
+
+        import sys
+        import StringIO
+
+        # print(70*'=')
+        # print(code_to_run)
+        # print(70*'=')
+        # sys.exit()
+
+
+        with open("run_test.py", 'w') as f:
+            f.write(code_to_run)
+
+        import subprocess
+        run_outputs = subprocess.check_output(['python','run_test.py'])
+        # print run_outputs
+
+
+        # print "before StringIO"
+
+        # create file-like string to capture output
+        # codeOut = StringIO.StringIO()
+        # codeErr = StringIO.StringIO()
+        # print "after StringIO"
+
+        # capture output and errors
+        # sys.stdout = codeOut
+        # print "after sys.stdout"
+        # sys.stderr = codeErr
+
+        # print "before run"
+
+        # exec code_to_run
+
+        # print "after run"
+
+        # restore stdout and stderr
+        # sys.stdout = sys.__stdout__
+        # sys.stderr = sys.__stderr__
+
+        # run_outputs = codeOut.getvalue()
+
+
+        # run_outputs = \
+        # '''
+        # 3.14 88.2
+        # 898.8 7768
+        # '''
+        # print('append',(title,source_minus_docstrings_with_prints,run_outputs))
+        test_source_code_for_feature.append((title,source_minus_docstrings_with_prints,run_outputs))
+        # print('len', len(test_source_code_for_feature))
+
+    # print('RETURN', len(test_source_code_for_feature))
     return test_source_code_for_feature
 
 if __name__ == "__main__":
+    # print 'asfklsdhfklashdklfhkl'
     for scf in get_test_source_code_for_feature('derivatives'):
+        # print(80*'-')
         print(scf)

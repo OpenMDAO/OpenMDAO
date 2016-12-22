@@ -27,9 +27,18 @@ class showUnitTestExamplesDirective(Directive):
                 #         continue
                 #     else:
                 #         print ("CHUNK: ", chunk)
+                #title_node = nodes.literal_block(title, title)
+                title_node = nodes.line(title, title)
+
                 literal = nodes.literal_block(src, src)
                 literal['language'] = 'python'
+
+                output_node = nodes.literal_block(output, output)
+
+                literals.append(title_node)
                 literals.append(literal)
+                literals.append(output_node)
+
 
         return literals
 
