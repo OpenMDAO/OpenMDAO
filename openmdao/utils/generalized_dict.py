@@ -6,8 +6,7 @@ class GeneralizedDictionary(object):
     """Dictionary with type-checking and default values of declared keys.
 
     This class is instantiated for:
-        1. the options attribute in solvers, drivers, and processor allocators
-        2. the metadata attribute in systems.
+        1. the metadata attribute in systems.
 
     Attributes
     ----------
@@ -44,19 +43,19 @@ class GeneralizedDictionary(object):
         value : -
             the value of the entry to be put in _dict or _global_dict.
         """
-        typ = self._declared_entries[name]['typ']
+        type_ = self._declared_entries[name]['type']
         values = self._declared_entries[name]['values']
 
         # (1) Check the type
-        if typ is not None and not isinstance(value, typ):
+        if type_ is not None and not isinstance(value, type_):
             raise ValueError("Entry '{}' has the wrong type ({})".format(
-                name, typ))
+                name, type_))
         # (2) Check the value
         if values is not None and value not in values:
             raise ValueError("Entry '{}'\'s value is not one of {}".format(
                 name, values))
 
-    def declare(self, name, typ=None, desc='',
+    def declare(self, name, type_=None, desc='',
                 value=None, values=None, required=False):
         """Declare an entry.
 
@@ -64,7 +63,7 @@ class GeneralizedDictionary(object):
         ----
         name : str
             the name of the entry.
-        typ : type or None
+        type_ : type or None
             type of the entry in _dict or _global_dict.
         desc : str
             description of the entry.
@@ -76,7 +75,7 @@ class GeneralizedDictionary(object):
             if True, this entry must be specified in _dict or _global_dict.
         """
         self._declared_entries[name] = {
-            'typ': typ,
+            'type': type_,
             'desc': desc,
             'value': value,
             'values': values,
@@ -200,11 +199,34 @@ class GeneralizedDictionary(object):
 
 
 class OptionsDictionary(GeneralizedDictionary):
+    """Dictionary with enforced type-checking and default values of declared keys.
+
+    This class is instantiated for:
+        1. the options attribute in solvers, drivers, and processor allocators
+
+    Attributes
+    ----------
+    _dict : dict
+        dictionary of entries set using via dictionary access.
+    _global_dict : dict
+        dictionary of entries like _dict, but combined with dicts of parents.
+    _declared_entries : dict
+        dictionary of entry declarations.
+    """
+
     def __init__(self, in_dict=None):
+        """Initialize all attributes. Raises ValueError if in_dict is not None.
+
+        Args
+        ----
+        in_dict : dict or None
+            optional dictionary with which to initialize.
+        """
         if in_dict is not None:
-            raise ValueError('Initial dictionaries cannot be used with OptionsDictionary '
-                             'declare options and use update.')
-        super(OptionsDictionary, self).__init__(self, in_dict)
+            raise ValueError('Initial dictionaries cannot be used with '
+                             'OptionsDictionary declare options and use '
+                             'update.')
+        super(OptionsDictionary, self).__init__(in_dict)
 
     def __setitem__(self, name, value):
         """Set an entry in the local dictionary.
