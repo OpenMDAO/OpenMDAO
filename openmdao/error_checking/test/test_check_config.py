@@ -113,6 +113,52 @@ class TestCheckConfig(unittest.TestCase):
         sccs = [sorted(s) for s in get_sccs(root, comps_only=True) if len(s) > 1]
         self.assertEqual([['C4', 'G1.C1', 'G1.C2']], sccs)
 
+    def test_multi_cycles(self):
+        p = Problem(root=Group())
+        root = p.root
+
+        indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
+
+        def make_cycle(root, start, end):
+            # systems within a cycle will be declared out of order, but
+            # should not be reported since they're internal to a cycle.
+            for i in range(end, start-1, -1):
+                root.add_subsystem("C%d" % i, MyComp())
+
+            for i in range(start, end):
+                root.connect("C%d.y" % i, "C%d.a" % (i+1))
+            root.connect("C%d.y" % end, "C%d.a" % start)
+
+        make_cycle(root, 1, 3)
+
+        root.add_subsystem("N1", MyComp())
+
+        make_cycle(root, 11, 13)
+
+        root.add_subsystem("N2", MyComp())
+
+        make_cycle(root, 21, 23)
+
+        root.add_subsystem("N3", MyComp())
+
+        root.connect("N1.z", "C12.b")
+        root.connect("C13.z", "N2.b")
+        root.connect("N2.z", "C21.b")
+        root.connect("C23.z", "N3.b")
+        root.connect("N3.z", "C2.b")
+        root.connect("C11.z", "C3.b")
+
+        testlogger = TestLogger()
+        p.setup(logger=testlogger)
+
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 4)
+
+        self.assertTrue("The following inputs are not connected:" in warnings[0])
+        self.assertEqual(warnings[1] ,"Group '' has the following cycles: [['C11', 'C12', 'C13'], ['C21', 'C22', 'C23'], ['C1', 'C2', 'C3']]")
+        self.assertEqual(warnings[2] ,"System 'C3' executes out-of-order with respect to its source systems ['C11']")
+        self.assertEqual(warnings[3] ,"System 'C2' executes out-of-order with respect to its source systems ['N3']")
+
 
 if __name__ == "__main__":
     unittest.main()
