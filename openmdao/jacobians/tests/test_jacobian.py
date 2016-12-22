@@ -100,7 +100,7 @@ class TestJacobianSrcIndicesDenseDense(unittest.TestCase):
         prob.root.connect('C1.f', 'C2.z', src_indices=[1])
 
         prob.setup(check=False)
-        prob.root.jacobian = GlobalJacobian(Matrix=mat_class)
+        prob.root.jacobian = GlobalJacobian(matrix_class=mat_class)
         prob.root.nl_solver = NewtonSolver(
             subsolvers={'linear': ScipyIterativeSolver(
                 maxiter=100,

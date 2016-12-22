@@ -40,7 +40,7 @@ class Problem(object):
         if True, allocate vectors to store ref. values.
     """
 
-    def __init__(self, root=None, comm=None, AssemblerClass=None,
+    def __init__(self, root=None, comm=None, assembler_class=None,
                  use_ref_vector=True):
         """Initialize attributes.
 
@@ -50,7 +50,7 @@ class Problem(object):
             pointer to the top-level <System> object (root node in the tree).
         comm : MPI.Comm or <FakeComm> or None
             the global communicator; the same as that of assembler and root.
-        AssemblerClass : <Assembler> or None
+        assembler_class : <Assembler> or None
             pointer to the global <Assembler> object.
         use_ref_vector : bool
             if True, allocate vectors to store ref. values.
@@ -61,12 +61,12 @@ class Problem(object):
                 comm = MPI.COMM_WORLD
             except ImportError:
                 comm = FakeComm()
-        if AssemblerClass is None:
-            AssemblerClass = DefaultAssembler
+        if assembler_class is None:
+            assembler_class = DefaultAssembler
 
         self.root = root
         self.comm = comm
-        self._assembler = AssemblerClass(comm)
+        self._assembler = assembler_class(comm)
         self._use_ref_vector = use_ref_vector
 
     # TODO: getitem/setitem need to properly handle scaling/units
@@ -128,12 +128,12 @@ class Problem(object):
         """
         return self.root._solve_nonlinear()
 
-    def setup(self, VectorClass=DefaultVector, check=True, logger=None):
+    def setup(self, vector_class=DefaultVector, check=True, logger=None):
         """Set up everything (root, assembler, vector, solvers, drivers).
 
         Args
         ----
-        VectorClass : type (DefaultVector)
+        vector_class : type (DefaultVector)
             reference to an actual <Vector> class; not an instance.
         check : boolean (True)
             whether to run error check after setup is complete.
@@ -176,24 +176,24 @@ class Problem(object):
         root._setup_scaling()
 
         # Vector setup for the basic execution vector
-        self.setup_vector(None, VectorClass, self._use_ref_vector)
+        self.setup_vector(None, vector_class, self._use_ref_vector)
 
         # Vector setup for the linear vector
-        self.setup_vector('', VectorClass, self._use_ref_vector)
+        self.setup_vector('', vector_class, self._use_ref_vector)
 
         if check:
             check_config(self, logger)
 
         return self
 
-    def setup_vector(self, vec_name, VectorClass, use_ref_vector):
+    def setup_vector(self, vec_name, vector_class, use_ref_vector):
         """Set up the 'vec_name' <Vector>.
 
         Args
         ----
         vec_name : str
             name of the vector.
-        VectorClass : type
+        vector_class : type
             reference to the actual <Vector> class.
         use_ref_vector : bool
             if True, allocate vectors to store ref. values.
@@ -208,7 +208,7 @@ class Problem(object):
             else:
                 typ = key
 
-            vectors[key] = VectorClass(vec_name, typ, self.root)
+            vectors[key] = vector_class(vec_name, typ, self.root)
 
         # TODO: implement this properly
         ind1, ind2 = self.root._variable_allprocs_range['output']
