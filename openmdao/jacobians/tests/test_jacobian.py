@@ -7,6 +7,8 @@ from scipy.sparse import coo_matrix, csr_matrix, issparse
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
      GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CsrMatrix, CooMatrix
 from openmdao.devtools.testutil import assert_rel_error
+from nose_parameterized import parameterized
+import itertools
 
 
 class MyExplicitComp(ExplicitComponent):
@@ -67,12 +69,52 @@ class MyExplicitComp2(ExplicitComponent):
             7.
         ]]))
 
-class TestJacobianSrcIndicesDenseDense(unittest.TestCase):
 
-    def setUp(self):
-        self.prob = self._setup_model(DenseMatrix, np.array)
+def arr2list(arr):
+    """Convert a numpy array to a 'sparse' list."""
+    data = []
+    rows = []
+    cols = []
 
-    def test_src_indices(self):
+    for row in range(arr.shape[0]):
+        for col in range(arr.shape[1]):
+            rows.append(row)
+            cols.append(col)
+            data.append(arr[row, col])
+
+    return [np.array(data), np.array(rows), np.array(cols)]
+
+def arr2revlist(arr):
+    """Convert a numpy array to a 'sparse' list in reverse order."""
+    lst = arr2list(arr)
+    return [lst[0][::-1], lst[1][::-1], lst[2][::-1]]
+
+def inverted_coo(arr):
+    """Convert an ordered coo matrix into one with columns in reverse order
+    so we can test unsorted coo matrices.
+    """
+    shape = arr.shape
+    arr = coo_matrix(arr)
+    return coo_matrix((arr.data[::-1], (arr.row[::-1], arr.col[::-1])), shape=shape)
+
+def inverted_csr(arr):
+    """Convert an ordered coo matrix into a csr with columns in reverse order
+    so we can test unsorted csr matrices.
+    """
+    return inverted_coo(arr).tocsr()
+
+
+class TestJacobian(unittest.TestCase):
+
+    @parameterized.expand(itertools.product(
+        [DenseMatrix, CsrMatrix, CooMatrix],
+        [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist]
+        ), testcase_func_name=
+            lambda func, num, param: 'test_jacobian_src_indices_' + '_'.join(p.__name__ for p in param.args)
+    )
+    def test_src_indices(self, matrix_class, comp_jac_class):
+
+        self._setup_model(matrix_class, comp_jac_class)
 
         # if we multiply our jacobian (at x,y = ones) by our work vec of 1's,
         # we get fwd_check
@@ -86,7 +128,7 @@ class TestJacobianSrcIndicesDenseDense(unittest.TestCase):
         self._check_rev(self.prob, rev_check)
 
     def _setup_model(self, mat_class, comp_jac_class):
-        prob = Problem(root=Group())
+        self.prob = prob = Problem(root=Group())
         prob.root.add_subsystem('indep',
                                 IndepVarComp((
                                     ('a', np.ones(3)),
@@ -100,7 +142,7 @@ class TestJacobianSrcIndicesDenseDense(unittest.TestCase):
         prob.root.connect('C1.f', 'C2.z', src_indices=[1])
 
         prob.setup(check=False)
-        prob.root.jacobian = GlobalJacobian(Matrix=mat_class)
+        prob.root.jacobian = GlobalJacobian(matrix_class=mat_class)
         prob.root.nl_solver = NewtonSolver(
             subsolvers={'linear': ScipyIterativeSolver(
                 maxiter=100,
@@ -111,8 +153,6 @@ class TestJacobianSrcIndicesDenseDense(unittest.TestCase):
         prob.root.suppress_solver_output = True
 
         prob.run()
-
-        return prob
 
     def _check_fwd(self, prob, check_vec):
         work = prob.root._vectors['output']['']._clone()
@@ -153,118 +193,3 @@ class TestJacobianSrcIndicesDenseDense(unittest.TestCase):
         prob.root._vectors['residual'][''] -= work
         self.assertAlmostEqual(
             prob.root._vectors['residual'][''].get_norm(), 0, delta=1e-6)
-
-
-def arr2list(arr):
-    """Convert a numpy array to a 'sparse' list."""
-    data = []
-    rows = []
-    cols = []
-
-    for row in range(arr.shape[0]):
-        for col in range(arr.shape[1]):
-            rows.append(row)
-            cols.append(col)
-            data.append(arr[row, col])
-
-    return [np.array(data), np.array(rows), np.array(cols)]
-
-def arr2revlist(arr):
-    """Convert a numpy array to a 'sparse' list in reverse order."""
-    lst = arr2list(arr)
-    return [lst[0][::-1], lst[1][::-1], lst[2][::-1]]
-
-def inverted_coo(arr):
-    """Convert an ordered coo matrix into one with columns in reverse order
-    so we can test unsorted coo matrices.
-    """
-    shape = arr.shape
-    arr = coo_matrix(arr)
-    return coo_matrix((arr.data[::-1], (arr.row[::-1], arr.col[::-1])), shape=shape)
-
-def inverted_csr(arr):
-    """Convert an ordered coo matrix into a csr with columns in reverse order
-    so we can test unsorted csr matrices.
-    """
-    return inverted_coo(arr).tocsr()
-
-
-class TestJacobianSrcIndicesDenseCoo(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(DenseMatrix, coo_matrix)
-
-class TestJacobianSrcIndicesDenseCsr(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(DenseMatrix, csr_matrix)
-
-class TestJacobianSrcIndicesDenseInvCoo(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(DenseMatrix, inverted_coo)
-
-class TestJacobianSrcIndicesDenseInvCsr(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(DenseMatrix, inverted_csr)
-
-class TestJacobianSrcIndicesDenseList(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(DenseMatrix, arr2list)
-
-class TestJacobianSrcIndicesDenseRevList(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(DenseMatrix, arr2revlist)
-
-class TestJacobianSrcIndicesCsrCsr(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CsrMatrix, csr_matrix)
-
-class TestJacobianSrcIndicesCsrCoo(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CsrMatrix, coo_matrix)
-
-class TestJacobianSrcIndicesCsrInvCoo(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CsrMatrix, inverted_coo)
-
-class TestJacobianSrcIndicesCsrInvCsr(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CsrMatrix, inverted_csr)
-
-class TestJacobianSrcIndicesCsrDense(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CsrMatrix, np.array)
-
-class TestJacobianSrcIndicesCsrList(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CsrMatrix, arr2list)
-
-class TestJacobianSrcIndicesCsrRevList(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CsrMatrix, arr2revlist)
-
-class TestJacobianSrcIndicesCooCsr(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CooMatrix, csr_matrix)
-
-class TestJacobianSrcIndicesCooCoo(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CooMatrix, coo_matrix)
-
-class TestJacobianSrcIndicesCooInvCoo(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CooMatrix, inverted_coo)
-
-class TestJacobianSrcIndicesCooInvCsr(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CooMatrix, inverted_csr)
-
-class TestJacobianSrcIndicesCooDense(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CooMatrix, np.array)
-
-class TestJacobianSrcIndicesCooList(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CooMatrix, arr2list)
-
-class TestJacobianSrcIndicesCooRevList(TestJacobianSrcIndicesDenseDense):
-    def setUp(self):
-        self.prob = self._setup_model(CooMatrix, arr2revlist)

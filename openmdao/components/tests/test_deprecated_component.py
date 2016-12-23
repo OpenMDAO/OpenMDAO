@@ -72,7 +72,7 @@ class DepCompTestCase(unittest.TestCase):
         p.setup(check=False)
         p.root.suppress_solver_output = True
 
-        #p.root.jacobian = GlobalJacobian(Matrix=DenseMatrix)
+        #p.root.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
         #print(p.root.jacobian._int_mtx._matrix)
 
         p.run()

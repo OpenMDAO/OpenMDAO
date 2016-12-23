@@ -43,10 +43,10 @@ class GlobalJacobian(Jacobian):
         meta = self._system._variable_myproc_metadata['input']
         ivar1, ivar2 = self._system._variable_allprocs_range['output']
 
-        self.options.declare('Matrix', value=DenseMatrix,
+        self.options.declare('matrix_class', value=DenseMatrix,
                              desc='<Matrix> class to use in this <Jacobian>.')
-        self._int_mtx = self.options['Matrix'](self._system.comm)
-        self._ext_mtx = self.options['Matrix'](self._system.comm)
+        self._int_mtx = self.options['matrix_class'](self._system.comm)
+        self._ext_mtx = self.options['matrix_class'](self._system.comm)
 
         out_offsets = {i: self._get_var_range(i, 'output')[0]
                        for i in indices['output']}

@@ -58,11 +58,11 @@ class CompTestCaseBase(unittest.TestCase):
 
         if global_jac:
             if jacobian_type == 'dense':
-                prob.root.jacobian = GlobalJacobian(Matrix=DenseMatrix)
+                prob.root.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
             elif jacobian_type == 'sparse-coo':
-                prob.root.jacobian = GlobalJacobian(Matrix=CooMatrix)
+                prob.root.jacobian = GlobalJacobian(matrix_class=CooMatrix)
             elif jacobian_type == 'sparse-csr':
-                prob.root.jacobian = GlobalJacobian(Matrix=CsrMatrix)
+                prob.root.jacobian = GlobalJacobian(matrix_class=CsrMatrix)
 
         prob.root.nl_solver = NewtonSolver(
             subsolvers={'linear': ScipyIterativeSolver(
