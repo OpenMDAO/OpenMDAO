@@ -56,7 +56,7 @@ def assert_rel_error(test_case, actual, desired, tolerance):
 
 
 class TestLogger(object):
-    """A logger replacement for testing that simplifies testing log output."""
+    """A logger replacement for testing that simplifies checking log output."""
 
     def __init__(self):
         """Initialize the message dict."""

@@ -2,7 +2,7 @@ import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 from openmdao.devtools.testutil import TestLogger
-from openmdao.error_checking.check_config import get_cycles
+from openmdao.error_checking.check_config import get_sccs
 
 class MyComp(ExecComp):
     def __init__(self):
@@ -16,8 +16,8 @@ class TestCheckConfig(unittest.TestCase):
 
         G1 = root.add_subsystem("G1", Group(), promotes=['*'])
         G2 = G1.add_subsystem("G2", Group(), promotes=['*'])
-        C1 = G2.add_subsystem("C1", ExecComp('y=x*2.0+w'), promotes=['*'])
         C2 = G2.add_subsystem("C2", IndepVarComp('x', 1.0), promotes=['*'])
+        C1 = G2.add_subsystem("C1", ExecComp('y=x*2.0+w'), promotes=['*'])
 
         G3 = root.add_subsystem("G3", Group())
         G4 = G3.add_subsystem("G4", Group())
@@ -42,7 +42,7 @@ class TestCheckConfig(unittest.TestCase):
 
         self.assertEqual(expected, actual)
 
-    def test_cycles_1_level(self):
+    def test_dataflow_1_level(self):
 
         p = Problem(root=Group())
         root = p.root
@@ -68,11 +68,12 @@ class TestCheckConfig(unittest.TestCase):
         p.setup(logger=testlogger)
 
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
+        self.assertEqual(len(warnings), 2)
 
         self.assertEqual(warnings[0] ,"Group '' has the following cycles: [['C1', 'C2', 'C4']]")
+        self.assertEqual(warnings[1] ,"System 'C3' executes out-of-order with respect to its source systems ['C4']")
 
-    def test_cycles_multi_level(self):
+    def test_dataflow_multi_level(self):
 
         p = Problem(root=Group())
         root = p.root
@@ -102,13 +103,61 @@ class TestCheckConfig(unittest.TestCase):
         p.setup(logger=testlogger)
 
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
+        self.assertEqual(len(warnings), 3)
 
-        self.assertEqual(warnings[0] ,"Group '' has the following cycles: [['G1', 'C4']]")
+        self.assertEqual(warnings[0] ,"Group '' has the following cycles: [['C4', 'G1']]")
+        self.assertEqual(warnings[1] ,"System 'C3' executes out-of-order with respect to its source systems ['C4']")
+        self.assertEqual(warnings[2] ,"System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']")
 
-        # test recursive cycle check
-        sccs = get_cycles(root, recurse=True)
-        self.assertEqual([['G1.C1', 'G1.C2', 'C4']], sccs)
+        # test comps_only cycle check
+        sccs = [sorted(s) for s in get_sccs(root, comps_only=True) if len(s) > 1]
+        self.assertEqual([['C4', 'G1.C1', 'G1.C2']], sccs)
+
+    def test_multi_cycles(self):
+        p = Problem(root=Group())
+        root = p.root
+
+        indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
+
+        def make_cycle(root, start, end):
+            # systems within a cycle will be declared out of order, but
+            # should not be reported since they're internal to a cycle.
+            for i in range(end, start-1, -1):
+                root.add_subsystem("C%d" % i, MyComp())
+
+            for i in range(start, end):
+                root.connect("C%d.y" % i, "C%d.a" % (i+1))
+            root.connect("C%d.y" % end, "C%d.a" % start)
+
+        make_cycle(root, 1, 3)
+
+        root.add_subsystem("N1", MyComp())
+
+        make_cycle(root, 11, 13)
+
+        root.add_subsystem("N2", MyComp())
+
+        make_cycle(root, 21, 23)
+
+        root.add_subsystem("N3", MyComp())
+
+        root.connect("N1.z", "C12.b")
+        root.connect("C13.z", "N2.b")
+        root.connect("N2.z", "C21.b")
+        root.connect("C23.z", "N3.b")
+        root.connect("N3.z", "C2.b")
+        root.connect("C11.z", "C3.b")
+
+        testlogger = TestLogger()
+        p.setup(logger=testlogger)
+
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 4)
+
+        self.assertTrue("The following inputs are not connected:" in warnings[0])
+        self.assertEqual(warnings[1] ,"Group '' has the following cycles: [['C11', 'C12', 'C13'], ['C21', 'C22', 'C23'], ['C1', 'C2', 'C3']]")
+        self.assertEqual(warnings[2] ,"System 'C2' executes out-of-order with respect to its source systems ['N3']")
+        self.assertEqual(warnings[3] ,"System 'C3' executes out-of-order with respect to its source systems ['C11']")
 
 
 if __name__ == "__main__":

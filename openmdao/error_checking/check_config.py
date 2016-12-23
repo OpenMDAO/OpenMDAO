@@ -6,7 +6,7 @@ import numpy
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
-from six import iteritems
+import networkx as nx
 
 from openmdao.core.group import Group
 from openmdao.core.component import Component
@@ -38,10 +38,10 @@ def check_config(problem, logger=None):
     root = problem.root
 
     _check_hanging_inputs(problem, logger)
-    _check_cycles(root, logger)
+    _check_dataflow(root, logger)
 
 
-def compute_sys_graph(group, input_src_ids, recurse=False):
+def compute_sys_graph(group, input_src_ids, comps_only=False):
     """Compute a dependency graph for subsystems in the given group.
 
     Args
@@ -53,28 +53,22 @@ def compute_sys_graph(group, input_src_ids, recurse=False):
         Array containing global variable ids for sources of the inputs
         indicated by the index into the array.
 
-    recurse : bool (False)
-        If True, return a graph of all components within the given group
-        or any of its descendants.  Otherwise, a graph containing only
-        direct children of the group will be returned.
+    comps_only : bool (False)
+        If True, return a graph of all Components within the given group
+        or any of its descendants. No sub-groups will be included. Otherwise,
+        a graph containing only direct children (both Components and Groups)
+        of the group will be returned.
 
     Returns
     -------
-    csr_matrix
-        A graph in the form of a sparse (CSR) adjacency matrix.
-
-    list of <System>
-        A list of subsystems of the given group, either direct children
-        or all directly or indirectly contained Components, depending
-        upon the value of the 'recurse' arg.
+    DiGraph
+        A directed graph containing names of subsystems and their connections.
 
     """
-    if recurse:
+    if comps_only:
         subsystems = list(system_iter(group, recurse=True, typ=Component))
     else:
         subsystems = group._subsystems_allprocs
-
-    nsubs = len(subsystems)
 
     i_start, i_end = group._variable_allprocs_range['input']
     o_start, o_end = group._variable_allprocs_range['output']
@@ -90,73 +84,142 @@ def compute_sys_graph(group, input_src_ids, recurse=False):
         start, end = s._variable_allprocs_range['output']
         outvar2sys[start - o_start:end - o_start] = i
 
-    rows = []
-    cols = []
+    graph = nx.DiGraph()
 
     for in_id, src_id in enumerate(input_src_ids):
         if (src_id != -1 and (o_start <= src_id < o_end) and
                 (i_start <= in_id < i_end)):
             # offset the ids to index into our var2sys arrays
-            rows.append(outvar2sys[src_id - o_start])
-            cols.append(invar2sys[in_id - i_start])
+            graph.add_edge(subsystems[outvar2sys[src_id - o_start]].path_name,
+                           subsystems[invar2sys[in_id - i_start]].path_name)
 
-    data = numpy.ones(len(rows))
-
-    return csr_matrix((data, (rows, cols)), shape=(nsubs, nsubs)), subsystems
+    return graph
 
 
-def get_cycles(group, recurse=False):
-    """Return all system cycles found in the given group.
+def get_sccs(group, comps_only=False):
+    """Return strongly connected subsystems of the given Group.
 
     Args
     ----
     group : <Group>
-        The Group being checked for cycles.
+        The strongly connected components will be computed for this Group.
 
-    recurse : bool (False)
-        If True, return cycles between all components within the given group
-        or any of its descendants.  Otherwise, only cycles involving
-        direct children of the group will be returned.
+    comps_only : bool (False)
+        If True, the graph used to compute strongly connected components
+        will contain all Components within the given group or any of its
+        descendants and no sub-groups will be included. Otherwise, the graph
+        used will contain only direct children (both Components and Groups)
+        of the given group.
 
     Returns
     -------
-    list of lists of str
-        List of all cycles found. Each cycle is a list of subsystem pathnames
-        of systems belonging to that cycle.
+    list of sets of str
+        A list of strongly connected components in topological order.
     """
-    graph, subs = compute_sys_graph(group, group._sys_assembler._input_src_ids,
-                                    recurse=recurse)
-    num_sccs, labels = connected_components(graph, connection='strong')
+    graph = compute_sys_graph(group, group._sys_assembler._input_src_ids,
+                              comps_only=comps_only)
 
-    sccs = []
-    for i in range(num_sccs):
-        # find systems in SCC i
-        connected_systems = numpy.where(labels == i)[0]
-        if connected_systems.size > 1:
-            sccs.append([
-                subs[i].path_name for i in connected_systems
-            ])
-
+    # Tarjan's algorithm returns SCCs in reverse topological order, so
+    # the list returned here is reversed.
+    sccs = list(nx.strongly_connected_components(graph))
+    sccs.reverse()
     return sccs
 
 
-def _check_cycles(group, logger):
-    """Report any cycles found in any Group to the logger.
+def _check_dataflow(group, logger):
+    """Report any cycles and out of order Systems to the logger.
 
     Args
     ----
     group : <Group>
-        The Group being checked for cycles.
+        The Group being checked for dataflow issues.
 
     logger : object
-        The object that managers logging output.
+        The object that manages logging output.
+
     """
-    for system in system_iter(group, include_self=True, recurse=True):
-        if isinstance(system, Group):
-            sccs = get_cycles(system)
-            if sccs:
-                logger.warning("Group '%s' has the following cycles: %s" %
-                               (system.path_name, sccs))
+    for system in system_iter(group, include_self=True, recurse=True,
+                              typ=Group):
+        sccs = get_sccs(system)
+        cycles = [sorted(s) for s in sccs if len(s) > 1]
+        cycle_idxs = {}
+
+        if cycles:
+            logger.warning("Group '%s' has the following cycles: %s" %
+                           (system.path_name, cycles))
+            for i, cycle in enumerate(cycles):
+                # keep track of cycles so we can detect when a system in
+                # one cycle is out of order with a system in a different cycle.
+                for s in cycle:
+                    cycle_idxs[s] = i
+
+        ubcs = _get_out_of_order_subs(system,
+                                      system._sys_assembler._input_src_ids)
+
+        for tgt_system, src_systems in sorted(ubcs.items()):
+            keep_srcs = []
+
+            for src_system in src_systems:
+                if not (src_system in cycle_idxs and
+                        tgt_system in cycle_idxs and
+                        cycle_idxs[tgt_system] == cycle_idxs[src_system]):
+                    keep_srcs.append(src_system)
+
+            if keep_srcs:
+                logger.warning("System '%s' executes out-of-order with "
+                               "respect to its source systems %s" %
+                               (tgt_system, sorted(keep_srcs)))
+
+
+def _get_out_of_order_subs(group, input_src_ids):
+    """Return Systems that are executed out of dataflow order.
+
+    Args
+    ----
+    group : <Group>
+        The Group where we're checking subsystem order.
+
+    input_src_ids : ndarray of int
+        Array containing global variable ids for sources of the inputs
+        indicated by the index into the array. This describes all variable
+        connections, either explicit or implicit, in the entire model.
+
+    Returns
+    -------
+    dict
+        A dict mapping names of target Systems to a list of names of their
+        source Systems that execute after them.
+
+    """
+    subsystems = group._subsystems_allprocs
+
+    i_start, i_end = group._variable_allprocs_range['input']
+    o_start, o_end = group._variable_allprocs_range['output']
+
+    # mapping arrays to find the system ID given the variable ID
+    invar2sys = numpy.empty(i_end - i_start, dtype=int)
+    outvar2sys = numpy.empty(o_end - o_start, dtype=int)
+
+    for i, s in enumerate(subsystems):
+        start, end = s._variable_allprocs_range['input']
+        invar2sys[start - i_start:end - i_start] = i
+
+        start, end = s._variable_allprocs_range['output']
+        outvar2sys[start - o_start:end - o_start] = i
+
+    ubcs = {}
+    for in_id, src_id in enumerate(input_src_ids):
+        if (src_id != -1 and (o_start <= src_id < o_end) and
+                (i_start <= in_id < i_end)):
+            # offset the ids to index into our var2sys arrays
+            src_sysID = outvar2sys[src_id - o_start]
+            tgt_sysID = invar2sys[in_id - i_start]
+            if (src_sysID > tgt_sysID):
+                src_sys = subsystems[src_sysID].path_name
+                tgt_sys = subsystems[tgt_sysID].path_name
+                ubcs.setdefault(tgt_sys, []).append(src_sys)
+
+    return ubcs
 
 
 def _check_hanging_inputs(problem, logger):

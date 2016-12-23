@@ -95,7 +95,8 @@ class System(object):
     _ln_solver : <LinearSolver>
         linear solver to be used for solve_linear; not the Newton system.
     _suppress_solver_output : boolean
-        global overriding flag that turns off all solver output if 'False'.
+        flag that turns off all solver output for this System and all
+        of its descendants if 'False'.
     """
 
     def __init__(self, **kwargs):
