@@ -1,5 +1,4 @@
-"""
-Classes and functions to support unit conversion.
+"""Classes and functions to support unit conversion.
 
 The module provides a basic set of predefined physical quantities
 in its built-in library; however, it also supports generation of
@@ -38,8 +37,7 @@ class NumberDict(OrderedDict):
     """
 
     def __getitem__(self, item):
-        """
-        get the item, or 0.
+        """Get the item, or 0.
 
         Args
         ----
@@ -57,8 +55,7 @@ class NumberDict(OrderedDict):
             return 0
 
     def __coerce__(self, other):
-        """
-        change other dict to NumberDicts.
+        """Change other dict to NumberDicts.
 
         Args
         ----
@@ -75,8 +72,7 @@ class NumberDict(OrderedDict):
         return self, other
 
     def __add__(self, other):
-        """
-        add another NumberDict to myself.
+        """Add another NumberDict to myself.
 
         Args
         ----
@@ -96,8 +92,7 @@ class NumberDict(OrderedDict):
         return sum_dict
 
     def __sub__(self, other):
-        """
-        add another NumberDict from myself.
+        """Add another NumberDict from myself.
 
         Args
         ----
@@ -117,8 +112,7 @@ class NumberDict(OrderedDict):
         return sum_dict
 
     def __rsub__(self, other):
-        """
-        add subtract myself from another NumberDict.
+        """Add subtract myself from another NumberDict.
 
         Args
         ----
@@ -138,8 +132,7 @@ class NumberDict(OrderedDict):
         return sum_dict
 
     def __mul__(self, other):
-        """
-        multiply myself by another NumberDict.
+        """Multiply myself by another NumberDict.
 
         Args
         ----
@@ -159,8 +152,7 @@ class NumberDict(OrderedDict):
     __rmul__ = __mul__
 
     def __div__(self, other):
-        """
-        divide myself by another NumberDict.
+        """Divide myself by another NumberDict.
 
         Args
         ----
@@ -180,8 +172,7 @@ class NumberDict(OrderedDict):
     __truediv__ = __div__  # for python 3
 
     def __repr__(self):
-        """
-        Return a string deceleration of myself.
+        """Return a string deceleration of myself.
 
         Args
         ----
@@ -245,7 +236,7 @@ class PhysicalUnit(object):
         self._powers = powers
 
     def __repr__(self):
-        """string representation of myself.
+        """String representation of myself.
 
         Returns
         -------
@@ -256,7 +247,7 @@ class PhysicalUnit(object):
                                               self._powers, self._offset)
 
     def __str__(self):
-        """convert myself to string.
+        """Convert myself to string.
 
         Returns
         -------
@@ -266,7 +257,7 @@ class PhysicalUnit(object):
         return '<PhysicalUnit ' + self.name() + '>'
 
     def __lt__(self, other):
-        """compare myself to other.
+        """Compare myself to other.
 
         Args
         ----
@@ -284,7 +275,7 @@ class PhysicalUnit(object):
         return self._factor < other._factor
 
     def __gt__(self, other):
-        """compare myself to other.
+        """Compare myself to other.
 
         Args
         ----
@@ -301,7 +292,7 @@ class PhysicalUnit(object):
         return self._factor > other._factor
 
     def __eq__(self, other):
-        """test for equality.
+        """Test for equality.
 
         Args
         ----
@@ -318,7 +309,7 @@ class PhysicalUnit(object):
                 self._powers == other._powers)
 
     def __mul__(self, other):
-        """multiply myself by other.
+        """Multiply myself by other.
 
         Args
         ----
@@ -347,7 +338,7 @@ class PhysicalUnit(object):
     __rmul__ = __mul__
 
     def __div__(self, other):
-        """divide myself by other.
+        """Divide myself by other.
 
         Args
         ----
@@ -374,7 +365,7 @@ class PhysicalUnit(object):
     __truediv__ = __div__   # for python 3
 
     def __rdiv__(self, other):
-        """divide other by myself.
+        """Divide other by myself.
 
         Args
         ----
@@ -393,7 +384,7 @@ class PhysicalUnit(object):
     __rtruediv__ = __rdiv__
 
     def __pow__(self, other):
-        """raise myself to a power.
+        """Raise myself to a power.
 
         Args
         ----
@@ -431,8 +422,7 @@ class PhysicalUnit(object):
         raise TypeError('Only integer and inverse integer exponents allowed')
 
     def in_base_units(self):
-        """
-        Return the base unit equivalent of this unit.
+        """Return the base unit equivalent of this unit.
 
         Returns
         -------
@@ -495,8 +485,7 @@ class PhysicalUnit(object):
         return (factor, offset)
 
     def is_compatible(self, other):
-        """
-        check for compatibility with another unit.
+        """Check for compatibility with another unit.
 
         Args
         ----
@@ -543,7 +532,7 @@ class PhysicalUnit(object):
         self._names[name] = 1
 
     def name(self):
-        """compute the name of this unit.
+        """Compute the name of this unit.
 
         Returns
         -------
@@ -710,8 +699,7 @@ def import_library(libfilepointer):
 
 
 def update_library(filename):
-    """
-    Update units in current library from `filename`.
+    """Update units in current library from `filename`.
 
     Args
     ----
@@ -853,8 +841,7 @@ def _find_unit(unit):
 
 
 def conversion_to_base_units(units):
-    """
-    Get the offset and scaler to convert from given units to base units.
+    """Get the offset and scaler to convert from given units to base units.
 
     Args
     ----

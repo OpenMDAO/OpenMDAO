@@ -26,7 +26,8 @@ ignores = {
         'E131',  # continuation line unaligned for hanging indent
     ],
     'pep257': [
-        'D203'  # 1 blank required before class docstrings
+        'D203',  # 1 blank required before class docstrings
+        'D213',  # Multi-line doc strings start on second line (see: D212)
     ]
 }
 
