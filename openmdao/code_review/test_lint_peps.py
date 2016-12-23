@@ -2,8 +2,10 @@ from __future__ import print_function
 
 import unittest
 import os
-from subprocess import Popen, PIPE, STDOUT, call
 from fnmatch import fnmatch, filter as fnfilter
+import pycodestyle
+import pydocstyle
+import re
 
 # fill in patterns to exclude directories here
 dir_excludes = [
@@ -24,7 +26,7 @@ ignores = {
         'E131',  # continuation line unaligned for hanging indent
     ],
     'pep257': [
-        'D203' # 1 blank required before class docstrings
+        'D203'  # 1 blank required before class docstrings
     ]
 }
 
@@ -46,46 +48,56 @@ def _get_files():
             yield os.path.join(dirpath, name)
 
 
+class StringReport(pycodestyle.StandardReport):
+    def get_failures(self):
+        """
+        Returns the list of failures, including source lines, as a formatted
+        strings ready to be printed.
+        """
+        err_strings = []
+        if self.total_errors > 0:
+            self._deferred_print.sort()
+            for line_number, offset, code, text, doc in self._deferred_print:
+                err_strings.append(self._fmt % {
+                    'path': self.filename,
+                    'row': self.line_offset + line_number, 'col': offset + 1,
+                    'code': code, 'text': text,
+                })
+                if line_number > len(self.lines):
+                    line = ''
+                else:
+                    line = self.lines[line_number - 1]
+                err_strings.append(line.rstrip())
+                err_strings.append(re.sub(r'\S', ' ', line[:offset]) + '^')
+        return err_strings
+
+    def get_file_results(self):
+        return self.file_errors
+
+
 class LintTestCase(unittest.TestCase):
     def test_pep8(self):
-        ignore = ','.join(ignores['pep8'])
-        if ignore:
-            ignore = '--ignore=%s' % ignore
+        pep8opts = pycodestyle.StyleGuide(
+            ignore=ignores['pep8'],
+            max_line_length=100,
+            format='pylint'
+        ).options
 
-        for path in _get_files():
-            p = Popen(['pep8', '--show-source', ignore, path],
-                      stdout=PIPE, stderr=STDOUT)
-            output = p.communicate()[0]
+        report = StringReport(pep8opts)
+        failures = []
+        for file in _get_files():
+            checker = pycodestyle.Checker(file, options=pep8opts, report=report)
+            checker.check_all()
+            report = checker.report
+            if report.get_file_results() > 0:
+                failures.extend(report.get_failures())
+                failures.append('')
 
-            if p.returncode:
-                msgs = [line for line in str(output).split('\n') if ':' in line]
-                self.fail('pep8 failure: %s' % '\n'.join(msgs))
+        if failures:
+            self.fail('{} PEP 8 Failure(s):\n'.format(report.total_errors) + '\n'.join(failures))
 
     def test_pep257(self):
-        ignore = ','.join(ignores['pep257'])
-        if ignore:
-            ignore = '--ignore=%s' % ignore
-
-        for path in _get_files():
-            p = Popen(['pep257', ignore, path], stdout=PIPE, stderr=STDOUT)
-            output = p.communicate()[0]
-
-            if p.returncode:
-                msgs = [line for line in str(output).split('\n') if ':' in line]
-                self.fail('pep257 failure: %s' % '\n'.join(msgs))
-
-
-if __name__ == '__main__':
-    for path in _get_files():
-        for check in ['pep8', 'pep257']:
-            print ('-' * 79)
-            print (check, path)
-
-            ignore = ','.join(ignores[check])
-            if ignore:
-                ignore = '--ignore=%s' % ignore
-
-            call([check, ignore, path])
-
-    print()
-    print()
+        failures = [str(fail) for fail in pydocstyle.check(_get_files(),
+                                                      ignore=ignores['pep257'])]
+        if failures:
+            self.fail('{} PEP 257 Failure(s):\n'.format(len(failures)) + '\n'.join(failures))
