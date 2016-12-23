@@ -20,11 +20,12 @@ file_excludes = [
 ]
 
 ignores = {
-    'pep8': [
+    'pycodestyle': [
         'E131',  # continuation line unaligned for hanging indent
     ],
-    'pep257': [
-        'D203' # 1 blank required before class docstrings
+    'pydocstyle': [
+        'D203',  # 1 blank required before class docstrings
+        'D213',  # Docstrings starting on the second line (see D212).
     ]
 }
 
@@ -48,7 +49,7 @@ def _get_files():
 
 class LintTestCase(unittest.TestCase):
     def test_pep8(self):
-        ignore = ','.join(ignores['pep8'])
+        ignore = ','.join(ignores['pycodestyle'])
         if ignore:
             ignore = '--ignore=%s' % ignore
 
@@ -62,7 +63,7 @@ class LintTestCase(unittest.TestCase):
                 self.fail('pep8 failure: %s' % '\n'.join(msgs))
 
     def test_pep257(self):
-        ignore = ','.join(ignores['pep257'])
+        ignore = ','.join(ignores['pydocstyle'])
         if ignore:
             ignore = '--ignore=%s' % ignore
 
@@ -77,7 +78,7 @@ class LintTestCase(unittest.TestCase):
 
 if __name__ == '__main__':
     for path in _get_files():
-        for check in ['pep8', 'pep257']:
+        for check in ['pycodestyle', 'pydocstyle']:
             print ('-' * 79)
             print (check, path)
 
