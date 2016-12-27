@@ -203,15 +203,6 @@ class OptionsDictionary(GeneralizedDictionary):
 
     This class is instantiated for:
         1. the options attribute in solvers, drivers, and processor allocators
-
-    Attributes
-    ----------
-    _dict : dict
-        dictionary of entries set using via dictionary access.
-    _global_dict : dict
-        dictionary of entries like _dict, but combined with dicts of parents.
-    _declared_entries : dict
-        dictionary of entry declarations.
     """
 
     def __init__(self, in_dict=None):

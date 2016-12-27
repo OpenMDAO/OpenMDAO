@@ -3,7 +3,7 @@ from __future__ import division
 import numpy
 from six.moves import range
 
-from openmdao.utils.generalized_dict import GeneralizedDictionary
+from openmdao.utils.generalized_dict import OptionsDictionary
 
 
 class ProcAllocator(object):
@@ -26,9 +26,10 @@ class ProcAllocator(object):
         **kwargs : dict
             Contains options.
         """
-        self.options = GeneralizedDictionary(kwargs)
+        self.options = OptionsDictionary()
         self.options.declare('parallel', type_=bool, value=False,
                              desc='whether to parallelize between subsystems')
+        self.options.update(kwargs)
 
     def __call__(self, nsub, comm, proc_range):
         """Perform the allocation if parallel.
