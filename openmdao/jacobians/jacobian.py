@@ -57,7 +57,8 @@ class Jacobian(object):
         self._keymap = {}
         self._iter_list = []
 
-        self.options = OptionsDictionary(kwargs)
+        self.options = OptionsDictionary()
+        self.options.update(kwargs)
 
     def _process_key(self, key):
         """Map output-input pair names to indices and sizes.

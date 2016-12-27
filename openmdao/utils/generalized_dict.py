@@ -18,7 +18,7 @@ class GeneralizedDictionary(object):
         dictionary of entry declarations.
     """
 
-    def __init__(self, in_dict=None):
+    def __init__(self):
         """Initialize all attributes.
 
         Args
@@ -29,9 +29,6 @@ class GeneralizedDictionary(object):
         self._dict = {}
         self._global_dict = {}
         self._declared_entries = {}
-
-        if in_dict is not None:
-            self._dict.update(in_dict)
 
     def _check_type_and_value(self, name, value):
         """If declared, check that value has the right type and is valid.
@@ -204,19 +201,6 @@ class OptionsDictionary(GeneralizedDictionary):
     This class is instantiated for:
         1. the options attribute in solvers, drivers, and processor allocators
     """
-
-    def __init__(self, in_dict=None):
-        """Initialize all attributes. Raises ValueError if in_dict is not None.
-
-        Args
-        ----
-        in_dict : dict or None
-            optional dictionary with which to initialize.
-        """
-        if in_dict is not None and in_dict:
-            raise ValueError('Initial dictionaries cannot be used with OptionsDictionary. '
-                             'Declare options and use update.')
-        super(OptionsDictionary, self).__init__(in_dict)
 
     def __setitem__(self, name, value):
         """Set an entry in the local dictionary.

@@ -8,14 +8,6 @@ class TestOptionsDict(unittest.TestCase):
     def setUp(self):
         self.dict = OptionsDictionary()
 
-    def test_in_dict(self):
-        expected_msg = ('Initial dictionaries cannot be used with OptionsDictionary. '
-                        'Declare options and use update.')
-        with self.assertRaises(ValueError) as context:
-            OptionsDictionary({'a': 1})
-
-        self.assertEqual(expected_msg, str(context.exception))
-
     def test_type_checking(self):
         self.dict.declare('test', int, 'Test integer value')
 
@@ -124,11 +116,6 @@ class TestOptionsDict(unittest.TestCase):
 class TestGeneralizedDict(TestOptionsDict):
     def setUp(self):
         self.dict = GeneralizedDictionary()
-
-    def test_in_dict(self):
-        obj = object()
-        dict_ = GeneralizedDictionary({'a': obj})
-        self.assertIs(dict_['a'], obj)
 
     def test_unnamed_args(self):
         obj = object()

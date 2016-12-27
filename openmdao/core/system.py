@@ -111,7 +111,8 @@ class System(object):
         self.name = ''
         self.path_name = ''
         self.comm = None
-        self.metadata = GeneralizedDictionary(kwargs)
+        self.metadata = GeneralizedDictionary()
+        self.metadata.update(kwargs)
 
         self._sys_depth = 0
         self._sys_assembler = None
