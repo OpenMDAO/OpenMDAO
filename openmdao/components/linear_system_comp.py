@@ -1,5 +1,4 @@
-""" A component that solves a linear system. """
-
+"""Define the LinearSystemComp class."""
 import numpy as np
 from scipy import linalg
 
@@ -7,12 +6,12 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 
 
 class LinearSystemComp(ImplicitComponent):
-    """Solve a linear system, Ax=b.
+    """Component that solves a linear system, Ax=b.
 
     Attributes
     ----------
     _lup : object
-        lup returned from scipy.linag.lu_factor
+        matrix factorization returned from scipy.linag.lu_factor
     """
 
     def __init__(self, **kwargs):
@@ -34,19 +33,53 @@ class LinearSystemComp(ImplicitComponent):
         self.add_input("b", val=np.ones(size))
         self.add_output("x", shape=size)
 
-    def solve_nonlinear(self, inputs, outputs):
-        """Use numpy to solve Ax=b for x."""
-        # lu factorization for use with solve_linear
-        self.lup = linalg.lu_factor(inputs['A'])
-        outputs['x'] = linalg.lu_solve(self.lup, inputs['b'])
-
     def apply_nonlinear(self, inputs, outputs, residuals):
-        """R = Ax - b."""
+        """R = Ax - b.
+
+        Args
+        ----
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        residuals : Vector
+            unscaled, dimensional residuals written to via residuals[key]
+        """
         residuals['x'] = inputs['A'].dot(outputs['x']) - inputs['b']
 
-    # @skip_lint
+    def solve_nonlinear(self, inputs, outputs):
+        """Use numpy to solve Ax=b for x.
+
+        Args
+        ----
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        """
+        # lu factorization for use with solve_linear
+        self._lup = linalg.lu_factor(inputs['A'])
+        outputs['x'] = linalg.lu_solve(self._lup, inputs['b'])
+
     def apply_linear(self, inputs, outputs, d_inputs, d_outputs,
                      d_residuals, mode):
+        r"""Compute jac-vector product.
+
+        Args
+        ----
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        d_inputs : Vector
+            see inputs; product must be computed only if var_name in d_inputs
+        d_outputs : Vector
+            see outputs; product must be computed only if var_name in d_outputs
+        d_residuals : Vector
+            see outputs
+        mode : str
+            either 'fwd' or 'rev'
+        """
         if mode == 'fwd':
 
             if 'x' in d_outputs:
@@ -66,7 +99,22 @@ class LinearSystemComp(ImplicitComponent):
                 d_inputs['b'] -= d_residuals['x']
 
     def solve_linear(self, d_outputs, d_residuals, mode):
-        """Back-substitution to solve the derivatives of the linear system."""
+        r"""Back-substitution to solve the derivatives of the linear system.
+
+        If mode is:
+            'fwd': d_residuals \|-> d_outputs
+
+            'rev': d_outputs \|-> d_residuals
+
+        Args
+        ----
+        d_outputs : Vector
+            unscaled, dimensional quantities read via d_outputs[key]
+        d_residuals : Vector
+            unscaled, dimensional quantities read via d_residuals[key]
+        mode : str
+            either 'fwd' or 'rev'
+        """
         if mode == 'fwd':
             sol_vec, rhs_vec = d_outputs, d_residuals
             t = 0
@@ -74,4 +122,4 @@ class LinearSystemComp(ImplicitComponent):
             sol_vec, rhs_vec = d_residuals, d_outputs
             t = 1
 
-        sol_vec['x'] = linalg.lu_solve(self.lup, rhs_vec['x'], trans=t)
+        sol_vec['x'] = linalg.lu_solve(self._lup, rhs_vec['x'], trans=t)
