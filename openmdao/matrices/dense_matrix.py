@@ -1,9 +1,9 @@
 """Define the DenseMatrix class."""
 from __future__ import division, print_function
 import numpy
-import scipy.sparse
+from scipy.sparse import coo_matrix, csr_matrix
 
-from openmdao.matrices.matrix import Matrix
+from openmdao.matrices.matrix import Matrix, _compute_index_map
 
 
 class DenseMatrix(Matrix):
@@ -20,29 +20,55 @@ class DenseMatrix(Matrix):
             number of cols in the matrix.
         """
         matrix = numpy.zeros((num_rows, num_cols))
-        for ind in range(2):
-            submats = [self._op_submats, self._ip_submats][ind]
-            metadata = [self._op_metadata, self._ip_metadata][ind]
+        submat_meta_iter = ((self._op_submats, self._op_metadata),
+                            (self._ip_submats, self._ip_metadata))
 
+        for submats, metadata in submat_meta_iter:
             for key in submats:
-                jac, irow, icol = submats[key]
+                jac, irow, icol, src_indices = submats[key]
 
-                if type(jac) is numpy.ndarray or scipy.sparse.issparse(jac):
-                    shape = jac.shape
-                    irow1 = irow
-                    irow2 = irow + shape[0]
-                    icol1 = icol
-                    icol2 = icol + shape[1]
-                    metadata[key] = matrix[irow1:irow2, icol1:icol2]
-                    if type(jac) is numpy.ndarray:
-                        metadata[key][:, :] = jac
+                if isinstance(jac, numpy.ndarray):
+                    nrows, ncols = jac.shape
+                    irow2 = irow + nrows
+                    if src_indices is None:
+                        icol2 = icol + ncols
+                        metadata[key] = (slice(irow, irow2),
+                                         slice(icol, icol2))
                     else:
-                        metadata[key][:, :] = jac.todense()
-                elif type(jac) is list:
-                    irows = irow + jac[1]
-                    icols = icol + jac[2]
-                    matrix[irows, icols] = jac[0]
+                        metadata[key] = (slice(irow, irow2),
+                                         src_indices + icol)
+
+                    irows, icols = metadata[key]
+                    matrix[irows, icols] = jac
+                elif isinstance(jac, (coo_matrix, csr_matrix)):
+                    jac = jac.tocoo()
+                    if src_indices is None:
+                        irows = irow + jac.row
+                        icols = icol + jac.col
+                    else:
+                        irows, icols, idxs = _compute_index_map(jac.row,
+                                                                jac.col,
+                                                                irow, icol,
+                                                                src_indices)
+                        revidxs = numpy.argsort(idxs)
+                        irows, icols = irows[revidxs], icols[revidxs]
+
                     metadata[key] = (irows, icols)
+                    matrix[irows, icols] = jac.data
+
+                elif isinstance(jac, list):
+                    if src_indices is None:
+                        irows = jac[1] + irow
+                        icols = jac[2] + icol
+                    else:
+                        irows, icols, idxs = _compute_index_map(jac[1], jac[2],
+                                                                irow, icol,
+                                                                src_indices)
+                        revidxs = numpy.argsort(idxs)
+                        irows, icols = irows[revidxs], icols[revidxs]
+
+                    metadata[key] = (irows, icols)
+                    matrix[irows, icols] = jac[0]
 
         self._matrix = matrix
 
@@ -60,12 +86,12 @@ class DenseMatrix(Matrix):
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
-        if type(jac) is numpy.ndarray:
-            metadata[key][:, :] = jac
-        elif scipy.sparse.issparse(jac):
-            metadata[key][:, :] = jac.todense()  # TODO: improve on todense
-        elif type(jac) is list:
-            irows, icols = metadata[key]
+        irows, icols = metadata[key]
+        if isinstance(jac, numpy.ndarray):
+            self._matrix[irows, icols] = jac
+        elif isinstance(jac, (coo_matrix, csr_matrix)):
+            self._matrix[irows, icols] = jac.data
+        elif isinstance(jac, list):
             self._matrix[irows, icols] = jac[0]
 
     def _prod(self, in_vec, mode):

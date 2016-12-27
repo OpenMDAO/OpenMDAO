@@ -40,47 +40,57 @@ class GlobalJacobian(Jacobian):
     def _initialize(self):
         """Allocate the global matrices."""
         indices = self._system._variable_myproc_indices
+        meta = self._system._variable_myproc_metadata['input']
         ivar1, ivar2 = self._system._variable_allprocs_range['output']
 
-        self.options.declare('Matrix', value=DenseMatrix,
+        self.options.declare('matrix_class', value=DenseMatrix,
                              desc='<Matrix> class to use in this <Jacobian>.')
-        self._int_mtx = self.options['Matrix'](self._system.comm)
-        self._ext_mtx = self.options['Matrix'](self._system.comm)
+        self._int_mtx = self.options['matrix_class'](self._system.comm)
+        self._ext_mtx = self.options['matrix_class'](self._system.comm)
 
         out_offsets = {i: self._get_var_range(i, 'output')[0]
                        for i in indices['output']}
         in_offsets = {i: self._get_var_range(i, 'input')[0]
                       for i in indices['input']}
+        src_indices = {i: meta[j]['indices']
+                       for j, i in enumerate(indices['input'])}
 
         for re_var_all in indices['output']:
             re_offset = out_offsets[re_var_all]
 
             for op_var_all in indices['output']:
-                op_offset = out_offsets[op_var_all]
-
                 key = (re_var_all, op_var_all)
                 if key in self._op_dict:
                     jac = self._op_dict[key]
 
                     self._int_mtx._op_add_submat(
-                        key, jac, re_offset, op_offset)
+                        key, jac, re_offset, out_offsets[op_var_all])
 
-            # TODO: make this use the input indices
             for ip_var_all in indices['input']:
-                ip_offset = in_offsets[ip_var_all]
-
                 key = (re_var_all, ip_var_all)
                 if key in self._ip_dict:
                     jac = self._ip_dict[key]
 
-                    op_var_all = self._assembler._input_var_ids[ip_var_all]
-                    op_offset = out_offsets[op_var_all]
+                    op_var_all = self._assembler._input_src_ids[ip_var_all]
                     if ivar1 <= op_var_all < ivar2:
-                        self._int_mtx._ip_add_submat(
-                            key, jac, re_offset, op_offset)
+                        if src_indices[ip_var_all] is None:
+                            self._keymap[key] = key
+                            self._int_mtx._ip_add_submat(
+                                key, jac, re_offset, out_offsets[op_var_all],
+                                None)
+                        else:
+                            # need to add an entry for d(output)/d(source)
+                            # instead of d(output)/d(input) when we have
+                            # src_indices
+                            key2 = (key[0],
+                                    self._assembler._input_src_ids[ip_var_all])
+                            self._keymap[key] = key2
+                            self._int_mtx._ip_add_submat(
+                                key2, jac, re_offset, out_offsets[op_var_all],
+                                src_indices[ip_var_all])
                     else:
                         self._ext_mtx._ip_add_submat(
-                            key, jac, re_offset, ip_offset)
+                            key, jac, re_offset, in_offsets[ip_var_all], None)
 
         ind1, ind2 = self._system._variable_allprocs_range['output']
         op_size = numpy.sum(
@@ -102,15 +112,15 @@ class GlobalJacobian(Jacobian):
             for op_var_all in indices['output']:
                 key = (re_var_all, op_var_all)
                 if key in self._op_dict:
-                    self._int_mtx._op_update_submat(key, self._op_dict[key])
+                    self._int_mtx._op_update_submat(key,
+                                                    self._op_dict[key])
 
-            # TODO: make this use the input indices
             for ip_var_all in indices['input']:
                 key = (re_var_all, ip_var_all)
                 if key in self._ip_dict:
-                    op_var_all = self._assembler._input_var_ids[ip_var_all]
+                    op_var_all = self._assembler._input_src_ids[ip_var_all]
                     if ivar1 <= op_var_all < ivar2:
-                        self._int_mtx._ip_update_submat(key,
+                        self._int_mtx._ip_update_submat(self._keymap[key],
                                                         self._ip_dict[key])
                     else:
                         self._ext_mtx._ip_update_submat(key,

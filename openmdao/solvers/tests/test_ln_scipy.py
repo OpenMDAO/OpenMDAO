@@ -21,7 +21,8 @@ class TestScipyIterativeSolver(unittest.TestCase):
         group = TestImplicitGroup(lnSolverClass=ScipyIterativeSolver)
 
         p = Problem(group)
-        p.setup()
+        p.setup(check=False)
+        p.root.suppress_solver_output = True
 
         # forward
         group._vectors['residual'][''].set_const(1.0)
@@ -46,7 +47,8 @@ class TestScipyIterativeSolver(unittest.TestCase):
         group.ln_solver.options['maxiter'] = 2
 
         p = Problem(group)
-        p.setup()
+        p.setup(check=False)
+        p.root.suppress_solver_output = True
 
         # forward
         group._vectors['residual'][''].set_const(1.0)

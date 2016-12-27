@@ -4,6 +4,7 @@ import unittest
 import os.path
 import importlib
 import inspect
+from six import PY3
 
 directories = [
     'assemblers',
@@ -21,7 +22,10 @@ class LintTestCase(unittest.TestCase):
 
     def check_method(self, dir_name, file_name,
                      class_name, method_name, method):
-        argspec = inspect.getargspec(method)
+        if PY3:
+            argspec = inspect.getfullargspec(method)
+        else:
+            argspec = inspect.getargspec(method)
         doc = inspect.getdoc(method)
 
         # Check if docstring is missing
@@ -30,7 +34,6 @@ class LintTestCase(unittest.TestCase):
                 (dir_name, file_name, class_name,
                  method_name) +
                 '... missing docstring')
-            return
 
         # Check if docstring references another method
         if doc[:3] == 'See':
@@ -46,7 +49,6 @@ class LintTestCase(unittest.TestCase):
                     (dir_name, file_name, class_name,
                      method_name) +
                     '... missing Args section in docstring')
-                return
 
             # Read the Args section in the docstring
             istart = loc + 10
@@ -77,7 +79,6 @@ class LintTestCase(unittest.TestCase):
                                 (dir_name, file_name, class_name,
                                  method_name, arg) +
                                 '... formatting incorrect')
-                            break
                         index += 1
                     # If currently on varargs or kwargs
                     elif index < num_args:
@@ -89,7 +90,6 @@ class LintTestCase(unittest.TestCase):
                              method_name) +
                             '... formatting incorrect ' +
                             'or too many arg docstrings')
-                        break
             # If we haven't reached the end
             if index < num_args:
                 self.fail('%s, %s : %s.%s ' %
@@ -114,8 +114,14 @@ class LintTestCase(unittest.TestCase):
             for file_name in os.listdir(dirpath):
                 if file_name != '__init__.py' and file_name[-3:] == '.py':
                     if print_info: print(file_name)
+
                     module_name = 'openmdao.%s.%s' % (dir_name, file_name[:-3])
-                    mod = importlib.import_module(module_name)
+                    try:
+                        mod = importlib.import_module(module_name)
+                    except ImportError as err:
+                        if print_info: print('Skipped:', err)
+                        # e.g. PETSc is not installed
+                        continue
 
                     # Loop over classes
                     classes = [x for x in dir(mod)
