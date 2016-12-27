@@ -20,10 +20,10 @@ class GlobalJacobian(Jacobian):
         **kwargs : dict
             options dictionary.
         """
-        self.options = OptionsDictionary()
+        super(GlobalJacobian, self).__init__()
         self.options.declare('matrix_class', value=DenseMatrix,
                              desc='<Matrix> class to use in this <Jacobian>.')
-        super(GlobalJacobian, self).__init__(**kwargs)
+        self.options.update(kwargs)
 
     def _get_var_range(self, ivar_all, typ):
         """Look up the variable name and <Jacobian> index range.
