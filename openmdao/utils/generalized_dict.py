@@ -127,7 +127,7 @@ class GeneralizedDictionary(object):
         Returns
         -------
         iterable
-            iterator over the keys in the dictions
+            iterator over the keys in the dictionary.
         """
         return iter(self._dict)
 
@@ -193,9 +193,9 @@ class GeneralizedDictionary(object):
                 return value
             # If not, raise an error
             else:
-                raise ValueError("Entry '{}' is not declared".format(name))
+                raise KeyError("Entry '{}' has no default".format(name))
 
-        raise ValueError("Entry '{}' cannot be found".format(name))
+        raise KeyError("Entry '{}' cannot be found".format(name))
 
 
 class OptionsDictionary(GeneralizedDictionary):
@@ -223,9 +223,8 @@ class OptionsDictionary(GeneralizedDictionary):
             optional dictionary with which to initialize.
         """
         if in_dict is not None:
-            raise ValueError('Initial dictionaries cannot be used with '
-                             'OptionsDictionary declare options and use '
-                             'update.')
+            raise ValueError('Initial dictionaries cannot be used with OptionsDictionary. '
+                             'Declare options and use update.')
         super(OptionsDictionary, self).__init__(in_dict)
 
     def __setitem__(self, name, value):
@@ -239,7 +238,29 @@ class OptionsDictionary(GeneralizedDictionary):
             value of the entry to be value- and type-checked if declared.
         """
         if name not in self._declared_entries:
-            raise KeyError("Option '{}' is not declared.".format(name))
+            raise KeyError("Entry '{}' is not declared".format(name))
 
         self._check_type_and_value(name, value)
         self._dict[name] = value
+
+    def _assemble_global_dict(self, parents_dict):
+        """Incorporate the dictionary passed down from the systems above.
+
+        Args
+        ----
+        parents_dict : dict
+            combination of the dict entries of all systems above this one.
+        """
+        # Reset the _global_dict attribute
+        self._global_dict = {}
+
+        # Loop over the passed in dict and insert into _global_dict
+        for name in parents_dict:
+            value = parents_dict[name]
+            if name not in self._declared_entries:
+                raise KeyError("Entry '{}' is not declared".format(name))
+            self._check_type_and_value(name, value)
+            self._global_dict[name] = value
+
+        # Add the local entries, overwriting when there are conflicts
+        self._global_dict.update(self._dict)
