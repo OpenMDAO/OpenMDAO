@@ -4,7 +4,7 @@ import numpy
 from scipy.sparse import coo_matrix, csr_matrix
 from six.moves import range
 
-from openmdao.utils.generalized_dict import GeneralizedDictionary
+from openmdao.utils.generalized_dict import OptionsDictionary
 
 
 class Jacobian(object):
@@ -34,7 +34,7 @@ class Jacobian(object):
         where the input has src_indices.
     _iter_list : [(op_name, ip_name), ...]
         list of output-input pairs to iterate over.
-    options : <GeneralizedDictionary>
+    options : <OptionsDictionary>
         options dictionary.
     """
 
@@ -57,7 +57,8 @@ class Jacobian(object):
         self._keymap = {}
         self._iter_list = []
 
-        self.options = GeneralizedDictionary(kwargs)
+        self.options = OptionsDictionary()
+        self.options.update(kwargs)
 
     def _process_key(self, key):
         """Map output-input pair names to indices and sizes.

@@ -15,7 +15,7 @@ class Group(System):
 
     def initialize(self):
         """Add subsystems from kwargs."""
-        self.metadata.declare('subsystems', typ=list, value=[],
+        self.metadata.declare('subsystems', type_=list, value=[],
                               desc='list of subsystems')
         self._subsystems_allprocs.extend(self.metadata['subsystems'])
         self.nl_solver = NonlinearBlockGS()
