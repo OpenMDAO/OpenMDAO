@@ -34,7 +34,7 @@ class Jacobian(object):
         where the input has src_indices.
     _iter_list : [(op_name, ip_name), ...]
         list of output-input pairs to iterate over.
-    options : <GeneralizedDictionary>
+    options : <OptionsDictionary>
         options dictionary.
     """
 

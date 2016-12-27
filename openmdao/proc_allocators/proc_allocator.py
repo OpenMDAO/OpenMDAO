@@ -14,7 +14,7 @@ class ProcAllocator(object):
     _parallel : boolean
         True means the comm is split across subsystems;
         False means the comm is passed to all subsystems.
-    options : <GeneralizedDictionary>
+    options : <OptionsDictionary>
         options dictionary.
     """
 

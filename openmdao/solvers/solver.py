@@ -23,7 +23,7 @@ class Solver(object):
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
         number of iterations for the current invocation of the solver.
-    options : <GeneralizedDictionary>
+    options : <OptionsDictionary>
         options dictionary.
     """
 
