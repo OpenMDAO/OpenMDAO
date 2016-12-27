@@ -14,15 +14,17 @@ class TestLinearSystem(unittest.TestCase):
         """Set up a problem with a 3x3 linear system."""
         root = Group()
 
-        lingrp = root.add_subsystem('lingrp', Group(), promotes=['*'])
-        lingrp.add_subsystem('lin', LinearSystemComp(size=3))
-
         x = np.array([1, 2, -3])
         A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
         b = A.dot(x)
+        b_T = A.T.dot(x)
 
         root.add_subsystem('p1', IndepVarComp('A', A))
         root.add_subsystem('p2', IndepVarComp('b', b))
+
+        lingrp = root.add_subsystem('lingrp', Group(), promotes=['*'])
+        lingrp.add_subsystem('lin', LinearSystemComp(size=3))
+
         root.connect('p1.A', 'lin.A')
         root.connect('p2.b', 'lin.b')
 
@@ -31,6 +33,8 @@ class TestLinearSystem(unittest.TestCase):
 
         self.prob = prob
         self.x = x
+        self.b = b
+        self.b_T = b_T
 
     def test_linear_system(self):
         """Check against the scipy solver."""
@@ -49,12 +53,21 @@ class TestLinearSystem(unittest.TestCase):
         prob = self.prob
 
         lingrp = prob.root.get_system('lingrp')
-        lingrp.ln_solver = None
-g
+        lingrp.ln_solver = ScipyIterativeSolver()
+
         prob.run()
 
-        assert_rel_error(self, prob['lin.x'], self.x, .0001)
-        assert_rel_error(self, prob.root._residuals.get_norm(), 0.0, 1e-10)
+        # Forward mode with RHS of self.b
+        lingrp._vectors['residual']['']['lin.x'] = self.b
+        lingrp._solve_linear([''], 'fwd')
+        sol = lingrp._vectors['output']['']['lin.x']
+        assert_rel_error(self, sol, self.x, .0001)
+
+        # Reverse mode with RHS of self.b_T
+        lingrp._vectors['output']['']['lin.x'] = self.b_T
+        lingrp._solve_linear([''], 'rev')
+        sol = lingrp._vectors['residual']['']['lin.x']
+        assert_rel_error(self, sol, self.x, .0001)
 
         # Compare against calculated derivs
         # Ainv = np.linalg.inv(A)
