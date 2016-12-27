@@ -126,7 +126,9 @@ class TestGeneralizedDict(TestOptionsDict):
         self.dict = GeneralizedDictionary()
 
     def test_in_dict(self):
-        pass
+        obj = object()
+        dict_ = GeneralizedDictionary({'a': obj})
+        self.assertIs(dict_['a'], obj)
 
     def test_unnamed_args(self):
         obj = object()

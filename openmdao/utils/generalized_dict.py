@@ -222,7 +222,7 @@ class OptionsDictionary(GeneralizedDictionary):
         in_dict : dict or None
             optional dictionary with which to initialize.
         """
-        if in_dict is not None:
+        if in_dict is not None and in_dict:
             raise ValueError('Initial dictionaries cannot be used with OptionsDictionary. '
                              'Declare options and use update.')
         super(OptionsDictionary, self).__init__(in_dict)
