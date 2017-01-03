@@ -77,7 +77,13 @@ class Group(System):
             the subsystem that was passed in. This is returned to
             enable users to instantiate and add a subsystem at the
             same time, and get the pointer back.
+
         """
+        for sub in self._subsystems_allprocs:
+            if name == sub.name:
+                raise RuntimeError("Subsystem name '%s' is already used." %
+                                   name)
+
         self._subsystems_allprocs.append(subsys)
         subsys.name = name
 
