@@ -23,7 +23,7 @@ class LinearSystemComp(ImplicitComponent):
 
     def initialize(self):
         """Define size parameter."""
-        self.metadata.declare('size', value=1, typ=int,
+        self.metadata.declare('size', value=1, type_=int,
                               desc='the size of the linear system')
 
     def initialize_variables(self):
