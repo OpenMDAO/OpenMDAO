@@ -38,7 +38,7 @@ class ScipyIterativeSolver(LinearSolver):
         """
         vec_name = self._vec_name
         system = self._system
-        ind1, ind2 = system._variable_allprocs_range['output']
+        ind1, ind2 = system._var_allprocs_range['output']
 
         if self._mode == 'fwd':
             x_vec = system._vectors['output'][vec_name]
@@ -49,10 +49,10 @@ class ScipyIterativeSolver(LinearSolver):
 
         x_vec.set_data(in_vec)
         var_inds = [
-            system._variable_allprocs_range['output'][0],
-            system._variable_allprocs_range['output'][1],
-            system._variable_allprocs_range['output'][0],
-            system._variable_allprocs_range['output'][1],
+            system._var_allprocs_range['output'][0],
+            system._var_allprocs_range['output'][1],
+            system._var_allprocs_range['output'][0],
+            system._var_allprocs_range['output'][1],
         ]
         system._apply_linear([vec_name], self._mode, var_inds)
         return b_vec.get_data()

@@ -21,10 +21,10 @@ def allproc_var_dump(system, out=sys.stdout):
     for typ in ['input', 'output']:
         vset_indices = assembler._variable_set_indices[typ]
         vset_IDs = assembler._variable_set_IDs[typ]
-        allproc_indices = system._variable_allprocs_indices[typ]
+        allproc_indices = system._var_allprocs_indices[typ]
 
         out.write("\n%s %ss:\n" % (system.pathname, typ))
-        lens = [len(n) for n in system._variable_allprocs_names[typ]]
+        lens = [len(n) for n in system._var_allprocs_names[typ]]
         nwid = max(lens) if lens else 0
         nwid = max(nwid, len("Name"))
         args = (
@@ -39,7 +39,7 @@ def allproc_var_dump(system, out=sys.stdout):
         template = ' '.join(["{%d:<%d}" % (i,wid) for i,wid in enumerate(wids)])
         template += "\n"
         out.write(template.format(*args))
-        for idx, name in enumerate(system._variable_allprocs_names[typ]):
+        for idx, name in enumerate(system._var_allprocs_names[typ]):
             out.write(template.format(name,
                                 allproc_indices[name],
                                 vset_IDs[vset_indices[idx][0]],

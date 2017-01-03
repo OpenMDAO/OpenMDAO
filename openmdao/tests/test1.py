@@ -57,15 +57,15 @@ class Test(unittest.TestCase):
         self.assertEqual(len(root._subsystems_allprocs), 2)
         self.assertEqual(len(root._subsystems_myproc), 2)
 
-    def test__variable_allprocs_names(self):
+    def test__var_allprocs_names(self):
         root = self.p.root
         compA = root.get_system('A')
-        self.assertEqual(compA._variable_allprocs_names['output'], ['x'])
+        self.assertEqual(compA._var_allprocs_names['output'], ['x'])
 
-    def test__variable_myproc_indices(self):
-        root_inds = self.p.root._variable_myproc_indices
-        compA_inds = self.p.root.get_system('A')._variable_myproc_indices
-        compB_inds = self.p.root.get_system('B')._variable_myproc_indices
+    def test__var_myproc_indices(self):
+        root_inds = self.p.root._var_myproc_indices
+        compA_inds = self.p.root.get_system('A')._var_myproc_indices
+        compB_inds = self.p.root.get_system('B')._var_myproc_indices
 
         self.assertEqualArrays(root_inds['input'], numpy.array([0]))
         self.assertEqualArrays(root_inds['output'], numpy.array([0,1]))
@@ -76,10 +76,10 @@ class Test(unittest.TestCase):
         self.assertEqualArrays(compB_inds['input'], numpy.array([0]))
         self.assertEqualArrays(compB_inds['output'], numpy.array([1]))
 
-    def test__variable_allprocs_ranges(self):
-        root_rng = self.p.root._variable_allprocs_range
-        compA_rng = self.p.root.get_system('A')._variable_allprocs_range
-        compB_rng = self.p.root.get_system('B')._variable_allprocs_range
+    def test__var_allprocs_ranges(self):
+        root_rng = self.p.root._var_allprocs_range
+        compA_rng = self.p.root.get_system('A')._var_allprocs_range
+        compB_rng = self.p.root.get_system('B')._var_allprocs_range
 
         self.assertEqualArrays(root_rng['input'], numpy.array([0,1]))
         self.assertEqualArrays(root_rng['output'], numpy.array([0,2]))
@@ -93,8 +93,8 @@ class Test(unittest.TestCase):
     def test_connections(self):
         root = self.p.root
 
-        self.assertEqual(root._variable_connections_indices[0][0], 0)
-        self.assertEqual(root._variable_connections_indices[0][1], 0)
+        self.assertEqual(root._var_connections_indices[0][0], 0)
+        self.assertEqual(root._var_connections_indices[0][1], 0)
 
     def test_GS(self):
         root = self.p.root

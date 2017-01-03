@@ -86,7 +86,7 @@ class Jacobian(object):
         op_name, ip_name = key
         outputs = self._system._outputs
         inputs = self._system._inputs
-        indices = self._system._variable_allprocs_indices
+        indices = self._system._var_allprocs_indices
 
         op_size = len(outputs._views_flat[op_name])
         op_ind = indices['output'][op_name]
@@ -135,17 +135,17 @@ class Jacobian(object):
         system = self._system
 
         self._iter_list = []
-        for re_name in system._variable_myproc_names['output']:
-            re_ind = system._variable_allprocs_indices['output'][re_name]
+        for re_name in system._var_myproc_names['output']:
+            re_ind = system._var_allprocs_indices['output'][re_name]
 
-            for op_name in system._variable_myproc_names['output']:
-                op_ind = system._variable_allprocs_indices['output'][op_name]
+            for op_name in system._var_myproc_names['output']:
+                op_ind = system._var_allprocs_indices['output'][op_name]
 
                 if (re_ind, op_ind) in self._op_dict:
                     self._iter_list.append((re_name, op_name))
 
-            for ip_name in system._variable_myproc_names['input']:
-                ip_ind = system._variable_allprocs_indices['input'][ip_name]
+            for ip_name in system._var_myproc_names['input']:
+                ip_ind = system._var_allprocs_indices['input'][ip_name]
 
                 if (re_ind, ip_ind) in self._ip_dict:
                     self._iter_list.append((re_name, ip_name))
@@ -207,10 +207,10 @@ class Jacobian(object):
             raise TypeError("Sub-jacobian of type '%s' for key %s is "
                             "not supported." % (type(jac).__name__, key))
 
-        ind = system._variable_myproc_names['output'].index(key[0])
+        ind = system._var_myproc_names['output'].index(key[0])
         r_factor = system._scaling_to_norm['residual'][ind, 1]
 
-        ind = system._variable_myproc_names[typ].index(key[1])
+        ind = system._var_myproc_names[typ].index(key[1])
         c_factor = system._scaling_to_norm[typ][ind, 1]
 
         if isinstance(jac, numpy.ndarray):
@@ -239,10 +239,10 @@ class Jacobian(object):
         dct, op_ind, ip_ind, op_size, ip_size, typ = self._process_key(key)
         jac = dct[op_ind, ip_ind]
 
-        ind = system._variable_myproc_names['output'].index(key[0])
+        ind = system._var_myproc_names['output'].index(key[0])
         r_factor = system._scaling_to_phys['residual'][ind, 1]
 
-        ind = system._variable_myproc_names[typ].index(key[1])
+        ind = system._var_myproc_names[typ].index(key[1])
         c_factor = system._scaling_to_phys[typ][ind, 1]
 
         if isinstance(jac, numpy.ndarray):

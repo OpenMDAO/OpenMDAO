@@ -207,7 +207,7 @@ class PetscKSP(LinearSolver):
         x_vec.set_data(_get_petsc_vec_array(in_vec))
 
         # apply linear
-        ind1, ind2 = system._variable_allprocs_range['output']
+        ind1, ind2 = system._var_allprocs_range['output']
         var_inds = [ind1, ind2, ind1, ind2]
         system._apply_linear([vec_name], self._mode, var_inds)
 

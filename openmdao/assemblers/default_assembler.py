@@ -50,7 +50,7 @@ class DefaultAssembler(Assembler):
         for ind, subsys in enumerate(subsystems_myproc):
             isub = subsystems_inds[ind]
 
-            sub_var_range = subsys._variable_allprocs_range
+            sub_var_range = subsys._var_allprocs_range
             sub_ip_ind1, sub_ip_ind2 = sub_var_range['input']
             sub_op_ind1, sub_op_ind2 = sub_var_range['output']
             for ip_ind in range(ip_ind1, ip_ind2):

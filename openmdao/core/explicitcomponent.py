@@ -141,14 +141,14 @@ class ExplicitComponent(Component):
         self._inputs.scale(self._scaling_to_norm['input'])
         self._outputs.scale(self._scaling_to_norm['output'])
 
-        for op_name in self._variable_myproc_names['output']:
+        for op_name in self._var_myproc_names['output']:
             size = len(self._outputs._views_flat[op_name])
             ones = numpy.ones(size)
             arange = numpy.arange(size)
             self._jacobian[op_name, op_name] = (ones, arange, arange)
 
-        for op_name in self._variable_myproc_names['output']:
-            for ip_name in self._variable_myproc_names['input']:
+        for op_name in self._var_myproc_names['output']:
+            for ip_name in self._var_myproc_names['input']:
                 if (op_name, ip_name) in self._jacobian:
                     self._jacobian._negate((op_name, ip_name))
 
