@@ -130,8 +130,7 @@ class System(object):
         self._var_myproc_indices = {'input': None, 'output': None}
 
         self._var_maps = {'input': {}, 'output': {}}
-        self._var_promotes = {'input': set(), 'output': set(),
-                                   'any': set()}
+        self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
         self._var_renames = {'input': {}, 'output': {}}
 
         self._var_connections = {}
