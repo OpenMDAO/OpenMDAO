@@ -6,10 +6,24 @@ from six.moves import range
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
+from openmdao.utils.generalized_dict import OptionsDictionary
 
 
 class GlobalJacobian(Jacobian):
     """Assemble dense global <Jacobian>."""
+
+    def __init__(self, **kwargs):
+        """Initialize all attributes.
+
+        Args
+        ----
+        **kwargs : dict
+            options dictionary.
+        """
+        super(GlobalJacobian, self).__init__()
+        self.options.declare('matrix_class', value=DenseMatrix,
+                             desc='<Matrix> class to use in this <Jacobian>.')
+        self.options.update(kwargs)
 
     def _get_var_range(self, ivar_all, typ):
         """Look up the variable name and <Jacobian> index range.
@@ -43,8 +57,6 @@ class GlobalJacobian(Jacobian):
         meta = self._system._variable_myproc_metadata['input']
         ivar1, ivar2 = self._system._variable_allprocs_range['output']
 
-        self.options.declare('matrix_class', value=DenseMatrix,
-                             desc='<Matrix> class to use in this <Jacobian>.')
         self._int_mtx = self.options['matrix_class'](self._system.comm)
         self._ext_mtx = self.options['matrix_class'](self._system.comm)
 

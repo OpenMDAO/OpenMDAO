@@ -183,8 +183,7 @@ class ExecComp(ExplicitComponent):
         self._codes = self._compile_exprs(self._exprs)
 
     def compute(self, inputs, outputs):
-        """
-        Execute this component's assignment statemens.
+        """Execute this component's assignment statemens.
 
         Args
         ----
@@ -199,8 +198,7 @@ class ExecComp(ExplicitComponent):
             exec(expr, _expr_dict, _IODict(outputs, inputs, self._to_colons))
 
     def compute_jacobian(self, params, unknowns, jacobian):
-        """
-        Use complex step method to update the given Jacobian.
+        """Use complex step method to update the given Jacobian.
 
         Args
         ----
@@ -350,8 +348,7 @@ class _IODict(object):
 
 
 def _import_functs(mod, dct, names=None):
-    """
-    Map attributes attrs from the given module into the given dict.
+    """Map attributes attrs from the given module into the given dict.
 
     Args
     ----
@@ -420,5 +417,6 @@ def _cs_abs(x):
     elif x.real < 0.0:
         return -x
     return x
+
 
 _expr_dict['abs'] = _cs_abs

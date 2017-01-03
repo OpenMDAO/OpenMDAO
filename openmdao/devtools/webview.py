@@ -3,7 +3,7 @@ import os
 import webbrowser
 
 def webview(outfile):
-    """pop up a web browser for the given file"""
+    """Pop up a web browser for the given file"""
     if sys.platform == 'darwin':
         os.system('open %s' % outfile)
     else:

@@ -6,8 +6,7 @@ class GeneralizedDictionary(object):
     """Dictionary with type-checking and default values of declared keys.
 
     This class is instantiated for:
-        1. the options attribute in solvers, drivers, and processor allocators
-        2. the metadata attribute in systems.
+        1. the metadata attribute in systems.
 
     Attributes
     ----------
@@ -19,7 +18,7 @@ class GeneralizedDictionary(object):
         dictionary of entry declarations.
     """
 
-    def __init__(self, in_dict=None):
+    def __init__(self):
         """Initialize all attributes.
 
         Args
@@ -31,9 +30,6 @@ class GeneralizedDictionary(object):
         self._global_dict = {}
         self._declared_entries = {}
 
-        if in_dict is not None:
-            self._dict.update(in_dict)
-
     def _check_type_and_value(self, name, value):
         """If declared, check that value has the right type and is valid.
 
@@ -44,19 +40,19 @@ class GeneralizedDictionary(object):
         value : -
             the value of the entry to be put in _dict or _global_dict.
         """
-        typ = self._declared_entries[name]['typ']
+        type_ = self._declared_entries[name]['type']
         values = self._declared_entries[name]['values']
 
         # (1) Check the type
-        if typ is not None and not isinstance(value, typ):
+        if type_ is not None and not isinstance(value, type_):
             raise ValueError("Entry '{}' has the wrong type ({})".format(
-                name, typ))
+                name, type_))
         # (2) Check the value
         if values is not None and value not in values:
             raise ValueError("Entry '{}'\'s value is not one of {}".format(
                 name, values))
 
-    def declare(self, name, typ=None, desc='',
+    def declare(self, name, type_=None, desc='',
                 value=None, values=None, required=False):
         """Declare an entry.
 
@@ -64,7 +60,7 @@ class GeneralizedDictionary(object):
         ----
         name : str
             the name of the entry.
-        typ : type or None
+        type_ : type or None
             type of the entry in _dict or _global_dict.
         desc : str
             description of the entry.
@@ -76,7 +72,7 @@ class GeneralizedDictionary(object):
             if True, this entry must be specified in _dict or _global_dict.
         """
         self._declared_entries[name] = {
-            'typ': typ,
+            'type': type_,
             'desc': desc,
             'value': value,
             'values': values,
@@ -128,7 +124,7 @@ class GeneralizedDictionary(object):
         Returns
         -------
         iterable
-            iterator over the keys in the dictions
+            iterator over the keys in the dictionary.
         """
         return iter(self._dict)
 
@@ -194,6 +190,52 @@ class GeneralizedDictionary(object):
                 return value
             # If not, raise an error
             else:
-                raise ValueError("Entry '{}' is not declared".format(name))
+                raise KeyError("Entry '{}' has no default".format(name))
 
-        raise ValueError("Entry '{}' cannot be found".format(name))
+        raise KeyError("Entry '{}' cannot be found".format(name))
+
+
+class OptionsDictionary(GeneralizedDictionary):
+    """Dictionary with enforced type-checking and default values of declared keys.
+
+    This class is instantiated for:
+        1. the options attribute in solvers, drivers, and processor allocators
+    """
+
+    def __setitem__(self, name, value):
+        """Set an entry in the local dictionary.
+
+        Args
+        ----
+        name : str
+            name of the entry.
+        value : -
+            value of the entry to be value- and type-checked if declared.
+        """
+        if name not in self._declared_entries:
+            raise KeyError("Entry '{}' is not declared".format(name))
+
+        self._check_type_and_value(name, value)
+        self._dict[name] = value
+
+    def _assemble_global_dict(self, parents_dict):
+        """Incorporate the dictionary passed down from the systems above.
+
+        Args
+        ----
+        parents_dict : dict
+            combination of the dict entries of all systems above this one.
+        """
+        # Reset the _global_dict attribute
+        self._global_dict = {}
+
+        # Loop over the passed in dict and insert into _global_dict
+        for name in parents_dict:
+            value = parents_dict[name]
+            if name not in self._declared_entries:
+                raise KeyError("Entry '{}' is not declared".format(name))
+            self._check_type_and_value(name, value)
+            self._global_dict[name] = value
+
+        # Add the local entries, overwriting when there are conflicts
+        self._global_dict.update(self._dict)

@@ -53,9 +53,10 @@ setup(name='openmdao',
         'six', 'numpydoc', #'numpy>=1.9.2',
         'scipy',
         'sqlitedict',
-        'pep8', 'pep257',
+        'pycodestyle', 'pydocstyle',
         'testflo',
         'nose-parameterized',
+        'networkx',
       ],
       #scripts=['bin/om-pylint.sh']
       entry_points="""

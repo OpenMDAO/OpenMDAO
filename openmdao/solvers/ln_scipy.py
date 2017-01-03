@@ -20,7 +20,7 @@ class ScipyIterativeSolver(LinearSolver):
             dictionary of options set by the instantiating class/script.
         """
         super(ScipyIterativeSolver, self).__init__(**kwargs)
-        self.options.declare('solver', typ=object, value=gmres,
+        self.options.declare('solver', type_=object, value=gmres,
                              desc='function handle for actual solver')
 
     def _mat_vec(self, in_vec):

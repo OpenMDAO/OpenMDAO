@@ -2,7 +2,7 @@
 from __future__ import division, print_function
 import numpy
 
-from openmdao.utils.generalized_dict import GeneralizedDictionary
+from openmdao.utils.generalized_dict import OptionsDictionary
 
 
 class Solver(object):
@@ -23,7 +23,7 @@ class Solver(object):
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
         number of iterations for the current invocation of the solver.
-    options : <GeneralizedDictionary>
+    options : <OptionsDictionary>
         options dictionary.
     """
 
@@ -43,17 +43,18 @@ class Solver(object):
         self._mode = 'fwd'
         self._iter_count = 0
 
-        self.options = GeneralizedDictionary(kwargs)
-        self.options.declare('maxiter', typ=int, value=10,
+        self.options = OptionsDictionary()
+        self.options.declare('maxiter', type_=int, value=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', value=1e-10,
                              desc='absolute error tolerance')
         self.options.declare('rtol', value=1e-10,
                              desc='relative error tolerance')
-        self.options.declare('iprint', typ=int, value=1,
+        self.options.declare('iprint', type_=int, value=1,
                              desc='whether to print output')
-        self.options.declare('subsolvers', typ=dict, value={},
+        self.options.declare('subsolvers', type_=dict, value={},
                              desc='dictionary of solvers called by this one')
+        self.options.update(kwargs)
 
     def _setup_solvers(self, system, depth):
         """Assign system instance, set depth, and optionally perform setup.

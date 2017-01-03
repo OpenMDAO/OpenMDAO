@@ -58,14 +58,17 @@ class LintAttributesTestCase(unittest.TestCase):
             # Loop over files
             for file_name in os.listdir(dirpath):
                 if file_name != '__init__.py' and file_name[-3:] == '.py':
-                    if print_info: print('File: %s' % (file_name))
+                    if print_info:
+                        print('File: {}'.format(file_name))
 
-                    module_name = 'openmdao.%s.%s' % (dir_name, file_name[:-3])
-                    if print_info: print(' Module: %s' % (module_name))
+                    module_name = 'openmdao.{}.{}'.format(dir_name,
+                                                          file_name[:-3])
+                    if print_info:
+                        print(' Module: {}'.format(module_name))
                     try:
                         mod = importlib.import_module(module_name)
                     except ImportError:
-                        print('Error: could not import `%s`' % (module_name))
+                        print('Error: could not import `{}`'.format(module_name))
                         continue
 
                     # Loop over classes
@@ -73,19 +76,27 @@ class LintAttributesTestCase(unittest.TestCase):
                                if inspect.isclass(getattr(mod, x)) and
                                getattr(mod, x).__module__ == module_name]
                     for class_name in classes:
-                        if print_info : print('  Class:', class_name)
-                        clss = getattr(mod, class_name)
-                        parent_classes = [c for c in inspect.getmro(clss) if c.__name__ != 'object' and c.__name__ != class_name]
-                        if print_info: print('  Parent Classes:', [c.__name__ for c in parent_classes])
-                        class_doc = inspect.getdoc(clss)
+                        if print_info:
+                            print('  Class:{}'.format(class_name))
+                        class_ = getattr(mod, class_name)
+                        parent_classes = [c for c in inspect.getmro(class_)
+                                          if c.__name__ != 'object'
+                                          and c.__name__ != class_name]
+                        if print_info:
+                            print('  Parent Classes:{}'.format(
+                                [c.__name__ for c in parent_classes])
+                            )
+                        class_doc = inspect.getdoc(class_)
                         classdoc_matches = classdoc_re.findall(class_doc)
-                        if(len(classdoc_matches) > 1):
-                            self.fail('%s/%s : Class `%s`' % (dir_name, file_name, class_name) + '... multiple Attributes section in docstring')
+                        if len(classdoc_matches) > 1:
+                            self.fail('{}/{} : Class `{}` ... multiple '
+                                      'Attributes section in docstring'.format(
+                                dir_name, file_name, class_name))
                         classdoc_varnames_matches = classdoc_varnames_re.findall(classdoc_matches[0]) if(len(classdoc_matches) == 1) else []
 
                         # There is a valid __init__ section in the class
-                        if('__init__' in clss.__dict__ and '__init__' in dir(clss) and (inspect.ismethod(getattr(clss, '__init__')) or inspect.isfunction(getattr(clss, '__init__'))) ):
-                            method = getattr(clss, '__init__')
+                        if('__init__' in class_.__dict__ and '__init__' in dir(class_) and (inspect.ismethod(getattr(class_, '__init__')) or inspect.isfunction(getattr(class_, '__init__'))) ):
+                            method = getattr(class_, '__init__')
                             mysrc = inspect.getsource(method)
                             valid_lines = ''.join(valid_line_with_self_re.findall(mysrc))
                             all_member_vars = list(set(member_var_re.findall(valid_lines)))

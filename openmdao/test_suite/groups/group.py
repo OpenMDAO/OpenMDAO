@@ -10,13 +10,13 @@ class TestGroupFlat(Group):
     """Test group flat, with only 1 level of hierarchy."""
 
     def initialize(self):
-        self.metadata.declare('num_comp', typ=int, value=2,
+        self.metadata.declare('num_comp', type_=int, value=2,
                               desc='total number of components')
-        self.metadata.declare('num_var', typ=int, value=2,
+        self.metadata.declare('num_var', type_=int, value=2,
                               desc='number of output variables per component')
         self.metadata.declare('var_shape', value=(1,),
                               desc='input/output variable shapes')
-        self.metadata.declare('connection_type', typ=str, value='explicit',
+        self.metadata.declare('connection_type', type_=str, value='explicit',
                               values=['explicit', 'implicit'],
                               desc='how to connect variables')
         self.metadata.declare('component_class',
