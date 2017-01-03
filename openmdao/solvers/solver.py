@@ -100,7 +100,11 @@ class Solver(object):
             else:
                 solver_name = solver_name.ljust(name_len)
 
-            print_str = ' ' * self._system._sys_depth + '-' * self._depth
+            depth = self._system.pathname.count('.')
+            if self._system.pathname != '':
+                depth += 1
+
+            print_str = ' ' * depth + '-' * self._depth
             print_str += sys_name + solver_name
             print_str += ' %3d | %.9g %.9g' % (iteration, res, res0)
             print(print_str)

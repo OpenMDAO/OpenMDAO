@@ -150,7 +150,7 @@ class Problem(object):
         assembler = self._assembler
 
         # Recursive system setup
-        root._setup_processors('', comm, {}, 0, assembler, [0, comm.size])
+        root._setup_processors('', comm, {}, assembler, [0, comm.size])
         root._setup_variables()
         root._setup_variable_indices({'input': 0, 'output': 0})
         root._setup_connections()

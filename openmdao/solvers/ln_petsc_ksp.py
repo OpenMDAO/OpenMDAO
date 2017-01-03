@@ -329,8 +329,8 @@ class PetscKSP(LinearSolver):
 
         rank = system.comm.rank + system._mpi_proc_range[0]
 
-        lsizes = system._sys_assembler._variable_sizes_all['output'][rank]
-        sizes = sum(system._sys_assembler._variable_sizes_all['output'])
+        lsizes = system._assembler._variable_sizes_all['output'][rank]
+        sizes = sum(system._assembler._variable_sizes_all['output'])
 
         lsize = sum(lsizes)
         size = sum(sizes)

@@ -142,7 +142,7 @@ class ImplicitComponent(Component):
         self._outputs.scale(self._scaling_to_norm['output'])
 
         self._jacobian._precompute_iter()
-        if not initial and self._jacobian._top_name == self.path_name:
+        if not initial and self._jacobian._top_name == self.pathname:
             self._jacobian._update()
 
     def apply_nonlinear(self, inputs, outputs, residuals):

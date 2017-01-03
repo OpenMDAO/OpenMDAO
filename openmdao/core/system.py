@@ -25,15 +25,13 @@ class System(object):
     ----------
     name : str
         name of the system, must be different from siblings.
-    path_name : str
+    pathname : str
         global name of the system, including the path.
     comm : MPI.Comm or <FakeComm>
         MPI communicator object.
     metadata : <GeneralizedDictionary>
         dictionary of user-defined arguments.
-    _sys_depth : int
-        distance from the root node in the hierarchy tree.
-    _sys_assembler : <Assembler>
+    _assembler : <Assembler>
         pointer to the global assembler object.
     _mpi_proc_allocator : <ProcAllocator>
         object that distributes procs among subsystems.
@@ -96,13 +94,11 @@ class System(object):
         linear solver to be used for solve_linear; not the Newton system.
     _suppress_solver_output : boolean
         flag that turns off all solver output for this System and all
-        of its descendants if 'False'.
+        of its descendants if False.
     """
 
     def __init__(self, **kwargs):
         """Initialize all attributes.
-
-        All subclasses use this __init__ method without overriding it.
 
         Args
         ----
@@ -110,13 +106,12 @@ class System(object):
             available here and in all descendants of this system.
         """
         self.name = ''
-        self.path_name = ''
+        self.pathname = ''
         self.comm = None
         self.metadata = GeneralizedDictionary()
         self.metadata.update(kwargs)
 
-        self._sys_depth = 0
-        self._sys_assembler = None
+        self._assembler = None
 
         self._mpi_proc_allocator = DefaultAllocator()
         self._mpi_proc_range = [0, 1]
@@ -164,14 +159,13 @@ class System(object):
         self.initialize()
 
     def _setup_processors(self, path, comm, global_dict,
-                          depth, assembler, proc_range):
+                          assembler, proc_range):
         """Recursively split comms and define local subsystems.
 
         Sets the following attributes:
-            path_name
+            pathname
             comm
-            _sys_depth
-            _sys_assembler
+            _assembler
             _mpi_proc_range
             _subsystems_myproc
             _subsystems_inds
@@ -184,18 +178,15 @@ class System(object):
             communicator for this system (already split, if applicable).
         global_dict : dict
             dictionary with kwargs of all parents assembled in it.
-        depth : int
-            depth level for this system - i.e., distance from root node.
         assembler : Assembler
-            pointer to the global assember object to distribute to everyone.
+            pointer to the global assembler object to distribute to everyone.
         proc_range : [int, int]
             indices of procs owned by comm with respect to COMM_WORLD.
         """
         # Set attributes
-        self.path_name = '.'.join((path, self.name)) if path else self.name
+        self.pathname = '.'.join((path, self.name)) if path else self.name
         self.comm = comm
-        self._sys_depth = depth
-        self._sys_assembler = assembler
+        self._assembler = assembler
         self._mpi_proc_range = proc_range
 
         # Add self's kwargs to dictionary of parents' kwargs (already new copy)
@@ -219,11 +210,11 @@ class System(object):
             # Perform recursion
             for subsys in self._subsystems_myproc:
                 sub_global_dict = self.metadata._global_dict.copy()
-                subsys._setup_processors(self.path_name, sub_comm,
-                                         sub_global_dict, depth + 1, assembler,
+                subsys._setup_processors(self.pathname, sub_comm,
+                                         sub_global_dict, assembler,
                                          sub_proc_range)
 
-    def _setup_variables(self, recursion=True):
+    def _setup_variables(self, recurse=True):
         """Assemble variable metadata and names lists.
 
         Sets the following attributes:
@@ -233,11 +224,11 @@ class System(object):
 
         Args
         ----
-        recursion : boolean
+        recurse : boolean
             recursion is not performed if traversing up the tree after reconf.
         """
         # Perform recursion
-        if recursion:
+        if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_variables()
 
@@ -254,7 +245,7 @@ class System(object):
 
             self.initialize_variables()
 
-    def _setup_variable_indices(self, index, recursion=True):
+    def _setup_variable_indices(self, global_index, recurse=True):
         """Define the variable indices and range.
 
         Sets the following attributes:
@@ -264,16 +255,16 @@ class System(object):
 
         Args
         ----
-        index : {'input': int, 'output': int}
+        global_index : {'input': int, 'output': int}
             current global variable counter.
-        recursion : boolean
+        recurse : boolean
             recursion is not performed if traversing up the tree after reconf.
         """
         # Define the global variable range for the system
         for typ in ['input', 'output']:
             size = len(self._variable_allprocs_names[typ])
-            self._variable_allprocs_range[typ][0] = index[typ]
-            self._variable_allprocs_range[typ][1] = index[typ] + size
+            self._variable_allprocs_range[typ][0] = global_index[typ]
+            self._variable_allprocs_range[typ][1] = global_index[typ] + size
 
         # If group, compute _variable_myproc_indices as follows
         if len(self._subsystems_myproc) > 0:
@@ -297,13 +288,13 @@ class System(object):
                     # Compute the offset
                     iproc = self.comm.rank
                     nvar_myproc = local_var_size
-                    index[typ] += (numpy.sum(nvar_allprocs[:iproc + 1]) -
-                                   nvar_myproc)
+                    global_index[typ] += \
+                        numpy.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
 
             # Perform the recursion
-            if recursion:
+            if recurse:
                 for subsys in self._subsystems_myproc:
-                    subsys._setup_variable_indices(index)
+                    subsys._setup_variable_indices(global_index)
 
             # Post-recursion: assemble local variable indices from subsystems
             for typ in ['input', 'output']:
@@ -321,7 +312,7 @@ class System(object):
         # Reset index dict to the global variable count on all procs
         # Necessary for younger siblings to have proper index values
         for typ in ['input', 'output']:
-            index[typ] = self._variable_allprocs_range[typ][1]
+            global_index[typ] = self._variable_allprocs_range[typ][1]
 
         # Populate the _variable_allprocs_indices dictionary
         for typ in ['input', 'output']:
@@ -407,9 +398,9 @@ class System(object):
         # units at which the scaled values are 0 and 1, respectively
 
         # Scaling coefficients from the src output
-        src_units = self._sys_assembler._src_units
-        src_0 = self._sys_assembler._src_scaling_0
-        src_1 = self._sys_assembler._src_scaling_1
+        src_units = self._assembler._src_units
+        src_0 = self._assembler._src_scaling_0
+        src_1 = self._assembler._src_scaling_1
 
         # Compute scaling arrays for inputs using a0 and a1
         for ind, meta in enumerate(self._variable_myproc_metadata['input']):
@@ -462,7 +453,7 @@ class System(object):
         subsystems_inds = self._subsystems_inds
 
         # Call the assembler's transfer setup routine
-        compute_transfers = self._sys_assembler._compute_transfers
+        compute_transfers = self._assembler._compute_transfers
         xfer_indices = compute_transfers(nsub_allprocs, var_range,
                                          subsystems_myproc, subsystems_inds)
         (xfer_ip_inds, xfer_op_inds,
@@ -598,7 +589,7 @@ class System(object):
         ip_names = []
         ip_ind = self._variable_allprocs_range['input'][0]
         for ip_name in self._variable_allprocs_names['input']:
-            op_ind = self._sys_assembler._input_src_ids[ip_ind]
+            op_ind = self._assembler._input_src_ids[ip_ind]
             if op_ind in self._vector_var_ids[vec_name]:
                 if var_inds is None or (var_inds[0] <= op_ind < var_inds[1] or
                                         var_inds[2] <= op_ind < var_inds[3]):
@@ -689,9 +680,9 @@ class System(object):
         else:
             self._jacobian = jacobian
             if is_top:
-                self._jacobian._top_name = self.path_name
+                self._jacobian._top_name = self.pathname
                 self._jacobian._system = self
-                self._jacobian._assembler = self._sys_assembler
+                self._jacobian._assembler = self._assembler
 
         for subsys in self._subsystems_myproc:
             subsys._set_jacobian(jacobian, False)
@@ -778,7 +769,7 @@ class System(object):
         System or None
             System if found on this proc else None.
         """
-        if name == self.path_name:
+        if name == self.pathname:
             # If this system's name matches, target found
             return self
         else:
@@ -802,7 +793,7 @@ class System(object):
 
         Available attributes:
             name
-            path_name
+            pathname
             comm
             metadata (local and global)
         """
@@ -813,7 +804,7 @@ class System(object):
 
         Available attributes:
             name
-            path_name
+            pathname
             comm
             metadata (local and global)
         """

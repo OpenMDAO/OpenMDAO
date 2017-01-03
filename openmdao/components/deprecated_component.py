@@ -201,7 +201,7 @@ class Component(BaseComponent):
                         self._jacobian._negate((op_name, ip_name))
 
         self._jacobian._precompute_iter()
-        if not initial and self._jacobian._top_name == self.path_name:
+        if not initial and self._jacobian._top_name == self.pathname:
             self._jacobian._update()
 
     def apply_nonlinear(self, params, unknowns, residuals):

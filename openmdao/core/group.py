@@ -242,7 +242,7 @@ class Group(System):
             The ordering is [lb1, ub1, lb2, ub2].
         """
         # Use global Jacobian
-        if self._jacobian._top_name == self.path_name:
+        if self._jacobian._top_name == self.pathname:
             for vec_name in vec_names:
                 with self._matvec_context(vec_name, var_inds, mode) as vecs:
                     d_inputs, d_outputs, d_residuals = vecs
@@ -301,7 +301,7 @@ class Group(System):
             subsys._linearize()
 
         # Update jacobian
-        if not initial and self._jacobian._top_name == self.path_name:
+        if not initial and self._jacobian._top_name == self.pathname:
             self._jacobian._system = self
             self._jacobian._update()
             self._jacobian._precompute_iter()

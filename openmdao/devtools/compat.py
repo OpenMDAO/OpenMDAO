@@ -90,7 +90,7 @@ def abs_varname_iter(system, typ, local=True):
         # deals only with promoted names.
         if isinstance(s, Component):
             for varname in s._variable_allprocs_names[typ]:
-                yield '.'.join((s.path_name, varname))
+                yield '.'.join((s.pathname, varname))
 
 def abs_meta_iter(system, typ):
     """An iter of (abs_var_name, metadata) for all local vars.

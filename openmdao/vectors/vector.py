@@ -62,7 +62,7 @@ class Vector(object):
         self._name = name
         self._typ = typ
 
-        self._assembler = system._sys_assembler
+        self._assembler = system._assembler
         self._system = system
 
         self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]

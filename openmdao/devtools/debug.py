@@ -14,7 +14,7 @@ def allproc_var_dump(system, out=sys.stdout):
         Output stream to write to.
 
     """
-    assembler = system._sys_assembler
+    assembler = system._assembler
     set_IDs = assembler._variable_set_IDs
     set_idxs = assembler._variable_set_indices
 
@@ -23,7 +23,7 @@ def allproc_var_dump(system, out=sys.stdout):
         vset_IDs = assembler._variable_set_IDs[typ]
         allproc_indices = system._variable_allprocs_indices[typ]
 
-        out.write("\n%s %ss:\n" % (system.path_name, typ))
+        out.write("\n%s %ss:\n" % (system.pathname, typ))
         lens = [len(n) for n in system._variable_allprocs_names[typ]]
         nwid = max(lens) if lens else 0
         nwid = max(nwid, len("Name"))
