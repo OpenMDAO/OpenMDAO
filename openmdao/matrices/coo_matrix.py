@@ -30,8 +30,8 @@ class CooMatrix(Matrix):
         """
         counter = 0
 
-        submat_meta_iter = ((self._op_submats, self._op_metadata),
-                            (self._ip_submats, self._ip_metadata))
+        submat_meta_iter = ((self._out_submats, self._out_metadata),
+                            (self._in_submats, self._in_metadata))
 
         for submats, metadata in submat_meta_iter:
             for key in submats:
@@ -106,7 +106,7 @@ class CooMatrix(Matrix):
                         rows[ind1:ind2] = irows
                         cols[ind1:ind2] = icols
 
-                if metadata is self._ip_metadata:
+                if metadata is self._in_metadata:
                     metadata[key] = (ind1, ind2, idxs)
                 else:
                     metadata[key] = slice(ind1, ind2)
@@ -125,14 +125,14 @@ class CooMatrix(Matrix):
         """
         data, rows, cols = self._build_sparse(num_rows, num_cols)
 
-        for key in self._ip_metadata:
-            ind1, ind2, idxs = self._ip_metadata[key]
+        for key in self._in_metadata:
+            ind1, ind2, idxs = self._in_metadata[key]
             if idxs is None:
-                self._ip_metadata[key] = slice(ind1, ind2)
+                self._in_metadata[key] = slice(ind1, ind2)
             else:
                 # store reverse indices to avoid copying subjac data during
                 # update_submat.
-                self._ip_metadata[key] = numpy.argsort(idxs) + ind1
+                self._in_metadata[key] = numpy.argsort(idxs) + ind1
 
         self._matrix = coo_matrix((data, (rows, cols)),
                                   shape=(num_rows, num_cols))
@@ -143,7 +143,7 @@ class CooMatrix(Matrix):
         Args
         ----
         submats : dict
-            dictionary of sub-jacobian data keyed by (op_ind, ip_ind).
+            dictionary of sub-jacobian data keyed by (out_ind, in_ind).
         metadata : dict
             implementation-specific data for the sub-jacobians.
         key : (int, int)
