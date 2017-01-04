@@ -211,7 +211,7 @@ class TestNewton(unittest.TestCase):
         prob.run()
 
         assert_rel_error(self, prob['comp.z'], -4.93191510182, .00001)
-        self.assertLessEqual(prob.root.nl_solver._iter_count, 10,
+        self.assertLessEqual(prob.root.nl_solver._iter_count, 4,
                              msg='Should get there pretty quick because of utol.')
 
 
