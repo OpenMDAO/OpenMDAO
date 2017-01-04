@@ -6,11 +6,15 @@ import os
 import pkgutil
 import inspect
 import re
+import textwrap
+from numpydoc.docscrape_sphinx import SphinxDocString
+from numpydoc.docscrape import NumpyDocString, Reader
 import openmdao
 from mock import Mock
 
 MOCK_MODULES = ['h5py', 'petsc4py', 'mpi4py', 'pyoptsparse']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+
 
 # this function is used to create the entire directory structure
 # of our source docs, as well as writing out each individual rst file.
@@ -169,7 +173,8 @@ OpenMDAO User Source Documentation
                     # get the meat of the ref sheet code done
                     filename = sub_package + ".py"
                     ref_sheet.write(".. index:: " + doctype + "_" + filename + "\n\n")
-                    ref_sheet.write(".. _" + doctype + "_" + package_name + "." + filename + ":\n\n")
+                    ref_sheet.write(".. _" + doctype + "_" + package_name + "." +
+                                    filename + ":\n\n")
                     ref_sheet.write(filename + "\n")
                     ref_sheet.write("+" * len(filename) + "\n\n")
                     ref_sheet.write(".. automodule:: " + package_name + "." + sub_package)
@@ -197,13 +202,9 @@ else:
 if doctype:
     generate_docs(doctype)
 
+
 # ------------------------begin monkeypatch-----------------------
 # monkeypatch to make our docs say "Args" instead of "Parameters"
-from numpydoc.docscrape_sphinx import SphinxDocString
-from numpydoc.docscrape import NumpyDocString, Reader
-import textwrap
-
-
 def _parse(self):
     """
     parse
@@ -244,6 +245,7 @@ def _parse(self):
 
 def __str__(self, indent=0, func_role="obj"):
     """
+    our own __str__
     """
     out = []
     out += self._str_signature()
@@ -293,7 +295,7 @@ def __init__(self, docstring, config={}):
         'References': '',
         'Examples': '',
         'index': {}
-        }
+    }
 
     try:
         self._parse()
@@ -304,7 +306,8 @@ def __init__(self, docstring, config={}):
     # In creation of usr docs, remove private Attributes (beginning with '_')
     # with a crazy list comprehension
     if tags.has("usr"):
-        self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"] if not att[0].startswith('_')]
+        self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"]
+                                              if not att[0].startswith('_')]
 
 
 def _str_options(self, name):
@@ -326,6 +329,7 @@ def _str_options(self, name):
             out += ['']
     return out
 
+
 # Do the actual patch switchover to these local versions
 NumpyDocString.__init__ = __init__
 SphinxDocString._str_options = _str_options
@@ -342,8 +346,8 @@ SphinxDocString.__str__ = __str__
 package = openmdao
 om_classes = {}
 for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
-                                                  prefix=package.__name__+'.',
-                                                  onerror=lambda x: None):
+                                                      prefix=package.__name__ + '.',
+                                                      onerror=lambda x: None):
     if not ispkg:
         if 'docs' not in modname:
             module = importer.find_module(modname).load_module(modname)
@@ -380,18 +384,22 @@ def om_process_docstring(app, what, name, obj, options, lines):
                         lines[i] = lines[i].replace(ma, link)
                     else:
                         # the class isn't in the class table!
-                        print("WARNING: {} not found in dictionary of OpenMDAO methods".format(justclass))
-                        # replace instances of <class> with just class in docstring (strip angle brackets)
+                        print("WARNING: {} not found in dictionary of OpenMDAO methods".format
+                              (justclass))
+                        # replace instances of <class> with just class in docstring
+                        # (strip angle brackets)
                         lines[i] = lines[i].replace(ma, m)
                 # otherwise, it's a class
                 else:
                     if m in om_classes:
                         classfullpath = om_classes[m]
-                        lines[i] = lines[i].replace(ma, ":class:`~"+classfullpath+"`")
+                        lines[i] = lines[i].replace(ma, ":class:`~" + classfullpath + "`")
                     else:
                         # the class isn't in the class table!
-                        print("WARNING: {} not found in dictionary of OpenMDAO classes".format(m))
-                        # replace instances of <class> with class in docstring (strip angle brackets)
+                        print("WARNING: {} not found in dictionary of OpenMDAO classes"
+                              .format(m))
+                        # replace instances of <class> with class in docstring
+                        # (strip angle brackets)
                         lines[i] = lines[i].replace(ma, m)
 
 
@@ -402,8 +410,8 @@ def setup(app):
     """
     app.connect('autodoc-process-docstring', om_process_docstring)
 
-#--------------end sphinx extension---------------------
 
+# --------------end sphinx extension---------------------
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -495,7 +503,7 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 html_theme = 'theme'
-#html_theme = 'sphinxdoc'
+# html_theme = 'sphinxdoc'
 
 # Add any paths that contain custom themes here, relative to this directory.
 html_theme_path = ['.']
