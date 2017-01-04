@@ -60,4 +60,4 @@ test_script:
 
 #after tests, need to cd down so that conf.py can be found for doctest
   - cd openmdao/docs
-  - nmake /f Makefile.nmake doctest
+  - nmake /f Makefile.nmake html
