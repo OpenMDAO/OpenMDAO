@@ -63,7 +63,11 @@ mock:
 	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
 	is required to build the docs. Install with:\n pip install mock"; exit 1)
 
-html: mock
+redbaron:
+	@(python -c "import redbaron" >/dev/null 2>&1) || (echo "The 'redbaron' package \
+	is required to build the docs. Install with:\n pip install redbaron"; exit 1)
+
+html: mock redbaron
 	python ../devtools/create_feature_docs_unit_test_db.py
 	rm -rf $(BUILDDIR)/*
 	rm -rf srcdocs/usr
