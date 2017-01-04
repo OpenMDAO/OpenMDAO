@@ -7,6 +7,7 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.components.deprecated_component import Component
 from openmdao.components.exec_comp import ExecComp
+from openmdao.components.linear_system_comp import LinearSystemComp
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
 from openmdao.solvers.ln_bjac import LinearBlockJac
 from openmdao.solvers.ln_bgs import LinearBlockGS

@@ -100,7 +100,11 @@ class Solver(object):
             else:
                 solver_name = solver_name.ljust(name_len)
 
-            print_str = ' ' * self._system._sys_depth + '-' * self._depth
+            depth = self._system.pathname.count('.')
+            if self._system.pathname != '':
+                depth += 1
+
+            print_str = ' ' * depth + '-' * self._depth
             print_str += sys_name + solver_name
             print_str += ' %3d | %.9g %.9g' % (iteration, res, res0)
             print(print_str)
@@ -314,10 +318,10 @@ class LinearSolver(Solver):
         """
         system = self._system
         var_inds = [
-            system._variable_allprocs_range['output'][0],
-            system._variable_allprocs_range['output'][1],
-            system._variable_allprocs_range['output'][0],
-            system._variable_allprocs_range['output'][1],
+            system._var_allprocs_range['output'][0],
+            system._var_allprocs_range['output'][1],
+            system._var_allprocs_range['output'][0],
+            system._var_allprocs_range['output'][1],
         ]
         system._apply_linear(self._vec_names, self._mode, var_inds)
 

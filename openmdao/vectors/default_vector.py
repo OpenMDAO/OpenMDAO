@@ -65,8 +65,8 @@ class DefaultVector(Vector):
         indices = [numpy.zeros(numpy.sum(sizes[self._iproc, :]), int)
                    for sizes in self._assembler._variable_sizes[self._typ]]
 
-        variable_indices = self._system._variable_myproc_indices[self._typ]
-        variable_names = self._system._variable_myproc_names[self._typ]
+        variable_indices = self._system._var_myproc_indices[self._typ]
+        variable_names = self._system._var_myproc_names[self._typ]
         set_indices = self._assembler._variable_set_indices[self._typ]
         sizes_all = self._assembler._variable_sizes_all[self._typ]
         sizes = self._assembler._variable_sizes[self._typ]
@@ -94,7 +94,7 @@ class DefaultVector(Vector):
         variable_sizes = self._assembler._variable_sizes[self._typ]
         variable_set_indices = self._assembler._variable_set_indices[self._typ]
 
-        ind1, ind2 = self._system._variable_allprocs_range[self._typ]
+        ind1, ind2 = self._system._var_allprocs_range[self._typ]
         sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
 
         data = []
@@ -146,9 +146,9 @@ class DefaultVector(Vector):
         variable_set_indices = self._assembler._variable_set_indices[self._typ]
 
         system = self._system
-        variable_myproc_names = system._variable_myproc_names[self._typ]
-        variable_myproc_indices = system._variable_myproc_indices[self._typ]
-        meta = system._variable_myproc_metadata[self._typ]
+        variable_myproc_names = system._var_myproc_names[self._typ]
+        variable_myproc_indices = system._var_myproc_indices[self._typ]
+        meta = system._var_myproc_metadata[self._typ]
 
         views = {}
         views_flat = {}

@@ -77,20 +77,26 @@ class Group(System):
             the subsystem that was passed in. This is returned to
             enable users to instantiate and add a subsystem at the
             same time, and get the pointer back.
+
         """
+        for sub in self._subsystems_allprocs:
+            if name == sub.name:
+                raise RuntimeError("Subsystem name '%s' is already used." %
+                                   name)
+
         self._subsystems_allprocs.append(subsys)
         subsys.name = name
 
         if promotes:
-            subsys._variable_promotes['any'] = set(promotes)
+            subsys._var_promotes['any'] = set(promotes)
         if promotes_inputs:
-            subsys._variable_promotes['input'] = set(promotes_inputs)
+            subsys._var_promotes['input'] = set(promotes_inputs)
         if promotes_outputs:
-            subsys._variable_promotes['output'] = set(promotes_outputs)
+            subsys._var_promotes['output'] = set(promotes_outputs)
         if renames_inputs:
-            subsys._variable_renames['input'] = dict(renames_inputs)
+            subsys._var_renames['input'] = dict(renames_inputs)
         if renames_outputs:
-            subsys._variable_renames['output'] = dict(renames_outputs)
+            subsys._var_renames['output'] = dict(renames_outputs)
 
         return subsys
 
@@ -108,25 +114,25 @@ class Group(System):
             variable, you can specify which indices of the source to be
             transferred to the input here.
         """
-        if ip_name in self._variable_connections:
-            srcname = self._variable_connections[ip_name][0]
+        if ip_name in self._var_connections:
+            srcname = self._var_connections[ip_name][0]
             raise RuntimeError("Input '%s' is already connected to '%s'" %
                                (ip_name, srcname))
 
-        self._variable_connections[ip_name] = (op_name, src_indices)
+        self._var_connections[ip_name] = (op_name, src_indices)
 
     def _setup_connections(self):
         """Recursively assemble a list of input-output connections.
 
         Sets the following attributes:
-            _variable_connections_indices
+            _var_connections_indices
         """
         # Perform recursion and assemble pairs from subsystems
         pairs = []
         for subsys in self._subsystems_myproc:
             subsys._setup_connections()
             if subsys.comm.rank == 0:
-                pairs.extend(subsys._variable_connections_indices)
+                pairs.extend(subsys._var_connections_indices)
 
         # Do an allgather to gather from root procs of all subsystems
         if self.comm.size > 1:
@@ -135,17 +141,17 @@ class Group(System):
             for sub_pairs in pairs_raw:
                 pairs.extend(sub_pairs)
 
-        allprocs_in_names = self._variable_allprocs_names['input']
-        myproc_in_names = self._variable_myproc_names['input']
-        allprocs_out_names = self._variable_allprocs_names['output']
-        input_meta = self._variable_myproc_metadata['input']
+        allprocs_in_names = self._var_allprocs_names['input']
+        myproc_in_names = self._var_myproc_names['input']
+        allprocs_out_names = self._var_allprocs_names['output']
+        input_meta = self._var_myproc_metadata['input']
 
-        ip_offset = self._variable_allprocs_range['input'][0]
-        op_offset = self._variable_allprocs_range['output'][0]
+        ip_offset = self._var_allprocs_range['input'][0]
+        op_offset = self._var_allprocs_range['output'][0]
 
         # Loop through user-defined connections
         for ip_name, (op_name, src_indices) \
-                in iteritems(self._variable_connections):
+                in iteritems(self._var_connections):
 
             for ip_index, name in enumerate(allprocs_in_names):
                 if name == ip_name:
@@ -174,22 +180,22 @@ class Group(System):
                         # name.
                         src_indices = None
 
-        self._variable_connections_indices = pairs
+        self._var_connections_indices = pairs
 
     def initialize_variables(self):
         """Set up variable name and metadata lists."""
         for typ in ['input', 'output']:
             for subsys in self._subsystems_myproc:
                 # Assemble the names list from subsystems
-                subsys._variable_maps[typ] = subsys._get_maps(typ)
-                for sub_name in subsys._variable_allprocs_names[typ]:
-                    name = subsys._variable_maps[typ][sub_name]
-                    self._variable_allprocs_names[typ].append(name)
-                    self._variable_myproc_names[typ].append(name)
+                subsys._var_maps[typ] = subsys._get_maps(typ)
+                for sub_name in subsys._var_allprocs_names[typ]:
+                    name = subsys._var_maps[typ][sub_name]
+                    self._var_allprocs_names[typ].append(name)
+                    self._var_myproc_names[typ].append(name)
 
                 # Assemble the metadata list from the subsystems
-                metadata = subsys._variable_myproc_metadata[typ]
-                self._variable_myproc_metadata[typ].extend(metadata)
+                metadata = subsys._var_myproc_metadata[typ]
+                self._var_myproc_metadata[typ].extend(metadata)
 
             # The names list is on all procs, allgather all names
             if self.comm.size > 1:
@@ -197,15 +203,15 @@ class Group(System):
                 # One representative proc from each sub_comm adds names
                 sub_comm = self._subsystems_myproc[0].comm
                 if sub_comm.rank == 0:
-                    names = self._variable_allprocs_names[typ]
+                    names = self._var_allprocs_names[typ]
                 else:
                     names = []
 
                 # Every proc on this comm now has global variable names
                 raw = self.comm.allgather(names)
-                self._variable_allprocs_names[typ] = []
+                self._var_allprocs_names[typ] = []
                 for names in raw:
-                    self._variable_allprocs_names[typ].extend(names)
+                    self._var_allprocs_names[typ].extend(names)
 
     def _apply_nonlinear(self):
         """Compute residuals."""
@@ -242,7 +248,7 @@ class Group(System):
             The ordering is [lb1, ub1, lb2, ub2].
         """
         # Use global Jacobian
-        if self._jacobian._top_name == self.path_name:
+        if self._jacobian._top_name == self.pathname:
             for vec_name in vec_names:
                 with self._matvec_context(vec_name, var_inds, mode) as vecs:
                     d_inputs, d_outputs, d_residuals = vecs
@@ -301,7 +307,7 @@ class Group(System):
             subsys._linearize()
 
         # Update jacobian
-        if not initial and self._jacobian._top_name == self.path_name:
+        if not initial and self._jacobian._top_name == self.pathname:
             self._jacobian._system = self
             self._jacobian._update()
             self._jacobian._precompute_iter()

@@ -16,7 +16,7 @@ class NonlinearBlockGS(NonlinearSolver):
             system._transfers['fwd', isub](system._inputs,
                                            system._outputs, 'fwd')
 
-            if isub in system._subsystems_inds:
-                index = system._subsystems_inds.index(isub)
+            if isub in system._subsystems_myproc_inds:
+                index = system._subsystems_myproc_inds.index(isub)
                 subsys = system._subsystems_myproc[index]
                 subsys._solve_nonlinear()
