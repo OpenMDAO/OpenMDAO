@@ -156,6 +156,7 @@ class TestNewton(unittest.TestCase):
         self.assertLess(prob.root.nl_solver._iter_count, 6)
 
     def test_implicit_utol(self):
+        # We are setup for reach utol termination condition quite quickly.
 
         raise unittest.SkipTest("solver utol not implemented yet")
 
