@@ -343,7 +343,7 @@ def get_unit_test_source_and_run_outputs(method_path):
                             teardown_source_code])
 
     # Write it to a file so we can run it. Tried using exec but ran into problems with that
-    with tempfile.NamedTemporaryFile(suffix='.py') as f:
+    with tempfile.NamedTemporaryFile(suffix='.py', dir='.') as f:
         f.write(code_to_run)
         f.flush()
         run_outputs = subprocess.check_output(['python', f.name])
