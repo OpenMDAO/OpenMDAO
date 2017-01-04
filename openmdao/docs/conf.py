@@ -186,7 +186,7 @@ OpenMDAO User Source Documentation
 # type is passed in from the Makefile via the -t tags argument to sphinxbuild
 if tags.has("dev"):
     doctype = "dev"
-if tags.has("usr"):
+elif tags.has("usr"):
     doctype = "usr"
 else:
     doctype = None

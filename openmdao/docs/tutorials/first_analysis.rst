@@ -91,7 +91,7 @@ The component is the basic building block of a model. You will always define com
 
 .. note::
 
-    What about implicit functions? Check out this tutorial about using an `ImplicitComponent`[LINK]
+    What about implicit functions? Check out this tutorial about using an `ImplicitComponent`
 
 
 ::
