@@ -14,13 +14,13 @@ class Matrix(object):
         communicator of the top-level system that owns the <Jacobian>.
     _matrix : object
         implementation-specific representation of the actual matrix.
-    _op_submats : dict
-        dictionary of sub-jacobian data keyed by (op_ind, ip_ind).
-    _ip_submats : dict
-        dictionary of sub-jacobian data keyed by (op_ind, ip_ind).
-    _op_metadata : dict
+    _out_submats : dict
+        dictionary of sub-jacobian data keyed by (out_ind, in_ind).
+    _in_submats : dict
+        dictionary of sub-jacobian data keyed by (out_ind, in_ind).
+    _out_metadata : dict
         implementation-specific data for the sub-jacobians.
-    _ip_metadata : dict
+    _in_metadata : dict
         implementation-specific data for the sub-jacobians.
     """
 
@@ -34,10 +34,10 @@ class Matrix(object):
         """
         self._comm = comm
         self._matrix = None
-        self._op_submats = {}
-        self._ip_submats = {}
-        self._op_metadata = {}
-        self._ip_metadata = {}
+        self._out_submats = {}
+        self._in_submats = {}
+        self._out_metadata = {}
+        self._in_metadata = {}
 
     def prod_fwd(self, in_vec, row_range=None):
         """Perform a forward product.
@@ -82,7 +82,7 @@ class Matrix(object):
 
         return self._prod(in_vec, 'rev')
 
-    def _op_add_submat(self, key, jac, irow, icol):
+    def _out_add_submat(self, key, jac, irow, icol):
         """Declare a sub-jacobian.
 
         Args
@@ -96,9 +96,9 @@ class Matrix(object):
         icol : int
             the starting col index (offset) for this sub-jacobian.
         """
-        self._op_submats[key] = (jac, irow, icol, None)
+        self._out_submats[key] = (jac, irow, icol, None)
 
-    def _ip_add_submat(self, key, jac, irow, icol, src_indices):
+    def _in_add_submat(self, key, jac, irow, icol, src_indices):
         """Declare a sub-jacobian.
 
         Args
@@ -115,9 +115,9 @@ class Matrix(object):
             indices from the source variable that an input variable
             connects to.
         """
-        self._ip_submats[key] = (jac, irow, icol, src_indices)
+        self._in_submats[key] = (jac, irow, icol, src_indices)
 
-    def _op_update_submat(self, key, jac):
+    def _out_update_submat(self, key, jac):
         """Update the values of a sub-jacobian.
 
         Args
@@ -127,9 +127,9 @@ class Matrix(object):
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
-        self._update_submat(self._op_submats, self._op_metadata, key, jac)
+        self._update_submat(self._out_submats, self._out_metadata, key, jac)
 
-    def _ip_update_submat(self, key, jac):
+    def _in_update_submat(self, key, jac):
         """Update the values of a sub-jacobian.
 
         Args
@@ -139,7 +139,7 @@ class Matrix(object):
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
-        self._update_submat(self._ip_submats, self._ip_metadata, key, jac)
+        self._update_submat(self._in_submats, self._in_metadata, key, jac)
 
     def _build(self, num_rows, num_cols):
         """Allocate the matrix.
@@ -159,7 +159,7 @@ class Matrix(object):
         Args
         ----
         submats : dict
-            dictionary of sub-jacobian data keyed by (op_ind, ip_ind).
+            dictionary of sub-jacobian data keyed by (out_ind, in_ind).
         metadata : dict
             implementation-specific data for the sub-jacobians.
         key : (int, int)

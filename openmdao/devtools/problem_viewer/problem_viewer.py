@@ -80,13 +80,13 @@ def _get_viewer_data(problem_or_rootgroup):
         raise TypeError('get_model_viewer_data only accepts Problems or Groups')
 
     connections_list = []
-    for ip_ind, op_ind in root_group._var_connections_indices:
-        ip_name = root_group._var_allprocs_names['input'][ip_ind]
-        op_name = root_group._var_allprocs_names['output'][op_ind]
+    for in_ind, out_ind in root_group._var_connections_indices:
+        in_name = root_group._var_allprocs_names['input'][in_ind]
+        out_name = root_group._var_allprocs_names['output'][out_ind]
 
         dct = OrderedDict()
-        dct['src'] = op_name
-        dct['tgt'] = ip_name
+        dct['src'] = out_name
+        dct['tgt'] = in_name
         connections_list.append(dct)
 
     data_dict = {}

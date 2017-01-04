@@ -13,38 +13,38 @@ real_types = tuple([numbers.Real, numpy.float32, numpy.float64])
 class DefaultTransfer(Transfer):
     """Default NumPy transfer."""
 
-    def __call__(self, ip_vec, op_vec, mode='fwd'):
+    def __call__(self, in_vec, out_vec, mode='fwd'):
         """Perform transfer.
 
         Args
         ----
-        ip_vec : <Vector>
+        in_vec : <Vector>
             pointer to the input vector.
-        op_vec : <Vector>
+        out_vec : <Vector>
             pointer to the output vector.
         mode : str
             'fwd' or 'rev'.
 
         """
-        ip_inds = self._ip_inds
-        op_inds = self._op_inds
+        in_inds = self._in_inds
+        out_inds = self._out_inds
         if mode == 'fwd':
-            for ip_iset, op_iset in self._ip_inds:
-                key = (ip_iset, op_iset)
-                if len(self._ip_inds[key]) > 0:
-                    ip_inds = self._ip_inds[key]
-                    op_inds = self._op_inds[key]
-                    tmp = op_vec._root_vector._data[op_iset][op_inds]
-                    ip_vec._root_vector._data[ip_iset][ip_inds] = tmp
+            for in_iset, out_iset in self._in_inds:
+                key = (in_iset, out_iset)
+                if len(self._in_inds[key]) > 0:
+                    in_inds = self._in_inds[key]
+                    out_inds = self._out_inds[key]
+                    tmp = out_vec._root_vector._data[out_iset][out_inds]
+                    in_vec._root_vector._data[in_iset][in_inds] = tmp
         elif mode == 'rev':
-            for ip_iset, op_iset in self._ip_inds:
-                key = (ip_iset, op_iset)
-                if len(self._ip_inds[key]) > 0:
-                    ip_inds = self._ip_inds[key]
-                    op_inds = self._op_inds[key]
-                    tmp = ip_vec._root_vector._data[ip_iset][ip_inds]
-                    numpy.add.at(op_vec._root_vector._data[op_iset],
-                                 op_inds, tmp)
+            for in_iset, out_iset in self._in_inds:
+                key = (in_iset, out_iset)
+                if len(self._in_inds[key]) > 0:
+                    in_inds = self._in_inds[key]
+                    out_inds = self._out_inds[key]
+                    tmp = in_vec._root_vector._data[in_iset][in_inds]
+                    numpy.add.at(out_vec._root_vector._data[out_iset],
+                                 out_inds, tmp)
 
 
 class DefaultVector(Vector):

@@ -160,7 +160,7 @@ class Assembler(object):
         ----
         connections : [(int, int), ...]
             index pairs representing user defined variable connections
-            (ip_ind, op_ind).
+            (in_ind, out_ind).
         variable_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
             list of names of all owned variables, not just on current proc.
         """
@@ -170,16 +170,16 @@ class Assembler(object):
 
         # Add user defined connections to the _input_src_ids vector
         # and inconns
-        for ip_ID, op_ID in connections:
-            _input_src_ids[ip_ID] = op_ID
+        for in_ID, out_ID in connections:
+            _input_src_ids[in_ID] = out_ID
 
         # Loop over input variables
-        for ip_ID, name in enumerate(variable_allprocs_names['input']):
+        for in_ID, name in enumerate(variable_allprocs_names['input']):
 
             # If name is also an output variable, add this implicit connection
-            for op_ID, oname in enumerate(out_names):
+            for out_ID, oname in enumerate(out_names):
                 if name == oname:
-                    _input_src_ids[ip_ID] = op_ID
+                    _input_src_ids[in_ID] = out_ID
                     break
 
         self._input_src_ids = _input_src_ids
@@ -239,32 +239,32 @@ class Assembler(object):
         nvar_out = len(variable_metadata)
 
         # List of src units; to check compatability with input units
-        op_units = [None for ind in range(nvar_out)]
+        out_units = [None for ind in range(nvar_out)]
         # List of unit_type IDs
-        op_int = numpy.empty(nvar_out, int)
+        out_int = numpy.empty(nvar_out, int)
         # The two columns correspond to ref0 and ref
-        op_flt = numpy.empty((nvar_out, 2))
+        out_flt = numpy.empty((nvar_out, 2))
 
         # Get unit type as well as ref0 and ref in standard units
-        op_int[:] = variable_indices
+        out_int[:] = variable_indices
         for ivar_out, meta in enumerate(variable_metadata):
             # ref0 and ref are the values of the variable in the specified
             # units at which the scaled values are 0 and 1, respectively
-            op_units[ivar_out] = meta['units']
-            op_flt[ivar_out, 0] = meta['ref0']
-            op_flt[ivar_out, 1] = meta['ref'] - meta['ref0']
+            out_units[ivar_out] = meta['units']
+            out_flt[ivar_out, 0] = meta['ref0']
+            out_flt[ivar_out, 1] = meta['ref'] - meta['ref0']
 
         # Broadcast to all procs
         if self._comm.size > 1:
-            op_units_raw = self._comm.allgather(op_units)
-            op_int_raw = self._comm.allgather(op_int)
-            op_flt_raw = self._comm.allgather(op_flt)
+            out_units_raw = self._comm.allgather(out_units)
+            out_int_raw = self._comm.allgather(out_int)
+            out_flt_raw = self._comm.allgather(out_flt)
 
-            op_units = []
-            for str_list in op_units_raw:
-                op_units.extend(str_list)
-            op_int = numpy.vstack(op_int_raw)
-            op_flt = numpy.vstack(op_flt_raw)
+            out_units = []
+            for str_list in out_units_raw:
+                out_units.extend(str_list)
+            out_int = numpy.vstack(out_int_raw)
+            out_flt = numpy.vstack(out_flt_raw)
 
         # Now, we can store ref0 and ref for each input
         nvar_in = len(self._input_src_ids)
@@ -273,10 +273,10 @@ class Assembler(object):
         self._src_scaling_1 = numpy.empty(nvar_in)
         for ivar_in, ivar_out in enumerate(self._input_src_ids):
             if ivar_out != -1:
-                ind = numpy.where(op_int == ivar_out)[0][0]
-                self._src_units[ivar_in] = op_units[ind]
-                self._src_scaling_0[ivar_in] = op_flt[ind, 0]
-                self._src_scaling_1[ivar_in] = op_flt[ind, 1]
+                ind = numpy.where(out_int == ivar_out)[0][0]
+                self._src_units[ivar_in] = out_units[ind]
+                self._src_scaling_0[ivar_in] = out_flt[ind, 0]
+                self._src_scaling_1[ivar_in] = out_flt[ind, 1]
             else:
                 self._src_units[ivar_in] = ''
                 self._src_scaling_0[ivar_in] = 0.
@@ -301,17 +301,17 @@ class Assembler(object):
 
         Returns
         -------
-        xfer_ip_inds : dict of int ndarray[:]
+        xfer_in_inds : dict of int ndarray[:]
             input indices of global transfer.
-        xfer_op_inds : dict of int ndarray[:]
+        xfer_out_inds : dict of int ndarray[:]
             output indices of global transfer.
-        fwd_xfer_ip_inds : [dict of int ndarray[:], ...]
+        fwd_xfer_in_inds : [dict of int ndarray[:], ...]
             list of input indices of forward transfers.
-        fwd_xfer_op_inds : [dict of int ndarray[:], ...]
+        fwd_xfer_out_inds : [dict of int ndarray[:], ...]
             list of output indices of forward transfers.
-        rev_xfer_ip_inds : [dict of int ndarray[:], ...]
+        rev_xfer_in_inds : [dict of int ndarray[:], ...]
             list of input indices of reverse transfers.
-        rev_xfer_op_inds : [dict of int ndarray[:], ...]
+        rev_xfer_out_inds : [dict of int ndarray[:], ...]
             list of output indices of reverse transfers.
         """
         pass
