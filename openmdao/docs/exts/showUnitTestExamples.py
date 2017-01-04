@@ -16,18 +16,8 @@ class showUnitTestExamplesDirective(Directive):
         from openmdao.docs.utils.get_test_source_code_for_feature import get_test_source_code_for_feature
         for arg in self.arguments:
             codelist = get_test_source_code_for_feature(arg)
-            print ("CODELIST", codelist)
             for code in codelist:
                 (title, src, output) = code
-                print ("TITLE: ", title)
-                print ("SOURCE: ", src)
-                print ("OUTPUT: ", output)
-                # for chunk in src:
-                #     if not chunk:
-                #         continue
-                #     else:
-                #         print ("CHUNK: ", chunk)
-                #title_node = nodes.literal_block(title, title)
                 title_node = nodes.line(title, title)
 
                 literal = nodes.literal_block(src, src)
@@ -38,7 +28,6 @@ class showUnitTestExamplesDirective(Directive):
                 literals.append(title_node)
                 literals.append(literal)
                 literals.append(output_node)
-
 
         return literals
 
