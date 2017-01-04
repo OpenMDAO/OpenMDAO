@@ -22,10 +22,11 @@ init:
   - conda config --set always_yes yes
   # We need to do this first as other commands may not work with older versions of conda.
   - conda update conda
-  - conda install numpy scipy nose hdf5 h5py sphinx mock redbaron pip --quiet
+  - conda install numpy scipy nose hdf5 h5py sphinx mock pip --quiet
 
 install:
   #Grab testflo for running tests, to ensure examples are run
+  - pip install redbaron
   - pip install git+https://github.com/OpenMDAO/testflo.git
   #We need to run these two lines to have nmake available for doctests
   - cd "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC"
