@@ -62,7 +62,7 @@ class Vector(object):
         self._name = name
         self._typ = typ
 
-        self._assembler = system._sys_assembler
+        self._assembler = system._assembler
         self._system = system
 
         self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
@@ -125,10 +125,10 @@ class Vector(object):
         variable_sizes = self._assembler._variable_sizes[self._typ]
         variable_set_indices = self._assembler._variable_set_indices[self._typ]
 
-        ind1, ind2 = self._system._variable_allprocs_range[self._typ]
+        ind1, ind2 = self._system._var_allprocs_range[self._typ]
         sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
 
-        variable_indices = self._system._variable_myproc_indices[self._typ]
+        variable_indices = self._system._var_myproc_indices[self._typ]
 
         # Create the index arrays for each var_set for ivar_map.
         # Also store the starting points in the data/index vector.
@@ -174,7 +174,7 @@ class Vector(object):
             Array combining the data of all the varsets.
         """
         if array is None:
-            inds = self._system._variable_myproc_indices[self._typ]
+            inds = self._system._var_myproc_indices[self._typ]
             sizes = self._assembler._variable_sizes_all[self._typ][self._iproc,
                                                                    inds]
             array = numpy.zeros(numpy.sum(sizes))

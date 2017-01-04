@@ -44,7 +44,7 @@ class GlobalJacobian(Jacobian):
         """
         sizes_all = self._assembler._variable_sizes_all
         iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
-        ivar_all0 = self._system._variable_allprocs_range['output'][0]
+        ivar_all0 = self._system._var_allprocs_range['output'][0]
 
         ind1 = numpy.sum(sizes_all['output'][iproc, ivar_all0:ivar_all])
         ind2 = numpy.sum(sizes_all['output'][iproc, ivar_all0:ivar_all + 1])
@@ -53,9 +53,9 @@ class GlobalJacobian(Jacobian):
 
     def _initialize(self):
         """Allocate the global matrices."""
-        indices = self._system._variable_myproc_indices
-        meta = self._system._variable_myproc_metadata['input']
-        ivar1, ivar2 = self._system._variable_allprocs_range['output']
+        indices = self._system._var_myproc_indices
+        meta = self._system._var_myproc_metadata['input']
+        ivar1, ivar2 = self._system._var_allprocs_range['output']
 
         self._int_mtx = self.options['matrix_class'](self._system.comm)
         self._ext_mtx = self.options['matrix_class'](self._system.comm)
@@ -104,11 +104,11 @@ class GlobalJacobian(Jacobian):
                         self._ext_mtx._ip_add_submat(
                             key, jac, re_offset, in_offsets[ip_var_all], None)
 
-        ind1, ind2 = self._system._variable_allprocs_range['output']
+        ind1, ind2 = self._system._var_allprocs_range['output']
         op_size = numpy.sum(
             self._assembler._variable_sizes_all['output'][ind1:ind2])
 
-        ind1, ind2 = self._system._variable_allprocs_range['input']
+        ind1, ind2 = self._system._var_allprocs_range['input']
         ip_size = numpy.sum(
             self._assembler._variable_sizes_all['input'][ind1:ind2])
 
@@ -117,8 +117,8 @@ class GlobalJacobian(Jacobian):
 
     def _update(self):
         """Read the user's sub-Jacobians and set into the global matrix."""
-        indices = self._system._variable_myproc_indices
-        ivar1, ivar2 = self._system._variable_allprocs_range['output']
+        indices = self._system._var_myproc_indices
+        ivar1, ivar2 = self._system._var_allprocs_range['output']
 
         for re_var_all in indices['output']:
             for op_var_all in indices['output']:

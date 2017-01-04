@@ -207,7 +207,7 @@ class PetscKSP(LinearSolver):
         x_vec.set_data(_get_petsc_vec_array(in_vec))
 
         # apply linear
-        ind1, ind2 = system._variable_allprocs_range['output']
+        ind1, ind2 = system._var_allprocs_range['output']
         var_inds = [ind1, ind2, ind1, ind2]
         system._apply_linear([vec_name], self._mode, var_inds)
 
@@ -329,8 +329,8 @@ class PetscKSP(LinearSolver):
 
         rank = system.comm.rank + system._mpi_proc_range[0]
 
-        lsizes = system._sys_assembler._variable_sizes_all['output'][rank]
-        sizes = sum(system._sys_assembler._variable_sizes_all['output'])
+        lsizes = system._assembler._variable_sizes_all['output'][rank]
+        sizes = sum(system._assembler._variable_sizes_all['output'])
 
         lsize = sum(lsizes)
         size = sum(sizes)

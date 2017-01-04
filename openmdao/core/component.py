@@ -55,9 +55,9 @@ class Component(System):
         elif 'shape' not in kwargs and isinstance(val, numpy.ndarray):
             metadata['shape'] = val.shape
 
-        self._variable_allprocs_names['input'].append(name)
-        self._variable_myproc_names['input'].append(name)
-        self._variable_myproc_metadata['input'].append(metadata)
+        self._var_allprocs_names['input'].append(name)
+        self._var_myproc_names['input'].append(name)
+        self._var_myproc_metadata['input'].append(metadata)
 
     def add_output(self, name, val=1.0, **kwargs):
         """Add an output variable to the component.
@@ -78,9 +78,9 @@ class Component(System):
         if 'shape' not in kwargs and isinstance(val, numpy.ndarray):
             metadata['shape'] = val.shape
 
-        self._variable_allprocs_names['output'].append(name)
-        self._variable_myproc_names['output'].append(name)
-        self._variable_myproc_metadata['output'].append(metadata)
+        self._var_allprocs_names['output'].append(name)
+        self._var_myproc_names['output'].append(name)
+        self._var_myproc_metadata['output'].append(metadata)
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
         r"""Add this vector and assign sub_vectors to subsystems.
@@ -118,13 +118,13 @@ class Component(System):
         #       value of 1.0 being broadcast into all values in the vector
         #       that were allocated according to the shape.
         if vectors['input']._name is None:
-            names = self._variable_myproc_names['input']
+            names = self._var_myproc_names['input']
             inputs = self._inputs
-            for i, meta in enumerate(self._variable_myproc_metadata['input']):
+            for i, meta in enumerate(self._var_myproc_metadata['input']):
                 inputs[names[i]] = meta['value']
 
         if vectors['output']._name is None:
-            names = self._variable_myproc_names['output']
+            names = self._var_myproc_names['output']
             outputs = self._outputs
-            for i, meta in enumerate(self._variable_myproc_metadata['output']):
+            for i, meta in enumerate(self._var_myproc_metadata['output']):
                 outputs[names[i]] = meta['value']
