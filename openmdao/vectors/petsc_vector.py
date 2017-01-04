@@ -17,48 +17,48 @@ class PETScTransfer(DefaultTransfer):
         Optionally implemented by the subclass.
         """
         self._transfers = {}
-        for ip_iset, op_iset in self._ip_inds:
-            key = (ip_iset, op_iset)
-            if len(self._ip_inds[key]) > 0:
-                ip_inds = numpy.array(self._ip_inds[key], 'i')
-                op_inds = numpy.array(self._op_inds[key], 'i')
-                ip_indexset = PETSc.IS().createGeneral(ip_inds,
+        for in_iset, out_iset in self._in_inds:
+            key = (in_iset, out_iset)
+            if len(self._in_inds[key]) > 0:
+                in_inds = numpy.array(self._in_inds[key], 'i')
+                out_inds = numpy.array(self._out_inds[key], 'i')
+                in_indexset = PETSc.IS().createGeneral(in_inds,
                                                        comm=self._comm)
-                op_indexset = PETSc.IS().createGeneral(op_inds,
-                                                       comm=self._comm)
-                ip_petsc = self._ip_vec._root_vector._petsc[ip_iset]
-                op_petsc = self._op_vec._root_vector._petsc[op_iset]
-                transfer = PETSc.Scatter().create(op_petsc, op_indexset,
-                                                  ip_petsc, ip_indexset)
+                out_indexset = PETSc.IS().createGeneral(out_inds,
+                                                        comm=self._comm)
+                in_petsc = self._in_vec._root_vector._petsc[in_iset]
+                out_petsc = self._out_vec._root_vector._petsc[out_iset]
+                transfer = PETSc.Scatter().create(out_petsc, out_indexset,
+                                                  in_petsc, in_indexset)
                 self._transfers[key] = transfer
 
-    def __call__(self, ip_vec, op_vec, mode='fwd'):
+    def __call__(self, in_vec, out_vec, mode='fwd'):
         """Perform transfer.
 
         Args
         ----
-        ip_vec : <Vector>
+        in_vec : <Vector>
             pointer to the input vector.
-        op_vec : <Vector>
+        out_vec : <Vector>
             pointer to the output vector.
         mode : str
             'fwd' or 'rev'.
         """
         if mode == 'fwd':
-            for ip_iset, op_iset in self._ip_inds:
-                key = (ip_iset, op_iset)
-                if len(self._ip_inds[key]) > 0:
-                    ip_petsc = self._ip_vec._root_vector._petsc[ip_iset]
-                    op_petsc = self._op_vec._root_vector._petsc[op_iset]
-                    self._transfers[key].scatter(op_petsc, ip_petsc,
+            for in_iset, out_iset in self._in_inds:
+                key = (in_iset, out_iset)
+                if len(self._in_inds[key]) > 0:
+                    in_petsc = self._in_vec._root_vector._petsc[in_iset]
+                    out_petsc = self._out_vec._root_vector._petsc[out_iset]
+                    self._transfers[key].scatter(out_petsc, in_petsc,
                                                  addv=False, mode=False)
         elif mode == 'rev':
-            for ip_iset, op_iset in self._ip_inds:
-                key = (ip_iset, op_iset)
-                if len(self._ip_inds[key]) > 0:
-                    ip_petsc = self._ip_vec._root_vector._petsc[ip_iset]
-                    op_petsc = self._op_vec._root_vector._petsc[op_iset]
-                    self._transfers[key].scatter(ip_petsc, op_petsc,
+            for in_iset, out_iset in self._in_inds:
+                key = (in_iset, out_iset)
+                if len(self._in_inds[key]) > 0:
+                    in_petsc = self._in_vec._root_vector._petsc[in_iset]
+                    out_petsc = self._out_vec._root_vector._petsc[out_iset]
+                    self._transfers[key].scatter(in_petsc, out_petsc,
                                                  addv=True, mode=True)
 
 

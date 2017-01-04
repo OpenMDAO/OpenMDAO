@@ -410,38 +410,38 @@ class Transfer(object):
 
     Attributes
     ----------
-    _ip_vec : Vector
+    _in_vec : Vector
         pointer to the input vector.
-    _op_vec : Vector
+    _out_vec : Vector
         pointer to the output vector.
-    _ip_inds : int ndarray
+    _in_inds : int ndarray
         input indices for the transfer.
-    _op_inds : int ndarray
+    _out_inds : int ndarray
         output indices for the transfer.
     _comm : MPI.Comm or FakeComm
         communicator of the system that owns this transfer.
     """
 
-    def __init__(self, ip_vec, op_vec, ip_inds, op_inds, comm):
+    def __init__(self, in_vec, out_vec, in_inds, out_inds, comm):
         """Initialize all attributes.
 
         Args
         ----
-        ip_vec : <Vector>
+        in_vec : <Vector>
             pointer to the input vector.
-        op_vec : <Vector>
+        out_vec : <Vector>
             pointer to the output vector.
-        ip_inds : int ndarray
+        in_inds : int ndarray
             input indices for the transfer.
-        op_inds : int ndarray
+        out_inds : int ndarray
             output indices for the transfer.
         comm : MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
         """
-        self._ip_vec = ip_vec
-        self._op_vec = op_vec
-        self._ip_inds = ip_inds
-        self._op_inds = op_inds
+        self._in_vec = in_vec
+        self._out_vec = out_vec
+        self._in_inds = in_inds
+        self._out_inds = out_inds
         self._comm = comm
 
         self._initialize_transfer()
@@ -453,16 +453,16 @@ class Transfer(object):
         """
         pass
 
-    def __call__(self, ip_vec, op_vec, mode='fwd'):
+    def __call__(self, in_vec, out_vec, mode='fwd'):
         """Perform transfer.
 
         Must be implemented by the subclass.
 
         Args
         ----
-        ip_vec : <Vector>
+        in_vec : <Vector>
             pointer to the input vector.
-        op_vec : <Vector>
+        out_vec : <Vector>
             pointer to the output vector.
         mode : str
             'fwd' or 'rev'.

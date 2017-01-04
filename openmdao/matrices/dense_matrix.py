@@ -20,8 +20,8 @@ class DenseMatrix(Matrix):
             number of cols in the matrix.
         """
         matrix = numpy.zeros((num_rows, num_cols))
-        submat_meta_iter = ((self._op_submats, self._op_metadata),
-                            (self._ip_submats, self._ip_metadata))
+        submat_meta_iter = ((self._out_submats, self._out_metadata),
+                            (self._in_submats, self._in_metadata))
 
         for submats, metadata in submat_meta_iter:
             for key in submats:
@@ -78,7 +78,7 @@ class DenseMatrix(Matrix):
         Args
         ----
         submats : dict
-            dictionary of sub-jacobian data keyed by (op_ind, ip_ind).
+            dictionary of sub-jacobian data keyed by (out_ind, in_ind).
         metadata : dict
             implementation-specific data for the sub-jacobians.
         key : (int, int)
