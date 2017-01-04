@@ -70,7 +70,7 @@ class System(object):
         _var_connections with variable indices instead of names.  Entries
         have the form (input_index, output_index).
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
-        dict of vector objects.
+        dict of vector objects. These are the derivatives vectors.
     _vector_transfers : dict
         dict of transfer objects.
     _vector_var_ids : dict
