@@ -69,6 +69,7 @@ install:
     pip install mpi4py;
     pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
   fi
+- pip install redbaron
 - pip install git+https://github.com/OpenMDAO/testflo.git
 - pip install -e .
 

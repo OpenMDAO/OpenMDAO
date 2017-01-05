@@ -54,11 +54,13 @@ clean:
 	IF EXIST srcdocs rmdir /s /q srcdocs
 
 html:
+	python ../devtools/create_feature_docs_unit_test_db.py
   rd /s /q $(BUILDDIR)/*
 	rd /s /q srcdocs/usr
 	rd /s /q srcdocs/dev
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "usr"
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "dev"
+	rm feature_docs_unit_test_db.sqlite
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)\html."
 

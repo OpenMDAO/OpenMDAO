@@ -1,5 +1,7 @@
 To build docs, one must have the following installed in local env:
   *Sphinx (pip install sphinx)
   *mock (pip install mock)
+  *redbaron (pip install redbaron)
+  
 Then, from the blue/openmdao/docs level, type 'make html'
 Point a browser to blue/openmdao/docs/_build/html/index.html to view docs.
