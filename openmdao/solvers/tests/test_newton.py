@@ -182,7 +182,7 @@ class TestNewton(unittest.TestCase):
         ## Make sure we aren't iterating like crazy
         self.assertLess(prob.root.nl_solver._iter_count, 8)
         self.assertEqual(prob.root.ln_solver._iter_count, 0)
-        self.assertGreater(prob.root.nl_solveroptions['subsolvers']['linear']._iter_count, 0)
+        self.assertGreater(prob.root.nl_solver.options['subsolvers']['linear']._iter_count, 0)
 
     def test_implicit_utol(self):
         # We are setup for reach utol termination condition quite quickly.
