@@ -81,7 +81,7 @@ class TestNewton(unittest.TestCase):
         prob.root.nl_solver = NewtonSolver()
 
         prob.setup(check=False)
-        #prob.root.suppress_solver_output = True
+        prob.root.suppress_solver_output = True
         prob.run()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -236,7 +236,7 @@ class TestNewton(unittest.TestCase):
         prob.setup(check=False)
         prob['comp.z'] = -4.93191510182
 
-        #prob.root.suppress_solver_output = True
+        prob.root.suppress_solver_output = True
         prob.run()
 
         assert_rel_error(self, prob['comp.z'], -4.93191510182, .00001)
