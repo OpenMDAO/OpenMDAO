@@ -456,25 +456,25 @@ class System(object):
         compute_transfers = self._assembler._compute_transfers
         xfer_indices = compute_transfers(nsub_allprocs, var_range,
                                          subsystems_myproc, subsystems_inds)
-        (xfer_ip_inds, xfer_op_inds,
-         fwd_xfer_ip_inds, fwd_xfer_op_inds,
-         rev_xfer_ip_inds, rev_xfer_op_inds) = xfer_indices
+        (xfer_in_inds, xfer_out_inds,
+         fwd_xfer_in_inds, fwd_xfer_out_inds,
+         rev_xfer_in_inds, rev_xfer_out_inds) = xfer_indices
 
         # Create Transfer objects from the raw indices
         transfers = {}
         transfers[None] = transfer_class(vectors['input'], vectors['output'],
-                                         xfer_ip_inds, xfer_op_inds, self.comm)
-        for isub in range(len(fwd_xfer_ip_inds)):
+                                         xfer_in_inds, xfer_out_inds, self.comm)
+        for isub in range(len(fwd_xfer_in_inds)):
             transfers['fwd', isub] = transfer_class(vectors['input'],
                                                     vectors['output'],
-                                                    fwd_xfer_ip_inds[isub],
-                                                    fwd_xfer_op_inds[isub],
+                                                    fwd_xfer_in_inds[isub],
+                                                    fwd_xfer_out_inds[isub],
                                                     self.comm)
-        for isub in range(len(rev_xfer_ip_inds)):
+        for isub in range(len(rev_xfer_in_inds)):
             transfers['rev', isub] = transfer_class(vectors['input'],
                                                     vectors['output'],
-                                                    rev_xfer_ip_inds[isub],
-                                                    rev_xfer_op_inds[isub],
+                                                    rev_xfer_in_inds[isub],
+                                                    rev_xfer_out_inds[isub],
                                                     self.comm)
         return transfers
 
@@ -575,29 +575,29 @@ class System(object):
                 d_outputs.set_const(0.0)
 
         # TODO: check if we can loop over myproc vars to save time
-        op_names = []
+        out_names = []
         res_names = []
-        op_ind = self._var_allprocs_range['output'][0]
-        for op_name in self._var_allprocs_names['output']:
-            if op_ind in self._vector_var_ids[vec_name]:
-                res_names.append(op_name)
-                if var_inds is None or (var_inds[0] <= op_ind < var_inds[1] or
-                                        var_inds[2] <= op_ind < var_inds[3]):
-                    op_names.append(op_name)
-            op_ind += 1
+        out_ind = self._var_allprocs_range['output'][0]
+        for out_name in self._var_allprocs_names['output']:
+            if out_ind in self._vector_var_ids[vec_name]:
+                res_names.append(out_name)
+                if var_inds is None or (var_inds[0] <= out_ind < var_inds[1] or
+                                        var_inds[2] <= out_ind < var_inds[3]):
+                    out_names.append(out_name)
+            out_ind += 1
 
-        ip_names = []
-        ip_ind = self._var_allprocs_range['input'][0]
-        for ip_name in self._var_allprocs_names['input']:
-            op_ind = self._assembler._input_src_ids[ip_ind]
-            if op_ind in self._vector_var_ids[vec_name]:
-                if var_inds is None or (var_inds[0] <= op_ind < var_inds[1] or
-                                        var_inds[2] <= op_ind < var_inds[3]):
-                    ip_names.append(ip_name)
-            ip_ind += 1
+        in_names = []
+        in_ind = self._var_allprocs_range['input'][0]
+        for in_name in self._var_allprocs_names['input']:
+            out_ind = self._assembler._input_src_ids[in_ind]
+            if out_ind in self._vector_var_ids[vec_name]:
+                if var_inds is None or (var_inds[0] <= out_ind < var_inds[1] or
+                                        var_inds[2] <= out_ind < var_inds[3]):
+                    in_names.append(in_name)
+            in_ind += 1
 
-        d_inputs._names = set(ip_names)
-        d_outputs._names = set(op_names)
+        d_inputs._names = set(in_names)
+        d_outputs._names = set(out_names)
         d_residuals._names = set(res_names)
 
         yield d_inputs, d_outputs, d_residuals

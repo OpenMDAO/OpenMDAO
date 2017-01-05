@@ -100,26 +100,26 @@ class Group(System):
 
         return subsys
 
-    def connect(self, op_name, ip_name, src_indices=None):
-        """Connect output op_name to input ip_name in this namespace.
+    def connect(self, out_name, in_name, src_indices=None):
+        """Connect output out_name to input in_name in this namespace.
 
         Args
         ----
-        op_name : str
+        out_name : str
             name of the output (source) variable to connect
-        ip_name : str
+        in_name : str
             name of the input (target) variable to connect
         src_indices : collection of int, optional
             When an input variable connects to some subset of an array output
             variable, you can specify which indices of the source to be
             transferred to the input here.
         """
-        if ip_name in self._var_connections:
-            srcname = self._var_connections[ip_name][0]
+        if in_name in self._var_connections:
+            srcname = self._var_connections[in_name][0]
             raise RuntimeError("Input '%s' is already connected to '%s'" %
-                               (ip_name, srcname))
+                               (in_name, srcname))
 
-        self._var_connections[ip_name] = (op_name, src_indices)
+        self._var_connections[in_name] = (out_name, src_indices)
 
     def _setup_connections(self):
         """Recursively assemble a list of input-output connections.
@@ -146,31 +146,31 @@ class Group(System):
         allprocs_out_names = self._var_allprocs_names['output']
         input_meta = self._var_myproc_metadata['input']
 
-        ip_offset = self._var_allprocs_range['input'][0]
-        op_offset = self._var_allprocs_range['output'][0]
+        in_offset = self._var_allprocs_range['input'][0]
+        out_offset = self._var_allprocs_range['output'][0]
 
         # Loop through user-defined connections
-        for ip_name, (op_name, src_indices) \
+        for in_name, (out_name, src_indices) \
                 in iteritems(self._var_connections):
 
-            for ip_index, name in enumerate(allprocs_in_names):
-                if name == ip_name:
+            for in_index, name in enumerate(allprocs_in_names):
+                if name == in_name:
                     try:
-                        op_index = allprocs_out_names.index(op_name)
+                        out_index = allprocs_out_names.index(out_name)
                     except ValueError:
                         continue
                     else:
-                        pairs.append((ip_index + ip_offset,
-                                      op_index + op_offset))
+                        pairs.append((in_index + in_offset,
+                                      out_index + out_offset))
 
                     if src_indices is not None:
                         # set the 'indices' metadata in the input variable
                         try:
-                            ip_myproc_index = myproc_in_names.index(ip_name)
+                            in_myproc_index = myproc_in_names.index(in_name)
                         except ValueError:
                             pass
                         else:
-                            meta = input_meta[ip_myproc_index]
+                            meta = input_meta[in_myproc_index]
                             meta['indices'] = numpy.array(src_indices,
                                                           dtype=int)
 

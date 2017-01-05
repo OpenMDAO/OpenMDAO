@@ -70,7 +70,7 @@ class TestGroupFlat(Group):
                 for icomp2 in range(num_comp):
                     if icomp != icomp2:
                         for ivar in range(num_var):
-                            ip_name = 'comp_%i.input_%i' % (icomp, index)
-                            op_name = 'comp_%i.output_%i' % (icomp2, ivar)
-                            self.connect(op_name, ip_name)
+                            in_name = 'comp_%i.input_%i' % (icomp, index)
+                            out_name = 'comp_%i.output_%i' % (icomp2, ivar)
+                            self.connect(out_name, in_name)
                             index += 1
