@@ -81,7 +81,7 @@ class TestNewton(unittest.TestCase):
         prob.root.nl_solver = NewtonSolver()
 
         prob.setup(check=False)
-        prob.root.suppress_solver_output = True
+        #prob.root.suppress_solver_output = True
         prob.run()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -154,6 +154,35 @@ class TestNewton(unittest.TestCase):
 
         ## Make sure we aren't iterating like crazy
         self.assertLess(prob.root.nl_solver._iter_count, 6)
+
+    def test_sellar_specify_linear_solver(self):
+
+        raise unittest.SkipTest("BUG: cannot specify subsolver")
+
+        prob = Problem()
+        prob.root = SellarStateConnection()
+        prob.root.nl_solver = NewtonSolver()
+
+        # Use bad settings for this one so that problem doesn't converge.
+        # That way, we test that we are really using Newton's Lin Solver
+        # instead.
+        prob.root.ln_solver = ScipyIterativeSolver()
+        prob.root.ln_solver.options['maxiter'] = 1
+
+        # The good solver
+        prob.root.nl_solver.options['subsolvers']['linear'] = ScipyIterativeSolver()
+
+        prob.root.suppress_solver_output = True
+        prob.setup(check=False)
+        prob.run()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+
+        ## Make sure we aren't iterating like crazy
+        self.assertLess(prob.root.nl_solver._iter_count, 8)
+        self.assertEqual(prob.root.ln_solver._iter_count, 0)
+        self.assertGreater(prob.root.nl_solveroptions['subsolvers']['linear']._iter_count, 0)
 
     def test_implicit_utol(self):
         # We are setup for reach utol termination condition quite quickly.

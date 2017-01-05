@@ -1,4 +1,5 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
+
 from __future__ import division, print_function
 import numpy
 
