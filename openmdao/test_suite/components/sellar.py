@@ -159,6 +159,7 @@ class SellarDerivatives(Group):
         self.nl_solver = NonlinearBlockGS()
         self.ln_solver = ScipyIterativeSolver()
 
+
 class SellarDerivativesGrouped(Group):
     """ Group containing the Sellar MDA. This version uses the disciplines
     without derivatives."""
