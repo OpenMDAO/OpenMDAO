@@ -444,7 +444,8 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'numpydoc',
-    'showUnitTestExamples'
+    'showUnitTestExamples',
+    'embedPythonCode'
 ]
 
 numpydoc_show_class_members = False

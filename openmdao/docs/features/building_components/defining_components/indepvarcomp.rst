@@ -51,3 +51,6 @@ Define one independent array variable.
 
 .. showunittestexamples::
     indepvarcomp
+
+.. embedPythonCode::
+    openmdao.tests.general_problem.GeneralComp
