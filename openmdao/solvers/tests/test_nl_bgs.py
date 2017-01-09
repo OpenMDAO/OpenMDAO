@@ -15,6 +15,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, \
 class TestNLBGaussSeidel(unittest.TestCase):
 
     def test_sellar(self):
+        # Basic sellar test.
 
         prob = Problem()
         prob.root = SellarDerivatives()
@@ -39,6 +40,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
             #self.assertEqual(2*nd1, nd2)
 
     def test_sellar_analysis_error(self):
+        # Tests Sellar behavior when AnalysisError is raised.
 
         raise unittest.SkipTest("AnalysisError not implemented yet")
 
@@ -59,6 +61,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
             self.fail("expected AnalysisError")
 
     def test_sellar_group_nested(self):
+        # This tests true nested gs. Subsolvers solve each Sellar system. Top
+        # solver couples them together through variable x.
 
         # This version has the indepvarcomps removed so we can connect them together.
         class SellarModified(Group):
