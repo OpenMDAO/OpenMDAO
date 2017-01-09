@@ -1,8 +1,6 @@
 from docutils import nodes
-from docutils.parsers.rst import directives
 from sphinx.util.compat import Directive
-from subprocess import call
-import os
+
 from openmdao.docs.utils.get_source_code_of_class_or_method import get_source_code_of_class_or_method
 
 

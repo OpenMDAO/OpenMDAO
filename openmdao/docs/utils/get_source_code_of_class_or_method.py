@@ -5,13 +5,13 @@ The docstrings are stripped from the code
 import importlib
 import inspect
 
-from openmdao.devtools.create_feature_docs_unit_test_db import remove_docstrings
+from openmdao.docs.utils.docutil import remove_docstrings
+
+# pylint: disable=C0103
 
 def get_source_code_of_class_or_method(class_or_method_path):
     '''The function to be called a the custom Sphinx directive code
     that includes the source code of a class or method.
-
-    
     '''
 
     # the class_or_method_path could be either to a class or method
