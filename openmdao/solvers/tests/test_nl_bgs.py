@@ -9,7 +9,7 @@ from openmdao.api import Problem, NonlinearBlockGS, Group, ScipyIterativeSolver
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
-     SellarDerivativesGrouped
+     SellarDis1withDerivatives, SellarDis2withDerivatives
 
 
 class TestNLBGaussSeidel(unittest.TestCase):
@@ -58,33 +58,41 @@ class TestNLBGaussSeidel(unittest.TestCase):
         else:
             self.fail("expected AnalysisError")
 
-    def test_sellar_group_nesting_nlbgs(self):
+    def test_sellar_group_nested(self):
+
+        # This version has the indepvarcomps removed so we can connect them together.
+        class SellarModified(Group):
+            """ Group containing the Sellar MDA. This version uses the disciplines
+            with derivatives."""
+
+            def __init__(self):
+                super(SellarModified, self).__init__()
+
+                self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+                self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+                self.nl_solver = NonlinearBlockGS()
+                self.ln_solver = ScipyIterativeSolver()
 
         prob = Problem()
-        prob.root = SellarDerivativesGrouped()
-        prob.root.nl_solver = NonlinearBlockGS()
-        mda = prob.root.get_system('mda')
-        mda.nl_solver = NonlinearBlockGS()
+        root = prob.root = Group()
+        root.nl_solver = NonlinearBlockGS()
+        root.nl_solver.options['maxiter'] = 20
+        root.add_subsystem('g1', SellarModified())
+        root.add_subsystem('g2', SellarModified())
 
-        # So, inner solver converges loosely.
-        mda.nl_solver.options['atol'] = 1e-3
-
-        # And outer solver tightens it up.
-        prob.root.nl_solver.options['atol'] = 1e-9
+        root.connect('g1.y2', 'g2.x')
+        root.connect('g2.y2', 'g1.x')
 
         prob.setup(check=False)
-        prob.root.suppress_solver_output = False
+        prob.root.suppress_solver_output = True
 
         prob.run()
-        #old_stdout = sys.stdout
-        #sys.stdout = cStringIO() # so we don't see the iprint output during testing
-        #try:
-            #prob.run()
-        #finally:
-            #sys.stdout = old_stdout
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_run_apply(self):
         # This test makes sure that we correctly apply the "run_apply" flag

@@ -771,7 +771,7 @@ class System(object):
         """
         # TODO: Addition of name here is a hack until self.pathname can be
         # determined in real time during construction.
-        if name == self.pathname or name==self.name:
+        if name == self.pathname or name == self.name:
             # If this system's name matches, target found
             return self
         else:
