@@ -51,3 +51,15 @@ Define one independent array variable.
 
 .. showunittestexamples::
     indepvarcomp
+
+Here's an example of embedding code, in the form of the TestIndepVarComp class:
+
+.. embedPythonCode::
+    openmdao.core.tests.test_component.TestIndepVarComp
+
+
+Here's an example of embedding code, in the form of the `test___init___1var` method:
+
+.. embedPythonCode::
+    openmdao.core.tests.test_component.TestIndepVarComp.test___init___1var
+    
