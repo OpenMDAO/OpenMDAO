@@ -769,11 +769,13 @@ class System(object):
         System or None
             System if found on this proc else None.
         """
-        if name == self.pathname:
+        # TODO: Addition of name here is a hack until self.pathname can be
+        # determined in real time during construction.
+        if name == self.pathname or name == self.name:
             # If this system's name matches, target found
             return self
         else:
-            for subsys in self._subsystems_myproc:
+            for subsys in self._subsystems_allprocs:
                 result = subsys.get_system(name)
                 if result is not None:
                     return result
