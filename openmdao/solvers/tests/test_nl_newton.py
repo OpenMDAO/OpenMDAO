@@ -30,7 +30,7 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
-        ## Make sure we aren't iterating like crazy
+        # Make sure we aren't iterating like crazy
         self.assertLess(prob.root.nl_solver._iter_count, 8)
 
     def test_sellar(self):
@@ -87,7 +87,7 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
-        ## Make sure we aren't iterating like crazy
+        # Make sure we aren't iterating like crazy
         self.assertLess(prob.root.nl_solver._iter_count, 8)
 
         ## Make sure we only call apply_linear on 'heads'
