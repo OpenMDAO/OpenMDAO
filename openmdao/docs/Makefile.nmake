@@ -55,7 +55,7 @@ clean:
 
 html:
 	python ../devtools/create_feature_docs_unit_test_db.py
-  rd /s /q $(BUILDDIR)/*
+  rd /s /q $(BUILDDIR)
 	rd /s /q srcdocs/usr
 	rd /s /q srcdocs/dev
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "usr"
