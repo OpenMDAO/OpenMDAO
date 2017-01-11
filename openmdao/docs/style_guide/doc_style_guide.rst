@@ -136,8 +136,11 @@ Detailed docstring rules:
 
 
 
-Feature Docs, Custom Directives and Including Tests in Documentation
---------------------------------------------------------------------
+Feature Docs and their Custom Directives for Including Code in Documentation
+----------------------------------------------------------------------------
+
+showUnitTestExamples
+++++++++++++++++++++
 
       `showUnitTestExamplesDirective` is an OpenMDAO custom Sphinx directive that allows unit
       test examples to be directly incorporated into a feature document.
@@ -182,3 +185,45 @@ Feature Docs, Custom Directives and Including Tests in Documentation
         Features
         --------
         indepvarcomp
+
+
+embedPythonCode
++++++++++++++++
+
+        `embedPythonCode` is a custom directive that lets a developer drop a class or a
+        class method directly into a feature doc by including that class or method's
+        full, dotted python path.  The syntax for invoking the directive looks like this:
+
+        ::
+
+            .. embedPythonCode::
+              openmdao.tests.general_problem.GeneralComp
+
+
+        What the above will do is replace the directive and its arg with the class
+        definition for `openmdao.tests.general_problem.GeneralComp`:
+
+        ::
+
+            class GeneralComp(ExplicitComponent):
+
+              def initialize_variables(self):
+                  kwargs = self.metadata
+                  icomp = kwargs['icomp']
+                  ncomp = kwargs['ncomp']
+                  use_var_sets = kwargs['use_var_sets']
+
+                  for ind in range(ncomp):
+                      if use_var_sets:
+                          var_set = ind
+                      else:
+                          var_set = 0
+
+                      if ind is not icomp:
+                          self.add_input('v%i' % ind)
+                      else:
+                          self.add_output('v%i' % ind, var_set=var_set)
+
+
+        This has the benefit of allowing you to drop entire code blocks into
+        a feature doc that illustrate a usage example.
