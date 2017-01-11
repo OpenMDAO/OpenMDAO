@@ -5,7 +5,7 @@ A collection of functions for modifying the source code
 import re
 import tokenize
 
-from io import StringIO
+from six import StringIO
 from redbaron import RedBaron
 
 
@@ -13,7 +13,7 @@ def remove_docstrings(source):
     """
     Returns 'source' minus docstrings.
     """
-    io_obj = StringIO(source.decode('utf-8'))
+    io_obj = StringIO(source)
     out = ""
     prev_toktype = tokenize.INDENT
     last_lineno = -1
