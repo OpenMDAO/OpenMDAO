@@ -75,3 +75,6 @@ install:
 
 script:
 - testflo . -n 1
+#after tests, need to cd down so that conf.py can be found for doc build
+- cd openmdao/docs
+- make html
