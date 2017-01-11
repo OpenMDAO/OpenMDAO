@@ -50,7 +50,7 @@ before_install:
 - export OPENMDAO_TEST_DOCS=1
 
 install:
-- conda install --yes python=$PY numpy scipy nose sphinx==1.3.1 mock swig
+- conda install --yes python=$PY numpy scipy nose sphinx==1.5 mock swig
 - if [ "$OS" = "Linux" ]; then
     if [ "$PY" = "2.7" ]; then
         pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
