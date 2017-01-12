@@ -2,8 +2,6 @@ from __future__ import division
 import numpy
 import unittest
 
-# from openmdao.tests.general_problem import GeneralProblem
-
 from .general_problem import GeneralProblem
 
 class Test(unittest.TestCase):
