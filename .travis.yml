@@ -13,6 +13,8 @@ language: generic
 env:
 - PY=2.7 MPI=1
 - PY=3.4 MPI=1
+- PY=2.7 MPI=
+- PY=3.4 MPI=
 
 
 addons:
@@ -67,6 +69,7 @@ install:
     pip install mpi4py;
     pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
   fi
+- pip install redbaron
 - pip install git+https://github.com/OpenMDAO/testflo.git
 - pip install -e .
 

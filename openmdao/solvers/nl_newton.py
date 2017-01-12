@@ -1,9 +1,13 @@
 """Define the NewtonSolver class."""
+
 from openmdao.solvers.solver import NonlinearSolver
 
 
 class NewtonSolver(NonlinearSolver):
-    """Newton solver."""
+    """Newton solver.
+
+    The default linear solver is the ln_solver in the containing system.
+    """
 
     SOLVER = 'NL: Newton'
 

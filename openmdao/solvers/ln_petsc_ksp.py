@@ -2,8 +2,11 @@
 
 from __future__ import division, print_function
 
-import petsc4py
-from petsc4py import PETSc
+try:
+    import petsc4py
+    from petsc4py import PETSc
+except ImportError:
+    PETSc = None
 
 from openmdao.solvers.solver import LinearSolver
 
@@ -62,13 +65,14 @@ def _get_petsc_vec_array_old(vec):
     return vec.getArray()
 
 
-try:
-    petsc_version = petsc4py.__version__
-except AttributeError:  # hack to fix doc-tests
-    petsc_version = "3.5"
+if PETSc:
+    try:
+        petsc_version = petsc4py.__version__
+    except AttributeError:  # hack to fix doc-tests
+        petsc_version = "3.5"
 
 
-if int((petsc_version).split('.')[1]) >= 6:
+if PETSc and int((petsc_version).split('.')[1]) >= 6:
     _get_petsc_vec_array = _get_petsc_vec_array_new
 else:
     _get_petsc_vec_array = _get_petsc_vec_array_old
@@ -149,6 +153,9 @@ class PetscKSP(LinearSolver):
         kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
+        if PETSc is None:
+            raise RuntimeError("PETSc is not available.")
+
         super(PetscKSP, self).__init__(**kwargs)
 
         self._print_name = 'KSP'
@@ -200,7 +207,7 @@ class PetscKSP(LinearSolver):
         x_vec.set_data(_get_petsc_vec_array(in_vec))
 
         # apply linear
-        ind1, ind2 = system._variable_allprocs_range['output']
+        ind1, ind2 = system._var_allprocs_range['output']
         var_inds = [ind1, ind2, ind1, ind2]
         system._apply_linear([vec_name], self._mode, var_inds)
 
@@ -322,8 +329,8 @@ class PetscKSP(LinearSolver):
 
         rank = system.comm.rank + system._mpi_proc_range[0]
 
-        lsizes = system._sys_assembler._variable_sizes_all['output'][rank]
-        sizes = sum(system._sys_assembler._variable_sizes_all['output'])
+        lsizes = system._assembler._variable_sizes_all['output'][rank]
+        sizes = sum(system._assembler._variable_sizes_all['output'])
 
         lsize = sum(lsizes)
         size = sum(sizes)

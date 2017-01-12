@@ -49,16 +49,5 @@ Define one independent array variable.
 
     self.assertEqualArrays(prob['indep_var'], array)
 
-Define two independent variables at once.
-
-::
-
-    comp = IndepVarComp((
-        ('indep_var_1', 1.0),
-        ('indep_var_2', 2.0),
-    ))
-
-    prob = Problem(comp).setup()
-
-    self.assertEqual(prob['indep_var_1'], 1.0)
-    self.assertEqual(prob['indep_var_2'], 2.0)
+.. showunittestexamples::
+    indepvarcomp

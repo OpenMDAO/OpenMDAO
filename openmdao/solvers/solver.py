@@ -1,8 +1,9 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
+
 from __future__ import division, print_function
 import numpy
 
-from openmdao.utils.generalized_dict import GeneralizedDictionary
+from openmdao.utils.generalized_dict import OptionsDictionary
 
 
 class Solver(object):
@@ -23,7 +24,7 @@ class Solver(object):
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
         number of iterations for the current invocation of the solver.
-    options : <GeneralizedDictionary>
+    options : <OptionsDictionary>
         options dictionary.
     """
 
@@ -43,17 +44,18 @@ class Solver(object):
         self._mode = 'fwd'
         self._iter_count = 0
 
-        self.options = GeneralizedDictionary(kwargs)
-        self.options.declare('maxiter', typ=int, value=10,
+        self.options = OptionsDictionary()
+        self.options.declare('maxiter', type_=int, value=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', value=1e-10,
                              desc='absolute error tolerance')
         self.options.declare('rtol', value=1e-10,
                              desc='relative error tolerance')
-        self.options.declare('iprint', typ=int, value=1,
+        self.options.declare('iprint', type_=int, value=1,
                              desc='whether to print output')
-        self.options.declare('subsolvers', typ=dict, value={},
+        self.options.declare('subsolvers', type_=dict, value={},
                              desc='dictionary of solvers called by this one')
+        self.options.update(kwargs)
 
     def _setup_solvers(self, system, depth):
         """Assign system instance, set depth, and optionally perform setup.
@@ -97,9 +99,13 @@ class Solver(object):
             if len(solver_name) > name_len:
                 solver_name = solver_name[:name_len]
             else:
-                solver_name = solver_name + ' ' * (name_len - len(solver_name))
+                solver_name = solver_name.ljust(name_len)
 
-            print_str = ' ' * self._system._sys_depth + '-' * self._depth
+            depth = self._system.pathname.count('.')
+            if self._system.pathname != '':
+                depth += 1
+
+            print_str = ' ' * depth + '-' * self._depth
             print_str += sys_name + solver_name
             print_str += ' %3d | %.9g %.9g' % (iteration, res, res0)
             print(print_str)
@@ -313,10 +319,10 @@ class LinearSolver(Solver):
         """
         system = self._system
         var_inds = [
-            system._variable_allprocs_range['output'][0],
-            system._variable_allprocs_range['output'][1],
-            system._variable_allprocs_range['output'][0],
-            system._variable_allprocs_range['output'][1],
+            system._var_allprocs_range['output'][0],
+            system._var_allprocs_range['output'][1],
+            system._var_allprocs_range['output'][0],
+            system._var_allprocs_range['output'][1],
         ]
         system._apply_linear(self._vec_names, self._mode, var_inds)
 

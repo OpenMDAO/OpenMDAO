@@ -6,7 +6,10 @@ import unittest
 
 from openmdao.core.problem import Problem
 
-from openmdao.vectors.petsc_vector import PETScVector
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 from openmdao.test_suite.groups.parallel_groups import \
     FanOutGrouped, FanInGrouped, Diamond, ConvergeDiverge
@@ -18,10 +21,15 @@ class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2
 
+    def setUp(self):
+        if PETScVector is None:
+            raise unittest.SkipTest("PETSc is required.")
+
     def test_fan_out_grouped(self):
 
         prob = Problem(FanOutGrouped())
-        prob.setup(VectorClass=PETScVector)
+        prob.setup(vector_class=PETScVector, check=False)
+        prob.root.suppress_solver_output = True
         prob.run()
 
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
@@ -31,7 +39,8 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.root = FanInGrouped()
-        prob.setup(VectorClass=PETScVector)
+        prob.setup(vector_class=PETScVector, check=False)
+        prob.root.suppress_solver_output = True
         prob.run()
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
@@ -40,7 +49,8 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.root = Diamond()
-        prob.setup(VectorClass=PETScVector)
+        prob.setup(vector_class=PETScVector, check=False)
+        prob.root.suppress_solver_output = True
         prob.run()
 
         assert_rel_error(self, prob['c4.y1'], 46.0, 1e-6)
@@ -50,7 +60,8 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.root = ConvergeDiverge()
-        prob.setup(VectorClass=PETScVector)
+        prob.setup(vector_class=PETScVector, check=False)
+        prob.root.suppress_solver_output = True
         prob.run()
 
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)

@@ -5,6 +5,7 @@ import sys
 
 from openmdao.assemblers.default_assembler import DefaultAssembler
 from openmdao.vectors.default_vector import DefaultVector
+from openmdao.error_checking.check_config import check_config
 
 
 class FakeComm(object):
@@ -39,7 +40,7 @@ class Problem(object):
         if True, allocate vectors to store ref. values.
     """
 
-    def __init__(self, root=None, comm=None, AssemblerClass=None,
+    def __init__(self, root=None, comm=None, assembler_class=None,
                  use_ref_vector=True):
         """Initialize attributes.
 
@@ -49,7 +50,7 @@ class Problem(object):
             pointer to the top-level <System> object (root node in the tree).
         comm : MPI.Comm or <FakeComm> or None
             the global communicator; the same as that of assembler and root.
-        AssemblerClass : <Assembler> or None
+        assembler_class : <Assembler> or None
             pointer to the global <Assembler> object.
         use_ref_vector : bool
             if True, allocate vectors to store ref. values.
@@ -60,12 +61,12 @@ class Problem(object):
                 comm = MPI.COMM_WORLD
             except ImportError:
                 comm = FakeComm()
-        if AssemblerClass is None:
-            AssemblerClass = DefaultAssembler
+        if assembler_class is None:
+            assembler_class = DefaultAssembler
 
         self.root = root
         self.comm = comm
-        self._assembler = AssemblerClass(comm)
+        self._assembler = assembler_class(comm)
         self._use_ref_vector = use_ref_vector
 
     # TODO: getitem/setitem need to properly handle scaling/units
@@ -84,11 +85,11 @@ class Problem(object):
         """
         try:
             self.root._outputs[name]
-            ind = self.root._variable_myproc_names['output'].index(name)
+            ind = self.root._var_myproc_names['output'].index(name)
             c0, c1 = self.root._scaling_to_phys['output'][ind, :]
             return c0 + c1 * self.root._outputs[name]
         except KeyError:
-            ind = self.root._variable_myproc_names['input'].index(name)
+            ind = self.root._var_myproc_names['input'].index(name)
             c0, c1 = self.root._scaling_to_phys['input'][ind, :]
             return c0 + c1 * self.root._inputs[name]
 
@@ -104,11 +105,11 @@ class Problem(object):
         """
         try:
             self.root._outputs[name]
-            ind = self.root._variable_myproc_names['output'].index(name)
+            ind = self.root._var_myproc_names['output'].index(name)
             c0, c1 = self.root._scaling_to_norm['output'][ind, :]
             self.root._outputs[name] = c0 + c1 * value
         except KeyError:
-            ind = self.root._variable_myproc_names['input'].index(name)
+            ind = self.root._var_myproc_names['input'].index(name)
             c0, c1 = self.root._scaling_to_norm['input'][ind, :]
             self.root._inputs[name] = c0 + c1 * value
 
@@ -127,17 +128,17 @@ class Problem(object):
         """
         return self.root._solve_nonlinear()
 
-    def setup(self, VectorClass=None, check=False, out_stream=sys.stdout):
+    def setup(self, vector_class=DefaultVector, check=True, logger=None):
         """Set up everything (root, assembler, vector, solvers, drivers).
 
         Args
         ----
-        VectorClass : type
+        vector_class : type (DefaultVector)
             reference to an actual <Vector> class; not an instance.
-        check : boolean
+        check : boolean (True)
             whether to run error check after setup is complete.
-        out_stream : file
-            Output stream where report will be written if check is performed.
+        logger : object
+            Object for logging config checks if check is True.
 
         Returns
         -------
@@ -148,53 +149,51 @@ class Problem(object):
         comm = self.comm
         assembler = self._assembler
 
-        if VectorClass is None:
-            VectorClass = DefaultVector
-
         # Recursive system setup
-        root._setup_processors('', comm, {}, 0, assembler, [0, comm.size])
+        root._setup_processors('', comm, {}, assembler, [0, comm.size])
         root._setup_variables()
         root._setup_variable_indices({'input': 0, 'output': 0})
         root._setup_connections()
 
         # Assembler setup: variable metadata and indices
-        nvars = {typ: len(root._variable_allprocs_names[typ])
+        nvars = {typ: len(root._var_allprocs_names[typ])
                  for typ in ['input', 'output']}
-        assembler._setup_variables(nvars, root._variable_myproc_metadata,
-                                   root._variable_myproc_indices)
+        assembler._setup_variables(nvars, root._var_myproc_metadata,
+                                   root._var_myproc_indices)
 
         # Assembler setup: variable connections
-        assembler._setup_connections(root._variable_connections_indices,
-                                     root._variable_allprocs_names)
+        assembler._setup_connections(root._var_connections_indices,
+                                     root._var_allprocs_names)
 
         # Assembler setup: global transfer indices vector
-        assembler._setup_src_indices(root._variable_myproc_metadata['input'],
-                                     root._variable_myproc_indices['input'])
+        assembler._setup_src_indices(root._var_myproc_metadata['input'],
+                                     root._var_myproc_indices['input'])
 
         # Assembler setup: compute data required for units/scaling
-        assembler._setup_src_data(root._variable_myproc_metadata['output'],
-                                  root._variable_myproc_indices['output'])
+        assembler._setup_src_data(root._var_myproc_metadata['output'],
+                                  root._var_myproc_indices['output'])
 
         root._setup_scaling()
 
         # Vector setup for the basic execution vector
-        self.setup_vector('nonlinear', VectorClass, self._use_ref_vector)
+        self.setup_vector('nonlinear', vector_class, self._use_ref_vector)
 
         # Vector setup for the linear vector
-        self.setup_vector('linear', VectorClass, self._use_ref_vector)
+        self.setup_vector('linear', vector_class, self._use_ref_vector)
 
-        # Vector setup for the
+        if check:
+            check_config(self, logger)
 
         return self
 
-    def setup_vector(self, vec_name, VectorClass, use_ref_vector):
+    def setup_vector(self, vec_name, vector_class, use_ref_vector):
         """Set up the 'vec_name' <Vector>.
 
         Args
         ----
         vec_name : str
             name of the vector.
-        VectorClass : type
+        vector_class : type
             reference to the actual <Vector> class.
         use_ref_vector : bool
             if True, allocate vectors to store ref. values.
@@ -209,10 +208,10 @@ class Problem(object):
             else:
                 typ = key
 
-            vectors[key] = VectorClass(vec_name, typ, self.root)
+            vectors[key] = vector_class(vec_name, typ, self.root)
 
         # TODO: implement this properly
-        ind1, ind2 = self.root._variable_allprocs_range['output']
+        ind1, ind2 = self.root._var_allprocs_range['output']
         import numpy
         vector_var_ids = numpy.arange(ind1, ind2)
 

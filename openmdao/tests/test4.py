@@ -83,7 +83,7 @@ class Test(unittest.TestCase):
         self.p = Problem(group)
 
         gmres = scipy.sparse.linalg.gmres
-        self.p.setup()
+        self.p.setup(check=False)
         self.p.root.ln_solver = LinearBlockGS()
 
         #view_model(self.p, show_browser=False)

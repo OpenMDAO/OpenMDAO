@@ -36,6 +36,7 @@ class TestScaling(unittest.TestCase):
         prob = Problem(group)
 
         prob.setup(check=False)
+        prob.root.suppress_solver_output = True
 
         prob['sys1.old_length'] = 3.e5
         self.assertAlmostEqual(prob['sys1.old_length'], 3.e5)

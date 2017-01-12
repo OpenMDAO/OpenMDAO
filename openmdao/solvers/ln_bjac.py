@@ -21,10 +21,10 @@ class LinearBlockJac(LinearSolver):
                     d_inputs, d_outputs, mode)
             for subsys in system._subsystems_myproc:
                 var_inds = [
-                    system._variable_allprocs_range['output'][0],
-                    subsys._variable_allprocs_range['output'][0],
-                    subsys._variable_allprocs_range['output'][1],
-                    system._variable_allprocs_range['output'][1],
+                    system._var_allprocs_range['output'][0],
+                    subsys._var_allprocs_range['output'][0],
+                    subsys._var_allprocs_range['output'][1],
+                    system._var_allprocs_range['output'][1],
                 ]
                 subsys._apply_linear(vec_names, mode, var_inds)
             for vec_name in vec_names:
@@ -36,10 +36,10 @@ class LinearBlockJac(LinearSolver):
         elif mode == 'rev':
             for subsys in system._subsystems_myproc:
                 var_inds = [
-                    system._variable_allprocs_range['output'][0],
-                    subsys._variable_allprocs_range['output'][0],
-                    subsys._variable_allprocs_range['output'][1],
-                    system._variable_allprocs_range['output'][1],
+                    system._var_allprocs_range['output'][0],
+                    subsys._var_allprocs_range['output'][0],
+                    subsys._var_allprocs_range['output'][1],
+                    system._var_allprocs_range['output'][1],
                 ]
                 subsys._apply_linear(vec_names, mode, var_inds)
             for vec_name in vec_names:

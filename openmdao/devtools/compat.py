@@ -31,7 +31,7 @@ def convert_file():
 
     sys.stdout.write(contents)
 
-def system_iter(system, local=True, include_self=False, recurse=True):
+def system_iter(system, local=True, include_self=False, recurse=True, typ=None):
     """A generator of ancestor systems of the given system.
 
     Args
@@ -49,6 +49,9 @@ def system_iter(system, local=True, include_self=False, recurse=True):
     recurse : bool (True)
         If True, iterate over the whole tree under system.
 
+    typ : type
+        If not None, only yield Systems that match that are instances of the
+        given type.
     """
     if local:
         sysiter = system._subsystems_myproc
@@ -56,12 +59,14 @@ def system_iter(system, local=True, include_self=False, recurse=True):
         sysiter = system._subsystems_allprocs
 
     if include_self:
-        yield system
+        if typ is None or isinstance(system, typ):
+            yield system
 
     for s in sysiter:
-        yield s
+        if typ is None or isinstance(s, typ):
+            yield s
         if recurse:
-            for sub in system_iter(s, local=local, recurse=True):
+            for sub in system_iter(s, local=local, recurse=True, typ=typ):
                 yield sub
 
 def abs_varname_iter(system, typ, local=True):
@@ -84,8 +89,8 @@ def abs_varname_iter(system, typ, local=True):
         # path is at the Component level since the rest of the framework
         # deals only with promoted names.
         if isinstance(s, Component):
-            for varname in s._variable_allprocs_names[typ]:
-                yield '.'.join((s.path_name, varname))
+            for varname in s._var_allprocs_names[typ]:
+                yield '.'.join((s.pathname, varname))
 
 def abs_meta_iter(system, typ):
     """An iter of (abs_var_name, metadata) for all local vars.
@@ -99,7 +104,7 @@ def abs_meta_iter(system, typ):
         Specifies either 'input' or 'output' vars.
 
     """
-    meta = system._variable_myproc_metadata[typ]
+    meta = system._var_myproc_metadata[typ]
     for i, vname in enumerate(abs_varname_iter(system, typ)):
         yield vname, meta[i]
 
@@ -107,7 +112,7 @@ def abs_conn_iter(system):
     """An iter of (abs_tgt_name, abs_src_name) for all connections."""
     tgt_names = list(abs_varname_iter(system, 'input', local=False))
     src_names = list(abs_varname_iter(system, 'output', local=False))
-    for tgt_idx, src_idx in system._variable_connections_indices:
+    for tgt_idx, src_idx in system._var_connections_indices:
         yield tgt_names[tgt_idx], src_names[src_idx]
 
 def get_abs_proms(system, typ, local=True):
@@ -126,9 +131,9 @@ def get_abs_proms(system, typ, local=True):
 
     """
     if local:
-        prom_names = system._variable_myproc_names[typ]
+        prom_names = system._var_myproc_names[typ]
     else:
-        prom_names = system._variable_allprocs_names[typ]
+        prom_names = system._var_allprocs_names[typ]
 
     for i, absname in enumerate(abs_varname_iter(system, typ, local=local)):
         yield absname, prom_names[i]

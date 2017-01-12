@@ -58,9 +58,9 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     abs_tgt_names = list(abs_varname_iter(system, 'input', local=True))
     abs_src_names = list(abs_varname_iter(system, 'output', local=True))
     src_vals = [system._outputs[n]
-                    for n in system._variable_myproc_names['output']]
+                    for n in system._var_myproc_names['output']]
     tgt_vals = [system._inputs[n]
-                    for n in system._variable_myproc_names['input']]
+                    for n in system._var_myproc_names['input']]
     connections = dict(abs_conn_iter(system))
     tmetas = dict(abs_meta_iter(system, 'input'))
     to_prom_out = abs2prom_map(system, 'output', local=True)
@@ -79,6 +79,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         for idx, t in enumerate(abs_tgt_names):
             tmeta = tmetas[t]
             idxs = tmeta['indices']
+            if idxs is None:
+                idxs = numpy.arange(numpy.prod(tmeta['shape']), dtype=int)
 
             if t in connections:
                 s = connections[t]

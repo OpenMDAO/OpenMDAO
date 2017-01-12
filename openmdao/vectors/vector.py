@@ -35,7 +35,7 @@ class Vector(object):
         0 or slice(None), used so that 1-sized vectors are made floats.
     _names : set([str, ...])
         set of variables that are relevant in the current context.
-    _global_vector : Vector
+    _root_vector : Vector
         pointer to the vector owned by the root system.
     _data : list
         list of the actual allocated data (depends on implementation).
@@ -45,7 +45,7 @@ class Vector(object):
         list of index arrays mapping each entry to its variable index.
     """
 
-    def __init__(self, name, typ, system, global_vector=None):
+    def __init__(self, name, typ, system, root_vector=None):
         """Initialize all attributes.
 
         Args
@@ -56,13 +56,13 @@ class Vector(object):
             'input' for input vectors; 'output' for output/residual vectors.
         system : <System>
             pointer to the owning system.
-        global_vector : <Vector>
+        root_vector : <Vector>
             pointer to the vector owned by the root system.
         """
         self._name = name
         self._typ = typ
 
-        self._assembler = system._sys_assembler
+        self._assembler = system._assembler
         self._system = system
 
         self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
@@ -74,16 +74,16 @@ class Vector(object):
         # set of variables relevant to the current matvec product.
         self._names = self._views
 
-        self._global_vector = None
+        self._root_vector = None
         self._data = []
         self._indices = []
         self._ivar_map = []
-        if global_vector is None:
-            self._global_vector = self
+        if root_vector is None:
+            self._root_vector = self
         else:
-            self._global_vector = global_vector
+            self._root_vector = root_vector
 
-        self._initialize_data(global_vector)
+        self._initialize_data(root_vector)
         self._initialize_views()
 
     def _create_subvector(self, system):
@@ -100,7 +100,7 @@ class Vector(object):
             subvector instance.
         """
         return self.__class__(self._name, self._typ, system,
-                              self._global_vector)
+                              self._root_vector)
 
     def _clone(self):
         """Return a copy that does not provide view access to its data.
@@ -111,32 +111,24 @@ class Vector(object):
             instance of the clone; the data is copied.
         """
         vec = self.__class__(self._name, self._typ, self._system,
-                             self._global_vector)
+                             self._root_vector)
         vec._clone_data()
         return vec
 
-    def _compute_ivar_map(self, ivar_map=None):
+    def _compute_ivar_map(self):
         """Compute the ivar_map.
 
         The ivar_map index vector is the same length as data and indices,
         and it yields the index of the local variable.
 
-        Args
-        ----
-        ivar_map : list or None
-            if not None, we can just set the attribute to this arg.
         """
-        if ivar_map is not None:
-            self._ivar_map = ivar_map
-            return
-
         variable_sizes = self._assembler._variable_sizes[self._typ]
         variable_set_indices = self._assembler._variable_set_indices[self._typ]
 
-        ind1, ind2 = self._system._variable_allprocs_range[self._typ]
+        ind1, ind2 = self._system._var_allprocs_range[self._typ]
         sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
 
-        variable_indices = self._system._variable_myproc_indices[self._typ]
+        variable_indices = self._system._var_myproc_indices[self._typ]
 
         # Create the index arrays for each var_set for ivar_map.
         # Also store the starting points in the data/index vector.
@@ -182,7 +174,7 @@ class Vector(object):
             Array combining the data of all the varsets.
         """
         if array is None:
-            inds = self._system._variable_myproc_indices[self._typ]
+            inds = self._system._var_myproc_indices[self._typ]
             sizes = self._assembler._variable_sizes_all[self._typ][self._iproc,
                                                                    inds]
             array = numpy.zeros(numpy.sum(sizes))
@@ -272,7 +264,7 @@ class Vector(object):
         else:
             raise KeyError("Variable '%s' not found." % key)
 
-    def _initialize_data(self, global_vector):
+    def _initialize_data(self, root_vector):
         """Internally allocate vectors.
 
         Must be implemented by the subclass.
@@ -283,7 +275,7 @@ class Vector(object):
 
         Args
         ----
-        global_vector : <Vector> or None
+        root_vector : <Vector> or None
             the root's vector instance or None, if we are at the root.
         """
         pass
@@ -418,38 +410,38 @@ class Transfer(object):
 
     Attributes
     ----------
-    _ip_vec : Vector
+    _in_vec : Vector
         pointer to the input vector.
-    _op_vec : Vector
+    _out_vec : Vector
         pointer to the output vector.
-    _ip_inds : int ndarray
+    _in_inds : int ndarray
         input indices for the transfer.
-    _op_inds : int ndarray
+    _out_inds : int ndarray
         output indices for the transfer.
     _comm : MPI.Comm or FakeComm
         communicator of the system that owns this transfer.
     """
 
-    def __init__(self, ip_vec, op_vec, ip_inds, op_inds, comm):
+    def __init__(self, in_vec, out_vec, in_inds, out_inds, comm):
         """Initialize all attributes.
 
         Args
         ----
-        ip_vec : <Vector>
+        in_vec : <Vector>
             pointer to the input vector.
-        op_vec : <Vector>
+        out_vec : <Vector>
             pointer to the output vector.
-        ip_inds : int ndarray
+        in_inds : int ndarray
             input indices for the transfer.
-        op_inds : int ndarray
+        out_inds : int ndarray
             output indices for the transfer.
         comm : MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
         """
-        self._ip_vec = ip_vec
-        self._op_vec = op_vec
-        self._ip_inds = ip_inds
-        self._op_inds = op_inds
+        self._in_vec = in_vec
+        self._out_vec = out_vec
+        self._in_inds = in_inds
+        self._out_inds = out_inds
         self._comm = comm
 
         self._initialize_transfer()
@@ -461,16 +453,16 @@ class Transfer(object):
         """
         pass
 
-    def __call__(self, ip_vec, op_vec, mode='fwd'):
+    def __call__(self, in_vec, out_vec, mode='fwd'):
         """Perform transfer.
 
         Must be implemented by the subclass.
 
         Args
         ----
-        ip_vec : <Vector>
+        in_vec : <Vector>
             pointer to the input vector.
-        op_vec : <Vector>
+        out_vec : <Vector>
             pointer to the output vector.
         mode : str
             'fwd' or 'rev'.

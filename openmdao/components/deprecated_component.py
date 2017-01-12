@@ -187,21 +187,21 @@ class Component(BaseComponent):
         self._inputs.scale(self._scaling_to_norm['input'])
         self._outputs.scale(self._scaling_to_norm['output'])
 
-        for op_name in self._variable_myproc_names['output']:
-            if op_name in self._output_names:
-                size = len(self._outputs._views_flat[op_name])
+        for out_name in self._var_myproc_names['output']:
+            if out_name in self._output_names:
+                size = len(self._outputs._views_flat[out_name])
                 ones = numpy.ones(size)
                 arange = numpy.arange(size)
-                self._jacobian[op_name, op_name] = (ones, arange, arange)
+                self._jacobian[out_name, out_name] = (ones, arange, arange)
 
-        for op_name in self._variable_myproc_names['output']:
-            if op_name in self._output_names:
-                for ip_name in self._variable_myproc_names['input']:
-                    if (op_name, ip_name) in self._jacobian:
-                        self._jacobian._negate((op_name, ip_name))
+        for out_name in self._var_myproc_names['output']:
+            if out_name in self._output_names:
+                for in_name in self._var_myproc_names['input']:
+                    if (out_name, in_name) in self._jacobian:
+                        self._jacobian._negate((out_name, in_name))
 
         self._jacobian._precompute_iter()
-        if not initial and self._jacobian._top_name == self.path_name:
+        if not initial and self._jacobian._top_name == self.pathname:
             self._jacobian._update()
 
     def apply_nonlinear(self, params, unknowns, residuals):

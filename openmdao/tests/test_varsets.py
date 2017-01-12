@@ -19,7 +19,7 @@ class TestVarSets(unittest.TestCase):
         group.suppress_solver_output = True
 
         p = Problem(group)
-        p.setup()
+        p.setup(check=False)
         self.p = p
 
         # now create the same problem with no varsets
@@ -29,7 +29,7 @@ class TestVarSets(unittest.TestCase):
         group.suppress_solver_output = True
 
         p = Problem(group)
-        p.setup()
+        p.setup(check=False)
         self.p_no_varsets = p
 
     def test_apply_linear(self):

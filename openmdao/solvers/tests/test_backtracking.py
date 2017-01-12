@@ -60,11 +60,11 @@ class TestBackTracking(unittest.TestCase):
         ls = root.nl_solver.set_subsolver('linesearch',
                                           BacktrackingLineSearch(rtol=0.9))
         ls.options['maxiter'] = 100
-        ls.options['c'] = 0.5
         ls.options['alpha'] = 10.0
         root.nl_solver.set_subsolver('linear', root.ln_solver)
 
         top.setup(check=False)
+        root.suppress_solver_output = True
         top['comp.x'] = 1.0
         top.run()
 
