@@ -1,7 +1,7 @@
 """Define the LinearSystemComp class."""
 from __future__ import division, print_function
 import numpy
-import scipy.linalg
+from scipy import linalg
 
 from openmdao.core.implicitcomponent import ImplicitComponent
 
@@ -59,8 +59,8 @@ class LinearSystemComp(ImplicitComponent):
             unscaled, dimensional output variables read via outputs[key]
         """
         # lu factorization for use with solve_linear
-        self._lup = scipy.linalg.lu_factor(inputs['A'])
-        outputs['x'] = scipy.linalg.lu_solve(self._lup, inputs['b'])
+        self._lup = linalg.lu_factor(inputs['A'])
+        outputs['x'] = linalg.lu_solve(self._lup, inputs['b'])
 
     def apply_linear(self, inputs, outputs, d_inputs, d_outputs,
                      d_residuals, mode):
