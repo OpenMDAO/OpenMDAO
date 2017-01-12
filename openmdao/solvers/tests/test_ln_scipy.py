@@ -24,18 +24,18 @@ class TestScipyIterativeSolver(unittest.TestCase):
         p.setup()
 
         # forward
-        group._vectors['residual'][''].set_const(1.0)
-        group._vectors['output'][''].set_const(0.0)
-        group._solve_linear([''], 'fwd')
-        output = group._vectors['output']['']._data
+        group._vectors['residual']['linear'].set_const(1.0)
+        group._vectors['output']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'fwd')
+        output = group._vectors['output']['linear']._data
         assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
         assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
 
         # reverse
-        group._vectors['output'][''].set_const(1.0)
-        group._vectors['residual'][''].set_const(0.0)
-        group._solve_linear([''], 'rev')
-        output = group._vectors['residual']['']._data
+        group._vectors['output']['linear'].set_const(1.0)
+        group._vectors['residual']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'rev')
+        output = group._vectors['residual']['linear']._data
         assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
         assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
 
@@ -49,16 +49,16 @@ class TestScipyIterativeSolver(unittest.TestCase):
         p.setup()
 
         # forward
-        group._vectors['residual'][''].set_const(1.0)
-        group._vectors['output'][''].set_const(0.0)
-        group._solve_linear([''], 'fwd')
+        group._vectors['residual']['linear'].set_const(1.0)
+        group._vectors['output']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'fwd')
 
         self.assertTrue(group.ln_solver._iter_count == 2)
 
         # reverse
-        group._vectors['output'][''].set_const(1.0)
-        group._vectors['residual'][''].set_const(0.0)
-        group._solve_linear([''], 'rev')
+        group._vectors['output']['linear'].set_const(1.0)
+        group._vectors['residual']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'rev')
 
         self.assertTrue(group.ln_solver._iter_count == 2)
 

@@ -12,7 +12,7 @@ from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.units import conversion_to_base_units, convert_units
+from openmdao.utils.units import convert_units
 
 
 class System(object):
@@ -81,13 +81,13 @@ class System(object):
     _scaling_to_phys : dict of ndarray
         coefficients to convert vectors to physical values.
     _inputs : <Vector>
-        inputs vector; points to _vectors['input'][None].
+        inputs vector; points to _vectors['input']['nonlinear'].
     _outputs : <Vector>
-        outputs vector; points to _vectors['output'][None].
+        outputs vector; points to _vectors['output']['nonlinear'].
     _residuals : <Vector>
-        residuals vector; points to _vectors['residual'][None].
+        residuals vector; points to _vectors['residual']['nonlinear'].
     _transfers : dict of <Transfer>
-        transfer object; points to _vector_transfers[None].
+        transfer object; points to _vector_transfers['nonlinear'].
     _jacobian : <Jacobian>
         global <Jacobian> object to be used in apply_linear
     _nl_solver : <NonlinearSolver>
@@ -375,11 +375,11 @@ class System(object):
         self._vector_var_ids[vec_name] = vector_var_ids
 
         # Define shortcuts for convenience
-        if vec_name is None:
-            self._inputs = self._vectors['input'][None]
-            self._outputs = self._vectors['output'][None]
-            self._residuals = self._vectors['residual'][None]
-            self._transfers = self._vector_transfers[None]
+        if vec_name is 'nonlinear':
+            self._inputs = self._vectors['input']['nonlinear']
+            self._outputs = self._vectors['output']['nonlinear']
+            self._residuals = self._vectors['residual']['nonlinear']
+            self._transfers = self._vector_transfers['nonlinear']
 
         # Perform recursion
         for subsys in self._subsystems_myproc:

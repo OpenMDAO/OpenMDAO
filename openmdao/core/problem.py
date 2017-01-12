@@ -178,10 +178,10 @@ class Problem(object):
         root._setup_scaling()
 
         # Vector setup for the basic execution vector
-        self.setup_vector(None, VectorClass, self._use_ref_vector)
+        self.setup_vector('nonlinear', VectorClass, self._use_ref_vector)
 
         # Vector setup for the linear vector
-        self.setup_vector('', VectorClass, self._use_ref_vector)
+        self.setup_vector('linear', VectorClass, self._use_ref_vector)
 
         # Vector setup for the
 

@@ -112,7 +112,7 @@ class TestNumpyVec(unittest.TestCase):
             [comp2._inputs['v4'],  1.0],
             ])
 
-            root._vector_transfers[None]['fwd', 0](root._inputs, root._outputs)
+            root._vector_transfers['nonlinear']['fwd', 0](root._inputs, root._outputs)
 
             self.assertList([
             [comp1._outputs['v1'], 2.0],
@@ -128,7 +128,7 @@ class TestNumpyVec(unittest.TestCase):
             [comp2._inputs['v4'],  1.0],
             ])
 
-            root._vector_transfers[None][None](root._inputs, root._outputs)
+            root._vector_transfers['nonlinear'][None](root._inputs, root._outputs)
 
             self.assertList([
             [comp1._outputs['v1'], 2.0],
@@ -149,7 +149,7 @@ try:
     from openmdao.parallel_api import PETScVector
 except ImportError:
     PETScVector = None
-    
+
 class TestPetscVec(TestNumpyVec):
 
     def setUp(self):

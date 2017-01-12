@@ -96,7 +96,7 @@ class Component(System):
         - _residuals*
         - _transfers*
 
-        \* If vec_name is None - i.e., we are setting up the nonlinear vector
+        \* If vec_name is 'nonlinear'
 
         Args
         ----
@@ -112,13 +112,13 @@ class Component(System):
 
         # Components must load their initial input and output values into the
         # vectors.
-        if vectors['input']._name is None:
+        if vectors['input']._name is 'nonlinear':
             names = self._variable_myproc_names['input']
             inputs = self._inputs
             for i, meta in enumerate(self._variable_myproc_metadata['input']):
                 inputs[names[i]] = meta['value']
 
-        if vectors['output']._name is None:
+        if vectors['output']._name is 'nonlinear':
             names = self._variable_myproc_names['output']
             outputs = self._outputs
             for i, meta in enumerate(self._variable_myproc_metadata['output']):
