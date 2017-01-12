@@ -35,20 +35,20 @@ class TestPetscKSP(unittest.TestCase):
         p.root.suppress_solver_output = True
 
         # forward
-        group._vectors['residual'][''].set_const(1.0)
-        group._vectors['output'][''].set_const(0.0)
-        group._solve_linear([''], 'fwd')
+        group._vectors['residual']['linear'].set_const(1.0)
+        group._vectors['output']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'fwd')
 
-        output = group._vectors['output']['']._data
+        output = group._vectors['output']['linear']._data
         assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
         assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
 
         # reverse
-        group._vectors['output'][''].set_const(1.0)
-        group._vectors['residual'][''].set_const(0.0)
-        group._solve_linear([''], 'rev')
+        group._vectors['output']['linear'].set_const(1.0)
+        group._vectors['residual']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'rev')
 
-        output = group._vectors['residual']['']._data
+        output = group._vectors['residual']['linear']._data
         assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
         assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
 
@@ -63,19 +63,19 @@ class TestPetscKSP(unittest.TestCase):
         p.root.suppress_solver_output = True
 
         # forward
-        group._vectors['residual'][''].set_const(1.0)
-        group._vectors['output'][''].set_const(0.0)
-        group._solve_linear([''], 'fwd')
+        group._vectors['residual']['linear'].set_const(1.0)
+        group._vectors['output']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'fwd')
 
-        output = group._vectors['output']['']._data
+        output = group._vectors['output']['linear']._data
         assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
 
         # reverse
-        group._vectors['output'][''].set_const(1.0)
-        group._vectors['residual'][''].set_const(0.0)
-        group._solve_linear([''], 'rev')
+        group._vectors['output']['linear'].set_const(1.0)
+        group._vectors['residual']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'rev')
 
-        output = group._vectors['residual']['']._data
+        output = group._vectors['residual']['linear']._data
         assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
 
     def test_solve_linear_ksp_maxiter(self):
@@ -89,16 +89,16 @@ class TestPetscKSP(unittest.TestCase):
         p.root.suppress_solver_output = True
 
         # forward
-        group._vectors['residual'][''].set_const(1.0)
-        group._vectors['output'][''].set_const(0.0)
-        group._solve_linear([''], 'fwd')
+        group._vectors['residual']['linear'].set_const(1.0)
+        group._vectors['output']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'fwd')
 
         self.assertTrue(group.ln_solver._iter_count == 3)
 
         # reverse
-        group._vectors['output'][''].set_const(1.0)
-        group._vectors['residual'][''].set_const(0.0)
-        group._solve_linear([''], 'rev')
+        group._vectors['output']['linear'].set_const(1.0)
+        group._vectors['residual']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'rev')
 
         self.assertTrue(group.ln_solver._iter_count == 3)
 
@@ -113,22 +113,22 @@ class TestPetscKSP(unittest.TestCase):
         p.root.suppress_solver_output = True
 
         # forward
-        group._vectors['residual'][''].set_const(1.0)
-        group._vectors['output'][''].set_const(0.0)
-        group._solve_linear([''], 'fwd')
+        group._vectors['residual']['linear'].set_const(1.0)
+        group._vectors['output']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'fwd')
 
-        output = group._vectors['output']['']._data
+        output = group._vectors['output']['linear']._data
         assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
         assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
 
         self.assertTrue(precon._iter_count > 0)
 
         # reverse
-        group._vectors['output'][''].set_const(1.0)
-        group._vectors['residual'][''].set_const(0.0)
-        group._solve_linear([''], 'rev')
+        group._vectors['output']['linear'].set_const(1.0)
+        group._vectors['residual']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'rev')
 
-        output = group._vectors['residual']['']._data
+        output = group._vectors['residual']['linear']._data
         assert_rel_error(self, output[0], group.expected_solution[0], 3e-15)
         assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
 

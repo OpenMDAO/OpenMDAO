@@ -155,41 +155,41 @@ class TestJacobian(unittest.TestCase):
         prob.run()
 
     def _check_fwd(self, prob, check_vec):
-        work = prob.root._vectors['output']['']._clone()
+        work = prob.root._vectors['output']['linear']._clone()
         work.set_const(1.0)
 
         # fwd apply_linear test
-        prob.root._vectors['output'][''].set_const(1.0)
-        prob.root._apply_linear([''], 'fwd')
-        res = prob.root._vectors['residual']['']
+        prob.root._vectors['output']['linear'].set_const(1.0)
+        prob.root._apply_linear(['linear'], 'fwd')
+        res = prob.root._vectors['residual']['linear']
         res.set_data(res.get_data() - check_vec)
         self.assertAlmostEqual(
-            prob.root._vectors['residual'][''].get_norm(), 0)
+            prob.root._vectors['residual']['linear'].get_norm(), 0)
 
         # fwd solve_linear test
-        prob.root._vectors['output'][''].set_const(0.0)
-        prob.root._vectors['residual'][''].set_data(check_vec)
-        prob.root._solve_linear([''], 'fwd')
-        prob.root._vectors['output'][''] -= work
+        prob.root._vectors['output']['linear'].set_const(0.0)
+        prob.root._vectors['residual']['linear'].set_data(check_vec)
+        prob.root._solve_linear(['linear'], 'fwd')
+        prob.root._vectors['output']['linear'] -= work
         self.assertAlmostEqual(
-            prob.root._vectors['output'][''].get_norm(), 0, delta=1e-6)
+            prob.root._vectors['output']['linear'].get_norm(), 0, delta=1e-6)
 
     def _check_rev(self, prob, check_vec):
-        work = prob.root._vectors['output']['']._clone()
+        work = prob.root._vectors['output']['linear']._clone()
         work.set_const(1.0)
 
         # rev apply_linear test
-        prob.root._vectors['residual'][''].set_const(1.0)
-        prob.root._apply_linear([''], 'rev')
-        outs = prob.root._vectors['output']['']
+        prob.root._vectors['residual']['linear'].set_const(1.0)
+        prob.root._apply_linear(['linear'], 'rev')
+        outs = prob.root._vectors['output']['linear']
         outs.set_data(outs.get_data() - check_vec)
         self.assertAlmostEqual(
-            prob.root._vectors['output'][''].get_norm(), 0)
+            prob.root._vectors['output']['linear'].get_norm(), 0)
 
         # rev solve_linear test
-        prob.root._vectors['residual'][''].set_const(0.0)
-        prob.root._vectors['output'][''].set_data(check_vec)
-        prob.root._solve_linear([''], 'rev')
-        prob.root._vectors['residual'][''] -= work
+        prob.root._vectors['residual']['linear'].set_const(0.0)
+        prob.root._vectors['output']['linear'].set_data(check_vec)
+        prob.root._solve_linear(['linear'], 'rev')
+        prob.root._vectors['residual']['linear'] -= work
         self.assertAlmostEqual(
-            prob.root._vectors['residual'][''].get_norm(), 0, delta=1e-6)
+            prob.root._vectors['residual']['linear'].get_norm(), 0, delta=1e-6)

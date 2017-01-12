@@ -5,6 +5,8 @@ import numpy
 from six import iteritems
 import warnings
 
+import numpy
+
 from openmdao.core.system import System
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
 from openmdao.solvers.ln_bgs import LinearBlockGS
