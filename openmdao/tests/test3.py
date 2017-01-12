@@ -2,9 +2,9 @@ from __future__ import division
 import numpy
 import unittest
 
-from general_problem import GeneralProblem
+# from openmdao.tests.general_problem import GeneralProblem
 
-
+from .general_problem import GeneralProblem
 
 class Test(unittest.TestCase):
 
