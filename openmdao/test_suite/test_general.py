@@ -79,7 +79,7 @@ class CompTestCaseBase(unittest.TestCase):
 
         # Setup for the 4 tests that follow
         size = numpy.prod(var_shape)
-        work = prob.root._vectors['output']['nonlinear']._clone()
+        work = prob.root._vectors['output']['linear']._clone()
         work.set_const(1.0)
         if component_class == TestImplCompNondLinear:
             val = 1 - 0.01 + 0.01 * size * num_var * num_comp
@@ -90,31 +90,31 @@ class CompTestCaseBase(unittest.TestCase):
         prob.root._linearize()
 
         # 1. fwd apply_linear test
-        prob.root._vectors['output']['nonlinear'].set_const(1.0)
-        prob.root._apply_linear(['nonlinear'], 'fwd')
-        prob.root._vectors['residual']['nonlinear'].add_scal_vec(-val, work)
+        prob.root._vectors['output']['linear'].set_const(1.0)
+        prob.root._apply_linear(['linear'], 'fwd')
+        prob.root._vectors['residual']['linear'].add_scal_vec(-val, work)
         self.assertAlmostEqual(
-            prob.root._vectors['residual']['nonlinear'].get_norm(), 0)
+            prob.root._vectors['residual']['linear'].get_norm(), 0)
 
         # 2. rev apply_linear test
-        prob.root._vectors['residual']['nonlinear'].set_const(1.0)
-        prob.root._apply_linear(['nonlinear'], 'rev')
-        prob.root._vectors['output']['nonlinear'].add_scal_vec(-val, work)
+        prob.root._vectors['residual']['linear'].set_const(1.0)
+        prob.root._apply_linear(['linear'], 'rev')
+        prob.root._vectors['output']['linear'].add_scal_vec(-val, work)
         self.assertAlmostEqual(
-            prob.root._vectors['output']['nonlinear'].get_norm(), 0)
+            prob.root._vectors['output']['linear'].get_norm(), 0)
 
         # 3. fwd solve_linear test
-        prob.root._vectors['output']['nonlinear'].set_const(0.0)
-        prob.root._vectors['residual']['nonlinear'].set_const(val)
-        prob.root._solve_linear(['nonlinear'], 'fwd')
-        prob.root._vectors['output']['nonlinear'] -= work
+        prob.root._vectors['output']['linear'].set_const(0.0)
+        prob.root._vectors['residual']['linear'].set_const(val)
+        prob.root._solve_linear(['linear'], 'fwd')
+        prob.root._vectors['output']['linear'] -= work
         self.assertAlmostEqual(
-            prob.root._vectors['output']['nonlinear'].get_norm(), 0, delta=1e-2)
+            prob.root._vectors['output']['linear'].get_norm(), 0, delta=1e-2)
 
         # 4. rev solve_linear test
-        prob.root._vectors['residual']['nonlinear'].set_const(0.0)
-        prob.root._vectors['output']['nonlinear'].set_const(val)
-        prob.root._solve_linear(['nonlinear'], 'rev')
-        prob.root._vectors['residual']['nonlinear'] -= work
+        prob.root._vectors['residual']['linear'].set_const(0.0)
+        prob.root._vectors['output']['linear'].set_const(val)
+        prob.root._solve_linear(['linear'], 'rev')
+        prob.root._vectors['residual']['linear'] -= work
         self.assertAlmostEqual(
-            prob.root._vectors['residual']['nonlinear'].get_norm(), 0, delta=1e-2)
+            prob.root._vectors['residual']['linear'].get_norm(), 0, delta=1e-2)
