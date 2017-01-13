@@ -58,15 +58,15 @@ class TestLinearSystem(unittest.TestCase):
         prob.run()
 
         # Forward mode with RHS of self.b
-        lingrp._vectors['residual']['']['lin.x'] = self.b
-        lingrp._solve_linear([''], 'fwd')
-        sol = lingrp._vectors['output']['']['lin.x']
+        lingrp._vectors['residual']['linear']['lin.x'] = self.b
+        lingrp._solve_linear(['linear'], 'fwd')
+        sol = lingrp._vectors['output']['linear']['lin.x']
         assert_rel_error(self, sol, self.x, .0001)
 
         # Reverse mode with RHS of self.b_T
-        lingrp._vectors['output']['']['lin.x'] = self.b_T
-        lingrp._solve_linear([''], 'rev')
-        sol = lingrp._vectors['residual']['']['lin.x']
+        lingrp._vectors['output']['linear']['lin.x'] = self.b_T
+        lingrp._solve_linear(['linear'], 'rev')
+        sol = lingrp._vectors['residual']['linear']['lin.x']
         assert_rel_error(self, sol, self.x, .0001)
 
         # Compare against calculated derivs

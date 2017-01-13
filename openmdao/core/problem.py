@@ -176,10 +176,10 @@ class Problem(object):
         root._setup_scaling()
 
         # Vector setup for the basic execution vector
-        self.setup_vector(None, vector_class, self._use_ref_vector)
+        self.setup_vector('nonlinear', vector_class, self._use_ref_vector)
 
         # Vector setup for the linear vector
-        self.setup_vector('', vector_class, self._use_ref_vector)
+        self.setup_vector('linear', vector_class, self._use_ref_vector)
 
         if check:
             check_config(self, logger)

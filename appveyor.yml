@@ -58,6 +58,7 @@ test_script:
         }
         testflo . -n 1
 
-#after tests, need to cd down so that conf.py can be found for doctest
-#  - cd openmdao/docs
-#  - nmake /f Makefile.nmake html
+#after tests, need to cd down so that conf.py can be found for docbuild
+  - cd openmdao/docs
+  - nmake /f Makefile.nmake clean
+  - nmake /f Makefile.nmake html
