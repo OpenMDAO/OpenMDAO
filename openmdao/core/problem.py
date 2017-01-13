@@ -216,3 +216,25 @@ class Problem(object):
         vector_var_ids = numpy.arange(ind1, ind2)
 
         self.root._setup_vector(vectors, vector_var_ids, use_ref_vector)
+
+    def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
+        """Compute derivatives of desired quantities with respect to desired inputs.
+
+        Args
+        ----
+        of : list of variable name strings or None
+            Variables whose derivatives will be computed. Default is None, which
+            uses the driver's objectives and constraints.
+        wrt : list of variable name strings or None
+            Variables with respect to which the derivatives will be computed.
+            Default is None, which uses the driver's desvars.
+        return_format : string
+            Format to return the derivatives. Default is a 'flat_dict', which
+            returns them in a dictionary whose keys are tuples of form (of, wrt).
+
+        Returns
+        -------
+        derivs : object
+            Derivatives in form requested by 'return_format'.
+        """
+        pass
