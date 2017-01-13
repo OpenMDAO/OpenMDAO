@@ -33,7 +33,7 @@ class DefaultJacobian(Jacobian):
                     ip = d_outputs._views_flat[ip_name]
                     if mode == 'fwd':
                         op += jac.dot(ip)
-                    if mode == 'rev':
+                    elif mode == 'rev':
                         ip += jac.T.dot(op)
 
                 if op_name in d_residuals and ip_name in d_inputs:
@@ -41,7 +41,7 @@ class DefaultJacobian(Jacobian):
                     ip = d_inputs._views_flat[ip_name]
                     if mode == 'fwd':
                         op += jac.dot(ip)
-                    if mode == 'rev':
+                    elif mode == 'rev':
                         ip += jac.T.dot(op)
 
             elif type(jac) is list:

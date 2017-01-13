@@ -10,7 +10,7 @@ from openmdao.solvers.solver import NonlinearSolver
 class BacktrackingLineSearch(NonlinearSolver):
     """Backtracking line search using the Armijo-Goldstein condition."""
 
-    SOLVER = 'NL: BK_TKG'
+    SOLVER = 'NL: BKTKG'
 
     def __init__(self, **kwargs):
         """Backtracking line search using the Armijo-Goldstein condition."""

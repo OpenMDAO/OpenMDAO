@@ -157,15 +157,23 @@ class DefaultVector(Vector):
         # will return either a float or a properly shaped array respectively.
         idxs = {}
 
+        ind_offsets = {}
+
         for ind, name in enumerate(variable_myproc_names):
             ivar_all = variable_myproc_indices[ind]
             iset, ivar = variable_set_indices[ivar_all, :]
             ind1 = numpy.sum(variable_sizes[iset][self._iproc, :ivar])
             ind2 = numpy.sum(variable_sizes[iset][self._iproc, :ivar + 1])
-            views[name] = self._root_vector._data[iset][ind1:ind2]
-            views_flat[name] = self._root_vector._data[iset][ind1:ind2]
+
+            # TODO: Optimize by precomputing offsets
+            if iset not in ind_offsets:
+                ind_offsets[iset] = ind1
+            ind1 -= ind_offsets[iset]
+            ind2 -= ind_offsets[iset]
+
+            views[name] = self._data[iset][ind1:ind2]
+            views_flat[name] = self._data[iset][ind1:ind2]
             views[name].shape = meta[ind]['shape']
-            val = meta[ind]['value']
 
             # The shape entry overrides value's shape, which is why we don't
             # use the shape of val as the reference

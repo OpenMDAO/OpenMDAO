@@ -3,6 +3,7 @@ from __future__ import division, print_function
 import itertools
 import unittest
 from six.moves import range
+from six import PY3, iteritems
 import numpy
 
 from openmdao.test_suite.components.implicit_components \
@@ -20,43 +21,85 @@ except ImportError:
     PETScVector = None
 
 from nose_parameterized import parameterized
+from collections import OrderedDict
+from openmdao.devtools.testutil import assert_rel_error
+
+TEST_PARAMS = (
+    [TestImplCompNondLinear, TestExplCompNondLinear],  # component_class
+    [DefaultVector, PETScVector] if PETScVector else [DefaultVector],  # vector_class
+    ['implicit', 'explicit'],  # connection_type
+    [True, False],  # global_jac
+    ['matvec', 'dense', 'sparse-coo', 'sparse-csr'],  # jacobian_type
+    ['array', 'sparse', 'aij'],  # partial_type
+    range(1, 3),  # num_var
+    range(1, 3),  # num_comp
+    [(1,), (2,), (2, 1), (1, 2)],  # var_shape
+)
 
 
-def custom_name(testcase_func, param_num, param):
-    return ''.join(('test_',
-                    '_'.join(p.__name__ for p in param.args[:2]),
-                    '_',
-                    '_'.join(str(p) for p in param.args[2:]))
-                   )
+def _nice_name(obj):
+    if isinstance(obj, type):
+        return obj.__name__
+    elif isinstance(obj, dict):
+        return str({_nice_name(k): _nice_name(v) for k, v in iteritems(obj)})
+    return str(obj)
 
 
-class CompTestCaseBase(unittest.TestCase):
-    """The TestCase that actually runs all of the cases inherits from this."""
+class GeneralProblem(object):
+    def __init__(self, component_class, vector_class, connection_type, global_jac, jacobian_type,
+                 partial_type, num_var, num_comp, var_shape):
 
-    @parameterized.expand(itertools.product(
-        [TestImplCompNondLinear, TestExplCompNondLinear],
-        [DefaultVector, PETScVector] if PETScVector else [DefaultVector],
-        ['implicit', 'explicit'],
-        [True, False],
-        ['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
-        ['array', 'sparse', 'aij'],
-        range(1, 3),
-        range(1, 3),
-        [(1,), (2,), (2, 1), (1, 2)],
-    ), testcase_func_name=custom_name)
-    def test_openmdao(self, component_class, vector_class, connection_type, global_jac, jacobian_type,
-                      partial_type, num_var, num_comp, var_shape):
+        self.args = OrderedDict((
+            ('component_class', component_class),
+            ('vector_class', vector_class),
+            ('connection_type', connection_type),
+            ('global_jac', global_jac),
+            ('jacobian_type', jacobian_type),
+            ('partial_type', partial_type),
+            ('num_var', num_var),
+            ('num_comp', num_comp),
+            ('var_shape', var_shape),
+        ))
 
-        group = TestGroupFlat(num_comp=num_comp, num_var=num_var,
-                              var_shape=var_shape,
-                              connection_type=connection_type,
-                              jacobian_type=jacobian_type,
-                              partial_type=partial_type,
-                              component_class=component_class,
+        self.name = '_'.join(
+            '{0}_{1}'.format(key, _nice_name(value)) for key, value in iteritems(self.args)
+        )
+
+        self._run = False
+        self._setup = False
+        self._linearized = False
+        self.problem = None
+        self.expected_d_input = None
+        self.expected_d_output = None
+        self.value = 0
+
+        self.solver_class = NewtonSolver
+        self.solver_options = {'subsolvers':{'linear': ScipyIterativeSolver(
+                maxiter=100,
+            )}}
+
+        self.linear_solver_class = ScipyIterativeSolver
+        self.linear_solver_options = {'maxiter': 200,
+                                      'atol': 1e-10,
+                                      'rtol': 1e-10,
+                                      }
+
+    def setup(self):
+        self._setup = True
+        args = self.args
+        group = TestGroupFlat(num_comp=args['num_comp'],
+                              num_var=args['num_var'],
+                              var_shape=args['var_shape'],
+                              connection_type=args['connection_type'],
+                              jacobian_type=args['jacobian_type'],
+                              partial_type=args['partial_type'],
+                              component_class=args['component_class'],
                               )
-        prob = Problem(group).setup(vector_class, check=False)
 
-        if global_jac:
+        self.problem = prob = Problem(group).setup(args['vector_class'], check=False)
+
+        if args['global_jac']:
+            jacobian_type = args['jacobian_type']
             if jacobian_type == 'dense':
                 prob.root.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
             elif jacobian_type == 'sparse-coo':
@@ -64,57 +107,106 @@ class CompTestCaseBase(unittest.TestCase):
             elif jacobian_type == 'sparse-csr':
                 prob.root.jacobian = GlobalJacobian(matrix_class=CsrMatrix)
 
-        prob.root.nl_solver = NewtonSolver(
-            subsolvers={'linear': ScipyIterativeSolver(
-                maxiter=100,
-            )}
-        )
-        prob.root.ln_solver = ScipyIterativeSolver(
-            maxiter=200, atol=1e-10, rtol=1e-10)
+        prob.root.ln_solver = self.linear_solver_class(**self.linear_solver_options)
+
+        prob.root.nl_solver = self.solver_class(**self.solver_options)
+
         prob.root.suppress_solver_output = True
 
-        fail, rele, abse = prob.run()
+        self._run = False
+
+        size = numpy.prod(args['var_shape'])
+        self.expected_d_input = prob.root._vectors['output']['']._clone(initialize_views=True)
+        self.expected_d_output = self.expected_d_input._clone(initialize_views=True)
+
+        n = args['num_var']
+        m = args['num_comp'] - 1
+        d_value = 0.01 * size * (n * (n + 1)) / 2 * m
+        if args['component_class'] == TestImplCompNondLinear:
+            self.value = 1 + d_value
+        elif args['component_class'] == TestExplCompNondLinear:
+            self.value = 1 - d_value
+        else:
+            raise NotImplementedError()
+
+        for name in self.expected_d_input:
+            output_num = int(name.split('_')[-1])
+            self.expected_d_input[name][:] = output_num + 1
+            self.expected_d_output[name][:] = output_num + self.value
+
+    def run(self):
+        if not self._setup:
+            self.setup()
+        self._run = True
+        return self.problem.run()
+
+    def apply_linear_test(self, mode='fwd'):
+        root = self.problem.root
+        if not self._linearized:
+            root._apply_nonlinear()
+            root._linearize()
+            self._linearized = True
+        if mode == 'fwd':
+            in_ = 'output'
+            out = 'residual'
+        elif mode == 'rev':
+            in_ = 'residual'
+            out = 'output'
+        else:
+            raise NotImplementedError('Mode must be "fwd" or "rev"')
+
+        root._vectors[in_][''].set_const(1.0)
+        root._apply_linear([''], mode)
+        root._vectors[out][''].add_scal_vec(-self.value, self.expected_d_input)
+        return root._vectors[out][''].get_norm()
+
+    def solve_linear_test(self, input=None, mode='fwd'):
+        root = self.problem.root
+        if input is None:
+            input = self.expected_d_output
+        if not self._linearized:
+            root._apply_nonlinear()
+            root._linearize()
+            self._linearized = True
+        if mode == 'rev':
+            in_ = 'output'
+            out = 'residual'
+        elif mode == 'fwd':
+            in_ = 'residual'
+            out = 'output'
+        else:
+            raise NotImplementedError('Mode must be "fwd" or "rev"')
+
+        root._vectors[out][''].set_const(0.0)
+        root._vectors[in_][''] = input
+        root._solve_linear([''], mode)
+        return root._vectors[out]['']._data
+
+
+def full_test_suite():
+    for args in itertools.product(*TEST_PARAMS):
+        yield (GeneralProblem(*args),)
+
+# Needed for Nose
+full_test_suite.__test__ = False
+
+
+def _test_name(testcase_func, param_num, params):
+    return '_'.join(('test', params.args[0].name))
+
+
+class ParameterizedTestCases(unittest.TestCase):
+    """The TestCase that actually runs all of the cases inherits from this."""
+
+    @parameterized.expand(full_test_suite(),
+                          testcase_func_name=_test_name)
+    def test_openmdao(self, test):
+
+        fail, rele, abse = test.run()
         if fail:
             self.fail('Problem run failed: re %f ; ae %f' % (rele, abse))
 
-        # Setup for the 4 tests that follow
-        size = numpy.prod(var_shape)
-        work = prob.root._vectors['output']['']._clone()
-        work.set_const(1.0)
-        if component_class == TestImplCompNondLinear:
-            val = 1 - 0.01 + 0.01 * size * num_var * num_comp
-        elif component_class == TestExplCompNondLinear:
-            val = 1 - 0.01 * size * num_var * (num_comp - 1)
-
-        prob.root._apply_nonlinear()
-        prob.root._linearize()
-
-        # 1. fwd apply_linear test
-        prob.root._vectors['output'][''].set_const(1.0)
-        prob.root._apply_linear([''], 'fwd')
-        prob.root._vectors['residual'][''].add_scal_vec(-val, work)
-        self.assertAlmostEqual(
-            prob.root._vectors['residual'][''].get_norm(), 0)
-
-        # 2. rev apply_linear test
-        prob.root._vectors['residual'][''].set_const(1.0)
-        prob.root._apply_linear([''], 'rev')
-        prob.root._vectors['output'][''].add_scal_vec(-val, work)
-        self.assertAlmostEqual(
-            prob.root._vectors['output'][''].get_norm(), 0)
-
-        # 3. fwd solve_linear test
-        prob.root._vectors['output'][''].set_const(0.0)
-        prob.root._vectors['residual'][''].set_const(val)
-        prob.root._solve_linear([''], 'fwd')
-        prob.root._vectors['output'][''] -= work
-        self.assertAlmostEqual(
-            prob.root._vectors['output'][''].get_norm(), 0, delta=1e-2)
-
-        # 4. rev solve_linear test
-        prob.root._vectors['residual'][''].set_const(0.0)
-        prob.root._vectors['output'][''].set_const(val)
-        prob.root._solve_linear([''], 'rev')
-        prob.root._vectors['residual'][''] -= work
-        self.assertAlmostEqual(
-            prob.root._vectors['residual'][''].get_norm(), 0, delta=1e-2)
+        assert_rel_error(self, test.solve_linear_test(mode='fwd'), test.expected_d_input._data, 1e-15)
+        assert_rel_error(self, test.solve_linear_test(mode='rev'), test.expected_d_input._data, 1e-15)
+        assert_rel_error(self, test.apply_linear_test(mode='fwd'), 0., 1e-15)
+        assert_rel_error(self, test.apply_linear_test(mode='rev'), 0., 1e-15)

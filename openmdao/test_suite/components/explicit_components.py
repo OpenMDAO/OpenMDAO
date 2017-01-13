@@ -12,6 +12,9 @@ from openmdao.api import ExplicitComponent
 class TestExplCompNondLinear(ExplicitComponent):
     """Test explicit component, non-distributed, linear."""
 
+    def __str__(self):
+        return 'TestExplCompNondLinear'
+
     def initialize(self):
         self.metadata.declare('num_input', type_=int, value=1,
                               desc='number of input variables to declare')
@@ -29,22 +32,22 @@ class TestExplCompNondLinear(ExplicitComponent):
         self.metadata['op_names'] = ['output_%i' % op_ind for op_ind in
                                      range(self.metadata['num_output'])]
 
-        for ip_name in self.metadata['ip_names']:
-            self.add_input(ip_name, shape=var_shape,
+        for in_name in self.metadata['ip_names']:
+            self.add_input(in_name, shape=var_shape,
                            indices=numpy.arange(size))
 
-        for op_name in self.metadata['op_names']:
-            self.add_output(op_name, shape=var_shape)
+        for out_name in self.metadata['op_names']:
+            self.add_output(out_name, shape=var_shape)
 
         self.coeffs = {}
         self.rhs_coeffs = {}
 
-        for op_name in self.metadata['op_names']:
+        for out_name in self.metadata['op_names']:
             mtx = numpy.ones(size)
-            self.rhs_coeffs[op_name] = mtx
-            for ip_name in self.metadata['ip_names']:
+            self.rhs_coeffs[out_name] = mtx
+            for in_name in self.metadata['ip_names']:
                 mtx = numpy.ones((size, size)) * 0.01
-                self.coeffs[op_name, ip_name] = mtx
+                self.coeffs[out_name, in_name] = mtx
 
     def compute(self, inputs, outputs):
         for op_name in self.metadata['op_names']:

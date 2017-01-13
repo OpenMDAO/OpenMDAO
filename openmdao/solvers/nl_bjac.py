@@ -5,7 +5,7 @@ from openmdao.solvers.solver import NonlinearSolver
 class NonlinearBlockJac(NonlinearSolver):
     """Nonlinear block Jacobi solver."""
 
-    METHOD = 'NL: NLBJ'
+    SOLVER = 'NL: NLBJ'
 
     def _iter_execute(self):
         """Perform the operations in the iteration loop."""

@@ -11,6 +11,9 @@ from openmdao.api import ImplicitComponent
 class TestImplCompNondLinear(ImplicitComponent):
     """Test implicit component, non-distributed, linear."""
 
+    def __str__(self):
+        return 'TestImplCompNondLinear'
+
     def initialize(self):
         self.metadata.declare('num_input', type_=int, value=1,
                               desc='number of input variables to declare')

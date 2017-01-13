@@ -24,9 +24,8 @@ def assert_rel_error(test_case, actual, desired, tolerance):
     tolerance : float
         Maximum relative error ``(actual - desired) / desired``.
     """
-    try:
-        actual[0]
-    except (TypeError, IndexError):
+
+    if isinstance(actual, float) and isinstance(desired, float):
         if isnan(actual) and not isnan(desired):
             test_case.fail('actual nan, desired %s' % desired)
         if desired != 0:
@@ -39,6 +38,8 @@ def assert_rel_error(test_case, actual, desired, tolerance):
 
     # array values
     else:
+        actual = np.array(actual, copy=False)
+        desired = np.array(desired, copy=False)
         if not np.all(np.isnan(actual) == np.isnan(desired)):
             test_case.fail('actual and desired values have non-matching nan'
                            ' values')
