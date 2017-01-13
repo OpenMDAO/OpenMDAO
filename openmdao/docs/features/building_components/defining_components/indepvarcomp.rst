@@ -62,4 +62,5 @@ Here's an example of embedding code, in the form of the `test___init___1var` met
 
 .. embedPythonCode::
     openmdao.core.tests.test_component.TestIndepVarComp.test___init___1var
-    
+
+.. tags:: indepVarComp, Component
