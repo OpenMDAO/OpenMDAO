@@ -2,10 +2,7 @@
 
 from __future__ import division
 
-import collections
-
 import numpy
-from six import string_types
 
 from openmdao.core.system import System
 
@@ -94,7 +91,7 @@ class Component(System):
         - _residuals*
         - _transfers*
 
-        \* If vec_name is None - i.e., we are setting up the nonlinear vector
+        \* If vec_name is 'nonlinear'
 
         Args
         ----
@@ -117,13 +114,13 @@ class Component(System):
         #       defaults to 1.0 and the shape can be anything, resulting in the
         #       value of 1.0 being broadcast into all values in the vector
         #       that were allocated according to the shape.
-        if vectors['input']._name is None:
+        if vectors['input']._name is 'nonlinear':
             names = self._var_myproc_names['input']
             inputs = self._inputs
             for i, meta in enumerate(self._var_myproc_metadata['input']):
                 inputs[names[i]] = meta['value']
 
-        if vectors['output']._name is None:
+        if vectors['output']._name is 'nonlinear':
             names = self._var_myproc_names['output']
             outputs = self._outputs
             for i, meta in enumerate(self._var_myproc_metadata['output']):
