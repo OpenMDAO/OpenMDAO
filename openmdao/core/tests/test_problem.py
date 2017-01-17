@@ -33,6 +33,8 @@ class TestProblem(unittest.TestCase):
         top.setup(check=False, mode='rev')
         top.run()
 
+        # TODO: Forward don't work yet
+
         of = ['f_xy']
         wrt = ['x', 'y']
         derivs = top.compute_total_derivs(of=of, wrt=wrt)
