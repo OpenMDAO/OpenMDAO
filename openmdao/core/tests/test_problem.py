@@ -22,7 +22,7 @@ class TestProblem(unittest.TestCase):
         root.ln_solver = ScipyIterativeSolver()
 
         top.setup(check=False, mode='fwd')
-        #top.root.suppress_solver_output = True
+        top.root.suppress_solver_output = True
         top.run()
 
         of = ['f_xy']
