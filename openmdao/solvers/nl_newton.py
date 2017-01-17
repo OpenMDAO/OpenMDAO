@@ -32,8 +32,8 @@ class NewtonSolver(NonlinearSolver):
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0
         system._linearize()
-        self.options['subsolvers']['linear'](['linear'], 'fwd')
+        self.options['subsolvers']['linear'].solve(['linear'], 'fwd')
         if 'linesearch' in self.options['subsolvers']:
-            self.options['subsolvers']['linesearch']()
+            self.options['subsolvers']['linesearch'].solve()
         else:
             system._outputs += system._vectors['output']['linear']

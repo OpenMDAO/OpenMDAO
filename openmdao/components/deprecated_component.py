@@ -99,7 +99,7 @@ class Component(BaseComponent):
     def _solve_nonlinear(self):
         """See System._solve_nonlinear."""
         if self._nl_solver is not None:
-            self._nl_solver()
+            self._nl_solver.solve()
         else:
             self._inputs.scale(self._scaling_to_phys['input'])
             self._outputs.scale(self._scaling_to_phys['output'])
