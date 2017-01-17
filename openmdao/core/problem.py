@@ -243,8 +243,20 @@ class Problem(object):
         if wrt is None:
             raise NotImplementedError("Need to specify 'wrt' for now.")
         if of is None:
-            raise NotImplementedError("Need to specify 'wrt' for now.")
+            raise NotImplementedError("Need to specify 'of' for now.")
 
+        # A number of features will need to be supported here as development
+        # goes forward.
+        # TODO: Make sure we can function in parallel when some params or
+        # functions are not local.
+        # TODO: Support parallel adjoint and parallel forward derivatives
+        #       Aside: how are they specified, and do we have to pick up any
+        #       that are missed?
+        # TODO: Handle driver scaling.
+        # TODO: Support for any other return_format we need.
+        # TODO: Support constraint sparsity (i.e., skip in/out that are not
+        #       relevant for this constraint) (desvars too?)
+        # TODO: Don't calculate for inactive constraints
+        # TODO: Support full-model FD. Don't know how this'll work, but we
+        #       used to need a separate function for that.
 
-
-        pass

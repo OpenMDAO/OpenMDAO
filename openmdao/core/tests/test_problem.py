@@ -18,7 +18,7 @@ class TestProblem(unittest.TestCase):
         root.add('xx', IndepVarComp('p2', name='y'), promotes=['y'])
         root.add('comp', promotes=['x', 'y', 'f_xy'])
 
-        #top.setup(mode='fwd')
+        top.setup(mode='fwd')
 
 
 if __name__ == "__main__":
