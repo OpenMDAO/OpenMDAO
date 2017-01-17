@@ -26,11 +26,11 @@ class TestProblem(unittest.TestCase):
         wrt = ['x', 'y']
         derivs = top.compute_total_derivs(of=of, wrt=wrt)
 
-        top.setup(check=False, mode='rev')
-        top.run()
-
         assert_rel_error(self, derivs[('f_xy', 'x')], -6.0, 1e-6)
         assert_rel_error(self, derivs[('f_xy', 'y')], 8.0, 1e-6)
+
+        top.setup(check=False, mode='rev')
+        top.run()
 
         of = ['f_xy']
         wrt = ['x', 'y']
