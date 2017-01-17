@@ -237,4 +237,14 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+        root = self.root
+
+        #TODO - Pull 'of' and 'wrt' from driver if unspecified.
+        if wrt is None:
+            raise NotImplementedError("Need to specify 'wrt' for now.")
+        if of is None:
+            raise NotImplementedError("Need to specify 'wrt' for now.")
+
+
+
         pass
