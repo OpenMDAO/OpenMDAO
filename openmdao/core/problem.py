@@ -378,7 +378,7 @@ class Problem(object):
                             key = (input_name, output_name)
 
                             if totals[key] is None:
-                                totals[key] = np.zeros((len_val, 1))
+                                totals[key] = np.zeros((1, len_val))
                             totals[key][idx, :] = deriv_val
 
         return totals
