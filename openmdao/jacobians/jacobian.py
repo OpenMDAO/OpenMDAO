@@ -193,7 +193,7 @@ class Jacobian(object):
         dct, out_ind, in_ind, out_size, in_size, typ = self._process_key(key)
 
         if numpy.isscalar(jac) or isinstance(jac, numpy.ndarray):
-            jac = numpy.atleast_2d(jac)
+            jac = numpy.atleast_2d(jac).reshape((out_size, in_size))
             # numpy.promote_types will choose the smallest dtype that can contain both arguments
             safe_dtype = numpy.promote_types(jac.dtype, float)
             jac = jac.astype(safe_dtype, copy=False)
