@@ -4,7 +4,6 @@ import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
 
@@ -20,7 +19,7 @@ class TestProblem(unittest.TestCase):
         root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         # TODO: We should use our default solver here, when it is working.
-        root.ln_solver = DirectSolver()
+        root.ln_solver = ScipyIterativeSolver()
 
         top.setup(check=False, mode='fwd')
         #top.root.suppress_solver_output = True
@@ -33,7 +32,8 @@ class TestProblem(unittest.TestCase):
         top.setup(check=False, mode='rev')
         top.run()
 
-        # TODO: Forward don't work yet
+        assert_rel_error(self, derivs[('f_xy', 'x')], -6.0, 1e-6)
+        assert_rel_error(self, derivs[('f_xy', 'y')], 8.0, 1e-6)
 
         of = ['f_xy']
         wrt = ['x', 'y']

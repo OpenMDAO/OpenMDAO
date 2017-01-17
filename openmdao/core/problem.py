@@ -328,10 +328,10 @@ class Problem(object):
 
         if mode == 'fwd':
             input_list, output_list = wrt, of
-            input_vec, output_vec = vec_doutput, vec_dresid
+            input_vec, output_vec = vec_dresid, vec_doutput
         else:
             input_list, output_list = of, wrt
-            input_vec, output_vec = vec_dresid, vec_doutput
+            input_vec, output_vec = vec_doutput, vec_dresid
 
         # TODO : Parallel adjoint setup loop goes here.
         # NOTE : Until we support it, we will just limit ourselves to the
@@ -357,16 +357,10 @@ class Problem(object):
                 # The root system solves here.
                 root._solve_linear([vecname], mode)
 
-                print(doutputs.get_data())
-
                 # Pull out the answers and pack them into our data structure.
                 for output_name in output_list:
 
-                    # IMPORTANT NOTE: Inserted a negative sign here, presumably
-                    # because the derivative of the residual wrt to a quantity
-                    # is minus the actual derivative, based on definition of
-                    # the residual.
-                    deriv_val = -doutputs._views_flat[output_name]
+                    deriv_val = doutputs._views_flat[output_name]
                     len_val = len(deriv_val)
 
                     if return_format == 'flat_dict':

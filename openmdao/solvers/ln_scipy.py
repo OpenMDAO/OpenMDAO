@@ -1,5 +1,7 @@
 """Define the scipy iterative solver class."""
+
 from __future__ import division, print_function
+
 import numpy
 from scipy.sparse.linalg import LinearOperator, gmres
 
@@ -22,6 +24,10 @@ class ScipyIterativeSolver(LinearSolver):
         super(ScipyIterativeSolver, self).__init__(**kwargs)
         self.options.declare('solver', type_=object, value=gmres,
                              desc='function handle for actual solver')
+
+        # Better defaults
+        self.options['maxiter'] = 200
+        self.options['atol'] = 1.0e-12
 
     def _mat_vec(self, in_vec):
         """Compute matrix-vector product.
@@ -55,6 +61,8 @@ class ScipyIterativeSolver(LinearSolver):
             system._var_allprocs_range['output'][1],
         ]
         system._apply_linear([vec_name], self._mode, var_inds)
+
+        # self._mpi_print(b_vec.get_data())
         return b_vec.get_data()
 
     def _monitor(self, res):
