@@ -2,15 +2,13 @@ from __future__ import division, print_function
 
 import itertools
 import unittest
-from six.moves import range
-from six import PY3, iteritems
+from six.moves import range, zip
+from six import PY3, iteritems, iterkeys, itervalues, string_types
 import numpy
+import collections
 
-from openmdao.test_suite.components.implicit_components \
-    import TestImplCompNondLinear
-from openmdao.test_suite.components.explicit_components \
-    import TestExplCompNondLinear
-from openmdao.test_suite.groups.group import TestGroupFlat
+from openmdao.test_suite.groups.group import TestMeshGroup
+from openmdao.test_suite.groups.cycle_group import CycleGroup
 from openmdao.api import Problem
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
 from openmdao.api import GlobalJacobian, DenseMatrix, CooMatrix, CsrMatrix
@@ -24,18 +22,37 @@ from nose_parameterized import parameterized
 from collections import OrderedDict
 from openmdao.devtools.testutil import assert_rel_error
 
-TEST_PARAMS = (
-    [TestImplCompNondLinear, TestExplCompNondLinear],  # component_class
-    [DefaultVector, PETScVector] if PETScVector else [DefaultVector],  # vector_class
-    ['implicit', 'explicit'],  # connection_type
-    [True, False],  # global_jac
-    ['matvec', 'dense', 'sparse-coo', 'sparse-csr'],  # jacobian_type
-    ['array', 'sparse', 'aij'],  # partial_type
-    range(1, 3),  # num_var
-    range(1, 3),  # num_comp
-    [(1,), (2,), (2, 1), (1, 2)],  # var_shape
-)
+MESH_PARAMS = {
+    'component_class': ['implicit', 'explicit'],
+    'vector_class': [DefaultVector, PETScVector] if PETScVector else [DefaultVector],
+    'connection_type': ['implicit', 'explicit'],
+    'global_jac': [True, False],
+    'jacobian_type': ['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
+    'partial_type': ['array', 'sparse', 'aij'],
+    'num_var': [2, 1],
+    'num_comp': [2, 1],
+    'var_shape': [(1,), (2,), (2, 1), (1, 2)],
+}
 
+CYCLE_PARAMS = {
+    'component_class': ['explicit'],
+    'vector_class': [DefaultVector, PETScVector] if PETScVector else [DefaultVector],
+    'connection_type': ['implicit', 'explicit'],
+    'global_jac': [True, False],
+    'jacobian_type': ['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
+    'partial_type': ['array', 'sparse', 'aij'],
+    'num_comp': [2, 1],
+}
+
+GROUP_PARAMS = {
+    'mesh': MESH_PARAMS,
+    'cycle': CYCLE_PARAMS,
+}
+
+GROUP_CONSTRUCTORS = {
+    'mesh': TestMeshGroup,
+    'cycle': CycleGroup,
+}
 
 def _nice_name(obj):
     if isinstance(obj, type):
@@ -45,21 +62,62 @@ def _nice_name(obj):
     return str(obj)
 
 
-class GeneralProblem(object):
-    def __init__(self, component_class, vector_class, connection_type, global_jac, jacobian_type,
-                 partial_type, num_var, num_comp, var_shape):
+def test_suite(**kwargs):
+    groups = kwargs.pop('group_type', iterkeys(GROUP_PARAMS))
 
-        self.args = OrderedDict((
-            ('component_class', component_class),
-            ('vector_class', vector_class),
-            ('connection_type', connection_type),
-            ('global_jac', global_jac),
-            ('jacobian_type', jacobian_type),
-            ('partial_type', partial_type),
-            ('num_var', num_var),
-            ('num_comp', num_comp),
-            ('var_shape', var_shape),
-        ))
+    if isinstance(groups, string_types):
+        groups = (groups, )
+
+    for group_type in groups:
+        opts = {}
+        default_opts = GROUP_PARAMS[group_type]
+
+        for arg, default_val in iteritems(default_opts):
+            if arg in kwargs:
+                arg_value = kwargs.pop(arg)
+                if arg_value == '*':
+                    opts[arg] = default_val
+                elif isinstance(arg_value, string_types) \
+                        or not isinstance(arg_value, collections.Iterable):
+                    # itertools.product expects iterables, so make 1-item tuple
+                    opts[arg] = (arg_value,)
+                else:
+                    opts[arg] = arg_value
+            else:
+                # We're not asked to vary this parameter, so choose first item as default
+                # Since we may use a generator (e.g. range), take the first value from the iterator
+                # instead of indexing.
+                for iter_val in default_val:
+                    opts[arg] = iter_val
+                    break
+
+        if kwargs:
+            raise ValueError('Unknown options given: {0}'.format(_nice_name(kwargs)))
+
+        for options in _cartesian_dict_product(opts):
+            yield (ParameterizedInstance(group_type, **options),)
+
+def _cartesian_dict_product(dicts):
+    return (dict(zip(dicts, x)) for x in itertools.product(*itervalues(dicts)))
+
+def full_test_suite():
+    for group_type, params in iteritems(GROUP_PARAMS):
+        for test_problem in test_suite(group_type=group_type, **params):
+            yield test_problem
+
+# Needed for Nose
+full_test_suite.__test__ = False
+
+
+def _test_name(testcase_func, param_num, params):
+    return '_'.join(('test', params.args[0].name))
+
+
+class ParameterizedInstance(object):
+    def __init__(self, group_type, **kwargs):
+
+        self._group_type = group_type
+        self.args = kwargs.copy()
 
         self.name = '_'.join(
             '{0}_{1}'.format(key, _nice_name(value)) for key, value in iteritems(self.args)
@@ -87,15 +145,8 @@ class GeneralProblem(object):
     def setup(self):
         self._setup = True
         args = self.args
-        group = TestGroupFlat(num_comp=args['num_comp'],
-                              num_var=args['num_var'],
-                              var_shape=args['var_shape'],
-                              connection_type=args['connection_type'],
-                              jacobian_type=args['jacobian_type'],
-                              partial_type=args['partial_type'],
-                              component_class=args['component_class'],
-                              )
 
+        group = GROUP_CONSTRUCTORS[self._group_type](**args)
         self.problem = prob = Problem(group).setup(args['vector_class'], check=False)
 
         if args['global_jac']:
@@ -122,9 +173,9 @@ class GeneralProblem(object):
         n = args['num_var']
         m = args['num_comp'] - 1
         d_value = 0.01 * size * (n * (n + 1)) / 2 * m
-        if args['component_class'] == TestImplCompNondLinear:
+        if args['component_class'] == 'implicit':
             self.value = 1 + d_value
-        elif args['component_class'] == TestExplCompNondLinear:
+        elif args['component_class'] == 'explicit':
             self.value = 1 - d_value
         else:
             raise NotImplementedError()
@@ -183,22 +234,12 @@ class GeneralProblem(object):
         return root._vectors[out]['linear']._data
 
 
-def full_test_suite():
-    for args in itertools.product(*TEST_PARAMS):
-        yield (GeneralProblem(*args),)
-
-# Needed for Nose
-full_test_suite.__test__ = False
-
-
-def _test_name(testcase_func, param_num, params):
-    return '_'.join(('test', params.args[0].name))
-
-
 class ParameterizedTestCases(unittest.TestCase):
     """The TestCase that actually runs all of the cases inherits from this."""
 
-    @parameterized.expand(full_test_suite(),
+    # @parameterized.expand(full_test_suite(),
+    #                       testcase_func_name=_test_name)
+    @parameterized.expand(test_suite(group_type='mesh', **MESH_PARAMS),
                           testcase_func_name=_test_name)
     def test_openmdao(self, test):
 

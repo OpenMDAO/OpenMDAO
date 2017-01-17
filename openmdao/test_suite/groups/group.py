@@ -4,10 +4,13 @@ from __future__ import division, print_function
 from six.moves import range
 
 from openmdao.api import Group
+from openmdao.test_suite.components.explicit_components import TestExplCompNondLinear
+from openmdao.test_suite.components.implicit_components import TestImplCompNondLinear
 
 
-class TestGroupFlat(Group):
-    """Test group flat, with only 1 level of hierarchy."""
+class TestMeshGroup(Group):
+    """Test group flat, with only 1 level of hierarchy.
+    Every component is connected to every other component."""
 
     def initialize(self):
         self.metadata.declare('num_comp', type_=int, value=2,
@@ -19,7 +22,8 @@ class TestGroupFlat(Group):
         self.metadata.declare('connection_type', type_=str, value='explicit',
                               values=['explicit', 'implicit'],
                               desc='how to connect variables')
-        self.metadata.declare('component_class',
+        self.metadata.declare('component_class', value='explicit',
+                              values=['explicit', 'implicit'],
                               desc='Component class to instantiate')
         self.metadata.declare('jacobian_type', value='matvec',
                               values=['matvec', 'dense', 'sparse-coo',
@@ -31,7 +35,13 @@ class TestGroupFlat(Group):
 
         num_comp = self.metadata['num_comp']
         num_var = self.metadata['num_var']
-        component_class = self.metadata['component_class']
+        if self.metadata['component_class'] == 'explicit':
+            component_class = TestExplCompNondLinear
+        elif self.metadata['component_class'] == 'implicit':
+            component_class = TestImplCompNondLinear
+        else:
+            raise ValueError('Component class must be "explicit" or "implicit"')
+
         for icomp in range(num_comp):
             kwargs = {
                 'num_input': num_var * (num_comp - 1),
@@ -74,3 +84,6 @@ class TestGroupFlat(Group):
                             out_name = 'comp_%i.output_%i' % (icomp2, ivar)
                             self.connect(out_name, in_name)
                             index += 1
+
+
+        self.expected_d_input = 0

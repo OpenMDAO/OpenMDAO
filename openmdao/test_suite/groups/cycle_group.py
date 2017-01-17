@@ -271,7 +271,7 @@ class CycleGroup(Group):
     def _initialize_metadata(self):
         self.metadata.declare('num_comp', type_=int, value=2,
                               desc='Total number of components')
-        self.metadata.declare('variable_length', type_=int, value=3,
+        self.metadata.declare('variable_length', type_=int, value=10,
                               desc='Size of the underlying systems.')
         self.metadata.declare('connection_type', type_=str, value='explicit',
                               values=['explicit', 'implicit'],
