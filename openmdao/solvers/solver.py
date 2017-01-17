@@ -165,7 +165,7 @@ class Solver(object):
         """
         pass
 
-    def __call__(self):
+    def solve(self):
         """Run the solver.
 
         Returns
@@ -216,7 +216,7 @@ class Solver(object):
 class NonlinearSolver(Solver):
     """Base class for nonlinear solvers."""
 
-    def __call__(self):
+    def solve(self):
         """Run the solver.
 
         Returns
@@ -260,7 +260,7 @@ class NonlinearSolver(Solver):
 class LinearSolver(Solver):
     """Base class for linear solvers."""
 
-    def __call__(self, vec_names, mode):
+    def solve(self, vec_names, mode):
         """Run the solver.
 
         Args

@@ -74,7 +74,7 @@ class ScipyIterativeSolver(LinearSolver):
         self._mpi_print(self._iter_count, norm / self._norm0, norm)
         self._iter_count += 1
 
-    def __call__(self, vec_names, mode):
+    def solve(self, vec_names, mode):
         """Run the solver.
 
         Args

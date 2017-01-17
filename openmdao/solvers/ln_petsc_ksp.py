@@ -214,7 +214,7 @@ class PetscKSP(LinearSolver):
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
 
-    def __call__(self, vec_names, mode):
+    def solve(self, vec_names, mode):
         """Solve the linear system for the problem in self._system.
 
         The full solution vector is returned.
@@ -298,7 +298,7 @@ class PetscKSP(LinearSolver):
             b_vec.set_data(_get_petsc_vec_array(in_vec))
 
             # call the preconditioner
-            self._precon([vec_name], mode)
+            self._precon.solve([vec_name], mode)
 
             # stuff resulting value of x vector into result for KSP
             x_vec.get_data(result.array)
