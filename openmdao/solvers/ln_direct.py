@@ -72,7 +72,7 @@ class DirectSolver(LinearSolver):
         # return result
         return b_vec.get_data()
 
-    def __call__(self, vec_names, mode):
+    def solve(self, vec_names, mode):
         """See LinearSolver."""
         self._vec_names = vec_names
         self._mode = mode
