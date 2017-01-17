@@ -148,7 +148,8 @@ class Problem(object):
             Object for logging config checks if check is True.
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint).
+            reverse (adjoint). Default is 'auto', which lets OpenMDAO choose
+            the best mode for your problem.
 
         Returns
         -------
