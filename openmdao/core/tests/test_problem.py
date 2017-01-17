@@ -2,7 +2,7 @@
 
 import unittest
 
-from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver
+from openmdao.api import Problem, Group, IndepVarComp
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
@@ -17,9 +17,6 @@ class TestProblem(unittest.TestCase):
         root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
-        # TODO: We should use our default solver here, when it is working.
-        root.ln_solver = ScipyIterativeSolver()
 
         top.setup(check=False, mode='fwd')
         top.root.suppress_solver_output = True
