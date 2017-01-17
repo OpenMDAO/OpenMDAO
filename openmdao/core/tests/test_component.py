@@ -97,7 +97,13 @@ class TestIndepVarComp(unittest.TestCase):
         self.assertEqualArrays(prob['indep_var'], array)
 
     def test___init___2vars(self):
-        """Define two independent variables at once."""
+        """Define two independent variables at once.
+
+        Features
+        --------
+        indepvarcomp
+
+        """
         comp = IndepVarComp((
             ('indep_var_1', 1.0),
             ('indep_var_2', 2.0),

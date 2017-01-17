@@ -70,18 +70,18 @@ def compute_sys_graph(group, input_src_ids, comps_only=False):
     else:
         subsystems = group._subsystems_allprocs
 
-    i_start, i_end = group._variable_allprocs_range['input']
-    o_start, o_end = group._variable_allprocs_range['output']
+    i_start, i_end = group._var_allprocs_range['input']
+    o_start, o_end = group._var_allprocs_range['output']
 
     # mapping arrays to find the system ID given the variable ID
     invar2sys = numpy.empty(i_end - i_start, dtype=int)
     outvar2sys = numpy.empty(o_end - o_start, dtype=int)
 
     for i, s in enumerate(subsystems):
-        start, end = s._variable_allprocs_range['input']
+        start, end = s._var_allprocs_range['input']
         invar2sys[start - i_start:end - i_start] = i
 
-        start, end = s._variable_allprocs_range['output']
+        start, end = s._var_allprocs_range['output']
         outvar2sys[start - o_start:end - o_start] = i
 
     graph = nx.DiGraph()
@@ -90,8 +90,8 @@ def compute_sys_graph(group, input_src_ids, comps_only=False):
         if (src_id != -1 and (o_start <= src_id < o_end) and
                 (i_start <= in_id < i_end)):
             # offset the ids to index into our var2sys arrays
-            graph.add_edge(subsystems[outvar2sys[src_id - o_start]].path_name,
-                           subsystems[invar2sys[in_id - i_start]].path_name)
+            graph.add_edge(subsystems[outvar2sys[src_id - o_start]].pathname,
+                           subsystems[invar2sys[in_id - i_start]].pathname)
 
     return graph
 
@@ -116,7 +116,7 @@ def get_sccs(group, comps_only=False):
     list of sets of str
         A list of strongly connected components in topological order.
     """
-    graph = compute_sys_graph(group, group._sys_assembler._input_src_ids,
+    graph = compute_sys_graph(group, group._assembler._input_src_ids,
                               comps_only=comps_only)
 
     # Tarjan's algorithm returns SCCs in reverse topological order, so
@@ -146,7 +146,7 @@ def _check_dataflow(group, logger):
 
         if cycles:
             logger.warning("Group '%s' has the following cycles: %s" %
-                           (system.path_name, cycles))
+                           (system.pathname, cycles))
             for i, cycle in enumerate(cycles):
                 # keep track of cycles so we can detect when a system in
                 # one cycle is out of order with a system in a different cycle.
@@ -154,7 +154,7 @@ def _check_dataflow(group, logger):
                     cycle_idxs[s] = i
 
         ubcs = _get_out_of_order_subs(system,
-                                      system._sys_assembler._input_src_ids)
+                                      system._assembler._input_src_ids)
 
         for tgt_system, src_systems in sorted(ubcs.items()):
             keep_srcs = []
@@ -193,18 +193,18 @@ def _get_out_of_order_subs(group, input_src_ids):
     """
     subsystems = group._subsystems_allprocs
 
-    i_start, i_end = group._variable_allprocs_range['input']
-    o_start, o_end = group._variable_allprocs_range['output']
+    i_start, i_end = group._var_allprocs_range['input']
+    o_start, o_end = group._var_allprocs_range['output']
 
     # mapping arrays to find the system ID given the variable ID
     invar2sys = numpy.empty(i_end - i_start, dtype=int)
     outvar2sys = numpy.empty(o_end - o_start, dtype=int)
 
     for i, s in enumerate(subsystems):
-        start, end = s._variable_allprocs_range['input']
+        start, end = s._var_allprocs_range['input']
         invar2sys[start - i_start:end - i_start] = i
 
-        start, end = s._variable_allprocs_range['output']
+        start, end = s._var_allprocs_range['output']
         outvar2sys[start - o_start:end - o_start] = i
 
     ubcs = {}
@@ -215,8 +215,8 @@ def _get_out_of_order_subs(group, input_src_ids):
             src_sysID = outvar2sys[src_id - o_start]
             tgt_sysID = invar2sys[in_id - i_start]
             if (src_sysID > tgt_sysID):
-                src_sys = subsystems[src_sysID].path_name
-                tgt_sys = subsystems[tgt_sysID].path_name
+                src_sys = subsystems[src_sysID].pathname
+                tgt_sys = subsystems[tgt_sysID].pathname
                 ubcs.setdefault(tgt_sys, []).append(src_sys)
 
     return ubcs

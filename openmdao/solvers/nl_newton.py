@@ -1,9 +1,13 @@
 """Define the NewtonSolver class."""
+
 from openmdao.solvers.solver import NonlinearSolver
 
 
 class NewtonSolver(NonlinearSolver):
-    """Newton solver."""
+    """Newton solver.
+
+    The default linear solver is the ln_solver in the containing system.
+    """
 
     SOLVER = 'NL: Newton'
 
@@ -25,11 +29,11 @@ class NewtonSolver(NonlinearSolver):
     def _iter_execute(self):
         """Perform the operations in the iteration loop."""
         system = self._system
-        system._vectors['residual'][''].set_vec(system._residuals)
-        system._vectors['residual'][''] *= -1.0
+        system._vectors['residual']['linear'].set_vec(system._residuals)
+        system._vectors['residual']['linear'] *= -1.0
         system._linearize()
-        self.options['subsolvers']['linear']([''], 'fwd')
+        self.options['subsolvers']['linear'](['linear'], 'fwd')
         if 'linesearch' in self.options['subsolvers']:
             self.options['subsolvers']['linesearch']()
         else:
-            system._outputs += system._vectors['output']['']
+            system._outputs += system._vectors['output']['linear']

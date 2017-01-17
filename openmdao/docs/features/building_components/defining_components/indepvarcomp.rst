@@ -49,16 +49,17 @@ Define one independent array variable.
 
     self.assertEqualArrays(prob['indep_var'], array)
 
-Define two independent variables at once.
+.. showunittestexamples::
+    indepvarcomp
 
-::
+Here's an example of embedding code, in the form of the TestIndepVarComp class:
 
-    comp = IndepVarComp((
-        ('indep_var_1', 1.0),
-        ('indep_var_2', 2.0),
-    ))
+.. embedPythonCode::
+    openmdao.core.tests.test_component.TestIndepVarComp
 
-    prob = Problem(comp).setup()
 
-    self.assertEqual(prob['indep_var_1'], 1.0)
-    self.assertEqual(prob['indep_var_2'], 2.0)
+Here's an example of embedding code, in the form of the `test___init___1var` method:
+
+.. embedPythonCode::
+    openmdao.core.tests.test_component.TestIndepVarComp.test___init___1var
+    

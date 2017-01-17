@@ -3,18 +3,25 @@
 # containing dir.
 import sys
 import os
-
-
+import pkgutil
+import inspect
+import re
+import textwrap
+from numpydoc.docscrape_sphinx import SphinxDocString
+from numpydoc.docscrape import NumpyDocString, Reader
+import openmdao
 from mock import Mock
+
 MOCK_MODULES = ['h5py', 'petsc4py', 'mpi4py', 'pyoptsparse']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
-
-import openmdao
 
 
 # this function is used to create the entire directory structure
 # of our source docs, as well as writing out each individual rst file.
 def generate_docs(doctype):
+    """
+    generate_docs
+    """
     index_top_dev = """:orphan:
 
 .. _source_documentation_dev:
@@ -47,7 +54,7 @@ OpenMDAO User Source Documentation
 
 """
 
-    if(doctype == "usr"):
+    if doctype == "usr":
         ref_sheet_bottom = """
    :members:
    :undoc-members:
@@ -58,7 +65,7 @@ OpenMDAO User Source Documentation
 .. toctree::
    :maxdepth: 1
 """
-    elif(doctype == "dev"):
+    elif doctype == "dev":
         ref_sheet_bottom = """
    :members:
    :show-inheritance:
@@ -109,7 +116,7 @@ OpenMDAO User Source Documentation
     # begin writing the 'srcdocs/index.rst' file at mid  level.
     index_filename = os.path.join(doc_dir, "index.rst")
     index = open(index_filename, "w")
-    if (doctype == "dev"):
+    if doctype == "dev":
         index.write(index_top_dev)
     else:
         index.write(index_top_usr)
@@ -166,7 +173,8 @@ OpenMDAO User Source Documentation
                     # get the meat of the ref sheet code done
                     filename = sub_package + ".py"
                     ref_sheet.write(".. index:: " + doctype + "_" + filename + "\n\n")
-                    ref_sheet.write(".. _" + doctype + "_" + package_name + "." + filename + ":\n\n")
+                    ref_sheet.write(".. _" + doctype + "_" + package_name + "." +
+                                    filename + ":\n\n")
                     ref_sheet.write(filename + "\n")
                     ref_sheet.write("+" * len(filename) + "\n\n")
                     ref_sheet.write(".. automodule:: " + package_name + "." + sub_package)
@@ -186,7 +194,7 @@ OpenMDAO User Source Documentation
 # type is passed in from the Makefile via the -t tags argument to sphinxbuild
 if tags.has("dev"):
     doctype = "dev"
-if tags.has("usr"):
+elif tags.has("usr"):
     doctype = "usr"
 else:
     doctype = None
@@ -194,124 +202,133 @@ else:
 if doctype:
     generate_docs(doctype)
 
+
 # ------------------------begin monkeypatch-----------------------
 # monkeypatch to make our docs say "Args" instead of "Parameters"
-from numpydoc.docscrape_sphinx import SphinxDocString
-from numpydoc.docscrape import NumpyDocString, Reader
-import textwrap
-
-
 def _parse(self):
-        self._doc.reset()
-        self._parse_summary()
+    """
+    parse
+    """
+    self._doc.reset()
+    self._parse_summary()
 
-        sections = list(self._read_sections())
-        section_names = set([section for section, content in sections])
+    sections = list(self._read_sections())
+    section_names = set([section for section, content in sections])
 
-        has_returns = 'Returns' in section_names
-        has_yields = 'Yields' in section_names
-        # We could do more tests, but we are not. Arbitrarily.
-        if has_returns and has_yields:
-            msg = 'Docstring contains both a Returns and Yields section.'
-            raise ValueError(msg)
+    has_returns = 'Returns' in section_names
+    has_yields = 'Yields' in section_names
+    # We could do more tests, but we are not. Arbitrarily.
+    if has_returns and has_yields:
+        msg = 'Docstring contains both a Returns and Yields section.'
+        raise ValueError(msg)
 
-        for (section, content) in sections:
-            if not section.startswith('..'):
-                section = (s.capitalize() for s in section.split(' '))
-                section = ' '.join(section)
-                if self.get(section):
-                    msg = ("The section %s appears twice in the docstring." %
-                           section)
-                    raise ValueError(msg)
+    for (section, content) in sections:
+        if not section.startswith('..'):
+            section = (s.capitalize() for s in section.split(' '))
+            section = ' '.join(section)
+            if self.get(section):
+                msg = ("The section %s appears twice in the docstring." %
+                       section)
+                raise ValueError(msg)
 
-            if section in ('Args', 'Options', 'Params', 'Returns', 'Yields', 'Raises',
-                           'Warns', 'Other Args', 'Attributes',
-                           'Methods'):
-                self[section] = self._parse_param_list(content)
-            elif section.startswith('.. index::'):
-                self['index'] = self._parse_index(section, content)
-            elif section == 'See Also':
-                self['See Also'] = self._parse_see_also(content)
-            else:
-                self[section] = content
+        if section in ('Args', 'Options', 'Params', 'Returns', 'Yields', 'Raises',
+                       'Warns', 'Other Args', 'Attributes',
+                       'Methods'):
+            self[section] = self._parse_param_list(content)
+        elif section.startswith('.. index::'):
+            self['index'] = self._parse_index(section, content)
+        elif section == 'See Also':
+            self['See Also'] = self._parse_see_also(content)
+        else:
+            self[section] = content
 
 
 def __str__(self, indent=0, func_role="obj"):
-        out = []
-        out += self._str_signature()
-        out += self._str_index() + ['']
-        out += self._str_summary()
-        out += self._str_extended_summary()
-        out += self._str_param_list('Args')
-        out += self._str_options('Options')
-        out += self._str_options('Params')
-        out += self._str_returns()
-        for param_list in ('Other Args', 'Raises', 'Warns'):
-            out += self._str_param_list(param_list)
-        out += self._str_warnings()
-        out += self._str_see_also(func_role)
-        out += self._str_section('Notes')
-        out += self._str_references()
-        out += self._str_examples()
-        for param_list in ('Attributes', 'Methods'):
-            out += self._str_member_list(param_list)
-        out = self._str_indent(out, indent)
-        return '\n'.join(out)
+    """
+    our own __str__
+    """
+    out = []
+    out += self._str_signature()
+    out += self._str_index() + ['']
+    out += self._str_summary()
+    out += self._str_extended_summary()
+    out += self._str_param_list('Args')
+    out += self._str_options('Options')
+    out += self._str_options('Params')
+    out += self._str_returns()
+    for param_list in ('Other Args', 'Raises', 'Warns'):
+        out += self._str_param_list(param_list)
+    out += self._str_warnings()
+    out += self._str_see_also(func_role)
+    out += self._str_section('Notes')
+    out += self._str_references()
+    out += self._str_examples()
+    for param_list in ('Attributes', 'Methods'):
+        out += self._str_member_list(param_list)
+    out = self._str_indent(out, indent)
+    return '\n'.join(out)
 
 
 def __init__(self, docstring, config={}):
-        docstring = textwrap.dedent(docstring).split('\n')
+    """
+    init
+    """
+    docstring = textwrap.dedent(docstring).split('\n')
 
-        self._doc = Reader(docstring)
-        self._parsed_data = {
-            'Signature': '',
-            'Summary': [''],
-            'Extended Summary': [],
-            'Args': [],
-            'Options': [],
-            'Returns': [],
-            'Raises': [],
-            'Warns': [],
-            'Other Args': [],
-            'Attributes': [],
-            'Params': [],
-            'Methods': [],
-            'See Also': [],
-            'Notes': [],
-            'Warnings': [],
-            'References': '',
-            'Examples': '',
-            'index': {}
-            }
+    self._doc = Reader(docstring)
+    self._parsed_data = {
+        'Signature': '',
+        'Summary': [''],
+        'Extended Summary': [],
+        'Args': [],
+        'Options': [],
+        'Returns': [],
+        'Raises': [],
+        'Warns': [],
+        'Other Args': [],
+        'Attributes': [],
+        'Params': [],
+        'Methods': [],
+        'See Also': [],
+        'Notes': [],
+        'Warnings': [],
+        'References': '',
+        'Examples': '',
+        'index': {}
+    }
 
-        try:
-            self._parse()
-        except ParseError as e:
-            e.docstring = orig_docstring
-            raise
+    try:
+        self._parse()
+    except ParseError as e:
+        e.docstring = orig_docstring
+        raise
 
-        # In creation of usr docs, remove private Attributes (beginning with '_')
-        # with a crazy list comprehension
-        if tags.has("usr"):
-            self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"] if not att[0].startswith('_')]
+    # In creation of usr docs, remove private Attributes (beginning with '_')
+    # with a crazy list comprehension
+    if tags.has("usr"):
+        self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"]
+                                              if not att[0].startswith('_')]
 
 
 def _str_options(self, name):
-        out = []
-        if self[name]:
-            out += self._str_field_list(name)
-            out += ['']
-            for param, param_type, desc in self[name]:
-                if param_type:
-                    out += self._str_indent(['**%s** : %s' % (param.strip(),
-                                                              param_type)])
-                else:
-                    out += self._str_indent(['**%s**' % param.strip()])
-                if desc:
-                    out += ['']
-                    out += self._str_indent(desc, 8)
+    """
+    """
+    out = []
+    if self[name]:
+        out += self._str_field_list(name)
+        out += ['']
+        for param, param_type, desc in self[name]:
+            if param_type:
+                out += self._str_indent(['**%s** : %s' % (param.strip(),
+                                                          param_type)])
+            else:
+                out += self._str_indent(['**%s**' % param.strip()])
+            if desc:
                 out += ['']
-        return out
+                out += self._str_indent(desc, 8)
+            out += ['']
+    return out
+
 
 # Do the actual patch switchover to these local versions
 NumpyDocString.__init__ = __init__
@@ -323,15 +340,13 @@ SphinxDocString.__str__ = __str__
 # --------------begin sphinx extension---------------------
 # a short sphinx extension to take care of hyperlinking in docs
 # where a syntax of <linktext> is employed.
-import pkgutil
-import inspect
 
 # first, we will need a dict that contains full pathnames to every class.
 # we construct that here, once, then use it for lookups in om_process_docstring
 package = openmdao
 om_classes = {}
 for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
-                                                      prefix=package.__name__+'.',
+                                                      prefix=package.__name__ + '.',
                                                       onerror=lambda x: None):
     if not ispkg:
         if 'docs' not in modname:
@@ -342,8 +357,9 @@ for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
 
 
 def om_process_docstring(app, what, name, obj, options, lines):
-    import re
-
+    """
+    our process_docstring
+    """
     for i in range(len(lines)):
         # create a regex pattern to match <linktext>
         pat = r'(<.*?>)'
@@ -353,6 +369,9 @@ def om_process_docstring(app, what, name, obj, options, lines):
             for ma in match:
                 # strip off the angle brackets `<>`
                 m = ma[1:-1]
+                #to get rid of bad matches in OrderedDict.set_item
+                if m=="==":
+                    continue
                 # if there's a dot in the pattern, it's a method
                 # e.g. <classname.method_name>
                 if '.' in m:
@@ -368,38 +387,45 @@ def om_process_docstring(app, what, name, obj, options, lines):
                         lines[i] = lines[i].replace(ma, link)
                     else:
                         # the class isn't in the class table!
-                        print("WARNING: {} not found in dictionary of OpenMDAO methods".format(justclass))
-                        # replace instances of <class> with just class in docstring (strip angle brackets)
+                        print("WARNING: {} not found in dictionary of OpenMDAO methods".format
+                              (justclass))
+                        # replace instances of <class> with just class in docstring
+                        # (strip angle brackets)
                         lines[i] = lines[i].replace(ma, m)
                 # otherwise, it's a class
                 else:
                     if m in om_classes:
                         classfullpath = om_classes[m]
-                        lines[i] = lines[i].replace(ma, ":class:`~"+classfullpath+"`")
+                        lines[i] = lines[i].replace(ma, ":class:`~" + classfullpath + "`")
                     else:
                         # the class isn't in the class table!
-                        print("WARNING: {} not found in dictionary of OpenMDAO classes".format(m))
-                        # replace instances of <class> with class in docstring (strip angle brackets)
+                        print("WARNING: {} not found in dictionary of OpenMDAO classes"
+                              .format(m))
+                        # replace instances of <class> with class in docstring
+                        # (strip angle brackets)
                         lines[i] = lines[i].replace(ma, m)
 
 
 # This is the crux of the extension--connecting an internal
 # Sphinx event with our own custom function.
 def setup(app):
+    """
+    """
     app.connect('autodoc-process-docstring', om_process_docstring)
 
-#--------------end sphinx extension---------------------
 
+# --------------end sphinx extension---------------------
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('./exts'))
 
-if (type == "usr"):
+if type == "usr":
     absp = os.path.join('.', 'srcdocs', 'usr')
     sys.path.insert(0, os.path.abspath(absp))
-elif (type == "dev"):
+elif type == "dev":
     absp = os.path.join('.', 'srcdocs', 'dev')
     sys.path.insert(0, os.path.abspath(absp))
 
@@ -420,7 +446,9 @@ extensions = [
     'sphinx.ext.coverage',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'numpydoc'
+    'numpydoc',
+    'showUnitTestExamples',
+    'embedPythonCode'
 ]
 
 numpydoc_show_class_members = False
@@ -479,7 +507,7 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 html_theme = 'theme'
-#html_theme = 'sphinxdoc'
+# html_theme = 'sphinxdoc'
 
 # Add any paths that contain custom themes here, relative to this directory.
 html_theme_path = ['.']

@@ -44,7 +44,7 @@ class GlobalJacobian(Jacobian):
         """
         sizes_all = self._assembler._variable_sizes_all
         iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
-        ivar_all0 = self._system._variable_allprocs_range['output'][0]
+        ivar_all0 = self._system._var_allprocs_range['output'][0]
 
         ind1 = numpy.sum(sizes_all['output'][iproc, ivar_all0:ivar_all])
         ind2 = numpy.sum(sizes_all['output'][iproc, ivar_all0:ivar_all + 1])
@@ -53,9 +53,9 @@ class GlobalJacobian(Jacobian):
 
     def _initialize(self):
         """Allocate the global matrices."""
-        indices = self._system._variable_myproc_indices
-        meta = self._system._variable_myproc_metadata['input']
-        ivar1, ivar2 = self._system._variable_allprocs_range['output']
+        indices = self._system._var_myproc_indices
+        meta = self._system._var_myproc_metadata['input']
+        ivar1, ivar2 = self._system._var_allprocs_range['output']
 
         self._int_mtx = self.options['matrix_class'](self._system.comm)
         self._ext_mtx = self.options['matrix_class'](self._system.comm)
@@ -70,73 +70,72 @@ class GlobalJacobian(Jacobian):
         for re_var_all in indices['output']:
             re_offset = out_offsets[re_var_all]
 
-            for op_var_all in indices['output']:
-                key = (re_var_all, op_var_all)
-                if key in self._op_dict:
-                    jac = self._op_dict[key]
+            for out_var_all in indices['output']:
+                key = (re_var_all, out_var_all)
+                if key in self._out_dict:
+                    jac = self._out_dict[key]
 
-                    self._int_mtx._op_add_submat(
-                        key, jac, re_offset, out_offsets[op_var_all])
+                    self._int_mtx._out_add_submat(
+                        key, jac, re_offset, out_offsets[out_var_all])
 
-            for ip_var_all in indices['input']:
-                key = (re_var_all, ip_var_all)
-                if key in self._ip_dict:
-                    jac = self._ip_dict[key]
+            for in_var_all in indices['input']:
+                key = (re_var_all, in_var_all)
+                if key in self._in_dict:
+                    jac = self._in_dict[key]
 
-                    op_var_all = self._assembler._input_src_ids[ip_var_all]
-                    if ivar1 <= op_var_all < ivar2:
-                        if src_indices[ip_var_all] is None:
+                    out_var_all = self._assembler._input_src_ids[in_var_all]
+                    if ivar1 <= out_var_all < ivar2:
+                        if src_indices[in_var_all] is None:
                             self._keymap[key] = key
-                            self._int_mtx._ip_add_submat(
-                                key, jac, re_offset, out_offsets[op_var_all],
+                            self._int_mtx._in_add_submat(
+                                key, jac, re_offset, out_offsets[out_var_all],
                                 None)
                         else:
                             # need to add an entry for d(output)/d(source)
                             # instead of d(output)/d(input) when we have
                             # src_indices
                             key2 = (key[0],
-                                    self._assembler._input_src_ids[ip_var_all])
+                                    self._assembler._input_src_ids[in_var_all])
                             self._keymap[key] = key2
-                            self._int_mtx._ip_add_submat(
-                                key2, jac, re_offset, out_offsets[op_var_all],
-                                src_indices[ip_var_all])
+                            self._int_mtx._in_add_submat(
+                                key2, jac, re_offset, out_offsets[out_var_all],
+                                src_indices[in_var_all])
                     else:
-                        self._ext_mtx._ip_add_submat(
-                            key, jac, re_offset, in_offsets[ip_var_all], None)
+                        self._ext_mtx._in_add_submat(
+                            key, jac, re_offset, in_offsets[in_var_all], None)
 
-        ind1, ind2 = self._system._variable_allprocs_range['output']
-        op_size = numpy.sum(
+        ind1, ind2 = self._system._var_allprocs_range['output']
+        out_size = numpy.sum(
             self._assembler._variable_sizes_all['output'][ind1:ind2])
 
-        ind1, ind2 = self._system._variable_allprocs_range['input']
-        ip_size = numpy.sum(
+        ind1, ind2 = self._system._var_allprocs_range['input']
+        in_size = numpy.sum(
             self._assembler._variable_sizes_all['input'][ind1:ind2])
 
-        self._int_mtx._build(op_size, op_size)
-        self._ext_mtx._build(op_size, ip_size)
+        self._int_mtx._build(out_size, out_size)
+        self._ext_mtx._build(out_size, in_size)
 
     def _update(self):
         """Read the user's sub-Jacobians and set into the global matrix."""
-        indices = self._system._variable_myproc_indices
-        ivar1, ivar2 = self._system._variable_allprocs_range['output']
+        indices = self._system._var_myproc_indices
+        ivar1, ivar2 = self._system._var_allprocs_range['output']
 
         for re_var_all in indices['output']:
-            for op_var_all in indices['output']:
-                key = (re_var_all, op_var_all)
-                if key in self._op_dict:
-                    self._int_mtx._op_update_submat(key,
-                                                    self._op_dict[key])
+            for out_var_all in indices['output']:
+                key = (re_var_all, out_var_all)
+                if key in self._out_dict:
+                    self._int_mtx._out_update_submat(key, self._out_dict[key])
 
-            for ip_var_all in indices['input']:
-                key = (re_var_all, ip_var_all)
-                if key in self._ip_dict:
-                    op_var_all = self._assembler._input_src_ids[ip_var_all]
-                    if ivar1 <= op_var_all < ivar2:
-                        self._int_mtx._ip_update_submat(self._keymap[key],
-                                                        self._ip_dict[key])
+            for in_var_all in indices['input']:
+                key = (re_var_all, in_var_all)
+                if key in self._in_dict:
+                    out_var_all = self._assembler._input_src_ids[in_var_all]
+                    if ivar1 <= out_var_all < ivar2:
+                        self._int_mtx._in_update_submat(self._keymap[key],
+                                                        self._in_dict[key])
                     else:
-                        self._ext_mtx._ip_update_submat(key,
-                                                        self._ip_dict[key])
+                        self._ext_mtx._in_update_submat(key,
+                                                        self._in_dict[key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """Compute matrix-vector product.

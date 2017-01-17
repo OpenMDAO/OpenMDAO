@@ -85,11 +85,11 @@ class Problem(object):
         """
         try:
             self.root._outputs[name]
-            ind = self.root._variable_myproc_names['output'].index(name)
+            ind = self.root._var_myproc_names['output'].index(name)
             c0, c1 = self.root._scaling_to_phys['output'][ind, :]
             return c0 + c1 * self.root._outputs[name]
         except KeyError:
-            ind = self.root._variable_myproc_names['input'].index(name)
+            ind = self.root._var_myproc_names['input'].index(name)
             c0, c1 = self.root._scaling_to_phys['input'][ind, :]
             return c0 + c1 * self.root._inputs[name]
 
@@ -105,11 +105,11 @@ class Problem(object):
         """
         try:
             self.root._outputs[name]
-            ind = self.root._variable_myproc_names['output'].index(name)
+            ind = self.root._var_myproc_names['output'].index(name)
             c0, c1 = self.root._scaling_to_norm['output'][ind, :]
             self.root._outputs[name] = c0 + c1 * value
         except KeyError:
-            ind = self.root._variable_myproc_names['input'].index(name)
+            ind = self.root._var_myproc_names['input'].index(name)
             c0, c1 = self.root._scaling_to_norm['input'][ind, :]
             self.root._inputs[name] = c0 + c1 * value
 
@@ -150,36 +150,36 @@ class Problem(object):
         assembler = self._assembler
 
         # Recursive system setup
-        root._setup_processors('', comm, {}, 0, assembler, [0, comm.size])
+        root._setup_processors('', comm, {}, assembler, [0, comm.size])
         root._setup_variables()
         root._setup_variable_indices({'input': 0, 'output': 0})
         root._setup_connections()
 
         # Assembler setup: variable metadata and indices
-        nvars = {typ: len(root._variable_allprocs_names[typ])
+        nvars = {typ: len(root._var_allprocs_names[typ])
                  for typ in ['input', 'output']}
-        assembler._setup_variables(nvars, root._variable_myproc_metadata,
-                                   root._variable_myproc_indices)
+        assembler._setup_variables(nvars, root._var_myproc_metadata,
+                                   root._var_myproc_indices)
 
         # Assembler setup: variable connections
-        assembler._setup_connections(root._variable_connections_indices,
-                                     root._variable_allprocs_names)
+        assembler._setup_connections(root._var_connections_indices,
+                                     root._var_allprocs_names)
 
         # Assembler setup: global transfer indices vector
-        assembler._setup_src_indices(root._variable_myproc_metadata['input'],
-                                     root._variable_myproc_indices['input'])
+        assembler._setup_src_indices(root._var_myproc_metadata['input'],
+                                     root._var_myproc_indices['input'])
 
         # Assembler setup: compute data required for units/scaling
-        assembler._setup_src_data(root._variable_myproc_metadata['output'],
-                                  root._variable_myproc_indices['output'])
+        assembler._setup_src_data(root._var_myproc_metadata['output'],
+                                  root._var_myproc_indices['output'])
 
         root._setup_scaling()
 
         # Vector setup for the basic execution vector
-        self.setup_vector(None, vector_class, self._use_ref_vector)
+        self.setup_vector('nonlinear', vector_class, self._use_ref_vector)
 
         # Vector setup for the linear vector
-        self.setup_vector('', vector_class, self._use_ref_vector)
+        self.setup_vector('linear', vector_class, self._use_ref_vector)
 
         if check:
             check_config(self, logger)
@@ -211,7 +211,7 @@ class Problem(object):
             vectors[key] = vector_class(vec_name, typ, self.root)
 
         # TODO: implement this properly
-        ind1, ind2 = self.root._variable_allprocs_range['output']
+        ind1, ind2 = self.root._var_allprocs_range['output']
         import numpy
         vector_var_ids = numpy.arange(ind1, ind2)
 

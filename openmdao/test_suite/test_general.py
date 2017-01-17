@@ -116,7 +116,7 @@ class GeneralProblem(object):
         self._run = False
 
         size = numpy.prod(args['var_shape'])
-        self.expected_d_input = prob.root._vectors['output']['']._clone(initialize_views=True)
+        self.expected_d_input = prob.root._vectors['output']['linear']._clone(initialize_views=True)
         self.expected_d_output = self.expected_d_input._clone(initialize_views=True)
 
         n = args['num_var']
@@ -155,10 +155,10 @@ class GeneralProblem(object):
         else:
             raise NotImplementedError('Mode must be "fwd" or "rev"')
 
-        root._vectors[in_][''].set_const(1.0)
-        root._apply_linear([''], mode)
-        root._vectors[out][''].add_scal_vec(-self.value, self.expected_d_input)
-        return root._vectors[out][''].get_norm()
+        root._vectors[in_]['linear'].set_const(1.0)
+        root._apply_linear(['linear'], mode)
+        root._vectors[out]['linear'].add_scal_vec(-self.value, self.expected_d_input)
+        return root._vectors[out]['linear'].get_norm()
 
     def solve_linear_test(self, input=None, mode='fwd'):
         root = self.problem.root
@@ -177,10 +177,10 @@ class GeneralProblem(object):
         else:
             raise NotImplementedError('Mode must be "fwd" or "rev"')
 
-        root._vectors[out][''].set_const(0.0)
-        root._vectors[in_][''] = input
-        root._solve_linear([''], mode)
-        return root._vectors[out]['']._data
+        root._vectors[out]['linear'].set_const(0.0)
+        root._vectors[in_]['linear'] = input
+        root._solve_linear(['linear'], mode)
+        return root._vectors[out]['linear']._data
 
 
 def full_test_suite():

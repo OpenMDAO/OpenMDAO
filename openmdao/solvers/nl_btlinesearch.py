@@ -39,7 +39,7 @@ class BacktrackingLineSearch(NonlinearSolver):
         self.alpha = self.options['alpha']
 
         u = system._outputs
-        du = system._vectors['output']['']
+        du = system._vectors['output']['linear']
         # lower = system.lower
         # upper = system.upper
         #
@@ -70,7 +70,7 @@ class BacktrackingLineSearch(NonlinearSolver):
         """Perform the operations in the iteration loop."""
         system = self._system
         u = system._outputs
-        du = system._vectors['output']['']
+        du = system._vectors['output']['linear']
 
         u.add_scal_vec(-self.alpha, du)
         self.alpha *= self.options['rho']

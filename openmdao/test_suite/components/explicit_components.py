@@ -27,53 +27,53 @@ class TestExplCompNondLinear(ExplicitComponent):
         var_shape = self.metadata['var_shape']
         size = numpy.prod(var_shape)
 
-        self.metadata['ip_names'] = ['input_%i' % ip_ind for ip_ind in
+        self.metadata['in_names'] = ['input_%i' % in_ind for in_ind in
                                      range(self.metadata['num_input'])]
-        self.metadata['op_names'] = ['output_%i' % op_ind for op_ind in
+        self.metadata['out_names'] = ['output_%i' % out_ind for out_ind in
                                      range(self.metadata['num_output'])]
 
-        for in_name in self.metadata['ip_names']:
+        for in_name in self.metadata['in_names']:
             self.add_input(in_name, shape=var_shape,
                            indices=numpy.arange(size))
 
-        for out_name in self.metadata['op_names']:
+        for out_name in self.metadata['out_names']:
             self.add_output(out_name, shape=var_shape)
 
         self.coeffs = {}
         self.rhs_coeffs = {}
 
-        for out_name in self.metadata['op_names']:
+        for out_name in self.metadata['out_names']:
             mtx = numpy.ones(size)
             self.rhs_coeffs[out_name] = mtx
-            for in_name in self.metadata['ip_names']:
+            for in_name in self.metadata['in_names']:
                 mtx = numpy.ones((size, size)) * 0.01
                 self.coeffs[out_name, in_name] = mtx
 
     def compute(self, inputs, outputs):
-        for op_name in self.metadata['op_names']:
-            op = outputs._views_flat[op_name]
-            op[:] = -self.rhs_coeffs[op_name]
-            for ip_name in self.metadata['ip_names']:
-                mtx = self.coeffs[op_name, ip_name]
-                ip = inputs._views_flat[ip_name]
+        for out_name in self.metadata['out_names']:
+            op = outputs._views_flat[out_name]
+            op[:] = -self.rhs_coeffs[out_name]
+            for in_name in self.metadata['in_names']:
+                mtx = self.coeffs[out_name, in_name]
+                ip = inputs._views_flat[in_name]
                 op += mtx.dot(ip)
 
     def compute_jacvec_product(self, inputs, outputs,
                                d_inputs, d_outputs, mode):
         if self.metadata['jacobian_type'] == 'matvec':
             if mode == 'fwd':
-                for op_name in d_outputs:
-                    d_op = d_outputs._views_flat[op_name]
-                    for ip_name in d_inputs:
-                        mtx = self.coeffs[op_name, ip_name]
-                        d_ip = d_inputs._views_flat[ip_name]
+                for out_name in d_outputs:
+                    d_op = d_outputs._views_flat[out_name]
+                    for in_name in d_inputs:
+                        mtx = self.coeffs[out_name, in_name]
+                        d_ip = d_inputs._views_flat[in_name]
                         d_op += mtx.dot(d_ip)
             elif mode == 'rev':
-                for op_name in d_outputs:
-                    d_op = d_outputs._views_flat[op_name]
-                    for ip_name in d_inputs:
-                        mtx = self.coeffs[op_name, ip_name]
-                        d_ip = d_inputs._views_flat[ip_name]
+                for out_name in d_outputs:
+                    d_op = d_outputs._views_flat[out_name]
+                    for in_name in d_inputs:
+                        mtx = self.coeffs[out_name, in_name]
+                        d_ip = d_inputs._views_flat[in_name]
                         d_ip += mtx.T.dot(d_op)
 
     def compute_jacobian(self, inputs, outputs, jacobian):
@@ -98,6 +98,6 @@ class TestExplCompNondLinear(ExplicitComponent):
 
         if self.metadata['jacobian_type'] != 'matvec':
             coeffs = self.coeffs
-            for op_name in self.metadata['op_names']:
-                for ip_name in self.metadata['ip_names']:
-                    jacobian[op_name, ip_name] = get_jac((op_name, ip_name))
+            for out_name in self.metadata['out_names']:
+                for in_name in self.metadata['in_names']:
+                    jacobian[out_name, in_name] = get_jac((out_name, in_name))

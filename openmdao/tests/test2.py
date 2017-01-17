@@ -67,9 +67,9 @@ class TestNumpyVec(unittest.TestCase):
         for a, b in ab_list:
             self.assertEqualArrays(a, b)
 
-    def test__variable_allprocs_names(self):
+    def test__var_allprocs_names(self):
         root = self.p.root
-        names = root._variable_allprocs_names['output']
+        names = root._var_allprocs_names['output']
         self.assertEqual(names, ['v1', 'v2', 'v3', 'v4'])
 
     def test__variable_set_IDs(self):
@@ -99,49 +99,49 @@ class TestNumpyVec(unittest.TestCase):
             comp4._outputs['v4'] = 8.0
 
             self.assertList([
-            [comp1._outputs['v1'], 2.0],
-            [comp1._inputs['v2'],  1.0],
-            [comp1._inputs['v3'],  1.0],
-            [comp1._inputs['v4'],  1.0],
+                [comp1._outputs['v1'], 2.0],
+                [comp1._inputs['v2'],  1.0],
+                [comp1._inputs['v3'],  1.0],
+                [comp1._inputs['v4'],  1.0],
             ])
 
             self.assertList([
-            [comp2._inputs['v1'],  1.0],
-            [comp2._outputs['v2'], 4.0],
-            [comp2._inputs['v3'],  1.0],
-            [comp2._inputs['v4'],  1.0],
+                [comp2._inputs['v1'],  1.0],
+                [comp2._outputs['v2'], 4.0],
+                [comp2._inputs['v3'],  1.0],
+                [comp2._inputs['v4'],  1.0],
             ])
 
-            root._vector_transfers[None]['fwd', 0](root._inputs, root._outputs)
+            root._vector_transfers['nonlinear']['fwd', 0](root._inputs, root._outputs)
 
             self.assertList([
-            [comp1._outputs['v1'], 2.0],
-            [comp1._inputs['v2'],  4.0],
-            [comp1._inputs['v3'],  6.0],
-            [comp1._inputs['v4'],  8.0],
-            ])
-
-            self.assertList([
-            [comp2._inputs['v1'],  1.0],
-            [comp2._outputs['v2'], 4.0],
-            [comp2._inputs['v3'],  1.0],
-            [comp2._inputs['v4'],  1.0],
-            ])
-
-            root._vector_transfers[None][None](root._inputs, root._outputs)
-
-            self.assertList([
-            [comp1._outputs['v1'], 2.0],
-            [comp1._inputs['v2'],  4.0],
-            [comp1._inputs['v3'],  6.0],
-            [comp1._inputs['v4'],  8.0],
+                [comp1._outputs['v1'], 2.0],
+                [comp1._inputs['v2'],  4.0],
+                [comp1._inputs['v3'],  6.0],
+                [comp1._inputs['v4'],  8.0],
             ])
 
             self.assertList([
-            [comp2._inputs['v1'],  2.0],
-            [comp2._outputs['v2'], 4.0],
-            [comp2._inputs['v3'],  6.0],
-            [comp2._inputs['v4'],  8.0],
+                [comp2._inputs['v1'],  1.0],
+                [comp2._outputs['v2'], 4.0],
+                [comp2._inputs['v3'],  1.0],
+                [comp2._inputs['v4'],  1.0],
+            ])
+
+            root._vector_transfers['nonlinear'][None](root._inputs, root._outputs)
+
+            self.assertList([
+                [comp1._outputs['v1'], 2.0],
+                [comp1._inputs['v2'],  4.0],
+                [comp1._inputs['v3'],  6.0],
+                [comp1._inputs['v4'],  8.0],
+            ])
+
+            self.assertList([
+                [comp2._inputs['v1'],  2.0],
+                [comp2._outputs['v2'], 4.0],
+                [comp2._inputs['v3'],  6.0],
+                [comp2._inputs['v4'],  8.0],
             ])
 
 
@@ -149,7 +149,7 @@ try:
     from openmdao.parallel_api import PETScVector
 except ImportError:
     PETScVector = None
-    
+
 class TestPetscVec(TestNumpyVec):
 
     def setUp(self):
