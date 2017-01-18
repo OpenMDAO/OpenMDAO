@@ -55,7 +55,16 @@ class Solver(object):
                              desc='whether to print output')
         self.options.declare('subsolvers', type_=dict, value={},
                              desc='dictionary of solvers called by this one')
+
+        self._declare_options()
         self.options.update(kwargs)
+
+    def _declare_options(self):
+        """Declare options before kwargs are processed in the init method.
+
+        This is optionally implemented by subclasses of Solver.
+        """
+        pass
 
     def _setup_solvers(self, system, depth):
         """Assign system instance, set depth, and optionally perform setup.
@@ -165,7 +174,7 @@ class Solver(object):
         """
         pass
 
-    def __call__(self):
+    def solve(self):
         """Run the solver.
 
         Returns
@@ -216,7 +225,7 @@ class Solver(object):
 class NonlinearSolver(Solver):
     """Base class for nonlinear solvers."""
 
-    def __call__(self):
+    def solve(self):
         """Run the solver.
 
         Returns
@@ -260,7 +269,7 @@ class NonlinearSolver(Solver):
 class LinearSolver(Solver):
     """Base class for linear solvers."""
 
-    def __call__(self, vec_names, mode):
+    def solve(self, vec_names, mode):
         """Run the solver.
 
         Args

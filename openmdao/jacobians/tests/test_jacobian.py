@@ -6,9 +6,11 @@ from scipy.sparse import coo_matrix, csr_matrix, issparse
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
      GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CsrMatrix, CooMatrix
+from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from nose_parameterized import parameterized
 import itertools
+
 
 
 class MyExplicitComp(ExplicitComponent):
@@ -68,6 +70,38 @@ class MyExplicitComp2(ExplicitComponent):
         jacobian['f', 'z'] = self._jac_type(np.array([[
             7.
         ]]))
+
+class ExplicitSetItemComp(ExplicitComponent):
+    def __init__(self, dtype, value, shape, constructor):
+        self._dtype = dtype
+        self._shape = shape
+        self._value = value
+        self._constructor = constructor
+        super(ExplicitSetItemComp, self).__init__()
+
+    def initialize_variables(self):
+        if self._shape == 'scalar':
+            in_val = 1
+            out_val = 1
+        elif self._shape == '1D_array':
+            in_val = np.array([1])
+            out_val = np.array([1, 2, 3, 4, 5])
+        elif self._shape == '2D_array':
+            in_val = np.array([1, 2, 3])
+            out_val = np.array([1, 2, 3])
+
+        if self._dtype == 'int':
+            scale = 1
+        elif self._dtype == 'float':
+            scale = 1.
+        elif self._dtype == 'complex':
+            scale = 1j
+
+        self.add_input('in', val=in_val*scale)
+        self.add_output('out', val=out_val*scale)
+
+    def compute_jacobian(self, inputs, outputs, jacobian):
+        jacobian['out', 'in'] = self._constructor(self._value)
 
 
 def arr2list(arr):
@@ -193,3 +227,42 @@ class TestJacobian(unittest.TestCase):
         prob.root._vectors['residual']['linear'] -= work
         self.assertAlmostEqual(
             prob.root._vectors['residual']['linear'].get_norm(), 0, delta=1e-6)
+
+    dtypes = [
+        ('int', 1),
+        ('float', 2.1),
+        # ('complex', 3.2 + 1.1j), # TODO: enable when Vectors support complex entries.
+    ]
+
+    shapes = [
+        ('scalar', lambda x: x),
+        ('1D_array', lambda x: np.array([x + i for i in range(5)])),
+        ('2D_array', lambda x: np.array([[x + i + 2 * j for i in range(3)] for j in range(3)]))
+    ]
+
+    @parameterized.expand(itertools.product(dtypes, shapes), testcase_func_name=
+        lambda f, n, p: '_'.join(['test_jacobian_set_item', p.args[0][0], p.args[1][0]]))
+    def test_jacobian_set_item(self, dtypes, shapes):
+
+
+
+        shape, constructor = shapes
+        dtype, value = dtypes
+
+        prob = Problem(root=Group())
+        comp = ExplicitSetItemComp(dtype, value, shape, constructor)
+        prob.root.add_subsystem('C1', comp)
+        prob.setup(check=False)
+
+        prob.root.suppress_solver_output = True
+        prob.run()
+        prob.root._apply_nonlinear()
+        prob.root._linearize()
+
+        expected = constructor(value)
+        jac_out = prob.root._subsystems_allprocs[0]._jacobian['out', 'in'] * -1
+
+        self.assertEqual(len(jac_out.shape), 2)
+        expected_dtype = np.promote_types(dtype, float)
+        self.assertEqual(jac_out.dtype, expected_dtype)
+        assert_rel_error(self, jac_out.squeeze(), expected, 1e-15)

@@ -16,9 +16,12 @@ class BacktrackingLineSearch(NonlinearSolver):
         """Backtracking line search using the Armijo-Goldstein condition."""
         super(BacktrackingLineSearch, self).__init__(**kwargs)
 
+    def _declare_options(self):
+        """Declare options before kwargs are processed in the init method."""
         opt = self.options
         opt['maxiter'] = 5
-        opt.declare('solve_subsystems', True,
+
+        opt.declare('solve_subsystems', value=True,
                     desc='Set to True to solve subsystems. You may need '
                          'this for solvers nested under Newton.')
         opt.declare('rho', value=0.5, desc="Backtracking multiplier.")

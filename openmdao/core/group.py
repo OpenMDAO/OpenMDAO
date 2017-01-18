@@ -234,7 +234,7 @@ class Group(System):
         float
             absolute error.
         """
-        return self._nl_solver()
+        return self._nl_solver.solve()
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product.
@@ -295,7 +295,7 @@ class Group(System):
         float
             absolute error.
         """
-        return self._ln_solver(vec_names, mode)
+        return self._ln_solver.solve(vec_names, mode)
 
     def _linearize(self, initial=False):
         """Compute jacobian / factorization.
