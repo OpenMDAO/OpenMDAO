@@ -54,7 +54,6 @@ def make_tagfiles(docdirs, tagdir):
 %s
 =========================
   .. toctree::
-     :titlesonly:
 """ % tag
 
                             #write the header for this tag's file.
@@ -77,6 +76,7 @@ Tags in OpenMDAO
 .. toctree::
    :maxdepth: 1
    :glob:
+   
    ./*
  """)
 

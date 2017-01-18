@@ -227,3 +227,28 @@ embedPythonCode
 
         This has the benefit of allowing you to drop entire code blocks into
         a feature doc that illustrate a usage example.
+
+
+Tagging
+-------
+
+OpenMDAO docs support blog-like tagging.  What this means is that you can
+associate words or terms with a document, with the aim of grouping like documents.
+When a user clicks on a tag hyperlink, it takes her to a page that contains links to other documents that have been tagged
+similarly. This makes it easier for users to find supplementary materials on a topic.
+
+If you are writing a document, and you have a set of tags that you want to apply to a document, the syntax is easy,
+once in the document, you just need to invoke the `tags` directive, and then list any categories in which you'd
+like the current document to be included.
+
+::
+
+  .. tags:: indepVarComp, Component
+
+That syntax should generate a Tags box at the bottom of the document that contains
+hyperlinks to each tag's index page:
+
+
+.. image:: images/tags.png
+
+Each tag hyperlink targets an index page that is a list of documents that all contain the same tag, e.g. `Component`.

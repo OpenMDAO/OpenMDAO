@@ -1,7 +1,7 @@
 #tag.py, this custom Sphinx extension is activated in conf.py
 # and allows the use of the custom directive for tags in our rst (e.g.):
 #.. tags:: tag1, tag2, tag3
-
+import os
 from sphinx.util.compat import Directive, make_admonition
 from docutils import nodes
 from sphinx.locale import _
@@ -49,7 +49,9 @@ class TagDirective(Directive):
 
         for tagg in taggs:
             #create rst hyperlinks of format `Python <http://www.python.org/>`_.
-            link = "`" + tagg  +" <../tags/" + tagg + ".html>`_ "
+            #html_dir = os.environ['BUILDDIR']
+            html_dir = "/Users/kmarstel/Work/blue/openmdao/docs/_build/html/"
+            link = "`" + tagg  +" <" + html_dir + "/html/tags/" + tagg + ".html>`_ "
             links.append(link)
         #put links back in a single comma-separated string together
         linkjoin = ", ".join(links)
