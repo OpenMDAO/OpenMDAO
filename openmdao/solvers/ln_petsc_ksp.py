@@ -160,15 +160,16 @@ class PetscKSP(LinearSolver):
 
         self._print_name = 'KSP'
 
-        # add option to specify which KSP algorithm to use
-        self.options.declare('ksp_type', value='fgmres', values=KSP_TYPES,
-                             desc="KSP algorithm to use. Default is 'fgmres'.")
-
         # initialize dictionary of KSP instances (keyed on vector name)
         self._ksp = {}
 
         # initialize preconditioner to None
         self._precon = None
+
+    def _declare_options(self):
+        """Declare options before kwargs are processed in the init method."""
+        self.options.declare('ksp_type', value='fgmres', values=KSP_TYPES,
+                             desc="KSP algorithm to use. Default is 'fgmres'.")
 
     def mult(self, mat, in_vec, result):
         """Apply Jacobian matrix (KSP Callback).

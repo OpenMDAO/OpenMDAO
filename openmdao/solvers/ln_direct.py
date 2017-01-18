@@ -32,6 +32,8 @@ class DirectSolver(LinearSolver):
 
         self._print_name = 'Direct'
 
+    def _declare_options(self):
+        """Declare options before kwargs are processed in the init method."""
         self.options.declare('method', value='solve', values=['LU', 'solve'],
                              desc="Solution method, either 'solve' for " +
                              "linalg.solve, or 'LU' for linalg.lu_factor " +

@@ -22,12 +22,15 @@ class ScipyIterativeSolver(LinearSolver):
             dictionary of options set by the instantiating class/script.
         """
         super(ScipyIterativeSolver, self).__init__(**kwargs)
-        self.options.declare('solver', type_=object, value=gmres,
-                             desc='function handle for actual solver')
 
+    def _declare_options(self):
+        """Declare options before kwargs are processed in the init method."""
         # TODO : These are the defaults we used in OpenMDAO Alpha
         # self.options['maxiter'] = 1000
         # self.options['atol'] = 1.0e-12
+
+        self.options.declare('solver', type_=object, value=gmres,
+                             desc='function handle for actual solver')
 
     def _mat_vec(self, in_vec):
         """Compute matrix-vector product.
