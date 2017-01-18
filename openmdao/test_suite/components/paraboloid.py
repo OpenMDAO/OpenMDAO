@@ -32,4 +32,3 @@ class Paraboloid(ExplicitComponent):
 
         J['f_xy', 'x'] = 2.0*x - 6.0 + y
         J['f_xy', 'y'] = 2.0*y + 8.0 + x
-        return J
