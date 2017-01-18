@@ -338,8 +338,8 @@ class Problem(object):
         # NOTE : Until we support it, we will just limit ourselves to the
         # 'linear' vector.
         vecname = 'linear'
-        dinputs = input_vec['linear']
-        doutputs = output_vec['linear']
+        dinputs = input_vec[vecname]
+        doutputs = output_vec[vecname]
 
         # If Forward mode, solve linear system for each 'wrt'
         # If Adjoint mode, solve linear system for each 'of'

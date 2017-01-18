@@ -25,9 +25,9 @@ class ScipyIterativeSolver(LinearSolver):
         self.options.declare('solver', type_=object, value=gmres,
                              desc='function handle for actual solver')
 
-        # Better defaults
-        self.options['maxiter'] = 200
-        self.options['atol'] = 1.0e-12
+        # TODO : These are the defaults we used in OpenMDAO Alpha
+        # self.options['maxiter'] = 1000
+        # self.options['atol'] = 1.0e-12
 
     def _mat_vec(self, in_vec):
         """Compute matrix-vector product.
