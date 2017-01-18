@@ -2,12 +2,10 @@
 from __future__ import print_function, division
 from openmdao.api import ExplicitComponent, Group, IndepVarComp
 import numpy as np
-from functools import lru_cache
 import scipy.sparse as sparse
 from six.moves import range
 
 
-@lru_cache(maxsize=2)
 def _compute_vector_terms(N):
     u = np.zeros(N)
     u[[0, -1]] = np.sqrt(2)/2
@@ -21,7 +19,6 @@ def _compute_vector_terms(N):
     return u, v, cross_terms, same_terms
 
 
-@lru_cache()
 def _compute_A(N, theta):
     u, v, cross_terms, same_terms = _compute_vector_terms(N)
     return (np.eye(N)
@@ -29,7 +26,6 @@ def _compute_A(N, theta):
             + (np.cos(theta) - 1) * same_terms)
 
 
-@lru_cache()
 def _compute_dA(N, theta):
     u, v, cross_terms, same_terms = _compute_vector_terms(N)
     return (np.cos(theta) * cross_terms
