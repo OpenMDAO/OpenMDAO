@@ -7,6 +7,8 @@ from openmdao.api import Group
 from openmdao.test_suite.components.explicit_components import TestExplCompNondLinear
 from openmdao.test_suite.components.implicit_components import TestImplCompNondLinear
 
+import numpy as np
+
 
 class TestMeshGroup(Group):
     """Test group flat, with only 1 level of hierarchy.
@@ -35,10 +37,21 @@ class TestMeshGroup(Group):
 
         num_comp = self.metadata['num_comp']
         num_var = self.metadata['num_var']
+
+
+        self.expected_d_input = {}
+        self.expected_d_output = {}
+
+        shape = self.metadata['var_shape']
+        size = np.prod(shape)
+
+        d_value = 0.01 * size * (num_var * (num_var + 1)) / 2 * (num_comp - 1)
         if self.metadata['component_class'] == 'explicit':
             component_class = TestExplCompNondLinear
+            self.value = 1 - d_value
         elif self.metadata['component_class'] == 'implicit':
             component_class = TestImplCompNondLinear
+            self.value = 1 + d_value
         else:
             raise ValueError('Component class must be "explicit" or "implicit"')
 
@@ -46,13 +59,19 @@ class TestMeshGroup(Group):
             kwargs = {
                 'num_input': num_var * (num_comp - 1),
                 'num_output': num_var,
-                'var_shape': self.metadata['var_shape'],
+                'var_shape': shape,
             }
             if self.metadata['connection_type'] == 'explicit':
                 self.add_subsystem('comp_%i' % icomp, component_class(**kwargs))
+                base_name = 'comp_{0}.output_{1}'
+                for output_num in range(num_var):
+                    key_name = base_name.format(icomp, output_num)
+                    self.expected_d_input[key_name] = np.ones(shape) * (output_num + 1)
+                    self.expected_d_output[key_name] = np.ones(shape) * (output_num + self.value)
             elif self.metadata['connection_type'] == 'implicit':
                 renames_inputs = {}
                 renames_outputs = {}
+                base_name = 'var_{0}'
 
                 index = 0
                 for icomp2 in range(num_comp):
@@ -69,10 +88,15 @@ class TestMeshGroup(Group):
                             old_name = 'output_%i' % ivar
                             new_name = 'var_%i' % index2
                             renames_outputs[old_name] = new_name
+                            key_name = base_name.format(index2)
+                            self.expected_d_input[key_name] = np.ones(shape) * (ivar + 1)
+                            self.expected_d_output[key_name] = np.ones(shape) * (ivar + self.value)
 
                 self.add_subsystem('comp_%i' % icomp, component_class(**kwargs),
                                    renames_inputs=renames_inputs,
                                    renames_outputs=renames_outputs)
+
+
 
         if self.metadata['connection_type'] == 'explicit':
             for icomp in range(num_comp):
@@ -84,6 +108,3 @@ class TestMeshGroup(Group):
                             out_name = 'comp_%i.output_%i' % (icomp2, ivar)
                             self.connect(out_name, in_name)
                             index += 1
-
-
-        self.expected_d_input = 0

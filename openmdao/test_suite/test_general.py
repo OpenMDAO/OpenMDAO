@@ -98,6 +98,7 @@ def test_suite(**kwargs):
             yield (ParameterizedInstance(group_type, **options),)
 
 def _cartesian_dict_product(dicts):
+    # From http://stackoverflow.com/a/5228294
     return (dict(zip(dicts, x)) for x in itertools.product(*itervalues(dicts)))
 
 def full_test_suite():
@@ -180,19 +181,16 @@ class ParameterizedInstance(object):
         else:
             raise NotImplementedError()
 
-        for name in self.expected_d_input:
-            output_num = int(name.split('_')[-1])
-            self.expected_d_input[name][:] = output_num + 1
-            self.expected_d_output[name][:] = output_num + self.value
-
     def run(self):
         if not self._setup:
             self.setup()
         self._run = True
         return self.problem.run()
 
-    def apply_linear_test(self, mode='fwd'):
+    def apply_linear_test(self, input=None, mode='fwd'):
         root = self.problem.root
+        if input is None:
+            input = root.expected_d_input
         if not self._linearized:
             root._apply_nonlinear()
             root._linearize()
@@ -206,15 +204,18 @@ class ParameterizedInstance(object):
         else:
             raise NotImplementedError('Mode must be "fwd" or "rev"')
 
-        root._vectors[in_]['linear'].set_const(1.0)
+        root._vectors[out]['linear'].set_const(0.0)
+        in_view = root._vectors[in_]['linear']._views
+        out_view = root._vectors[out]['linear']._views
+        for key, val in iteritems(input):
+            in_view[key][:] = val[:]
         root._apply_linear(['linear'], mode)
-        root._vectors[out]['linear'].add_scal_vec(-self.value, self.expected_d_input)
-        return root._vectors[out]['linear'].get_norm()
+        return out_view
 
     def solve_linear_test(self, input=None, mode='fwd'):
         root = self.problem.root
         if input is None:
-            input = self.expected_d_output
+            input = root.expected_d_output
         if not self._linearized:
             root._apply_nonlinear()
             root._linearize()
@@ -229,9 +230,12 @@ class ParameterizedInstance(object):
             raise NotImplementedError('Mode must be "fwd" or "rev"')
 
         root._vectors[out]['linear'].set_const(0.0)
-        root._vectors[in_]['linear'] = input
+        in_view = root._vectors[in_]['linear']._views
+        out_view = root._vectors[out]['linear']._views
+        for key, val in iteritems(input):
+            in_view[key][:] = val[:]
         root._solve_linear(['linear'], mode)
-        return root._vectors[out]['linear']._data
+        return out_view
 
 
 class ParameterizedTestCases(unittest.TestCase):
@@ -247,7 +251,13 @@ class ParameterizedTestCases(unittest.TestCase):
         if fail:
             self.fail('Problem run failed: re %f ; ae %f' % (rele, abse))
 
-        assert_rel_error(self, test.solve_linear_test(mode='fwd'), test.expected_d_input._data, 1e-15)
-        assert_rel_error(self, test.solve_linear_test(mode='rev'), test.expected_d_input._data, 1e-15)
-        assert_rel_error(self, test.apply_linear_test(mode='fwd'), 0., 1e-15)
-        assert_rel_error(self, test.apply_linear_test(mode='rev'), 0., 1e-15)
+        expected_d_input = test.problem.root.expected_d_input
+        expected_d_output = test.problem.root.expected_d_output
+
+        args = test.args
+
+        calculated = test.solve_linear_test(mode='fwd')
+        assert_rel_error(self, calculated, expected_d_input, 1e-15)
+        assert_rel_error(self, test.solve_linear_test(mode='rev'), expected_d_input, 1e-15)
+        assert_rel_error(self, test.apply_linear_test(mode='fwd'), expected_d_output, 1e-15)
+        assert_rel_error(self, test.apply_linear_test(mode='rev'), expected_d_output, 1e-15)

@@ -15,17 +15,39 @@ def assert_rel_error(test_case, actual, desired, tolerance):
     test_case : :class:`unittest.TestCase`
         TestCase instance used for assertions.
 
-    actual : float
+    actual : float, array-like, dict
         The value from the test.
 
-    desired : float
+    desired : float, array-like, dict
         The value expected.
 
     tolerance : float
         Maximum relative error ``(actual - desired) / desired``.
     """
 
-    if isinstance(actual, float) and isinstance(desired, float):
+    if isinstance(actual, dict) and isinstance(desired, dict):
+
+        actual_keys = set(actual.keys())
+        desired_keys = set(desired.keys())
+
+        if actual_keys.symmetric_difference(desired_keys):
+            msg = 'Actual and desired keys differ. Actual extra keys: {}, Desired extra keys: {}'
+            actual_extra = actual_keys.difference(desired_keys)
+            desired_extra = desired_keys.difference(actual_keys)
+            test_case.fail(msg.format(actual_extra, desired_extra))
+
+        error = 0.
+
+        for key in actual_keys:
+            try:
+                new_error = assert_rel_error(test_case, actual[key], desired[key], tolerance)
+                error = max(error, new_error)
+            except test_case.failureException as exception:
+                msg = '{}: '.format(key) + str(exception)
+                raise test_case.failureException(msg)
+
+
+    elif isinstance(actual, float) and isinstance(desired, float):
         if isnan(actual) and not isnan(desired):
             test_case.fail('actual nan, desired %s' % desired)
         if desired != 0:
