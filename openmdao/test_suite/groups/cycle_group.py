@@ -63,11 +63,14 @@ def _vector_to_outputs(x, outputs, num_var, var_shape):
 
 def _cycle_comp_jacobian(component, inputs, outputs, jacobian, angle_param):
     if component.metadata['jacobian_type'] != 'matvec':
-        N = component.N
         angle = inputs[angle_param]
         x = inputs['x']
-        A = _compute_A(N, angle)
-        dA = _compute_dA(N, angle)
+        num_var = component.metadata['num_var']
+        var_shape = component.metadata['var_shape']
+        size = num_var * np.prod(var_shape)
+        x = _inputs_to_vector(inputs, num_var, var_shape)
+        A = _compute_A(size, angle)
+        dA = _compute_dA(size, angle)
         dA_x = np.atleast_2d(dA.dot(x)).T
         pd_type = component.metadata['partial_type']
         dtheta = np.array([[1.]])
