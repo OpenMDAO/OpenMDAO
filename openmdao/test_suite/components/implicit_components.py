@@ -45,12 +45,14 @@ class TestImplCompNondLinear(ImplicitComponent):
             mtx = numpy.ones(size)
             self.rhs_coeffs[re_name] = mtx
             for out_name in self.metadata['out_names']:
-                mtx = numpy.ones((size, size)) * 0.01
                 if re_name == out_name:
-                    numpy.fill_diagonal(mtx, 1)
-                self.coeffs[re_name, out_name] = mtx
+                    mtx = numpy.eye(size)
+                    self.coeffs[re_name, out_name] = mtx
+                else:
+                    mtx = numpy.ones((size, size)) * 0
+                # self.coeffs[re_name, out_name] = mtx
             for in_name in self.metadata['in_names']:
-                mtx = numpy.ones((size, size)) * 0.01
+                mtx = numpy.ones((size, size)) * -0.01
                 self.coeffs[re_name, in_name] = mtx
 
     def apply_nonlinear(self, inputs, outputs, residuals):
@@ -58,9 +60,10 @@ class TestImplCompNondLinear(ImplicitComponent):
             re = residuals._views_flat[re_name]
             re[:] = -self.rhs_coeffs[re_name]
             for out_name in self.metadata['out_names']:
-                mtx = self.coeffs[re_name, out_name]
-                op = outputs._views_flat[out_name]
-                re += mtx.dot(op)
+                if (re_name, out_name) in self.coeffs:
+                    mtx = self.coeffs[re_name, out_name]
+                    op = outputs._views_flat[out_name]
+                    re += mtx.dot(op)
             for in_name in self.metadata['in_names']:
                 mtx = self.coeffs[re_name, in_name]
                 ip = inputs._views_flat[in_name]
@@ -73,9 +76,10 @@ class TestImplCompNondLinear(ImplicitComponent):
                 for re_name in d_residuals:
                     d_re = d_residuals._views_flat[re_name]
                     for out_name in d_outputs:
-                        mtx = self.coeffs[re_name, out_name]
-                        d_op = d_outputs._views_flat[out_name]
-                        d_re += mtx.dot(d_op)
+                        if (re_name, out_name) in self.coeffs:
+                            mtx = self.coeffs[re_name, out_name]
+                            d_op = d_outputs._views_flat[out_name]
+                            d_re += mtx.dot(d_op)
                     for in_name in d_inputs:
                         mtx = self.coeffs[re_name, in_name]
                         d_ip = d_inputs._views_flat[in_name]
@@ -84,9 +88,10 @@ class TestImplCompNondLinear(ImplicitComponent):
                 for re_name in d_residuals:
                     d_re = d_residuals._views_flat[re_name]
                     for out_name in d_outputs:
-                        mtx = self.coeffs[re_name, out_name]
-                        d_op = d_outputs._views_flat[out_name]
-                        d_op += mtx.T.dot(d_re)
+                        if (re_name, out_name) in self.coeffs:
+                            mtx = self.coeffs[re_name, out_name]
+                            d_op = d_outputs._views_flat[out_name]
+                            d_op += mtx.T.dot(d_re)
                     for in_name in d_inputs:
                         mtx = self.coeffs[re_name, in_name]
                         d_ip = d_inputs._views_flat[in_name]
@@ -116,6 +121,7 @@ class TestImplCompNondLinear(ImplicitComponent):
             coeffs = self.coeffs
             for re_name in self.metadata['out_names']:
                 for out_name in self.metadata['out_names']:
-                    jacobian[re_name, out_name] = get_jac((re_name, out_name))
+                    if (re_name, out_name) in self.coeffs:
+                        jacobian[re_name, out_name] = get_jac((re_name, out_name))
                 for in_name in self.metadata['in_names']:
                     jacobian[re_name, in_name] = get_jac((re_name, in_name))

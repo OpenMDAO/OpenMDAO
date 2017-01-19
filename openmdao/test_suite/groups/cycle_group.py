@@ -1,17 +1,19 @@
 """Contains test groups for cycles with easily verified values/derivatives."""
 from __future__ import print_function, division
 from openmdao.api import ExplicitComponent, Group, IndepVarComp
+from openmdao.test_suite.groups.group import ParametericTestGroup
 import numpy as np
 import scipy.sparse as sparse
 from six.moves import range
 
+PSI = 1.
 
-def _compute_vector_terms(N):
-    u = np.zeros(N)
+def _compute_vector_terms(system_size):
+    u = np.zeros(system_size)
     u[[0, -1]] = np.sqrt(2)/2
 
-    v = np.zeros(N)
-    v[1:-1] = 1 / np.sqrt(N - 2)
+    v = np.zeros(system_size)
+    v[1:-1] = 1 / np.sqrt(system_size - 2)
 
     cross_terms = np.outer(v, u) - np.outer(u, v)
     same_terms = np.outer(u, u) + np.outer(v, v)
@@ -19,15 +21,15 @@ def _compute_vector_terms(N):
     return u, v, cross_terms, same_terms
 
 
-def _compute_A(N, theta):
-    u, v, cross_terms, same_terms = _compute_vector_terms(N)
-    return (np.eye(N)
+def _compute_A(system_size, theta):
+    u, v, cross_terms, same_terms = _compute_vector_terms(system_size)
+    return (np.eye(system_size)
             + np.sin(theta) * cross_terms
             + (np.cos(theta) - 1) * same_terms)
 
 
-def _compute_dA(N, theta):
-    u, v, cross_terms, same_terms = _compute_vector_terms(N)
+def _compute_dA(system_size, theta):
+    u, v, cross_terms, same_terms = _compute_vector_terms(system_size)
     return (np.cos(theta) * cross_terms
             - np.sin(theta) * same_terms)
 
@@ -42,7 +44,7 @@ def _dense_to_aij(A):
                 data.append(A[i, j])
                 rows.append(i)
                 cols.append(j)
-    return (data, rows, cols)
+    return np.array(data), np.array(rows), np.array(cols)
 
 
 def _cycle_comp_jacobian(component, inputs, outputs, jacobian, angle_param):
@@ -52,10 +54,9 @@ def _cycle_comp_jacobian(component, inputs, outputs, jacobian, angle_param):
         x = inputs['x']
         A = _compute_A(N, angle)
         dA = _compute_dA(N, angle)
-        dA_x = dA.dot(x)
-        dA_x.shape = [3, 1]
+        dA_x = np.atleast_2d(dA.dot(x)).T
         pd_type = component.metadata['partial_type']
-        dtheta = np.array([1.])
+        dtheta = np.array([[1.]])
         if pd_type == 'array':
             J_y_x = A
             J_y_angle = dA_x
@@ -99,6 +100,11 @@ def _cycle_comp_jacvec(component, inputs, outputs, d_inputs, d_outputs, mode, an
                 d_inputs['x'] += A.T.dot(dy)
                 d_inputs['theta'] += dtheta_out
                 d_inputs[angle_param] += x.T.dot(dA.T.dot(dy))
+
+def _compute_d_xsum_d_psi(psi, x0, num_comp):
+    system_size = x0.shape[0]
+    dA = _compute_dA(system_size, -psi/(num_comp - 1))
+    return (-1/(num_comp - 1))*np.sum(dA.dot(x0))
 
 
 class ExplicitCycleComp(ExplicitComponent):
@@ -214,6 +220,7 @@ class ExplicitLastComp(ExplicitComponent):
         self.add_input('psi', value=1.)
 
         self.add_output('theta_out', shape=(1,))
+        self.add_output('theta_mod', shape=(1,))
         self.add_output('x_sum', shape=(1,))
 
         self._u, self._v, self._cross_terms, self._same_terms = _compute_vector_terms(N)
@@ -230,6 +237,9 @@ class ExplicitLastComp(ExplicitComponent):
         # theta_out has 1/2 the error as theta does to the correct angle.
         outputs['theta_out'] = theta/2 + (self._n * 2 * np.pi - psi) / (2*k - 2)
 
+        # theta is unique only up to equivalence mod 2*pi/(k-1).
+        outputs['theta_mod'] = outputs['theta_out'] % (2*np.pi / (k - 1))
+
     def compute_jacobian(self, inputs, outputs, jacobian):
         if self.metadata['jacobian_type'] != 'matvec':
             jacobian['x_sum', 'x'] = np.ones(self.N)
@@ -237,6 +247,10 @@ class ExplicitLastComp(ExplicitComponent):
             k = self.metadata['num_comp']
             jacobian['theta_out', 'theta'] = np.array([.5])
             jacobian['theta_out', 'psi'] = np.array([-1/(2*k-2)])
+
+            # Warning: theta_mod is not differentiable at multiples of 2*pi/(k-1).
+            jacobian['theta_mod', 'psi'] = jacobian['theta_out', 'psi']
+            jacobian['theta_mod', 'theta'] = jacobian['theta_out', 'theta']
 
     def compute_jacvec_product(self, inputs, outputs,
                                d_inputs, d_outputs, mode):
@@ -252,16 +266,18 @@ class ExplicitLastComp(ExplicitComponent):
 
                     d_outputs['x_sum'] += np.sum(dx)
                     d_outputs['theta_out'] += np.array([.5*dtheta - dpsi/(2*k-2)])
+                    d_outputs['theta_mod'] += np.array([.5*dtheta - dpsi/(2*k-2)])
                 elif mode == 'rev':
                     dxsum = d_outputs['x_sum']
                     dtheta_out = d_outputs['theta_out']
+                    dtheta_mod = d_outputs['theta_mod']
 
                     d_inputs['x'] += np.ones(self.N) * dxsum
-                    d_inputs['theta'] += .5*dtheta_out
-                    d_inputs['psi'] += -dtheta_out/(2*k-2)
+                    d_inputs['theta'] += .5*dtheta_out + .5*dtheta_mod
+                    d_inputs['psi'] += -dtheta_out/(2*k-2) - dtheta_mod/(2*k-2)
 
 
-class CycleGroup(Group):
+class CycleGroup(ParametericTestGroup):
     """Group with a cycle. Derivatives and values are known."""
 
     def _initialize_metadata(self):
@@ -303,12 +319,28 @@ class CycleGroup(Group):
             middle_class = ExplicitCycleComp
             last_class = ExplicitLastComp
         else:
-            raise ValueError('Should not happen.')
+            raise ValueError('Should not happen or else metadata dict is broken.')
 
         self._generate_components(connection_type, first_class, middle_class, last_class, num_comp)
 
-    def _generate_components(self, connection_type, first_class, middle_class, last_class,
-                             num_comp):
+        self.total_of = ['last.x_sum', 'last.theta_mod']
+        self.total_wrt = ['psi_comp.psi']
+        dxsum = _compute_d_xsum_d_psi(PSI, np.ones(N), num_comp)
+        self.expected_totals = {
+            ('last.x_sum', 'psi_comp.psi'): dxsum,
+            ('last.theta_mod', 'psi_comp.psi'): -1. / (num_comp - 1),
+        }
+
+        expected_theta = np.mod(-PSI, 2*np.pi) / (num_comp - 1)
+        self.expected_values = {
+            'last.theta_mod': expected_theta,
+            # 'last.x_sum': np.sum(_compute_A(N, expected_theta).dot(np.ones(N)))
+            # Note: While the derivative of x_sum w.r.t. psi is independent of the choice of theta,
+            # the value of x_sum is not.
+        }
+
+
+    def _generate_components(self, conn_type, first_class, middle_class, last_class, num_comp):
         first_name = 'first'
         last_name = 'last'
         comp_args = {
@@ -317,10 +349,10 @@ class CycleGroup(Group):
             'partial_type': self.metadata['partial_type']
         }
 
-        self.add_subsystem('psi_comp', IndepVarComp('psi', 1.))
+        self.add_subsystem('psi_comp', IndepVarComp('psi', PSI))
         self.add_subsystem('x0_comp', IndepVarComp('x', np.ones(self.N)))
 
-        self._add_middle_cycle(connection_type, first_class, first_name, 0, comp_args)
+        self._add_middle_cycle(conn_type, first_class, first_name, 0, comp_args)
         prev_name = first_name
         idx = 0
 
@@ -331,19 +363,19 @@ class CycleGroup(Group):
 
         for idx in range(1, num_comp - 1):
             current_name = 'middle_{0}'.format(idx)
-            self._add_middle_cycle(connection_type, middle_class, current_name, idx, comp_args)
+            self._add_middle_cycle(conn_type, middle_class, current_name, idx, comp_args)
 
-            if connection_type == 'explicit':
+            if conn_type == 'explicit':
                 self._explicit_connections(prev_name, current_name, connection_variables)
 
             prev_name = current_name
-        if connection_type == 'explicit':
+        if conn_type == 'explicit':
             self.add_subsystem(last_name, last_class(**comp_args))
 
             self._explicit_connections(prev_name, last_name, connection_variables)
             self._explicit_connections(last_name, first_name,[('theta_out', 'theta')])
 
-        elif connection_type == 'implicit':
+        elif conn_type == 'implicit':
             renames_inputs = {
                 'x': 'x_{}'.format(idx + 1),
                 'theta': 'theta_{0}'.format(idx + 1)

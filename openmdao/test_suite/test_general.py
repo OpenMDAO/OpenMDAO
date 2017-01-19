@@ -7,7 +7,7 @@ from six import PY3, iteritems, iterkeys, itervalues, string_types
 import numpy
 import collections
 
-from openmdao.test_suite.groups.group import TestMeshGroup
+from openmdao.test_suite.groups.mesh_group import TestMeshGroup
 from openmdao.test_suite.groups.cycle_group import CycleGroup
 from openmdao.api import Problem
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
@@ -41,7 +41,7 @@ CYCLE_PARAMS = {
     'global_jac': [True, False],
     'jacobian_type': ['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
     'partial_type': ['array', 'sparse', 'aij'],
-    'num_comp': [2, 1],
+    'num_comp': [3, 2],
 }
 
 GROUP_PARAMS = {
@@ -108,6 +108,7 @@ def full_test_suite():
 
 # Needed for Nose
 full_test_suite.__test__ = False
+test_suite.__test__ = False
 
 
 def _test_name(testcase_func, param_num, params):
@@ -167,30 +168,15 @@ class ParameterizedInstance(object):
 
         self._run = False
 
-        size = numpy.prod(args['var_shape'])
-        self.expected_d_input = prob.root._vectors['output']['linear']._clone(initialize_views=True)
-        self.expected_d_output = self.expected_d_input._clone(initialize_views=True)
-
-        n = args['num_var']
-        m = args['num_comp'] - 1
-        d_value = 0.01 * size * (n * (n + 1)) / 2 * m
-        if args['component_class'] == 'implicit':
-            self.value = 1 + d_value
-        elif args['component_class'] == 'explicit':
-            self.value = 1 - d_value
-        else:
-            raise NotImplementedError()
-
     def run(self):
         if not self._setup:
             self.setup()
         self._run = True
         return self.problem.run()
 
-    def apply_linear_test(self, input=None, mode='fwd'):
+    def apply_linear_test(self, mode='fwd'):
         root = self.problem.root
-        if input is None:
-            input = root.expected_d_input
+        input = root.expected_partials
         if not self._linearized:
             root._apply_nonlinear()
             root._linearize()
@@ -207,15 +193,16 @@ class ParameterizedInstance(object):
         root._vectors[out]['linear'].set_const(0.0)
         in_view = root._vectors[in_]['linear']._views
         out_view = root._vectors[out]['linear']._views
-        for key, val in iteritems(input):
-            in_view[key][:] = val[:]
+        for key in iterkeys(in_view):
+            in_view[key][:] = input.get(key, 0.)
         root._apply_linear(['linear'], mode)
+        if root._vars_of_interest:
+            return {key: out_view[key] for key in root._vars_of_interest if key in out_view}
         return out_view
 
-    def solve_linear_test(self, input=None, mode='fwd'):
+    def solve_linear_test(self, mode='fwd'):
         root = self.problem.root
-        if input is None:
-            input = root.expected_d_output
+        input = root.expected_d_output
         if not self._linearized:
             root._apply_nonlinear()
             root._linearize()
@@ -232,9 +219,11 @@ class ParameterizedInstance(object):
         root._vectors[out]['linear'].set_const(0.0)
         in_view = root._vectors[in_]['linear']._views
         out_view = root._vectors[out]['linear']._views
-        for key, val in iteritems(input):
-            in_view[key][:] = val[:]
+        for key in iterkeys(in_view):
+            in_view[key][:] = input.get(key, 0.)
         root._solve_linear(['linear'], mode)
+        if root._vars_of_interest:
+            return {key: out_view[key] for key in root._vars_of_interest if key in out_view}
         return out_view
 
 
@@ -243,7 +232,9 @@ class ParameterizedTestCases(unittest.TestCase):
 
     # @parameterized.expand(full_test_suite(),
     #                       testcase_func_name=_test_name)
-    @parameterized.expand(test_suite(group_type='mesh', **MESH_PARAMS),
+    # @parameterized.expand(test_suite(group_type='mesh', **MESH_PARAMS),
+    #                       testcase_func_name=_test_name)
+    @parameterized.expand(test_suite(group_type='cycle', **CYCLE_PARAMS),
                           testcase_func_name=_test_name)
     def test_openmdao(self, test):
 
@@ -251,13 +242,34 @@ class ParameterizedTestCases(unittest.TestCase):
         if fail:
             self.fail('Problem run failed: re %f ; ae %f' % (rele, abse))
 
-        expected_d_input = test.problem.root.expected_d_input
-        expected_d_output = test.problem.root.expected_d_output
+        problem = test.problem
+        root = problem.root
 
-        args = test.args
+        tested = False
+        expected_totals = root.expected_totals
+        if expected_totals:
 
-        calculated = test.solve_linear_test(mode='fwd')
-        assert_rel_error(self, calculated, expected_d_input, 1e-15)
-        assert_rel_error(self, test.solve_linear_test(mode='rev'), expected_d_input, 1e-15)
-        assert_rel_error(self, test.apply_linear_test(mode='fwd'), expected_d_output, 1e-15)
-        assert_rel_error(self, test.apply_linear_test(mode='rev'), expected_d_output, 1e-15)
+            tested = True
+            of = root.total_of
+            wrt = root.total_wrt
+
+            # Forward Derivatives Check
+            problem.setup(check=False, mode='fwd')
+            problem.run()
+            totals = problem.compute_total_derivs(of, wrt)
+            assert_rel_error(self, totals, expected_totals, 1e-12)
+
+            # Reverse Derivatives Check
+            problem.setup(check=False, mode='rev')
+            problem.run()
+            totals = problem.compute_total_derivs(of, wrt)
+            assert_rel_error(self, totals, expected_totals, 1e-12)
+
+        expected_values = root.expected_values
+        if expected_values:
+            tested = True
+            actual = {key: problem[key] for key in iterkeys(expected_values)}
+            assert_rel_error(self, actual, expected_values, 1e-12)
+
+        if not tested:
+            raise RuntimeError('Neither expected_totals nor expected_values present.')
