@@ -134,9 +134,12 @@ class ParameterizedInstance(object):
         self.value = 0
 
         self.solver_class = NewtonSolver
-        self.solver_options = {'subsolvers':{'linear': ScipyIterativeSolver(
+        self.solver_options = {
+            'subsolvers':{'linear': ScipyIterativeSolver(
                 maxiter=100,
-            )}}
+            )},
+            'maxiter':100
+        }
 
         self.linear_solver_class = ScipyIterativeSolver
         self.linear_solver_options = {'maxiter': 200,
@@ -174,59 +177,6 @@ class ParameterizedInstance(object):
         self._run = True
         return self.problem.run()
 
-    def apply_linear_test(self, mode='fwd'):
-        root = self.problem.root
-        input = root.expected_partials
-        if not self._linearized:
-            root._apply_nonlinear()
-            root._linearize()
-            self._linearized = True
-        if mode == 'fwd':
-            in_ = 'output'
-            out = 'residual'
-        elif mode == 'rev':
-            in_ = 'residual'
-            out = 'output'
-        else:
-            raise NotImplementedError('Mode must be "fwd" or "rev"')
-
-        root._vectors[out]['linear'].set_const(0.0)
-        in_view = root._vectors[in_]['linear']._views
-        out_view = root._vectors[out]['linear']._views
-        for key in iterkeys(in_view):
-            in_view[key][:] = input.get(key, 0.)
-        root._apply_linear(['linear'], mode)
-        if root._vars_of_interest:
-            return {key: out_view[key] for key in root._vars_of_interest if key in out_view}
-        return out_view
-
-    def solve_linear_test(self, mode='fwd'):
-        root = self.problem.root
-        input = root.expected_d_output
-        if not self._linearized:
-            root._apply_nonlinear()
-            root._linearize()
-            self._linearized = True
-        if mode == 'rev':
-            in_ = 'output'
-            out = 'residual'
-        elif mode == 'fwd':
-            in_ = 'residual'
-            out = 'output'
-        else:
-            raise NotImplementedError('Mode must be "fwd" or "rev"')
-
-        root._vectors[out]['linear'].set_const(0.0)
-        in_view = root._vectors[in_]['linear']._views
-        out_view = root._vectors[out]['linear']._views
-        for key in iterkeys(in_view):
-            in_view[key][:] = input.get(key, 0.)
-        root._solve_linear(['linear'], mode)
-        if root._vars_of_interest:
-            return {key: out_view[key] for key in root._vars_of_interest if key in out_view}
-        return out_view
-
-
 class ParameterizedTestCases(unittest.TestCase):
     """The TestCase that actually runs all of the cases inherits from this."""
 
@@ -246,6 +196,13 @@ class ParameterizedTestCases(unittest.TestCase):
         root = problem.root
 
         tested = False
+
+        expected_values = root.expected_values
+        if expected_values:
+            tested = True
+            actual = {key: problem[key] for key in iterkeys(expected_values)}
+            assert_rel_error(self, actual, expected_values, 1e-8)
+
         expected_totals = root.expected_totals
         if expected_totals:
 
@@ -257,19 +214,15 @@ class ParameterizedTestCases(unittest.TestCase):
             problem.setup(check=False, mode='fwd')
             problem.run()
             totals = problem.compute_total_derivs(of, wrt)
-            assert_rel_error(self, totals, expected_totals, 1e-12)
+            assert_rel_error(self, totals, expected_totals, 1e-8)
 
             # Reverse Derivatives Check
             problem.setup(check=False, mode='rev')
             problem.run()
             totals = problem.compute_total_derivs(of, wrt)
-            assert_rel_error(self, totals, expected_totals, 1e-12)
+            assert_rel_error(self, totals, expected_totals, 1e-8)
 
-        expected_values = root.expected_values
-        if expected_values:
-            tested = True
-            actual = {key: problem[key] for key in iterkeys(expected_values)}
-            assert_rel_error(self, actual, expected_values, 1e-12)
+
 
         if not tested:
             raise RuntimeError('Neither expected_totals nor expected_values present.')
