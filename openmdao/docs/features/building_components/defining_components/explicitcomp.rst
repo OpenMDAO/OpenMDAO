@@ -2,8 +2,8 @@
 
 .. `Defining explicit variables`
 
-Defining explicit variables
-------------------------------
+Defining explicit variables (draft)
+---------------------------
 
 **Description:** Explicit variables are those that are computed as an explicit function of other variables.
 For instance, :math:`y` would be an explicit variable, given :math:`y=\sin(x)`, while :math:`z` would not be, given :math:`\cos(xz)-z=0`.
@@ -16,7 +16,7 @@ The methods that form the API for explicit components are given below.
   Information like variable names, sizes, units, and bounds are declared.
 - :code:`compute(inputs, outputs)` : compute the :code:`outputs` given the :code:`inputs`
 - :code:`compute_partial_derivs(inputs, outputs, partials)` (optional) : compute the :code:`partials` (partial derivatives) given the  :code:`inputs`. The :code:`outputs` are also provided for convenience
-- :code:`compute_jacvec_product(inputs, outputs, d_inputs, d_outputs, mode)` (optional) : provide the partial derivatives as a matrix-vector product. If :code:`mode` is :code:`'fwd'`, this method must compute :math:`d_outputs = J * d_inputs`. If :code:`mode` is :code:`'rev'`, this method must compute :math:`d_inputs = J^T * d_outputs`.
+- :code:`compute_jacvec_product(inputs, outputs, d_inputs, d_outputs, mode)` (optional) : provide the partial derivatives as a matrix-vector product. If :code:`mode` is :code:`'fwd'`, this method must compute :math:`d\_{outputs} = J \cdot d\_{inputs}`, where :math:`J` is the partial derivative Jacobian. If :code:`mode` is :code:`'rev'`, this method must compute :math:`d\_{inputs} = J^T \cdot d\_{outputs}`.
 
 Note that the last two are optional because the class can implement one or the other, or neither if they want to use the finite-difference or complex-step method.
 
@@ -29,6 +29,8 @@ Its implementation of :code:`compute_partial_derivs` looks like:
 
 .. embed-python-code::
     openmdao.test_suite.components.expl_comp_simple.TestExplCompSimpleDense.compute_jacobian
+
+This component would then be used in a run script as follows.
 
 .. embed-python-code::
     openmdao.core.tests.test_component.TestExplicitComponent.test___init___simple
