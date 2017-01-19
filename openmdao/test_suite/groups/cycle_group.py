@@ -220,6 +220,7 @@ class ExplicitLastComp(ExplicitComponent):
         self.add_input('psi', value=1.)
 
         self.add_output('theta_out', shape=(1,))
+        self.add_output('theta_mod', shape=(1,))
         self.add_output('x_sum', shape=(1,))
 
         self._u, self._v, self._cross_terms, self._same_terms = _compute_vector_terms(N)
@@ -236,6 +237,9 @@ class ExplicitLastComp(ExplicitComponent):
         # theta_out has 1/2 the error as theta does to the correct angle.
         outputs['theta_out'] = theta/2 + (self._n * 2 * np.pi - psi) / (2*k - 2)
 
+        # theta is unique only up to equivalence mod 2*pi/(k-1).
+        outputs['theta_mod'] = outputs['theta_out'] % (2*np.pi / (k - 1))
+
     def compute_jacobian(self, inputs, outputs, jacobian):
         if self.metadata['jacobian_type'] != 'matvec':
             jacobian['x_sum', 'x'] = np.ones(self.N)
@@ -243,6 +247,10 @@ class ExplicitLastComp(ExplicitComponent):
             k = self.metadata['num_comp']
             jacobian['theta_out', 'theta'] = np.array([.5])
             jacobian['theta_out', 'psi'] = np.array([-1/(2*k-2)])
+
+            # Warning: theta_mod is not differentiable at multiples of 2*pi/(k-1).
+            jacobian['theta_mod', 'psi'] = jacobian['theta_out', 'psi']
+            jacobian['theta_mod', 'theta'] = jacobian['theta_out', 'theta']
 
     def compute_jacvec_product(self, inputs, outputs,
                                d_inputs, d_outputs, mode):
@@ -258,13 +266,15 @@ class ExplicitLastComp(ExplicitComponent):
 
                     d_outputs['x_sum'] += np.sum(dx)
                     d_outputs['theta_out'] += np.array([.5*dtheta - dpsi/(2*k-2)])
+                    d_outputs['theta_mod'] += np.array([.5*dtheta - dpsi/(2*k-2)])
                 elif mode == 'rev':
                     dxsum = d_outputs['x_sum']
                     dtheta_out = d_outputs['theta_out']
+                    dtheta_mod = d_outputs['theta_mod']
 
                     d_inputs['x'] += np.ones(self.N) * dxsum
-                    d_inputs['theta'] += .5*dtheta_out
-                    d_inputs['psi'] += -dtheta_out/(2*k-2)
+                    d_inputs['theta'] += .5*dtheta_out + .5*dtheta_mod
+                    d_inputs['psi'] += -dtheta_out/(2*k-2) - dtheta_mod/(2*k-2)
 
 
 class CycleGroup(ParametericTestGroup):
@@ -313,17 +323,17 @@ class CycleGroup(ParametericTestGroup):
 
         self._generate_components(connection_type, first_class, middle_class, last_class, num_comp)
 
-        self.total_of = ['last.x_sum', 'last.theta_out']
+        self.total_of = ['last.x_sum', 'last.theta_mod']
         self.total_wrt = ['psi_comp.psi']
         dxsum = _compute_d_xsum_d_psi(PSI, np.ones(N), num_comp)
         self.expected_totals = {
             ('last.x_sum', 'psi_comp.psi'): dxsum,
-            ('last.theta_out', 'psi_comp.psi'): -1. / (num_comp - 1),
+            ('last.theta_mod', 'psi_comp.psi'): -1. / (num_comp - 1),
         }
 
         expected_theta = np.mod(-PSI, 2*np.pi) / (num_comp - 1)
         self.expected_values = {
-            'last.theta_out': expected_theta,
+            'last.theta_mod': expected_theta,
             # 'last.x_sum': np.sum(_compute_A(N, expected_theta).dot(np.ones(N)))
             # Note: While the derivative of x_sum w.r.t. psi is independent of the choice of theta,
             # the value of x_sum is not.
