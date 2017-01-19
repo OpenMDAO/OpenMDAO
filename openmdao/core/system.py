@@ -463,6 +463,10 @@ class System(object):
             for ind, meta in enumerate(self._var_myproc_metadata['output']):
                 name = self._var_myproc_names['output'][ind]
                 a, b = self._scaling_to_norm['output'][ind, :]
+
+                # We have to convert from physical, unscaled to scaled, dimensionless.
+                # We set into the bounds vector first and then apply a and b because
+                # meta['lower'] and meta['upper'] could be lists or tuples.
                 if meta['lower'] is None:
                     self._lower_bounds[name] = -numpy.inf
                 else:
