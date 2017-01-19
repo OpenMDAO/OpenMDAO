@@ -346,7 +346,8 @@ class Problem(object):
         for input_name in input_list:
 
             flat_view = dinputs._views_flat[input_name]
-            for idx in range(len(flat_view)):
+            n_in = len(flat_view)
+            for idx in range(n_in):
 
                 # Maybe we don't need to clean up so much at the beginning,
                 # since we clean this every time.
@@ -371,7 +372,7 @@ class Problem(object):
                             key = (output_name, input_name)
 
                             if totals[key] is None:
-                                totals[key] = np.zeros((len_val, 1))
+                                totals[key] = np.zeros((len_val, n_in))
                             totals[key][:, idx] = deriv_val
 
                         else:
@@ -379,7 +380,7 @@ class Problem(object):
                             key = (input_name, output_name)
 
                             if totals[key] is None:
-                                totals[key] = np.zeros((1, len_val))
+                                totals[key] = np.zeros((n_in, len_val))
                             totals[key][idx, :] = deriv_val
 
         return totals
