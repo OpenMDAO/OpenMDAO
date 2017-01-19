@@ -1,40 +1,47 @@
-#tag.py, this custom Sphinx extension is activated in conf.py
+# tag.py, this custom Sphinx extension is activated in conf.py
 # and allows the use of the custom directive for tags in our rst (e.g.):
-#.. tags:: tag1, tag2, tag3
+# .. tags:: tag1, tag2, tag3
 import os
 from sphinx.util.compat import Directive, make_admonition
 from docutils import nodes
 from sphinx.locale import _
 
-#The setup function for the Sphinx extension
+
+# The setup function for the Sphinx extension
 def setup(app):
-    #This adds a new node class to build sys, with custom functs, (same name as file)
+    # This adds a new node class to build sys, with custom functs, (same name as file)
     app.add_node(tag, html=(visit_tag_node, depart_tag_node))
-    #This creates a new ".. tags:: " directive in Sphinx
+    # This creates a new ".. tags:: " directive in Sphinx
     app.add_directive('tags', TagDirective)
-    #These are event handlers, functions connected to events.
+    # These are event handlers, functions connected to events.
     app.connect('doctree-resolved', process_tag_nodes)
     app.connect('env-purge-doc', purge_tags)
-    #Identifies the version of our extension
+    # Identifies the version of our extension
     return {'version': '0.1'}
+
 
 def visit_tag_node(self, node):
     self.visit_admonition(node)
 
+
 def depart_tag_node(self, node):
     self.depart_admonition(node)
+
 
 def purge_tags(app, env, docname):
     return
 
+
 def process_tag_nodes(app, doctree, fromdocname):
     env = app.builder.env
+
 
 class tag (nodes.Admonition, nodes.Element):
     pass
 
+
 class TagDirective(Directive):
-    #This allows content in the directive, e.g. to list tags here
+    # This allows content in the directive, e.g. to list tags here
     has_content = True
 
     def run(self):
@@ -42,21 +49,22 @@ class TagDirective(Directive):
         targetid = "tag-%d" % env.new_serialno('tag')
         targetnode = nodes.target('', '', ids=[targetid])
 
-        #the tags fetched from the custom directive are one piece of text
-        #sitting in self.content[0]
+        # The tags fetched from the custom directive are one piece of text
+        # sitting in self.content[0]
         taggs = self.content[0].split(", ")
         links = []
 
         for tagg in taggs:
-            #create rst hyperlinks of format `Python <http://www.python.org/>`_.
-            #html_dir = os.environ['BUILDDIR']
-            html_dir = "/Users/kmarstel/Work/blue/openmdao/docs/_build/html/"
-            link = "`" + tagg  +" <" + html_dir + "/html/tags/" + tagg + ".html>`_ "
+            # Create rst hyperlinks of format `Python <http://www.python.org/>`_.
+            import os
+            cwd = os.getcwd()
+            html_dir = os.path.join(cwd, "_build", "html")
+            link = "`" + tagg + " <" + html_dir + os.sep + "tags" + os.sep + tagg + ".html>`_ "
             links.append(link)
-        #put links back in a single comma-separated string together
+        # Put links back in a single comma-separated string together
         linkjoin = ", ".join(links)
 
-        #replace content[0] with hyperlinks to display in admonition
+        # Replace content[0] with hyperlinks to display in admonition
         self.content[0] = linkjoin
 
         ad = make_admonition(tag, self.name, [_('Tags')], self.options,
