@@ -33,16 +33,20 @@ class TestMeshGroup(ParametericTestGroup):
         num_comp = self.metadata['num_comp']
         num_var = self.metadata['num_var']
 
+        shape = self.metadata['var_shape']
+        size = np.prod(shape)
+
 
         self.expected_d_input = {}
         self.expected_d_output = {}
 
-        self.expected_totals = {'tmp': None}
+        self.expected_totals = {
+            ('comp_0.output_0', 'comp_0.output_0'): np.eye(size),
+        }
         self.total_of = ['comp_0.output_0']
         self.total_wrt = ['comp_0.output_0']
 
-        shape = self.metadata['var_shape']
-        size = np.prod(shape)
+
 
         d_value = 0.01 * size * (num_var * (num_var + 1)) / 2 * (num_comp - 1)
         self.value = 1 - d_value
