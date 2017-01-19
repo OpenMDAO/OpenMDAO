@@ -68,7 +68,12 @@ class TestIndepVarComp(unittest.TestCase):
         self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
 
     def test___init___1var(self):
-        """Define one independent variable and set its value."""
+        """Define one independent variable and set its value.
+
+        Features
+        --------
+        indepvarcomp
+        """
         comp = IndepVarComp('indep_var')
         prob = Problem(comp).setup(check=False)
 
@@ -78,14 +83,24 @@ class TestIndepVarComp(unittest.TestCase):
         self.assertEqual(prob['indep_var'], 2.0)
 
     def test___init___1var_val(self):
-        """Define one independent variable with a default value."""
+        """Define one independent variable with a default value.
+
+        Features
+        --------
+        indepvarcomp
+        """
         comp = IndepVarComp('indep_var', val=2.0)
         prob = Problem(comp).setup(check=False)
 
         self.assertEqual(prob['indep_var'], 2.0)
 
     def test___init___1var_array(self):
-        """Define one independent array variable."""
+        """Define one independent array variable.
+
+        Features
+        --------
+        indepvarcomp
+        """
         array = numpy.array([
             [1., 2.],
             [3., 4.],
