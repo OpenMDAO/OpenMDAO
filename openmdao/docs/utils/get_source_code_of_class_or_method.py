@@ -41,7 +41,7 @@ def get_source_code_of_class_or_method(class_or_method_path):
 if __name__ == "__main__":
     # Get source of method
     method_source = get_source_code_of_class_or_method(
-                    'openmdao.solvers.ln_direct.DirectSolver.__call__')
+                    'openmdao.solvers.ln_direct.DirectSolver.solve')
     print(90*'-')
     print(method_source)
     print(90*'=')

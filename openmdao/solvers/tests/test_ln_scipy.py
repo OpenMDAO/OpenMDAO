@@ -4,9 +4,10 @@ from __future__ import division, print_function
 
 import unittest
 
-from openmdao.solvers.ln_scipy import ScipyIterativeSolver
+from openmdao.solvers.ln_scipy import ScipyIterativeSolver, gmres
 
 from openmdao.core.problem import Problem
+from openmdao.core.group import Group
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
@@ -14,6 +15,14 @@ from openmdao.devtools.testutil import assert_rel_error
 
 
 class TestScipyIterativeSolver(unittest.TestCase):
+
+    def test_options(self):
+        """Verify that the SciPy solver specific options are declared."""
+
+        group = Group()
+        group.ln_solver = ScipyIterativeSolver()
+
+        assert(group.ln_solver.options['solver'] == gmres)
 
     def test_solve_linear_scipy(self):
         """Solve implicit system with ScipyIterativeSolver."""

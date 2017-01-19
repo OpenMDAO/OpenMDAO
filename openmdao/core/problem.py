@@ -1,7 +1,13 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
-from __future__ import division
 
+from __future__ import division
+from collections import OrderedDict
 import sys
+
+from six import string_types
+from six.moves import range
+
+import numpy as np
 
 from openmdao.assemblers.default_assembler import DefaultAssembler
 from openmdao.vectors.default_vector import DefaultVector
@@ -128,7 +134,8 @@ class Problem(object):
         """
         return self.root._solve_nonlinear()
 
-    def setup(self, vector_class=DefaultVector, check=True, logger=None):
+    def setup(self, vector_class=DefaultVector, check=True, logger=None,
+              mode='auto'):
         """Set up everything (root, assembler, vector, solvers, drivers).
 
         Args
@@ -139,6 +146,10 @@ class Problem(object):
             whether to run error check after setup is complete.
         logger : object
             Object for logging config checks if check is True.
+        mode : string
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint). Default is 'auto', which lets OpenMDAO choose
+            the best mode for your problem.
 
         Returns
         -------
@@ -148,6 +159,15 @@ class Problem(object):
         root = self.root
         comm = self.comm
         assembler = self._assembler
+
+        if mode not in ['fwd', 'rev', 'auto']:
+            msg = "Unsupported mode: '%s'" % mode
+            raise ValueError(msg)
+
+        # TODO: Support automatic determination of mode
+        if mode == 'auto':
+            mode = 'rev'
+        self._mode = mode
 
         # Recursive system setup
         root._setup_processors('', comm, {}, assembler, [0, comm.size])
@@ -216,3 +236,149 @@ class Problem(object):
         vector_var_ids = numpy.arange(ind1, ind2)
 
         self.root._setup_vector(vectors, vector_var_ids, use_ref_vector)
+
+    def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
+        """Compute derivatives of desired quantities with respect to desired inputs.
+
+        Args
+        ----
+        of : list of variable name strings or None
+            Variables whose derivatives will be computed. Default is None, which
+            uses the driver's objectives and constraints.
+        wrt : list of variable name strings or None
+            Variables with respect to which the derivatives will be computed.
+            Default is None, which uses the driver's desvars.
+        return_format : string
+            Format to return the derivatives. Default is a 'flat_dict', which
+            returns them in a dictionary whose keys are tuples of form (of, wrt).
+
+        Returns
+        -------
+        derivs : object
+            Derivatives in form requested by 'return_format'.
+        """
+        root = self.root
+        mode = self._mode
+        vec_dinput = root._vectors['input']
+        vec_doutput = root._vectors['output']
+        vec_dresid = root._vectors['residual']
+
+        # TODO - Pull 'of' and 'wrt' from driver if unspecified.
+        if wrt is None:
+            raise NotImplementedError("Need to specify 'wrt' for now.")
+        if of is None:
+            raise NotImplementedError("Need to specify 'of' for now.")
+
+        # A number of features will need to be supported here as development
+        # goes forward.
+        # -------------------------------------------------------------------
+        # TODO: Make sure we can function in parallel when some params or
+        # functions are not local.
+        # TODO: Support parallel adjoint and parallel forward derivatives
+        #       Aside: how are they specified, and do we have to pick up any
+        #       that are missed?
+        # TODO: Handle driver scaling.
+        # TODO: Might be some additional adjustments needed to set the 'one'
+        #       into the PETSC vector.
+        # TODO: support parmeter/constraint indices
+        # TODO: Support for any other return_format we need.
+        # TODO: Support constraint sparsity (i.e., skip in/out that are not
+        #       relevant for this constraint) (desvars too?)
+        # TODO: Don't calculate for inactive constraints
+        # TODO: Support full-model FD. Don't know how this'll work, but we
+        #       used to need a separate function for that.
+        # TODO: poi_indices and qoi_indices requires special support
+        # -------------------------------------------------------------------
+
+        # Prepare model for calculation by cleaning out the derivatives
+        # vectors.
+        for subname in vec_dinput:
+
+            # TODO: Do all three deriv vectors have the same keys?
+
+            # Skip nonlinear because we don't need to mess with it?
+            if subname == 'nonlinear':
+                continue
+
+            vec_dinput[subname].set_const(0.0)
+            vec_doutput[subname].set_const(0.0)
+            vec_dresid[subname].set_const(0.0)
+
+        # Linearize Model
+        root._linearize()
+
+        # Create data structures (and possibly allocate space) for the total
+        # derivatives that we will return.
+        if return_format == 'flat_dict':
+
+            totals = OrderedDict()
+
+            for okeys in of:
+                if isinstance(okeys, string_types):
+                    okeys = (okeys,)
+                for okey in okeys:
+                    for ikeys in wrt:
+                        if isinstance(ikeys, string_types):
+                            ikeys = (ikeys,)
+                        for ikey in ikeys:
+                            totals[(okey, ikey)] = None
+
+        else:
+            msg = "Unsupported return format '%s." % return_format
+            raise NotImplementedError(msg)
+
+        if mode == 'fwd':
+            input_list, output_list = wrt, of
+            input_vec, output_vec = vec_dresid, vec_doutput
+        else:
+            input_list, output_list = of, wrt
+            input_vec, output_vec = vec_doutput, vec_dresid
+
+        # TODO : Parallel adjoint setup loop goes here.
+        # NOTE : Until we support it, we will just limit ourselves to the
+        # 'linear' vector.
+        vecname = 'linear'
+        dinputs = input_vec[vecname]
+        doutputs = output_vec[vecname]
+
+        # If Forward mode, solve linear system for each 'wrt'
+        # If Adjoint mode, solve linear system for each 'of'
+        for input_name in input_list:
+
+            for idx in range(dinputs._idxs[input_name] + 1):
+
+                # Maybe we don't need to clean up so much at the beginning,
+                # since we clean this every time.
+                dinputs.set_const(0.0)
+
+                # Dictionary access returns a scaler for 1d input, and we
+                # need a vector for clean code, so use _views_flat.
+                dinputs._views_flat[input_name][idx] = 1.0
+
+                # The root system solves here.
+                root._solve_linear([vecname], mode)
+
+                # Pull out the answers and pack them into our data structure.
+                for output_name in output_list:
+
+                    deriv_val = doutputs._views_flat[output_name]
+                    len_val = len(deriv_val)
+
+                    if return_format == 'flat_dict':
+                        if mode == 'fwd':
+
+                            key = (output_name, input_name)
+
+                            if totals[key] is None:
+                                totals[key] = np.zeros((len_val, 1))
+                            totals[key][:, idx] = deriv_val
+
+                        else:
+
+                            key = (input_name, output_name)
+
+                            if totals[key] is None:
+                                totals[key] = np.zeros((1, len_val))
+                            totals[key][idx, :] = deriv_val
+
+        return totals

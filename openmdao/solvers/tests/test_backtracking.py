@@ -3,9 +3,7 @@
 import unittest
 from math import exp
 
-import numpy as np
-
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ImplicitComponent
+from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent
 from openmdao.solvers.nl_btlinesearch import BacktrackingLineSearch
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
@@ -46,6 +44,16 @@ class TrickyComp(ImplicitComponent):
 
 
 class TestBackTracking(unittest.TestCase):
+
+    def test_options(self):
+        """Verify that the BacktrackingLineSearch options are declared."""
+
+        group = Group()
+        group.nl_solver = BacktrackingLineSearch()
+
+        assert(group.nl_solver.options['solve_subsystems'] is True)
+        assert(group.nl_solver.options['rho'] == 0.5)
+        assert(group.nl_solver.options['alpha'] == 1.0)
 
     def test_newton_with_backtracking(self):
 
