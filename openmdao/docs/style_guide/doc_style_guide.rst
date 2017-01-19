@@ -142,7 +142,7 @@ Feature Docs and their Custom Directives for Including Code in Documentation
 show-unittest-examples
 ++++++++++++++++++++++
 
-      `showUnitTestExamplesDirective` is an OpenMDAO custom Sphinx directive that allows unit
+      `show-unittest-examples` is an OpenMDAO custom Sphinx directive that allows unit
       test examples to be directly incorporated into a feature document.
       An example usage within a feature document would look like this:
 
