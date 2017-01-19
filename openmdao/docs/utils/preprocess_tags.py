@@ -95,5 +95,5 @@ def tag(args=None):
     make_tagfiles(docdirs, tagdir)
     make_tagindex(tagdir)
 
-
-tag()
+if __name__ == "__main__":
+    tag()
