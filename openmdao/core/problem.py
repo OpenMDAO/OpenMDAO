@@ -345,7 +345,8 @@ class Problem(object):
         # If Adjoint mode, solve linear system for each 'of'
         for input_name in input_list:
 
-            for idx in range(dinputs._idxs[input_name] + 1):
+            flat_view = dinputs._views_flat[input_name]
+            for idx in range(len(flat_view)):
 
                 # Maybe we don't need to clean up so much at the beginning,
                 # since we clean this every time.
@@ -353,7 +354,7 @@ class Problem(object):
 
                 # Dictionary access returns a scaler for 1d input, and we
                 # need a vector for clean code, so use _views_flat.
-                dinputs._views_flat[input_name][idx] = 1.0
+                flat_view[idx] = 1.0
 
                 # The root system solves here.
                 root._solve_linear([vecname], mode)

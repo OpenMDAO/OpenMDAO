@@ -249,7 +249,7 @@ class ExplicitLastComp(ExplicitComponent):
                                d_inputs, d_outputs, mode):
 
         if self.metadata['jacobian_type'] == 'matvec':
-            if 'x_sum' in d_outputs and 'theta_out' in d_outputs and \
+            if 'x_norm2' in d_outputs and 'theta_out' in d_outputs and \
                             'x' in d_inputs and 'theta' in d_inputs and 'psi' in d_inputs:
                 k = self.metadata['num_comp']
                 x = inputs['x']
