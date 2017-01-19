@@ -49,18 +49,18 @@ Define one independent array variable.
 
     self.assertEqualArrays(prob['indep_var'], array)
 
-.. showunittestexamples::
+.. show-unittest-examples::
     indepvarcomp
 
 Here's an example of embedding code, in the form of the TestIndepVarComp class:
 
-.. embedPythonCode::
+.. embed-python-code::
     openmdao.core.tests.test_component.TestIndepVarComp
 
 
 Here's an example of embedding code, in the form of the `test___init___1var` method:
 
-.. embedPythonCode::
+.. embed-python-code::
     openmdao.core.tests.test_component.TestIndepVarComp.test___init___1var
 
 .. tags:: indepVarComp, Component

@@ -139,8 +139,8 @@ Detailed docstring rules:
 Feature Docs and their Custom Directives for Including Code in Documentation
 ----------------------------------------------------------------------------
 
-showUnitTestExamples
-++++++++++++++++++++
+show-unittest-examples
+++++++++++++++++++++++
 
       `showUnitTestExamplesDirective` is an OpenMDAO custom Sphinx directive that allows unit
       test examples to be directly incorporated into a feature document.
@@ -148,7 +148,7 @@ showUnitTestExamples
 
       ::
 
-        .. showunittestexamples::
+        .. show-unittest-examples::
             indepvarcomp
 
 
@@ -187,16 +187,16 @@ showUnitTestExamples
         indepvarcomp
 
 
-embedPythonCode
-+++++++++++++++
+embed-python-code
++++++++++++++++++
 
-        `embedPythonCode` is a custom directive that lets a developer drop a class or a
+        `embed-python-code` is a custom directive that lets a developer drop a class or a
         class method directly into a feature doc by including that class or method's
         full, dotted python path.  The syntax for invoking the directive looks like this:
 
         ::
 
-            .. embedPythonCode::
+            .. embed-python-code::
               openmdao.tests.general_problem.GeneralComp
 
 
