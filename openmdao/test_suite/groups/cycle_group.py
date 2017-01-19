@@ -55,6 +55,11 @@ def _inputs_to_vector(inputs, num_var, var_shape):
 
     return x
 
+def _vector_to_outputs(x, outputs, num_var, var_shape):
+    size = np.prod(var_shape)
+    for i in range(num_var):
+        x_i = x[size*i:size*(i+1)].reshape(var_shape)
+        outputs['y_{}'.format(i)] = x_i
 
 def _cycle_comp_jacobian(component, inputs, outputs, jacobian, angle_param):
     if component.metadata['jacobian_type'] != 'matvec':
@@ -108,7 +113,9 @@ def _cycle_comp_jacvec(component, inputs, outputs, d_inputs, d_outputs, mode, an
         elif mode == 'rev':
             if 'y' in d_outputs:
                 dy = d_outputs['y']
-                d_inputs['x'] += A.T.dot(dy)
+                # TODO: Investigate why 'x' is in _views_flat but gives a KeyError for the Vector.
+                if 'x' in d_inputs:
+                    d_inputs['x'] += A.T.dot(dy)
                 d_inputs[angle_param] += x.T.dot(dA.T.dot(dy))
 
             if 'theta_out' in d_outputs:
