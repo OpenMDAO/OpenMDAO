@@ -1,11 +1,11 @@
 import numpy as np
 
-from openmdao.core.group import Group
+from openmdao.test_suite.groups.group import ParametericTestGroup
 from openmdao.test_suite.components.explicit_components import TestExplCompNondLinear
 from openmdao.test_suite.components.implicit_components import TestImplCompNondLinear
 
 
-class TestMeshGroup(Group):
+class TestMeshGroup(ParametericTestGroup):
     """Test group flat, with only 1 level of hierarchy.
     Every component is connected to every other component."""
 
@@ -36,7 +36,10 @@ class TestMeshGroup(Group):
 
         self.expected_d_input = {}
         self.expected_d_output = {}
-        self._vars_of_interest = []
+
+        self.expected_totals = {'tmp': None}
+        self.total_of = ['comp_0.output_0']
+        self.total_wrt = ['comp_0.output_0']
 
         shape = self.metadata['var_shape']
         size = np.prod(shape)

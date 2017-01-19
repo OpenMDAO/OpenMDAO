@@ -245,28 +245,24 @@ class ExplicitLastComp(ExplicitComponent):
             jacobian['theta_out', 'theta'] = np.array([.5])
             jacobian['theta_out', 'psi'] = np.array([-1/(2*k-2)])
 
-    def compute_jacvec_product(self, inputs, outputs,
-                               d_inputs, d_outputs, mode):
-
+    def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
         if self.metadata['jacobian_type'] == 'matvec':
-            if 'x_norm2' in d_outputs and 'theta_out' in d_outputs and \
-                            'x' in d_inputs and 'theta' in d_inputs and 'psi' in d_inputs:
-                k = self.metadata['num_comp']
-                x = inputs['x']
-                if mode == 'fwd':
-                    dx = d_inputs['x']
-                    dtheta = d_inputs['theta']
-                    dpsi = d_inputs['psi']
+            k = self.metadata['num_comp']
+            x = inputs['x']
+            if mode == 'fwd':
+                dx = d_inputs['x']
+                dtheta = d_inputs['theta']
+                dpsi = d_inputs['psi']
 
-                    d_outputs['x_norm2'] += np.dot(x, dx)
-                    d_outputs['theta_out'] += np.array([.5*dtheta - dpsi/(2*k-2)])
-                elif mode == 'rev':
-                    dxnorm = d_outputs['x_norm2']
-                    dtheta_out = d_outputs['theta_out']
+                d_outputs['x_norm2'] += np.dot(x, dx)
+                d_outputs['theta_out'] += np.array([.5*dtheta - dpsi/(2*k-2)])
+            elif mode == 'rev':
+                dxnorm = d_outputs['x_norm2']
+                dtheta_out = d_outputs['theta_out']
 
-                    d_inputs['x'] += x * dxnorm
-                    d_inputs['theta'] += .5*dtheta_out
-                    d_inputs['psi'] += -dtheta_out/(2*k-2)
+                d_inputs['x'] += x * dxnorm
+                d_inputs['theta'] += .5*dtheta_out
+                d_inputs['psi'] += -dtheta_out/(2*k-2)
 
 
 class CycleGroup(ParametericTestGroup):
@@ -319,7 +315,6 @@ class CycleGroup(ParametericTestGroup):
 
         self.total_of = ['last.x_norm2', theta_name]
         self.total_wrt = ['psi_comp.psi']
-        dxsum = _compute_d_xsum_d_psi(PSI, np.ones(N), num_comp)
         self.expected_totals = {
             ('last.x_norm2', 'psi_comp.psi'): 0.,
             (theta_name, 'psi_comp.psi'): -1. / (num_comp - 1),
@@ -328,9 +323,7 @@ class CycleGroup(ParametericTestGroup):
         expected_theta = -PSI / (num_comp - 1)
         self.expected_values = {
             theta_name: expected_theta,
-            # 'last.x_sum': np.sum(_compute_A(N, expected_theta).dot(np.ones(N)))
-            # Note: While the derivative of x_sum w.r.t. psi is independent of the choice of theta,
-            # the value of x_sum is not.
+            'last.x_norm2': 0.5*N,
         }
 
 

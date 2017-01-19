@@ -182,10 +182,10 @@ class ParameterizedTestCases(unittest.TestCase):
 
     # @parameterized.expand(full_test_suite(),
     #                       testcase_func_name=_test_name)
-    # @parameterized.expand(test_suite(group_type='mesh', **MESH_PARAMS),
-    #                       testcase_func_name=_test_name)
-    @parameterized.expand(test_suite(group_type='cycle', **CYCLE_PARAMS),
+    @parameterized.expand(test_suite(group_type='mesh', **MESH_PARAMS),
                           testcase_func_name=_test_name)
+    # @parameterized.expand(test_suite(group_type='cycle', **CYCLE_PARAMS),
+    #                       testcase_func_name=_test_name)
     def test_openmdao(self, test):
 
         fail, rele, abse = test.run()
