@@ -295,57 +295,150 @@ class DefaultVector(Vector):
             data[:] = coeffs[self._ivar_map[iset], 0] + \
                 coeffs[self._ivar_map[iset], 1] * data
 
-    def enforce_bounds_all(self, step, lower_bounds, upper_bounds):
-        """Enforce lower/upper bounds and backtrack the entire vector together.
+    def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
+        """Enforce lower/upper bounds, backtracking the entire vector together.
+
+        This method modifies both self (u) and step (du) in-place.
 
         Args
         ----
-        step : <Vector>
+        du : <Vector>
             Newton step; the backtracking is applied to this vector in-place.
+        alpha : float
+            step size.
         lower_bounds : <Vector>
             Lower bounds vector.
         upper_bounds : <Vector>
             Upper bounds vector.
         """
+        u = self
+
+        # The assumption is that alpha * du has been added to self (i.e., u)
+        # just prior to this method being called. We are currently in the
+        # initialization of a line search, and we're trying to ensure that
+        # the u does not violate bounds in the first iteration. If it does,
+        # we modify the du vector directly.
+
+        # This is the required change in step size, relative to the du vector.
         d_alpha = 0
 
         # Loop over varsets and find the largest amount a bound is violated
-        # where positive means a bound is violated.
+        # where positive means a bound is violated - i.e. the required d_alpha.
         for u_data, du_data, lower_data, upper_data in zip(
-                self._data, step._data, lower_bounds._data, upper_bounds._data):
+                u._data, du._data, lower_bounds._data, upper_bounds._data):
 
-            print(du_data)
-            mask = du_data > 0
+            mask = du_data != 0
             if mask.any():
-                max_d_alpha = numpy.amax((lower_data[mask] - u_data[mask]) / du_data[mask])
+                abs_du_mask = numpy.abs(du_data[mask])
+
+                # Check lower bound
+                max_d_alpha = numpy.amax((lower_data[mask] - u_data[mask]) / abs_du_mask)
                 d_alpha = max(d_alpha, max_d_alpha)
 
-            mask = du_data > 0
-            if mask.any():
-                max_d_alpha = numpy.amax((u_data[mask] - upper_data[mask]) / du_data[mask])
+                # Check upper bound
+                max_d_alpha = numpy.amax((u_data[mask] - upper_data[mask]) / abs_du_mask)
                 d_alpha = max(d_alpha, max_d_alpha)
-
 
         # d_alpha will not be negative because it was initialized to be 0
         # and we've only done max operations.
-        # d_alpha will not be greater than 1 because the assumption is that
+        # d_alpha will not be greater than alpha because the assumption is that
         # the original point was valid - i.e., no bounds were violated.
-        step *= 1 - d_alpha
+        # Therefore 0 <= d_alpha <= alpha.
 
-    def enforce_bounds(self, step, lower_bounds, upper_bounds):
-        """Enforce lower/upper bounds and backtrack only the violating entries.
+        # We first update u to reflect the required change to du.
+        u.add_scal_vec(-d_alpha, du)
+
+        # At this point, we normalize d_alpha by alpha to figure out the relative
+        # amount that the du vector has to be reduced, then apply the reduction.
+        du *= 1 - d_alpha / alpha
+
+    def _enforce_bounds_scalar(self, du, alpha, lower_bounds, upper_bounds):
+        """Enforce lower/upper bounds on each scalar separately, then backtrack as a vector.
+
+        This method modifies both self (u) and step (du) in-place.
 
         Args
         ----
-        step : <Vector>
+        du : <Vector>
             Newton step; the backtracking is applied to this vector in-place.
+        alpha : float
+            step size.
         lower_bounds : <Vector>
             Lower bounds vector.
         upper_bounds : <Vector>
             Upper bounds vector.
         """
+        u = self
+
+        # The assumption is that alpha * step has been added to this vector
+        # just prior to this method being called. We are currently in the
+        # initialization of a line search, and we're trying to ensure that
+        # the initial step does not violate bounds. If it does, we modify
+        # the step vector directly.
+
         # Loop over varsets and enforce bounds on step in-place.
         for u_data, du_data, lower_data, upper_data in zip(
-                self._data, step._data, lower_bounds._data, upper_bounds._data):
-            du_data += numpy.maximum(u_data, lower_data) - u_data
-            du_data += numpy.minimum(u_data, upper_data) - u_data
+                u._data, du._data, lower_bounds._data, upper_bounds._data):
+
+            # If u > lower, we're just adding zero. Otherwise, we're adding
+            # the step required to get up to the lower bound.
+            # For du, we normalize by alpha since du eventually gets
+            # multiplied by alpha.
+            change = numpy.maximum(u_data, lower_data) - u_data
+            u_data += change
+            du_data += change / alpha
+
+            # If u < upper, we're just adding zero. Otherwise, we're adding
+            # the step required to get down to the upper bound, but normalized
+            # by alpha since du eventually gets multiplied by alpha.
+            change = numpy.minimum(u_data, upper_data) - u_data
+            u_data += change
+            du_data += change / alpha
+
+    def _enforce_bounds_wall(self, du, alpha, lower_bounds, upper_bounds):
+        """Enforce lower/upper bounds on each scalar separately, then backtrack along the wall.
+
+        This method modifies both self (u) and step (du) in-place.
+
+        Args
+        ----
+        du : <Vector>
+            Newton step; the backtracking is applied to this vector in-place.
+        alpha : float
+            step size.
+        lower_bounds : <Vector>
+            Lower bounds vector.
+        upper_bounds : <Vector>
+            Upper bounds vector.
+        """
+        u = self
+
+        # The assumption is that alpha * step has been added to this vector
+        # just prior to this method being called. We are currently in the
+        # initialization of a line search, and we're trying to ensure that
+        # the initial step does not violate bounds. If it does, we modify
+        # the step vector directly.
+
+        # Loop over varsets and enforce bounds on step in-place.
+        for u_data, du_data, lower_data, upper_data in zip(
+                u._data, du._data, lower_bounds._data, upper_bounds._data):
+
+            # If u > lower, we're just adding zero. Otherwise, we're adding
+            # the step required to get up to the lower bound.
+            # For du, we normalize by alpha since du eventually gets
+            # multiplied by alpha.
+            change_lower = numpy.maximum(u_data, lower_data) - u_data
+            u_data += change_lower
+            du_data += change_lower / alpha
+
+            # If u < upper, we're just adding zero. Otherwise, we're adding
+            # the step required to get down to the upper bound, but normalized
+            # by alpha since du eventually gets multiplied by alpha.
+            change_upper = numpy.minimum(u_data, upper_data) - u_data
+            u_data += change_upper
+            du_data += change_upper / alpha
+
+            # Now we ensure that we will backtrack along the wall during the
+            # line search by setting the entries of du at the bounds to zero.
+            changed_either = change_lower.astype(bool) + change_upper.astype(bool)
+            du_data[changed_either] = 0.
