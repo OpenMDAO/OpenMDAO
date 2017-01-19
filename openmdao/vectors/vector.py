@@ -399,6 +399,34 @@ class Vector(object):
         """
         pass
 
+    def enforce_bounds_all(self, step, lower_bounds, upper_bounds):
+        """Enforce lower/upper bounds and backtrack the entire vector together.
+
+        Args
+        ----
+        step : <Vector>
+            Newton step; the backtracking is applied to this vector in-place.
+        lower_bounds : <Vector>
+            Lower bounds vector.
+        upper_bounds : <Vector>
+            Upper bounds vector.
+        """
+        pass
+
+    def enforce_bounds(self, step, lower_bounds, upper_bounds):
+        """Enforce lower/upper bounds and backtrack only the violating entries.
+
+        Args
+        ----
+        step : <Vector>
+            Newton step; the backtracking is applied to this vector in-place.
+        lower_bounds : <Vector>
+            Lower bounds vector.
+        upper_bounds : <Vector>
+            Upper bounds vector.
+        """
+        pass
+
 
 class Transfer(object):
     """Base Transfer class.

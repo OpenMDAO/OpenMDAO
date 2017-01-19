@@ -1,5 +1,7 @@
 """Define the scipy iterative solver class."""
+
 from __future__ import division, print_function
+
 import numpy
 from scipy.sparse.linalg import LinearOperator, gmres
 
@@ -20,6 +22,13 @@ class ScipyIterativeSolver(LinearSolver):
             dictionary of options set by the instantiating class/script.
         """
         super(ScipyIterativeSolver, self).__init__(**kwargs)
+
+    def _declare_options(self):
+        """Declare options before kwargs are processed in the init method."""
+        # TODO : These are the defaults we used in OpenMDAO Alpha
+        # self.options['maxiter'] = 1000
+        # self.options['atol'] = 1.0e-12
+
         self.options.declare('solver', type_=object, value=gmres,
                              desc='function handle for actual solver')
 
@@ -55,6 +64,8 @@ class ScipyIterativeSolver(LinearSolver):
             system._var_allprocs_range['output'][1],
         ]
         system._apply_linear([vec_name], self._mode, var_inds)
+
+        # self._mpi_print(b_vec.get_data())
         return b_vec.get_data()
 
     def _monitor(self, res):
@@ -74,7 +85,7 @@ class ScipyIterativeSolver(LinearSolver):
         self._mpi_print(self._iter_count, norm / self._norm0, norm)
         self._iter_count += 1
 
-    def __call__(self, vec_names, mode):
+    def solve(self, vec_names, mode):
         """Run the solver.
 
         Args

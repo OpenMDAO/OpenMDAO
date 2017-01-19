@@ -79,6 +79,10 @@ class System(object):
         coefficients to convert vectors to normalized values.
     _scaling_to_phys : dict of ndarray
         coefficients to convert vectors to physical values.
+    _lower_bounds : <Vector>
+        vector of lower bounds, scaled and dimensionless.
+    _upper_bounds : <Vector>
+        vector of upper bounds, scaled and dimensionless.
     _inputs : <Vector>
         inputs vector; points to _vectors['input']['nonlinear'].
     _outputs : <Vector>
@@ -144,6 +148,9 @@ class System(object):
             'input': None, 'output': None, 'residual': None}
         self._scaling_to_phys = {
             'input': None, 'output': None, 'residual': None}
+
+        self._lower_bounds = None
+        self._upper_bounds = None
 
         self._inputs = None
         self._outputs = None
@@ -343,7 +350,7 @@ class System(object):
 
         Args
         ----
-        vectors : {'input': Vector, 'output': Vector, 'residual': Vector}
+        vectors : {'input': <Vector>, 'output': <Vector>, 'residual': <Vector>}
             Vector objects corresponding to 'name'.
         vector_var_ids : ndarray[:]
             integer array of all relevant variables for this vector.
@@ -431,6 +438,45 @@ class System(object):
 
         for subsys in self._subsystems_myproc:
             subsys._setup_scaling()
+
+    def _setup_bounds_vectors(self, lower_bounds, upper_bounds, is_top):
+        """Set up the lower and upper bounds vectors.
+
+        Sets the following attributes:
+            _lower_bounds
+            _upper_bounds
+
+        Args
+        ----
+        lower_bounds : <Vector>
+            lower bound vector allocated in <Problem>.
+        upper_bounds : <Vector>
+            upper bound vector allocated in <Problem>.
+        is_top : bool
+            whether this system is the root system.
+        """
+        self._lower_bounds = lower_bounds
+        self._upper_bounds = upper_bounds
+
+        # if this is the top-most group, we will set the values here as well.
+        if is_top:
+            for ind, meta in enumerate(self._var_myproc_metadata['output']):
+                name = self._var_myproc_names['output'][ind]
+                a, b = self._scaling_to_norm['output'][ind, :]
+                if meta['lower'] is None:
+                    self._lower_bounds[name] = -numpy.inf
+                else:
+                    self._lower_bounds[name] = a + b * numpy.atleast_1d(meta['lower'])
+                if meta['upper'] is None:
+                    self._upper_bounds[name] = numpy.inf
+                else:
+                    self._upper_bounds[name] = a + b * numpy.atleast_1d(meta['upper'])
+
+        # Perform recursion
+        for subsys in self._subsystems_myproc:
+            sub_lower_bounds = lower_bounds._create_subvector(subsys)
+            sub_upper_bounds = upper_bounds._create_subvector(subsys)
+            subsys._setup_bounds_vectors(sub_lower_bounds, sub_upper_bounds, False)
 
     def _get_transfers(self, vectors):
         """Compute transfers.

@@ -32,6 +32,8 @@ class DirectSolver(LinearSolver):
 
         self._print_name = 'Direct'
 
+    def _declare_options(self):
+        """Declare options before kwargs are processed in the init method."""
         self.options.declare('method', value='solve', values=['LU', 'solve'],
                              desc="Solution method, either 'solve' for " +
                              "linalg.solve, or 'LU' for linalg.lu_factor " +
@@ -72,7 +74,7 @@ class DirectSolver(LinearSolver):
         # return result
         return b_vec.get_data()
 
-    def __call__(self, vec_names, mode):
+    def solve(self, vec_names, mode):
         """See LinearSolver."""
         self._vec_names = vec_names
         self._mode = mode

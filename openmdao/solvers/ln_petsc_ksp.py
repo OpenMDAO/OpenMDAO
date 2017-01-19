@@ -160,15 +160,16 @@ class PetscKSP(LinearSolver):
 
         self._print_name = 'KSP'
 
-        # add option to specify which KSP algorithm to use
-        self.options.declare('ksp_type', value='fgmres', values=KSP_TYPES,
-                             desc="KSP algorithm to use. Default is 'fgmres'.")
-
         # initialize dictionary of KSP instances (keyed on vector name)
         self._ksp = {}
 
         # initialize preconditioner to None
         self._precon = None
+
+    def _declare_options(self):
+        """Declare options before kwargs are processed in the init method."""
+        self.options.declare('ksp_type', value='fgmres', values=KSP_TYPES,
+                             desc="KSP algorithm to use. Default is 'fgmres'.")
 
     def mult(self, mat, in_vec, result):
         """Apply Jacobian matrix (KSP Callback).
@@ -214,7 +215,7 @@ class PetscKSP(LinearSolver):
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
 
-    def __call__(self, vec_names, mode):
+    def solve(self, vec_names, mode):
         """Solve the linear system for the problem in self._system.
 
         The full solution vector is returned.
@@ -298,7 +299,7 @@ class PetscKSP(LinearSolver):
             b_vec.set_data(_get_petsc_vec_array(in_vec))
 
             # call the preconditioner
-            self._precon([vec_name], mode)
+            self._precon.solve([vec_name], mode)
 
             # stuff resulting value of x vector into result for KSP
             x_vec.get_data(result.array)

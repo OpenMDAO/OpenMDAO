@@ -7,6 +7,7 @@ import unittest
 from openmdao.solvers.ln_direct import DirectSolver
 
 from openmdao.core.problem import Problem
+from openmdao.core.group import Group
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
@@ -14,6 +15,14 @@ from openmdao.devtools.testutil import assert_rel_error
 
 
 class TestDirectSolver(unittest.TestCase):
+
+    def test_options(self):
+        """Verify that the DirectSolver specific options are declared."""
+
+        group = Group()
+        group.ln_solver = DirectSolver()
+
+        assert(group.ln_solver.options['method'] == 'solve')
 
     def test_solve_linear_direct_default(self):
         """Solve implicit system with DirectSolver.
