@@ -46,6 +46,15 @@ def _dense_to_aij(A):
                 cols.append(j)
     return np.array(data), np.array(rows), np.array(cols)
 
+def _inputs_to_vector(inputs, num_var, var_shape):
+    size = np.prod(var_shape)
+    x = np.zeros(num_var * size)
+    for i in range(num_var):
+        x_i = inputs['x_{}'.format(i)].flat
+        x[size*i:size*(i+1)] = x_i
+
+    return x
+
 
 def _cycle_comp_jacobian(component, inputs, outputs, jacobian, angle_param):
     if component.metadata['jacobian_type'] != 'matvec':
@@ -79,27 +88,33 @@ def _cycle_comp_jacobian(component, inputs, outputs, jacobian, angle_param):
 
 def _cycle_comp_jacvec(component, inputs, outputs, d_inputs, d_outputs, mode, angle_param):
     if component.metadata['jacobian_type'] == 'matvec':
-        if 'y' in d_outputs and 'theta_out' in d_outputs and \
-                        'x' in d_inputs and 'theta' in d_inputs and angle_param in d_inputs:
-            x = inputs['x']
-            angle = inputs[angle_param]
-            A = _compute_A(component.N, angle)
-            dA = _compute_dA(component.N, angle)
-            if mode == 'fwd':
+        x = inputs['x']
+        angle = inputs[angle_param]
+        A = _compute_A(component.N, angle)
+        dA = _compute_dA(component.N, angle)
+        if mode == 'fwd':
+            if 'x' in d_inputs:
                 dx = d_inputs['x']
-                dtheta = d_inputs['theta']
-                dangle = d_inputs[angle_param]
+                d_outputs['y'] += A.dot(dx)
 
-                d_outputs['y'] += A.dot(dx) + (dA.dot(x)) * dangle
+            if 'theta' in d_inputs:
+                dtheta = d_inputs['theta']
                 d_outputs['theta_out'] += dtheta
 
-            elif mode == 'rev':
-                dy = d_outputs['y']
-                dtheta_out = d_outputs['theta_out']
+            if angle_param in d_inputs:
+                dangle = d_inputs[angle_param]
+                d_outputs['y'] +=  (dA.dot(x)) * dangle
 
+        elif mode == 'rev':
+            if 'y' in d_outputs:
+                dy = d_outputs['y']
                 d_inputs['x'] += A.T.dot(dy)
-                d_inputs['theta'] += dtheta_out
                 d_inputs[angle_param] += x.T.dot(dA.T.dot(dy))
+
+            if 'theta_out' in d_outputs:
+                dtheta_out = d_outputs['theta_out']
+                d_inputs['theta'] += dtheta_out
+
 
 def _compute_d_xsum_d_psi(psi, x0, num_comp):
     system_size = x0.shape[0]
@@ -271,8 +286,10 @@ class CycleGroup(ParametericTestGroup):
     def _initialize_metadata(self):
         self.metadata.declare('num_comp', type_=int, value=2,
                               desc='Total number of components')
-        self.metadata.declare('variable_length', type_=int, value=10,
-                              desc='Size of the underlying systems.')
+        self.metadata.declare('num_var', type_=int, value=1,
+                              desc='Number of variables per component')
+        self.metadata.declare('var_shape', type_=int, value=(3,),
+                              desc='Shape of ')
         self.metadata.declare('connection_type', type_=str, value='explicit',
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
@@ -294,7 +311,7 @@ class CycleGroup(ParametericTestGroup):
         if num_comp < 2:
             raise ValueError('Number of components must be at least 2.')
 
-        self.N = N = self.metadata['variable_length']
+        self.N = N = 3#self.metadata['variable_length']
         if N < 3:
             raise ValueError('Variable length must be at least 3.')
 
@@ -339,7 +356,7 @@ class CycleGroup(ParametericTestGroup):
         self.add_subsystem('psi_comp', IndepVarComp('psi', PSI))
         self.add_subsystem('x0_comp', IndepVarComp('x', np.ones(self.N)))
 
-        self._add_middle_cycle(conn_type, first_class, first_name, 0, comp_args)
+        self._add_cycle_comp(conn_type, first_class, first_name, 0, comp_args)
         prev_name = first_name
         idx = 0
 
@@ -350,7 +367,7 @@ class CycleGroup(ParametericTestGroup):
 
         for idx in range(1, num_comp - 1):
             current_name = 'middle_{0}'.format(idx)
-            self._add_middle_cycle(conn_type, middle_class, current_name, idx, comp_args)
+            self._add_cycle_comp(conn_type, middle_class, current_name, idx, comp_args)
 
             if conn_type == 'explicit':
                 self._explicit_connections(prev_name, current_name, connection_variables)
@@ -376,7 +393,10 @@ class CycleGroup(ParametericTestGroup):
 
         self.connect('psi_comp.psi', first_name + '.psi')
         self.connect('psi_comp.psi', last_name + '.psi')
-        self.connect('x0_comp.x', first_name + '.x')
+        first_x_name = '.x'
+        if conn_type == 'implicit':
+            first_x_name += '_0'
+        self.connect('x0_comp.x', first_name + first_x_name)
 
     def _explicit_connections(self, prev_name, current_name, vars):
         for out_var, in_var in vars:
@@ -385,7 +405,7 @@ class CycleGroup(ParametericTestGroup):
                 '{0}.{1}'.format(current_name, in_var)
             )
 
-    def _add_middle_cycle(self, connection_type, comp_class, comp_name, index, comp_args):
+    def _add_cycle_comp(self, connection_type, comp_class, comp_name, index, comp_args):
         if connection_type == 'explicit':
             self.add_subsystem(comp_name, comp_class(**comp_args))
         elif connection_type == 'implicit':

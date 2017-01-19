@@ -184,8 +184,8 @@ class ParameterizedTestCases(unittest.TestCase):
                           testcase_func_name=_test_name)
     def test_openmdao(self, test):
 
-        if test.args['connection_type'] == 'implicit' and test.args['jacobian_type'] == 'matvec':
-            self.skipTest('Undetermined issue with implicit conns and matvec.')
+        # if test.args['connection_type'] == 'implicit' and test.args['jacobian_type'] == 'matvec':
+        #     self.skipTest('Undetermined issue with implicit conns and matvec.')
 
         fail, rele, abse = test.run()
         if fail:
