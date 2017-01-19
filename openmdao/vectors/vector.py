@@ -260,6 +260,10 @@ class Vector(object):
             variable value to set (not scaled, not dimensionless)
         """
         if key in self._names:
+            if isinstance(value, tuple) or isinstance(value, list):
+                value = numpy.atleast_1d(value)
+            if isinstance(value, numpy.ndarray):
+                value = value.reshape(self._views[key].shape)
             self._views[key][:] = value
         else:
             raise KeyError("Variable '%s' not found." % key)

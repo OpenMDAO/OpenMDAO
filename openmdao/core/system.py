@@ -466,11 +466,13 @@ class System(object):
                 if meta['lower'] is None:
                     self._lower_bounds[name] = -numpy.inf
                 else:
-                    self._lower_bounds[name] = a + b * numpy.atleast_1d(meta['lower'])
+                    self._lower_bounds[name] = meta['lower']
+                    self._lower_bounds[name] = a + b * self._lower_bounds[name]
                 if meta['upper'] is None:
                     self._upper_bounds[name] = numpy.inf
                 else:
-                    self._upper_bounds[name] = a + b * numpy.atleast_1d(meta['upper'])
+                    self._upper_bounds[name] = meta['upper']
+                    self._upper_bounds[name] = a + b * self._upper_bounds[name]
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
