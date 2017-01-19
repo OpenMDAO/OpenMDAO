@@ -8,12 +8,12 @@ from openmdao.solvers.solver import NonlinearSolver
 
 
 class BacktrackingLineSearch(NonlinearSolver):
-    """Backtracking line search using the Armijo-Goldstein condition."""
+    """Backtracking line search."""
 
     SOLVER = 'NL: BK_TKG'
 
     def __init__(self, **kwargs):
-        """Backtracking line search using the Armijo-Goldstein condition."""
+        """Backtracking line search."""
         super(BacktrackingLineSearch, self).__init__(**kwargs)
 
     def _declare_options(self):
@@ -21,9 +21,10 @@ class BacktrackingLineSearch(NonlinearSolver):
         opt = self.options
         opt['maxiter'] = 5
 
-        opt.declare('solve_subsystems', value=True,
-                    desc='Set to True to solve subsystems. You may need '
-                         'this for solvers nested under Newton.')
+        opt.declare('bound_enforcement', value='vector', values=['vector', 'scalar'],
+            desc="If this is set to 'vector', the entire vector is backtracked together" +
+            "when a bound is violated. If this is set to 'scalar', only the violating" +
+            "entries are backtracked to the bound.")
         opt.declare('rho', value=0.5, desc="Backtracking multiplier.")
         opt.declare('alpha', value=1.0, desc="Initial line search step.")
         # opt.declare('c', value=0.5, desc="Slope check trigger.")
@@ -43,29 +44,18 @@ class BacktrackingLineSearch(NonlinearSolver):
 
         u = system._outputs
         du = system._vectors['output']['linear']
-        # lower = system.lower
-        # upper = system.upper
-        #
-        # if not numpy.isnan(lower).all() \
-        #    and not numpy.isnan(u).any() \
-        #    and not numpy.isnan(du).any():
-        #     lower_const = u + self.alpha * du - lower
-        #     ind = numpy.nanargmin(lower_const)
-        #     if lower_const[ind] < 0:
-        #         self.alpha = (lower[ind] - u[ind]) / du[ind]
-        # if not numpy.isnan(upper).all() \
-        #    and not numpy.isnan(u).any() \
-        #    and not numpy.isnan(du).any():
-        #     upper_const = -(u + self.alpha * du - upper)
-        #     ind = numpy.nanargmin(upper_const)
-        #     if upper_const[ind] < 0:
-        #         self.alpha = (upper[ind] - u[ind]) / du[ind]
 
         norm0 = self._iter_get_norm()
         if norm0 == 0.0:
             norm0 = 1.0
 
         u.add_scal_vec(self.alpha, du)
+
+        if self.options['bound_enforcement'] == 'vector':
+            u.enforce_bounds_all(du, system._lower_bounds, system._upper_bounds)
+        else:
+            u.enforce_bounds(du, system._lower_bounds, system._upper_bounds)
+
         norm = self._iter_get_norm()
         return norm0, norm
 

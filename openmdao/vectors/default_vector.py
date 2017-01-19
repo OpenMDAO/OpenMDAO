@@ -294,3 +294,58 @@ class DefaultVector(Vector):
         for iset, data in enumerate(self._data):
             data[:] = coeffs[self._ivar_map[iset], 0] + \
                 coeffs[self._ivar_map[iset], 1] * data
+
+    def enforce_bounds_all(self, step, lower_bounds, upper_bounds):
+        """Enforce lower/upper bounds and backtrack the entire vector together.
+
+        Args
+        ----
+        step : <Vector>
+            Newton step; the backtracking is applied to this vector in-place.
+        lower_bounds : <Vector>
+            Lower bounds vector.
+        upper_bounds : <Vector>
+            Upper bounds vector.
+        """
+        d_alpha = 0
+
+        # Loop over varsets and find the largest amount a bound is violated
+        # where positive means a bound is violated.
+        for u_data, du_data, lower_data, upper_data in zip(
+                self._data, step._data, lower_bounds._data, upper_bounds._data):
+
+            print(du_data)
+            mask = du_data > 0
+            if mask.any():
+                max_d_alpha = numpy.amax((lower_data[mask] - u_data[mask]) / du_data[mask])
+                d_alpha = max(d_alpha, max_d_alpha)
+
+            mask = du_data > 0
+            if mask.any():
+                max_d_alpha = numpy.amax((u_data[mask] - upper_data[mask]) / du_data[mask])
+                d_alpha = max(d_alpha, max_d_alpha)
+
+
+        # d_alpha will not be negative because it was initialized to be 0
+        # and we've only done max operations.
+        # d_alpha will not be greater than 1 because the assumption is that
+        # the original point was valid - i.e., no bounds were violated.
+        step *= 1 - d_alpha
+
+    def enforce_bounds(self, step, lower_bounds, upper_bounds):
+        """Enforce lower/upper bounds and backtrack only the violating entries.
+
+        Args
+        ----
+        step : <Vector>
+            Newton step; the backtracking is applied to this vector in-place.
+        lower_bounds : <Vector>
+            Lower bounds vector.
+        upper_bounds : <Vector>
+            Upper bounds vector.
+        """
+        # Loop over varsets and enforce bounds on step in-place.
+        for u_data, du_data, lower_data, upper_data in zip(
+                self._data, step._data, lower_bounds._data, upper_bounds._data):
+            du_data += numpy.maximum(u_data, lower_data) - u_data
+            du_data += numpy.minimum(u_data, upper_data) - u_data
