@@ -11,7 +11,7 @@ class BacktrackingLineSearch(NonlinearSolver):
     """Backtracking line search."""
 
     SOLVER = 'NL: BKTKG'
-    
+
     def _declare_options(self):
         """Declare options before kwargs are processed in the init method."""
         opt = self.options

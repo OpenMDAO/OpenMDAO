@@ -28,12 +28,10 @@ CYCLE_PARAMS = {
 }
 
 GROUP_PARAMS = {
-    # 'mesh': MESH_PARAMS,
     'cycle': CYCLE_PARAMS,
 }
 
 GROUP_CONSTRUCTORS = {
-    # 'mesh': TestMeshGroup,
     'cycle': CycleGroup,
 }
 
