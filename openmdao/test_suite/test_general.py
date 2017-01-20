@@ -1,120 +1,68 @@
-from __future__ import division, print_function
+"""General tests to demonstrate the parametric suite"""
+from __future__ import print_function, division
 
-import itertools
 import unittest
-from six.moves import range
-import numpy
-
-from openmdao.test_suite.components.implicit_components \
-    import TestImplCompNondLinear
-from openmdao.test_suite.components.explicit_components \
-    import TestExplCompNondLinear
-from openmdao.test_suite.groups.group import TestGroupFlat
-from openmdao.api import Problem
-from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
-from openmdao.api import GlobalJacobian, DenseMatrix, CooMatrix, CsrMatrix
-
-try:
-    from openmdao.vectors.petsc_vector import PETScVector
-except ImportError:
-    PETScVector = None
-
 from nose_parameterized import parameterized
+from openmdao.test_suite.parametric_suite import full_test_suite, test_suite
+from openmdao.devtools.testutil import assert_rel_error
+from six import iterkeys
 
 
-def custom_name(testcase_func, param_num, param):
-    return ''.join(('test_',
-                    '_'.join(p.__name__ for p in param.args[:2]),
-                    '_',
-                    '_'.join(str(p) for p in param.args[2:]))
-                   )
+def _test_name(testcase_func, param_num, params):
+    return '_'.join(('test', params.args[0].name))
 
 
-class CompTestCaseBase(unittest.TestCase):
+def _test_name2(testcase_func, param_num, params):
+    return '_'.join(('test2', params.args[0].name))
+
+
+class ParameterizedTestCases(unittest.TestCase):
     """The TestCase that actually runs all of the cases inherits from this."""
 
-    @parameterized.expand(itertools.product(
-        [TestImplCompNondLinear, TestExplCompNondLinear],
-        [DefaultVector, PETScVector] if PETScVector else [DefaultVector],
-        ['implicit', 'explicit'],
-        [True, False],
-        ['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
-        ['array', 'sparse', 'aij'],
-        range(1, 3),
-        range(1, 3),
-        [(1,), (2,), (2, 1), (1, 2)],
-    ), testcase_func_name=custom_name)
-    def test_openmdao(self, component_class, vector_class, connection_type, global_jac, jacobian_type,
-                      partial_type, num_var, num_comp, var_shape):
+    @parameterized.expand(full_test_suite(),
+                          testcase_func_name=_test_name)
+    def test_openmdao(self, test):
+        test.setup()
+        problem = test.problem
 
-        group = TestGroupFlat(num_comp=num_comp, num_var=num_var,
-                              var_shape=var_shape,
-                              connection_type=connection_type,
-                              jacobian_type=jacobian_type,
-                              partial_type=partial_type,
-                              component_class=component_class,
-                              )
-        prob = Problem(group).setup(vector_class, check=False)
+        root = problem.root
 
-        if global_jac:
-            if jacobian_type == 'dense':
-                prob.root.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
-            elif jacobian_type == 'sparse-coo':
-                prob.root.jacobian = GlobalJacobian(matrix_class=CooMatrix)
-            elif jacobian_type == 'sparse-csr':
-                prob.root.jacobian = GlobalJacobian(matrix_class=CsrMatrix)
+        expected_values = root.expected_values
+        if expected_values:
+            actual = {key: problem[key] for key in iterkeys(expected_values)}
+            assert_rel_error(self, actual, expected_values, 1e-8)
 
-        prob.root.nl_solver = NewtonSolver(
-            subsolvers={'linear': ScipyIterativeSolver(
-                maxiter=100,
-            )}
-        )
-        prob.root.ln_solver = ScipyIterativeSolver(
-            maxiter=200, atol=1e-10, rtol=1e-10)
-        prob.root.suppress_solver_output = True
+        expected_totals = root.expected_totals
+        if expected_totals:
+            # Forward Derivatives Check
+            totals = test.compute_totals('fwd')
+            assert_rel_error(self, totals, expected_totals, 1e-8)
 
-        fail, rele, abse = prob.run()
-        if fail:
-            self.fail('Problem run failed: re %f ; ae %f' % (rele, abse))
+            # Reverse Derivatives Check
+            totals = test.compute_totals('rev')
+            assert_rel_error(self, totals, expected_totals, 1e-8)
 
-        # Setup for the 4 tests that follow
-        size = numpy.prod(var_shape)
-        work = prob.root._vectors['output']['linear']._clone()
-        work.set_const(1.0)
-        if component_class == TestImplCompNondLinear:
-            val = 1 - 0.01 + 0.01 * size * num_var * num_comp
-        elif component_class == TestExplCompNondLinear:
-            val = 1 - 0.01 * size * num_var * (num_comp - 1)
 
-        prob.root._apply_nonlinear()
-        prob.root._linearize()
+class ParameterizedTestCasesSubset(unittest.TestCase):
+    """Duplicating some testing to demonstrate filters."""
+    @parameterized.expand(test_suite(jacobian_type='*', num_comp=[2, 5, 10], partial_type='aij'),
+                          testcase_func_name=_test_name2)
+    def test_subset(self, test):
+        test.setup()
+        problem = test.problem
+        root = problem.root
 
-        # 1. fwd apply_linear test
-        prob.root._vectors['output']['linear'].set_const(1.0)
-        prob.root._apply_linear(['linear'], 'fwd')
-        prob.root._vectors['residual']['linear'].add_scal_vec(-val, work)
-        self.assertAlmostEqual(
-            prob.root._vectors['residual']['linear'].get_norm(), 0)
+        expected_values = root.expected_values
+        if expected_values:
+            actual = {key: problem[key] for key in iterkeys(expected_values)}
+            assert_rel_error(self, actual, expected_values, 1e-8)
 
-        # 2. rev apply_linear test
-        prob.root._vectors['residual']['linear'].set_const(1.0)
-        prob.root._apply_linear(['linear'], 'rev')
-        prob.root._vectors['output']['linear'].add_scal_vec(-val, work)
-        self.assertAlmostEqual(
-            prob.root._vectors['output']['linear'].get_norm(), 0)
+        expected_totals = root.expected_totals
+        if expected_totals:
+            # Forward Derivatives Check
+            totals = test.compute_totals('fwd')
+            assert_rel_error(self, totals, expected_totals, 1e-8)
 
-        # 3. fwd solve_linear test
-        prob.root._vectors['output']['linear'].set_const(0.0)
-        prob.root._vectors['residual']['linear'].set_const(val)
-        prob.root._solve_linear(['linear'], 'fwd')
-        prob.root._vectors['output']['linear'] -= work
-        self.assertAlmostEqual(
-            prob.root._vectors['output']['linear'].get_norm(), 0, delta=1e-2)
-
-        # 4. rev solve_linear test
-        prob.root._vectors['residual']['linear'].set_const(0.0)
-        prob.root._vectors['output']['linear'].set_const(val)
-        prob.root._solve_linear(['linear'], 'rev')
-        prob.root._vectors['residual']['linear'] -= work
-        self.assertAlmostEqual(
-            prob.root._vectors['residual']['linear'].get_norm(), 0, delta=1e-2)
+            # Reverse Derivatives Check
+            totals = test.compute_totals('rev')
+            assert_rel_error(self, totals, expected_totals, 1e-8)

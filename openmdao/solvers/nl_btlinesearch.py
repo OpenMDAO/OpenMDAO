@@ -10,21 +10,20 @@ from openmdao.solvers.solver import NonlinearSolver
 class BacktrackingLineSearch(NonlinearSolver):
     """Backtracking line search."""
 
-    SOLVER = 'NL: BK_TKG'
+    SOLVER = 'NL: BKTKG'
 
     def _declare_options(self):
         """Declare options before kwargs are processed in the init method."""
         opt = self.options
         opt['maxiter'] = 5
-
         opt.declare(
             'bound_enforcement', value='vector', values=['vector', 'scalar', 'wall'],
             desc="If this is set to 'vector', the entire vector is backtracked together " +
-                "when a bound is violated. If this is set to 'scalar', only the violating " +
-                "entries are set to the bound and then the backtracking occurs on the vector " +
-                "as a whole. If this is set to 'wall', only the violating entries are set " +
-                "to the bound, and then the backtracking follows the wall - i.e., the " +
-                "violating entries do not change during the line search.")
+                 "when a bound is violated. If this is set to 'scalar', only the violating " +
+                 "entries are set to the bound and then the backtracking occurs on the vector " +
+                 "as a whole. If this is set to 'wall', only the violating entries are set " +
+                 "to the bound, and then the backtracking follows the wall - i.e., the " +
+                 "violating entries do not change during the line search.")
         opt.declare('rho', value=0.5, desc="Backtracking multiplier.")
         opt.declare('alpha', value=1.0, desc="Initial line search step.")
         # opt.declare('c', value=0.5, desc="Slope check trigger.")
