@@ -46,29 +46,11 @@ def _dense_to_aij(A):
                 cols.append(j)
     return np.array(data), np.array(rows), np.array(cols)
 
-def _inputs_to_vector(inputs, num_var, var_shape):
-    size = np.prod(var_shape)
-    x = np.zeros(num_var * size)
-    for i in range(num_var):
-        x_i = inputs['x_{}'.format(i)].flat
-        x[size*i:size*(i+1)] = x_i
-
-    return x
-
-def _vector_to_outputs(x, outputs, num_var, var_shape):
-    size = np.prod(var_shape)
-    for i in range(num_var):
-        x_i = x[size*i:size*(i+1)].reshape(var_shape)
-        outputs['y_{}'.format(i)] = x_i
-
 def _cycle_comp_jacobian(component, inputs, outputs, jacobian, angle_param):
     if component.metadata['jacobian_type'] != 'matvec':
         angle = inputs[angle_param]
         x = inputs['x']
-        num_var = component.metadata['num_var']
-        var_shape = component.metadata['var_shape']
-        size = num_var * np.prod(var_shape)
-        x = _inputs_to_vector(inputs, num_var, var_shape)
+        size = component.N
         A = _compute_A(size, angle)
         dA = _compute_dA(size, angle)
         dA_x = np.atleast_2d(dA.dot(x)).T
@@ -431,5 +413,3 @@ class CycleGroup(ParametericTestGroup):
             self.add_subsystem(comp_name, comp_class(**comp_args),
                                renames_inputs=renames_inputs,
                                renames_outputs=renames_outputs)
-
-

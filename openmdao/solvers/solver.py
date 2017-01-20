@@ -225,7 +225,7 @@ class Solver(object):
         """Return a string representation of the solver.
 
         Returns
-        _______
+        -------
         str
             String representation of the solver.
         """
