@@ -172,8 +172,7 @@ class PetscKSP(LinearSolver):
                              desc="KSP algorithm to use. Default is 'fgmres'.")
 
         # changing the default maxiter from the base class
-        self.options.declare('maxiter', type_=int, value=100,
-                             desc='maximum number of iterations')
+        self.options['maxiter'] = 100
 
     def mult(self, mat, in_vec, result):
         """Apply Jacobian matrix (KSP Callback).
