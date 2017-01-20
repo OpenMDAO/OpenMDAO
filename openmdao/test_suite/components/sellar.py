@@ -162,7 +162,7 @@ class SellarDerivatives(Group):
 
 class SellarDerivativesGrouped(Group):
     """ Group containing the Sellar MDA. This version uses the disciplines
-    without derivatives."""
+    with derivatives."""
 
     def __init__(self):
         super(SellarDerivativesGrouped, self).__init__()
