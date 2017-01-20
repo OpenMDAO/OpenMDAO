@@ -10,6 +10,7 @@ from openmdao.components.exec_comp import ExecComp
 from openmdao.components.linear_system_comp import LinearSystemComp
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
 from openmdao.solvers.ln_direct import DirectSolver
+from openmdao.solvers.ln_petsc_ksp import PetscKSP
 from openmdao.solvers.nl_btlinesearch import BacktrackingLineSearch
 from openmdao.solvers.ln_bjac import LinearBlockJac
 from openmdao.solvers.ln_bgs import LinearBlockGS

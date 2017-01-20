@@ -32,6 +32,10 @@ class ScipyIterativeSolver(LinearSolver):
         self.options.declare('solver', type_=object, value=gmres,
                              desc='function handle for actual solver')
 
+        # changing the default maxiter from the base class
+        self.options.declare('maxiter', type_=int, value=100,
+                             desc='maximum number of iterations')
+
     def _mat_vec(self, in_vec):
         """Compute matrix-vector product.
 
