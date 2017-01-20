@@ -103,7 +103,12 @@ class Vector(object):
                               self._root_vector)
 
     def _clone(self, initialize_views=False):
-        """Return a copy that does not provide view access to its data.
+        """Return a copy that optionally provides view access to its data.
+
+        Args
+        ----
+        initialize_views : bool
+            Whether to initialize the views into the clone.
 
         Returns
         -------
