@@ -193,7 +193,13 @@ class Problem(object):
         assembler._setup_src_data(root._var_myproc_metadata['output'],
                                   root._var_myproc_indices['output'])
 
+        # Set up scaling vectors
         root._setup_scaling()
+
+        # Set up lower and upper bounds vectors
+        lower_bounds = vector_class('lower', 'output', self.root)
+        upper_bounds = vector_class('upper', 'output', self.root)
+        root._setup_bounds_vectors(lower_bounds, upper_bounds, True)
 
         # Vector setup for the basic execution vector
         self.setup_vector('nonlinear', vector_class, self._use_ref_vector)

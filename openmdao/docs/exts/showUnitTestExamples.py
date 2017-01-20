@@ -59,4 +59,4 @@ class showUnitTestExamplesDirective(Directive):
 
 def setup(app):
     """add custom directive into Sphinx so that it is found during document parsing"""
-    app.add_directive('showunittestexamples', showUnitTestExamplesDirective)
+    app.add_directive('show-unittest-examples', showUnitTestExamplesDirective)

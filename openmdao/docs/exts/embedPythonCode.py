@@ -41,4 +41,4 @@ class embedPythonCodeDirective(Directive):
 
 def setup(app):
     """add custom directive into Sphinx so that it is found during document parsing"""
-    app.add_directive('embedpythoncode', embedPythonCodeDirective)
+    app.add_directive('embed-python-code', embedPythonCodeDirective)
