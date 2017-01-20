@@ -109,9 +109,6 @@ class ParameterizedInstance(object):
 
         self.solver_class = NewtonSolver
         self.solver_options = {
-            'subsolvers':{'linear': ScipyIterativeSolver(
-                maxiter=100,
-            )},
             'maxiter':100
         }
 
