@@ -1,4 +1,4 @@
-Setting up your first analysis
+Setting up a simple analysis
 =================================================
 
 This tutorial illustrates how to build, run, and optimize a very simple model in
@@ -118,26 +118,32 @@ The component is the basic building block of a model. You will always define com
 The run-script
 ---------------------
 
-In this example we've set up the run script at the bottom of the file. The
-start of the run script is denoted by the
-:code:`if __name__ == '__main__':` statement. All OpenMDAO models are built up
-from a hierarchy of `Group` instances that organize the components. Here
-the hierarchy is very simple, consisting of a single root group that holds
-two components. The first component is an `IndepVarComp` instance. This is
-a special component that OpenMDAO provides for you to specify the
-independent variables in your problem. The second component is an instance
-of the `Paraboloid` class that we just defined.
+In this example we've set up the run script at the bottom of the file.
+The start of the run script is denoted by the following statement:
 
-As part of the the model hierarchy, you will also define any connections
-to move data between components in the relevant group. Here, we connect
-the design variables to the inputs on the paraboloid component.
+:code:`if __name__ == '__main__':`
 
-Once the model hierarchy is defined, we pass it to the constructor of the
-`Problem` class then call the `setup()` method on that problem which tells the
-framework to do some initial work to get the data structures in place for
-execution. Then we call `run()` to actually perform the computation.
+All OpenMDAO models are built up from a hierarchy of `Group` instances that organize the components.
+Here the hierarchy is very simple, consisting of a single root group that holds two components.
+The first component is an `IndepVarComp` instance.
+This is a special component that OpenMDAO provides for you to specify the independent variables in your problem.
+The second component is an instance of the `Paraboloid` class that we just defined.
 
-Here we called run twice. The first times with the initial values of 3.0 and -4.0 for `x` and `y`. The second time we changed those values and re-ran. There are a few details to note here. First, notice the way we printed the outputs via :code:`prob['parab_comp.f']` and similarly how we set the new values for `x` and `y`. You can both get and set values using the problem, which works with dimensional values in the units of the source variable. In this case, there are no units on the source (i.e. `des_vars.x`). You can read more about how OpenMDAO handles units and scaling here[LINK TO FEATURE DOC].
+As part of the the model hierarchy, you will also define any connections to move data between components in the relevant group.
+Here, we connect the design variables to the inputs on the paraboloid component.
+
+Once the model hierarchy is defined,
+we pass it to the constructor of the `Problem` class then call the `setup()` method on that problem which tells the framework to do some initial work to get the data structures in place for execution.
+Then we call `run()` to actually perform the computation.
+
+Here we called run twice.
+The first times with the initial values of 3.0 and -4.0 for `x` and `y`.
+The second time we changed those values and re-ran.
+There are a few details to note here.
+First, notice the way we printed the outputs via :code:`prob['parab_comp.f']` and similarly how we set the new values for `x` and `y`.
+You can both get and set values using the problem, which works with dimensional values in the units of the source variable.
+In this case, there are no units on the source (i.e. `des_vars.x`).
+You can read more about how OpenMDAO handles units and scaling here[LINK TO FEATURE DOC].
 
 ::
 
