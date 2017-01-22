@@ -71,11 +71,12 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['f_xy'], 174.0, 1e-6)
 
     def test_feature_petsc_setup(self):
-        if PETScVector is None: #  TODO: add decorator so this doesn't end up in the documentation?
-            raise unittest.SkipTest("PETSc is required.")
-
         from openmdao.api import Problem, Group, IndepVarComp, PETScVector
         from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        #  TODO: add decorator so this doesn't end up in the documentation?
+        if PETScVector is None:
+            raise unittest.SkipTest("PETSc is required.")
 
         prob = Problem()
         root = prob.root = Group()
