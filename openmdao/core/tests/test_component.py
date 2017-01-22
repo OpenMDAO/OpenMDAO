@@ -21,7 +21,7 @@ class TestExplicitComponent(unittest.TestCase):
 
         prob['length'] = 3.
         prob['width'] = 2.
-        prob.run()
+        prob.run_model()
         self.assertEqual(prob['area'], 6.)
 
     def test___init___array(self):
@@ -31,7 +31,7 @@ class TestExplicitComponent(unittest.TestCase):
 
         prob['lengths'] = 3.
         prob['widths'] = 2.
-        prob.run()
+        prob.run_model()
         self.assertEqual(prob['total_volume'], 24.)
 
 
@@ -49,7 +49,7 @@ class TestImplicitComponent(unittest.TestCase):
         prob = Problem(comp).setup(check=False)
 
         prob['a'] = a
-        prob.run()
+        prob.run_model()
         self.assertEqual(prob['x'], x)
 
     def test___init___array(self):
@@ -58,7 +58,7 @@ class TestImplicitComponent(unittest.TestCase):
         prob = Problem(comp).setup(check=False)
 
         prob['rhs'] = numpy.ones(2)
-        prob.run()
+        prob.run_model()
         self.assertEqualArrays(prob['x'], numpy.ones(2))
 
 

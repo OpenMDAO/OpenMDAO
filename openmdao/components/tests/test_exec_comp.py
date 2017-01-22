@@ -25,7 +25,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('y' in C1._outputs)
 
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 45.0, 0.00001)
 
@@ -39,7 +39,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('y' in C1._outputs)
 
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 3.0, 0.00001)
 
@@ -54,7 +54,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('pi' not in C1._inputs)
 
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 2 * math.pi, 0.00001)
 
@@ -72,7 +72,7 @@ class TestExecComp(unittest.TestCase):
         self.assertFalse('units' in C1._inputs['z'])
 
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 5.0, 0.00001)
 
@@ -86,7 +86,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('y' in C1._outputs)
 
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], math.sin(2.0), 0.00001)
 
@@ -100,7 +100,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('y' in C1._outputs)
 
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 2.0, 0.00001)
 
@@ -115,7 +115,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('y' in C1._outputs)
 
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], np.array([2.,1.]), 0.00001)
 
@@ -132,7 +132,7 @@ class TestExecComp(unittest.TestCase):
 
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         raise unittest.SkipTest("no check_partial_derivatives function")
         data = prob.check_partial_derivatives(out_stream=None)
@@ -157,7 +157,7 @@ class TestExecComp(unittest.TestCase):
 
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         raise unittest.SkipTest("no check_partial_derivatives function")
         data = prob.check_partial_derivatives(out_stream=None)
@@ -179,7 +179,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('y' in C1._outputs)
 
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 5.0, 0.00001)
 
@@ -195,7 +195,7 @@ class TestExecComp(unittest.TestCase):
 
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         raise unittest.SkipTest("problem missing calc_gradient")
         J = prob.calc_gradient(['p1.x'], ['comp.y'], mode='fwd', return_format='dict')
@@ -210,7 +210,7 @@ class TestExecComp(unittest.TestCase):
 
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 4.0, 0.00001)
 
@@ -234,7 +234,7 @@ class TestExecComp(unittest.TestCase):
 
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], np.ones(3)*4.0, 0.00001)
 
@@ -270,7 +270,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('a:y' in C1._outputs)
 
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, C1._outputs['a:y'], 3.5, 0.00001)
 
@@ -284,7 +284,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('foo:y' in C1._outputs)
 
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, C1._outputs['foo:y'], 5.0, 0.00001)
 
@@ -300,7 +300,7 @@ class TestExecComp(unittest.TestCase):
 
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         raise unittest.SkipTest("problem missing calc_gradient")
         J = prob.calc_gradient(['p1.x'], ['comp.foo:y'], mode='fwd', return_format='dict')
@@ -323,7 +323,7 @@ class TestExecComp(unittest.TestCase):
 
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         raise unittest.SkipTest("no check_partial_derivatives function")
         data = prob.check_partial_derivatives(out_stream=None)

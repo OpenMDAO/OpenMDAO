@@ -139,7 +139,7 @@ class ParameterizedInstance(object):
 
         prob.root.suppress_solver_output = True
 
-        fail, rele, abse = prob.run()
+        fail, rele, abse = prob.run_model()
         if fail:
             raise RuntimeError('Problem run failed: re %f ; ae %f' % (rele, abse))
 
@@ -148,7 +148,7 @@ class ParameterizedInstance(object):
 
         if problem._mode != mode:
             problem.setup(check=False, mode=mode)
-            fail, rele, abse = problem.run()
+            fail, rele, abse = problem.run_model()
             if fail:
                 raise RuntimeError('Problem run failed: re %f ; ae %f' % (rele, abse))
 

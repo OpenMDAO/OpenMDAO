@@ -135,7 +135,7 @@ class Problem(object):
         return self.root._solve_nonlinear()
 
     def run_once(self):
-        """Backwards compatible call for run_model
+        """Backward compatible call for run_model.
 
         Returns
         -------
@@ -146,7 +146,6 @@ class Problem(object):
         float
             absolute error.
         """
-
         warnings.simplefilter('always', DeprecationWarning)
         warnings.warn('This method provides backwards compabitibility with '
                       'OpenMDAO <= 1.x ; use run_driver instead.',
@@ -156,7 +155,7 @@ class Problem(object):
         return self.run_model()
 
     def run(self):
-        """Backwards compatible call for run_driver
+        """Backward compatible call for run_driver.
 
         Returns
         -------
@@ -167,7 +166,6 @@ class Problem(object):
         float
             absolute error.
         """
-
         warnings.simplefilter('always', DeprecationWarning)
         warnings.warn('This method provides backwards compabitibility with '
                       'OpenMDAO <= 1.x ; use run_driver instead.',

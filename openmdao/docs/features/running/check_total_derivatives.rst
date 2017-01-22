@@ -17,13 +17,18 @@ Examples
 You can check specific combinations of variables by specifying them manually
 
 .. embed-test::
-    openmdao.core.tests.test_problem.TestProblem.test_feature_check_total_derivatives_maunal
+    openmdao.core.tests.test_problem.TestProblem.test_feature_check_total_derivatives_manual
 
 
 Or you check the all the derivatives that the driver will need
 
 .. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_total_derivatives_from_driver
+
+
+Related Features
+-----------------
+check_partial_derivatives, setup, run_model
 
 
 

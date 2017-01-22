@@ -186,7 +186,7 @@ class TestJacobian(unittest.TestCase):
             maxiter=200, atol=1e-10, rtol=1e-10)
         prob.root.suppress_solver_output = True
 
-        prob.run()
+        prob.run_model()
 
     def _check_fwd(self, prob, check_vec):
         work = prob.root._vectors['output']['linear']._clone()
@@ -255,7 +255,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup(check=False)
 
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
         prob.root._apply_nonlinear()
         prob.root._linearize()
 

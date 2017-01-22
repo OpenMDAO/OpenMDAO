@@ -43,7 +43,7 @@ class TestComp(Component):
 
 class DepCompTestCase(unittest.TestCase):
 
-    def test_run(self):
+    def test_run_model(self):
         group = Group()
         group.add_subsystem('sys1', IndepVarComp('x', val=4.))
         group.add_subsystem('sys2', IndepVarComp('y', val=3.))
@@ -54,7 +54,7 @@ class DepCompTestCase(unittest.TestCase):
         p.setup(check=False)
         p.root.suppress_solver_output = True
 
-        p.run()
+        p.run_model()
 
         assert_rel_error(self, p['sys3.z1'], 8., 1e-10)
         assert_rel_error(self, p['sys3.z2'], 24, 1e-10)
@@ -75,7 +75,7 @@ class DepCompTestCase(unittest.TestCase):
         #p.root.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
         #print(p.root.jacobian._int_mtx._matrix)
 
-        p.run()
+        p.run_model()
 
         assert_rel_error(self, p['sys3.z1'], 8., 1e-10)
         assert_rel_error(self, p['sys3.z2'], 24, 1e-10)

@@ -89,7 +89,7 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
 
-    def test_feature_check_total_derivatives_maunal(self):
+    def test_feature_check_total_derivatives_manual(self):
 
         raise unittest.SkipTest("check_total_derivatives not implemented yet")
 
