@@ -107,9 +107,35 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         # manually specify which derivatives to check
+        # TODO: need a decorator to capture this output and put it into the doc,
+        #       or maybe just a new kind of assert?
         prob.check_total_derivatives(of=['obj', 'con1'], wrt=['x', 'z'])
         # TODO: Need to devlop the group FD/CS api, so user can control how this
         #       happens by chaninging settings on the root node
+
+    def test_feature_run_driver(self):
+        raise unittest.SkipTest("drivers not implemented yet")
+
+        from openmdao.api import Problem, ScipyOpt
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem()
+        root = prob.root = Group()
+        root.add_subsystem('p1', IndepVarComp('x', 2.0), promotes=['x'])
+        root.add_subsystem('p2', IndepVarComp('y', 3.0), promotes=['y'])
+        root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        # TODO: this api is not final, just a placeholder for now
+        prob.driver = ScipyOpt()
+        prob.driver.options['method'] = 'slsqp' # note: this might
+        prob.root.add_design_var('x')
+        prob.root.add_design_var('z')
+        prob.root.add_objective('obj')
+        prob.root.add_design_var('con1')
+        prob.root.add_design_var('con2')
+
+        prob.setup()
+        prob.run_driver()
 
     def test_feature_check_total_derivatives_from_driver(self):
 
@@ -125,7 +151,7 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         prob.driver = ScipyOpt()
-        prob.driver.options['algorithm'] = 'slsqp'
+        prob.driver.options['method'] = 'slsqp'
         prob.root.add_design_var('x')
         prob.root.add_design_var('z')
         prob.root.add_objective('obj')
@@ -137,6 +163,11 @@ class TestProblem(unittest.TestCase):
         # We don't call run_driver() here because we don't
         # actually want the optimizer to run
         prob.run_model()
+
+        self.assert_rel_error(prob['x'], 0.0, 1e-6)
+        self.assert_rel_error(prob['y'], [3.160000, 3.755278], 1e-6)
+        self.assert_rel_error(prob['z'], [1.977639, 0.000000], 1e-6)
+        self.assert_rel_error(prob['obj'], 3.18339, 1e-6)
 
         # check derivatives of all obj+constraints w.r.t all design variables
         prob.check_total_derivatives()
