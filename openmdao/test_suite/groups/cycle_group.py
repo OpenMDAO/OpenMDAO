@@ -1,6 +1,6 @@
 """Contains test groups for cycles with easily verified values/derivatives."""
 from __future__ import print_function, division
-from openmdao.api import ExplicitComponent, Group, IndepVarComp
+from openmdao.api import ExplicitComponent, IndepVarComp
 from openmdao.test_suite.groups.group import ParametericTestGroup
 import numpy as np
 import scipy.sparse as sparse
@@ -8,17 +8,27 @@ from six.moves import range
 
 PSI = 1.
 
+_vec_terms = {}
+
+
 def _compute_vector_terms(system_size):
-    u = np.zeros(system_size)
-    u[[0, -1]] = np.sqrt(2)/2
+    # Try/Except pattern is much faster than if key in ... if the key is present (which it will be
+    # outside of the first invocation).
+    try:
+        return _vec_terms[system_size]
+    except KeyError:
+        u = np.zeros(system_size)
+        u[[0, -1]] = np.sqrt(2)/2
 
-    v = np.zeros(system_size)
-    v[1:-1] = 1 / np.sqrt(system_size - 2)
+        v = np.zeros(system_size)
+        v[1:-1] = 1 / np.sqrt(system_size - 2)
 
-    cross_terms = np.outer(v, u) - np.outer(u, v)
-    same_terms = np.outer(u, u) + np.outer(v, v)
+        cross_terms = np.outer(v, u) - np.outer(u, v)
+        same_terms = np.outer(u, u) + np.outer(v, v)
 
-    return u, v, cross_terms, same_terms
+        _vec_terms[system_size] = u, v, cross_terms, same_terms
+
+        return u, v, cross_terms, same_terms
 
 
 def _compute_A(system_size, theta):
@@ -30,8 +40,7 @@ def _compute_A(system_size, theta):
 
 def _compute_dA(system_size, theta):
     u, v, cross_terms, same_terms = _compute_vector_terms(system_size)
-    return (np.cos(theta) * cross_terms
-            - np.sin(theta) * same_terms)
+    return np.cos(theta) * cross_terms - np.sin(theta) * same_terms
 
 
 def _dense_to_aij(A):
@@ -45,6 +54,7 @@ def _dense_to_aij(A):
                 rows.append(i)
                 cols.append(j)
     return np.array(data), np.array(rows), np.array(cols)
+
 
 def _cycle_comp_jacobian(component, inputs, outputs, jacobian, angle_param):
     if component.metadata['jacobian_type'] != 'matvec':
@@ -83,35 +93,29 @@ def _cycle_comp_jacvec(component, inputs, outputs, d_inputs, d_outputs, mode, an
         A = _compute_A(component.N, angle)
         dA = _compute_dA(component.N, angle)
         if mode == 'fwd':
-            if 'x' in d_inputs:
+            if 'x' in d_inputs and 'y' in d_outputs:
                 dx = d_inputs['x']
                 d_outputs['y'] += A.dot(dx)
 
-            if 'theta' in d_inputs:
+            if 'theta' in d_inputs and 'theta_out' in d_outputs:
                 dtheta = d_inputs['theta']
                 d_outputs['theta_out'] += dtheta
 
-            if angle_param in d_inputs:
+            if angle_param in d_inputs and 'y' in d_outputs:
                 dangle = d_inputs[angle_param]
-                d_outputs['y'] +=  (dA.dot(x)) * dangle
+                d_outputs['y'] += (dA.dot(x)) * dangle
 
         elif mode == 'rev':
             if 'y' in d_outputs:
                 dy = d_outputs['y']
-                # TODO: Investigate why 'x' is in _views_flat but gives a KeyError for the Vector.
                 if 'x' in d_inputs:
                     d_inputs['x'] += A.T.dot(dy)
-                d_inputs[angle_param] += x.T.dot(dA.T.dot(dy))
+                if angle_param in d_inputs:
+                    d_inputs[angle_param] += x.T.dot(dA.T.dot(dy))
 
-            if 'theta_out' in d_outputs:
+            if 'theta_out' in d_outputs and 'theta' in d_inputs:
                 dtheta_out = d_outputs['theta_out']
                 d_inputs['theta'] += dtheta_out
-
-
-def _compute_d_xsum_d_psi(psi, x0, num_comp):
-    system_size = x0.shape[0]
-    dA = _compute_dA(system_size, -psi/(num_comp - 1))
-    return (-1/(num_comp - 1))*np.sum(dA.dot(x0))
 
 
 class ExplicitCycleComp(ExplicitComponent):
@@ -274,6 +278,17 @@ class ExplicitLastComp(ExplicitComponent):
 
 class CycleGroup(ParametericTestGroup):
     """Group with a cycle. Derivatives and values are known."""
+
+    def __init__(self, **kwargs):
+        super(CycleGroup, self).__init__(**kwargs)
+
+        self.default_params.update({
+            'component_class': ['explicit'],
+            'connection_type': ['implicit', 'explicit'],
+            'partial_type': ['array', 'sparse', 'aij'],
+            'num_comp': [3, 2],
+        })
+
 
     def _initialize_metadata(self):
         self.metadata.declare('num_comp', type_=int, value=2,
