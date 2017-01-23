@@ -111,7 +111,7 @@ class Group(System):
             name of the output (source) variable to connect
         in_name : str or [str, ... ] or (str, ...)
             name of the input or inputs (target) variable to connect
-        src_indices : collection of int, optional
+        src_indices : collection of int optional
             When an input variable connects to some subset of an array output
             variable, you can specify which indices of the source to be
             transferred to the input here.

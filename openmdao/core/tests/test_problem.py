@@ -128,11 +128,11 @@ class TestProblem(unittest.TestCase):
 
         prob.driver = ScipyOpt()
         prob.driver.options['method'] = 'slsqp'
-        prob.root.add_design_var('x')
-        prob.root.add_design_var('z')
-        prob.root.add_objective('obj')
-        prob.root.add_design_var('con1')
-        prob.root.add_design_var('con2')
+        prob.driver.add_design_var('x')
+        prob.driver.add_design_var('z')
+        prob.driver.add_objective('obj')
+        prob.driver.add_design_var('con1')
+        prob.driver.add_design_var('con2')
         # re-do setup since we changed the driver and problem inputs/outputs
         prob.setup()
 
@@ -190,6 +190,23 @@ class TestProblem(unittest.TestCase):
 
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
 
+    def test_feature_simple_not_promoted_sellar_set_get_outputs(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivativesConnected
+
+        prob = Problem()
+        prob.root = SellarDerivativesConnected()
+        prob.root.nl_solver = NonlinearBlockGS()
+
+        prob.setup()
+
+        prob['px.x'] = 2.75
+        assert_rel_error(self, prob['px.x'], 2.75, 1e-6)
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['d1.y1'], 27.3049178437, 1e-6)
+
     def test_feature_simple_promoted_sellar_set_get_inputs(self):
         from openmdao.api import Problem, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -210,24 +227,9 @@ class TestProblem(unittest.TestCase):
         # the connected input variable, referenced by the absolute path
         assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
 
-    def test_feature_simple_not_promoted_sellar_set_get_outputs(self):
-        from openmdao.api import Problem, NonlinearBlockGS
-        from openmdao.test_suite.components.sellar import SellarDerivativesConnected
-
-        prob = Problem()
-        prob.root = SellarDerivativesConnected()
-        prob.root.nl_solver = NonlinearBlockGS()
-
-        prob.setup()
-
-        prob['px.x'] = 2.75
-        assert_rel_error(self, prob['px.x'], 2.75, 1e-6)
-
-        prob.run_model()
-
-        assert_rel_error(self, prob['d1.y1'], 27.3049178437, 1e-6)
-
     def test_feature_set_get(self):
+        raise unittest.SkipTest("set/get inputs via full path name not supported yet")
+
         import numpy as np
         from openmdao.api import Problem, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivatives
