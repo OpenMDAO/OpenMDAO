@@ -8,7 +8,7 @@ before calling this method.
     You should probably **not** use this method until you've used :code:`check_partial_derivatives()` to verify the
     partials for each component in your model. :code:`check_total_derivatives()` is a very blunt instrument, since it can only tell you that there is a problem, but will not give you much insight into which component or group is causing the problem.
 
-.. emebed-autodoc::
+.. embed-autodoc::
     openmdao.core.problem.check_total_derivatives()
 
 Examples

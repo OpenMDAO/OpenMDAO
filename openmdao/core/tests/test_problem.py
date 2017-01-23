@@ -173,7 +173,7 @@ class TestProblem(unittest.TestCase):
         self.assert_rel_error(self, prob['z'], [1.977639, 0.000000], 1e-6)
         self.assert_rel_error(self, prob['obj'], 3.18339, 1e-6)
 
-    def test_feature_simple_promoted_sellar_set_get(self):
+    def test_feature_simple_promoted_sellar_set_get_outputs(self):
         from openmdao.api import Problem, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -190,7 +190,27 @@ class TestProblem(unittest.TestCase):
 
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
 
-    def test_feature_simple_not_promoted_sellar_set_get(self):
+    def test_feature_simple_promoted_sellar_set_get_inputs(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem()
+        prob.root = SellarDerivatives()
+        prob.root.nl_solver = NonlinearBlockGS()
+
+        prob.setup()
+
+        prob['x'] = 2.75
+        assert_rel_error(self, prob['x'], 2.75, 1e-6)
+
+        prob.run_model()
+
+        # the output variable, referenced by the promoted name
+        assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
+        # the connected input variable, referenced by the absolute path
+        assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
+
+    def test_feature_simple_not_promoted_sellar_set_get_outputs(self):
         from openmdao.api import Problem, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivativesConnected
 
