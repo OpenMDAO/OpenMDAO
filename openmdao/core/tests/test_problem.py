@@ -208,6 +208,8 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['d1.y1'], 27.3049178437, 1e-6)
 
     def test_feature_simple_promoted_sellar_set_get_inputs(self):
+        raise unittest.SkipTest("set/get inputs via full path name not supported yet")
+
         from openmdao.api import Problem, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -228,7 +230,6 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
 
     def test_feature_set_get(self):
-        raise unittest.SkipTest("set/get inputs via full path name not supported yet")
 
         import numpy as np
         from openmdao.api import Problem, NonlinearBlockGS
