@@ -110,17 +110,15 @@ class Problem(object):
         value : float or ndarray or list
             value to set this variable to.
         """
-
         try:
-            print("here", name,  value, self.root._outputs[name])
             self.root._outputs[name]
             ind = self.root._var_myproc_names['output'].index(name)
             c0, c1 = self.root._scaling_to_norm['output'][ind, :]
-            self.root._outputs[name] = c0 + c1 * value
+            self.root._outputs[name] = c0 + c1 * np.array(value)
         except KeyError:
             ind = self.root._var_myproc_names['input'].index(name)
             c0, c1 = self.root._scaling_to_norm['input'][ind, :]
-            self.root._inputs[name] = c0 + c1 * value
+            self.root._inputs[name] = c0 + c1 * np.array(value)
 
     def run_model(self):
         """Run the model by calling the root's solve_nonlinear.
@@ -148,7 +146,6 @@ class Problem(object):
         float
             absolute error.
         """
-
         warnings.simplefilter('always', DeprecationWarning)
         warnings.warn('This method provides backwards compabitibility with '
                       'OpenMDAO <= 1.x ; use run_driver instead.',

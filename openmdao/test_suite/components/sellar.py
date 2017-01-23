@@ -181,8 +181,8 @@ class SellarDerivativesConnected(Group):
 
         self.connect('px.x', ['d1.x', 'obj_cmp.x'])
         self.connect('pz.z', ['d1.z', 'd2.z', 'obj_cmp.z'])
-        self.connect('d1.y1', ['d2.y1', 'obj_cmp.y1', 'con1.y1'])
-        self.connect('d2.y2', ['d1.y2', 'obj_cmp.y2', 'con2.y2'])
+        self.connect('d1.y1', ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1'])
+        self.connect('d2.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
 
         self.nl_solver = NonlinearBlockGS()
         self.ln_solver = ScipyIterativeSolver()
