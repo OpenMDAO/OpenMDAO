@@ -110,7 +110,9 @@ class Problem(object):
         value : float or ndarray or list
             value to set this variable to.
         """
+
         try:
+            print("here", name,  value, self.root._outputs[name])
             self.root._outputs[name]
             ind = self.root._var_myproc_names['output'].index(name)
             c0, c1 = self.root._scaling_to_norm['output'][ind, :]
@@ -146,6 +148,7 @@ class Problem(object):
         float
             absolute error.
         """
+
         warnings.simplefilter('always', DeprecationWarning)
         warnings.warn('This method provides backwards compabitibility with '
                       'OpenMDAO <= 1.x ; use run_driver instead.',

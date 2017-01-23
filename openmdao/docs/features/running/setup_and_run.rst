@@ -9,7 +9,7 @@ and it is important to note is that you can not set or get any variable values o
 Once setup is done, you can then execute your model in one of two ways:
     #. :code:`run_model()`
     #. :code:`run_driver()`
-The first one will execute one pass through your model. The second one executes the `Driver`[Link to feature docs] running optimization or DOE you've set up.
+The first one will execute one pass through your model. The second one executes the `Driver` [TODO:Link to feature docs] running the optimization, DOE, etc. that you've set up.
 
 .. embed-autodoc:
     openmdao.core.problem.setup
@@ -18,19 +18,26 @@ The first one will execute one pass through your model. The second one executes 
 Examples
 ---------
 
-Basic setup, using numpy vectors for data passing:
+A basic setup using numpy vectors for the the framework data handling, and executing a single pass through the mode.
 
 .. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_numpyvec_setup
 
 
-To use any of the PETSc linear solvers or to run in parallel under MPI:
+To use any of the PETSc linear solvers and/or to run in parallel under MPI, the framework data handling should be done with the :code:`PETScVector`.
 
 .. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_petsc_setup
 
 
+Setup a simple optimization problem and run it, call :code:`run_driver`.
 
+.. embed-test::
+    openmdao.core.tests.test_problem.TestProblem.test_feature_run_driver
+
+
+
+[TODO: auto-link to the appropriate top other feature docs!]
 Related Features
 -------------------
 set_get, drivers

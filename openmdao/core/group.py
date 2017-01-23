@@ -116,6 +116,12 @@ class Group(System):
             variable, you can specify which indices of the source to be
             transferred to the input here.
         """
+
+        if isinstance(in_name, (list, tuple)):
+            for name in in_name:
+                self.connect(out_name, name, src_indices)
+            return
+
         if in_name in self._var_connections:
             srcname = self._var_connections[in_name][0]
             raise RuntimeError("Input '%s' is already connected to '%s'" %

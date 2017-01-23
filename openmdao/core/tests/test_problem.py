@@ -113,30 +113,6 @@ class TestProblem(unittest.TestCase):
         # TODO: Need to devlop the group FD/CS api, so user can control how this
         #       happens by chaninging settings on the root node
 
-    def test_feature_run_driver(self):
-        raise unittest.SkipTest("drivers not implemented yet")
-
-        from openmdao.api import Problem, ScipyOpt
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        prob = Problem()
-        root = prob.root = Group()
-        root.add_subsystem('p1', IndepVarComp('x', 2.0), promotes=['x'])
-        root.add_subsystem('p2', IndepVarComp('y', 3.0), promotes=['y'])
-        root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
-        # TODO: this api is not final, just a placeholder for now
-        prob.driver = ScipyOpt()
-        prob.driver.options['method'] = 'slsqp' # note: this might
-        prob.root.add_design_var('x')
-        prob.root.add_design_var('z')
-        prob.root.add_objective('obj')
-        prob.root.add_design_var('con1')
-        prob.root.add_design_var('con2')
-
-        prob.setup()
-        prob.run_driver()
-
     def test_feature_check_total_derivatives_from_driver(self):
 
         raise unittest.SkipTest("check_total_derivatives not implemented yet")
@@ -164,13 +140,106 @@ class TestProblem(unittest.TestCase):
         # actually want the optimizer to run
         prob.run_model()
 
-        self.assert_rel_error(prob['x'], 0.0, 1e-6)
-        self.assert_rel_error(prob['y'], [3.160000, 3.755278], 1e-6)
-        self.assert_rel_error(prob['z'], [1.977639, 0.000000], 1e-6)
-        self.assert_rel_error(prob['obj'], 3.18339, 1e-6)
-
         # check derivatives of all obj+constraints w.r.t all design variables
         prob.check_total_derivatives()
+        # TODO: need a decorator to capture this output and put it into the doc,
+        #       or maybe just a new kind of assert?
+
+    def test_feature_run_driver(self):
+        raise unittest.SkipTest("drivers not implemented yet")
+
+        from openmdao.api import Problem, NonlinearBlockGS, ScipyOpt
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem()
+        prob.root = SellarDerivatives()
+        prob.root.nl_solver = NonlinearBlockGS()
+
+        # TODO: this api is not final, just a placeholder for now
+        prob.driver = ScipyOpt()
+        prob.driver.options['method'] = 'slsqp'
+        # note: this might differ from clippy api, but is consistent with arg name in scipy.
+        prob.root.add_design_var('x')
+        prob.root.add_design_var('z')
+        prob.root.add_objective('obj')
+        prob.root.add_design_var('con1')
+        prob.root.add_design_var('con2')
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assert_rel_error(self, prob['x'], 0.0, 1e-6)
+        self.assert_rel_error(self, prob['y'], [3.160000, 3.755278], 1e-6)
+        self.assert_rel_error(self, prob['z'], [1.977639, 0.000000], 1e-6)
+        self.assert_rel_error(self, prob['obj'], 3.18339, 1e-6)
+
+    def test_feature_simple_promoted_sellar_set_get(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem()
+        prob.root = SellarDerivatives()
+        prob.root.nl_solver = NonlinearBlockGS()
+
+        prob.setup()
+
+        prob['x'] = 2.75
+        assert_rel_error(self, prob['x'], 2.75, 1e-6)
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
+
+    def test_feature_simple_not_promoted_sellar_set_get(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivativesConnected
+
+        prob = Problem()
+        prob.root = SellarDerivativesConnected()
+        prob.root.nl_solver = NonlinearBlockGS()
+
+        prob.setup()
+
+        prob['px.x'] = 2.75
+        assert_rel_error(self, prob['px.x'], 2.75, 1e-6)
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['d1.y1'], 27.3049178437, 1e-6)
+
+    def test_feature_set_get(self):
+        import numpy as np
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem()
+        prob.root = SellarDerivatives()
+        prob.root.nl_solver = NonlinearBlockGS()
+
+        prob.setup()
+
+        # default value from the class definition
+        assert_rel_error(self, prob['x'], 1.0, 1e-6)
+        prob['x'] = 2.75
+        assert_rel_error(self, prob['x'], 2.75, 1e-6)
+
+        assert_rel_error(self, prob['z'], [5.0, 2.0], 1e-6)
+        prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
+        assert_rel_error(self, prob['z'], [1.5, 1.5], 1e-6)
+
+        prob.run_model()
+        assert_rel_error(self, prob['y1'], 5.43379016853, 1e-6)
+        assert_rel_error(self, prob['y2'], 5.33104915618, 1e-6)
+
+        prob['z'] = np.array([2.5, 2.5])
+        assert_rel_error(self, prob['z'], [2.5, 2.5], 1e-6)
+
+        prob.run_model()
+        assert_rel_error(self, prob['y1'], 9.87161739688, 1e-6)
+        assert_rel_error(self, prob['y2'], 8.14191301549, 1e-6)
+
+
+
 
     def test_setup_bad_mode(self):
         # Test error message when passing bad mode to setup.
