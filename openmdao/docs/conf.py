@@ -448,7 +448,8 @@ extensions = [
     'sphinx.ext.viewcode',
     'numpydoc',
     'showUnitTestExamples',
-    'embedPythonCode'
+    'embedPythonCode',
+    'tags'
 ]
 
 numpydoc_show_class_members = False

@@ -193,7 +193,13 @@ class Problem(object):
         assembler._setup_src_data(root._var_myproc_metadata['output'],
                                   root._var_myproc_indices['output'])
 
+        # Set up scaling vectors
         root._setup_scaling()
+
+        # Set up lower and upper bounds vectors
+        lower_bounds = vector_class('lower', 'output', self.root)
+        upper_bounds = vector_class('upper', 'output', self.root)
+        root._setup_bounds_vectors(lower_bounds, upper_bounds, True)
 
         # Vector setup for the basic execution vector
         self.setup_vector('nonlinear', vector_class, self._use_ref_vector)
@@ -344,16 +350,16 @@ class Problem(object):
         # If Forward mode, solve linear system for each 'wrt'
         # If Adjoint mode, solve linear system for each 'of'
         for input_name in input_list:
-
-            for idx in range(dinputs._idxs[input_name] + 1):
-
+            flat_view = dinputs._views_flat[input_name]
+            n_in = len(flat_view)
+            for idx in range(n_in):
                 # Maybe we don't need to clean up so much at the beginning,
                 # since we clean this every time.
                 dinputs.set_const(0.0)
 
                 # Dictionary access returns a scaler for 1d input, and we
                 # need a vector for clean code, so use _views_flat.
-                dinputs._views_flat[input_name][idx] = 1.0
+                flat_view[idx] = 1.0
 
                 # The root system solves here.
                 root._solve_linear([vecname], mode)
@@ -370,7 +376,7 @@ class Problem(object):
                             key = (output_name, input_name)
 
                             if totals[key] is None:
-                                totals[key] = np.zeros((len_val, 1))
+                                totals[key] = np.zeros((len_val, n_in))
                             totals[key][:, idx] = deriv_val
 
                         else:
@@ -378,7 +384,7 @@ class Problem(object):
                             key = (input_name, output_name)
 
                             if totals[key] is None:
-                                totals[key] = np.zeros((1, len_val))
+                                totals[key] = np.zeros((n_in, len_val))
                             totals[key][idx, :] = deriv_val
 
         return totals

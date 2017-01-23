@@ -102,8 +102,13 @@ class Vector(object):
         return self.__class__(self._name, self._typ, system,
                               self._root_vector)
 
-    def _clone(self):
-        """Return a copy that does not provide view access to its data.
+    def _clone(self, initialize_views=False):
+        """Return a copy that optionally provides view access to its data.
+
+        Args
+        ----
+        initialize_views : bool
+            Whether to initialize the views into the clone.
 
         Returns
         -------
@@ -113,6 +118,8 @@ class Vector(object):
         vec = self.__class__(self._name, self._typ, self._system,
                              self._root_vector)
         vec._clone_data()
+        if initialize_views:
+            vec._initialize_views()
         return vec
 
     def _compute_ivar_map(self):
@@ -260,6 +267,10 @@ class Vector(object):
             variable value to set (not scaled, not dimensionless)
         """
         if key in self._names:
+            if isinstance(value, tuple) or isinstance(value, list):
+                value = numpy.atleast_1d(value)
+            if isinstance(value, numpy.ndarray):
+                value = value.reshape(self._views[key].shape)
             self._views[key][:] = value
         else:
             raise KeyError("Variable '%s' not found." % key)
@@ -396,6 +407,60 @@ class Vector(object):
             0th order coefficients for scaling/unscaling.
         c1 : int ndarray[nvar_myproc]
             1st order coefficients for scaling/unscaling.
+        """
+        pass
+
+    def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
+        """Enforce lower/upper bounds, backtracking the entire vector together.
+
+        This method modifies both self (u) and step (du) in-place.
+
+        Args
+        ----
+        du : <Vector>
+            Newton step; the backtracking is applied to this vector in-place.
+        alpha : float
+            step size.
+        lower_bounds : <Vector>
+            Lower bounds vector.
+        upper_bounds : <Vector>
+            Upper bounds vector.
+        """
+        pass
+
+    def _enforce_bounds_scalar(self, du, alpha, lower_bounds, upper_bounds):
+        """Enforce lower/upper bounds on each scalar separately, then backtrack as a vector.
+
+        This method modifies both self (u) and step (du) in-place.
+
+        Args
+        ----
+        du : <Vector>
+            Newton step; the backtracking is applied to this vector in-place.
+        alpha : float
+            step size.
+        lower_bounds : <Vector>
+            Lower bounds vector.
+        upper_bounds : <Vector>
+            Upper bounds vector.
+        """
+        pass
+
+    def _enforce_bounds_wall(self, du, alpha, lower_bounds, upper_bounds):
+        """Enforce lower/upper bounds on each scalar separately, then backtrack along the wall.
+
+        This method modifies both self (u) and step (du) in-place.
+
+        Args
+        ----
+        du : <Vector>
+            Newton step; the backtracking is applied to this vector in-place.
+        alpha : float
+            step size.
+        lower_bounds : <Vector>
+            Lower bounds vector.
+        upper_bounds : <Vector>
+            Upper bounds vector.
         """
         pass
 

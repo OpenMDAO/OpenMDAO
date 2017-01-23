@@ -221,6 +221,16 @@ class Solver(object):
         """
         return self.options['subsolvers'][name]
 
+    def __str__(self):
+        """Return a string representation of the solver.
+
+        Returns
+        -------
+        str
+            String representation of the solver.
+        """
+        return self.SOLVER
+
 
 class NonlinearSolver(Solver):
     """Base class for nonlinear solvers."""

@@ -139,16 +139,16 @@ Detailed docstring rules:
 Feature Docs and their Custom Directives for Including Code in Documentation
 ----------------------------------------------------------------------------
 
-showUnitTestExamples
-++++++++++++++++++++
+show-unittest-examples
+++++++++++++++++++++++
 
-      `showUnitTestExamplesDirective` is an OpenMDAO custom Sphinx directive that allows unit
+      `show-unittest-examples` is an OpenMDAO custom Sphinx directive that allows unit
       test examples to be directly incorporated into a feature document.
       An example usage within a feature document would look like this:
 
       ::
 
-        .. showunittestexamples::
+        .. show-unittest-examples::
             indepvarcomp
 
 
@@ -187,16 +187,16 @@ showUnitTestExamples
         indepvarcomp
 
 
-embedPythonCode
-+++++++++++++++
+embed-python-code
++++++++++++++++++
 
-        `embedPythonCode` is a custom directive that lets a developer drop a class or a
+        `embed-python-code` is a custom directive that lets a developer drop a class or a
         class method directly into a feature doc by including that class or method's
         full, dotted python path.  The syntax for invoking the directive looks like this:
 
         ::
 
-            .. embedPythonCode::
+            .. embed-python-code::
               openmdao.tests.general_problem.GeneralComp
 
 
@@ -227,3 +227,28 @@ embedPythonCode
 
         This has the benefit of allowing you to drop entire code blocks into
         a feature doc that illustrate a usage example.
+
+
+Tagging
+-------
+
+OpenMDAO docs support blog-like tagging.  What this means is that you can
+associate words or terms with a document, with the aim of grouping like documents.
+When a user clicks on a tag hyperlink, it takes her to a page that contains links to other documents that have been tagged
+similarly. This makes it easier for users to find supplementary materials on a topic.
+
+If you are writing a document, and you have a set of tags that you want to apply to a document, the syntax is easy,
+once in the document, you just need to invoke the `tags` directive, and then list any categories in which you'd
+like the current document to be included.
+
+::
+
+  .. tags:: indepVarComp, Component
+
+That syntax should generate a Tags box at the bottom of the document that contains
+hyperlinks to each tag's index page:
+
+
+.. image:: images/tags.png
+
+Each tag hyperlink targets an index page that is a list of documents that all contain the same tag, e.g. `Component`.
