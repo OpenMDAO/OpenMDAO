@@ -2,9 +2,13 @@
 from __future__ import print_function
 import unittest
 
-from openmdao.api import Problem, Group, IndepVarComp, PETScVector
+import numpy as np
+
+from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
+
+from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
 
 
 class TestProblem(unittest.TestCase):
@@ -41,9 +45,6 @@ class TestProblem(unittest.TestCase):
 
     def test_feature_numpyvec_setup(self):
 
-        from openmdao.api import Problem, Group, IndepVarComp
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
         prob = Problem()
         root = prob.root = Group()
         root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
@@ -71,9 +72,6 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['f_xy'], 174.0, 1e-6)
 
     def test_feature_petsc_setup(self):
-        from openmdao.api import Problem, Group, IndepVarComp, PETScVector
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
         #  TODO: add decorator so this doesn't end up in the documentation?
         if PETScVector is None:
             raise unittest.SkipTest("PETSc is required.")
@@ -93,11 +91,7 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
 
     def test_feature_check_total_derivatives_manual(self):
-
         raise unittest.SkipTest("check_total_derivatives not implemented yet")
-
-        from openmdao.api import Problem, NonlinearBlockGS
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         prob.root = SellarDerivatives()
@@ -116,9 +110,6 @@ class TestProblem(unittest.TestCase):
     def test_feature_check_total_derivatives_from_driver(self):
 
         raise unittest.SkipTest("check_total_derivatives not implemented yet")
-
-        from openmdao.api import Problem, NonlinearBlockGS, ScipyOpt
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         prob.root = SellarDerivatives()
@@ -148,9 +139,6 @@ class TestProblem(unittest.TestCase):
     def test_feature_run_driver(self):
         raise unittest.SkipTest("drivers not implemented yet")
 
-        from openmdao.api import Problem, NonlinearBlockGS, ScipyOpt
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
         prob = Problem()
         prob.root = SellarDerivatives()
         prob.root.nl_solver = NonlinearBlockGS()
@@ -174,8 +162,6 @@ class TestProblem(unittest.TestCase):
         self.assert_rel_error(self, prob['obj'], 3.18339, 1e-6)
 
     def test_feature_simple_promoted_sellar_set_get_outputs(self):
-        from openmdao.api import Problem, NonlinearBlockGS
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         prob.root = SellarDerivatives()
@@ -191,8 +177,6 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
 
     def test_feature_simple_not_promoted_sellar_set_get_outputs(self):
-        from openmdao.api import Problem, NonlinearBlockGS
-        from openmdao.test_suite.components.sellar import SellarDerivativesConnected
 
         prob = Problem()
         prob.root = SellarDerivativesConnected()
@@ -209,9 +193,6 @@ class TestProblem(unittest.TestCase):
 
     def test_feature_simple_promoted_sellar_set_get_inputs(self):
         raise unittest.SkipTest("set/get inputs via full path name not supported yet")
-
-        from openmdao.api import Problem, NonlinearBlockGS
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         prob.root = SellarDerivatives()
@@ -230,11 +211,6 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
 
     def test_feature_set_get(self):
-
-        import numpy as np
-        from openmdao.api import Problem, NonlinearBlockGS
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
         prob = Problem()
         prob.root = SellarDerivatives()
         prob.root.nl_solver = NonlinearBlockGS()
