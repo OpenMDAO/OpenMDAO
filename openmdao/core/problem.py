@@ -37,26 +37,26 @@ class Problem(object):
 
     Attributes
     ----------
-    root : <System>
+    model : <System>
         pointer to the top-level <System> object (root node in the tree).
     comm : MPI.Comm or <FakeComm>
-        the global communicator; the same as that of assembler and root.
+        the global communicator; the same as that of assembler and model.
     _assembler : <Assembler>
         pointer to the global <Assembler> object.
     _use_ref_vector : bool
         if True, allocate vectors to store ref. values.
     """
 
-    def __init__(self, root=None, comm=None, assembler_class=None,
+    def __init__(self, model=None, comm=None, assembler_class=None,
                  use_ref_vector=True):
         """Initialize attributes.
 
         Args
         ----
-        root : <System> or None
+        model : <System> or None
             pointer to the top-level <System> object (root node in the tree).
         comm : MPI.Comm or <FakeComm> or None
-            the global communicator; the same as that of assembler and root.
+            the global communicator; the same as that of assembler and model.
         assembler_class : <Assembler> or None
             pointer to the global <Assembler> object.
         use_ref_vector : bool
@@ -71,7 +71,7 @@ class Problem(object):
         if assembler_class is None:
             assembler_class = DefaultAssembler
 
-        self.root = root
+        self.model = model
         self.comm = comm
         self._assembler = assembler_class(comm)
         self._use_ref_vector = use_ref_vector
@@ -83,7 +83,7 @@ class Problem(object):
         Args
         ----
         name : str
-            name of the variable in the root's namespace.
+            name of the variable in the root system's namespace.
 
         Returns
         -------
@@ -91,14 +91,14 @@ class Problem(object):
             the requested output/input variable.
         """
         try:
-            self.root._outputs[name]
-            ind = self.root._var_myproc_names['output'].index(name)
-            c0, c1 = self.root._scaling_to_phys['output'][ind, :]
-            return c0 + c1 * self.root._outputs[name]
+            self.model._outputs[name]
+            ind = self.model._var_myproc_names['output'].index(name)
+            c0, c1 = self.model._scaling_to_phys['output'][ind, :]
+            return c0 + c1 * self.model._outputs[name]
         except KeyError:
-            ind = self.root._var_myproc_names['input'].index(name)
-            c0, c1 = self.root._scaling_to_phys['input'][ind, :]
-            return c0 + c1 * self.root._inputs[name]
+            ind = self.model._var_myproc_names['input'].index(name)
+            c0, c1 = self.model._scaling_to_phys['input'][ind, :]
+            return c0 + c1 * self.model._inputs[name]
 
     def __setitem__(self, name, value):
         """Set an output/input variable.
@@ -106,22 +106,22 @@ class Problem(object):
         Args
         ----
         name : str
-            name of the output/input variable in the root's namespace.
+            name of the output/input variable in the root system's namespace.
         value : float or ndarray or list
             value to set this variable to.
         """
         try:
-            self.root._outputs[name]
-            ind = self.root._var_myproc_names['output'].index(name)
-            c0, c1 = self.root._scaling_to_norm['output'][ind, :]
-            self.root._outputs[name] = c0 + c1 * np.array(value)
+            self.model._outputs[name]
+            ind = self.model._var_myproc_names['output'].index(name)
+            c0, c1 = self.model._scaling_to_norm['output'][ind, :]
+            self.model._outputs[name] = c0 + c1 * np.array(value)
         except KeyError:
-            ind = self.root._var_myproc_names['input'].index(name)
-            c0, c1 = self.root._scaling_to_norm['input'][ind, :]
-            self.root._inputs[name] = c0 + c1 * np.array(value)
+            ind = self.model._var_myproc_names['input'].index(name)
+            c0, c1 = self.model._scaling_to_norm['input'][ind, :]
+            self.model._inputs[name] = c0 + c1 * np.array(value)
 
     def run_model(self):
-        """Run the model by calling the root's solve_nonlinear.
+        """Run the model by calling the root system's solve_nonlinear.
 
         Returns
         -------
@@ -132,7 +132,7 @@ class Problem(object):
         float
             absolute error.
         """
-        return self.root._solve_nonlinear()
+        return self.model._solve_nonlinear()
 
     def run_once(self):
         """Backward compatible call for run_model.
@@ -176,7 +176,7 @@ class Problem(object):
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None,
               mode='auto'):
-        """Set up everything (root, assembler, vector, solvers, drivers).
+        """Set up everything (model, assembler, vector, solvers, drivers).
 
         Args
         ----
@@ -196,7 +196,7 @@ class Problem(object):
         self : <Problem>
             this enables the user to instantiate and setup in one line.
         """
-        root = self.root
+        model = self.model
         comm = self.comm
         assembler = self._assembler
 
@@ -210,36 +210,36 @@ class Problem(object):
         self._mode = mode
 
         # Recursive system setup
-        root._setup_processors('', comm, {}, assembler, [0, comm.size])
-        root._setup_variables()
-        root._setup_variable_indices({'input': 0, 'output': 0})
-        root._setup_connections()
+        model._setup_processors('', comm, {}, assembler, [0, comm.size])
+        model._setup_variables()
+        model._setup_variable_indices({'input': 0, 'output': 0})
+        model._setup_connections()
 
         # Assembler setup: variable metadata and indices
-        nvars = {typ: len(root._var_allprocs_names[typ])
+        nvars = {typ: len(model._var_allprocs_names[typ])
                  for typ in ['input', 'output']}
-        assembler._setup_variables(nvars, root._var_myproc_metadata,
-                                   root._var_myproc_indices)
+        assembler._setup_variables(nvars, model._var_myproc_metadata,
+                                   model._var_myproc_indices)
 
         # Assembler setup: variable connections
-        assembler._setup_connections(root._var_connections_indices,
-                                     root._var_allprocs_names)
+        assembler._setup_connections(model._var_connections_indices,
+                                     model._var_allprocs_names)
 
         # Assembler setup: global transfer indices vector
-        assembler._setup_src_indices(root._var_myproc_metadata['input'],
-                                     root._var_myproc_indices['input'])
+        assembler._setup_src_indices(model._var_myproc_metadata['input'],
+                                     model._var_myproc_indices['input'])
 
         # Assembler setup: compute data required for units/scaling
-        assembler._setup_src_data(root._var_myproc_metadata['output'],
-                                  root._var_myproc_indices['output'])
+        assembler._setup_src_data(model._var_myproc_metadata['output'],
+                                  model._var_myproc_indices['output'])
 
         # Set up scaling vectors
-        root._setup_scaling()
+        model._setup_scaling()
 
         # Set up lower and upper bounds vectors
-        lower_bounds = vector_class('lower', 'output', self.root)
-        upper_bounds = vector_class('upper', 'output', self.root)
-        root._setup_bounds_vectors(lower_bounds, upper_bounds, True)
+        lower_bounds = vector_class('lower', 'output', self.model)
+        upper_bounds = vector_class('upper', 'output', self.model)
+        model._setup_bounds_vectors(lower_bounds, upper_bounds, True)
 
         # Vector setup for the basic execution vector
         self.setup_vector('nonlinear', vector_class, self._use_ref_vector)
@@ -264,7 +264,7 @@ class Problem(object):
         use_ref_vector : bool
             if True, allocate vectors to store ref. values.
         """
-        root = self.root
+        model = self.model
         assembler = self._assembler
 
         vectors = {}
@@ -274,14 +274,14 @@ class Problem(object):
             else:
                 typ = key
 
-            vectors[key] = vector_class(vec_name, typ, self.root)
+            vectors[key] = vector_class(vec_name, typ, self.model)
 
         # TODO: implement this properly
-        ind1, ind2 = self.root._var_allprocs_range['output']
+        ind1, ind2 = self.model._var_allprocs_range['output']
         import numpy
         vector_var_ids = numpy.arange(ind1, ind2)
 
-        self.root._setup_vector(vectors, vector_var_ids, use_ref_vector)
+        self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
         """Compute derivatives of desired quantities with respect to desired inputs.
@@ -303,11 +303,11 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        root = self.root
+        model = self.model
         mode = self._mode
-        vec_dinput = root._vectors['input']
-        vec_doutput = root._vectors['output']
-        vec_dresid = root._vectors['residual']
+        vec_dinput = model._vectors['input']
+        vec_doutput = model._vectors['output']
+        vec_dresid = model._vectors['residual']
 
         # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:
@@ -351,7 +351,7 @@ class Problem(object):
             vec_dresid[subname].set_const(0.0)
 
         # Linearize Model
-        root._linearize()
+        model._linearize()
 
         # Create data structures (and possibly allocate space) for the total
         # derivatives that we will return.
@@ -402,7 +402,7 @@ class Problem(object):
                 flat_view[idx] = 1.0
 
                 # The root system solves here.
-                root._solve_linear([vecname], mode)
+                model._solve_linear([vecname], mode)
 
                 # Pull out the answers and pack them into our data structure.
                 for output_name in output_list:

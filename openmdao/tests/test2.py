@@ -58,7 +58,7 @@ class TestNumpyVec(unittest.TestCase):
     def setUp(self):
         group = GroupG()
         self.p = Problem(group).setup(DefaultVector)
-        self.p.root._mpi_proc_allocator.parallel = True
+        self.p.model._mpi_proc_allocator.parallel = True
 
     def assertEqualArrays(self, a, b):
         self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
@@ -68,7 +68,7 @@ class TestNumpyVec(unittest.TestCase):
             self.assertEqualArrays(a, b)
 
     def test__var_allprocs_names(self):
-        root = self.p.root
+        root = self.p.model
         names = root._var_allprocs_names['output']
         self.assertEqual(names, ['v1', 'v2', 'v3', 'v4'])
 
@@ -85,7 +85,7 @@ class TestNumpyVec(unittest.TestCase):
         self.assertEqualArrays(set_indices, array)
 
     def test_transfer(self):
-        root = self.p.root
+        root = self.p.model
 
         if root.comm.size == 1:
             comp1 = root.get_system('C1')
@@ -157,7 +157,7 @@ class TestPetscVec(TestNumpyVec):
             raise unittest.SkipTest("PETSc not found")
         group = GroupG()
         self.p = Problem(group).setup(PETScVector)
-        self.p.root._mpi_proc_allocator.parallel = True
+        self.p.model._mpi_proc_allocator.parallel = True
 
 
 if __name__ == '__main__':

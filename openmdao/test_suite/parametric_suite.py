@@ -131,17 +131,17 @@ class ParameterizedInstance(object):
         if args['global_jac']:
             jacobian_type = args['jacobian_type']
             if jacobian_type == 'dense':
-                prob.root.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+                prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
             elif jacobian_type == 'sparse-coo':
-                prob.root.jacobian = GlobalJacobian(matrix_class=CooMatrix)
+                prob.model.jacobian = GlobalJacobian(matrix_class=CooMatrix)
             elif jacobian_type == 'sparse-csr':
-                prob.root.jacobian = GlobalJacobian(matrix_class=CsrMatrix)
+                prob.model.jacobian = GlobalJacobian(matrix_class=CsrMatrix)
 
-        prob.root.ln_solver = self.linear_solver_class(**self.linear_solver_options)
+        prob.model.ln_solver = self.linear_solver_class(**self.linear_solver_options)
 
-        prob.root.nl_solver = self.solver_class(**self.solver_options)
+        prob.model.nl_solver = self.solver_class(**self.solver_options)
 
-        prob.root.suppress_solver_output = True
+        prob.model.suppress_solver_output = True
 
         fail, rele, abse = prob.run_model()
         if fail:
@@ -156,7 +156,7 @@ class ParameterizedInstance(object):
             if fail:
                 raise RuntimeError('Problem run failed: re %f ; ae %f' % (rele, abse))
 
-        root = problem.root
+        root = problem.model
         of = root.total_of
         wrt = root.total_wrt
 
