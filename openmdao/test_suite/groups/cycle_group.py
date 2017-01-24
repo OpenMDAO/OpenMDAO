@@ -46,6 +46,25 @@ def _dense_to_aij(A):
                 cols.append(j)
     return np.array(data), np.array(rows), np.array(cols)
 
+def _array2jac(component, arr):
+    pd_type = component.metadata['partial_type']
+    if pd_type == 'array':
+        return arr
+    elif pd_type == 'sparse':
+        return sparse.csr_matrix(arr)
+    elif pd_type == 'aij':
+        return _dense_to_aij(np.atleast_2d(arr))
+    else:
+        raise ValueError('Unknown partial_type: {}'.format(pd_type))
+
+def _array2kwargs(component, arr):
+        pd_type = component.metadata['partial_type']
+        if pd_type == 'aij':
+            jac = _array2jac(component, arr)
+            return {'val':jac[0], 'rows':jac[1], 'cols':jac[2]}
+        else:
+            return {'val':_array2jac(component, arr)}
+
 def _cycle_comp_jacobian(component, inputs, outputs, jacobian, angle_param):
     if component.metadata['jacobian_type'] != 'matvec':
         angle = inputs[angle_param]
@@ -54,26 +73,24 @@ def _cycle_comp_jacobian(component, inputs, outputs, jacobian, angle_param):
         A = _compute_A(size, angle)
         dA = _compute_dA(size, angle)
         dA_x = np.atleast_2d(dA.dot(x)).T
-        pd_type = component.metadata['partial_type']
         dtheta = np.array([[1.]])
-        if pd_type == 'array':
-            J_y_x = A
-            J_y_angle = dA_x
-            J_theta = dtheta
-        elif pd_type == 'sparse':
-            J_y_x = sparse.csr_matrix(A)
-            J_y_angle = sparse.csr_matrix(dA_x)
-            J_theta = sparse.csr_matrix(dtheta)
-        elif pd_type == 'aij':
-            J_y_x = _dense_to_aij(A)
-            J_y_angle = _dense_to_aij(dA_x)
-            J_theta = _dense_to_aij(dtheta)
-        else:
-            raise ValueError('Unknown partial_type: {}'.format(pd_type))
 
-        jacobian['y', 'x'] = J_y_x
-        jacobian['y', angle_param] = J_y_angle
-        jacobian['theta_out', 'theta'] = J_theta
+        jacobian['y', 'x'] = _array2jac(component, A)
+        jacobian['y', angle_param] = _array2jac(component, dA_x)
+        jacobian['theta_out', 'theta'] = _array2jac(component, dtheta)
+
+def _cycle_comp_setup_jacobian(component, angle_param):
+    if component.metadata['jacobian_type'] != 'matvec':
+        N = component.N
+        A = np.ones((N, N))
+        dA_x = np.ones((N, 1))
+        dtheta = np.array([[1.]])
+        kwargs = _array2kwargs(component, A)
+        component.declare_partial_derivs('y', 'x', **kwargs)
+        kwargs = _array2kwargs(component, dA_x)
+        component.declare_partial_derivs('y', angle_param, **kwargs)
+        kwargs = _array2kwargs(component, dtheta)
+        component.declare_partial_derivs('theta_out', 'theta', **kwargs)
 
 
 def _cycle_comp_jacvec(component, inputs, outputs, d_inputs, d_outputs, mode, angle_param):
@@ -143,6 +160,8 @@ class ExplicitCycleComp(ExplicitComponent):
 
         self._u, self._v, self._cross_terms, self._same_terms = _compute_vector_terms(N)
 
+        _cycle_comp_setup_jacobian(self, 'theta')
+
     def compute(self, inputs, outputs):
         theta = inputs['theta']
         A = _compute_A(self.N, theta)
@@ -186,6 +205,8 @@ class ExplicitFirstComp(ExplicitComponent):
         self._u, self._v, self._cross_terms, self._same_terms = _compute_vector_terms(N)
 
         self.add_input('psi', value=1.)
+
+        _cycle_comp_setup_jacobian(self, 'psi')
 
     def compute(self, inputs, outputs):
         theta = inputs['theta']
@@ -232,6 +253,13 @@ class ExplicitLastComp(ExplicitComponent):
         self._u, self._v, self._cross_terms, self._same_terms = _compute_vector_terms(N)
 
         self._n = 0
+
+        if self.metadata['jacobian_type'] != 'matvec':
+            kwargs = _array2kwargs(self, np.ones((N,)))
+            self.declare_partial_derivs('x_norm2', 'x', **kwargs)
+            kwargs = _array2kwargs(self, np.array([1.]))
+            self.declare_partial_derivs('theta_out', ['theta', 'psi'],
+                                        **kwargs)
 
     def compute(self, inputs, outputs):
         theta = inputs['theta']

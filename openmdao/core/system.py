@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import numpy
 
 from six.moves import range
+from six import string_types
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
@@ -93,6 +94,11 @@ class System(object):
         transfer object; points to _vector_transfers['nonlinear'].
     _jacobian : <Jacobian>
         global <Jacobian> object to be used in apply_linear
+    _subjacs_info : list of dict
+        Sub-jacobian metadata for each (output, input) pair added using
+        set_subjac_info.
+    _pre_setup_jac : <GlobalJacobian>
+        Storage for a GlobalJacobian that was set prior to problem setup.
     _nl_solver : <NonlinearSolver>
         nonlinear solver to be used for solve_nonlinear.
     _ln_solver : <LinearSolver>
@@ -158,6 +164,10 @@ class System(object):
         self._transfers = None
 
         self._jacobian = DefaultJacobian()
+        self._jacobian._system = self
+
+        self._subjacs_info = []
+        self._pre_setup_jac = None
 
         self._nl_solver = None
         self._ln_solver = None
@@ -727,6 +737,14 @@ class System(object):
         is_top : boolean
             whether this is the top; i.e., start of the recursion.
         """
+        # Don't update jacobians if we haven't run setup yet.  Just store
+        # for later and update at the end of setup. _assember is set at
+        # the beginning of setup.  It is assumed here that set_jacobian
+        # will never be called (by a user) during setup.
+        if self._assembler is None:
+            self._pre_setup_jac = jacobian
+            return
+
         if jacobian is None:
             self._jacobian = DefaultJacobian()
         else:
@@ -736,13 +754,57 @@ class System(object):
                 self._jacobian._system = self
                 self._jacobian._assembler = self._assembler
 
+            # set info from our _subjacs_info
+            self._set_subjac_infos()
+
         for subsys in self._subsystems_myproc:
             subsys._set_jacobian(jacobian, False)
 
         if jacobian is not None and is_top:
-            self._linearize(True)
             self._jacobian._system = self
             self._jacobian._initialize()
+
+    def _set_subjac_infos(self):
+        """Sets subjacobian info into our jacobian.
+
+        Overridden in <Component>.
+        """
+        pass
+
+    def system_iter(self, local=True, include_self=False, recurse=True,
+                    typ=None):
+        """A generator of subsystems of this system.
+
+        Args
+        ----
+        local : bool (True)
+            If True, only iterate over systems on this proc.
+
+        include_self : bool (False)
+            If True, include this system in the iteration.
+
+        recurse : bool (True)
+            If True, iterate over the whole tree under this system.
+
+        typ : type
+            If not None, only yield Systems that match that are instances of the
+            given type.
+        """
+        if local:
+            sysiter = self._subsystems_myproc
+        else:
+            sysiter = self._subsystems_allprocs
+
+        if include_self:
+            if typ is None or isinstance(self, typ):
+                yield self
+
+        for s in sysiter:
+            if typ is None or isinstance(s, typ):
+                yield s
+            if recurse:
+                for sub in s.system_iter(local=local, recurse=True, typ=typ):
+                    yield sub
 
     def _apply_nonlinear(self):
         """Compute residuals."""
@@ -798,14 +860,8 @@ class System(object):
         """
         pass
 
-    def _linearize(self, initial=False):
-        """Compute jacobian / factorization.
-
-        Args
-        ----
-        initial : boolean
-            whether this is the initial call to assemble the Jacobian.
-        """
+    def _linearize(self):
+        """Compute jacobian / factorization."""
         pass
 
     def get_subsystem(self, name):

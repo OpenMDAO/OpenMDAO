@@ -123,14 +123,8 @@ class ExplicitComponent(Component):
             elif mode == 'rev':
                 d_residuals.set_vec(d_outputs)
 
-    def _linearize(self, initial=False):
-        """Compute jacobian / factorization.
-
-        Args
-        ----
-        initial : boolean
-            whether this is the initial call to assemble the Jacobian.
-        """
+    def _linearize(self):
+        """Compute jacobian / factorization."""
         self._jacobian._system = self
 
         self._inputs.scale(self._scaling_to_phys['input'])
@@ -152,8 +146,19 @@ class ExplicitComponent(Component):
                 if (out_name, in_name) in self._jacobian:
                     self._jacobian._negate((out_name, in_name))
 
-        if not initial and self._jacobian._top_name == self.pathname:
+        if self._jacobian._top_name == self.pathname:
             self._jacobian._update()
+
+    def _set_subjac_infos(self):
+        """Sets subjacobian info into our jacobian."""
+        for out_name in self._var_myproc_names['output']:
+            size = numpy.prod(self._var2meta[out_name]['shape'])
+            arange = numpy.arange(size)
+            self.declare_partial_derivs(out_name, out_name,
+                                       rows=arange, cols=arange,
+                                       val=numpy.ones(size))
+
+        super(ExplicitComponent, self)._set_subjac_infos()
 
     def compute(self, inputs, outputs):
         """Compute outputs given inputs.

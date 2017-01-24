@@ -247,6 +247,12 @@ class Problem(object):
         # Vector setup for the linear vector
         self.setup_vector('linear', vector_class, self._use_ref_vector)
 
+        # check to see if a global jacobian was set prior to setup
+        for system in model.system_iter(include_self=True, recurse=True):
+            if system._pre_setup_jac is not None:
+                system.set_jacobian(system._pre_setup_jac)
+                system._pre_setup_jac = None
+
         if check:
             check_config(self, logger)
 

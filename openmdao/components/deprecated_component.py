@@ -172,7 +172,7 @@ class Component(BaseComponent):
 
             return success
 
-    def _linearize(self, initial=False):
+    def _linearize(self):
         """See System._linearize."""
         self._jacobian._system = self
 
@@ -200,7 +200,7 @@ class Component(BaseComponent):
                     if (out_name, in_name) in self._jacobian:
                         self._jacobian._negate((out_name, in_name))
 
-        if not initial and self._jacobian._top_name == self.pathname:
+        if self._jacobian._top_name == self.pathname:
             self._jacobian._update()
 
     def apply_nonlinear(self, params, unknowns, residuals):

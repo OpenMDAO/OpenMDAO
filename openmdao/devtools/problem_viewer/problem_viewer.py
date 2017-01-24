@@ -69,7 +69,7 @@ def _get_tree_dict(system):
 def _get_viewer_data(problem_or_rootgroup):
     """Get the data needed by the N2 viewer as a dictionary."""
     if isinstance(problem_or_rootgroup, Problem):
-        root_group = problem_or_rootgroup.root
+        root_group = problem_or_rootgroup.model
     elif isinstance(problem_or_rootgroup, Group):
         if not problem_or_rootgroup.pathname: # root group
             root_group = problem_or_rootgroup

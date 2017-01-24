@@ -108,6 +108,59 @@ class Jacobian(object):
 
         return dct, out_ind, in_ind, out_size, in_size, typ
 
+    def _key2shape(self, key):
+        """Return shape of sub-jacobian for variables making up the key tuple.
+
+        This assumes that no inputs and outputs share the same name,
+        so it should only be called from a Component, never from a Group.
+
+        Args
+        ----
+        key : (str, str)
+            output name, input name of sub-Jacobian.
+
+        Returns
+        -------
+        out_size : int
+            local size of the output variable.
+        in_size : int
+            local size of the input variable.
+        """
+        out_name, in_name = key
+        if in_name in self._system._inputs:
+            in_size = self._system._inputs._views_flat[in_name].size
+        else:
+            in_size = self._system._outputs[in_name].size
+
+        return self._system._outputs._views_flat[out_name].size, in_size
+
+    def _key2unique(self, key):
+        """Map output-input string pair to a unique key.
+
+        Args
+        ----
+        key : (str, str)
+            output name, input name of sub-Jacobian.
+
+        Returns
+        -------
+        out_ind : int
+            global index of output variable.
+        in_ind : int
+            global index of input variable.
+        type_id : int
+            -1 if output, -2 if input
+        """
+        out_name, in_name = key
+        in_ind = self._system._var_allprocs_indices['input'].get(in_name)
+        if in_ind is not None:
+            return (self._system._var_allprocs_indices['output'][out_name],
+                    in_ind, -2)
+
+        return (self._system._var_allprocs_indices['output'][out_name],
+                self._system._var_allprocs_indices['output'][in_name],
+                -1)
+
     def _negate(self, key):
         """Multiply this sub-Jacobian by -1.0, for explicit variables.
 
@@ -197,7 +250,7 @@ class Jacobian(object):
         ----
         key : (str, str)
             output name, input name of sub-Jacobian.
-        jac : int or float or ndarray or list[3] or tuple[3]
+        jac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
         system = self._system
@@ -227,12 +280,13 @@ class Jacobian(object):
         ind = system._var_myproc_names[typ].index(key[1])
         c_factor = system._scaling_to_norm[typ][ind, 1]
 
-        if isinstance(jac, numpy.ndarray):
-            jac *= r_factor / c_factor
-        elif isinstance(jac, (coo_matrix, csr_matrix)):
-            jac.data *= r_factor / c_factor
-        elif len(jac) == 3:
-            jac[0] *= r_factor / c_factor
+        if r_factor != c_factor:
+            if isinstance(jac, numpy.ndarray):
+                jac *= r_factor / c_factor
+            elif isinstance(jac, (coo_matrix, csr_matrix)):
+                jac.data *= r_factor / c_factor
+            elif len(jac) == 3:
+                jac[0] *= r_factor / c_factor
 
         dct[out_ind, in_ind] = jac
 
@@ -259,12 +313,13 @@ class Jacobian(object):
         ind = system._var_myproc_names[typ].index(key[1])
         c_factor = system._scaling_to_phys[typ][ind, 1]
 
-        if isinstance(jac, numpy.ndarray):
-            jac *= r_factor / c_factor
-        elif isinstance(jac, (coo_matrix, csr_matrix)):
-            jac.data *= r_factor / c_factor
-        elif len(jac) == 3:
-            jac[0] *= r_factor / c_factor
+        if r_factor != c_factor:
+            if isinstance(jac, numpy.ndarray):
+                jac *= r_factor / c_factor
+            elif isinstance(jac, (coo_matrix, csr_matrix)):
+                jac.data *= r_factor / c_factor
+            elif len(jac) == 3:
+                jac[0] *= r_factor / c_factor
 
         return jac
 

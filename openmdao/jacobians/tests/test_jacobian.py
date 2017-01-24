@@ -23,6 +23,12 @@ class MyExplicitComp(ExplicitComponent):
         self.add_input('y', val=np.zeros(2))
         self.add_output('f', val=np.zeros(2))
 
+        val = self._jac_type(np.array([[1., 1.],[1., 1.]]))
+        if isinstance(val, list):
+            self.declare_partial_derivs('f', ['x','y'], rows=val[1], cols=val[2], val=val[0])
+        else:
+            self.declare_partial_derivs('f', ['x','y'], val=val)
+
     def compute(self, inputs, outputs):
         x = inputs['x']
         y = inputs['y']
@@ -53,6 +59,18 @@ class MyExplicitComp2(ExplicitComponent):
         self.add_input('z', val=0.0)
         self.add_output('f', val=0.0)
 
+        val=self._jac_type(np.array([[7.]]))
+        if isinstance(val, list):
+            self.declare_partial_derivs('f', 'z', rows=val[1], cols=val[2], val=val[0])
+        else:
+            self.declare_partial_derivs('f', 'z', val=val)
+
+        val=self._jac_type(np.array([[1., 1., 1.]]))
+        if isinstance(val, list):
+            self.declare_partial_derivs('f', 'w', rows=val[1], cols=val[2], val=val[0])
+        else:
+            self.declare_partial_derivs('f', 'w', val=val)
+
     def compute(self, inputs, outputs):
         w = inputs['w']
         z = inputs['z']
@@ -67,9 +85,6 @@ class MyExplicitComp2(ExplicitComponent):
             6.
         ]]))
 
-        jacobian['f', 'z'] = self._jac_type(np.array([[
-            7.
-        ]]))
 
 class ExplicitSetItemComp(ExplicitComponent):
     def __init__(self, dtype, value, shape, constructor):
