@@ -15,13 +15,13 @@ from openmdao.solvers.ln_bgs import LinearBlockGS
 class Group(System):
     """Class used to group systems together; instantiate or inherit."""
 
-    def initialize(self):
-        """Add subsystems from kwargs."""
-        self.metadata.declare('subsystems', type_=list, value=[],
-                              desc='list of subsystems')
-        self._subsystems_allprocs.extend(self.metadata['subsystems'])
-        self.nl_solver = NonlinearBlockGS()
-        self.ln_solver = LinearBlockGS()
+    def __init__(self, **kwargs):
+        super(Group, self).__init__(**kwargs)
+
+        if not self.nl_solver:
+            self.nl_solver = NonlinearBlockGS()
+        if not self.ln_solver:
+            self.ln_solver = LinearBlockGS()
 
     def add(self, name, subsys, promotes=None):
         """Deprecated version of <Group.add_subsystem>.
@@ -56,15 +56,15 @@ class Group(System):
             Name of the subsystem being added
         subsys : <System>
             An instantiated, but not-yet-set up system object.
-        promotes : iter of str, optional
-            A list of variable names specifying which subsystem variables
+        promotes : str, iter of str, optional
+            One or a list of variable names specifying which subsystem variables
             to 'promote' up to this group. This is for backwards compatibility
             with older versions of OpenMDAO.
-        promotes_inputs : iter of str, optional
-            A list of input variable names specifying which subsystem input
+        promotes_inputs : str, iter of str, optional
+            One or a list of input variable names specifying which subsystem input
             variables to 'promote' up to this group.
-        promotes_outputs : iter of str, optional
-            A list of output variable names specifying which subsystem output
+        promotes_outputs : str, iter of str, optional
+            One or a list of output variable names specifying which subsystem output
             variables to 'promote' up to this group.
         renames_inputs : list of (str, str) or dict, optional
             A dict mapping old name to new name for any subsystem
