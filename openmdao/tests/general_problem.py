@@ -78,11 +78,11 @@ class GeneralProblem(object):
             all_systems.extend(current_systems[::-1])
             ilevel += 1
 
-        self.root = current_systems[0]
+        self.model = current_systems[0]
         self.all_systems = all_systems
 
-        self.root.metadata['use_var_sets'] = use_var_sets
-        self.problem = Problem(self.root).setup(vec_impl)
+        self.model.metadata['use_var_sets'] = use_var_sets
+        self.problem = Problem(self.model).setup(vec_impl)
 
     def print_all(self):
         for sys in self.all_systems[::-1]:

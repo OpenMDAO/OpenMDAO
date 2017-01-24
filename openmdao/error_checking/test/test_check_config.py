@@ -11,8 +11,8 @@ class MyComp(ExecComp):
 class TestCheckConfig(unittest.TestCase):
 
     def test_hanging_inputs(self):
-        p = Problem(root=Group())
-        root = p.root
+        p = Problem(model=Group())
+        root = p.model
 
         G1 = root.add_subsystem("G1", Group(), promotes=['*'])
         G2 = G1.add_subsystem("G2", Group(), promotes=['*'])
@@ -44,8 +44,8 @@ class TestCheckConfig(unittest.TestCase):
 
     def test_dataflow_1_level(self):
 
-        p = Problem(root=Group())
-        root = p.root
+        p = Problem(model=Group())
+        root = p.model
 
         indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
         C1 = root.add_subsystem("C1", MyComp())
@@ -75,8 +75,8 @@ class TestCheckConfig(unittest.TestCase):
 
     def test_dataflow_multi_level(self):
 
-        p = Problem(root=Group())
-        root = p.root
+        p = Problem(model=Group())
+        root = p.model
 
         indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
 
@@ -114,8 +114,8 @@ class TestCheckConfig(unittest.TestCase):
         self.assertEqual([['C4', 'G1.C1', 'G1.C2']], sccs)
 
     def test_multi_cycles(self):
-        p = Problem(root=Group())
-        root = p.root
+        p = Problem(model=Group())
+        root = p.model
 
         indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
 
