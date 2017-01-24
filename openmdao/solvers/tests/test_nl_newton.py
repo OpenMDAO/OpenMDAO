@@ -25,7 +25,7 @@ class TestNewton(unittest.TestCase):
 
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
@@ -43,7 +43,7 @@ class TestNewton(unittest.TestCase):
         prob.root.nl_solver = NewtonSolver()
 
         prob.setup(check=False)
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
@@ -65,7 +65,7 @@ class TestNewton(unittest.TestCase):
         prob.setup(check=False)
 
         try:
-            prob.run()
+            prob.run_model()
         except AnalysisError as err:
             self.assertEqual(str(err), "Solve in '': Newton FAILED to converge after 2 iterations")
         else:
@@ -82,7 +82,7 @@ class TestNewton(unittest.TestCase):
 
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
@@ -108,7 +108,7 @@ class TestNewton(unittest.TestCase):
 
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
@@ -124,7 +124,7 @@ class TestNewton(unittest.TestCase):
         prob.root.nl_solver = NewtonSolver()
         prob.root.suppress_solver_output = True
         prob.setup(check=False)
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
@@ -147,7 +147,7 @@ class TestNewton(unittest.TestCase):
 
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
@@ -174,7 +174,7 @@ class TestNewton(unittest.TestCase):
 
         prob.root.suppress_solver_output = True
         prob.setup(check=False)
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
@@ -237,7 +237,7 @@ class TestNewton(unittest.TestCase):
         prob['comp.z'] = -4.93191510182
 
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['comp.z'], -4.93191510182, .00001)
         self.assertLessEqual(prob.root.nl_solver._iter_count, 4,

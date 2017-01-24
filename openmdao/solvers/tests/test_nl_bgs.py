@@ -23,7 +23,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
@@ -54,7 +54,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob.root.suppress_solver_output = True
 
         try:
-            prob.run()
+            prob.run_model()
         except AnalysisError as err:
             self.assertEqual(str(err), "Solve in '': NLGaussSeidel FAILED to converge after 2 iterations")
         else:
@@ -91,7 +91,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob.setup(check=False)
         prob.root.suppress_solver_output = True
 
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
         assert_rel_error(self, prob['g1.y2'], 0.80, .00001)

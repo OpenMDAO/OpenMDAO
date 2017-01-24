@@ -46,7 +46,7 @@ class TestConnections(unittest.TestCase):
         self.assertEqual(self.C3._inputs['x'], 0.)
         self.assertEqual(self.C4._inputs['x'], 0.)
 
-        self.p.run()
+        self.p.run_model()
         self.assertEqual(self.C3._inputs['x'], 999.)
         self.assertEqual(self.C4._inputs['x'], 999.)
 
@@ -92,7 +92,7 @@ class TestConnections(unittest.TestCase):
         p.root.connect('src.y2', 'tgt.x2')
 
         p.setup(check=False)
-        p.run()
+        p.run_model()
 
         self.assertEqual(p['tgt.y1'], 12.0)
         self.assertEqual(p['tgt.y2'], 12.0)
@@ -150,7 +150,7 @@ class TestConnections(unittest.TestCase):
         top.root.connect('src.y3', 'tgt.x3')
 
         top.setup(check=False)
-        top.run()
+        top.run_model()
 
         self.assertEqual(top['tgt.y1'], 6.0)
         self.assertEqual(top['tgt.y2'], 6.0)
@@ -309,12 +309,12 @@ class TestConnectionsPromoted(unittest.TestCase):
         p.root.suppress_solver_output = True
 
         # setting promoted name will set the value into the outputs, but will
-        # not propagate it to the inputs. That will happen during run().
+        # not propagate it to the inputs. That will happen during run_model().
         p['x'] = 999.
         self.assertEqual(C3._inputs['x'], 0.)
         self.assertEqual(C4._inputs['x'], 0.)
 
-        p.run()
+        p.run_model()
         self.assertEqual(C3._inputs['x'], 999.)
         self.assertEqual(C4._inputs['x'], 999.)
 
@@ -337,12 +337,12 @@ class TestConnectionsPromoted(unittest.TestCase):
         p.root.suppress_solver_output = True
 
         # setting promoted name will set the value into the outputs, but will
-        # not propagate it to the inputs. That will happen during run().
+        # not propagate it to the inputs. That will happen during run_model().
         p['G1.x'] = 999.
         self.assertEqual(C3._inputs['x'], 0.)
         self.assertEqual(C4._inputs['x'], 0.)
 
-        p.run()
+        p.run_model()
         self.assertEqual(C3._inputs['x'], 999.)
         self.assertEqual(C4._inputs['x'], 999.)
 
@@ -411,7 +411,7 @@ class TestConnectionsPromoted(unittest.TestCase):
         #self.assertEqual(ubcs, ['C1.x2'])
         #self.assertEqual(tgts, set(['C1']))
 
-        #p.run()
+        #p.run_model()
 
         ## TODO: for now, we've just decided to force component devs to give proper initial
         ## values for their outputs.  If later we decide to use push scatters or some other

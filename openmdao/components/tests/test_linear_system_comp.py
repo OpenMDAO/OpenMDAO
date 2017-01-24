@@ -43,7 +43,7 @@ class TestLinearSystem(unittest.TestCase):
         lingrp = prob.root.get_system('lingrp')
         lingrp.ln_solver = ScipyIterativeSolver()
 
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['lin.x'], self.x, .0001)
         assert_rel_error(self, prob.root._residuals.get_norm(), 0.0, 1e-10)
@@ -55,7 +55,7 @@ class TestLinearSystem(unittest.TestCase):
         lingrp = prob.root.get_system('lingrp')
         lingrp.ln_solver = ScipyIterativeSolver()
 
-        prob.run()
+        prob.run_model()
 
         # Forward mode with RHS of self.b
         lingrp._vectors['residual']['linear']['lin.x'] = self.b

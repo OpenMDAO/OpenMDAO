@@ -30,7 +30,7 @@ class TestParallelGroups(unittest.TestCase):
         prob = Problem(FanOutGrouped())
         prob.setup(vector_class=PETScVector, check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
@@ -41,7 +41,7 @@ class TestParallelGroups(unittest.TestCase):
         prob.root = FanInGrouped()
         prob.setup(vector_class=PETScVector, check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
@@ -51,7 +51,7 @@ class TestParallelGroups(unittest.TestCase):
         prob.root = Diamond()
         prob.setup(vector_class=PETScVector, check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['c4.y1'], 46.0, 1e-6)
         assert_rel_error(self, prob['c4.y2'], -93.0, 1e-6)
@@ -62,7 +62,7 @@ class TestParallelGroups(unittest.TestCase):
         prob.root = ConvergeDiverge()
         prob.setup(vector_class=PETScVector, check=False)
         prob.root.suppress_solver_output = True
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 

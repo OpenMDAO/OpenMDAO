@@ -1,8 +1,7 @@
-:orphan:
 
-.. `Defining explicit variables`
+..`Defining Explicit Variables`
 
-Defining explicit variables (draft)
+Defining explicit variables
 ---------------------------
 
 **Description:** Explicit variables are those that are computed as an explicit function of other variables.
