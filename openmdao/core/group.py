@@ -1,11 +1,11 @@
 """Define the Group class."""
 from __future__ import division
 
-import numpy
-from six import iteritems
+from six import iteritems, string_types
+from collections import Iterable
 import warnings
 
-import numpy
+import numpy as np
 
 from openmdao.core.system import System
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
@@ -116,11 +116,40 @@ class Group(System):
             variable, you can specify which indices of the source to be
             transferred to the input here.
         """
+        # src_indices argument, if given, should be valid
+        if isinstance(src_indices, string_types):
+            if isinstance(in_name, string_types):
+                in_name = [in_name]
+            in_name.append(src_indices)
+            raise TypeError("src_indices must be an index array, did you mean"
+                            " connect('{0}', {1})?".format(out_name, in_name))
+
+        if isinstance(src_indices, np.ndarray):
+            if not np.issubdtype(src_indices.dtype, np.integer):
+                raise TypeError("src_indices must contain integers, but connection in {0} "
+                                "from {1} to {2} src_indices is {3}.".format(self.name, out_name, out_name, src_indices.dtype.type))
+        elif isinstance(src_indices, Iterable):
+            types_in_src_idxs = set( type(idx) for idx in src_indices)
+            for t in types_in_src_idxs:
+                if not np.issubdtype(t, np.integer):
+                    raise TypeError("src_indices must contain integers, but connection in {0} "
+                                    "from {1} to {2} contains non-integers.".format(self.name, out_name, out_name))
+
+        # if multiple targets, recursively connect to each
         if isinstance(in_name, (list, tuple)):
             for name in in_name:
                 self.connect(out_name, name, src_indices)
             return
 
+        # the output and input names should exist
+        # FIXME: the following would only work after setup()
+        # if out_name not in self._var_allprocs_names['output']:
+        #     raise NameError("Output '%s' does not exist" % (out_name))
+
+        # if in_name not in self._var_allprocs_names['input']:
+        #     raise NameError("Input '%s' does not exist" % (in_name))
+
+        # should not already be connected
         if in_name in self._var_connections:
             srcname = self._var_connections[in_name][0]
             raise RuntimeError("Input '%s' is already connected to '%s'" %
@@ -178,7 +207,7 @@ class Group(System):
                             pass
                         else:
                             meta = input_meta[in_myproc_index]
-                            meta['indices'] = numpy.array(src_indices,
+                            meta['indices'] = np.array(src_indices,
                                                           dtype=int)
 
                         # set src_indices to None to avoid unnecessary
