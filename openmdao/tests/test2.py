@@ -4,6 +4,11 @@ import unittest
 
 from openmdao.api import Problem, ExplicitComponent, Group, DefaultVector
 
+try:
+    from openmdao.parallel_api import PETScVector
+except ImportError:
+    PETScVector = None
+
 # Systems: R > C1, C2, C3, C4
 # Variables: v1, v2, v3, v4; all depend on each other
 
@@ -145,11 +150,7 @@ class TestNumpyVec(unittest.TestCase):
             ])
 
 
-try:
-    from openmdao.parallel_api import PETScVector
-except ImportError:
-    PETScVector = None
-
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestPetscVec(TestNumpyVec):
 
     def setUp(self):

@@ -3,11 +3,12 @@ import numpy
 import unittest
 
 from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector
+
 try:
     from openmdao.parallel_api import PETScVector
 except ImportError:
     PETScVector = None
-    
+
 #      (A) -> x
 # x -> (B) -> f
 
@@ -105,39 +106,39 @@ class Test(unittest.TestCase):
 
             if root.comm.rank == 0:
                 self.assertList([
-                [root._outputs['A.x'], 0],
-                [compA._outputs['x'],  0],
+                    [root._outputs['A.x'], 0],
+                    [compA._outputs['x'],  0],
                 ])
                 compA._outputs['x'] = 10
             if root.comm.rank == 2:
                 self.assertList([
-                [compB._inputs['x'],   0],
-                [compB._outputs['f'],  0],
+                    [compB._inputs['x'],   0],
+                    [compB._outputs['f'],  0],
                 ])
 
             root._solve_nonlinear()
 
             if root.comm.rank == 0:
                 self.assertList([
-                [root._outputs['A.x'], 10],
-                [compA._outputs['x'],  10],
+                    [root._outputs['A.x'], 10],
+                    [compA._outputs['x'],  10],
                 ])
             if root.comm.rank == 2:
                 self.assertList([
-                [compB._inputs['x'],   10],
-                [compB._outputs['f'],  20],
+                    [compB._inputs['x'],   10],
+                    [compB._outputs['f'],  20],
                 ])
 
- 
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestPETScVec(Test):
 
     def setUp(self):
-        if PETScVector is None:
-            raise unittest.SkipTest("PETSc not found")
         group = GroupG()
         group.add_subsystems()
         self.p = Problem(group).setup(PETScVector)
         self.p.root.suppress_solver_output = True
+
 
 if __name__ == '__main__':
     unittest.main()

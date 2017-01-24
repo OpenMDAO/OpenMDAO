@@ -71,10 +71,8 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['f_xy'], 174.0, 1e-6)
 
+    @unittest.skipUnless(PETScVector, "PETSc is required.")
     def test_feature_petsc_setup(self):
-        #  TODO: add decorator so this doesn't end up in the documentation?
-        if PETScVector is None:
-            raise unittest.SkipTest("PETSc is required.")
 
         prob = Problem()
         root = prob.root = Group()
@@ -237,14 +235,10 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 9.87161739688, 1e-6)
         assert_rel_error(self, prob['y2'], 8.14191301549, 1e-6)
 
-
-
-
     def test_setup_bad_mode(self):
         # Test error message when passing bad mode to setup.
 
-        top = Problem()
-        root = top.root = Group()
+        top = Problem(Group())
 
         try:
             top.setup(mode='junk')

@@ -17,13 +17,10 @@ from openmdao.test_suite.groups.parallel_groups import \
 from openmdao.devtools.testutil import assert_rel_error
 
 
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2
-
-    def setUp(self):
-        if PETScVector is None:
-            raise unittest.SkipTest("PETSc is required.")
 
     def test_fan_out_grouped(self):
 
