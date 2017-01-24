@@ -40,7 +40,7 @@ class TestLinearSystem(unittest.TestCase):
         """Check against the scipy solver."""
         prob = self.prob
 
-        lingrp = prob.model.get_system('lingrp')
+        lingrp = prob.model.get_subsystem('lingrp')
         lingrp.ln_solver = ScipyIterativeSolver()
 
         prob.run_model()
@@ -52,7 +52,7 @@ class TestLinearSystem(unittest.TestCase):
         """Check against solve_linear."""
         prob = self.prob
 
-        lingrp = prob.model.get_system('lingrp')
+        lingrp = prob.model.get_subsystem('lingrp')
         lingrp.ln_solver = ScipyIterativeSolver()
 
         prob.run_model()
