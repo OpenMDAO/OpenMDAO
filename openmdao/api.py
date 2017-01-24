@@ -24,3 +24,9 @@ from openmdao.jacobians.global_jacobian import GlobalJacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import CooMatrix
 from openmdao.matrices.csr_matrix import CsrMatrix
+
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None

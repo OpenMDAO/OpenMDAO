@@ -79,18 +79,22 @@ def test_suite(**kwargs):
         for options in _cartesian_dict_product(opts):
             yield (ParameterizedInstance(group_type, **options),)
 
+
 def _cartesian_dict_product(dicts):
     # From http://stackoverflow.com/a/5228294
     return (dict(zip(dicts, x)) for x in itertools.product(*itervalues(dicts)))
+
 
 def full_test_suite():
     for group_type, params in iteritems(GROUP_PARAMS):
         for test_problem in test_suite(group_type=group_type, **params):
             yield test_problem
 
+
 # Needed for nose
 full_test_suite.__test__ = False
 test_suite.__test__ = False
+
 
 class ParameterizedInstance(object):
     def __init__(self, group_type, **kwargs):
@@ -109,7 +113,7 @@ class ParameterizedInstance(object):
 
         self.solver_class = NewtonSolver
         self.solver_options = {
-            'maxiter':100
+            'maxiter': 100
         }
 
         self.linear_solver_class = ScipyIterativeSolver
@@ -139,7 +143,7 @@ class ParameterizedInstance(object):
 
         prob.root.suppress_solver_output = True
 
-        fail, rele, abse = prob.run()
+        fail, rele, abse = prob.run_model()
         if fail:
             raise RuntimeError('Problem run failed: re %f ; ae %f' % (rele, abse))
 
@@ -148,7 +152,7 @@ class ParameterizedInstance(object):
 
         if problem._mode != mode:
             problem.setup(check=False, mode=mode)
-            fail, rele, abse = problem.run()
+            fail, rele, abse = problem.run_model()
             if fail:
                 raise RuntimeError('Problem run failed: re %f ; ae %f' % (rele, abse))
 

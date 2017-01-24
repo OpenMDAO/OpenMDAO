@@ -1,6 +1,4 @@
-:orphan:
-
-.. `Defining independent variables`
+.. `Defining Independent Variables`
 
 Defining independent variables
 ------------------------------

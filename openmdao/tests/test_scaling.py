@@ -41,7 +41,7 @@ class TestScaling(unittest.TestCase):
         prob['sys1.old_length'] = 3.e5
         self.assertAlmostEqual(prob['sys1.old_length'], 3.e5)
         self.assertAlmostEqual(prob.root._outputs['sys1.old_length'], 3.)
-        prob.run()
+        prob.run_model()
         self.assertAlmostEqual(prob['sys2.new_length'], 3.e-1)
         self.assertAlmostEqual(prob.root._outputs['sys2.new_length'], 3.)
 

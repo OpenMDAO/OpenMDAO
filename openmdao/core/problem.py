@@ -3,6 +3,7 @@
 from __future__ import division
 from collections import OrderedDict
 import sys
+import warnings
 
 from six import string_types
 from six.moves import range
@@ -113,14 +114,13 @@ class Problem(object):
             self.root._outputs[name]
             ind = self.root._var_myproc_names['output'].index(name)
             c0, c1 = self.root._scaling_to_norm['output'][ind, :]
-            self.root._outputs[name] = c0 + c1 * value
+            self.root._outputs[name] = c0 + c1 * np.array(value)
         except KeyError:
             ind = self.root._var_myproc_names['input'].index(name)
             c0, c1 = self.root._scaling_to_norm['input'][ind, :]
-            self.root._inputs[name] = c0 + c1 * value
+            self.root._inputs[name] = c0 + c1 * np.array(value)
 
-    # TODO: once we have drivers, this should call self.driver.run() instead
-    def run(self):
+    def run_model(self):
         """Run the model by calling the root's solve_nonlinear.
 
         Returns
@@ -133,6 +133,46 @@ class Problem(object):
             absolute error.
         """
         return self.root._solve_nonlinear()
+
+    def run_once(self):
+        """Backward compatible call for run_model.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        warnings.simplefilter('always', DeprecationWarning)
+        warnings.warn('This method provides backwards compabitibility with '
+                      'OpenMDAO <= 1.x ; use run_driver instead.',
+                      DeprecationWarning, stacklevel=2)
+        warnings.simplefilter('ignore', DeprecationWarning)
+
+        return self.run_model()
+
+    def run(self):
+        """Backward compatible call for run_driver.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        warnings.simplefilter('always', DeprecationWarning)
+        warnings.warn('This method provides backwards compabitibility with '
+                      'OpenMDAO <= 1.x ; use run_driver instead.',
+                      DeprecationWarning, stacklevel=2)
+        warnings.simplefilter('ignore', DeprecationWarning)
+
+        return self.run_driver()
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None,
               mode='auto'):

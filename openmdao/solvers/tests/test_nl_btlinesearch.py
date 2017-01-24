@@ -42,7 +42,7 @@ class TestBacktrackingLineSearch(unittest.TestCase):
 
         top.setup(check=False)
         top['comp.y'] = 1.0
-        top.run()
+        top.run_model()
 
         # This tests that Newton can converge with the line search
         assert_rel_error(self, top['comp.y'], .3968459, .0001)
@@ -71,13 +71,13 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
 
         # Run without a line search at x=2.0
         top['px.x'] = 2.0
-        top.run()
+        top.run_model()
         assert_rel_error(self, top['comp.y'], 4.666666, 1e-4)
         assert_rel_error(self, top['comp.z'], 1.333333, 1e-4)
 
         # Run without a line search at x=0.5
         top['px.x'] = 0.5
-        top.run()
+        top.run_model()
         assert_rel_error(self, top['comp.y'], 5.833333, 1e-4)
         assert_rel_error(self, top['comp.z'], 2.666666, 1e-4)
 
@@ -93,14 +93,14 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
-        top.run()
+        top.run_model()
         assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
 
         # Test upper bound: should go to the upper bound and stall
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
-        top.run()
+        top.run_model()
         assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
 
     def test_linesearch_bounds_wall(self):
@@ -115,14 +115,14 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
-        top.run()
+        top.run_model()
         assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
 
         # Test upper bound: should go to the upper bound and stall
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
-        top.run()
+        top.run_model()
         assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
 
     def test_linesearch_bounds_scalar(self):
@@ -137,14 +137,14 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
-        top.run()
+        top.run_model()
         self.assertTrue(1.5 <= top['comp.z'] <= 1.6)
 
         # Test lower bound: should stop just short of the upper bound
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
-        top.run()
+        top.run_model()
         self.assertTrue(2.4 <= top['comp.z'] <= 2.5)
 
 
@@ -172,14 +172,14 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
 
         # Run without a line search at x=2.0
         top['px.x'] = 2.0
-        top.run()
+        top.run_model()
         for ind in range(3):
             assert_rel_error(self, top['comp.y'][ind], 4.666666, 1e-4)
             assert_rel_error(self, top['comp.z'][ind], 1.333333, 1e-4)
 
         # Run without a line search at x=0.5
         top['px.x'] = 0.5
-        top.run()
+        top.run_model()
         for ind in range(3):
             assert_rel_error(self, top['comp.y'][ind], 5.833333, 1e-4)
             assert_rel_error(self, top['comp.z'][ind], 2.666666, 1e-4)
@@ -196,7 +196,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
-        top.run()
+        top.run_model()
         for ind in range(3):
             assert_rel_error(self, top['comp.z'][ind], 1.5, 1e-8)
 
@@ -204,7 +204,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
-        top.run()
+        top.run_model()
         for ind in range(3):
             assert_rel_error(self, top['comp.z'][ind], 2.5, 1e-8)
 
@@ -220,7 +220,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
-        top.run()
+        top.run_model()
         for ind in range(3):
             print('jjohn',ind, top['comp.z'], self.ub[ind])
             assert_rel_error(self, top['comp.z'][ind], 1.5, 1e-8)
@@ -229,7 +229,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
-        top.run()
+        top.run_model()
         for ind in range(3):
             assert_rel_error(self, top['comp.z'][ind], self.ub[ind], 1e-8)
 
@@ -245,7 +245,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
-        top.run()
+        top.run_model()
         for ind in range(3):
             self.assertTrue(1.5 <= top['comp.z'][ind] <= 1.6)
 
@@ -253,7 +253,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
-        top.run()
+        top.run_model()
         for ind in range(3):
             self.assertTrue(2.4 <= top['comp.z'][ind] <= self.ub[ind])
 
