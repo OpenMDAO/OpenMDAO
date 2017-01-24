@@ -27,7 +27,7 @@ class TestBacktrackingLineSearch(unittest.TestCase):
     def test_newton_with_backtracking(self):
 
         top = Problem()
-        root = top.root = Group()
+        root = top.model = Group()
         root.add_subsystem('comp', ImplCompOneState())
         root.add_subsystem('p', IndepVarComp('x', 1.2278849186466743))
         root.connect('p.y', 'comp.x')
@@ -52,15 +52,15 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
 
     def setUp(self):
         top = Problem()
-        top.root = Group()
-        top.root.add_subsystem('px', IndepVarComp('x', 1.0))
-        top.root.add_subsystem('comp', ImplCompTwoStates())
-        top.root.connect('px.x', 'comp.x')
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
+        top.model.add_subsystem('comp', ImplCompTwoStates())
+        top.model.connect('px.x', 'comp.x')
 
-        top.root.nl_solver = NewtonSolver()
-        top.root.nl_solver.options['maxiter'] = 10
-        top.root.ln_solver = ScipyIterativeSolver()
-        top.root.nl_solver.set_subsolver('linear', top.root.ln_solver)
+        top.model.nl_solver = NewtonSolver()
+        top.model.nl_solver.options['maxiter'] = 10
+        top.model.ln_solver = ScipyIterativeSolver()
+        top.model.nl_solver.set_subsolver('linear', top.model.ln_solver)
 
         top.setup(check=False)
 
@@ -84,7 +84,7 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
     def test_linesearch_bounds_vector(self):
         top = self.top
 
-        ls = top.root.nl_solver.set_subsolver(
+        ls = top.model.nl_solver.set_subsolver(
             'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='vector'))
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
@@ -106,7 +106,7 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
     def test_linesearch_bounds_wall(self):
         top = self.top
 
-        ls = top.root.nl_solver.set_subsolver(
+        ls = top.model.nl_solver.set_subsolver(
             'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='wall'))
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
@@ -128,7 +128,7 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
     def test_linesearch_bounds_scalar(self):
         top = self.top
 
-        ls = top.root.nl_solver.set_subsolver(
+        ls = top.model.nl_solver.set_subsolver(
             'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='scalar'))
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
@@ -152,15 +152,15 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
 
     def setUp(self):
         top = Problem()
-        top.root = Group()
-        top.root.add_subsystem('px', IndepVarComp('x', numpy.ones((3,1))))
-        top.root.add_subsystem('comp', ImplCompTwoStatesArrays())
-        top.root.connect('px.x', 'comp.x')
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', numpy.ones((3,1))))
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
+        top.model.connect('px.x', 'comp.x')
 
-        top.root.nl_solver = NewtonSolver()
-        top.root.nl_solver.options['maxiter'] = 10
-        top.root.ln_solver = ScipyIterativeSolver()
-        top.root.nl_solver.set_subsolver('linear', top.root.ln_solver)
+        top.model.nl_solver = NewtonSolver()
+        top.model.nl_solver.options['maxiter'] = 10
+        top.model.ln_solver = ScipyIterativeSolver()
+        top.model.nl_solver.set_subsolver('linear', top.model.ln_solver)
 
         top.setup(check=False)
 
@@ -187,7 +187,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
 
-        ls = top.root.nl_solver.set_subsolver(
+        ls = top.model.nl_solver.set_subsolver(
             'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='vector'))
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
@@ -211,7 +211,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement(self):
         top = self.top
 
-        ls = top.root.nl_solver.set_subsolver(
+        ls = top.model.nl_solver.set_subsolver(
             'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='wall'))
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
@@ -236,7 +236,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement(self):
         top = self.top
 
-        ls = top.root.nl_solver.set_subsolver(
+        ls = top.model.nl_solver.set_subsolver(
             'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='scalar'))
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0

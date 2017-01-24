@@ -39,7 +39,7 @@ class TestPetscKSP(unittest.TestCase):
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
         # forward
         group._vectors['residual']['linear'].set_const(1.0)
@@ -67,7 +67,7 @@ class TestPetscKSP(unittest.TestCase):
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
         # forward
         group._vectors['residual']['linear'].set_const(1.0)
@@ -93,7 +93,7 @@ class TestPetscKSP(unittest.TestCase):
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
         # forward
         group._vectors['residual']['linear'].set_const(1.0)
@@ -117,7 +117,7 @@ class TestPetscKSP(unittest.TestCase):
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
         # forward
         group._vectors['residual']['linear'].set_const(1.0)

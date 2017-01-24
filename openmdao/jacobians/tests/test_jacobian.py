@@ -162,71 +162,71 @@ class TestJacobian(unittest.TestCase):
         self._check_rev(self.prob, rev_check)
 
     def _setup_model(self, mat_class, comp_jac_class):
-        self.prob = prob = Problem(root=Group())
-        prob.root.add_subsystem('indep',
+        self.prob = prob = Problem(model=Group())
+        prob.model.add_subsystem('indep',
                                 IndepVarComp((
                                     ('a', np.ones(3)),
                                     ('b', np.ones(2)),
                                 )))
-        C1 = prob.root.add_subsystem('C1', MyExplicitComp(comp_jac_class))
-        C2 = prob.root.add_subsystem('C2', MyExplicitComp2(comp_jac_class))
-        prob.root.connect('indep.a', 'C1.x', src_indices=[2,0])
-        prob.root.connect('indep.b', 'C1.y')
-        prob.root.connect('indep.a', 'C2.w', src_indices=[0,2,1])
-        prob.root.connect('C1.f', 'C2.z', src_indices=[1])
+        C1 = prob.model.add_subsystem('C1', MyExplicitComp(comp_jac_class))
+        C2 = prob.model.add_subsystem('C2', MyExplicitComp2(comp_jac_class))
+        prob.model.connect('indep.a', 'C1.x', src_indices=[2,0])
+        prob.model.connect('indep.b', 'C1.y')
+        prob.model.connect('indep.a', 'C2.w', src_indices=[0,2,1])
+        prob.model.connect('C1.f', 'C2.z', src_indices=[1])
 
         prob.setup(check=False)
-        prob.root.jacobian = GlobalJacobian(matrix_class=mat_class)
-        prob.root.nl_solver = NewtonSolver(
+        prob.model.jacobian = GlobalJacobian(matrix_class=mat_class)
+        prob.model.nl_solver = NewtonSolver(
             subsolvers={'linear': ScipyIterativeSolver(
                 maxiter=100,
             )}
         )
-        prob.root.ln_solver = ScipyIterativeSolver(
+        prob.model.ln_solver = ScipyIterativeSolver(
             maxiter=200, atol=1e-10, rtol=1e-10)
-        prob.root.suppress_solver_output = True
+        prob.model.suppress_solver_output = True
 
         prob.run_model()
 
     def _check_fwd(self, prob, check_vec):
-        work = prob.root._vectors['output']['linear']._clone()
+        work = prob.model._vectors['output']['linear']._clone()
         work.set_const(1.0)
 
         # fwd apply_linear test
-        prob.root._vectors['output']['linear'].set_const(1.0)
-        prob.root._apply_linear(['linear'], 'fwd')
-        res = prob.root._vectors['residual']['linear']
+        prob.model._vectors['output']['linear'].set_const(1.0)
+        prob.model._apply_linear(['linear'], 'fwd')
+        res = prob.model._vectors['residual']['linear']
         res.set_data(res.get_data() - check_vec)
         self.assertAlmostEqual(
-            prob.root._vectors['residual']['linear'].get_norm(), 0)
+            prob.model._vectors['residual']['linear'].get_norm(), 0)
 
         # fwd solve_linear test
-        prob.root._vectors['output']['linear'].set_const(0.0)
-        prob.root._vectors['residual']['linear'].set_data(check_vec)
-        prob.root._solve_linear(['linear'], 'fwd')
-        prob.root._vectors['output']['linear'] -= work
+        prob.model._vectors['output']['linear'].set_const(0.0)
+        prob.model._vectors['residual']['linear'].set_data(check_vec)
+        prob.model._solve_linear(['linear'], 'fwd')
+        prob.model._vectors['output']['linear'] -= work
         self.assertAlmostEqual(
-            prob.root._vectors['output']['linear'].get_norm(), 0, delta=1e-6)
+            prob.model._vectors['output']['linear'].get_norm(), 0, delta=1e-6)
 
     def _check_rev(self, prob, check_vec):
-        work = prob.root._vectors['output']['linear']._clone()
+        work = prob.model._vectors['output']['linear']._clone()
         work.set_const(1.0)
 
         # rev apply_linear test
-        prob.root._vectors['residual']['linear'].set_const(1.0)
-        prob.root._apply_linear(['linear'], 'rev')
-        outs = prob.root._vectors['output']['linear']
+        prob.model._vectors['residual']['linear'].set_const(1.0)
+        prob.model._apply_linear(['linear'], 'rev')
+        outs = prob.model._vectors['output']['linear']
         outs.set_data(outs.get_data() - check_vec)
         self.assertAlmostEqual(
-            prob.root._vectors['output']['linear'].get_norm(), 0)
+            prob.model._vectors['output']['linear'].get_norm(), 0)
 
         # rev solve_linear test
-        prob.root._vectors['residual']['linear'].set_const(0.0)
-        prob.root._vectors['output']['linear'].set_data(check_vec)
-        prob.root._solve_linear(['linear'], 'rev')
-        prob.root._vectors['residual']['linear'] -= work
+        prob.model._vectors['residual']['linear'].set_const(0.0)
+        prob.model._vectors['output']['linear'].set_data(check_vec)
+        prob.model._solve_linear(['linear'], 'rev')
+        prob.model._vectors['residual']['linear'] -= work
         self.assertAlmostEqual(
-            prob.root._vectors['residual']['linear'].get_norm(), 0, delta=1e-6)
+            prob.model._vectors['residual']['linear'].get_norm(), 0, delta=1e-6)
 
     dtypes = [
         ('int', 1),
@@ -249,18 +249,18 @@ class TestJacobian(unittest.TestCase):
         shape, constructor = shapes
         dtype, value = dtypes
 
-        prob = Problem(root=Group())
+        prob = Problem(model=Group())
         comp = ExplicitSetItemComp(dtype, value, shape, constructor)
-        prob.root.add_subsystem('C1', comp)
+        prob.model.add_subsystem('C1', comp)
         prob.setup(check=False)
 
-        prob.root.suppress_solver_output = True
+        prob.model.suppress_solver_output = True
         prob.run_model()
-        prob.root._apply_nonlinear()
-        prob.root._linearize()
+        prob.model._apply_nonlinear()
+        prob.model._linearize()
 
         expected = constructor(value)
-        jac_out = prob.root._subsystems_allprocs[0]._jacobian['out', 'in'] * -1
+        jac_out = prob.model._subsystems_allprocs[0]._jacobian['out', 'in'] * -1
 
         self.assertEqual(len(jac_out.shape), 2)
         expected_dtype = np.promote_types(dtype, float)

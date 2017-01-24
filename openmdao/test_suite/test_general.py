@@ -25,7 +25,7 @@ class ParameterizedTestCases(unittest.TestCase):
         test.setup()
         problem = test.problem
 
-        root = problem.root
+        root = problem.model
 
         expected_values = root.expected_values
         if expected_values:
@@ -50,7 +50,7 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
     def test_subset(self, test):
         test.setup()
         problem = test.problem
-        root = problem.root
+        root = problem.model
 
         expected_values = root.expected_values
         if expected_values:

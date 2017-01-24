@@ -17,13 +17,13 @@ class TestProblem(unittest.TestCase):
         # Basic test for the method using default solvers on simple model.
 
         top = Problem()
-        root = top.root = Group()
+        root = top.model = Group()
         root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         top.setup(check=False, mode='fwd')
-        top.root.suppress_solver_output = True
+        top.model.suppress_solver_output = True
         top.run_model()
 
         of = ['f_xy']
@@ -46,7 +46,7 @@ class TestProblem(unittest.TestCase):
     def test_feature_numpyvec_setup(self):
 
         prob = Problem()
-        root = prob.root = Group()
+        root = prob.model = Group()
         root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -75,7 +75,7 @@ class TestProblem(unittest.TestCase):
     def test_feature_petsc_setup(self):
 
         prob = Problem()
-        root = prob.root = Group()
+        root = prob.model = Group()
         root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -92,8 +92,8 @@ class TestProblem(unittest.TestCase):
         raise unittest.SkipTest("check_total_derivatives not implemented yet")
 
         prob = Problem()
-        prob.root = SellarDerivatives()
-        prob.root.nl_solver = NonlinearBlockGS()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
 
         prob.setup()
         prob.run_model()
@@ -110,8 +110,8 @@ class TestProblem(unittest.TestCase):
         raise unittest.SkipTest("check_total_derivatives not implemented yet")
 
         prob = Problem()
-        prob.root = SellarDerivatives()
-        prob.root.nl_solver = NonlinearBlockGS()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
 
         prob.setup()
 
@@ -138,18 +138,18 @@ class TestProblem(unittest.TestCase):
         raise unittest.SkipTest("drivers not implemented yet")
 
         prob = Problem()
-        prob.root = SellarDerivatives()
-        prob.root.nl_solver = NonlinearBlockGS()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
 
         # TODO: this api is not final, just a placeholder for now
         prob.driver = ScipyOpt()
         prob.driver.options['method'] = 'slsqp'
         # note: this might differ from clippy api, but is consistent with arg name in scipy.
-        prob.root.add_design_var('x')
-        prob.root.add_design_var('z')
-        prob.root.add_objective('obj')
-        prob.root.add_design_var('con1')
-        prob.root.add_design_var('con2')
+        prob.model.add_design_var('x')
+        prob.model.add_design_var('z')
+        prob.model.add_objective('obj')
+        prob.model.add_design_var('con1')
+        prob.model.add_design_var('con2')
 
         prob.setup()
         prob.run_driver()
@@ -162,8 +162,8 @@ class TestProblem(unittest.TestCase):
     def test_feature_simple_promoted_sellar_set_get_outputs(self):
 
         prob = Problem()
-        prob.root = SellarDerivatives()
-        prob.root.nl_solver = NonlinearBlockGS()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
 
         prob.setup()
 
@@ -177,8 +177,8 @@ class TestProblem(unittest.TestCase):
     def test_feature_simple_not_promoted_sellar_set_get_outputs(self):
 
         prob = Problem()
-        prob.root = SellarDerivativesConnected()
-        prob.root.nl_solver = NonlinearBlockGS()
+        prob.model = SellarDerivativesConnected()
+        prob.model.nl_solver = NonlinearBlockGS()
 
         prob.setup()
 
@@ -193,8 +193,8 @@ class TestProblem(unittest.TestCase):
         raise unittest.SkipTest("set/get inputs via full path name not supported yet")
 
         prob = Problem()
-        prob.root = SellarDerivatives()
-        prob.root.nl_solver = NonlinearBlockGS()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
 
         prob.setup()
 
@@ -210,8 +210,8 @@ class TestProblem(unittest.TestCase):
 
     def test_feature_set_get(self):
         prob = Problem()
-        prob.root = SellarDerivatives()
-        prob.root.nl_solver = NonlinearBlockGS()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
 
         prob.setup()
 

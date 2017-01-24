@@ -50,9 +50,9 @@ class DepCompTestCase(unittest.TestCase):
         group.add_subsystem('sys3', TestComp())
 
         p = Problem()
-        p.root = group
+        p.model = group
         p.setup(check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
         p.run_model()
 
@@ -66,14 +66,14 @@ class DepCompTestCase(unittest.TestCase):
         group.add_subsystem('sys3', TestComp())
 
         p = Problem()
-        p.root = group
-        p.root.nl_solver = NewtonSolver(
+        p.model = group
+        p.model.nl_solver = NewtonSolver(
             subsolvers={'linear': ScipyIterativeSolver()})
         p.setup(check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
-        #p.root.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
-        #print(p.root.jacobian._int_mtx._matrix)
+        #p.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        #print(p.model.jacobian._int_mtx._matrix)
 
         p.run_model()
 
