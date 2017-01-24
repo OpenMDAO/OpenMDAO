@@ -154,8 +154,6 @@ class TestNumpyVec(unittest.TestCase):
 class TestPetscVec(TestNumpyVec):
 
     def setUp(self):
-        if PETScVector is None:
-            raise unittest.SkipTest("PETSc not found")
         group = GroupG()
         self.p = Problem(group).setup(PETScVector)
         self.p.model._mpi_proc_allocator.parallel = True
