@@ -71,10 +71,8 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['f_xy'], 174.0, 1e-6)
 
+    @unittest.skipUnless(PETScVector, "PETSc is required.")
     def test_feature_petsc_setup(self):
-        #  TODO: add decorator so this doesn't end up in the documentation?
-        if PETScVector is None:
-            raise unittest.SkipTest("PETSc is required.")
 
         prob = Problem()
         root = prob.root = Group()
