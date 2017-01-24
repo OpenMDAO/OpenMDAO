@@ -84,7 +84,7 @@ class Test(unittest.TestCase):
 
         gmres = scipy.sparse.linalg.gmres
         self.p.setup(check=False)
-        self.p.root.ln_solver = LinearBlockGS()
+        self.p.model.ln_solver = LinearBlockGS()
 
         #view_model(self.p, show_browser=False)
 
@@ -92,7 +92,7 @@ class Test(unittest.TestCase):
         self.assertTrue(numpy.linalg.norm(a-b) < tol)
 
     def test_apply_linear(self):
-        root = self.p.root
+        root = self.p.model
 
         root.suppress_solver_output = True
         #root._solve_nonlinear()
@@ -108,7 +108,7 @@ class Test(unittest.TestCase):
         self.assertEqualArrays(output, [7, 3])
 
     def test_solve_linear(self):
-        root = self.p.root
+        root = self.p.model
 
         root.suppress_solver_output = True
         #root._solve_nonlinear()
