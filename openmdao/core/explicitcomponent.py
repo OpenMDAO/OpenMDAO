@@ -152,7 +152,6 @@ class ExplicitComponent(Component):
                 if (out_name, in_name) in self._jacobian:
                     self._jacobian._negate((out_name, in_name))
 
-        self._jacobian._precompute_iter()
         if not initial and self._jacobian._top_name == self.pathname:
             self._jacobian._update()
 

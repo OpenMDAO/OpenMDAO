@@ -55,7 +55,7 @@ class Jacobian(object):
         self._int_mtx = None
         self._ext_mtx = None
         self._keymap = {}
-        self._iter_list = []
+        self._iter_list = None
 
         self.options = OptionsDictionary()
         self.options.update(kwargs)
@@ -131,10 +131,17 @@ class Jacobian(object):
             pass
 
     def _precompute_iter(self):
-        """Assemble list of output-input pairs by name."""
+        """Assemble list of output-input pairs by name.
+
+        Returns
+        -------
+        list
+            List of (output, input) pairs found in the jacobian
+            for the current System.
+        """
         system = self._system
 
-        self._iter_list = []
+        iter_list = []
         for re_name in system._var_myproc_names['output']:
             re_ind = system._var_allprocs_indices['output'][re_name]
 
@@ -142,13 +149,15 @@ class Jacobian(object):
                 out_ind = system._var_allprocs_indices['output'][out_name]
 
                 if (re_ind, out_ind) in self._out_dict:
-                    self._iter_list.append((re_name, out_name))
+                    iter_list.append((re_name, out_name))
 
             for in_name in system._var_myproc_names['input']:
                 in_ind = system._var_allprocs_indices['input'][in_name]
 
                 if (re_ind, in_ind) in self._in_dict:
-                    self._iter_list.append((re_name, in_name))
+                    iter_list.append((re_name, in_name))
+
+        return iter_list
 
     def __contains__(self, key):
         """Map output-input pairs names to indices.
@@ -177,6 +186,8 @@ class Jacobian(object):
         listiterator
             iterator returning (out_name, in_name) pairs.
         """
+        if self._iter_list is None:
+            self._iter_list = self._precompute_iter()
         return iter(self._iter_list)
 
     def __setitem__(self, key, jac):

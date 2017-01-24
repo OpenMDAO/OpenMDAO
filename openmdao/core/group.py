@@ -317,4 +317,3 @@ class Group(System):
         if not initial and self._jacobian._top_name == self.pathname:
             self._jacobian._system = self
             self._jacobian._update()
-            self._jacobian._precompute_iter()

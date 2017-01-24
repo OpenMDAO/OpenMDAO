@@ -141,7 +141,6 @@ class ImplicitComponent(Component):
         self._inputs.scale(self._scaling_to_norm['input'])
         self._outputs.scale(self._scaling_to_norm['output'])
 
-        self._jacobian._precompute_iter()
         if not initial and self._jacobian._top_name == self.pathname:
             self._jacobian._update()
 
