@@ -16,10 +16,10 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_basic(self):
 
-        raise unittest.SkipTest('Unit Conversion not working robustly at present.')
+        #raise unittest.SkipTest('Unit Conversion not working robustly at present.')
 
         prob = Problem()
-        prob.root = UnitConvGroup()
+        prob.model = UnitConvGroup()
 
         prob.setup(check=False, mode='fwd')
         prob.run()
