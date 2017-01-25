@@ -4,7 +4,9 @@ A collection of functions for modifying the source code
 
 import re
 import tokenize
-
+import importlib
+import inspect
+import sqlite3
 from six import StringIO
 from redbaron import RedBaron
 
@@ -161,16 +163,14 @@ def remove_initial_empty_lines_from_source(source):
     idx = re.search(r'\S', source, re.MULTILINE).start()
     return source[idx:]
 
+
 """
 Function that returns the source code of a method or class.
 The docstrings are stripped from the code
 """
-import importlib
-import inspect
-
-from openmdao.docs.utils.docutil import remove_docstrings
 
 # pylint: disable=C0103
+
 
 def get_source_code_of_class_or_method(class_or_method_path):
     '''The function to be called a the custom Sphinx directive code
@@ -201,11 +201,10 @@ def get_source_code_of_class_or_method(class_or_method_path):
 
     return source_minus_docstrings
 
+
 """
 Definition of function to be called by the showunittestexamples directive
 """
-
-import sqlite3
 
 sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
 table_name = 'feature_unit_tests'   # name of the table to be queried
@@ -230,8 +229,8 @@ def get_test_source_code_for_feature(feature_name):
 
     conn = sqlite3.connect(sqlite_file)
     cur = conn.cursor()
-    cur.execute('SELECT title, unit_test_source, run_outputs FROM {tn} WHERE feature="{fn}"'.\
-            format(tn=table_name, fn=feature_name))
+    cur.execute('SELECT title, unit_test_source, run_outputs FROM {tn} WHERE feature="{fn}"'.
+                format(tn=table_name, fn=feature_name))
     all_rows = cur.fetchall()
     conn.close()
 
@@ -244,11 +243,10 @@ def get_test_source_code_for_feature(feature_name):
 
     return test_source_code_for_feature
 
+
 """
 Definition of function to be called by the showunittestexamples directive
 """
-
-import sqlite3
 
 sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
 table_name = 'feature_unit_tests'   # name of the table to be queried
@@ -273,8 +271,8 @@ def get_test_source_code_for_feature(feature_name):
 
     conn = sqlite3.connect(sqlite_file)
     cur = conn.cursor()
-    cur.execute('SELECT title, unit_test_source, run_outputs FROM {tn} WHERE feature="{fn}"'.\
-            format(tn=table_name, fn=feature_name))
+    cur.execute('SELECT title, unit_test_source, run_outputs FROM {tn} WHERE feature="{fn}"'.
+                format(tn=table_name, fn=feature_name))
     all_rows = cur.fetchall()
     conn.close()
 

@@ -14,3 +14,5 @@ The *IndepVarComp* class is instantiated directly (without defining a subclass),
 
 .. show-unittest-examples::
     indepvarcomp
+
+.. tags::  junk, that
