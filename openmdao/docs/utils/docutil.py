@@ -4,7 +4,9 @@ A collection of functions for modifying the source code
 
 import re
 import tokenize
-
+import importlib
+import inspect
+import sqlite3
 from six import StringIO
 from redbaron import RedBaron
 
@@ -160,3 +162,125 @@ def remove_initial_empty_lines_from_source(source):
 
     idx = re.search(r'\S', source, re.MULTILINE).start()
     return source[idx:]
+
+
+"""
+Function that returns the source code of a method or class.
+The docstrings are stripped from the code
+"""
+
+# pylint: disable=C0103
+
+
+def get_source_code_of_class_or_method(class_or_method_path):
+    '''The function to be called a the custom Sphinx directive code
+    that includes the source code of a class or method.
+    '''
+
+    # the class_or_method_path could be either to a class or method
+
+    # first assume class and see if it works
+    try:
+        module_path = '.'.join(class_or_method_path.split('.')[:-1])
+        module_with_class = importlib.import_module(module_path)
+        class_name = class_or_method_path.split('.')[-1]
+        cls = getattr(module_with_class, class_name)
+        source = inspect.getsource(cls)
+    except ImportError:
+        # else assume it is a path to a method
+        module_path = '.'.join(class_or_method_path.split('.')[:-2])
+        module_with_method = importlib.import_module(module_path)
+        class_name = class_or_method_path.split('.')[-2]
+        method_name = class_or_method_path.split('.')[-1]
+        cls = getattr(module_with_method, class_name)
+        meth = getattr(cls, method_name)
+        source = inspect.getsource(meth)
+
+    # Remove docstring from source code
+    source_minus_docstrings = remove_docstrings(source)
+
+    return source_minus_docstrings
+
+
+"""
+Definition of function to be called by the showunittestexamples directive
+"""
+
+sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
+table_name = 'feature_unit_tests'   # name of the table to be queried
+
+
+def get_test_source_code_for_feature(feature_name):
+    '''The function to be called from the custom Sphinx directive code
+    that includes relevant unit test code(s).
+
+    It gets the test source from the unit tests that have been
+    marked to indicate that they are associated with the "feature_name"'''
+
+    # get the:
+    #
+    #   1. title of the test
+    #   2. test source code
+    #   3. output of running the test
+    #
+    # from from the database that was created during an earlier
+    # phase of the doc build process using the
+    # devtools/create_feature_docs_unit_test_db.py script
+
+    conn = sqlite3.connect(sqlite_file)
+    cur = conn.cursor()
+    cur.execute('SELECT title, unit_test_source, run_outputs FROM {tn} WHERE feature="{fn}"'.
+                format(tn=table_name, fn=feature_name))
+    all_rows = cur.fetchall()
+    conn.close()
+
+    test_source_code_for_feature = []
+
+    # Loop through all the unit tests that are relevant to this feature name
+    for title, unit_test_source, run_outputs in all_rows:
+        # add to the list that will be returned
+        test_source_code_for_feature.append((title, unit_test_source, run_outputs))
+
+    return test_source_code_for_feature
+
+
+"""
+Definition of function to be called by the showunittestexamples directive
+"""
+
+sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
+table_name = 'feature_unit_tests'   # name of the table to be queried
+
+
+def get_test_source_code_for_feature(feature_name):
+    '''The function to be called from the custom Sphinx directive code
+    that includes relevant unit test code(s).
+
+    It gets the test source from the unit tests that have been
+    marked to indicate that they are associated with the "feature_name"'''
+
+    # get the:
+    #
+    #   1. title of the test
+    #   2. test source code
+    #   3. output of running the test
+    #
+    # from from the database that was created during an earlier
+    # phase of the doc build process using the
+    # devtools/create_feature_docs_unit_test_db.py script
+
+    conn = sqlite3.connect(sqlite_file)
+    cur = conn.cursor()
+    cur.execute('SELECT title, unit_test_source, run_outputs FROM {tn} WHERE feature="{fn}"'.
+                format(tn=table_name, fn=feature_name))
+    all_rows = cur.fetchall()
+    conn.close()
+
+    test_source_code_for_feature = []
+
+    # Loop through all the unit tests that are relevant to this feature name
+    for title, unit_test_source, run_outputs in all_rows:
+        # add to the list that will be returned
+        test_source_code_for_feature.append((title, unit_test_source, run_outputs))
+
+    return test_source_code_for_feature
