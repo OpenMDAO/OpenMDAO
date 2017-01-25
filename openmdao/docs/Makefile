@@ -69,7 +69,7 @@ redbaron:
 
 html: mock redbaron
 	python utils/preprocess_tags.py
-	python ../devtools/create_feature_docs_unit_test_db.py
+	python utils/create_feature_docs_unit_test_db.py
 	rm -rf $(BUILDDIR)/*
 	rm -rf srcdocs/usr
 	rm -rf srcdocs/dev
