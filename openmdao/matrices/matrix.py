@@ -14,13 +14,9 @@ class Matrix(object):
         communicator of the top-level system that owns the <Jacobian>.
     _matrix : object
         implementation-specific representation of the actual matrix.
-    _out_submats : dict
+    _submats : dict
         dictionary of sub-jacobian data keyed by (out_ind, in_ind).
-    _in_submats : dict
-        dictionary of sub-jacobian data keyed by (out_ind, in_ind).
-    _out_metadata : dict
-        implementation-specific data for the sub-jacobians.
-    _in_metadata : dict
+    __metadata : dict
         implementation-specific data for the sub-jacobians.
     """
 
@@ -34,10 +30,8 @@ class Matrix(object):
         """
         self._comm = comm
         self._matrix = None
-        self._out_submats = {}
-        self._in_submats = {}
-        self._out_metadata = {}
-        self._in_metadata = {}
+        self._submats = {}
+        self._metadata = {}
 
     def prod_fwd(self, in_vec, row_range=None):
         """Perform a forward product.
@@ -101,7 +95,7 @@ class Matrix(object):
         shape : tuple
             Shape of the specified submatrix.
         """
-        self._out_submats[key] = (info, irow, icol, src_indices, shape)
+        self._submats[key] = (info, irow, icol, src_indices, shape)
 
     def _in_add_submat(self, key, info, irow, icol, src_indices, shape):
         """Declare a sub-jacobian.
@@ -122,7 +116,7 @@ class Matrix(object):
         shape : tuple
             Shape of the specified submatrix.
         """
-        self._in_submats[key] = (info, irow, icol, src_indices, shape)
+        self._submats[key] = (info, irow, icol, src_indices, shape)
 
     def _build(self, num_rows, num_cols):
         """Allocate the matrix.

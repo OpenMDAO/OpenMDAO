@@ -3,6 +3,7 @@ from __future__ import division
 
 from fnmatch import fnmatchcase
 from contextlib import contextmanager
+from collections import namedtuple
 
 import numpy
 
@@ -14,6 +15,9 @@ from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import convert_units
+
+# This is for storing various data mapped to var pathname
+PathData = namedtuple("PathData", ['name', 'idx', 'typ'])
 
 
 class System(object):
@@ -47,6 +51,8 @@ class System(object):
         subsystems (subsystems on all of this system's processors).
     _var_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
         list of names of all owned variables, not just on current proc.
+    _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
+        list of pathnames of all owned variables, not just on current proc.
     _var_allprocs_range : {'input': [int, int], 'output': [int, int]}
         index range of owned variables with respect to all problem variables.
     _var_allprocs_indices : {'input': dict, 'output': dict}
@@ -55,6 +61,10 @@ class System(object):
         list of names of owned variables on current proc.
     _var_myproc_metadata : {'input': list, 'output': list}
         list of metadata dictionaries of variables that exist on this proc.
+    _var_pathdict : dict
+        maps full variable pathname to local name, index and I/O type
+    _var_name2path = dict
+        maps local var name to full pathname
     _var_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
         integer arrays of global indices of variables on this proc.
     _var_maps : {'input': dict, 'output': dict}
@@ -132,12 +142,16 @@ class System(object):
         self._subsystems_myproc_inds = []
 
         self._var_allprocs_names = {'input': [], 'output': []}
+        self._var_allprocs_pathnames = {'input': [], 'output': []}
         self._var_allprocs_range = {'input': [0, 0], 'output': [0, 0]}
         self._var_allprocs_indices = {'input': {}, 'output': {}}
 
         self._var_myproc_names = {'input': [], 'output': []}
         self._var_myproc_metadata = {'input': [], 'output': []}
         self._var_myproc_indices = {'input': None, 'output': None}
+
+        self._var_pathdict = {}
+        self._var_name2path = {}
 
         self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
@@ -257,6 +271,7 @@ class System(object):
             # Empty the lists in case this is part of a reconfiguration
             for typ in ['input', 'output']:
                 self._var_allprocs_names[typ] = []
+                self._var_allprocs_pathnames[typ] = []
                 self._var_myproc_names[typ] = []
                 self._var_myproc_metadata[typ] = []
 

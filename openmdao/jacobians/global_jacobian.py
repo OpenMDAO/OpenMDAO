@@ -26,10 +26,8 @@ class GlobalJacobian(Jacobian):
 
     Attributes
     ----------
-    _in_subjacs_info : dict
-        Dict of subjacobian metadata keyed on (resid_idx, input_idx).
-    _out_subjacs_info : dict
-        Dict of subjacobian metadata keyed on (resid_idx, output_idx).
+    _subjacs_info : dict
+        Dict of subjacobian metadata keyed on (resid_path, (in/out)_path).
     """
 
     def __init__(self, **kwargs):
@@ -45,9 +43,7 @@ class GlobalJacobian(Jacobian):
                              desc='<Matrix> class to use in this <Jacobian>.')
         self.options.update(kwargs)
 
-        # dicts of subjacobian metadata keyed by (resid_index, (in/out)_index)
-        self._in_subjacs_info = {}
-        self._out_subjacs_info = {}
+        self._subjacs_info = {}
 
     def _get_var_range(self, ivar_all, typ):
         """Look up the variable name and <Jacobian> index range.
@@ -83,7 +79,9 @@ class GlobalJacobian(Jacobian):
         meta_in = system._var_myproc_metadata['input']
         meta_out = system._var_myproc_metadata['output']
         out_names = system._var_allprocs_names['output']
+        out_paths = system._var_allprocs_pathnames['output']
         in_names = system._var_allprocs_names['input']
+        in_paths = system._var_allprocs_pathnames['input']
         ivar1, ivar2 = system._var_allprocs_range['output']
 
         self._int_mtx = self.options['matrix_class'](system.comm)
@@ -100,12 +98,14 @@ class GlobalJacobian(Jacobian):
         for s in self._system.system_iter(local=True, recurse=True,
                                           include_self=True, typ=Component):
             for re_idx_all in s._var_myproc_indices['output']:
+                re_path = out_paths[re_idx_all]
                 re_offset = out_offsets[re_idx_all]
 
                 for out_idx_all in s._var_myproc_indices['output']:
-                    key = (re_idx_all, out_idx_all)
-                    if key in self._out_subjacs_info:
-                        info, shape = self._out_subjacs_info[key]
+                    out_path = out_paths[out_idx_all]
+                    key = (re_path, out_path)
+                    if key in self._subjacs_info:
+                        info, shape = self._subjacs_info[key]
                     else:
                         info = SUBJAC_META_DEFAULTS
                         rname = out_names[re_idx_all]
@@ -117,10 +117,11 @@ class GlobalJacobian(Jacobian):
                         key, info, re_offset, out_offsets[out_idx_all], None, shape)
 
                 for in_count, in_idx_all in enumerate(s._var_myproc_indices['input']):
-                    key = (re_idx_all, in_idx_all)
+                    in_path = in_paths[in_idx_all]
+                    key = (re_path, in_path)
                     self._keymap[key] = key
-                    if key in self._in_subjacs_info:
-                        info, shape = self._in_subjacs_info[key]
+                    if key in self._subjacs_info:
+                        info, shape = self._subjacs_info[key]
                     else:
                         info = SUBJAC_META_DEFAULTS
                         rname = out_names[re_idx_all]
@@ -138,8 +139,9 @@ class GlobalJacobian(Jacobian):
                             # need to add an entry for d(output)/d(source)
                             # instead of d(output)/d(input) when we have
                             # src_indices
-                            key2 = (key[0],
-                                    self._assembler._input_src_ids[in_idx_all])
+                            src = self._assembler._input_src_ids[in_idx_all]
+                            in_path = out_paths[src]
+                            key2 = (key[0], in_path)
                             self._keymap[key] = key2
                             self._int_mtx._in_add_submat(
                                 key2, info, re_offset, out_offsets[out_idx_all],
@@ -162,27 +164,29 @@ class GlobalJacobian(Jacobian):
         """Read the user's sub-Jacobians and set into the global matrix."""
         # var_var_indices are the *global* indices for variables on this proc
         var_indices = self._system._var_myproc_indices
+        var_paths = self._system._var_allprocs_pathnames
         ivar1, ivar2 = self._system._var_allprocs_range['output']
 
         for re_idx_all in var_indices['output']:
+            re_path = var_paths['output'][re_idx_all]
             for out_idx_all in var_indices['output']:
-                key = (re_idx_all, out_idx_all)
-                if key in self._out_dict:
-                    self._int_mtx._update_submat(self._int_mtx._out_metadata,
-                                                 key, self._out_dict[key])
+                out_path = var_paths['output'][out_idx_all]
+                #key = (re_idx_all, out_idx_all)
+                key = (re_path, out_path)
+                if key in self._subjacs:
+                    self._int_mtx._update_submat(key, self._subjacs[key])
 
             for in_idx_all in var_indices['input']:
-                key = (re_idx_all, in_idx_all)
-                if key in self._in_dict:
+                in_path = var_paths['input'][in_idx_all]
+                #key = (re_idx_all, in_idx_all)
+                key = (re_path, in_path)
+                if key in self._subjacs:
                     out_idx_all = self._assembler._input_src_ids[in_idx_all]
                     if ivar1 <= out_idx_all < ivar2:
-                        self._int_mtx._update_submat(self._int_mtx._in_metadata,
-                                                     self._keymap[key],
-                                                     self._in_dict[key])
+                        self._int_mtx._update_submat(self._keymap[key],
+                                                     self._subjacs[key])
                     else:
-                        self._ext_mtx._update_submat(self._ext_mtx._in_metadata,
-                                                     key,
-                                                     self._in_dict[key])
+                        self._ext_mtx._update_submat(key, self._subjacs[key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """Compute matrix-vector product.
@@ -218,13 +222,7 @@ class GlobalJacobian(Jacobian):
         meta : dict
             Metadata dictionary for the subjacobian.
         """
-        dct, out_ind, in_ind, out_size, in_size, typ = self._process_key(key)
-        if typ == 'input':
-            self._in_subjacs_info[(out_ind, in_ind)] = (meta, (out_size,
-                                                               in_size))
-        else:
-            self._out_subjacs_info[(out_ind, in_ind)] = (meta, (out_size,
-                                                               in_size))
+        self._subjacs_info[self._key2unique(key)] = (meta, self._key2shape(key))
 
         val = meta['value']
         if val is not None:

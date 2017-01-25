@@ -274,11 +274,11 @@ class ExplicitLastComp(ExplicitComponent):
 
     def compute_jacobian(self, inputs, outputs, jacobian):
         if self.metadata['jacobian_type'] != 'matvec':
-            jacobian['x_norm2', 'x'] = inputs['x']
+            jacobian['x_norm2', 'x'] = _array2jac(self, inputs['x'])
 
             k = self.metadata['num_comp']
-            jacobian['theta_out', 'theta'] = np.array([.5])
-            jacobian['theta_out', 'psi'] = np.array([-1/(2*k-2)])
+            jacobian['theta_out', 'theta'] = _array2jac(self, np.array([.5]))
+            jacobian['theta_out', 'psi'] = _array2jac(self, np.array([-1/(2*k-2)]))
 
     def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
         if self.metadata['jacobian_type'] == 'matvec':

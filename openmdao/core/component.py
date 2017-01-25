@@ -6,7 +6,7 @@ from fnmatch import fnmatchcase
 from six import string_types
 import numpy
 
-from openmdao.core.system import System
+from openmdao.core.system import System, PathData
 
 
 class Component(System):
@@ -168,6 +168,33 @@ class Component(System):
                             self._jacobian._set_subjac_info(key, meta, typ)
 
         self._jacobian._system = oldsys
+
+    def _setup_variables(self, recurse=False):
+        """Assemble variable metadata and names lists.
+
+        Sets the following attributes:
+            _var_allprocs_names
+            _var_myproc_names
+            _var_myproc_metadata
+
+        Args
+        ----
+        recurse : boolean
+            Ignored.
+        """
+        super(Component, self)._setup_variables(False)
+
+        self._var_pathdict = {}
+        self._var_name2path = {}
+        for typ in ['input', 'output']:
+            self._var_allprocs_pathnames[typ] = [
+                '.'.join((self.pathname, n)) for n in
+                    self._var_allprocs_names[typ]
+            ]
+            for idx, name in enumerate(self._var_allprocs_names[typ]):
+                path = self._var_allprocs_pathnames[typ][idx]
+                self._var_pathdict[path] = PathData(name, idx, typ)
+                self._var_name2path[name] = (path,)
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
         r"""Add this vector and assign sub_vectors to subsystems.
