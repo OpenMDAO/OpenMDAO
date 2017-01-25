@@ -3,7 +3,7 @@
 from __future__ import division, print_function
 import numpy
 
-from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils import OptionsDictionary
 
 
 class Solver(object):

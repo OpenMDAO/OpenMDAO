@@ -4,7 +4,7 @@ import numpy
 from scipy.sparse import coo_matrix, csr_matrix
 from six.moves import range
 
-from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils import OptionsDictionary
 
 
 class Jacobian(object):

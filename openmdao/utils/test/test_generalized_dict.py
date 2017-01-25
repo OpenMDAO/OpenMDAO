@@ -1,4 +1,4 @@
-from openmdao.utils.generalized_dict import GeneralizedDictionary, OptionsDictionary
+from openmdao.utils import GeneralizedDictionary, OptionsDictionary
 import unittest
 from six import PY3, assertRegex
 
