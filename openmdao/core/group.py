@@ -116,43 +116,37 @@ class Group(System):
             variable, you can specify which indices of the source to be
             transferred to the input here.
         """
-        # src_indices argument, if given, should be valid
+        # if src_indices argument is given, it should be valid
         if isinstance(src_indices, string_types):
             if isinstance(in_name, string_types):
                 in_name = [in_name]
             in_name.append(src_indices)
             raise TypeError("src_indices must be an index array, did you mean"
-                            " connect('{0}', {1})?".format(out_name, in_name))
+                            " connect('%s', %s)?" % (out_name, in_name))
 
         if isinstance(src_indices, np.ndarray):
             if not np.issubdtype(src_indices.dtype, np.integer):
-                raise TypeError("src_indices must contain integers, but connection in {0} "
-                                "from {1} to {2} src_indices is {3}.".format(self.name, out_name, out_name, src_indices.dtype.type))
+                raise TypeError("src_indices must contain integers, but src_indices for "
+                                "connection from %s to %s is %s." %
+                                (out_name, in_name, src_indices.dtype.type))
         elif isinstance(src_indices, Iterable):
             types_in_src_idxs = set( type(idx) for idx in src_indices)
             for t in types_in_src_idxs:
                 if not np.issubdtype(t, np.integer):
-                    raise TypeError("src_indices must contain integers, but connection in {0} "
-                                    "from {1} to {2} contains non-integers.".format(self.name, out_name, out_name))
+                    raise TypeError("src_indices must contain integers, but src_indices for "
+                                    "connection from %s to %s contains non-integers." %
+                                    (out_name, in_name))
 
-        # if multiple targets, recursively connect to each
+        # if multiple targets are given, recursively connect to each
         if isinstance(in_name, (list, tuple)):
             for name in in_name:
                 self.connect(out_name, name, src_indices)
             return
 
-        # the output and input names should exist
-        # FIXME: the following would only work after setup()
-        # if out_name not in self._var_allprocs_names['output']:
-        #     raise NameError("Output '%s' does not exist" % (out_name))
-
-        # if in_name not in self._var_allprocs_names['input']:
-        #     raise NameError("Input '%s' does not exist" % (in_name))
-
-        # should not already be connected
+        # target should not already be connected
         if in_name in self._var_connections:
             srcname = self._var_connections[in_name][0]
-            raise RuntimeError("Input '%s' is already connected to '%s'" %
+            raise RuntimeError("Input '%s' is already connected to '%s'." %
                                (in_name, srcname))
 
         self._var_connections[in_name] = (out_name, src_indices)
@@ -188,6 +182,18 @@ class Group(System):
         # Loop through user-defined connections
         for in_name, (out_name, src_indices) \
                 in iteritems(self._var_connections):
+
+            # throw an exception if either output or input doesn't exist
+            # (not traceable to a connect statement, so provide context)
+            if out_name not in allprocs_out_names:
+                raise NameError("Output '%s' does not exist for connection "
+                                "in %s from %s to %s." % (out_name, self.name
+                                if self.name else 'model', out_name, in_name))
+
+            if in_name not in allprocs_in_names:
+                raise NameError("Input '%s' does not exist for connection "
+                                "in %s from %s to %s." % (in_name, self.name
+                                if self.name else 'model', out_name, in_name))
 
             for in_index, name in enumerate(allprocs_in_names):
                 if name == in_name:
