@@ -149,6 +149,10 @@ class Group(System):
             raise RuntimeError("Input '%s' is already connected to '%s'." %
                                (in_name, srcname))
 
+        if out_name.rsplit('.', 1)[0] == in_name.rsplit('.', 1)[0]:
+            raise RuntimeError("Input and output are in the same System for " +
+                               "connection from '%s' to '%s'." % (out_name, in_name))
+
         self._var_connections[in_name] = (out_name, src_indices)
 
     def _setup_connections(self):

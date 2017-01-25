@@ -86,6 +86,26 @@ class TestConnect(unittest.TestCase):
         with self.assertRaisesRegexp(NameError, msg):
             self.prob.setup(check=False)
 
+    def test_connect_within_system(self):
+        msg = "Input and output are in the same System for connection " + \
+              "from 'tgt.y' to 'tgt.x'."
+
+        with self.assertRaisesRegexp(RuntimeError, msg):
+            self.sub.connect('tgt.y', 'tgt.x', src_indices=[1])
+
+    def test_connect_within_system_with_promotes(self):
+        prob = Problem(Group())
+
+        sub = prob.model.add_subsystem('sub', Group())
+        sub.add_subsystem('tgt', ExecComp('y = x'), promotes=['y'])
+        sub.connect('y', 'tgt.x', src_indices=[1])
+
+        msg = "Input and output are in the same System for connection " + \
+              "in 'sub' from 'y' to 'tgt.x'."
+
+        with self.assertRaisesRegexp(RuntimeError, msg):
+            self.prob.setup(check=False)
+
 
 if __name__ == "__main__":
     unittest.main()
