@@ -51,7 +51,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     # since people will be used to passing the Problem as the first arg to
     # the N2 diagram funct, allow them to pass a Problem here as well.
     if isinstance(root, Problem):
-        system = root.root
+        system = root.model
     else:
         system = root
 

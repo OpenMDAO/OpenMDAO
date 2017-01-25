@@ -14,3 +14,9 @@ The *IndepVarComp* class is instantiated directly (without defining a subclass),
 
 .. show-unittest-examples::
     indepvarcomp
+
+
+Specific reference to openmdao.core.tests.test_component.TestIndepVarComp.test___init___1var
+
+.. embed-test::
+    openmdao.core.tests.test_component.TestIndepVarComp.test___init___1var

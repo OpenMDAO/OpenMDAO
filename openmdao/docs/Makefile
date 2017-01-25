@@ -58,6 +58,7 @@ clean:
 	rm -rf $(BUILDDIR)/*
 	rm -rf srcdocs/usr
 	rm -rf srcdocs/dev
+	rm -rf tags
 
 mock:
 	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
@@ -69,13 +70,14 @@ redbaron:
 
 html: mock redbaron
 	python utils/preprocess_tags.py
-	python ../devtools/create_feature_docs_unit_test_db.py
+	python utils/create_feature_docs_unit_test_db.py
 	rm -rf $(BUILDDIR)/*
 	rm -rf srcdocs/usr
 	rm -rf srcdocs/dev
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "dev"
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr"
 	rm feature_docs_unit_test_db.sqlite
+	rm -rf tags
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 

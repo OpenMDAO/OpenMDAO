@@ -369,8 +369,8 @@ def om_process_docstring(app, what, name, obj, options, lines):
             for ma in match:
                 # strip off the angle brackets `<>`
                 m = ma[1:-1]
-                #to get rid of bad matches in OrderedDict.set_item
-                if m=="==":
+                # to get rid of bad matches in OrderedDict.set_item
+                if m == "==":
                     continue
                 # if there's a dot in the pattern, it's a method
                 # e.g. <classname.method_name>
@@ -447,8 +447,9 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'numpydoc',
-    'showUnitTestExamples',
-    'embedPythonCode',
+    'show_unittest_examples',
+    'embed_python_code',
+    'embed_test',
     'tags'
 ]
 
