@@ -7,6 +7,7 @@ import numpy
 from openmdao.core.component import Component as BaseComponent
 from openmdao.utils.general_utils import warn_deprecation
 
+
 class Component(BaseComponent):
     """Component Class for backwards compatibility.
 
@@ -24,12 +25,10 @@ class Component(BaseComponent):
         self._state_names = []
         self._output_names = []
 
-
-        msg = 'Components should inherit from ImplicitComponent ' + \
-              'or ExplicitComponent. This class provides ' + \
-              'backwards compabitibility with OpenMDAO <= 1.x as ' + \
-              'this Component class is deprecated'
-        warn_deprecation(msg)
+        warn_deprecation('Components should inherit from ImplicitComponent '
+                         'or ExplicitComponent. This class provides '
+                         'backwards compabitibility with OpenMDAO <= 1.x as '
+                         'this Component class is deprecated')
 
     def add_param(self, name, val=1.0, **kwargs):
         """Add an param variable to the component.

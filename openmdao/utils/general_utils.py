@@ -1,10 +1,10 @@
-""" Some miscellaneous utility functions."""
+"""Some miscellaneous utility functions."""
 
 import warnings
 
 
 def warn_deprecation(msg):
-    """ Raises a warning and prints a deprecation message to stdout.
+    """Raise a warning and prints a deprecation message to stdout.
 
     Args
     ----
