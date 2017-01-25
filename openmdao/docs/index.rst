@@ -43,6 +43,13 @@ Solvers (nonlinear and linear)
 Running your models
 ================================
 
+.. toctree::
+   :maxdepth: 1
+
+   features/running/setup_and_run
+   features/running/set_get
+   features/running/check_total_derivatives
+
 Drivers (optimizers and DOE)
 ================================
 
