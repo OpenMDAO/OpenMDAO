@@ -3,6 +3,7 @@
 import unittest
 
 from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver
+from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarStateConnection
 
 
@@ -22,7 +23,7 @@ class TestSolverDeprecations(unittest.TestCase):
         prob.model.ln_solver.options['maxiter'] = 1
 
         # The good solver
-        prob.model.nl_solver.options['subsolvers']['linear'] = ScipyIterativeSolver()
+        prob.model.nl_solver.ln_solver = ScipyIterativeSolver()
 
         prob.model.suppress_solver_output = True
         prob.setup(check=False)
@@ -35,6 +36,10 @@ class TestSolverDeprecations(unittest.TestCase):
         self.assertLess(prob.model.nl_solver._iter_count, 8)
         self.assertEqual(prob.model.ln_solver._iter_count, 0)
         self.assertGreater(prob.model.nl_solver.options['subsolvers']['linear']._iter_count, 0)
+
+        # Make sure we can get the solver too.
+        ln_solver = prob.model.nl_solver.ln_solver
+        self.assertTrue(ln_solver.options['maxiter'] > 1)
 
 
 if __name__ == "__main__":
