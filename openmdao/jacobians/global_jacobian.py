@@ -180,7 +180,7 @@ class GlobalJacobian(Jacobian):
                                                      self._keymap[key],
                                                      self._in_dict[key])
                     else:
-                        self._ext_mtx._update_submat(self._int_mtx._in_metadata,
+                        self._ext_mtx._update_submat(self._ext_mtx._in_metadata,
                                                      key,
                                                      self._in_dict[key])
 
