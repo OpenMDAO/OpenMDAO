@@ -43,6 +43,20 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'x'], -6.0, 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], 8.0, 1e-6)
 
+    def test_feature_set_indeps(self):
+        prob = Problem()
+        root = prob.root = Group()
+        root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        prob.setup()
+
+        prob['x'] = 2.
+        prob['y'] = 10.
+        prob.run_model()
+        assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
+
     def test_feature_numpyvec_setup(self):
 
         prob = Problem()

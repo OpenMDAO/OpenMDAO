@@ -13,28 +13,28 @@ Outputs and independent variables
 -----------------------------------
 
 To set or get the output variable, you reference it by its promoted name.
-In the regular <SellarDerivatives> problem all the variables have been promoted to the top of the model.
-So to get the value of the "y1" output defined in <SellarDis1withDerivatives> component you would do the following:
+In the regular <openmdao.test_suite.components.sellar.SellarDerivatives> problem all the variables have been promoted to the top of the model.
+So to get the value of the "y1" output defined in <openmdao.test_suite.components.sellar.SellarDis1withDerivatives> component you would do the following:
 
 .. embed-test:
     openmdao.core.tests.test_problem.TestProblem.test_feature_simple_promoted_sellar_get_outputs
 
 
-A somewhat special case to note is the output variables of <IndepVarComp>,
-which define the independent variables of your problem.
-OpenMDAO requires that every variable must have an ultimate source.
-IndepVarComps provide this functionality for independent variables,
-which are external inputs to the model that are set by the user or a <Driver>,
-by having only output variables (i.e. no input variables). For example,
-consider our paraboloid tutorial problem problem which has two independent variables: `x` and `y`.
-These would be set as follows:
+You use the same syntax when working with the independent variables of your problem.
+Independent variables hold values set by a user or are used as design variables by a <openmdao.core.driver.Driver>.
+OpenMDAO requires that every variable must have an ultimate source, even independent variables.
+We accomplish this by defining independent variables as outputs of a special component,
+<openmdao.core.indepvarcomp.IndepVarComp>, that does not any inputs.
+For example, consider our paraboloid tutorial problem problem which has two independent variables: `x` and `y`.
+
+These would be defined and set as follows:
 
 .. embed-test:
-    openmdao.core.tests.test_problem.TestProblem.test_feature_numpyvec_setup
+    openmdao.core.tests.test_problem.TestProblem.test_feature_set_indeps
 
 
 As we said above, outputs are always referenced via their promoted name.
-So if you built the Sellar problem using connections (see <SellarDerivativesConnected>),
+So if you built the Sellar problem using connections (see <openmdao.test_suite.components.sellar.SellarDerivativesConnected>),
 instead of promoting everything, then you would access the variables like this:
 
 .. embed-test:
@@ -42,6 +42,8 @@ instead of promoting everything, then you would access the variables like this:
 
 Working with Array Variables
 ------------------------------
+
+When you define array
 
 
 Inputs
