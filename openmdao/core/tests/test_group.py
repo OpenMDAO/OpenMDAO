@@ -14,6 +14,7 @@ class SimpleGroup(Group):
 class TestGroup(unittest.TestCase):
 
     def test_same_sys_name(self):
+        """Test error checking for the case where we add two subsystems with the same name."""
         p = Problem(model=Group())
         p.model.add_subsystem('comp1', IndepVarComp('x', 5.0))
         p.model.add_subsystem('comp2', ExecComp('b=2*a'))
@@ -26,6 +27,7 @@ class TestGroup(unittest.TestCase):
             self.fail('Exception expected.')
 
     def test_group_simple(self):
+        """Simple example for adding subsystems to a group and issuing connections."""
         p = Problem(model=Group())
         p.model.add_subsystem('comp1', IndepVarComp('x', 5.0))
         p.model.add_subsystem('comp2', ExecComp('b=2*a'))
@@ -37,12 +39,13 @@ class TestGroup(unittest.TestCase):
         cx = p.model.get_subsystem('comp')
         self.assertEqual(c1.name, 'comp1')
         self.assertEqual(c2.name, 'comp2')
-        self.assertEqual(cx, None)    
+        self.assertEqual(cx, None)
 
         p.run_model()
         self.assertEqual(p['comp2.b'], 10.0)
 
     def test_group_inmethod(self):
+        """Example for adding subsystems and connections in the Group implementation."""
         p = Problem(model=SimpleGroup())
         p.setup()
 
@@ -55,6 +58,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp2.b'], 10.0)
 
     def test_group_promotes(self):
+        """Promoting a single variable."""
         p = Problem(model=Group())
         p.model.add_subsystem('comp1', IndepVarComp([
                 ('a', 2.0),
@@ -70,6 +74,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp2.y'], 10)
 
     def test_group_promotes_multiple(self):
+        """Promoting multiple variables."""
         p = Problem(model=Group())
         p.model.add_subsystem('comp1', IndepVarComp([
                 ('a', 2.0),
@@ -85,6 +90,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp2.y'], 10)
 
     def test_group_promotes_all(self):
+        """Promoting all variables with asterisk."""
         p = Problem(model=Group())
         p.model.add_subsystem('comp1', IndepVarComp([
                 ('a', 2.0),
@@ -100,21 +106,23 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp2.y'], 10)
 
     def test_group_renames(self):
+        """Renaming variables and using implicit connections."""
         p = Problem(model=Group())
         p.model.add_subsystem('comp1', IndepVarComp([
                 ('a', 2.0),
                 ('x', 5.0),
             ]),
-            renames_outputs={'x':'x', 'a':'q'})
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'), renames_inputs={'x':'x'})
+            renames_outputs={'x':'x2', 'a':'q'})
+        p.model.add_subsystem('comp2', ExecComp('y=2*x'), renames_inputs={'x':'x2'})
         p.setup()
         p.run_model()
 
         self.assertEqual(p['q'], 2)
-        self.assertEqual(p['x'], 5)
+        self.assertEqual(p['x2'], 5)
         self.assertEqual(p['comp2.y'], 10)
 
     def test_group_renames_and_connect(self):
+        """Renaming variables and issuing explicit connections."""
         p = Problem(model=Group())
         p.model.add_subsystem('comp1', IndepVarComp([
                 ('a', 2.0),
@@ -132,6 +140,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp2.y'], 10)
 
     def test_group_nested(self):
+        """Example of adding subsystems and issuing connections with nested groups."""
         g1 = Group()
         c1_1 = g1.add_subsystem('comp1', IndepVarComp('x', 5.0))
         c1_2 = g1.add_subsystem('comp2', ExecComp('b=2*a'))
