@@ -16,7 +16,7 @@ class Matrix(object):
         implementation-specific representation of the actual matrix.
     _submats : dict
         dictionary of sub-jacobian data keyed by (out_ind, in_ind).
-    __metadata : dict
+    _metadata : dict
         implementation-specific data for the sub-jacobians.
     """
 
@@ -76,28 +76,7 @@ class Matrix(object):
 
         return self._prod(in_vec, 'rev')
 
-    def _out_add_submat(self, key, info, irow, icol, src_indices, shape):
-        """Declare a sub-jacobian.
-
-        Args
-        ----
-        key : (int, int)
-            the global output and input variable indices.
-        info : dict
-            sub-jacobian metadata.
-        irow : int
-            the starting row index (offset) for this sub-jacobian.
-        icol : int
-            the starting col index (offset) for this sub-jacobian.
-        src_indices : ndarray
-            indices from the source variable that an input variable
-            connects to.
-        shape : tuple
-            Shape of the specified submatrix.
-        """
-        self._submats[key] = (info, irow, icol, src_indices, shape)
-
-    def _in_add_submat(self, key, info, irow, icol, src_indices, shape):
+    def _add_submat(self, key, info, irow, icol, src_indices, shape):
         """Declare a sub-jacobian.
 
         Args

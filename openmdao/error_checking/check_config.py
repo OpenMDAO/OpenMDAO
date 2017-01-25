@@ -139,7 +139,7 @@ def _check_dataflow(group, logger):
 
     """
     for system in group.system_iter(include_self=True, recurse=True,
-                              typ=Group):
+                                    typ=Group):
         sccs = get_sccs(system)
         cycles = [sorted(s) for s in sccs if len(s) > 1]
         cycle_idxs = {}

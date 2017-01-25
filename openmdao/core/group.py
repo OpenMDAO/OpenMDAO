@@ -198,11 +198,11 @@ class Group(System):
             for subsys in self._subsystems_myproc:
                 # Assemble the names list from subsystems
                 subsys._var_maps[typ] = subsys._get_maps(typ)
+                paths = subsys._var_allprocs_pathnames[typ]
                 for idx, subname in enumerate(subsys._var_allprocs_names[typ]):
                     name = subsys._var_maps[typ][subname]
                     self._var_allprocs_names[typ].append(name)
-                    self._var_allprocs_pathnames[typ].append(
-                            subsys._var_allprocs_pathnames[typ][idx])
+                    self._var_allprocs_pathnames[typ].append(paths[idx])
                     self._var_myproc_names[typ].append(name)
 
                 # Assemble the metadata list from the subsystems

@@ -150,7 +150,7 @@ class Component(System):
                 self._subjacs_info.append((of, wrt, meta))
 
     def _set_subjac_infos(self):
-        """Sets subjacobian info into our jacobian."""
+        """Set subjacobian info into our jacobian."""
         indices = self._var_allprocs_indices
         oldsys = self._jacobian._system
         self._jacobian._system = self
@@ -165,7 +165,7 @@ class Component(System):
                     if wrtname == wrt or fnmatchcase(wrtname, wrt):
                         for ofmatch in ofmatches:
                             key = (ofmatch, wrtname)
-                            self._jacobian._set_subjac_info(key, meta, typ)
+                            self._jacobian._set_subjac_info(key, meta)
 
         self._jacobian._system = oldsys
 

@@ -78,7 +78,7 @@ class CooMatrix(Matrix):
                 rows[ind1:ind2] += irow
                 cols[ind1:ind2] += icol
 
-            else:  #  sparse
+            else:  # sparse
                 if isinstance(val, (coo_matrix, csr_matrix)):
                     jac_type = type(val)
                     jac = val.tocoo()

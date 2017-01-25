@@ -97,11 +97,14 @@ class GlobalJacobian(Jacobian):
         from openmdao.core.component import Component
         for s in self._system.system_iter(local=True, recurse=True,
                                           include_self=True, typ=Component):
-            for re_idx_all in s._var_myproc_indices['output']:
+            sub_out_inds = s._var_myproc_indices['output']
+            sub_in_inds = s._var_myproc_indices['input']
+
+            for re_idx_all in sub_out_inds:
                 re_path = out_paths[re_idx_all]
                 re_offset = out_offsets[re_idx_all]
 
-                for out_idx_all in s._var_myproc_indices['output']:
+                for out_idx_all in sub_out_inds:
                     out_path = out_paths[out_idx_all]
                     key = (re_path, out_path)
                     if key in self._subjacs_info:
@@ -113,10 +116,11 @@ class GlobalJacobian(Jacobian):
                         shape = (system._outputs._views_flat[rname].size,
                                  system._outputs._views_flat[oname].size)
 
-                    self._int_mtx._out_add_submat(
-                        key, info, re_offset, out_offsets[out_idx_all], None, shape)
+                    self._int_mtx._add_submat(key, info, re_offset,
+                                              out_offsets[out_idx_all],
+                                              None, shape)
 
-                for in_count, in_idx_all in enumerate(s._var_myproc_indices['input']):
+                for in_count, in_idx_all in enumerate(sub_in_inds):
                     in_path = in_paths[in_idx_all]
                     key = (re_path, in_path)
                     self._keymap[key] = key
@@ -132,7 +136,7 @@ class GlobalJacobian(Jacobian):
                     out_idx_all = self._assembler._input_src_ids[in_idx_all]
                     if ivar1 <= out_idx_all < ivar2:
                         if src_indices[in_idx_all] is None:
-                            self._int_mtx._in_add_submat(
+                            self._int_mtx._add_submat(
                                 key, info, re_offset, out_offsets[out_idx_all],
                                 None, shape)
                         else:
@@ -143,12 +147,14 @@ class GlobalJacobian(Jacobian):
                             in_path = out_paths[src]
                             key2 = (key[0], in_path)
                             self._keymap[key] = key2
-                            self._int_mtx._in_add_submat(
-                                key2, info, re_offset, out_offsets[out_idx_all],
-                                src_indices[in_idx_all], shape)
+                            self._int_mtx._add_submat(key2, info, re_offset,
+                                                      out_offsets[out_idx_all],
+                                                      src_indices[in_idx_all],
+                                                      shape)
                     else:
-                        self._ext_mtx._in_add_submat(
-                            key, info, re_offset, in_offsets[in_idx_all], None, shape)
+                        self._ext_mtx._add_submat(key, info, re_offset,
+                                                  in_offsets[in_idx_all],
+                                                  None, shape)
 
         out_size = numpy.sum(
             self._assembler._variable_sizes_all['output'][ivar1:ivar2])
@@ -171,14 +177,12 @@ class GlobalJacobian(Jacobian):
             re_path = var_paths['output'][re_idx_all]
             for out_idx_all in var_indices['output']:
                 out_path = var_paths['output'][out_idx_all]
-                #key = (re_idx_all, out_idx_all)
                 key = (re_path, out_path)
                 if key in self._subjacs:
                     self._int_mtx._update_submat(key, self._subjacs[key])
 
             for in_idx_all in var_indices['input']:
                 in_path = var_paths['input'][in_idx_all]
-                #key = (re_idx_all, in_idx_all)
                 key = (re_path, in_path)
                 if key in self._subjacs:
                     out_idx_all = self._assembler._input_src_ids[in_idx_all]
@@ -212,7 +216,7 @@ class GlobalJacobian(Jacobian):
             d_outputs.iadd_data(int_mtx._prod(d_residuals.get_data(), mode))
             d_inputs.iadd_data(ext_mtx._prod(d_residuals.get_data(), mode))
 
-    def _set_subjac_info(self, key, meta, typ):
+    def _set_subjac_info(self, key, meta):
         """Store subjacobian metadata.
 
         Args

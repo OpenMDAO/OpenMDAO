@@ -150,13 +150,13 @@ class ExplicitComponent(Component):
             self._jacobian._update()
 
     def _set_subjac_infos(self):
-        """Sets subjacobian info into our jacobian."""
+        """Set subjacobian info into our jacobian."""
         for out_name in self._var_myproc_names['output']:
             size = numpy.prod(self._var2meta[out_name]['shape'])
             arange = numpy.arange(size)
             self.declare_partial_derivs(out_name, out_name,
-                                       rows=arange, cols=arange,
-                                       val=numpy.ones(size))
+                                        rows=arange, cols=arange,
+                                        val=numpy.ones(size))
 
         super(ExplicitComponent, self)._set_subjac_infos()
 

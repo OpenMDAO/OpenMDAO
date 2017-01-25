@@ -780,7 +780,7 @@ class System(object):
             self._jacobian._initialize()
 
     def _set_subjac_infos(self):
-        """Sets subjacobian info into our jacobian.
+        """Set subjacobian info into our jacobian.
 
         Overridden in <Component>.
         """
@@ -792,15 +792,12 @@ class System(object):
 
         Args
         ----
-        local : bool (True)
+        local : bool
             If True, only iterate over systems on this proc.
-
-        include_self : bool (False)
+        include_self : bool
             If True, include this system in the iteration.
-
-        recurse : bool (True)
+        recurse : bool
             If True, iterate over the whole tree under this system.
-
         typ : type
             If not None, only yield Systems that match that are instances of the
             given type.

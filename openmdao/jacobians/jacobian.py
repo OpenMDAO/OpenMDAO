@@ -104,7 +104,7 @@ class Jacobian(object):
         """
         out_paths = self._system._var_name2path[key[0]]
         in_paths = self._system._var_name2path[key[1]]
-        assert (len(in_paths)==1 and len(out_paths)==1)
+        assert (len(in_paths) == 1 and len(out_paths) == 1)
         return (out_paths[0], in_paths[0])
 
     def _negate(self, key):
@@ -140,22 +140,23 @@ class Jacobian(object):
         """
         system = self._system
         pathdict = system._var_pathdict
+        pathnames = system._var_allprocs_pathnames
         out_offset = system._var_allprocs_range['output'][0]
         in_offset = system._var_allprocs_range['input'][0]
 
         iter_list = []
         for re_ind in system._var_myproc_indices['output']:
-            re_path = system._var_allprocs_pathnames['output'][re_ind-out_offset]
+            re_path = pathnames['output'][re_ind - out_offset]
 
             for out_ind in system._var_myproc_indices['output']:
-                out_path = system._var_allprocs_pathnames['output'][out_ind-out_offset]
+                out_path = pathnames['output'][out_ind - out_offset]
 
                 if (re_path, out_path) in self._subjacs:
                     iter_list.append((pathdict[re_path].name,
                                       pathdict[out_path].name))
 
             for in_ind in system._var_myproc_indices['input']:
-                in_path = system._var_allprocs_pathnames['input'][in_ind-in_offset]
+                in_path = pathnames['input'][in_ind - in_offset]
 
                 if (re_path, in_path) in self._subjacs:
                     iter_list.append((pathdict[re_path].name,
