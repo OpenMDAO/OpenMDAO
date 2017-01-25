@@ -3,13 +3,13 @@ from __future__ import division
 
 import numpy
 from six import iteritems
-import warnings
 
 import numpy
 
 from openmdao.core.system import System
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
 from openmdao.solvers.ln_bgs import LinearBlockGS
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class Group(System):
@@ -37,11 +37,8 @@ class Group(System):
             to 'promote' up to this group. This is for backwards compatibility
             with older versions of OpenMDAO.
         """
-        warnings.simplefilter('always', DeprecationWarning)
-        warnings.warn('This method provides backwards compabitibility with '
-                      'OpenMDAO <= 1.x ; use add_subsystem instead.',
-                      DeprecationWarning, stacklevel=2)
-        warnings.simplefilter('ignore', DeprecationWarning)
+        warn_deprecation('This method provides backwards compabitibility with '
+                         'OpenMDAO <= 1.x ; use add_subsystem instead.')
 
         self.add_subsystem(name, subsys, promotes=promotes)
 
