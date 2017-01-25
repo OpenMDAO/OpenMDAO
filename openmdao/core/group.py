@@ -127,14 +127,14 @@ class Group(System):
         if isinstance(src_indices, np.ndarray):
             if not np.issubdtype(src_indices.dtype, np.integer):
                 raise TypeError("src_indices must contain integers, but src_indices for "
-                                "connection from %s to %s is %s." %
+                                "connection from '%s' to '%s' is %s." %
                                 (out_name, in_name, src_indices.dtype.type))
         elif isinstance(src_indices, Iterable):
             types_in_src_idxs = set( type(idx) for idx in src_indices)
             for t in types_in_src_idxs:
                 if not np.issubdtype(t, np.integer):
                     raise TypeError("src_indices must contain integers, but src_indices for "
-                                    "connection from %s to %s contains non-integers." %
+                                    "connection from '%s' to '%s' contains non-integers." %
                                     (out_name, in_name))
 
         # if multiple targets are given, recursively connect to each
@@ -187,12 +187,12 @@ class Group(System):
             # (not traceable to a connect statement, so provide context)
             if out_name not in allprocs_out_names:
                 raise NameError("Output '%s' does not exist for connection "
-                                "in %s from %s to %s." % (out_name, self.name
+                                "in '%s' from '%s' to '%s'." % (out_name, self.name
                                 if self.name else 'model', out_name, in_name))
 
             if in_name not in allprocs_in_names:
                 raise NameError("Input '%s' does not exist for connection "
-                                "in %s from %s to %s." % (in_name, self.name
+                                "in '%s' from '%s' to '%s'." % (in_name, self.name
                                 if self.name else 'model', out_name, in_name))
 
             for in_index, name in enumerate(allprocs_in_names):
