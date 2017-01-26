@@ -85,7 +85,6 @@ class MyExplicitComp2(ExplicitComponent):
             6.
         ]]))
 
-
 class ExplicitSetItemComp(ExplicitComponent):
     def __init__(self, dtype, value, shape, constructor):
         self._dtype = dtype
@@ -156,10 +155,11 @@ def inverted_csr(arr):
 def _test_func_name(func, num, param):
     args = []
     for p in param.args:
-        if isinstance(p, bool):
-            args.append(str(p))
-        else:
-            args.append(p.__name__)
+        try:
+            arg = p.__name__
+        except:
+            arg = str(p)
+        args.append(arg)
     return 'test_jacobian_src_indices_' + '_'.join(args)
 
 class TestJacobian(unittest.TestCase):
@@ -167,12 +167,13 @@ class TestJacobian(unittest.TestCase):
     @parameterized.expand(itertools.product(
         [DenseMatrix, CsrMatrix, CooMatrix],
         [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist],
-        [False, True]
+        [False, True],  # not nested, nested
+        [0, 1],  # extra calls to linearize
         ), testcase_func_name=_test_func_name
     )
-    def test_src_indices(self, matrix_class, comp_jac_class, nested):
+    def test_src_indices(self, matrix_class, comp_jac_class, nested, lincalls):
 
-        self._setup_model(matrix_class, comp_jac_class, nested)
+        self._setup_model(matrix_class, comp_jac_class, nested, lincalls)
 
         # if we multiply our jacobian (at x,y = ones) by our work vec of 1's,
         # we get fwd_check
@@ -183,9 +184,13 @@ class TestJacobian(unittest.TestCase):
         rev_check = np.array([-35., -5., 9., -63., -3., 1., -6., 1.])
 
         self._check_fwd(self.prob, fwd_check)
+        # to catch issues with constant subjacobians, repeatedly call linearize
+        for i in range(lincalls):
+            self.prob.model._linearize()
+        self._check_fwd(self.prob, fwd_check)
         self._check_rev(self.prob, rev_check)
 
-    def _setup_model(self, mat_class, comp_jac_class, nested):
+    def _setup_model(self, mat_class, comp_jac_class, nested, lincalls):
         self.prob = prob = Problem(model=Group())
         if nested:
             top = prob.model.add_subsystem('G1', Group())
