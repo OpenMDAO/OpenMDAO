@@ -52,7 +52,7 @@ from numpydoc.docscrape_sphinx import SphinxDocString
 from openmdao.docs.utils.docutil import remove_docstrings, get_method_body, \
         replace_asserts_with_prints, remove_initial_empty_lines_from_source, \
         get_lines_before_test_cases
-from openmdao.docs.utils.get_test_source_code_for_feature import sqlite_file, table_name
+from openmdao.docs.utils.docutil import sqlite_file, table_name
 
 # pylint: disable=C0103
 

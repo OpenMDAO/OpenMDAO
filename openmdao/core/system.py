@@ -436,10 +436,13 @@ class System(object):
 
         # Compute scaling arrays for inputs using a0 and a1
         for ind, meta in enumerate(self._var_myproc_metadata['input']):
+            global_ind = self._var_myproc_indices['input'][ind]
             self._scaling_to_phys['input'][ind, 0] = \
-                convert_units(src_0[ind], src_units[ind], meta['units'])
+                convert_units(src_0[global_ind], src_units[global_ind],
+                              meta['units'])
             self._scaling_to_phys['input'][ind, 1] = \
-                convert_units(src_1[ind], src_units[ind], meta['units'])
+                convert_units(src_1[global_ind], src_units[global_ind],
+                              meta['units'])
 
         for ind, meta in enumerate(self._var_myproc_metadata['output']):
             # Compute scaling arrays for outputs; no unit conversion needed

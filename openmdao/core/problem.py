@@ -3,7 +3,6 @@
 from __future__ import division
 from collections import OrderedDict
 import sys
-import warnings
 
 from six import string_types
 from six.moves import range
@@ -11,8 +10,9 @@ from six.moves import range
 import numpy as np
 
 from openmdao.assemblers.default_assembler import DefaultAssembler
-from openmdao.vectors.default_vector import DefaultVector
 from openmdao.error_checking.check_config import check_config
+from openmdao.utils.general_utils import warn_deprecation
+from openmdao.vectors.default_vector import DefaultVector
 
 
 class FakeComm(object):
@@ -146,11 +146,8 @@ class Problem(object):
         float
             absolute error.
         """
-        warnings.simplefilter('always', DeprecationWarning)
-        warnings.warn('This method provides backwards compabitibility with '
-                      'OpenMDAO <= 1.x ; use run_driver instead.',
-                      DeprecationWarning, stacklevel=2)
-        warnings.simplefilter('ignore', DeprecationWarning)
+        warn_deprecation('This method provides backwards compabitibility with '
+                         'OpenMDAO <= 1.x ; use run_driver instead.')
 
         return self.run_model()
 
@@ -166,11 +163,8 @@ class Problem(object):
         float
             absolute error.
         """
-        warnings.simplefilter('always', DeprecationWarning)
-        warnings.warn('This method provides backwards compabitibility with '
-                      'OpenMDAO <= 1.x ; use run_driver instead.',
-                      DeprecationWarning, stacklevel=2)
-        warnings.simplefilter('ignore', DeprecationWarning)
+        warn_deprecation('This method provides backwards compabitibility with '
+                         'OpenMDAO <= 1.x ; use run_driver instead.')
 
         return self.run_driver()
 
