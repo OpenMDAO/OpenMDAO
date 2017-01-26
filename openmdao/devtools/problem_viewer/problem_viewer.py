@@ -15,6 +15,7 @@ except ImportError:
     h5py = None
 
 from openmdao.api import ImplicitComponent, Problem, Group
+from openmdao.utils.general_utils import warn_deprecation
 #from openmdao.util.record_util import is_valid_sqlite3_db
 import base64
 
@@ -99,10 +100,7 @@ def view_tree(*args, **kwargs):
     """
     view_tree was renamed to view_model, but left here for backwards compatibility
     """
-    import warnings
-    warnings.simplefilter('always', DeprecationWarning)
-    warnings.warn("view_tree is deprecated. Please switch to view_model.", DeprecationWarning, stacklevel=2)
-    warnings.simplefilter('ignore', DeprecationWarning)
+    warn_deprecation("view_tree is deprecated. Please switch to view_model.")
     view_model(*args, **kwargs)
 
 def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_browser=True, offline=True, embed=False):
