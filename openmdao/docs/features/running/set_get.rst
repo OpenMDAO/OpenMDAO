@@ -12,7 +12,7 @@ To set or get the output variable, you reference it by its promoted name.
 In the regular <openmdao.test_suite.components.sellar.SellarDerivatives> problem all the variables have been promoted to the top of the model.
 So to get the value of the "y1" output defined in <openmdao.test_suite.components.sellar.SellarDis1withDerivatives> component you would do the following:
 
-.. embed-python-code::
+.. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_promoted_sellar_set_get_outputs
 
 
@@ -25,7 +25,7 @@ For example, consider our paraboloid tutorial problem problem which has two inde
 
 These would be defined and set as follows:
 
-.. embed-python-code::
+.. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_set_indeps
 
 
@@ -35,7 +35,7 @@ So if you built the Sellar problem using connections (see <openmdao.test_suite.c
 instead of promoting everything, then you would access the variables like this:
 
 
-.. embed-python-code::
+.. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_not_promoted_sellar_set_get_outputs
 
 
@@ -46,7 +46,7 @@ When you have an array variables, for convenience we allow you to set the value 
 In other words, the shape of the list has to match the shape of the actual data.
 
 
-.. embed-python-code::
+.. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_set_get_array
 
 
@@ -55,7 +55,7 @@ Residuals
 If you want to look at the residual values associated with any particular output variable, you will reference them using the same naming conventions the outputs.
 Also like outputs, you will be given the residuals in the unscaled dimensional form.
 
-.. embed-python-code::
+.. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_residuals
 
 
@@ -70,7 +70,7 @@ Inputs
 To set or get the and input variable, you reference it by its absolute path name. The full path name is necessary, because you could have a output (source) variable in units of meters and then two connected inputs (targets) in units of millimeters and centimeters respectively. Hence you need a specific path to reference each of two different inputs separately to get the value in that inputs units.
 
 
-.. embed-python-code::
+.. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_promoted_sellar_set_get_inputs
 
 Related Features
