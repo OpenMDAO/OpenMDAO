@@ -20,7 +20,7 @@ class TestNewton(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivativesGrouped()
-        mda = [s for s in prob.model._subsystems_allprocs if s.name == 'mda'][0]
+        mda = prob.model.get_subsystem('mda')
         mda.nl_solver = NewtonSolver()
 
         prob.setup(check=False)
@@ -157,7 +157,7 @@ class TestNewton(unittest.TestCase):
 
     def test_sellar_specify_linear_solver(self):
 
-        raise unittest.SkipTest("BUG: cannot specify subsolver")
+        #raise unittest.SkipTest("BUG: cannot specify subsolver")
 
         prob = Problem()
         prob.model = SellarStateConnection()
@@ -170,7 +170,7 @@ class TestNewton(unittest.TestCase):
         prob.model.ln_solver.options['maxiter'] = 1
 
         # The good solver
-        prob.model.nl_solver.options['subsolvers']['linear'] = ScipyIterativeSolver()
+        prob.model.nl_solver.set_subsolver('linear', ScipyIterativeSolver())
 
         prob.model.suppress_solver_output = True
         prob.setup(check=False)
