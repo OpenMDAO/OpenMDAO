@@ -136,7 +136,7 @@ class ExplicitCycleComp(ExplicitComponent):
             raise ValueError('Error: variable_length must be >= 3')
 
         self.add_input('x', shape=(N,))
-        self.add_input('theta', value=1.)
+        self.add_input('theta', val=1.)
 
         self.add_output('theta_out', shape=(1,))
         self.add_output('y', shape=(N,))
@@ -178,14 +178,14 @@ class ExplicitFirstComp(ExplicitComponent):
             raise ValueError('Error: variable_length must be >= 3')
 
         self.add_input('x', shape=(N,))
-        self.add_input('theta', value=1.)
+        self.add_input('theta', val=1.)
 
         self.add_output('theta_out', shape=(1,))
         self.add_output('y', shape=(N,))
 
         self._u, self._v, self._cross_terms, self._same_terms = _compute_vector_terms(N)
 
-        self.add_input('psi', value=1.)
+        self.add_input('psi', val=1.)
 
     def compute(self, inputs, outputs):
         theta = inputs['theta']
@@ -223,8 +223,8 @@ class ExplicitLastComp(ExplicitComponent):
             raise ValueError('Error: variable_length must be >= 3')
 
         self.add_input('x', shape=(N,))
-        self.add_input('theta', value=1.)
-        self.add_input('psi', value=1.)
+        self.add_input('theta', val=1.)
+        self.add_input('psi', val=1.)
 
         self.add_output('theta_out', shape=(1,))
         self.add_output('x_norm2', shape=(1,))

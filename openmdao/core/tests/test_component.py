@@ -67,7 +67,7 @@ class TestIndepVarComp(unittest.TestCase):
     def assertEqualArrays(self, a, b):
         self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
 
-    def test___init___1var(self):
+    def test_indep_simple(self):
         """Define one independent variable and set its value.
 
         Features
@@ -82,7 +82,7 @@ class TestIndepVarComp(unittest.TestCase):
         prob['indep_var'] = 2.0
         self.assertEqual(prob['indep_var'], 2.0)
 
-    def test___init___1var_val(self):
+    def test_indep_simple_default(self):
         """Define one independent variable with a default value.
 
         Features
@@ -94,7 +94,22 @@ class TestIndepVarComp(unittest.TestCase):
 
         self.assertEqual(prob['indep_var'], 2.0)
 
-    def test___init___1var_array(self):
+    def test_indep_simple_kwargs(self):
+        """Define one independent variable with a default value and additional options.
+
+        Features
+        --------
+        indepvarcomp
+        """
+        kwargs = {'units': 'm', 'lower': 0, 'upper': 10,}
+        comp = IndepVarComp([
+            ('indep_var', 2.0, kwargs),
+        ])
+        prob = Problem(comp).setup(check=False)
+
+        self.assertEqual(prob['indep_var'], 2.0)
+
+    def test_indep_simple_array(self):
         """Define one independent array variable.
 
         Features
@@ -111,7 +126,7 @@ class TestIndepVarComp(unittest.TestCase):
 
         self.assertEqualArrays(prob['indep_var'], array)
 
-    def test___init___2vars(self):
+    def test_indep_multiple_default(self):
         """Define two independent variables at once.
 
         Features
@@ -122,6 +137,24 @@ class TestIndepVarComp(unittest.TestCase):
         comp = IndepVarComp((
             ('indep_var_1', 1.0),
             ('indep_var_2', 2.0),
+        ))
+
+        prob = Problem(comp).setup(check=False)
+
+        self.assertEqual(prob['indep_var_1'], 1.0)
+        self.assertEqual(prob['indep_var_2'], 2.0)
+
+    def test_indep_multiple_kwargs(self):
+        """Define two independent variables at once and additional options.
+
+        Features
+        --------
+        indepvarcomp
+
+        """
+        comp = IndepVarComp((
+            ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
+            ('indep_var_2', 2.0, {'lower': 1., 'upper': 20}),
         ))
 
         prob = Problem(comp).setup(check=False)
