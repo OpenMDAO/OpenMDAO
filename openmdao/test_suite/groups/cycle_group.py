@@ -43,55 +43,62 @@ def _compute_dA(system_size, theta):
     return np.cos(theta) * cross_terms - np.sin(theta) * same_terms
 
 
-def _dense_to_aij(A):
-    data = []
-    rows = []
-    cols = []
-    for i in range(A.shape[0]):
-        for j in range(A.shape[1]):
-            if np.abs(A[i, j]) > 1e-15:
-                data.append(A[i, j])
-                rows.append(i)
-                cols.append(j)
-    return np.array(data), np.array(rows), np.array(cols)
-
-
-def _cycle_comp_jacobian(component, inputs, outputs, jacobian, angle_param):
+def _cycle_comp_jacobian(component, inputs, outputs, jacobian):
     if component.metadata['jacobian_type'] != 'matvec':
+        angle_param = component.angle_param
         angle = inputs[angle_param]
-        x = inputs['x']
-        size = component.N
+        num_var = component.num_var
+        var_shape = component.var_shape
+        var_size = np.prod(var_shape)
+        x = _inputs_to_vector(inputs, num_var, var_shape)
+        size = component.size
         A = _compute_A(size, angle)
         dA = _compute_dA(size, angle)
         dA_x = np.atleast_2d(dA.dot(x)).T
         pd_type = component.metadata['partial_type']
         dtheta = np.array([[1.]])
-        if pd_type == 'array':
-            J_y_x = A
-            J_y_angle = dA_x
-            J_theta = dtheta
-        elif pd_type == 'sparse':
-            J_y_x = sparse.csr_matrix(A)
-            J_y_angle = sparse.csr_matrix(dA_x)
-            J_theta = sparse.csr_matrix(dtheta)
-        elif pd_type == 'aij':
-            J_y_x = _dense_to_aij(A)
-            J_y_angle = _dense_to_aij(dA_x)
-            J_theta = _dense_to_aij(dtheta)
-        else:
-            raise ValueError('Unknown partial_type: {}'.format(pd_type))
 
-        jacobian['y', 'x'] = J_y_x
-        jacobian['y', angle_param] = J_y_angle
-        jacobian['theta_out', 'theta'] = J_theta
+        def array_idx(i):
+            return slice(i*var_size, (i+1)*var_size)
+
+        def make_jacobian_entry(A, pd_type):
+            if pd_type == 'array':
+                return A
+            if pd_type == 'sparse':
+                return sparse.csr_matrix(A)
+            if pd_type == 'aij':
+                data = []
+                rows = []
+                cols = []
+                for i in range(A.shape[0]):
+                    for j in range(A.shape[1]):
+                        if np.abs(A[i, j]) > 1e-15:
+                            data.append(A[i, j])
+                            rows.append(i)
+                            cols.append(j)
+                return np.array(data), np.array(rows), np.array(cols)
+
+        for out_idx in range(num_var):
+            out_var = 'y_{0}'.format(out_idx)
+            for in_idx in range(num_var):
+                in_var = 'x_{0}'.format(in_idx)
+
+                J_y_x = make_jacobian_entry(A[array_idx(out_idx), array_idx(in_idx)], pd_type)
+                J_y_angle = make_jacobian_entry(dA_x[array_idx(out_idx)], pd_type)
+
+                jacobian[out_var, in_var] = J_y_x
+                jacobian[out_var, angle_param] = J_y_angle
+
+        jacobian['theta_out', 'theta'] = make_jacobian_entry(dtheta, pd_type)
 
 
-def _cycle_comp_jacvec(component, inputs, outputs, d_inputs, d_outputs, mode, angle_param):
+def _cycle_comp_jacvec(component, inputs, outputs, d_inputs, d_outputs, mode):
     if component.metadata['jacobian_type'] == 'matvec':
-        x = inputs['x']
+        angle_param = component.angle_param
+        x = _inputs_to_vector(inputs, component.num_var, component.var_shape)
         angle = inputs[angle_param]
-        A = _compute_A(component.N, angle)
-        dA = _compute_dA(component.N, angle)
+        A = _compute_A(component.size, angle)
+        dA = _compute_dA(component.size, angle)
         if mode == 'fwd':
             if 'x' in d_inputs and 'y' in d_outputs:
                 dx = d_inputs['x']
@@ -118,130 +125,99 @@ def _cycle_comp_jacvec(component, inputs, outputs, d_inputs, d_outputs, mode, an
                 d_inputs['theta'] += dtheta_out
 
 
+def _inputs_to_vector(inputs, num_var, var_shape):
+    size = np.prod(var_shape)
+    x = np.zeros(num_var * size)
+    for i in range(num_var):
+        x_i = inputs['x_{}'.format(i)].flat
+        x[size*i:size*(i+1)] = x_i
+
+    return x
+
+
+def _vector_to_outputs(vec, outputs, num_var, var_shape):
+    size = np.prod(var_shape)
+    for i in range(num_var):
+        y_i = vec[size * i:size * (i + 1)].reshape(var_shape)
+        outputs['y_{}'.format(i)] = y_i
+
 class ExplicitCycleComp(ExplicitComponent):
     def __str__(self):
         return 'Explicit Cycle Component'
 
     def initialize(self):
-        self.metadata.declare('variable_length', type_=int, value=3,
-                              desc='Size of the system used within the cycle.')
         self.metadata.declare('jacobian_type', value='matvec',
-                              values=['matvec', 'dense', 'sparse-coo',
-                                      'sparse-csr'],
+                              values=['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
                               desc='method of assembling derivatives')
         self.metadata.declare('partial_type', value='array',
                               values=['array', 'sparse', 'aij'],
                               desc='type of partial derivatives')
+        self.metadata.declare('num_var', type_=int, value=1,
+                              desc='Number of variables per component')
+        self.metadata.declare('var_shape', type_=tuple, value=(3,),
+                              desc='Shape of each variable')
+
+        self.angle_param = 'theta'
 
     def initialize_variables(self):
-        self.N = N = self.metadata['variable_length']
+        self.num_var = self.metadata['num_var']
+        self.var_shape = self.metadata['var_shape']
+        self.size = self.num_var * np.prod(self.var_shape)
 
-        if N < 3:
-            raise ValueError('Error: variable_length must be >= 3')
+        for i in range(self.num_var):
+            self.add_input('x_{}'.format(i), shape=self.var_shape)
+            self.add_output('y_{}'.format(i), shape=self.var_shape)
 
-        self.add_input('x', shape=(N,))
         self.add_input('theta', value=1.)
-
         self.add_output('theta_out', shape=(1,))
-        self.add_output('y', shape=(N,))
-
-        self._u, self._v, self._cross_terms, self._same_terms = _compute_vector_terms(N)
 
     def compute(self, inputs, outputs):
         theta = inputs['theta']
-        A = _compute_A(self.N, theta)
-        outputs['y'] = A.dot(inputs['x'])
+        A = _compute_A(self.size, theta)
+        x = _inputs_to_vector(inputs, self.num_var, self.var_shape)
+        y = A.dot(x)
+        _vector_to_outputs(y, outputs, self.num_var, self.var_shape)
         outputs['theta_out'] = theta
 
     def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
-        _cycle_comp_jacvec(self, inputs, outputs, d_inputs, d_outputs, mode, 'theta')
+        _cycle_comp_jacvec(self, inputs, outputs, d_inputs, d_outputs, mode)
 
     def compute_jacobian(self, inputs, outputs, jacobian):
-        _cycle_comp_jacobian(self, inputs, outputs, jacobian, 'theta')
+        _cycle_comp_jacobian(self, inputs, outputs, jacobian)
 
 
-class ExplicitFirstComp(ExplicitComponent):
+class ExplicitFirstComp(ExplicitCycleComp):
     def __str__(self):
         return 'Explicit Cycle Component - First'
 
-    def initialize(self):
-        self.metadata.declare('variable_length', type_=int, value=3,
-                              desc='Size of the system used within the cycle.')
-        self.metadata.declare('jacobian_type', value='matvec',
-                              values=['matvec', 'dense', 'sparse-coo',
-                                      'sparse-csr'],
-                              desc='method of assembling derivatives')
-        self.metadata.declare('partial_type', value='array',
-                              values=['array', 'sparse', 'aij'],
-                              desc='type of partial derivatives')
-
     def initialize_variables(self):
-        self.N = N = self.metadata['variable_length']
-
-        if N < 3:
-            raise ValueError('Error: variable_length must be >= 3')
-
-        self.add_input('x', shape=(N,))
-        self.add_input('theta', value=1.)
-
-        self.add_output('theta_out', shape=(1,))
-        self.add_output('y', shape=(N,))
-
-        self._u, self._v, self._cross_terms, self._same_terms = _compute_vector_terms(N)
-
+        super(ExplicitFirstComp, self).initialize_variables()
         self.add_input('psi', value=1.)
+        self.angle_param = 'psi'
 
     def compute(self, inputs, outputs):
         theta = inputs['theta']
         psi = inputs['psi']
-        A = _compute_A(self.N, psi)
-        outputs['y'] = A.dot(inputs['x'])
+        A = _compute_A(self.size, psi)
+        y = A.dot(np.ones(self.size))
+        _vector_to_outputs(y, outputs, self.num_var, self.var_shape)
         outputs['theta_out'] = theta
 
-    def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
-        _cycle_comp_jacvec(self, inputs, outputs, d_inputs, d_outputs, mode, 'psi')
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
-        _cycle_comp_jacobian(self, inputs, outputs, jacobian, 'psi')
-
-
-class ExplicitLastComp(ExplicitComponent):
+class ExplicitLastComp(ExplicitFirstComp):
     def __str__(self):
         return 'Explicit Cycle Component - Last'
 
-    def initialize(self):
-        self.metadata.declare('variable_length', type_=int, value=3,
-                              desc='Size of the system used within the cycle.')
-        self.metadata.declare('jacobian_type', value='matvec',
-                              values=['matvec', 'dense', 'sparse-coo',
-                                      'sparse-csr'],
-                              desc='method of assembling derivatives')
-        self.metadata.declare('partial_type', value='array',
-                              values=['array', 'sparse', 'aij'],
-                              desc='type of partial derivatives')
-
     def initialize_variables(self):
-        self.N = N = self.metadata['variable_length']
-
-        if N < 3:
-            raise ValueError('Error: variable_length must be >= 3')
-
-        self.add_input('x', shape=(N,))
-        self.add_input('theta', value=1.)
-        self.add_input('psi', value=1.)
-
-        self.add_output('theta_out', shape=(1,))
+        super(ExplicitLastComp, self).initialize_variables()
         self.add_output('x_norm2', shape=(1,))
-
-        self._u, self._v, self._cross_terms, self._same_terms = _compute_vector_terms(N)
-
-        self._n = 0
+        self._n = 1
 
     def compute(self, inputs, outputs):
         theta = inputs['theta']
         psi = inputs['psi']
         k = self.metadata['num_comp']
-        x = inputs['x']
+        x = _inputs_to_vector(inputs, self.metadata['num_var'], self.metadata['var_shape'])
 
         outputs['x_norm2'] = 0.5*np.dot(x,x)
 
@@ -250,7 +226,10 @@ class ExplicitLastComp(ExplicitComponent):
 
     def compute_jacobian(self, inputs, outputs, jacobian):
         if self.metadata['jacobian_type'] != 'matvec':
-            jacobian['x_norm2', 'x'] = inputs['x']
+
+            for i in range(self.metadata['num_var']):
+                in_var = 'x_{0}'.format(i)
+                jacobian['x_norm2', in_var] = inputs[in_var].flat[:]
 
             k = self.metadata['num_comp']
             jacobian['theta_out', 'theta'] = np.array([.5])
@@ -259,21 +238,33 @@ class ExplicitLastComp(ExplicitComponent):
     def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
         if self.metadata['jacobian_type'] == 'matvec':
             k = self.metadata['num_comp']
-            x = inputs['x']
+            num_var = self.metadata['num_var']
+            var_shape = self.metadata['var_shape']
             if mode == 'fwd':
-                dx = d_inputs['x']
-                dtheta = d_inputs['theta']
-                dpsi = d_inputs['psi']
+                if 'theta_out' in d_outputs:
+                    if 'theta' in d_inputs :
+                        d_outputs['theta_out'] += 0.5 * d_inputs['theta']
+                    if 'psi' in d_inputs:
+                        d_outputs['theta_out'] += -d_inputs['psi'] / (2 * k - 2)
+                for i in range(num_var):
+                    in_var = 'x_{0}'.format(i)
+                    if in_var in d_inputs and 'x_norm2' in d_outputs:
+                        d_outputs['x_norm2'] += np.dot(inputs[in_var].flat, d_inputs[in_var].flat)
 
-                d_outputs['x_norm2'] += np.dot(x, dx)
-                d_outputs['theta_out'] += np.array([.5*dtheta - dpsi/(2*k-2)])
             elif mode == 'rev':
-                dxnorm = d_outputs['x_norm2']
-                dtheta_out = d_outputs['theta_out']
+                if 'x' in d_inputs:
+                    if 'x_norm2' in d_outputs:
+                        dxnorm = d_outputs['x_norm2']
+                        for i in range(num_var):
+                            in_var = 'x_{0}'.format(i)
+                            d_inputs['x'] += inputs[in_var] * dxnorm
 
-                d_inputs['x'] += x * dxnorm
-                d_inputs['theta'] += .5*dtheta_out
-                d_inputs['psi'] += -dtheta_out/(2*k-2)
+                if 'theta_out' in d_outputs:
+                    dtheta_out = d_outputs['theta_out']
+                    if 'theta' in d_inputs:
+                        d_inputs['theta'] += .5*dtheta_out
+                    if 'psi' in d_inputs:
+                        d_inputs['psi'] += -dtheta_out/(2*k-2)
 
 
 class CycleGroup(ParametericTestGroup):
@@ -287,6 +278,8 @@ class CycleGroup(ParametericTestGroup):
             'connection_type': ['implicit', 'explicit'],
             'partial_type': ['array', 'sparse', 'aij'],
             'num_comp': [3, 2],
+            'num_var': [2, 1],
+            'var_shape': [(2, 3), (3,), (4, 2)],
         })
 
 
@@ -295,8 +288,8 @@ class CycleGroup(ParametericTestGroup):
                               desc='Total number of components')
         self.metadata.declare('num_var', type_=int, value=1,
                               desc='Number of variables per component')
-        self.metadata.declare('var_shape', type_=int, value=(3,),
-                              desc='Shape of ')
+        self.metadata.declare('var_shape', value=(3,),
+                              desc='Shape of each variable')
         self.metadata.declare('connection_type', type_=str, value='explicit',
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
@@ -318,9 +311,12 @@ class CycleGroup(ParametericTestGroup):
         if num_comp < 2:
             raise ValueError('Number of components must be at least 2.')
 
-        self.N = N = 3#self.metadata['variable_length']
-        if N < 3:
-            raise ValueError('Variable length must be at least 3.')
+        self.num_var = num_var = self.metadata['num_var']
+        self.var_shape = var_shape = self.metadata['var_shape']
+
+        self.size = num_var * np.prod(var_shape)
+        if self.size < 3:
+            raise ValueError('Product of num_var and var_shape must be at least 3.')
 
         connection_type = self.metadata['connection_type']
 
@@ -344,24 +340,23 @@ class CycleGroup(ParametericTestGroup):
             (theta_name, 'psi_comp.psi'): -1. / (num_comp - 1),
         }
 
-        expected_theta = -PSI / (num_comp - 1)
+        expected_theta = (2*np.pi - PSI) / (num_comp - 1)
         self.expected_values = {
             theta_name: expected_theta,
-            'last.x_norm2': 0.5*N,
+            'last.x_norm2': 0.5*self.size,
         }
-
 
     def _generate_components(self, conn_type, first_class, middle_class, last_class, num_comp):
         first_name = 'first'
         last_name = 'last'
         comp_args = {
-            'variable_length': self.N,
+            'var_shape': self.metadata['var_shape'],
+            'num_var': self.metadata['num_var'],
             'jacobian_type': self.metadata['jacobian_type'],
             'partial_type': self.metadata['partial_type']
         }
 
         self.add_subsystem('psi_comp', IndepVarComp('psi', PSI))
-        self.add_subsystem('x0_comp', IndepVarComp('x', np.ones(self.N)))
 
         self._add_cycle_comp(conn_type, first_class, first_name, 0, comp_args)
         prev_name = first_name
@@ -372,6 +367,7 @@ class CycleGroup(ParametericTestGroup):
             ('theta_out', 'theta')
         )
 
+        # Middle Subsystems
         for idx in range(1, num_comp - 1):
             current_name = 'middle_{0}'.format(idx)
             self._add_cycle_comp(conn_type, middle_class, current_name, idx, comp_args)
@@ -380,6 +376,8 @@ class CycleGroup(ParametericTestGroup):
                 self._explicit_connections(prev_name, current_name, connection_variables)
 
             prev_name = current_name
+
+        # Final Subsystem
         if conn_type == 'explicit':
             self.add_subsystem(last_name, last_class(**comp_args))
 
@@ -387,10 +385,8 @@ class CycleGroup(ParametericTestGroup):
             self._explicit_connections(last_name, first_name,[('theta_out', 'theta')])
 
         elif conn_type == 'implicit':
-            renames_inputs = {
-                'x': 'x_{}'.format(idx + 1),
-                'theta': 'theta_{0}'.format(idx + 1)
-            }
+            renames_inputs = {'x': 'x_{0}_{1}'.format(idx + 1, i) for i in range(self.num_var)}
+            renames_inputs['theta'] = 'theta_{0}'.format(idx + 1)
             renames_outputs = {
                 'theta_out': 'theta_0'
             }
@@ -400,30 +396,24 @@ class CycleGroup(ParametericTestGroup):
 
         self.connect('psi_comp.psi', first_name + '.psi')
         self.connect('psi_comp.psi', last_name + '.psi')
-        first_x_name = '.x'
-        if conn_type == 'implicit':
-            first_x_name += '_0'
-        self.connect('x0_comp.x', first_name + first_x_name)
 
     def _explicit_connections(self, prev_name, current_name, vars):
         for out_var, in_var in vars:
-            self.connect(
-                '{0}.{1}'.format(prev_name, out_var),
-                '{0}.{1}'.format(current_name, in_var)
-            )
+            for i in range(self.num_var):
+                self.connect(
+                    '{0}.{1}_{2}'.format(prev_name, out_var, i),
+                    '{0}.{1}_{2}'.format(current_name, in_var, i)
+                )
 
     def _add_cycle_comp(self, connection_type, comp_class, comp_name, index, comp_args):
         if connection_type == 'explicit':
             self.add_subsystem(comp_name, comp_class(**comp_args))
         elif connection_type == 'implicit':
-            renames_inputs = {
-                'theta': 'theta_{0}'.format(index),
-                'x': 'x_{0}'.format(index),
-            }
-            renames_outputs = {
-                'theta_out': 'theta_{0}'.format(index+1),
-                'y': 'x_{0}'.format(index+1),
-            }
+            renames_inputs = {'x': 'x_{0}_{1}'.format(index, i) for i in range(self.num_var)}
+            renames_inputs['theta'] = 'theta_{0}'.format(index)
+
+            renames_outputs = {'x': 'x_{0}_{1}'.format(index + 1, i) for i in range(self.num_var)}
+            renames_outputs['theta_out'] = 'theta_{0}'.format(index + 1)
 
             self.add_subsystem(comp_name, comp_class(**comp_args),
                                renames_inputs=renames_inputs,
