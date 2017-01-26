@@ -1,4 +1,4 @@
-""" Unit test for the Newton nonlinear solver. """
+"""Test the Newton nonlinear solver. """
 
 import unittest
 from six import iteritems
@@ -14,6 +14,20 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
 
 
 class TestNewton(unittest.TestCase):
+
+    def test_feature_newton_basic(self):
+        """ Feature test for slotting a Newton solver and using it to solve
+        Sellar.
+        """
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NewtonSolver()
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_sellar_grouped(self):
         # Tests basic Newton solution on Sellar in a subgroup
@@ -156,8 +170,6 @@ class TestNewton(unittest.TestCase):
         self.assertLess(prob.model.nl_solver._iter_count, 6)
 
     def test_sellar_specify_linear_solver(self):
-
-        #raise unittest.SkipTest("BUG: cannot specify subsolver")
 
         prob = Problem()
         prob.model = SellarStateConnection()
