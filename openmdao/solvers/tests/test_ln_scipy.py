@@ -8,11 +8,15 @@ import unittest
 import numpy as np
 
 from openmdao.core.group import Group
+from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.problem import Problem
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver, gmres
-from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
+from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec, \
+     TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+from openmdao.test_suite.components.simple_comps import DoubleArrayComp
+from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
      FanOut, FanOutGrouped, ConvergeDiverge, ConvergeDivergeFlat, \
      ConvergeDivergeGroups, Diamond, DiamondFlat
@@ -76,155 +80,155 @@ class TestScipyIterativeSolver(unittest.TestCase):
 
         self.assertTrue(group.ln_solver._iter_count == 2)
 
-    def test_simple_matvec(self):
-        group = Group()
-        group.add('x_param', IndepVarComp('x', 1.0), promotes=['*'])
-        group.add('mycomp', SimpleCompDerivMatVec(), promotes=['x', 'y'])
-
+    def test_feature_simple(self):
+        """Tests feature for adding a Scipy GMRES solver and calculating the
+        derivatives."""
+        # Tests derivatives on a simple comp that defines compute_jacvec.
         prob = Problem()
-        prob.root = group
-        prob.root.ln_solver = ScipyGMRES()
-        prob.setup(check=False)
-        prob.run()
+        model = prob.model = Group()
+        model.add_subsystem('x_param', IndepVarComp('length', 3.0),
+                            promotes=['length'])
+        model.add_subsystem('mycomp', TestExplCompSimpleDense(),
+                            promotes=['length', 'width', 'area'])
 
-        J = prob.calc_gradient(['x'], ['y'], mode='fwd', return_format='dict')
-        assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
+        model.ln_solver = ScipyIterativeSolver()
+        model.suppress_solver_output = True
 
-        J = prob.calc_gradient(['x'], ['y'], mode='rev', return_format='dict')
-        assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
+        prob.setup(check=False, mode='fwd')
+        prob['width'] = 2.0
+        prob.run_model()
+
+        of = ['area']
+        wrt = ['length']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
+
+    def test_simple_matvec(self):
+        # Tests derivatives on a simple comp that defines compute_jacvec.
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('x_param', IndepVarComp('length', 3.0),
+                            promotes=['length'])
+        model.add_subsystem('mycomp', TestExplCompSimpleJacVec(),
+                            promotes=['length', 'width', 'area'])
+
+        model.ln_solver = ScipyIterativeSolver()
+        model.suppress_solver_output = True
+
+        prob.setup(check=False, mode='fwd')
+        prob['width'] = 2.0
+        prob.run_model()
+
+        of = ['area']
+        wrt = ['length']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
+
+        prob.setup(check=False, mode='rev')
+        prob['width'] = 2.0
+        prob.run_model()
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
 
     def test_simple_matvec_subbed(self):
-        group = Group()
-        group.add('mycomp', SimpleCompDerivMatVec(), promotes=['x', 'y'])
-
+        # Tests derivatives on a group that contains a simple comp that
+        # defines compute_jacvec.
         prob = Problem()
-        prob.root = Group()
-        prob.root.add('x_param', IndepVarComp('x', 1.0), promotes=['*'])
-        prob.root.add('sub', group, promotes=['*'])
+        model = prob.model = Group()
+        model.add_subsystem('x_param', IndepVarComp('length', 3.0),
+                            promotes=['length'])
+        sub = model.add_subsystem('sub', Group(),
+                                  promotes=['length', 'width', 'area'])
+        sub.add_subsystem('mycomp', TestExplCompSimpleJacVec(),
+                            promotes=['length', 'width', 'area'])
 
-        prob.root.ln_solver = ScipyGMRES()
-        prob.setup(check=False)
-        prob.run()
+        model.ln_solver = ScipyIterativeSolver()
+        model.suppress_solver_output = True
 
-        J = prob.calc_gradient(['x'], ['y'], mode='fwd', return_format='dict')
-        assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
+        prob.setup(check=False, mode='fwd')
+        prob['width'] = 2.0
+        prob.run_model()
 
-        J = prob.calc_gradient(['x'], ['y'], mode='rev', return_format='dict')
-        assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
+        of = ['area']
+        wrt = ['length']
 
-        J = prob.calc_gradient(['x'], ['y'], mode='fd', return_format='dict')
-        assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
+
+        prob.setup(check=False, mode='rev')
+        prob['width'] = 2.0
+        prob.run_model()
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
 
     def test_simple_matvec_subbed_like_multipoint(self):
-        group = Group()
-        group.add('mycomp', SimpleCompDerivMatVec(), promotes=['x', 'y'])
-
+        # Tests derivatives on a group that contains a simple comp that
+        # defines compute_jacvec. For this one, the indepvarcomp is also
+        # in the subsystem.
         prob = Problem()
-        prob.root = Group()
-        prob.root.add('sub', group, promotes=['*'])
-        prob.root.sub.add('x_param', IndepVarComp('x', 1.0), promotes=['*'])
+        model = prob.model = Group()
+        sub = model.add_subsystem('sub', Group(),
+                                  promotes=['length', 'width', 'area'])
+        sub.add_subsystem('x_param', IndepVarComp('length', 3.0),
+                            promotes=['length'])
+        sub.add_subsystem('mycomp', TestExplCompSimpleJacVec(),
+                            promotes=['length', 'width', 'area'])
 
-        prob.root.ln_solver = ScipyGMRES()
-        prob.setup(check=False)
-        prob.run()
+        model.ln_solver = ScipyIterativeSolver()
+        model.suppress_solver_output = True
 
-        J = prob.calc_gradient(['x'], ['y'], mode='fwd', return_format='dict')
-        assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
+        prob.setup(check=False, mode='fwd')
+        prob['width'] = 2.0
+        prob.run_model()
 
-        J = prob.calc_gradient(['x'], ['y'], mode='rev', return_format='dict')
-        assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
+        of = ['area']
+        wrt = ['length']
 
-        J = prob.calc_gradient(['x'], ['y'], mode='fd', return_format='dict')
-        assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
 
-        J = prob.calc_gradient(['x'], ['y'], mode='fd', return_format='array')
-        assert_rel_error(self, J[0][0], 2.0, 1e-6)
+        prob.setup(check=False, mode='rev')
+        prob['width'] = 2.0
+        prob.run_model()
 
-    def test_array2D(self):
-        group = Group()
-        group.add('x_param', IndepVarComp('x', np.ones((2, 2))), promotes=['*'])
-        group.add('mycomp', ArrayComp2D(), promotes=['x', 'y'])
-
-        prob = Problem()
-        prob.root = group
-        prob.root.ln_solver = ScipyGMRES()
-        prob.setup(check=False)
-        prob.run()
-
-        J = prob.calc_gradient(['x'], ['y'], mode='fwd', return_format='dict')
-        Jbase = prob.root.mycomp._jacobian_cache
-        diff = np.linalg.norm(J['y']['x'] - Jbase['y', 'x'])
-        assert_rel_error(self, diff, 0.0, 1e-8)
-
-        J = prob.calc_gradient(['x'], ['y'], mode='rev', return_format='dict')
-        diff = np.linalg.norm(J['y']['x'] - Jbase['y', 'x'])
-        assert_rel_error(self, diff, 0.0, 1e-8)
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
 
     def test_double_arraycomp(self):
-        # Mainly testing a bug in the array return for multiple arrays
-
+        # Mainly testing an old bug in the array return for multiple arrays
         group = Group()
-        group.add('x_param1', IndepVarComp('x1', np.ones((2))), promotes=['*'])
-        group.add('x_param2', IndepVarComp('x2', np.ones((2))), promotes=['*'])
-        group.add('mycomp', DoubleArrayComp(), promotes=['*'])
+        group.add_subsystem('x_param1', IndepVarComp('x1', np.ones((2))),
+                            promotes=['x1'])
+        group.add_subsystem('x_param2', IndepVarComp('x2', np.ones((2))),
+                            promotes=['x2'])
+        group.add_subsystem('mycomp', DoubleArrayComp(),
+                            promotes=['x1', 'x2', 'y1', 'y2'])
 
         prob = Problem()
-        prob.root = group
-        prob.root.ln_solver = ScipyGMRES()
-        prob.setup(check=False)
-        prob.run()
+        model = prob.model = group
+        model.ln_solver = ScipyIterativeSolver()
+        model.suppress_solver_output = True
 
-        Jbase = group.mycomp.JJ
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
 
-        J = prob.calc_gradient(['x1', 'x2'], ['y1', 'y2'], mode='fwd',
-                               return_format='array')
-        diff = np.linalg.norm(J - Jbase)
+        Jbase = group.get_subsystem('mycomp').JJ
+        of = ['y1', 'y2']
+        wrt = ['x1', 'x2']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        diff = np.linalg.norm(J['y1', 'x1'] - Jbase[0:2, 0:2])
         assert_rel_error(self, diff, 0.0, 1e-8)
-
-        J = prob.calc_gradient(['x1', 'x2'], ['y1', 'y2'], mode='fd',
-                               return_format='array')
-        diff = np.linalg.norm(J - Jbase)
+        diff = np.linalg.norm(J['y1', 'x2'] - Jbase[0:2, 2:4])
         assert_rel_error(self, diff, 0.0, 1e-8)
-
-        J = prob.calc_gradient(['x1', 'x2'], ['y1', 'y2'], mode='rev',
-                               return_format='array')
-        diff = np.linalg.norm(J - Jbase)
+        diff = np.linalg.norm(J['y2', 'x1'] - Jbase[2:4, 0:2])
         assert_rel_error(self, diff, 0.0, 1e-8)
-
-    def test_simple_in_group_matvec(self):
-        group = Group()
-        sub = group.add('sub', Group(), promotes=['x', 'y'])
-        group.add('x_param', IndepVarComp('x', 1.0), promotes=['*'])
-        sub.add('mycomp', SimpleCompDerivMatVec(), promotes=['x', 'y'])
-
-        prob = Problem()
-        prob.root = group
-        prob.root.ln_solver = ScipyGMRES()
-        prob.setup(check=False)
-        prob.run()
-
-        J = prob.calc_gradient(['x'], ['y'], mode='fwd', return_format='dict')
-        assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
-
-        J = prob.calc_gradient(['x'], ['y'], mode='rev', return_format='dict')
-        assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
-
-    def test_simple_jac(self):
-        group = Group()
-        group.add('x_param', IndepVarComp('x', 1.0), promotes=['*'])
-        group.add('mycomp', ExecComp(['y=2.0*x']), promotes=['x', 'y'])
-
-        prob = Problem()
-        prob.root = group
-        prob.root.ln_solver = ScipyGMRES()
-        prob.setup(check=False)
-        prob.run()
-
-        J = prob.calc_gradient(['x'], ['y'], mode='fwd', return_format='dict')
-        assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
-
-        J = prob.calc_gradient(['x'], ['y'], mode='rev', return_format='dict')
-        assert_rel_error(self, J['y']['x'][0][0], 2.0, 1e-6)
+        diff = np.linalg.norm(J['y2', 'x2'] - Jbase[2:4, 2:4])
+        assert_rel_error(self, diff, 0.0, 1e-8)
 
     def test_fan_out(self):
         # Test derivatives for fan-out topology.
