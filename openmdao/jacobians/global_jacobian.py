@@ -6,7 +6,7 @@ from six.moves import range
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
-from openmdao.utils import OptionsDictionary
+from openmdao.utils.generalized_dict import OptionsDictionary
 
 
 class GlobalJacobian(Jacobian):

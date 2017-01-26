@@ -3,7 +3,7 @@ from __future__ import division
 import numpy
 from six.moves import range
 
-from openmdao.utils import OptionsDictionary
+from openmdao.utils.generalized_dict import OptionsDictionary
 
 
 class ProcAllocator(object):
