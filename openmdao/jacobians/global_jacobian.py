@@ -151,7 +151,7 @@ class GlobalJacobian(Jacobian):
                                                       out_offsets[out_idx_all],
                                                       src_indices[in_idx_all],
                                                       shape)
-                    else:
+                    elif out_idx_all != -1:  # skip unconnected inputs
                         self._ext_mtx._add_submat(key, info, re_offset,
                                                   in_offsets[in_idx_all],
                                                   None, shape)
@@ -189,7 +189,7 @@ class GlobalJacobian(Jacobian):
                     if ivar1 <= out_idx_all < ivar2:
                         self._int_mtx._update_submat(self._keymap[key],
                                                      self._subjacs[key])
-                    else:
+                    elif out_idx_all != -1:  # skip unconnected inputs
                         self._ext_mtx._update_submat(key, self._subjacs[key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
