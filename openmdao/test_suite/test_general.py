@@ -2,9 +2,10 @@
 from __future__ import print_function, division
 
 import unittest
+from six import iterkeys
+
 from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.devtools.testutil import assert_rel_error
-from six import iterkeys
 
 
 class ParameterizedTestCases(unittest.TestCase):

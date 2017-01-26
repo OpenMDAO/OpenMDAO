@@ -4,13 +4,13 @@ import itertools
 from six.moves import zip
 from six import iteritems, iterkeys, itervalues, string_types
 import collections
+from nose_parameterized import parameterized
+from unittest import SkipTest
 
 from openmdao.test_suite.groups.cycle_group import CycleGroup
 from openmdao.api import Problem
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
 from openmdao.api import GlobalJacobian, DenseMatrix, CooMatrix, CsrMatrix
-from nose_parameterized import parameterized
-from unittest import SkipTest
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector

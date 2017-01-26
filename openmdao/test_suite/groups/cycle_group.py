@@ -1,11 +1,13 @@
 """Contains test groups for cycles with easily verified values/derivatives."""
 from __future__ import print_function, division
-from openmdao.api import ExplicitComponent, IndepVarComp
-from openmdao.test_suite.groups.parametric_group import ParametericTestGroup
+from six.moves import range
 import numpy as np
+
+from openmdao.api import IndepVarComp
+from openmdao.test_suite.groups.parametric_group import ParametericTestGroup
 from openmdao.test_suite.components.cycle_comps import PSI, ExplicitCycleComp, ExplicitFirstComp,\
     ExplicitLastComp
-from six.moves import range
+
 
 
 class CycleGroup(ParametericTestGroup):
