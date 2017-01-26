@@ -35,7 +35,7 @@ def check_config(problem, logger=None):
         console.setLevel(logging.INFO)
         logger.addHandler(console)
 
-    root = problem.root
+    root = problem.model
 
     _check_hanging_inputs(problem, logger)
     _check_dataflow(root, logger)
@@ -237,7 +237,7 @@ def _check_hanging_inputs(problem, logger):
     input_src_ids = problem._assembler._input_src_ids
 
     hanging = sorted([
-        name for i, name in enumerate(abs_varname_iter(problem.root, 'input',
+        name for i, name in enumerate(abs_varname_iter(problem.model, 'input',
                                                        local=False)) if
                                                        input_src_ids[i] == -1
     ])

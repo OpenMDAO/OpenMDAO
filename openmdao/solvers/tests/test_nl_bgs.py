@@ -18,23 +18,23 @@ class TestNLBGaussSeidel(unittest.TestCase):
         # Basic sellar test.
 
         prob = Problem()
-        prob.root = SellarDerivatives()
-        prob.root.nl_solver = NonlinearBlockGS()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
 
         prob.setup(check=False)
-        prob.root.suppress_solver_output = True
-        prob.run()
+        prob.model.suppress_solver_output = True
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.root.nl_solver._iter_count, 8)
+        self.assertLess(prob.model.nl_solver._iter_count, 8)
 
         # Make sure we only call apply_linear on 'heads'
-        #nd1 = prob.root.cycle.d1.execution_count
-        #nd2 = prob.root.cycle.d2.execution_count
-        #if prob.root.cycle.d1._run_apply == True:
+        #nd1 = prob.model.cycle.d1.execution_count
+        #nd2 = prob.model.cycle.d2.execution_count
+        #if prob.model.cycle.d1._run_apply == True:
             #self.assertEqual(nd1, 2*nd2)
         #else:
             #self.assertEqual(2*nd1, nd2)
@@ -45,16 +45,16 @@ class TestNLBGaussSeidel(unittest.TestCase):
         raise unittest.SkipTest("AnalysisError not implemented yet")
 
         prob = Problem()
-        prob.root = SellarDerivatives()
-        prob.root.nl_solver = NonlinearBlockGS()
-        prob.root.nl_solver.options['maxiter'] = 2
-        prob.root.nl_solver.options['err_on_maxiter'] = True
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nl_solver.options['maxiter'] = 2
+        prob.model.nl_solver.options['err_on_maxiter'] = True
 
         prob.setup(check=False)
-        prob.root.suppress_solver_output = True
+        prob.model.suppress_solver_output = True
 
         try:
-            prob.run()
+            prob.run_model()
         except AnalysisError as err:
             self.assertEqual(str(err), "Solve in '': NLGaussSeidel FAILED to converge after 2 iterations")
         else:
@@ -79,7 +79,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
                 self.ln_solver = ScipyIterativeSolver()
 
         prob = Problem()
-        root = prob.root = Group()
+        root = prob.model = Group()
         root.nl_solver = NonlinearBlockGS()
         root.nl_solver.options['maxiter'] = 20
         root.add_subsystem('g1', SellarModified())
@@ -89,9 +89,9 @@ class TestNLBGaussSeidel(unittest.TestCase):
         root.connect('g2.y2', 'g1.x')
 
         prob.setup(check=False)
-        prob.root.suppress_solver_output = True
+        prob.model.suppress_solver_output = True
 
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
         assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
@@ -108,7 +108,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         raise unittest.SkipTest("Test specific to implementation of double-run prevention.")
 
         prob = Problem()
-        root = prob.root = Group()
+        root = prob.model = Group()
 
         sub1 = root.add_subsystem('sub1', Group())
         sub2 = root.add_subsystem('sub2', Group())
@@ -131,7 +131,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         root.ln_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
-        prob.root.suppress_solver_output = True
+        prob.model.suppress_solver_output = True
 
         # Will be True in one group and False in the other, depending on
         # where it cuts.

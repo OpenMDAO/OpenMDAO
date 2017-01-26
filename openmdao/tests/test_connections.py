@@ -4,7 +4,6 @@ import unittest
 import numpy as np
 from six import text_type, PY3
 from six.moves import cStringIO
-import warnings
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 
@@ -12,8 +11,8 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitCompone
 class TestConnections(unittest.TestCase):
 
     def setUp(self, c1units=None, c3units=None):
-        self.p = Problem(root=Group())
-        root = self.p.root
+        self.p = Problem(model=Group())
+        root = self.p.model
 
         self.G1 = root.add_subsystem("G1", Group())
         self.G2 = self.G1.add_subsystem("G2", Group())
@@ -38,15 +37,15 @@ class TestConnections(unittest.TestCase):
 
     def test_inp_inp_explicit_conn_w_src(self):
         raise unittest.SkipTest("explicit input-input connections not supported yet")
-        self.p.root.connect('G3.G4.C3.x', 'G3.G4.C4.x') # connect inputs
-        self.p.root.connect('G1.G2.C2.x', 'G3.G4.C3.x') # connect src to one of connected inputs
+        self.p.model.connect('G3.G4.C3.x', 'G3.G4.C4.x') # connect inputs
+        self.p.model.connect('G1.G2.C2.x', 'G3.G4.C3.x') # connect src to one of connected inputs
         self.p.setup(check=False)
 
         self.p['G1.G2.C2.x'] = 999.
         self.assertEqual(self.C3._inputs['x'], 0.)
         self.assertEqual(self.C4._inputs['x'], 0.)
 
-        self.p.run()
+        self.p.run_model()
         self.assertEqual(self.C3._inputs['x'], 999.)
         self.assertEqual(self.C4._inputs['x'], 999.)
 
@@ -84,15 +83,15 @@ class TestConnections(unittest.TestCase):
                 outputs['y2'] = np.sum(x2)
 
         p = Problem()
-        p.root = Group()
-        p.root.add_subsystem('src', Src())
-        p.root.add_subsystem('tgt', Tgt())
+        p.model = Group()
+        p.model.add_subsystem('src', Src())
+        p.model.add_subsystem('tgt', Tgt())
 
-        p.root.connect('src.y1', 'tgt.x1')
-        p.root.connect('src.y2', 'tgt.x2')
+        p.model.connect('src.y1', 'tgt.x1')
+        p.model.connect('src.y2', 'tgt.x2')
 
         p.setup(check=False)
-        p.run()
+        p.run_model()
 
         self.assertEqual(p['tgt.y1'], 12.0)
         self.assertEqual(p['tgt.y2'], 12.0)
@@ -141,16 +140,16 @@ class TestConnections(unittest.TestCase):
                 outputs['y3'] = np.sum(x3)
 
         top = Problem()
-        top.root = Group()
-        top.root.add_subsystem('src', Src())
-        top.root.add_subsystem('tgt', Tgt())
+        top.model = Group()
+        top.model.add_subsystem('src', Src())
+        top.model.add_subsystem('tgt', Tgt())
 
-        top.root.connect('src.y1', 'tgt.x1', src_indices=(0, 1))
-        top.root.connect('src.y2', 'tgt.x2', src_indices=(0, 1))
-        top.root.connect('src.y3', 'tgt.x3')
+        top.model.connect('src.y1', 'tgt.x1', src_indices=(0, 1))
+        top.model.connect('src.y2', 'tgt.x2', src_indices=(0, 1))
+        top.model.connect('src.y3', 'tgt.x3')
 
         top.setup(check=False)
-        top.run()
+        top.run_model()
 
         self.assertEqual(top['tgt.y1'], 6.0)
         self.assertEqual(top['tgt.y2'], 6.0)
@@ -158,14 +157,14 @@ class TestConnections(unittest.TestCase):
 
     def test_inp_inp_conn_no_src(self):
         raise unittest.SkipTest("no setup testing yet")
-        self.p.root.connect('G3.G4.C3.x', 'G3.G4.C4.x')
+        self.p.model.connect('G3.G4.C3.x', 'G3.G4.C4.x')
 
         stream = cStringIO()
         self.p.setup(out_stream=stream)
 
         self.p['G3.G4.C3.x'] = 999.
-        self.assertEqual(self.p.root.G3.G4.C3._inputs['x'], 999.)
-        self.assertEqual(self.p.root.G3.G4.C4._inputs['x'], 999.)
+        self.assertEqual(self.p.model.G3.G4.C3._inputs['x'], 999.)
+        self.assertEqual(self.p.model.G3.G4.C4._inputs['x'], 999.)
 
         content = stream.getvalue()
         self.assertTrue("The following parameters have no associated unknowns:\nG1.G2.C1.x\nG3.G4.C3.x\nG3.G4.C4.x" in content)
@@ -180,7 +179,7 @@ class TestConnections(unittest.TestCase):
         self.C3._inputs['x'] = 5.
 
         # connect two inputs
-        self.p.root.connect('G1.G2.C1.x', 'G3.G4.C3.x')
+        self.p.model.connect('G1.G2.C1.x', 'G3.G4.C3.x')
 
         try:
             self.p.setup(check=False)
@@ -199,7 +198,7 @@ class TestConnections(unittest.TestCase):
         self.setUp(c1units={'x': 'ft'}, c3units={'x': 'inch'})
 
         # connect two inputs
-        self.p.root.connect('G1.G2.C1.x', 'G3.G4.C3.x')
+        self.p.model.connect('G1.G2.C1.x', 'G3.G4.C3.x')
 
         try:
             self.p.setup(check=False)
@@ -216,7 +215,7 @@ class TestConnections(unittest.TestCase):
         self.setUp(c1units={'x': 'ft'}, c3units={'x': 'inch'})
 
         # connect two inputs
-        self.p.root.connect('G3.G4.C3.x', 'G1.G2.C1.x')
+        self.p.model.connect('G3.G4.C3.x', 'G1.G2.C1.x')
 
         try:
             self.p.setup(check=False)
@@ -229,8 +228,8 @@ class TestConnections(unittest.TestCase):
     def test_diff_conn_input_units_w_src(self):
         raise unittest.SkipTest("no compatability checking of connected inputs yet")
 
-        p = Problem(root=Group())
-        root = p.root
+        p = Problem(model=Group())
+        root = p.model
 
         num_comps = 50
 
@@ -271,8 +270,8 @@ class TestConnectionsPromoted(unittest.TestCase):
     def test_inp_inp_promoted_no_src(self):
         raise unittest.SkipTest("connected inputs w/o src not supported yet")
 
-        p = Problem(root=Group())
-        root = p.root
+        p = Problem(model=Group())
+        root = p.model
 
         G1 = root.add_subsystem("G1", Group())
         G2 = G1.add_subsystem("G2", Group())
@@ -292,8 +291,8 @@ class TestConnectionsPromoted(unittest.TestCase):
         self.assertEqual(C4._inputs['x'], 999.)
 
     def test_inp_inp_promoted_w_prom_src(self):
-        p = Problem(root=Group())
-        root = p.root
+        p = Problem(model=Group())
+        root = p.model
 
         G1 = root.add_subsystem("G1", Group(), promotes=['x'])
         G2 = G1.add_subsystem("G2", Group(), promotes=['x'])
@@ -306,21 +305,21 @@ class TestConnectionsPromoted(unittest.TestCase):
         C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0'), promotes=['x'])
 
         p.setup(check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
         # setting promoted name will set the value into the outputs, but will
-        # not propagate it to the inputs. That will happen during run().
+        # not propagate it to the inputs. That will happen during run_model().
         p['x'] = 999.
         self.assertEqual(C3._inputs['x'], 0.)
         self.assertEqual(C4._inputs['x'], 0.)
 
-        p.run()
+        p.run_model()
         self.assertEqual(C3._inputs['x'], 999.)
         self.assertEqual(C4._inputs['x'], 999.)
 
     def test_inp_inp_promoted_w_explicit_src(self):
-        p = Problem(root=Group())
-        root = p.root
+        p = Problem(model=Group())
+        root = p.model
 
         G1 = root.add_subsystem("G1", Group())
         G2 = G1.add_subsystem("G2", Group(), promotes=['x'])
@@ -332,24 +331,24 @@ class TestConnectionsPromoted(unittest.TestCase):
         C3 = G4.add_subsystem("C3", ExecComp('y=x*2.0'), promotes=['x'])
         C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0'), promotes=['x'])
 
-        p.root.connect('G1.x', 'G3.x')
+        p.model.connect('G1.x', 'G3.x')
         p.setup(check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
         # setting promoted name will set the value into the outputs, but will
-        # not propagate it to the inputs. That will happen during run().
+        # not propagate it to the inputs. That will happen during run_model().
         p['G1.x'] = 999.
         self.assertEqual(C3._inputs['x'], 0.)
         self.assertEqual(C4._inputs['x'], 0.)
 
-        p.run()
+        p.run_model()
         self.assertEqual(C3._inputs['x'], 999.)
         self.assertEqual(C4._inputs['x'], 999.)
 
     def test_unit_conv_message(self):
         raise unittest.SkipTest("no units yet")
-        prob = Problem(root=Group())
-        root = prob.root
+        prob = Problem(model=Group())
+        root = prob.model
 
         root.add_subsystem("C1", ExecComp('y=x*2.0', units={'x':'ft'}), promotes=['x'])
         root.add_subsystem("C2", ExecComp('y=x*2.0', units={'x':'inch'}), promotes=['x'])
@@ -365,8 +364,8 @@ class TestConnectionsPromoted(unittest.TestCase):
 
         # Remedy the problem with an Indepvarcomp
 
-        prob = Problem(root=Group())
-        root = prob.root
+        prob = Problem(model=Group())
+        root = prob.model
 
         root.add_subsystem("C1", ExecComp('y=x*2.0', units={'x':'ft'}), promotes=['x'])
         root.add_subsystem("C2", ExecComp('y=x*2.0', units={'x':'inch'}), promotes=['x'])
@@ -379,8 +378,8 @@ class TestConnectionsPromoted(unittest.TestCase):
 #class TestUBCS(unittest.TestCase):
 
     #def test_ubcs(self):
-        #p = Problem(root=Group())
-        #root = p.root
+        #p = Problem(model=Group())
+        #root = p.model
         #root._ln_solver = ScipyGMRES()
 
         #self.P1 = root.add_subsystem("P1", IndepVarComp('x', 1.0))
@@ -411,7 +410,7 @@ class TestConnectionsPromoted(unittest.TestCase):
         #self.assertEqual(ubcs, ['C1.x2'])
         #self.assertEqual(tgts, set(['C1']))
 
-        #p.run()
+        #p.run_model()
 
         ## TODO: for now, we've just decided to force component devs to give proper initial
         ## values for their outputs.  If later we decide to use push scatters or some other
@@ -433,7 +432,7 @@ class TestConnectionsPromoted(unittest.TestCase):
     #def test_setup(self):
         #top = Problem()
 
-        #root = top.root = Group()
+        #root = top.model = Group()
 
         #root.add_subsystem('src1', IndepVarComp('x', 0.0, units='m'))
         #root.add_subsystem('sink1', Sink1())
@@ -454,7 +453,7 @@ class TestConnectionsPromoted(unittest.TestCase):
     #def test_src_indices_as_float_array_fails(self):
         #top = Problem()
 
-        #root = top.root = Group()
+        #root = top.model = Group()
 
         #root.add_subsystem('src1', IndepVarComp('x', np.zeros(5,), units='m'))
         #root.add_subsystem('sink1', Sink1())
@@ -465,7 +464,7 @@ class TestConnectionsPromoted(unittest.TestCase):
     #def test_src_indices_as_int_array_passes(self):
         #top = Problem()
 
-        #root = top.root = Group()
+        #root = top.model = Group()
 
         #root.add_subsystem('src1', IndepVarComp('x', np.zeros(5,), units='m'))
         #root.add_subsystem('sink1', Sink1())
@@ -478,7 +477,7 @@ class TestConnectionsPromoted(unittest.TestCase):
     #def test_src_indices_as_float_list_fails(self):
         #top = Problem()
 
-        #root = top.root = Group()
+        #root = top.model = Group()
 
         #root.add_subsystem('src1', IndepVarComp('x', np.zeros(5,), units='m'))
         #root.add_subsystem('sink1', Sink1())
@@ -489,7 +488,7 @@ class TestConnectionsPromoted(unittest.TestCase):
     #def test_src_indices_as_int_array_passes(self):
         #top = Problem()
 
-        #root = top.root = Group()
+        #root = top.model = Group()
 
         #root.add_subsystem('src1', IndepVarComp('x', np.zeros(5,), units='m'))
         #root.add_subsystem('sink1', Sink1())

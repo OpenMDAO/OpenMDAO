@@ -27,7 +27,7 @@ class TestBacktrackingLineSearch(unittest.TestCase):
     def test_newton_with_backtracking(self):
 
         top = Problem()
-        root = top.root = Group()
+        root = top.model = Group()
         root.add_subsystem('comp', ImplCompOneState())
         root.add_subsystem('p', IndepVarComp('x', 1.2278849186466743))
         root.connect('p.y', 'comp.x')
@@ -42,7 +42,7 @@ class TestBacktrackingLineSearch(unittest.TestCase):
 
         top.setup(check=False)
         top['comp.y'] = 1.0
-        top.run()
+        top.run_model()
 
         # This tests that Newton can converge with the line search
         assert_rel_error(self, top['comp.y'], .3968459, .0001)
@@ -52,15 +52,15 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
 
     def setUp(self):
         top = Problem()
-        top.root = Group()
-        top.root.add_subsystem('px', IndepVarComp('x', 1.0))
-        top.root.add_subsystem('comp', ImplCompTwoStates())
-        top.root.connect('px.x', 'comp.x')
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
+        top.model.add_subsystem('comp', ImplCompTwoStates())
+        top.model.connect('px.x', 'comp.x')
 
-        top.root.nl_solver = NewtonSolver()
-        top.root.nl_solver.options['maxiter'] = 10
-        top.root.ln_solver = ScipyIterativeSolver()
-        top.root.nl_solver.set_subsolver('linear', top.root.ln_solver)
+        top.model.nl_solver = NewtonSolver()
+        top.model.nl_solver.options['maxiter'] = 10
+        top.model.ln_solver = ScipyIterativeSolver()
+        top.model.nl_solver.set_subsolver('linear', top.model.ln_solver)
 
         top.setup(check=False)
 
@@ -71,20 +71,20 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
 
         # Run without a line search at x=2.0
         top['px.x'] = 2.0
-        top.run()
+        top.run_model()
         assert_rel_error(self, top['comp.y'], 4.666666, 1e-4)
         assert_rel_error(self, top['comp.z'], 1.333333, 1e-4)
 
         # Run without a line search at x=0.5
         top['px.x'] = 0.5
-        top.run()
+        top.run_model()
         assert_rel_error(self, top['comp.y'], 5.833333, 1e-4)
         assert_rel_error(self, top['comp.z'], 2.666666, 1e-4)
 
     def test_linesearch_bounds_vector(self):
         top = self.top
 
-        ls = top.root.nl_solver.set_subsolver(
+        ls = top.model.nl_solver.set_subsolver(
             'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='vector'))
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
@@ -93,20 +93,20 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
-        top.run()
+        top.run_model()
         assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
 
         # Test upper bound: should go to the upper bound and stall
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
-        top.run()
+        top.run_model()
         assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
 
     def test_linesearch_bounds_wall(self):
         top = self.top
 
-        ls = top.root.nl_solver.set_subsolver(
+        ls = top.model.nl_solver.set_subsolver(
             'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='wall'))
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
@@ -115,20 +115,20 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
-        top.run()
+        top.run_model()
         assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
 
         # Test upper bound: should go to the upper bound and stall
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
-        top.run()
+        top.run_model()
         assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
 
     def test_linesearch_bounds_scalar(self):
         top = self.top
 
-        ls = top.root.nl_solver.set_subsolver(
+        ls = top.model.nl_solver.set_subsolver(
             'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='scalar'))
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
@@ -137,14 +137,14 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
-        top.run()
+        top.run_model()
         self.assertTrue(1.5 <= top['comp.z'] <= 1.6)
 
         # Test lower bound: should stop just short of the upper bound
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
-        top.run()
+        top.run_model()
         self.assertTrue(2.4 <= top['comp.z'] <= 2.5)
 
 
@@ -152,15 +152,15 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
 
     def setUp(self):
         top = Problem()
-        top.root = Group()
-        top.root.add_subsystem('px', IndepVarComp('x', numpy.ones((3,1))))
-        top.root.add_subsystem('comp', ImplCompTwoStatesArrays())
-        top.root.connect('px.x', 'comp.x')
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', numpy.ones((3,1))))
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
+        top.model.connect('px.x', 'comp.x')
 
-        top.root.nl_solver = NewtonSolver()
-        top.root.nl_solver.options['maxiter'] = 10
-        top.root.ln_solver = ScipyIterativeSolver()
-        top.root.nl_solver.set_subsolver('linear', top.root.ln_solver)
+        top.model.nl_solver = NewtonSolver()
+        top.model.nl_solver.options['maxiter'] = 10
+        top.model.ln_solver = ScipyIterativeSolver()
+        top.model.nl_solver.set_subsolver('linear', top.model.ln_solver)
 
         top.setup(check=False)
 
@@ -172,14 +172,14 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
 
         # Run without a line search at x=2.0
         top['px.x'] = 2.0
-        top.run()
+        top.run_model()
         for ind in range(3):
             assert_rel_error(self, top['comp.y'][ind], 4.666666, 1e-4)
             assert_rel_error(self, top['comp.z'][ind], 1.333333, 1e-4)
 
         # Run without a line search at x=0.5
         top['px.x'] = 0.5
-        top.run()
+        top.run_model()
         for ind in range(3):
             assert_rel_error(self, top['comp.y'][ind], 5.833333, 1e-4)
             assert_rel_error(self, top['comp.z'][ind], 2.666666, 1e-4)
@@ -187,7 +187,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
 
-        ls = top.root.nl_solver.set_subsolver(
+        ls = top.model.nl_solver.set_subsolver(
             'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='vector'))
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
@@ -196,7 +196,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
-        top.run()
+        top.run_model()
         for ind in range(3):
             assert_rel_error(self, top['comp.z'][ind], 1.5, 1e-8)
 
@@ -204,14 +204,14 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
-        top.run()
+        top.run_model()
         for ind in range(3):
             assert_rel_error(self, top['comp.z'][ind], 2.5, 1e-8)
 
     def test_linesearch_wall_bound_enforcement(self):
         top = self.top
 
-        ls = top.root.nl_solver.set_subsolver(
+        ls = top.model.nl_solver.set_subsolver(
             'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='wall'))
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
@@ -220,7 +220,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
-        top.run()
+        top.run_model()
         for ind in range(3):
             print('jjohn',ind, top['comp.z'], self.ub[ind])
             assert_rel_error(self, top['comp.z'][ind], 1.5, 1e-8)
@@ -229,14 +229,14 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
-        top.run()
+        top.run_model()
         for ind in range(3):
             assert_rel_error(self, top['comp.z'][ind], self.ub[ind], 1e-8)
 
     def test_linesearch_wall_bound_enforcement(self):
         top = self.top
 
-        ls = top.root.nl_solver.set_subsolver(
+        ls = top.model.nl_solver.set_subsolver(
             'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='scalar'))
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
@@ -245,7 +245,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
-        top.run()
+        top.run_model()
         for ind in range(3):
             self.assertTrue(1.5 <= top['comp.z'][ind] <= 1.6)
 
@@ -253,7 +253,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
-        top.run()
+        top.run_model()
         for ind in range(3):
             self.assertTrue(2.4 <= top['comp.z'][ind] <= self.ub[ind])
 

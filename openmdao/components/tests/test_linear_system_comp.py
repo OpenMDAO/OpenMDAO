@@ -12,23 +12,23 @@ class TestLinearSystem(unittest.TestCase):
 
     def setUp(self):
         """Set up a problem with a 3x3 linear system."""
-        root = Group()
+        model = Group()
 
         x = np.array([1, 2, -3])
         A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
         b = A.dot(x)
         b_T = A.T.dot(x)
 
-        root.add_subsystem('p1', IndepVarComp('A', A))
-        root.add_subsystem('p2', IndepVarComp('b', b))
+        model.add_subsystem('p1', IndepVarComp('A', A))
+        model.add_subsystem('p2', IndepVarComp('b', b))
 
-        lingrp = root.add_subsystem('lingrp', Group(), promotes=['*'])
+        lingrp = model.add_subsystem('lingrp', Group(), promotes=['*'])
         lingrp.add_subsystem('lin', LinearSystemComp(size=3))
 
-        root.connect('p1.A', 'lin.A')
-        root.connect('p2.b', 'lin.b')
+        model.connect('p1.A', 'lin.A')
+        model.connect('p2.b', 'lin.b')
 
-        prob = Problem(root)
+        prob = Problem(model)
         prob.setup()
 
         self.prob = prob
@@ -40,22 +40,22 @@ class TestLinearSystem(unittest.TestCase):
         """Check against the scipy solver."""
         prob = self.prob
 
-        lingrp = prob.root.get_system('lingrp')
+        lingrp = prob.model.get_subsystem('lingrp')
         lingrp.ln_solver = ScipyIterativeSolver()
 
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['lin.x'], self.x, .0001)
-        assert_rel_error(self, prob.root._residuals.get_norm(), 0.0, 1e-10)
+        assert_rel_error(self, prob.model._residuals.get_norm(), 0.0, 1e-10)
 
     def test_linear_system_solve_linear(self):
         """Check against solve_linear."""
         prob = self.prob
 
-        lingrp = prob.root.get_system('lingrp')
+        lingrp = prob.model.get_subsystem('lingrp')
         lingrp.ln_solver = ScipyIterativeSolver()
 
-        prob.run()
+        prob.run_model()
 
         # Forward mode with RHS of self.b
         lingrp._vectors['residual']['linear']['lin.x'] = self.b

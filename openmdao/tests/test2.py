@@ -4,6 +4,11 @@ import unittest
 
 from openmdao.api import Problem, ExplicitComponent, Group, DefaultVector
 
+try:
+    from openmdao.parallel_api import PETScVector
+except ImportError:
+    PETScVector = None
+
 # Systems: R > C1, C2, C3, C4
 # Variables: v1, v2, v3, v4; all depend on each other
 
@@ -58,7 +63,7 @@ class TestNumpyVec(unittest.TestCase):
     def setUp(self):
         group = GroupG()
         self.p = Problem(group).setup(DefaultVector)
-        self.p.root._mpi_proc_allocator.parallel = True
+        self.p.model._mpi_proc_allocator.parallel = True
 
     def assertEqualArrays(self, a, b):
         self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
@@ -68,7 +73,7 @@ class TestNumpyVec(unittest.TestCase):
             self.assertEqualArrays(a, b)
 
     def test__var_allprocs_names(self):
-        root = self.p.root
+        root = self.p.model
         names = root._var_allprocs_names['output']
         self.assertEqual(names, ['v1', 'v2', 'v3', 'v4'])
 
@@ -85,13 +90,13 @@ class TestNumpyVec(unittest.TestCase):
         self.assertEqualArrays(set_indices, array)
 
     def test_transfer(self):
-        root = self.p.root
+        root = self.p.model
 
         if root.comm.size == 1:
-            comp1 = root.get_system('C1')
-            comp2 = root.get_system('C2')
-            comp3 = root.get_system('C3')
-            comp4 = root.get_system('C4')
+            comp1 = root.get_subsystem('C1')
+            comp2 = root.get_subsystem('C2')
+            comp3 = root.get_subsystem('C3')
+            comp4 = root.get_subsystem('C4')
 
             comp1._outputs['v1'] = 2.0
             comp2._outputs['v2'] = 4.0
@@ -145,19 +150,13 @@ class TestNumpyVec(unittest.TestCase):
             ])
 
 
-try:
-    from openmdao.parallel_api import PETScVector
-except ImportError:
-    PETScVector = None
-
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestPetscVec(TestNumpyVec):
 
     def setUp(self):
-        if PETScVector is None:
-            raise unittest.SkipTest("PETSc not found")
         group = GroupG()
         self.p = Problem(group).setup(PETScVector)
-        self.p.root._mpi_proc_allocator.parallel = True
+        self.p.model._mpi_proc_allocator.parallel = True
 
 
 if __name__ == '__main__':
