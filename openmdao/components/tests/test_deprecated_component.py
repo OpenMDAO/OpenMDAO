@@ -43,18 +43,18 @@ class TestComp(Component):
 
 class DepCompTestCase(unittest.TestCase):
 
-    def test_run(self):
+    def test_run_model(self):
         group = Group()
         group.add_subsystem('sys1', IndepVarComp('x', val=4.))
         group.add_subsystem('sys2', IndepVarComp('y', val=3.))
         group.add_subsystem('sys3', TestComp())
 
         p = Problem()
-        p.root = group
+        p.model = group
         p.setup(check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
-        p.run()
+        p.run_model()
 
         assert_rel_error(self, p['sys3.z1'], 8., 1e-10)
         assert_rel_error(self, p['sys3.z2'], 24, 1e-10)
@@ -66,16 +66,16 @@ class DepCompTestCase(unittest.TestCase):
         group.add_subsystem('sys3', TestComp())
 
         p = Problem()
-        p.root = group
-        p.root.nl_solver = NewtonSolver(
+        p.model = group
+        p.model.nl_solver = NewtonSolver(
             subsolvers={'linear': ScipyIterativeSolver()})
         p.setup(check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
-        #p.root.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
-        #print(p.root.jacobian._int_mtx._matrix)
+        #p.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        #print(p.model.jacobian._int_mtx._matrix)
 
-        p.run()
+        p.run_model()
 
         assert_rel_error(self, p['sys3.z1'], 8., 1e-10)
         assert_rel_error(self, p['sys3.z2'], 24, 1e-10)

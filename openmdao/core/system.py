@@ -411,10 +411,13 @@ class System(object):
 
         # Compute scaling arrays for inputs using a0 and a1
         for ind, meta in enumerate(self._var_myproc_metadata['input']):
+            global_ind = self._var_myproc_indices['input'][ind]
             self._scaling_to_phys['input'][ind, 0] = \
-                convert_units(src_0[ind], src_units[ind], meta['units'])
+                convert_units(src_0[global_ind], src_units[global_ind],
+                              meta['units'])
             self._scaling_to_phys['input'][ind, 1] = \
-                convert_units(src_1[ind], src_units[ind], meta['units'])
+                convert_units(src_1[global_ind], src_units[global_ind],
+                              meta['units'])
 
         for ind, meta in enumerate(self._var_myproc_metadata['output']):
             # Compute scaling arrays for outputs; no unit conversion needed
@@ -808,7 +811,7 @@ class System(object):
         """
         pass
 
-    def get_system(self, name):
+    def get_subsystem(self, name):
         """Return the system called 'name' in the current namespace.
 
         Args
@@ -819,19 +822,26 @@ class System(object):
         Returns
         -------
         System or None
-            System if found on this proc else None.
+            System if found else None.
         """
-        # TODO: Addition of name here is a hack until self.pathname can be
-        # determined in real time during construction.
-        if name == self.pathname or name == self.name:
-            # If this system's name matches, target found
-            return self
-        else:
+        idot = name.find('.')
+
+        # If name does not contain '.', only check the immediate children
+        if idot == -1:
             for subsys in self._subsystems_allprocs:
-                result = subsys.get_system(name)
-                if result is not None:
-                    return result
-            return None
+                if subsys.name == name:
+                    return subsys
+        # If name does contain at least one '.', we have to recurse (possibly).
+        else:
+            sub_name = name[:idot]
+            for subsys in self._subsystems_allprocs:
+                # We only check if the prefix matches, and with the prefix removed.
+                if subsys.name == sub_name:
+                    result = subsys.get_subsystem(name[idot + 1:])
+                    if result:
+                        return result
+
+        return None
 
     def initialize(self):
         """Optional user-defined method run once during instantiation.

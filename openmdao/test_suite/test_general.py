@@ -14,7 +14,8 @@ class ParameterizedTestCases(unittest.TestCase):
     def test_openmdao(self, test):
         test.setup()
         problem = test.problem
-        root = problem.root
+
+        root = problem.model
 
         expected_values = root.expected_values
         if expected_values:
@@ -38,14 +39,14 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
     def test_subset(self, param_instance):
         param_instance.setup()
         problem = param_instance.problem
-        root = problem.root
+        model = problem.model
 
-        expected_values = root.expected_values
+        expected_values = model.expected_values
         if expected_values:
             actual = {key: problem[key] for key in iterkeys(expected_values)}
             assert_rel_error(self, actual, expected_values, 1e-8)
 
-        expected_totals = root.expected_totals
+        expected_totals = model.expected_totals
         if expected_totals:
             # Forward Derivatives Check
             totals = param_instance.compute_totals('fwd')

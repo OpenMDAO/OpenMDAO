@@ -36,14 +36,14 @@ class TestScaling(unittest.TestCase):
         prob = Problem(group)
 
         prob.setup(check=False)
-        prob.root.suppress_solver_output = True
+        prob.model.suppress_solver_output = True
 
         prob['sys1.old_length'] = 3.e5
         self.assertAlmostEqual(prob['sys1.old_length'], 3.e5)
-        self.assertAlmostEqual(prob.root._outputs['sys1.old_length'], 3.)
-        prob.run()
+        self.assertAlmostEqual(prob.model._outputs['sys1.old_length'], 3.)
+        prob.run_model()
         self.assertAlmostEqual(prob['sys2.new_length'], 3.e-1)
-        self.assertAlmostEqual(prob.root._outputs['sys2.new_length'], 3.)
+        self.assertAlmostEqual(prob.model._outputs['sys2.new_length'], 3.)
 
 
 if __name__ == '__main__':

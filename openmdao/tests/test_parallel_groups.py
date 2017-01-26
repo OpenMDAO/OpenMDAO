@@ -17,20 +17,17 @@ from openmdao.test_suite.groups.parallel_groups import \
 from openmdao.devtools.testutil import assert_rel_error
 
 
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2
-
-    def setUp(self):
-        if PETScVector is None:
-            raise unittest.SkipTest("PETSc is required.")
 
     def test_fan_out_grouped(self):
 
         prob = Problem(FanOutGrouped())
         prob.setup(vector_class=PETScVector, check=False)
-        prob.root.suppress_solver_output = True
-        prob.run()
+        prob.model.suppress_solver_output = True
+        prob.run_model()
 
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
@@ -38,20 +35,20 @@ class TestParallelGroups(unittest.TestCase):
     def test_fan_in_grouped(self):
 
         prob = Problem()
-        prob.root = FanInGrouped()
+        prob.model = FanInGrouped()
         prob.setup(vector_class=PETScVector, check=False)
-        prob.root.suppress_solver_output = True
-        prob.run()
+        prob.model.suppress_solver_output = True
+        prob.run_model()
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
     def test_diamond(self):
 
         prob = Problem()
-        prob.root = Diamond()
+        prob.model = Diamond()
         prob.setup(vector_class=PETScVector, check=False)
-        prob.root.suppress_solver_output = True
-        prob.run()
+        prob.model.suppress_solver_output = True
+        prob.run_model()
 
         assert_rel_error(self, prob['c4.y1'], 46.0, 1e-6)
         assert_rel_error(self, prob['c4.y2'], -93.0, 1e-6)
@@ -59,10 +56,10 @@ class TestParallelGroups(unittest.TestCase):
     def test_converge_diverge(self):
 
         prob = Problem()
-        prob.root = ConvergeDiverge()
+        prob.model = ConvergeDiverge()
         prob.setup(vector_class=PETScVector, check=False)
-        prob.root.suppress_solver_output = True
-        prob.run()
+        prob.model.suppress_solver_output = True
+        prob.run_model()
 
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 

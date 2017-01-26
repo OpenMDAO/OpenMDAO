@@ -19,19 +19,19 @@ class TestNewton(unittest.TestCase):
         # Tests basic Newton solution on Sellar in a subgroup
 
         prob = Problem()
-        prob.root = SellarDerivativesGrouped()
-        mda = [s for s in prob.root._subsystems_allprocs if s.name == 'mda'][0]
+        prob.model = SellarDerivativesGrouped()
+        mda = [s for s in prob.model._subsystems_allprocs if s.name == 'mda'][0]
         mda.nl_solver = NewtonSolver()
 
         prob.setup(check=False)
-        prob.root.suppress_solver_output = True
-        prob.run()
+        prob.model.suppress_solver_output = True
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.root.nl_solver._iter_count, 8)
+        self.assertLess(prob.model.nl_solver._iter_count, 8)
 
     def test_sellar(self):
         # Just tests Newton on Sellar with FD derivs.
@@ -39,17 +39,17 @@ class TestNewton(unittest.TestCase):
         raise unittest.SkipTest("FD not implemented yet")
 
         prob = Problem()
-        prob.root = SellarNoDerivatives()
-        prob.root.nl_solver = NewtonSolver()
+        prob.model = SellarNoDerivatives()
+        prob.model.nl_solver = NewtonSolver()
 
         prob.setup(check=False)
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.root.nl_solver.iter_count, 8)
+        self.assertLess(prob.model.nl_solver.iter_count, 8)
 
     def test_sellar_analysis_error(self):
         # Make sure analysis error is raised.
@@ -57,15 +57,15 @@ class TestNewton(unittest.TestCase):
         raise unittest.SkipTest("AnalysisError not implemented yet")
 
         prob = Problem()
-        prob.root = SellarNoDerivatives()
-        prob.root.nl_solver = Newton()
-        prob.root.nl_solver.options['err_on_maxiter'] = True
-        prob.root.nl_solver.options['maxiter'] = 2
+        prob.model = SellarNoDerivatives()
+        prob.model.nl_solver = Newton()
+        prob.model.nl_solver.options['err_on_maxiter'] = True
+        prob.model.nl_solver.options['maxiter'] = 2
 
         prob.setup(check=False)
 
         try:
-            prob.run()
+            prob.run_model()
         except AnalysisError as err:
             self.assertEqual(str(err), "Solve in '': Newton FAILED to converge after 2 iterations")
         else:
@@ -77,23 +77,23 @@ class TestNewton(unittest.TestCase):
         # on the head component behind the cycle break.
 
         prob = Problem()
-        prob.root = SellarDerivatives()
-        prob.root.nl_solver = NewtonSolver()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NewtonSolver()
 
         prob.setup(check=False)
-        prob.root.suppress_solver_output = True
-        prob.run()
+        prob.model.suppress_solver_output = True
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.root.nl_solver._iter_count, 8)
+        self.assertLess(prob.model.nl_solver._iter_count, 8)
 
         ## Make sure we only call apply_linear on 'heads'
-        #nd1 = prob.root.d1.execution_count
-        #nd2 = prob.root.d2.execution_count
-        #if prob.root.d1._run_apply == True:
+        #nd1 = prob.model.d1.execution_count
+        #nd2 = prob.model.d2.execution_count
+        #if prob.model.d1._run_apply == True:
             #self.assertEqual(nd1, 2*nd2)
         #else:
             #self.assertEqual(2*nd1, nd2)
@@ -101,36 +101,36 @@ class TestNewton(unittest.TestCase):
     def test_sellar_derivs_with_Lin_GS(self):
 
         prob = Problem()
-        prob.root = SellarDerivatives()
-        prob.root.nl_solver = NewtonSolver()
-        prob.root.ln_solver = LinearBlockGS()
-        prob.root.ln_solver.options['maxiter'] = 2
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NewtonSolver()
+        prob.model.ln_solver = LinearBlockGS()
+        prob.model.ln_solver.options['maxiter'] = 2
 
         prob.setup(check=False)
-        prob.root.suppress_solver_output = True
-        prob.run()
+        prob.model.suppress_solver_output = True
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         ## Make sure we aren't iterating like crazy
-        self.assertLess(prob.root.nl_solver._iter_count, 8)
+        self.assertLess(prob.model.nl_solver._iter_count, 8)
 
     def test_sellar_state_connection(self):
         # Sellar model closes loop with state connection instead of a cycle.
 
         prob = Problem()
-        prob.root = SellarStateConnection()
-        prob.root.nl_solver = NewtonSolver()
-        prob.root.suppress_solver_output = True
+        prob.model = SellarStateConnection()
+        prob.model.nl_solver = NewtonSolver()
+        prob.model.suppress_solver_output = True
         prob.setup(check=False)
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
         ## Make sure we aren't iterating like crazy
-        self.assertLess(prob.root.nl_solver._iter_count, 8)
+        self.assertLess(prob.model.nl_solver._iter_count, 8)
 
     def test_sellar_state_connection_fd_system(self):
         # Sellar model closes loop with state connection instead of a cycle.
@@ -139,50 +139,50 @@ class TestNewton(unittest.TestCase):
         raise unittest.SkipTest("FD not implemented yet")
 
         prob = Problem()
-        prob.root = SellarStateConnection()
-        prob.root.nl_solver = NewtonSolver()
+        prob.model = SellarStateConnection()
+        prob.model.nl_solver = NewtonSolver()
 
         # TODO - Specify FD for group.
-        #prob.root.deriv_options['type'] = 'fd'
+        #prob.model.deriv_options['type'] = 'fd'
 
         prob.setup(check=False)
-        prob.root.suppress_solver_output = True
-        prob.run()
+        prob.model.suppress_solver_output = True
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
         ## Make sure we aren't iterating like crazy
-        self.assertLess(prob.root.nl_solver._iter_count, 6)
+        self.assertLess(prob.model.nl_solver._iter_count, 6)
 
     def test_sellar_specify_linear_solver(self):
 
         raise unittest.SkipTest("BUG: cannot specify subsolver")
 
         prob = Problem()
-        prob.root = SellarStateConnection()
-        prob.root.nl_solver = NewtonSolver()
+        prob.model = SellarStateConnection()
+        prob.model.nl_solver = NewtonSolver()
 
         # Use bad settings for this one so that problem doesn't converge.
         # That way, we test that we are really using Newton's Lin Solver
         # instead.
-        prob.root.ln_solver = ScipyIterativeSolver()
-        prob.root.ln_solver.options['maxiter'] = 1
+        prob.model.ln_solver = ScipyIterativeSolver()
+        prob.model.ln_solver.options['maxiter'] = 1
 
         # The good solver
-        prob.root.nl_solver.options['subsolvers']['linear'] = ScipyIterativeSolver()
+        prob.model.nl_solver.options['subsolvers']['linear'] = ScipyIterativeSolver()
 
-        prob.root.suppress_solver_output = True
+        prob.model.suppress_solver_output = True
         prob.setup(check=False)
-        prob.run()
+        prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
         ## Make sure we aren't iterating like crazy
-        self.assertLess(prob.root.nl_solver._iter_count, 8)
-        self.assertEqual(prob.root.ln_solver._iter_count, 0)
-        self.assertGreater(prob.root.nl_solver.options['subsolvers']['linear']._iter_count, 0)
+        self.assertLess(prob.model.nl_solver._iter_count, 8)
+        self.assertEqual(prob.model.ln_solver._iter_count, 0)
+        self.assertGreater(prob.model.nl_solver.options['subsolvers']['linear']._iter_count, 0)
 
     def test_implicit_utol(self):
         # We are setup for reach utol termination condition quite quickly.
@@ -225,22 +225,22 @@ class TestNewton(unittest.TestCase):
                 J[('z', 'x')] = 1.0*1e15
 
         prob = Problem()
-        root = prob.root = Group()
+        root = prob.model = Group()
         root.add_subsystem('comp', CubicImplicit())
         root.add_subsystem('p1', IndepVarComp('x', 17.4))
         root.connect('p1.x', 'comp.x')
 
-        prob.root.nl_solver = NewtonSolver()
-        prob.root.ln_solver = ScipyIterativeSolver()
+        prob.model.nl_solver = NewtonSolver()
+        prob.model.ln_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
         prob['comp.z'] = -4.93191510182
 
-        prob.root.suppress_solver_output = True
-        prob.run()
+        prob.model.suppress_solver_output = True
+        prob.run_model()
 
         assert_rel_error(self, prob['comp.z'], -4.93191510182, .00001)
-        self.assertLessEqual(prob.root.nl_solver._iter_count, 4,
+        self.assertLessEqual(prob.model.nl_solver._iter_count, 4,
                              msg='Should get there pretty quick because of utol.')
 
 

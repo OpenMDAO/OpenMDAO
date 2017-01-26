@@ -21,10 +21,8 @@ from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.devtools.testutil import assert_rel_error
 
 
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestPetscKSP(unittest.TestCase):
-    def setUp(self):
-        if PETScVector is None:
-            raise unittest.SkipTest("PETSc is required.")
 
     def test_options(self):
         """Verify that the PetscKSP specific options are declared."""
@@ -41,7 +39,7 @@ class TestPetscKSP(unittest.TestCase):
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
         # forward
         group._vectors['residual']['linear'].set_const(1.0)
@@ -69,7 +67,7 @@ class TestPetscKSP(unittest.TestCase):
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
         # forward
         group._vectors['residual']['linear'].set_const(1.0)
@@ -95,7 +93,7 @@ class TestPetscKSP(unittest.TestCase):
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
         # forward
         group._vectors['residual']['linear'].set_const(1.0)
@@ -119,7 +117,7 @@ class TestPetscKSP(unittest.TestCase):
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
-        p.root.suppress_solver_output = True
+        p.model.suppress_solver_output = True
 
         # forward
         group._vectors['residual']['linear'].set_const(1.0)

@@ -150,11 +150,39 @@ class SellarDerivatives(Group):
         self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
         self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                     z=np.array([0.0, 0.0]), x=0.0),
-                 promotes=['obj', 'x', 'z', 'y1', 'y2'])
+                           z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        self.nl_solver = NonlinearBlockGS()
+        self.ln_solver = ScipyIterativeSolver()
+
+
+class SellarDerivativesConnected(Group):
+    """ Group containing the Sellar MDA. This version uses the disciplines
+    with derivatives."""
+
+    def __init__(self):
+        super(SellarDerivativesConnected, self).__init__()
+
+        self.add_subsystem('px', IndepVarComp('x', 1.0))
+        self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
+
+        self.add_subsystem('d1', SellarDis1withDerivatives())
+        self.add_subsystem('d2', SellarDis2withDerivatives())
+
+        self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                           z=np.array([0.0, 0.0]), x=0.0))
+
+        self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'))
+        self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'))
+
+        self.connect('px.x', ['d1.x', 'obj_cmp.x'])
+        self.connect('pz.z', ['d1.z', 'd2.z', 'obj_cmp.z'])
+        self.connect('d1.y1', ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1'])
+        self.connect('d2.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
 
         self.nl_solver = NonlinearBlockGS()
         self.ln_solver = ScipyIterativeSolver()

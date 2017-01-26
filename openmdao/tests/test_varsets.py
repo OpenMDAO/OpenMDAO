@@ -33,7 +33,7 @@ class TestVarSets(unittest.TestCase):
         self.p_no_varsets = p
 
     def test_apply_linear(self):
-        root = self.p.root
+        root = self.p.model
         root._vectors['output']['linear'].set_const(1.0)
         root._apply_linear(['linear'], 'fwd')
         output = root._vectors['residual']['linear']._data
@@ -41,7 +41,7 @@ class TestVarSets(unittest.TestCase):
         assert_rel_error(self, output[1], [3, 6, 3, 6], 1e-15)
 
         # for no varsets, number should be the same, but reordered
-        root = self.p_no_varsets.root
+        root = self.p_no_varsets.model
 
         root._vectors['output']['linear'].set_const(1.0)
         root._apply_linear(['linear'], 'fwd')
@@ -51,7 +51,7 @@ class TestVarSets(unittest.TestCase):
                                  for i,j in self.p._assembler._variable_set_indices['output']])
         assert_rel_error(self, output_novs, expected, 1e-15)
 
-        root = self.p.root
+        root = self.p.model
         root._vectors['residual']['linear'].set_const(1.0)
         root._apply_linear(['linear'], 'rev')
         output = root._vectors['output']['linear']._data
@@ -59,7 +59,7 @@ class TestVarSets(unittest.TestCase):
         assert_rel_error(self, output[1], [3, 6, 3, 6], 1e-15)
 
         # for no varsets, number should be the same, but reordered
-        root = self.p_no_varsets.root
+        root = self.p_no_varsets.model
         root._vectors['residual']['linear'].set_const(1.0)
         root._apply_linear(['linear'], 'rev')
         output_novs = root._vectors['output']['linear']._data
@@ -68,7 +68,7 @@ class TestVarSets(unittest.TestCase):
         assert_rel_error(self, output_novs, expected, 1e-15)
 
     def test_solve_linear(self):
-        root = self.p.root
+        root = self.p.model
         root._vectors['residual']['linear'].set_const(1.0)
         root._vectors['output']['linear'].set_const(0.0)
         root._solve_linear(['linear'], 'fwd')
@@ -77,7 +77,7 @@ class TestVarSets(unittest.TestCase):
         assert_rel_error(self, output[1], root.expected_solution[1], 1e-15)
 
         # now try without varsets for comparison
-        root = self.p_no_varsets.root
+        root = self.p_no_varsets.model
         root._vectors['residual']['linear'].set_const(1.0)
         root._vectors['output']['linear'].set_const(0.0)
         root._solve_linear(['linear'], 'fwd')
@@ -86,7 +86,7 @@ class TestVarSets(unittest.TestCase):
                                  for i,j in self.p._assembler._variable_set_indices['output']])
         assert_rel_error(self, output_novs, expected, 1e-15)
 
-        root = self.p.root
+        root = self.p.model
         root._vectors['output']['linear'].set_const(1.0)
         root._vectors['residual']['linear'].set_const(0.0)
         root._solve_linear(['linear'], 'rev')
@@ -95,7 +95,7 @@ class TestVarSets(unittest.TestCase):
         assert_rel_error(self, output[1], root.expected_solution[1], 1e-15)
 
         # now try without varsets for comparison
-        root = self.p_no_varsets.root
+        root = self.p_no_varsets.model
         root._vectors['output']['linear'].set_const(1.0)
         root._vectors['residual']['linear'].set_const(0.0)
         root._solve_linear(['linear'], 'rev')
