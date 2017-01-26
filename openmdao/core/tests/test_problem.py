@@ -45,7 +45,7 @@ class TestProblem(unittest.TestCase):
 
     def test_feature_set_indeps(self):
         prob = Problem()
-        root = prob.root = Group()
+        root = prob.model = Group()
         root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -102,6 +102,7 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
 
+    # @unittest.skip("check_total_derivatives not implemented yet")
     def test_feature_check_total_derivatives_manual(self):
         raise unittest.SkipTest("check_total_derivatives not implemented yet")
 
@@ -119,8 +120,8 @@ class TestProblem(unittest.TestCase):
         # TODO: Need to devlop the group FD/CS api, so user can control how this
         #       happens by chaninging settings on the root node
 
+    # @unittest.skip("check_total_derivatives not implemented yet")
     def test_feature_check_total_derivatives_from_driver(self):
-
         raise unittest.SkipTest("check_total_derivatives not implemented yet")
 
         prob = Problem()
@@ -148,6 +149,7 @@ class TestProblem(unittest.TestCase):
         # TODO: need a decorator to capture this output and put it into the doc,
         #       or maybe just a new kind of assert?
 
+    # @unittest.skip("drivers not implemented yet")
     def test_feature_run_driver(self):
         raise unittest.SkipTest("drivers not implemented yet")
 
@@ -173,7 +175,7 @@ class TestProblem(unittest.TestCase):
         self.assert_rel_error(self, prob['z'], [1.977639, 0.000000], 1e-6)
         self.assert_rel_error(self, prob['obj'], 3.18339, 1e-6)
 
-    def test_feature_simple_promoted_sellar_set_get_outputs(self):
+    def test_feature_promoted_sellar_set_get_outputs(self):
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -188,7 +190,7 @@ class TestProblem(unittest.TestCase):
 
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
 
-    def test_feature_simple_not_promoted_sellar_set_get_outputs(self):
+    def test_feature_not_promoted_sellar_set_get_outputs(self):
 
         prob = Problem()
         prob.model = SellarDerivativesConnected()
@@ -203,8 +205,10 @@ class TestProblem(unittest.TestCase):
 
         assert_rel_error(self, prob['d1.y1'], 27.3049178437, 1e-6)
 
-    def test_feature_simple_promoted_sellar_set_get_inputs(self):
+    # @unittest.skip("set/get inputs via full path name not supported yet")
+    def test_feature_promoted_sellar_set_get_inputs(self):
         raise unittest.SkipTest("set/get inputs via full path name not supported yet")
+
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -222,7 +226,7 @@ class TestProblem(unittest.TestCase):
         # the connected input variable, referenced by the absolute path
         assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
 
-    def test_feature_set_get(self):
+    def test_feature_set_get_array(self):
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nl_solver = NonlinearBlockGS()
@@ -237,6 +241,8 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['z'], [5.0, 2.0], 1e-6)
         prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
         assert_rel_error(self, prob['z'], [1.5, 1.5], 1e-6)
+        prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
+        assert_rel_error(self, prob['z'], (1.5, 1.5), 1e-6)
 
         prob.run_model()
         assert_rel_error(self, prob['y1'], 5.43379016853, 1e-6)
@@ -248,6 +254,24 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['y1'], 9.87161739688, 1e-6)
         assert_rel_error(self, prob['y2'], 8.14191301549, 1e-6)
+
+    # @unittest.skip('residualss accessor on Problem not implemented yet')
+    def test_feature_residuals(self):
+        raise unittest.SkipTest('residualss accessor on Problem not implemented yet')
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        prob.setup()
+
+        # default value from the class definition
+
+        prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
+        prob.run_model()
+
+        self.assertLess(prob.residuals['y1'], 1e-6)
+        self.assertLess(prob.residuals['y2'], 1e-6)
 
     def test_setup_bad_mode(self):
         # Test error message when passing bad mode to setup.
