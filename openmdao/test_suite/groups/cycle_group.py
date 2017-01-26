@@ -278,7 +278,7 @@ class CycleGroup(ParametericTestGroup):
             'connection_type': ['implicit', 'explicit'],
             'partial_type': ['array', 'sparse', 'aij'],
             'num_comp': [3, 2],
-            'num_var': [2, 1],
+            'num_var': [3, 1],
             'var_shape': [(2, 3), (3,), (4, 2)],
         })
 

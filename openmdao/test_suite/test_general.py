@@ -34,7 +34,7 @@ from six import iterkeys
 
 class ParameterizedTestCasesSubset(unittest.TestCase):
     """Duplicating some testing to demonstrate filters."""
-    @parametric_suite(jacobian_type='*', num_comp=[2, 5, 10], partial_type='aij')
+    @parametric_suite(jacobian_type='sparse-csr', num_comp=[2, 5, 10], partial_type='*')
     def test_subset(self, param_instance):
         param_instance.setup()
         problem = param_instance.problem
