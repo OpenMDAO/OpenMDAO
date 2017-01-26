@@ -1,7 +1,7 @@
 """Contains test groups for cycles with easily verified values/derivatives."""
 from __future__ import print_function, division
 from openmdao.api import ExplicitComponent, IndepVarComp
-from openmdao.test_suite.groups.group import ParametericTestGroup
+from openmdao.test_suite.groups.parametric_group import ParametericTestGroup
 import numpy as np
 import scipy.sparse as sparse
 from six.moves import range
@@ -349,23 +349,24 @@ class CycleGroup(ParametericTestGroup):
     def _generate_components(self, conn_type, first_class, middle_class, last_class, num_comp):
         first_name = 'first'
         last_name = 'last'
+        var_shape = self.metadata['var_shape']
+        num_var = self.metadata['num_var']
         comp_args = {
-            'var_shape': self.metadata['var_shape'],
-            'num_var': self.metadata['num_var'],
+            'var_shape': var_shape,
+            'num_var': num_var,
             'jacobian_type': self.metadata['jacobian_type'],
             'partial_type': self.metadata['partial_type']
         }
 
         self.add_subsystem('psi_comp', IndepVarComp('psi', PSI))
+        self.add_subsystem('x0_comp', IndepVarComp([('x_{0}'.format(i), np.ones(var_shape)) for i in range(num_var)]))
 
         self._add_cycle_comp(conn_type, first_class, first_name, 0, comp_args)
         prev_name = first_name
         idx = 0
 
-        connection_variables = (
-            ('y', 'x'),
-            ('theta_out', 'theta')
-        )
+        connection_variables = [('y_{0}'.format(i), 'x_{0}'.format(i)) for i in range(num_var)]
+        connection_variables.append(('theta_out', 'theta'))
 
         # Middle Subsystems
         for idx in range(1, num_comp - 1):
@@ -382,10 +383,10 @@ class CycleGroup(ParametericTestGroup):
             self.add_subsystem(last_name, last_class(**comp_args))
 
             self._explicit_connections(prev_name, last_name, connection_variables)
-            self._explicit_connections(last_name, first_name,[('theta_out', 'theta')])
+            self._explicit_connections(last_name, first_name, [('theta_out', 'theta')])
 
         elif conn_type == 'implicit':
-            renames_inputs = {'x': 'x_{0}_{1}'.format(idx + 1, i) for i in range(self.num_var)}
+            renames_inputs = {'x_{0}'.format(i): 'x_{0}_{1}'.format(idx + 1, i) for i in range(self.num_var)}
             renames_inputs['theta'] = 'theta_{0}'.format(idx + 1)
             renames_outputs = {
                 'theta_out': 'theta_0'
@@ -396,23 +397,29 @@ class CycleGroup(ParametericTestGroup):
 
         self.connect('psi_comp.psi', first_name + '.psi')
         self.connect('psi_comp.psi', last_name + '.psi')
+        if conn_type == 'explicit':
+            var_name = first_name + '.x_{0}'
+        else:
+            var_name = 'x_0_{0}'
+        for i in range(num_var):
+            self.connect('x0_comp.x_{0}'.format(i), var_name.format(i))
 
     def _explicit_connections(self, prev_name, current_name, vars):
         for out_var, in_var in vars:
-            for i in range(self.num_var):
-                self.connect(
-                    '{0}.{1}_{2}'.format(prev_name, out_var, i),
-                    '{0}.{1}_{2}'.format(current_name, in_var, i)
-                )
+            self.connect(
+                '{0}.{1}'.format(prev_name, out_var),
+                '{0}.{1}'.format(current_name, in_var)
+            )
 
     def _add_cycle_comp(self, connection_type, comp_class, comp_name, index, comp_args):
         if connection_type == 'explicit':
             self.add_subsystem(comp_name, comp_class(**comp_args))
         elif connection_type == 'implicit':
-            renames_inputs = {'x': 'x_{0}_{1}'.format(index, i) for i in range(self.num_var)}
+
+            renames_inputs = {'x_{0}'.format(i): 'x_{0}_{1}'.format(index, i) for i in range(self.num_var)}
             renames_inputs['theta'] = 'theta_{0}'.format(index)
 
-            renames_outputs = {'x': 'x_{0}_{1}'.format(index + 1, i) for i in range(self.num_var)}
+            renames_outputs = {'y_{0}'.format(i): 'x_{0}_{1}'.format(index + 1, i) for i in range(self.num_var)}
             renames_outputs['theta_out'] = 'theta_{0}'.format(index + 1)
 
             self.add_subsystem(comp_name, comp_class(**comp_args),

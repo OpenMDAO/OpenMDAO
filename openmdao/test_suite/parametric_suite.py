@@ -87,7 +87,7 @@ def _cartesian_dict_product(dicts):
 
 def _test_name(testcase_fun, param_num, params):
     return '_'.join([
-        'test',
+        'ptest',
         str(params.args[0]),
     ])
 
