@@ -88,7 +88,7 @@ class Jacobian(object):
 
         This should only be called when self._system is a Component or
         key parts are all outputs.  If the key contains an input name, that
-        will not be unique in a Group context.
+        may not be unique in a Group context.
 
         Args
         ----

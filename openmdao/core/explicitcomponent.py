@@ -5,6 +5,7 @@ from __future__ import division
 import collections
 
 import numpy
+from scipy.sparse import coo_matrix, csr_matrix
 from six import string_types
 
 from openmdao.core.component import Component
@@ -123,9 +124,87 @@ class ExplicitComponent(Component):
             elif mode == 'rev':
                 d_residuals.set_vec(d_outputs)
 
+    def _setup_variables(self, recurse=False):
+        """Assemble variable metadata and names lists.
+
+        Sets the following attributes:
+            _var_allprocs_names
+            _var_myproc_names
+            _var_myproc_metadata
+
+        Args
+        ----
+        recurse : boolean
+            Ignored.
+        """
+        super(ExplicitComponent, self)._setup_variables(False)
+
+        # for i, out_name in enumerate(self._var_myproc_names['output']):
+        #    meta = self._var_myproc_metadata['output'][i]
+        #    size = numpy.prod(meta['shape'])
+        #    arange = numpy.arange(size)
+        #    self.declare_partial_derivs(out_name, out_name,
+        #                                val=[numpy.ones(size), arange, arange])
+
+    def _negate_jac(self):
+        """Negate this component's part of the jacobian."""
+        for out_name in self._var_myproc_names['output']:
+            for in_name in self._var_myproc_names['input']:
+                if (out_name, in_name) in self._jacobian:
+                    self._jacobian._negate((out_name, in_name))
+
+    def declare_partial_derivs(self, of, wrt, dependent=True,
+                               rows=None, cols=None, val=None):
+        """Store subjacobian metadata for later use.
+
+        Args
+        ----
+        of : str or list of str
+            The name of the residual(s) that derivatives are being computed for.
+            May also contain a glob pattern.
+        wrt : str or list of str
+            The name of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+        dependent : bool(True)
+            If False, specifies no dependence between the output(s) and the
+            input(s). This is only necessary in the case of a sparse global
+            jacobian, because if 'dependent=False' is not specified and
+            set_subjac_info is not called for a given pair, then a dense
+            matrix of zeros will be allocated in the sparse global jacobian
+            for that pair.  In the case of a dense global jacobian it doesn't
+            matter because the space for a dense subjac will always be
+            allocated for every pair.
+        rows : ndarray of int or None
+            Row indices for each nonzero entry.  For sparse subjacobians only.
+        cols : ndarray of int or None
+            Column indices for each nonzero entry.  For sparse subjacobians only.
+        val : float or ndarray of float
+            Value of subjacobian.  If rows and cols are not None, this will
+            contain the values found at each (row, col) location in the subjac.
+
+        """
+        # negate the value so it'll be the right sign later when we negate it prior to
+        # calling compute_jacobian
+        if val is None:
+            pass
+        elif isinstance(val, numpy.ndarray):
+            val = -val
+        elif isinstance(val, (coo_matrix, csr_matrix)):
+            val.data *= -1.0  # DOK not supported
+        elif isinstance(val, list) and len(val) == 3:
+            val[0] *= -1.0
+        else:
+            raise ValueError("Invalid subjacobian value of type %s for vars %s" %
+                             (type(val), (of, wrt)))
+
+        super(ExplicitComponent, self).declare_partial_derivs(of, wrt, dependent, rows, cols, val)
+
     def _linearize(self):
         """Compute jacobian / factorization."""
         self._jacobian._system = self
+
+        self._negate_jac()
 
         self._inputs.scale(self._scaling_to_phys['input'])
         self._outputs.scale(self._scaling_to_phys['output'])
@@ -141,10 +220,7 @@ class ExplicitComponent(Component):
             arange = numpy.arange(size)
             self._jacobian[out_name, out_name] = (ones, arange, arange)
 
-        for out_name in self._var_myproc_names['output']:
-            for in_name in self._var_myproc_names['input']:
-                if (out_name, in_name) in self._jacobian:
-                    self._jacobian._negate((out_name, in_name))
+        self._negate_jac()
 
         if self._jacobian._top_name == self.pathname:
             self._jacobian._update()
