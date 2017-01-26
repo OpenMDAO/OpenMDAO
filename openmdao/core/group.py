@@ -188,6 +188,7 @@ class Group(System):
                 in iteritems(self._var_connections):
 
             # throw an exception if either output or input doesn't exist
+            # or if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
             if out_name not in allprocs_out_names:
                 raise NameError("Output '%s' does not exist for connection "
@@ -198,6 +199,11 @@ class Group(System):
                 raise NameError("Input '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." % (in_name, self.name
                                 if self.name else 'model', out_name, in_name))
+
+            if out_name.rsplit('.', 1)[0] == in_name.rsplit('.', 1)[0]:
+                raise RuntimeError("Input and output are in the same System for " +
+                                   "connection in '%s' from '%s' to '%s'." %
+                                   (self.name if self.name else 'model', out_name, in_name))
 
             for in_index, name in enumerate(allprocs_in_names):
                 if name == in_name:
@@ -220,10 +226,9 @@ class Group(System):
                             meta['indices'] = np.array(src_indices,
                                                           dtype=int)
 
-                        # set src_indices to None to avoid unnecessary
-                        # repeat of setting indices and shape metadata
-                        # when we have multiple inputs promoted to the same
-                        # name.
+                        # set src_indices to None to avoid unnecessary repeat
+                        # of setting indices and shape metadata when we have
+                        # multiple inputs promoted to the same name.
                         src_indices = None
 
         self._var_connections_indices = pairs

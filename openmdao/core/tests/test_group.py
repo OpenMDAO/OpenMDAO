@@ -104,7 +104,7 @@ class TestConnect(unittest.TestCase):
               "in 'sub' from 'y' to 'tgt.x'."
 
         with self.assertRaisesRegexp(RuntimeError, msg):
-            self.prob.setup(check=False)
+            prob.setup(check=False)
 
 
 if __name__ == "__main__":
