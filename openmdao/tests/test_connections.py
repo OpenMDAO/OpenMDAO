@@ -4,7 +4,6 @@ import unittest
 import numpy as np
 from six import text_type, PY3
 from six.moves import cStringIO
-import warnings
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 
