@@ -216,7 +216,7 @@ class GlobalJacobian(Jacobian):
             d_outputs.iadd_data(int_mtx._prod(d_residuals.get_data(), mode))
             d_inputs.iadd_data(ext_mtx._prod(d_residuals.get_data(), mode))
 
-    def _set_subjac_info(self, key, meta):
+    def _set_partal_deriv_meta(self, key, meta):
         """Store subjacobian metadata.
 
         Args

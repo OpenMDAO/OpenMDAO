@@ -773,7 +773,7 @@ class System(object):
                 self._jacobian._assembler = self._assembler
 
             # set info from our _subjacs_info
-            self._set_subjac_infos()
+            self._set_partial_deriv_meta()
 
         for subsys in self._subsystems_myproc:
             subsys._set_jacobian(jacobian, False)
@@ -782,7 +782,7 @@ class System(object):
             self._jacobian._system = self
             self._jacobian._initialize()
 
-    def _set_subjac_infos(self):
+    def _set_partial_deriv_meta(self):
         """Set subjacobian info into our jacobian.
 
         Overridden in <Component>.

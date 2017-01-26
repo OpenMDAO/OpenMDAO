@@ -149,7 +149,7 @@ class ExplicitComponent(Component):
         if self._jacobian._top_name == self.pathname:
             self._jacobian._update()
 
-    def _set_subjac_infos(self):
+    def _set_partial_deriv_meta(self):
         """Set subjacobian info into our jacobian."""
         for out_name in self._var_myproc_names['output']:
             size = numpy.prod(self._var2meta[out_name]['shape'])
@@ -158,7 +158,7 @@ class ExplicitComponent(Component):
                                         rows=arange, cols=arange,
                                         val=numpy.ones(size))
 
-        super(ExplicitComponent, self)._set_subjac_infos()
+        super(ExplicitComponent, self)._set_partial_deriv_meta()
 
     def compute(self, inputs, outputs):
         """Compute outputs given inputs.
