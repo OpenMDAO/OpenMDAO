@@ -49,5 +49,11 @@ class CsrMatrix(CooMatrix):
 
         # data array for the CSR should be the same as for the COO since
         # it was already in sorted order.
-        self._matrix = coo_matrix((data, (rows, cols)),
-                                  shape=(num_rows, num_cols)).tocsr()
+        coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
+        self._matrix = coo.tocsr()
+
+        # make sure data size is the same between coo and csr, else indexing is
+        # messed up
+        if coo.data.size != self._matrix.data.size:
+            raise ValueError("CSR matrix data contains duplicate row/col entries. "
+                             "This would break internal indexing.")
