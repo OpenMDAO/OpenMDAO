@@ -153,17 +153,26 @@ def inverted_csr(arr):
     return inverted_coo(arr).tocsr()
 
 
+def _test_func_name(func, num, param):
+    args = []
+    for p in param.args:
+        if isinstance(p, bool):
+            args.append(str(p))
+        else:
+            args.append(p.__name__)
+    return 'test_jacobian_src_indices_' + '_'.join(args)
+
 class TestJacobian(unittest.TestCase):
 
     @parameterized.expand(itertools.product(
         [DenseMatrix, CsrMatrix, CooMatrix],
-        [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist]
-        ), testcase_func_name=
-            lambda func, num, param: 'test_jacobian_src_indices_' + '_'.join(p.__name__ for p in param.args)
+        [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist],
+        [False, True]
+        ), testcase_func_name=_test_func_name
     )
-    def test_src_indices(self, matrix_class, comp_jac_class):
+    def test_src_indices(self, matrix_class, comp_jac_class, nested):
 
-        self._setup_model(matrix_class, comp_jac_class)
+        self._setup_model(matrix_class, comp_jac_class, nested)
 
         # if we multiply our jacobian (at x,y = ones) by our work vec of 1's,
         # we get fwd_check
@@ -176,28 +185,33 @@ class TestJacobian(unittest.TestCase):
         self._check_fwd(self.prob, fwd_check)
         self._check_rev(self.prob, rev_check)
 
-    def _setup_model(self, mat_class, comp_jac_class):
+    def _setup_model(self, mat_class, comp_jac_class, nested):
         self.prob = prob = Problem(model=Group())
-        prob.model.add_subsystem('indep',
-                                IndepVarComp((
-                                    ('a', np.ones(3)),
-                                    ('b', np.ones(2)),
-                                )))
-        C1 = prob.model.add_subsystem('C1', MyExplicitComp(comp_jac_class))
-        C2 = prob.model.add_subsystem('C2', MyExplicitComp2(comp_jac_class))
-        prob.model.connect('indep.a', 'C1.x', src_indices=[2,0])
-        prob.model.connect('indep.b', 'C1.y')
-        prob.model.connect('indep.a', 'C2.w', src_indices=[0,2,1])
-        prob.model.connect('C1.f', 'C2.z', src_indices=[1])
+        if nested:
+            top = prob.model.add_subsystem('G1', Group())
+        else:
+            top = prob.model
+
+        top.add_subsystem('indep',
+                          IndepVarComp((
+                              ('a', np.ones(3)),
+                              ('b', np.ones(2)),
+                          )))
+        C1 = top.add_subsystem('C1', MyExplicitComp(comp_jac_class))
+        C2 = top.add_subsystem('C2', MyExplicitComp2(comp_jac_class))
+        top.connect('indep.a', 'C1.x', src_indices=[2,0])
+        top.connect('indep.b', 'C1.y')
+        top.connect('indep.a', 'C2.w', src_indices=[0,2,1])
+        top.connect('C1.f', 'C2.z', src_indices=[1])
 
         prob.setup(check=False)
-        prob.model.jacobian = GlobalJacobian(matrix_class=mat_class)
-        prob.model.nl_solver = NewtonSolver(
+        top.jacobian = GlobalJacobian(matrix_class=mat_class)
+        top.nl_solver = NewtonSolver(
             subsolvers={'linear': ScipyIterativeSolver(
                 maxiter=100,
             )}
         )
-        prob.model.ln_solver = ScipyIterativeSolver(
+        top.ln_solver = ScipyIterativeSolver(
             maxiter=200, atol=1e-10, rtol=1e-10)
         prob.model.suppress_solver_output = True
 
