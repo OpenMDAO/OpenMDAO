@@ -147,7 +147,8 @@ class ExplicitComponent(Component):
                                         val=numpy.ones(size))
 
         # a GlobalJacobian will not have been set at this point, so this will
-        # negate values in the DefaultJacobian
+        # negate values in the DefaultJacobian. These will later be copied
+        # into the GlobalJacobian (if one is set).
         self._negate_jac()
 
     def _negate_jac(self):
@@ -163,6 +164,7 @@ class ExplicitComponent(Component):
         """Compute jacobian / factorization."""
         self._jacobian._system = self
 
+        # negate the negated jacobian back to normal
         self._negate_jac()
 
         self._inputs.scale(self._scaling_to_phys['input'])
@@ -173,12 +175,7 @@ class ExplicitComponent(Component):
         self._inputs.scale(self._scaling_to_norm['input'])
         self._outputs.scale(self._scaling_to_norm['output'])
 
-        #for out_name in self._var_myproc_names['output']:
-            #size = len(self._outputs._views_flat[out_name])
-            #ones = numpy.ones(size)
-            #arange = numpy.arange(size)
-            #self._jacobian[out_name, out_name] = (ones, arange, arange)
-
+        # re-negate the jacobian
         self._negate_jac()
 
         if self._jacobian._top_name == self.pathname:
@@ -190,8 +187,8 @@ class ExplicitComponent(Component):
         self._jacobian._system = self
 
         for key, meta, typ in self._iter_partial_deriv_matches():
-            negate = typ == 'input'
-            self._jacobian._set_partal_deriv_meta(key, meta, negate)
+            # only negate d_output/d_input partials
+            self._jacobian._set_partal_deriv_meta(key, meta, typ == 'input')
 
         self._jacobian._system = oldsys
 

@@ -81,12 +81,6 @@ class Jacobian(object):
         out_name, in_name = key
         return (numpy.prod(self._system._var2meta[out_name]['shape']),
                 numpy.prod(self._system._var2meta[in_name]['shape']))
-        #if in_name in self._system._inputs:
-            #in_size = self._system._inputs._views_flat[in_name].size
-        #else:
-            #in_size = self._system._outputs[in_name].size
-
-        #return self._system._outputs._views_flat[out_name].size, in_size
 
     def _key2unique(self, key):
         """Map output-input local name pair to a unique key.
@@ -315,7 +309,7 @@ class Jacobian(object):
         meta : dict
             Metadata dictionary for the subjacobian.
         negate : bool
-             If True negate the given value (if any).
+            If True negate the given value, if any.
         """
         self._subjacs_info[self._key2unique(key)] = (meta, self._key2shape(key))
 
@@ -328,7 +322,12 @@ class Jacobian(object):
             self.__setitem__(key, val)
 
     def _copy_from(self, jac):
-        """
+        """Copy the subjac contents of the given jacobian into self.
+
+        Args
+        ----
+        jac : Jacobian
+            The jacobian to be copied.
         """
         old_subjacs = jac._subjacs_info
         for key in old_subjacs:

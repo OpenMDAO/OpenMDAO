@@ -150,6 +150,7 @@ class Component(System):
                 self._subjacs_info.append((of, wrt, meta))
 
     def _iter_partial_deriv_matches(self):
+        """Generate all (of, wrt) name pairs to add to jacobian."""
         outs = self._var_allprocs_names['output']
         ins = self._var_allprocs_names['input']
         tvlists = (('output', outs), ('input', ins))
@@ -187,15 +188,15 @@ class Component(System):
         """
         super(Component, self)._setup_variables(False)
 
+        # set up absolute path info
         self._var_pathdict = {}
         self._var_name2path = {}
         for typ in ['input', 'output']:
-            self._var_allprocs_pathnames[typ] = [
-                '.'.join((self.pathname, n)) for n in
-                    self._var_allprocs_names[typ]
-            ]
-            for idx, name in enumerate(self._var_allprocs_names[typ]):
-                path = self._var_allprocs_pathnames[typ][idx]
+            names = self._var_allprocs_names[typ]
+            self._var_allprocs_pathnames[typ] = paths = [
+                '.'.join((self.pathname, n)) for n in names]
+            for idx, name in enumerate(names):
+                path = paths[idx]
                 self._var_pathdict[path] = PathData(name, idx, typ)
                 self._var_name2path[name] = (path,)
 
