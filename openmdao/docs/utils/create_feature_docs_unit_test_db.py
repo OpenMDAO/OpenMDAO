@@ -43,6 +43,7 @@ import unittest
 
 from numpydoc.docscrape import NumpyDocString, Reader, ParseError
 from numpydoc.docscrape_sphinx import SphinxDocString
+from openmdao.docs.config_params import IGNORE_LIST
 
 
 # The results of this script will be stored in a sqlite database file
@@ -224,29 +225,33 @@ cur.execute("CREATE TABLE {tn}(method_path TEXT, feature TEXT, title TEXT, \
                 unit_test_source TEXT, run_outputs TEXT)".format(tn=table_name))
 
 # Search for all the unit tests
-test_loader = unittest.TestLoader()
-suite = test_loader.discover('..', pattern="test_*.py")
+suites = []
+for listing in os.listdir(".."):
+    if os.path.isdir(os.path.join("..", listing)):
+        if listing not in IGNORE_LIST:
+            suites.append(unittest.TestLoader().discover(os.path.join('..', listing), pattern="test_*.py"))
 
-for test_file in suite:  # Loop through the TestCases found
-    for test_case in test_file:  # Loop though the test methods in the TestCases
-        if isinstance(test_case, unittest.suite.TestSuite):
-            for test_method in test_case:
-                cls = test_method.__class__
-                module_path = cls.__module__
-                class_name = cls.__name__
-                method_name = test_method._testMethodName
-                method_path = '.'.join([module_path, class_name, method_name])
-                test_doc = getattr(cls, method_name).__doc__
-                if test_doc:
-                    test_doc_numpy = NumpyDocString(test_doc)
-                    if test_doc_numpy['Features']:
-                        for feature in [f.strip() for f in test_doc_numpy['Features']]:
-                            title = test_doc_numpy['Summary'][0]
-                            unit_test_source, run_outputs = \
-                                get_unit_test_source_and_run_outputs(method_path)
-                            cur.execute(
-                                'insert into {tn} values (?,?,?,?,?)'.format(tn=table_name),
-                                (method_path, feature, title, unit_test_source, run_outputs))
+for suite in suites:
+    for test_file in suite:  # Loop through the TestCases found
+        for test_case in test_file:  # Loop though the test methods in the TestCases
+            if isinstance(test_case, unittest.suite.TestSuite):
+                for test_method in test_case:
+                    cls = test_method.__class__
+                    module_path = cls.__module__
+                    class_name = cls.__name__
+                    method_name = test_method._testMethodName
+                    method_path = '.'.join([module_path, class_name, method_name])
+                    test_doc = getattr(cls, method_name).__doc__
+                    if test_doc:
+                        test_doc_numpy = NumpyDocString(test_doc)
+                        if test_doc_numpy['Features']:
+                            for feature in [f.strip() for f in test_doc_numpy['Features']]:
+                                title = test_doc_numpy['Summary'][0]
+                                unit_test_source, run_outputs = \
+                                    get_unit_test_source_and_run_outputs(method_path)
+                                cur.execute(
+                                    'insert into {tn} values (?,?,?,?,?)'.format(tn=table_name),
+                                    (method_path, feature, title, unit_test_source, run_outputs))
 
 conn.commit()
 conn.close()
