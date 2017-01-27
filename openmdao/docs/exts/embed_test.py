@@ -30,14 +30,19 @@ class EmbedTestDirective(Directive):
         method_path = self.arguments[0]
 
         # grabbing source, and output of a test segment
-        (src, output) = get_unit_test_source_and_run_outputs(method_path)
+        (src, output, skipped) = get_unit_test_source_and_run_outputs(method_path)
 
         # we want the body of test code to be formatted and code highlighted
         body = nodes.literal_block(src, src)
         body['language'] = 'python'
 
         # we want the output block to also be formatted similarly
-        output_node = nodes.literal_block(output, output)
+        if skipped:
+            output = "Test skipped because " + output
+            # from sphinx.addnodes import seealso
+            output_node = nodes.literal_block(output, output)
+        else:
+            output_node = nodes.literal_block(output, output)
 
         # put the nodes we've created in the list, and return them
         doc_nodes.append(body)
