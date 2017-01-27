@@ -193,16 +193,32 @@ class Group(System):
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
             if out_name not in allprocs_out_names:
-                raise NameError("Output '%s' does not exist for connection "
-                                "in '%s' from '%s' to '%s'." %
-                                (out_name, self.name if self.name else 'model',
-                                 out_name, in_name))
+                found = False
+                sys, name = out_name.rsplit('.', 1)
+                for subsys in self._subsystems_allprocs:
+                    for map_name, prom_name in iteritems(subsys._var_maps['output']):
+                        if name == prom_name:
+                            found = True
+                            break
+                if not found:
+                    raise NameError("Output '%s' does not exist for connection "
+                                    "in '%s' from '%s' to '%s'." %
+                                    (out_name, self.name if self.name else 'model',
+                                     out_name, in_name))
 
             if in_name not in allprocs_in_names:
-                raise NameError("Input '%s' does not exist for connection "
-                                "in '%s' from '%s' to '%s'." %
-                                (in_name, self.name if self.name else 'model',
-                                 out_name, in_name))
+                found = False
+                sys, name = in_name.rsplit('.', 1)
+                for subsys in self._subsystems_allprocs:
+                    for map_name, prom_name in iteritems(subsys._var_maps['input']):
+                        if name == prom_name:
+                            found = True
+                            break
+                if not found:
+                    raise NameError("Input '%s' does not exist for connection "
+                                    "in '%s' from '%s' to '%s'." %
+                                    (in_name, self.name if self.name else 'model',
+                                     out_name, in_name))
 
             # throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -210,7 +226,7 @@ class Group(System):
                 # output var is promoted from a subsys, figure out which one
                 out_subsys = None
                 for subsys in self._subsystems_allprocs:
-                    for name, prom_name in subsys._var_maps['output'].items():
+                    for name, prom_name in iteritems(subsys._var_maps['output']):
                         if out_name == prom_name:
                             out_subsys = subsys.name
                             break
@@ -221,7 +237,7 @@ class Group(System):
                 # input var is promoted from a subsys, figure out which one
                 in_subsys = None
                 for subsys in self._subsystems_allprocs:
-                    for name, prom_name in subsys._var_maps['input'].items():
+                    for name, prom_name in iteritems(subsys._var_maps['input']):
                         if in_name == prom_name:
                             in_subsys = subsys.name
                             break
