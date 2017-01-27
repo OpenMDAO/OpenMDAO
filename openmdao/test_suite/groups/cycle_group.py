@@ -91,9 +91,9 @@ def _cycle_comp_setup_jacobian(component, angle_param):
         # match their type (data values don't matter, only structure).
         # Otherwise, we assume they are dense and we'll get an error later
         # when we assign a subjac with a type that doesn't match.
-        component.declare_partial_derivs('y', 'x', **_array2kwargs(component, A))
-        component.declare_partial_derivs('y', angle_param, **_array2kwargs(component, dA_x))
-        component.declare_partial_derivs('theta_out', 'theta', **_array2kwargs(component, dtheta))
+        component.declare_partials('y', 'x', **_array2kwargs(component, A))
+        component.declare_partials('y', angle_param, **_array2kwargs(component, dA_x))
+        component.declare_partials('theta_out', 'theta', **_array2kwargs(component, dtheta))
 
 def _cycle_comp_jacvec(component, inputs, outputs, d_inputs, d_outputs, mode, angle_param):
     if component.metadata['jacobian_type'] == 'matvec':
@@ -257,9 +257,9 @@ class ExplicitLastComp(ExplicitComponent):
         self._n = 0
 
         if self.metadata['jacobian_type'] != 'matvec':
-            self.declare_partial_derivs('x_norm2', 'x',
+            self.declare_partials('x_norm2', 'x',
                                         **_array2kwargs(self, np.ones((N,))))
-            self.declare_partial_derivs('theta_out', ['theta', 'psi'],
+            self.declare_partials('theta_out', ['theta', 'psi'],
                                         **_array2kwargs(self, np.array([1.])))
 
     def compute(self, inputs, outputs):

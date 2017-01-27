@@ -100,8 +100,8 @@ class Component(System):
         self._var_myproc_metadata['output'].append(metadata)
         self._var2meta[name] = metadata
 
-    def declare_partial_derivs(self, of, wrt, dependent=True,
-                               rows=None, cols=None, val=None):
+    def declare_partials(self, of, wrt, dependent=True,
+                         rows=None, cols=None, val=None):
         """Store subjacobian metadata for later use.
 
         Args
@@ -149,7 +149,7 @@ class Component(System):
                 }
                 self._subjacs_info.append((of, wrt, meta))
 
-    def _iter_partial_deriv_matches(self):
+    def _iter_partials_matches(self):
         """Generate all (of, wrt) name pairs to add to jacobian."""
         outs = self._var_allprocs_names['output']
         ins = self._var_allprocs_names['input']
@@ -163,12 +163,12 @@ class Component(System):
                         for ofmatch in ofmatches:
                             yield (ofmatch, wrtname), meta, typ
 
-    def _set_partial_deriv_meta(self):
+    def _set_partials_meta(self):
         """Set subjacobian info into our jacobian."""
         oldsys = self._jacobian._system
         self._jacobian._system = self
 
-        for key, meta, typ in self._iter_partial_deriv_matches():
+        for key, meta, typ in self._iter_partials_matches():
             self._jacobian._set_partal_deriv_meta(key, meta)
 
         self._jacobian._system = oldsys

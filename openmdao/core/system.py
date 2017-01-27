@@ -781,7 +781,7 @@ class System(object):
             self._jacobian._system = self
             self._jacobian._initialize()
 
-    def _set_partial_deriv_meta(self):
+    def _set_partials_meta(self):
         """Set subjacobian info into our jacobian.
 
         Overridden in <Component>.

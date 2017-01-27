@@ -143,8 +143,8 @@ class ExplicitComponent(Component):
             meta = self._var_myproc_metadata['output'][i]
             size = numpy.prod(meta['shape'])
             arange = numpy.arange(size)
-            self.declare_partial_derivs(out_name, out_name, rows=arange, cols=arange,
-                                        val=numpy.ones(size))
+            self.declare_partials(out_name, out_name, rows=arange, cols=arange,
+                                  val=numpy.ones(size))
 
         # a GlobalJacobian will not have been set at this point, so this will
         # negate values in the DefaultJacobian. These will later be copied
@@ -181,12 +181,12 @@ class ExplicitComponent(Component):
         if self._jacobian._top_name == self.pathname:
             self._jacobian._update()
 
-    def _set_partial_deriv_meta(self):
+    def _set_partials_meta(self):
         """Set subjacobian info into our jacobian."""
         oldsys = self._jacobian._system
         self._jacobian._system = self
 
-        for key, meta, typ in self._iter_partial_deriv_matches():
+        for key, meta, typ in self._iter_partials_matches():
             # only negate d_output/d_input partials
             self._jacobian._set_partal_deriv_meta(key, meta, typ == 'input')
 

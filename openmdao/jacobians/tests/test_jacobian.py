@@ -25,9 +25,9 @@ class MyExplicitComp(ExplicitComponent):
 
         val = self._jac_type(np.array([[1., 1.],[1., 1.]]))
         if isinstance(val, list):
-            self.declare_partial_derivs('f', ['x','y'], rows=val[1], cols=val[2], val=val[0])
+            self.declare_partials('f', ['x','y'], rows=val[1], cols=val[2], val=val[0])
         else:
-            self.declare_partial_derivs('f', ['x','y'], val=val)
+            self.declare_partials('f', ['x','y'], val=val)
 
     def compute(self, inputs, outputs):
         x = inputs['x']
@@ -61,15 +61,15 @@ class MyExplicitComp2(ExplicitComponent):
 
         val=self._jac_type(np.array([[7.]]))
         if isinstance(val, list):
-            self.declare_partial_derivs('f', 'z', rows=val[1], cols=val[2], val=val[0])
+            self.declare_partials('f', 'z', rows=val[1], cols=val[2], val=val[0])
         else:
-            self.declare_partial_derivs('f', 'z', val=val)
+            self.declare_partials('f', 'z', val=val)
 
         val=self._jac_type(np.array([[1., 1., 1.]]))
         if isinstance(val, list):
-            self.declare_partial_derivs('f', 'w', rows=val[1], cols=val[2], val=val[0])
+            self.declare_partials('f', 'w', rows=val[1], cols=val[2], val=val[0])
         else:
-            self.declare_partial_derivs('f', 'w', val=val)
+            self.declare_partials('f', 'w', val=val)
 
     def compute(self, inputs, outputs):
         w = inputs['w']
