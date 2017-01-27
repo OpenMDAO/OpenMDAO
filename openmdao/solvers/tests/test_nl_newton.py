@@ -1,4 +1,4 @@
-""" Unit test for the Newton nonlinear solver. """
+"""Test the Newton nonlinear solver. """
 
 import unittest
 from six import iteritems
@@ -15,12 +15,26 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
 
 class TestNewton(unittest.TestCase):
 
+    def test_feature_newton_basic(self):
+        """ Feature test for slotting a Newton solver and using it to solve
+        Sellar.
+        """
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NewtonSolver()
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
     def test_sellar_grouped(self):
         # Tests basic Newton solution on Sellar in a subgroup
 
         prob = Problem()
         prob.model = SellarDerivativesGrouped()
-        mda = [s for s in prob.model._subsystems_allprocs if s.name == 'mda'][0]
+        mda = prob.model.get_subsystem('mda')
         mda.nl_solver = NewtonSolver()
 
         prob.setup(check=False)
@@ -157,8 +171,6 @@ class TestNewton(unittest.TestCase):
 
     def test_sellar_specify_linear_solver(self):
 
-        raise unittest.SkipTest("BUG: cannot specify subsolver")
-
         prob = Problem()
         prob.model = SellarStateConnection()
         prob.model.nl_solver = NewtonSolver()
@@ -170,7 +182,7 @@ class TestNewton(unittest.TestCase):
         prob.model.ln_solver.options['maxiter'] = 1
 
         # The good solver
-        prob.model.nl_solver.options['subsolvers']['linear'] = ScipyIterativeSolver()
+        prob.model.nl_solver.set_subsolver('linear', ScipyIterativeSolver())
 
         prob.model.suppress_solver_output = True
         prob.setup(check=False)

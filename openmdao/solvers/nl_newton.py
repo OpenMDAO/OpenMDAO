@@ -1,6 +1,7 @@
 """Define the NewtonSolver class."""
 
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class NewtonSolver(NonlinearSolver):
@@ -37,3 +38,38 @@ class NewtonSolver(NonlinearSolver):
             self.options['subsolvers']['linesearch'].solve()
         else:
             system._outputs += system._vectors['output']['linear']
+
+    # ------ Deprecated methods --------
+
+    @property
+    def ln_solver(self):
+        """Get the nonlinear solver for this system.
+
+        This method is deprecated.
+
+        Returns
+        -------
+        LinearSolver
+            The requested linear solver instance.
+        """
+        warn_deprecation('This method provides backwards compabitibility with '
+                         'OpenMDAO <= 1.x ; use '
+                         ".options['subsolvers']['linear'].")
+
+        return self.options['subsolvers']['linear']
+
+    @ln_solver.setter
+    def ln_solver(self, solver):
+        """Set this system's nonlinear solver and perform setup.
+
+        This method is deprecated.
+
+        Args
+        ----
+        solver : `LinearSolver`
+            Linear solver to be used for Newton.
+        """
+        warn_deprecation('This method provides backwards compabitibility with '
+                         'OpenMDAO <= 1.x ; use set_subsolver instead.')
+
+        self.set_subsolver('linear', solver)
