@@ -34,6 +34,8 @@ a derivative, so a linear solver is also specified:
 
 The answers given are the expected solution to the problem given the default initial conditions for x and z.
 
+----
+
 Next, let's show an example of setting nonlinear solvers at different levels in your model hieararchy.  We take our current Sellar model and place it
 into a group called SellarSubGroup. Our new model contains two SellarSubGroups, where we connect 'y1' from each group to the input 'x' of the other
 group. This forms another cycle that needs to be converged.  For this cycle, we will use the `NonlinearBlockGS` solver, which implements Gauss-Seidel
