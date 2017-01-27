@@ -85,11 +85,18 @@ def _cartesian_dict_product(dicts):
     return (dict(zip(dicts, x)) for x in itertools.product(*itervalues(dicts)))
 
 
-def _test_name(testcase_fun, param_num, params):
-    return '_'.join([
-        'ptest',
-        str(params.args[0]),
-    ])
+def _test_name(run_by_default):
+    if run_by_default:
+        test_prefix = 'test'
+    else:
+        test_prefix = 'ptest'
+
+    def namer(testcase_fun, param_num, params):
+        return '_'.join([
+            test_prefix,
+            str(params.args[0]),
+        ])
+    return namer
 
 
 def parametric_suite(*args, **kwargs):
@@ -101,8 +108,9 @@ def parametric_suite(*args, **kwargs):
         arg='*' will vary over all default options,
         arg=iterable will iterate over the given options.
     Arguments that are not specified will have a reasonable default chosen."""
+    run_by_default = kwargs.pop('run_by_default', False)
     test_cases = _test_suite(*args, **kwargs)
-    return parameterized.expand(test_cases, testcase_func_name=_test_name)
+    return parameterized.expand(test_cases, testcase_func_name=_test_name(run_by_default))
 
 # Needed for Nose
 parametric_suite.__test__ = False

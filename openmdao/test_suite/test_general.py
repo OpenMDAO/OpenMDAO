@@ -35,8 +35,11 @@ class ParameterizedTestCases(unittest.TestCase):
 
 
 class ParameterizedTestCasesSubset(unittest.TestCase):
-    """Duplicating some testing to demonstrate filters."""
-    @parametric_suite(jacobian_type='*', num_comp=[2, 5, 10], partial_type='aij')
+    """Duplicating some testing to demonstrate filters and default running."""
+    @parametric_suite(jacobian_type='*',
+                      num_comp=[2, 5, 10],
+                      partial_type='aij',
+                      run_by_default=True)
     def test_subset(self, param_instance):
         param_instance.setup()
         problem = param_instance.problem
