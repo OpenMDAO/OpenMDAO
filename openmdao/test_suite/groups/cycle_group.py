@@ -95,6 +95,9 @@ def _cycle_comp_setup_jacobian(component, angle_param):
         component.declare_partials('y', angle_param, **_array2kwargs(component, dA_x))
         component.declare_partials('theta_out', 'theta', **_array2kwargs(component, dtheta))
 
+        if angle_param == 'psi':
+            component.declare_partials('y', 'theta', dependent=False)
+
 def _cycle_comp_jacvec(component, inputs, outputs, d_inputs, d_outputs, mode, angle_param):
     if component.metadata['jacobian_type'] == 'matvec':
         x = inputs['x']

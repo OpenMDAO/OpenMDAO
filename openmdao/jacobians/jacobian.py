@@ -311,7 +311,13 @@ class Jacobian(object):
         negate : bool
             If True negate the given value, if any.
         """
-        self._subjacs_info[self._key2unique(key)] = (meta, self._key2shape(key))
+        if not meta['dependent']:
+            return
+
+        ukey = self._key2unique(key)
+        if ukey is None:
+            raise KeyError("Could not find unique key for %s." % (key,))
+        self._subjacs_info[ukey] = (meta, self._key2shape(key))
 
         val = meta['value']
         if val is not None:

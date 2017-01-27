@@ -16,6 +16,7 @@ SUBJAC_META_DEFAULTS = {
     'value': None,
     'approx': None,
     'step': 1.e-3,
+    'method': 'FD',
     'form': 'forward',
     'dependent': True,
 }

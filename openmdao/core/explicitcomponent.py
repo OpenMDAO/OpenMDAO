@@ -164,7 +164,8 @@ class ExplicitComponent(Component):
         """Compute jacobian / factorization."""
         self._jacobian._system = self
 
-        # negate the negated jacobian back to normal
+        # negate constant subjacs (and others that will get overwritten)
+        # back to normal
         self._negate_jac()
 
         self._inputs.scale(self._scaling_to_phys['input'])
