@@ -40,6 +40,13 @@ Grouping components for more complex models
 Solvers (nonlinear and linear)
 ================================
 
+.. toctree::
+   :maxdepth: 1
+
+   features/solvers/set_solvers
+   features/solvers/solver_options
+
+
 Running your models
 ================================
 
