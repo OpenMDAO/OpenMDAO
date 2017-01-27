@@ -133,7 +133,7 @@ class Group(System):
                                 "connection from '%s' to '%s' is %s." %
                                 (out_name, in_name, src_indices.dtype.type))
         elif isinstance(src_indices, Iterable):
-            types_in_src_idxs = set( type(idx) for idx in src_indices)
+            types_in_src_idxs = set(type(idx) for idx in src_indices)
             for t in types_in_src_idxs:
                 if not np.issubdtype(t, np.integer):
                     raise TypeError("src_indices must contain integers, but src_indices for "
@@ -191,22 +191,48 @@ class Group(System):
                 in iteritems(self._var_connections):
 
             # throw an exception if either output or input doesn't exist
-            # or if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
             if out_name not in allprocs_out_names:
                 raise NameError("Output '%s' does not exist for connection "
-                                "in '%s' from '%s' to '%s'." % (out_name, self.name
-                                if self.name else 'model', out_name, in_name))
+                                "in '%s' from '%s' to '%s'." %
+                                (out_name, self.name if self.name else 'model',
+                                 out_name, in_name))
 
             if in_name not in allprocs_in_names:
                 raise NameError("Input '%s' does not exist for connection "
-                                "in '%s' from '%s' to '%s'." % (in_name, self.name
-                                if self.name else 'model', out_name, in_name))
+                                "in '%s' from '%s' to '%s'." %
+                                (in_name, self.name if self.name else 'model',
+                                 out_name, in_name))
 
-            if out_name.rsplit('.', 1)[0] == in_name.rsplit('.', 1)[0]:
-                raise RuntimeError("Input and output are in the same System for " +
-                                   "connection in '%s' from '%s' to '%s'." %
-                                   (self.name if self.name else 'model', out_name, in_name))
+            # throw an exception if output and input are in the same system
+            # (not traceable to a connect statement, so provide context)
+            if '.' not in out_name:
+                # output var is promoted from a subsys, figure out which one
+                out_subsys = None
+                for subsys in self._subsystems_allprocs:
+                    for name, prom_name in subsys._var_maps['output'].items():
+                        if out_name == prom_name:
+                            out_subsys = subsys.name
+                            break
+            else:
+                out_subsys = out_name.rsplit('.', 1)[0]
+
+            if '.' not in in_name:
+                # input var is promoted from a subsys, figure out which one
+                in_subsys = None
+                for subsys in self._subsystems_allprocs:
+                    for name, prom_name in subsys._var_maps['input'].items():
+                        if in_name == prom_name:
+                            in_subsys = subsys.name
+                            break
+            else:
+                in_subsys = in_name.rsplit('.', 1)[0]
+
+            if out_subsys == in_subsys:
+                raise RuntimeError("Input and output are in the same System " +
+                                   "for connection in '%s' from '%s' to '%s'." %
+                                   (self.name if self.name else 'model',
+                                    out_name, in_name))
 
             for in_index, name in enumerate(allprocs_in_names):
                 if name == in_name:
@@ -226,8 +252,7 @@ class Group(System):
                             pass
                         else:
                             meta = input_meta[in_myproc_index]
-                            meta['indices'] = np.array(src_indices,
-                                                          dtype=int)
+                            meta['indices'] = np.array(src_indices, dtype=int)
 
                         # set src_indices to None to avoid unnecessary repeat
                         # of setting indices and shape metadata when we have

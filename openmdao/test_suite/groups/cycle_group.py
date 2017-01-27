@@ -1,12 +1,13 @@
 """Contains test groups for cycles with easily verified values/derivatives."""
 from __future__ import print_function, division
-from openmdao.api import ExplicitComponent, Group, IndepVarComp
+from openmdao.api import ExplicitComponent, IndepVarComp
 from openmdao.test_suite.groups.group import ParametericTestGroup
 import numpy as np
 import scipy.sparse as sparse
 from six.moves import range
 
 PSI = 1.
+
 
 def _compute_vector_terms(system_size):
     u = np.zeros(system_size)
@@ -45,6 +46,7 @@ def _dense_to_aij(A):
                 rows.append(i)
                 cols.append(j)
     return np.array(data), np.array(rows), np.array(cols)
+
 
 def _cycle_comp_jacobian(component, inputs, outputs, jacobian, angle_param):
     if component.metadata['jacobian_type'] != 'matvec':
@@ -303,7 +305,7 @@ class CycleGroup(ParametericTestGroup):
         if num_comp < 2:
             raise ValueError('Number of components must be at least 2.')
 
-        self.N = N = 3#self.metadata['variable_length']
+        self.N = N = 3  # self.metadata['variable_length']
         if N < 3:
             raise ValueError('Variable length must be at least 3.')
 
@@ -334,7 +336,6 @@ class CycleGroup(ParametericTestGroup):
             theta_name: expected_theta,
             'last.x_norm2': 0.5*N,
         }
-
 
     def _generate_components(self, conn_type, first_class, middle_class, last_class, num_comp):
         first_name = 'first'

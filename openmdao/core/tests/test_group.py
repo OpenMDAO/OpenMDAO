@@ -267,11 +267,24 @@ class TestConnect(unittest.TestCase):
         prob = Problem(Group())
 
         sub = prob.model.add_subsystem('sub', Group())
-        sub.add_subsystem('tgt', ExecComp('y = x'), promotes=['y'])
+        sub.add_subsystem('tgt', ExecComp('y = x'), promotes_outputs=['y'])
         sub.connect('y', 'tgt.x', src_indices=[1])
 
         msg = "Input and output are in the same System for connection " + \
               "in 'sub' from 'y' to 'tgt.x'."
+
+        with self.assertRaisesRegexp(RuntimeError, msg):
+            prob.setup(check=False)
+
+    def test_connect_within_system_with_renames(self):
+        prob = Problem(Group())
+
+        sub = prob.model.add_subsystem('sub', Group())
+        sub.add_subsystem('tgt', ExecComp('y = x'), renames_outputs={'y': 'y2'})
+        sub.connect('y2', 'tgt.x', src_indices=[1])
+
+        msg = "Input and output are in the same System for connection " + \
+              "in 'sub' from 'y2' to 'tgt.x'."
 
         with self.assertRaisesRegexp(RuntimeError, msg):
             prob.setup(check=False)
