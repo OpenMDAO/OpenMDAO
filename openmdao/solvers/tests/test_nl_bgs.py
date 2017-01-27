@@ -1,4 +1,4 @@
-""" Unit test for the Nonlinear Block Gauss Seidel solver. """
+"""Test the Nonlinear Block Gauss Seidel solver. """
 
 import sys
 import unittest

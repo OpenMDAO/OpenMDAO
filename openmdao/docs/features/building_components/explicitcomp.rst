@@ -5,7 +5,7 @@ Defining explicit variables
 ---------------------------
 
 **Description:** Explicit variables are those that are computed as an explicit function of other variables.
-For instance, :math:`y` would be an explicit variable, given :math:`y=\sin(x)`, while :math:`z` would not be, given :math:`\cos(xz)-z=0`.
+For instance, :math:`y` would be an explicit variable, given :math:`y=\sin(x)`, while :math:`z` would not be, given :math:`\cos(yz)-z=0`.
 
 **Usage:** Explicit variables are defined by writing a class that inherits from the <ExplicitComponent> class.
 The explicit variables would be considered *outputs* while the variables on which they depend would be considered *inputs* (e.g., :math:`x` in the examples above).
