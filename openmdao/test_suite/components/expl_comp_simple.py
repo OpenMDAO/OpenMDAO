@@ -39,3 +39,30 @@ class TestExplCompSimpleSparse(TestExplCompSimple):
     def compute_jacobian(self, inputs, outputs, jacobian):
         jacobian['area', 'length'] = (inputs['width'], 0, 0)
         jacobian['area', 'width'] = (inputs['length'], 0, 0)
+
+
+class TestExplCompSimpleJacVec(TestExplCompSimple):
+
+    def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs,
+                               mode):
+
+        length = inputs['length']
+        width = inputs['width']
+        d_area = d_outputs['area']
+
+        if mode == 'fwd':
+
+            # TODO: Assignment back into the results vector doesn't work with
+            # intermediate variables (seem commented out line).
+
+            if 'width' in d_inputs:
+                #d_area += d_inputs['width']*length
+                d_outputs['area'] += d_inputs['width']*length
+            if 'length' in d_inputs:
+                #d_area += d_inputs['length']*width
+                d_outputs['area'] += d_inputs['length']*width
+        else:
+            if 'width' in d_inputs:
+                d_inputs['width'] += d_area*length
+            if 'length' in d_inputs:
+                d_inputs['length'] += d_area*width
