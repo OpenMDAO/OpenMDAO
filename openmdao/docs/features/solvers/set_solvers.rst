@@ -13,9 +13,11 @@ letting you build a hierarchical solver setup to efficiently converge your model
 Solvers for groups and components
 ----------------------------------
 
+.. embed-python-code::
+    openmdao.solvers.tests.test_solver_features.SellarDis1
 
 
-sub-solvers for other solvers
+Sub-solvers for other solvers
 -------------------------------
 
 Some nonlinear solvers need other solvers to help them converge.
