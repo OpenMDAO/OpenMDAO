@@ -10,41 +10,8 @@ from openmdao.core.system import System
 class Component(System):
     """Base Component class; not to be directly instantiated."""
 
-    INPUT_DEFAULTS = {
-        'shape': (1,),
-        'units': '',
-        'var_set': 0,
-        'indices': None,
-    }
-
-    OUTPUT_DEFAULTS = {
-        'shape': (1,),
-        'units': '',
-        'var_set': 0,
-        'lower': None,
-        'upper': None,
-        'ref': 1.0,
-        'ref0': 0.0,
-        'res_units': '',
-        'res_ref': 1.0,
-        'res_ref0': 0.0,
-    }
-
     def add_input(self, name, val=1.0, shape=None, indices=None, units='', var_set=0):
         """Add an input variable to the component.
-
-        ==================================================  ===================================
-        Examples of valid calls                             Initial value / notes
-        ==================================================  ===================================
-        add_input('name')                                   Scalar with value 1
-        add_input('name', scalar)                           Scalar with value scalar
-        add_input('name', array_like)                       Array with value array_like
-        add_input('name', shape=shp)                        Constant array of ones
-        add_input('name', indices=inds)                     Shape inferred from inds; all ones
-        add_input('name', scalar, shape=shp)                Constant array with value scalar
-        add_input('name', scalar, indices=inds)             Shape inferred from inds
-        add_input('name', array_like, indices=inds)         Checks shapes of array & inds match
-        ==================================================  ===================================
 
         Args
         ----
@@ -132,16 +99,6 @@ class Component(System):
                    lower=None, upper=None, ref=1.0, ref0=0.0,
                    res_ref=1.0, res_ref0=0.0, var_set=0):
         """Add an output variable to the component.
-
-        ==================================================  ===================================
-        Examples of valid calls                             Initial value / notes
-        ==================================================  ===================================
-        add_output('name')                                  Scalar with value 1
-        add_output('name', scalar)                          Scalar with value scalar
-        add_output('name', array_like)                      Array with value array_like
-        add_output('name', shape=shp)                       Constant array of ones
-        add_output('name', scalar, shape=shp)               Constant array with value scalar
-        ==================================================  ===================================
 
         Args
         ----

@@ -76,8 +76,8 @@ class TestAddVarCompBounds(ExplicitComponent):
         self.add_input('x')
         self.add_output('y_a', 2.0, lower=0.)
         self.add_output('y_b', 2.0, lower=0., upper=10.)
-        self.add_output('y_c', 2.0 * numpy.ones(6), lower=0., upper=10. * numpy.ones(6))
-        self.add_output('y_d', 2.0 * numpy.ones(6), lower=numpy.zeros(6), upper=10.)
+        self.add_output('y_c', 2.0 * numpy.ones(6),  lower=numpy.zeros(6), upper=10.)
+        self.add_output('y_d', 2.0 * numpy.ones(6), lower=0., upper=[12, 10, 10, 10, 10, 12])
         self.add_output('y_e', 2.0 * numpy.ones((3, 2)), lower=numpy.zeros((3, 2)))
 
 
