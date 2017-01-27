@@ -23,6 +23,8 @@ class Jacobian(object):
         pointer to the system that is currently operating on this Jacobian.
     _subjacs : dict
         dictionary containing the user-supplied sub-Jacobians.
+    _subjacs_info : dict
+        Dict of subjacobian metadata keyed on (resid_path, (in/out)_path).
     _int_mtx : <Matrix>
         global internal Jacobian.
     _ext_mtx : <Matrix>
@@ -49,6 +51,7 @@ class Jacobian(object):
         self._system = None
 
         self._subjacs = {}
+        self._subjacs_info = {}
         self._int_mtx = None
         self._ext_mtx = None
         self._keymap = {}
@@ -76,12 +79,14 @@ class Jacobian(object):
             local size of the input variable.
         """
         out_name, in_name = key
-        if in_name in self._system._inputs:
-            in_size = self._system._inputs._views_flat[in_name].size
-        else:
-            in_size = self._system._outputs[in_name].size
+        return (numpy.prod(self._system._var2meta[out_name]['shape']),
+                numpy.prod(self._system._var2meta[in_name]['shape']))
+        #if in_name in self._system._inputs:
+            #in_size = self._system._inputs._views_flat[in_name].size
+        #else:
+            #in_size = self._system._outputs[in_name].size
 
-        return self._system._outputs._views_flat[out_name].size, in_size
+        #return self._system._outputs._views_flat[out_name].size, in_size
 
     def _key2unique(self, key):
         """Map output-input local name pair to a unique key.
@@ -102,8 +107,10 @@ class Jacobian(object):
         in_path : str
             pathname of input variable.
         """
-        out_paths = self._system._var_name2path[key[0]]
-        in_paths = self._system._var_name2path[key[1]]
+        out_paths = self._system._var_name2path.get(key[0])
+        in_paths = self._system._var_name2path.get(key[1])
+        if out_paths is None or in_paths is None:
+            return None
         assert (len(in_paths) == 1 and len(out_paths) == 1)
         return (out_paths[0], in_paths[0])
 
@@ -297,3 +304,34 @@ class Jacobian(object):
             'fwd' or 'rev'.
         """
         pass
+
+    def _set_partal_deriv_meta(self, key, meta, negate=False):
+        """Store subjacobian metadata.
+
+        Args
+        ----
+        key : (str, str)
+            output name, input name of sub-Jacobian.
+        meta : dict
+            Metadata dictionary for the subjacobian.
+        negate : bool
+             If True negate the given value (if any).
+        """
+        self._subjacs_info[self._key2unique(key)] = (meta, self._key2shape(key))
+
+        val = meta['value']
+        if val is not None:
+            if negate:
+                val *= -1.
+            if meta['rows'] is not None:
+                val = [val, meta['rows'], meta['cols']]
+            self.__setitem__(key, val)
+
+    def _copy_from(self, jac):
+        """
+        """
+        old_subjacs = jac._subjacs_info
+        for key in old_subjacs:
+            self._subjacs_info[key] = old_subjacs[key]
+        for key in jac._subjacs:
+            self._subjacs[key] = jac._subjacs[key]

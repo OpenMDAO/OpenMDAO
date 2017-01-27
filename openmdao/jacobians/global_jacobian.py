@@ -22,13 +22,7 @@ SUBJAC_META_DEFAULTS = {
 
 
 class GlobalJacobian(Jacobian):
-    """Assemble dense global <Jacobian>.
-
-    Attributes
-    ----------
-    _subjacs_info : dict
-        Dict of subjacobian metadata keyed on (resid_path, (in/out)_path).
-    """
+    """Assemble dense global <Jacobian>."""
 
     def __init__(self, **kwargs):
         """Initialize all attributes.
@@ -42,8 +36,6 @@ class GlobalJacobian(Jacobian):
         self.options.declare('matrix_class', value=DenseMatrix,
                              desc='<Matrix> class to use in this <Jacobian>.')
         self.options.update(kwargs)
-
-        self._subjacs_info = {}
 
     def _get_var_range(self, ivar_all, typ):
         """Look up the variable name and <Jacobian> index range.
@@ -215,21 +207,3 @@ class GlobalJacobian(Jacobian):
         elif mode == 'rev':
             d_outputs.iadd_data(int_mtx._prod(d_residuals.get_data(), mode))
             d_inputs.iadd_data(ext_mtx._prod(d_residuals.get_data(), mode))
-
-    def _set_partal_deriv_meta(self, key, meta):
-        """Store subjacobian metadata.
-
-        Args
-        ----
-        key : (str, str)
-            output name, input name of sub-Jacobian.
-        meta : dict
-            Metadata dictionary for the subjacobian.
-        """
-        self._subjacs_info[self._key2unique(key)] = (meta, self._key2shape(key))
-
-        val = meta['value']
-        if val is not None:
-            if meta['rows'] is not None:
-                val = [val, meta['rows'], meta['cols']]
-            self.__setitem__(key, val)

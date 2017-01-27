@@ -764,21 +764,20 @@ class System(object):
             return
 
         if jacobian is None:
-            self._jacobian = DefaultJacobian()
+            jacobian = DefaultJacobian()
         else:
-            self._jacobian = jacobian
             if is_top:
-                self._jacobian._top_name = self.pathname
-                self._jacobian._system = self
-                self._jacobian._assembler = self._assembler
+                jacobian._top_name = self.pathname
+                jacobian._system = self
+                jacobian._assembler = self._assembler
 
-            # set info from our _subjacs_info
-            self._set_partial_deriv_meta()
+        jacobian._copy_from(self._jacobian)
+        self._jacobian = jacobian
 
         for subsys in self._subsystems_myproc:
             subsys._set_jacobian(jacobian, False)
 
-        if jacobian is not None and is_top:
+        if not isinstance(jacobian, DefaultJacobian) and is_top:
             self._jacobian._system = self
             self._jacobian._initialize()
 

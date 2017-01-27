@@ -54,7 +54,7 @@ class Component(System):
 
         Args
         ----
-        name : str60
+        name : str
             name of the variable in this component's namespace.
         val : object
             The value of the variable being added.
@@ -149,23 +149,26 @@ class Component(System):
                 }
                 self._subjacs_info.append((of, wrt, meta))
 
-    def _set_partial_deriv_meta(self):
-        """Set subjacobian info into our jacobian."""
-        indices = self._var_allprocs_indices
-        oldsys = self._jacobian._system
-        self._jacobian._system = self
-
+    def _iter_partial_deriv_matches(self):
         outs = self._var_allprocs_names['output']
         ins = self._var_allprocs_names['input']
+        tvlists = (('output', outs), ('input', ins))
 
         for of, wrt, meta in self._subjacs_info:
             ofmatches = [n for n in outs if n == of or fnmatchcase(n, of)]
-            for typ, vnames in (('output', outs), ('input', ins)):
+            for typ, vnames in tvlists:
                 for wrtname in vnames:
                     if wrtname == wrt or fnmatchcase(wrtname, wrt):
                         for ofmatch in ofmatches:
-                            key = (ofmatch, wrtname)
-                            self._jacobian._set_partal_deriv_meta(key, meta)
+                            yield (ofmatch, wrtname), meta, typ
+
+    def _set_partial_deriv_meta(self):
+        """Set subjacobian info into our jacobian."""
+        oldsys = self._jacobian._system
+        self._jacobian._system = self
+
+        for key, meta, typ in self._iter_partial_deriv_matches():
+            self._jacobian._set_partal_deriv_meta(key, meta)
 
         self._jacobian._system = oldsys
 
