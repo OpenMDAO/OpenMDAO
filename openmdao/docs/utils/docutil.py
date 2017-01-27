@@ -15,6 +15,8 @@ from six import StringIO, PY3
 
 from redbaron import RedBaron
 
+sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
+table_name = 'feature_unit_tests'   # name of the table to be queried
 
 def remove_docstrings(source):
     """
@@ -249,12 +251,19 @@ def get_test_source_code_for_feature(feature_name):
     return test_source_code_for_feature
 
 
-"""
-Definition of function to be called by the showunittestexamples directive
-"""
 
-sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
-table_name = 'feature_unit_tests'   # name of the table to be queried
+def get_skip_unless_predicate_and_message(source, method_name):
+    '''
+    '''
+
+    rb = RedBaron(source)
+    def_nodes = rb.findAll("DefNode", name=method_name)
+    if def_nodes:
+        if def_nodes[0].decorators:
+            if def_nodes[0].decorators[0].value.dumps() == 'unittest.skipUnless':
+                return ( def_nodes[0].decorators[0].call.value[0].dumps(), 
+                    def_nodes[0].decorators[0].call.value[1].value.to_python() )
+    return None
 
 
 def get_test_source_code_for_feature(feature_name):
@@ -290,6 +299,19 @@ def get_test_source_code_for_feature(feature_name):
 
     return test_source_code_for_feature
 
+def remove_raise_skip_tests(source):
+    '''
+       Remove from the code any raise unittest.SkipTest lines since we don't want those in
+       what the user sees
+    '''
+    rb = RedBaron(source)
+    raise_nodes = rb.findAll("RaiseNode")
+    for rn in raise_nodes:
+        # only the raise for SkipTest
+        if rn.value[:2].dumps() == 'unittestSkipTest':
+            rn.parent.value.remove(rn)
+    return rb.dumps()
+
 
 def get_unit_test_source_and_run_outputs(method_path):
     '''
@@ -317,6 +339,10 @@ def get_unit_test_source_and_run_outputs(method_path):
     # Replace some of the asserts with prints of the actual values
     source_minus_docstrings_with_prints = replace_asserts_with_prints(method_body_source)
 
+    # remove raise SkipTest lines
+    # We decided to leave them in for now
+    # source_minus_docstrings_with_prints = remove_raise_skip_tests(source_minus_docstrings_with_prints)
+
     # Remove the initial empty lines
     source_minus_docstrings_with_prints_cleaned = remove_initial_empty_lines_from_source(
         source_minus_docstrings_with_prints)
@@ -326,21 +352,52 @@ def get_unit_test_source_and_run_outputs(method_path):
     lines_before_test_cases = get_lines_before_test_cases(module_source_code)
     setup_source_code = get_method_body(inspect.getsource(getattr(cls, 'setUp')))
     teardown_source_code = get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
+
+    # If the test method has a skipUnless decorator, we need to convert it to a 
+    #   raise call
+    class_source_code = inspect.getsource(cls)
+    skip_unless_predicate_and_message = \
+            get_skip_unless_predicate_and_message(class_source_code, method_name)
+    if skip_unless_predicate_and_message:
+        # predicate, message = skip_unless_predicate_and_message
+        raise_skip_test_source_code = 'import unittest\nif not {}: raise unittest.SkipTest("{}")'.format(*skip_unless_predicate_and_message)
+    else:
+        raise_skip_test_source_code = ""
+
     code_to_run = '\n'.join([lines_before_test_cases,
                             setup_source_code,
+                            raise_skip_test_source_code,
                             source_minus_docstrings_with_prints_cleaned,
                             teardown_source_code])
 
     # Write it to a file so we can run it. Tried using exec but ran into problems with that
     fd, code_to_run_path = tempfile.mkstemp()
+    skipped = False
     try:
         with os.fdopen(fd, 'w') as tmp:
             tmp.write(code_to_run)
             tmp.close()
-        run_outputs = subprocess.check_output(['python', code_to_run_path])
+        run_outputs = subprocess.check_output(['python', code_to_run_path], stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        # Get a traceback like this:
+        # Traceback (most recent call last):
+        #     File "/Applications/PyCharm CE.app/Contents/helpers/pydev/pydevd.py", line 1556, in <module>
+        #         globals = debugger.run(setup['file'], None, None, is_module)
+        #     File "/Applications/PyCharm CE.app/Contents/helpers/pydev/pydevd.py", line 940, in run
+        #         pydev_imports.execfile(file, globals, locals)  # execute the script
+        #     File "/var/folders/l3/9j86k5gn6cx0_p25kdplxgpw1l9vkk/T/tmp215aM1", line 23, in <module>
+        #         raise unittest.SkipTest("check_total_derivatives not implemented yet")
+        # unittest.case.SkipTest: check_total_derivatives not implemented yet
+        if 'raise unittest.SkipTest' in e.output:
+            reason_for_skip = e.output.splitlines()[-1][len('unittest.case.SkipTest: '):]
+            run_outputs = reason_for_skip
+            skipped = True
+        else:
+            print("Running of embedded test " + method_path + " in docs failed due to: " + e.output)
+            raise
     finally:
         os.remove(code_to_run_path)
 
     if PY3:
         run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
-    return source_minus_docstrings_with_prints_cleaned, run_outputs
+    return source_minus_docstrings_with_prints_cleaned, run_outputs, skipped

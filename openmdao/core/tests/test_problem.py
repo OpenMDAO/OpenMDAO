@@ -168,10 +168,10 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        self.assert_rel_error(self, prob['x'], 0.0, 1e-6)
-        self.assert_rel_error(self, prob['y'], [3.160000, 3.755278], 1e-6)
-        self.assert_rel_error(self, prob['z'], [1.977639, 0.000000], 1e-6)
-        self.assert_rel_error(self, prob['obj'], 3.18339, 1e-6)
+        assert_rel_error(self, prob['x'], 0.0, 1e-6)
+        assert_rel_error(self, prob['y'], [3.160000, 3.755278], 1e-6)
+        assert_rel_error(self, prob['z'], [1.977639, 0.000000], 1e-6)
+        assert_rel_error(self, prob['obj'], 3.18339, 1e-6)
 
     def test_feature_simple_promoted_sellar_set_get_outputs(self):
 
