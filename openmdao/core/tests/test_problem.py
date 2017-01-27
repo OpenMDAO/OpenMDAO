@@ -43,6 +43,20 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'x'], -6.0, 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], 8.0, 1e-6)
 
+    def test_feature_set_indeps(self):
+        prob = Problem()
+        root = prob.root = Group()
+        root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        prob.setup()
+
+        prob['x'] = 2.
+        prob['y'] = 10.
+        prob.run_model()
+        assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
+
     def test_feature_numpyvec_setup(self):
 
         prob = Problem()
@@ -154,10 +168,10 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        self.assert_rel_error(self, prob['x'], 0.0, 1e-6)
-        self.assert_rel_error(self, prob['y'], [3.160000, 3.755278], 1e-6)
-        self.assert_rel_error(self, prob['z'], [1.977639, 0.000000], 1e-6)
-        self.assert_rel_error(self, prob['obj'], 3.18339, 1e-6)
+        assert_rel_error(self, prob['x'], 0.0, 1e-6)
+        assert_rel_error(self, prob['y'], [3.160000, 3.755278], 1e-6)
+        assert_rel_error(self, prob['z'], [1.977639, 0.000000], 1e-6)
+        assert_rel_error(self, prob['obj'], 3.18339, 1e-6)
 
     def test_feature_simple_promoted_sellar_set_get_outputs(self):
 

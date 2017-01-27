@@ -22,7 +22,7 @@ class TestSolverPrint(unittest.TestCase):
         newton.options['maxiter'] = 2
         prob.setup(check=False)
 
-        # use a reall bad initial guess
+        # use a real bad initial guess
         prob['y1'] = 10000
         prob['y2'] = -26
 
