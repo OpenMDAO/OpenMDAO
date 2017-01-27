@@ -2,20 +2,23 @@
 
 import unittest
 
-from openmdao.core.explicitcomponent import ExplicitComponent
+import numpy
+
+from openmdao.api import ExplicitComponent, Problem, Group, NonlinearBlockGS, \
+     ScipyIterativeSolver, IndepVarComp, NewtonSolver
+from openmdao.devtools.testutil import assert_rel_error
 
 
-# Note, we are inclduing "clean" versions of the Sellar disciplines for
+# Note, we are including "clean" versions of the Sellar disciplines for
 # showcasing in the feature doc.
 
 class SellarDis1(ExplicitComponent):
-    """Component containing Discipline 1."""
 
     def __init__(self):
         super(SellarDis1, self).__init__()
 
         # Global Design Variable
-        self.add_input('z', val=np.zeros(2))
+        self.add_input('z', val=numpy.zeros(2))
 
         # Local Design Variable
         self.add_input('x', val=0.)
@@ -36,18 +39,17 @@ class SellarDis1(ExplicitComponent):
 
     def compute_jacobian(self, params, unknowns, J):
         J['y1','y2'] = -0.2
-        J['y1','z'] = np.array([[2.0*params['z'][0], 1.0]])
+        J['y1','z'] = numpy.array([[2.0*params['z'][0], 1.0]])
         J['y1','x'] = 1.0
 
 
 class SellarDis2(ExplicitComponent):
-    """Component containing Discipline 2."""
 
     def __init__(self):
         super(SellarDis2, self).__init__()
 
         # Global Design Variable
-        self.add_input('z', val=np.zeros(2))
+        self.add_input('z', val=numpy.zeros(2))
 
         # Coupling parameter
         self.add_input('y1', val=1.0)
@@ -73,13 +75,69 @@ class SellarDis2(ExplicitComponent):
 
     def compute_jacobian(self, params, unknowns, J):
         J['y2', 'y1'] = .5*params['y1']**-.5
-        J['y2', 'z'] = np.array([[1.0, 1.0]])
+        J['y2', 'z'] = numpy.array([[1.0, 1.0]])
 
 
 class TestSolverFeatures(unittest.TestCase):
 
     def test_specify_solver(self):
-        pass
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('d1', SellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('px', IndepVarComp('x', val=1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', val=numpy.array([5.0, 2.0])),
+                            promotes=['z'])
+
+        # Specify Newton's method for the nonlinear solver.
+        model.nl_solver = NewtonSolver()
+
+        # Specify scipy GMRES for the linear solver.
+        model.ln_solver = ScipyIterativeSolver()
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_specify_subgroup_solvers(self):
+        class SellarSubGroup(Group):
+
+            def __init__(self):
+                super(SellarSubGroup, self).__init__()
+
+                self.add_subsystem('d1', SellarDis1(),
+                                   promotes=['x', 'z', 'y1', 'y2'])
+                self.add_subsystem('d2', SellarDis2(),
+                                   promotes=['z', 'y1', 'y2'])
+
+                # Each Sellar group uses Newton's method
+                self.nl_solver = NewtonSolver()
+                self.ln_solver = ScipyIterativeSolver()
+
+        prob = Problem()
+        root = prob.model = Group()
+
+        root.add_subsystem('g1', SellarSubGroup())
+        root.add_subsystem('g2', SellarSubGroup())
+
+        root.connect('g1.y2', 'g2.x')
+        root.connect('g2.y2', 'g1.x')
+
+        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
+        root.nl_solver = NonlinearBlockGS()
+        root.nl_solver.options['rtol'] = 1.0e-5
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
 if __name__ == "__main__":
     unittest.main()
