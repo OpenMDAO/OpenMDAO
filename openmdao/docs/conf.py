@@ -11,8 +11,8 @@ from numpydoc.docscrape_sphinx import SphinxDocString
 from numpydoc.docscrape import NumpyDocString, Reader
 import openmdao
 from mock import Mock
+from openmdao.docs.config_params import MOCK_MODULES, IGNORE_LIST
 
-MOCK_MODULES = ['h5py', 'petsc4py', 'mpi4py', 'pyoptsparse']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 
@@ -95,9 +95,6 @@ OpenMDAO User Source Documentation
     # those directories will be the openmdao packages
     # auto-generate the top-level index.rst file for srcdocs, based on
     # openmdao packages:
-    IGNORE_LIST = [
-        'docs', 'tests', 'devtools', '__pycache__', 'code_review', 'test_suite'
-    ]
 
     # to improve the order that the user sees in the source docs, put
     # the important packages in this list explicitly. Any new ones that
@@ -350,6 +347,8 @@ for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
                                                       onerror=lambda x: None):
     if not ispkg:
         if 'docs' not in modname:
+            if any(ignore in modname for ignore in IGNORE_LIST):
+                continue
             module = importer.find_module(modname).load_module(modname)
             for classname, class_object in inspect.getmembers(module, inspect.isclass):
                 if class_object.__module__.startswith("openmdao"):
