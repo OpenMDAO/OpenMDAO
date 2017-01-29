@@ -13,6 +13,36 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDeriv
 
 class TestProblem(unittest.TestCase):
 
+    @unittest.skip('correct behavior not implemented yet')
+    def test_set_2d_array(self):
+
+        prob = Problem(model=Group())
+        model = prob.model
+        model.add_subsystem(name='indeps',
+                            subsys=IndepVarComp(name='X_c', shape=(3, 1)))
+        prob.setup()
+
+        new_val = -5*np.ones((3, 1))
+        prob['indeps.X_c'] = new_val
+        assert_rel_error(self, prob['indeps.X_c'], new_val, 1e-10)
+
+        new_val = 2.5*np.ones(3)
+        prob['indeps.X_c'][:, 0] = new_val
+        assert_rel_error(self, prob['indeps.X_c'], new_val.reshape((3,)), 1e-10)
+        assert_rel_error(self, prob['indeps.X_c'][:, 0], new_val, 1e-10)
+
+        # Reassignment syntax
+        try:
+            prob['indeps.X_c'] = new_val
+        except ValueError as err:
+            self.assertEqual(err, 'Incorrect size during assignment. Expected (10,1), but got (10,)')
+        else:
+            self.fail("execption expected")
+
+        new_val = -10*np.ones((10, 1)).tolist()
+        prob['indeps.X_c'] = new_val
+        assert_rel_error(self, prob['indeps.X_c'], new_val, 1e-10)
+
     def test_compute_total_derivs_basic(self):
         # Basic test for the method using default solvers on simple model.
 

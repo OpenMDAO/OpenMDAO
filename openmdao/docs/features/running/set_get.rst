@@ -49,6 +49,10 @@ In other words, the shape of the list has to match the shape of the actual data.
 .. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_set_get_array
 
+.. embed-test::
+    openmdao.core.tests.test_problem.TestProblem.test_set_2d_array
+
+
 
 Residuals
 ---------------------------

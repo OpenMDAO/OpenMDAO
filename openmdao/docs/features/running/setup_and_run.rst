@@ -22,21 +22,21 @@ Examples
 
 A basic setup using numpy vectors for the the framework data handling, and executing a single pass through the mode.
 
-.. embed-python-code::
+.. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_numpyvec_setup
 
 ----
 
 To use any of the PETSc linear solvers and/or to run in parallel under MPI, the framework data handling should be done with the :code:`PETScVector`.
 
-.. embed-python-code::
+.. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_petsc_setup
 
 ----
 
 Setup a simple optimization problem and run it, call :code:`run_driver`.
 
-.. embed-python-code::
+.. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_run_driver
 
 
