@@ -45,10 +45,10 @@ class TestProblem(unittest.TestCase):
 
     def test_feature_set_indeps(self):
         prob = Problem()
-        root = prob.root = Group()
-        root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         prob.setup()
 
