@@ -150,7 +150,13 @@ class Component(System):
                 # matching names/glob patterns will be resolved later because
                 # we don't know if all variables have been declared at this
                 # point.
-                self._subjacs_info[(of, wrt)] = meta
+                key = (of, wrt)
+                if key in self._subjacs_info:
+                    meta2 = self._subjacs_info[key].copy()
+                    meta2.update(meta)
+                    self._subjacs_info[key] = meta2
+                else:
+                    self._subjacs_info[key] = meta
 
     def _iter_partials_matches(self):
         """Generate all (of, wrt) name pairs to add to jacobian."""
