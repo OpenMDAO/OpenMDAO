@@ -189,6 +189,8 @@ class Component(System):
             _var_allprocs_names
             _var_myproc_names
             _var_myproc_metadata
+            _var_pathdict
+            _var_name2path
 
         Args
         ----

@@ -87,6 +87,7 @@ class GlobalJacobian(Jacobian):
         src_indices = {i: meta_in[j]['indices']
                        for j, i in enumerate(var_indices['input'])}
 
+        # avoid circular imports
         from openmdao.core.component import Component
         for s in self._system.system_iter(local=True, recurse=True,
                                           include_self=True, typ=Component):
