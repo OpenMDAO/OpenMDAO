@@ -152,11 +152,11 @@ class ExplicitCycleComp(ExplicitComponent):
         raise ValueError('Unknown partial_type: {}'.format(pd_type))
 
     def _array2kwargs(self, arr, pd_type):
+        jac = self.make_jacobian_entry(arr, pd_type)
         if pd_type == 'aij':
-            jac = self.make_jacobian_entry(arr, pd_type)
             return {'val':jac[0], 'rows':jac[1], 'cols':jac[2]}
         else:
-            return {'val':_array2jac(self, arr)}
+            return {'val': jac}
 
     def setup_jacobian(self):
         pd_type = self.metadata['partial_type']
