@@ -39,16 +39,7 @@ class EmbedTestDirective(Directive):
         # we want the output block to also be formatted similarly
         if skipped:
             output = "Test skipped because " + output
-            # Trying new docutil nodes to make it look different
-            # import sphinx.addnodes
-            # output_node = sphinx.addnodes.seealso(output)
-            # output_node = sphinx.addnodes.literal_emphasis(output, output)
-            # output_node = sphinx.addnodes.compact_paragraph(output, output)
-            # import docutils
-            # doc_nodes.append(docutils.nodes.inline(u'\u2013', u'\u2013'))
-            output_node = nodes.literal_block(output, output)
-        else:
-            output_node = nodes.literal_block(output, output)
+        output_node = nodes.literal_block(output, output)
 
         # put the nodes we've created in the list, and return them
         doc_nodes.append(body)
