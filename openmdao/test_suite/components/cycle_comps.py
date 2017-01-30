@@ -227,11 +227,9 @@ class ExplicitFirstComp(ExplicitCycleComp):
         return 'Explicit Cycle Component - First'
 
     def initialize_variables(self):
-        super(ExplicitFirstComp, self).initialize_variables()
         self.add_input('psi', value=1.)
         self.angle_param = 'psi'
-
-        self.setup_jacobian()
+        super(ExplicitFirstComp, self).initialize_variables()
 
     def compute(self, inputs, outputs):
         theta = inputs['theta']
@@ -247,11 +245,9 @@ class ExplicitLastComp(ExplicitFirstComp):
         return 'Explicit Cycle Component - Last'
 
     def initialize_variables(self):
-        super(ExplicitLastComp, self).initialize_variables()
         self.add_output('x_norm2', shape=(1,))
         self._n = 1
-
-        self.setup_jacobian()
+        super(ExplicitLastComp, self).initialize_variables()
 
     def compute(self, inputs, outputs):
         theta = inputs['theta']
@@ -275,8 +271,8 @@ class ExplicitLastComp(ExplicitFirstComp):
                 self.declare_partials('x_norm2', in_var,
                                       **self._array2kwargs(x.flatten(), pd_type))
 
-            self.declare_partials('theta_out', 'theta',
-                                  **self._array2kwargs(np.array([1.]), pd_type))
+            #self.declare_partials('theta_out', 'theta',
+                                  #**self._array2kwargs(np.array([1.]), pd_type))
             self.declare_partials('theta_out', 'psi',
                                   **self._array2kwargs(np.array([1.]), pd_type))
 
