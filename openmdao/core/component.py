@@ -3,7 +3,7 @@
 from __future__ import division
 
 from fnmatch import fnmatchcase
-from six import string_types
+from six import string_types, iteritems
 import numpy
 
 from openmdao.core.system import System, PathData
@@ -147,7 +147,10 @@ class Component(System):
                     'value': val,
                     'dependent': dependent,
                 }
-                self._subjacs_info.append((of, wrt, meta))
+                # matching names/glob patterns will be resolved later because
+                # we don't know if all variables have been declared at this
+                # point.
+                self._subjacs_info[(of, wrt)] = meta
 
     def _iter_partials_matches(self):
         """Generate all (of, wrt) name pairs to add to jacobian."""
@@ -155,7 +158,7 @@ class Component(System):
         ins = self._var_allprocs_names['input']
         tvlists = (('output', outs), ('input', ins))
 
-        for of, wrt, meta in self._subjacs_info:
+        for (of, wrt), meta in iteritems(self._subjacs_info):
             ofmatches = [n for n in outs if n == of or fnmatchcase(n, of)]
             for typ, vnames in tvlists:
                 for wrtname in vnames:

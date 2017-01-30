@@ -3,7 +3,7 @@ from __future__ import division
 
 from fnmatch import fnmatchcase
 from contextlib import contextmanager
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 import numpy
 
@@ -104,9 +104,9 @@ class System(object):
         transfer object; points to _vector_transfers['nonlinear'].
     _jacobian : <Jacobian>
         global <Jacobian> object to be used in apply_linear
-    _subjacs_info : list of dict
+    _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
-        set_subjac_info.
+        declare_partials. Members of each pair may be glob patterns.
     _pre_setup_jac : <GlobalJacobian>
         Storage for a GlobalJacobian that was set prior to problem setup.
     _nl_solver : <NonlinearSolver>
@@ -180,7 +180,7 @@ class System(object):
         self._jacobian = DefaultJacobian()
         self._jacobian._system = self
 
-        self._subjacs_info = []
+        self._subjacs_info = OrderedDict()
         self._pre_setup_jac = None
 
         self._nl_solver = None
