@@ -178,7 +178,7 @@ class Component(System):
         self._jacobian._system = self
 
         for key, meta, typ in self._iter_partials_matches():
-            self._jacobian._set_partal_deriv_meta(key, meta)
+            self._jacobian._set_partials_meta(key, meta)
 
         self._jacobian._system = oldsys
 

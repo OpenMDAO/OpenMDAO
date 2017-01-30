@@ -299,7 +299,7 @@ class Jacobian(object):
         """
         pass
 
-    def _set_partal_deriv_meta(self, key, meta, negate=False):
+    def _set_partials_meta(self, key, meta, negate=False):
         """Store subjacobian metadata.
 
         Args

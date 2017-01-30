@@ -189,7 +189,7 @@ class ExplicitComponent(Component):
 
         for key, meta, typ in self._iter_partials_matches():
             # only negate d_output/d_input partials
-            self._jacobian._set_partal_deriv_meta(key, meta, typ == 'input')
+            self._jacobian._set_partials_meta(key, meta, typ == 'input')
 
         self._jacobian._system = oldsys
 
