@@ -202,12 +202,10 @@ class Jacobian(object):
         jac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        system = self._system
-        shape = self._key2shape(key)
         ukey = self._key2unique(key)
-        typ = system._var_pathdict[ukey[1]].typ
 
         if numpy.isscalar(jac) or isinstance(jac, numpy.ndarray):
+            shape = self._key2shape(key)
             jac = numpy.atleast_2d(jac).reshape(shape)
             # numpy.promote_types will choose the smallest dtype that can contain both arguments
             safe_dtype = numpy.promote_types(jac.dtype, float)
@@ -225,9 +223,11 @@ class Jacobian(object):
             raise TypeError("Sub-jacobian of type '%s' for key %s is "
                             "not supported." % (type(jac).__name__, key))
 
+        system = self._system
         ind = system._var_myproc_names['output'].index(key[0])
         r_factor = system._scaling_to_norm['residual'][ind, 1]
 
+        typ = system._var_pathdict[ukey[1]].typ
         ind = system._var_myproc_names[typ].index(key[1])
         c_factor = system._scaling_to_norm[typ][ind, 1]
 
