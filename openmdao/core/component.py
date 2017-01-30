@@ -7,6 +7,7 @@ from six import string_types, iteritems
 import numpy
 
 from openmdao.core.system import System, PathData
+from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
 
 
 class Component(System):
@@ -152,11 +153,11 @@ class Component(System):
                 # point.
                 key = (of, wrt)
                 if key in self._subjacs_info:
-                    meta2 = self._subjacs_info[key].copy()
-                    meta2.update(meta)
-                    self._subjacs_info[key] = meta2
+                    meta2 = self._subjacs_info[key]
                 else:
-                    self._subjacs_info[key] = meta
+                    meta2 = SUBJAC_META_DEFAULTS.copy()
+                meta2.update(meta)
+                self._subjacs_info[key] = meta2
 
     def _iter_partials_matches(self):
         """Generate all (of, wrt) name pairs to add to jacobian."""
