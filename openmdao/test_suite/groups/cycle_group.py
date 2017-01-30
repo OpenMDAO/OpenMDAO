@@ -20,6 +20,9 @@ reduction of error by 1/2 ensures Gauss-Seidel type methods will converge.
 To provide support for multiple variables/variable sizes, the vector is constructed from the inputs
 by taking the inputs in order (e.g. x_0, x_1, ...), flattening the array, and concatenating those
 arrays into one vector. The outputs y_i are constructed in the reverse manner.
+
+Note: 'theta' is unique only up to equivalence mod (2*pi)/(num_comp - 1). Test authors should not
+depend on particular values of 'theta' (or 'x_i'/'y_i' values) without taking this in to account.
 """
 
 from __future__ import print_function, division
