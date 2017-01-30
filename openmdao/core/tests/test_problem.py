@@ -71,6 +71,7 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['f_xy'], 174.0, 1e-6)
 
+    @unittest.skipUnless(PETScVector, "PETSc is required.")
     def test_feature_petsc_setup(self):
 
         prob = Problem()

@@ -232,16 +232,16 @@ show-unittest-examples
         indepvarcomp
 
 
-embed-python-code
+embed-code
 +++++++++++++++++
 
-        `embed-python-code` is a custom directive that lets a developer drop a class or a
+        `embed-code` is a custom directive that lets a developer drop a class or a
         class method directly into a feature doc by including that class or method's
         full, dotted python path.  The syntax for invoking the directive looks like this:
 
         ::
 
-            .. embed-python-code::
+            .. embed-code::
               openmdao.tests.general_problem.GeneralComp
 
 
