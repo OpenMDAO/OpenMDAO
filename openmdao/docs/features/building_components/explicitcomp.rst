@@ -21,15 +21,15 @@ Note that the last two are optional because the class can implement one or the o
 
 A simple example of an explicit component is:
 
-.. embed-python-code::
+.. embed-code::
     openmdao.test_suite.components.expl_comp_simple.TestExplCompSimple
 
 Its implementation of :code:`compute_partial_derivs` looks like:
 
-.. embed-python-code::
+.. embed-code::
     openmdao.test_suite.components.expl_comp_simple.TestExplCompSimpleDense.compute_jacobian
 
 This component would then be used in a run script as follows.
 
-.. embed-python-code::
+.. embed-code::
     openmdao.core.tests.test_component.TestExplicitComponent.test___init___simple

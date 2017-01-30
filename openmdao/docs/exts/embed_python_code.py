@@ -8,7 +8,7 @@ class EmbedPythonCodeDirective(Directive):
     """EmbedPythonCodeDirective is a custom directive to allow blocks of
      python code to be shown in feature docs.  An example usage would look like this:
 
-    .. embed-python-code::
+    .. embed-code::
         openmdao.test.whatever.method
 
     What the above will do is replace the directive and its args with the block of code
@@ -41,4 +41,4 @@ class EmbedPythonCodeDirective(Directive):
 
 def setup(app):
     """add custom directive into Sphinx so that it is found during document parsing"""
-    app.add_directive('embed-python-code', EmbedPythonCodeDirective)
+    app.add_directive('embed-code', EmbedPythonCodeDirective)
