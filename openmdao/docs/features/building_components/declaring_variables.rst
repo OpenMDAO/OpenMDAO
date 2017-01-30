@@ -11,7 +11,7 @@ Regardless of the type, each component has input variables and output variables 
 In explicit and implicit components, the user must call :code:`add_input` and :code:`add_output` to declare variables in the :code:`initialize_variables` method.
 An example is given below.
 
-.. embed-python-code::
+.. embed-code::
     openmdao.test_suite.components.expl_comp_simple.TestExplCompSimple
 
 Method signature
@@ -28,7 +28,7 @@ Usage
 
 1. Declaring with only the default value.
 
-.. embed-python-code::
+.. embed-code::
     openmdao.core.tests.test_add_var.TestAddVarCompVal
 
 .. embed-test::
@@ -36,7 +36,7 @@ Usage
 
 2. Declaring with only the shape argument.
 
-.. embed-python-code::
+.. embed-code::
     openmdao.core.tests.test_add_var.TestAddVarCompShape
 
 .. embed-test::
@@ -44,7 +44,7 @@ Usage
 
 3. Declaring with only the indices argument.
 
-.. embed-python-code::
+.. embed-code::
     openmdao.core.tests.test_add_var.TestAddVarCompIndices
 
 .. embed-test::
@@ -52,7 +52,7 @@ Usage
 
 4. Declaring an array variable with a scalar default value.
 
-.. embed-python-code::
+.. embed-code::
     openmdao.core.tests.test_add_var.TestAddVarCompScalarArray
 
 .. embed-test::
@@ -60,7 +60,7 @@ Usage
 
 5. Declaring with an array val and indices (their shapes must match).
 
-.. embed-python-code::
+.. embed-code::
     openmdao.core.tests.test_add_var.TestAddVarCompArrayIndices
 
 .. embed-test::
@@ -68,7 +68,7 @@ Usage
 
 6. Declaring an output with bounds.
 
-.. embed-python-code::
+.. embed-code::
     openmdao.core.tests.test_add_var.TestAddVarCompBounds
 
 .. embed-test::

@@ -39,10 +39,7 @@ class EmbedTestDirective(Directive):
         # we want the output block to also be formatted similarly
         if skipped:
             output = "Test skipped because " + output
-            # from sphinx.addnodes import seealso
-            output_node = nodes.literal_block(output, output)
-        else:
-            output_node = nodes.literal_block(output, output)
+        output_node = nodes.literal_block(output, output)
 
         # put the nodes we've created in the list, and return them
         doc_nodes.append(body)

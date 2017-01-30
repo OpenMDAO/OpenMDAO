@@ -21,14 +21,14 @@ The implementation of each method will be illustrated using a simple explicit co
   Declare input and output variables via :code:`add_input` and :code:`add_output`.
   Information like variable names, sizes, units, and bounds are declared.
 
-  .. embed-python-code::
+  .. embed-code::
       openmdao.core.tests.test_expl_comp.TestExplCompSimpleCompute.initialize_variables
 
 - :code:`compute(inputs, outputs)` :
 
   Compute the :code:`outputs` given the :code:`inputs`.
 
-  .. embed-python-code::
+  .. embed-code::
       openmdao.core.tests.test_expl_comp.TestExplCompSimpleCompute.compute
 
 - :code:`compute_partial_derivs(inputs, outputs, partials)` :
@@ -36,14 +36,14 @@ The implementation of each method will be illustrated using a simple explicit co
   [Optional] Compute the :code:`partials` (partial derivatives) given the :code:`inputs`.
   The :code:`outputs` are also provided for convenience.
 
-  .. embed-python-code::
+  .. embed-code::
       openmdao.core.tests.test_expl_comp.TestExplCompSimplePartial.compute_jacobian
 
 - :code:`compute_jacvec_product(inputs, outputs, d_inputs, d_outputs, mode)` :
 
   [Optional] Provide the partial derivatives as a matrix-vector product. If :code:`mode` is :code:`'fwd'`, this method must compute :math:`d\_{outputs} = J \cdot d\_{inputs}`, where :math:`J` is the partial derivative Jacobian. If :code:`mode` is :code:`'rev'`, this method must compute :math:`d\_{inputs} = J^T \cdot d\_{outputs}`.
 
-  .. embed-python-code::
+  .. embed-code::
       openmdao.core.tests.test_expl_comp.TestExplCompSimpleJacVec.compute_jacvec_product
 
 Note that the last two are optional because the class can implement one or the other, or neither if the user wants to use the finite-difference or complex-step method.

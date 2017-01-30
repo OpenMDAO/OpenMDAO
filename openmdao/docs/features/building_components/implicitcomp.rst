@@ -21,21 +21,21 @@ The implementation of each method will be illustrated using a simple implicit co
   Declare input and output variables via :code:`add_input` and :code:`add_output`.
   Information like variable names, sizes, units, and bounds are declared.
 
-  .. embed-python-code::
+  .. embed-code::
       openmdao.core.tests.test_impl_comp.TestImplCompSimpleCompute.initialize_variables
 
 - :code:`apply_nonlinear(inputs, outputs, residuals)` :
 
   Compute the :code:`residuals` given the :code:`inputs` and :code:`outputs`.
 
-  .. embed-python-code::
+  .. embed-code::
       openmdao.core.tests.test_impl_comp.TestImplCompSimpleCompute.apply_nonlinear
 
 - :code:`solve_nonlinear(inputs, outputs)` :
 
   [Optional] Compute the :code:`outputs` given the :code:`inputs`.
 
-  .. embed-python-code::
+  .. embed-code::
       openmdao.core.tests.test_impl_comp.TestImplCompSimpleCompute.solve_nonlinear
 
 - :code:`linearize(inputs, outputs, partials)` :
@@ -45,19 +45,19 @@ The implementation of each method will be illustrated using a simple implicit co
   If the user wants to implement partial derivatives in a matrix-free way, this method provides a place to perform any necessary assembly or pre-processing for the matrix-vector products.
   Regardless of how the partial derivatives are computed, this method provides a place to perform any relevant factorizations for directly solving or preconditioning the linear system.
 
-  .. embed-python-code::
+  .. embed-code::
       openmdao.core.tests.test_impl_comp.TestImplCompSimpleLinearize.linearize
 
 - :code:`apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)` :
 
   [Optional] If the user wants to implement partial derivatives in a matrix-free way, this method performs the matrix-vector product. If mode is 'fwd', this method computes :math:`d\_{residuals} = J \cdot [ d\_{inputs} \quad d\_{outputs} ]^T`. If mode is 'rev', this method computes :math:`[ d\_{inputs} \quad d\_{outputs} ]^T = J^T \cdot d\_{residuals}`.
 
-  .. embed-python-code::
+  .. embed-code::
       openmdao.core.tests.test_impl_comp.TestImplCompSimpleJacVec.apply_linear
 
 - :code:`solve_linear(d_outputs, d_residuals, mode)` :
 
   [Optional] Solves a linear system where the matrix is :math:`d\_{residuals} / d\_{outputs}` or its transpose. If mode is 'fwd', the right-hand side vector is :math:`d\_{residuals}` and the solution vector is :math:`d\_{outputs}`. If mode is 'rev', the right-hand side vector is :math:`d\_{outputs}` and the solution vector is :math:`d\_{residuals}`.
 
-  .. embed-python-code::
+  .. embed-code::
       openmdao.core.tests.test_impl_comp.TestImplCompSimpleJacVec.solve_linear
