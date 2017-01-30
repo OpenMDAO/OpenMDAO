@@ -14,6 +14,16 @@ you will be able to construct models by linking multiple analyses together and t
    tutorials/first_optimization
    tutorials/first_mdao
 
+
+===============================
+`Sample Problems`_
+===============================
+
+.. toctree::
+   :maxdepth: 1
+
+   features/problems/sellar
+
 ============================
 `Features`_
 ============================
@@ -21,6 +31,8 @@ you will be able to construct models by linking multiple analyses together and t
 
 OpenMDAOs fully supported features are documented here.
 Anything documented here has been thoroughly tested an should be considered fully functional.
+
+
 
 Building components
 ====================

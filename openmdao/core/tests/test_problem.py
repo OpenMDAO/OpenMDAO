@@ -75,10 +75,11 @@ class TestProblem(unittest.TestCase):
 
     def test_feature_set_indeps(self):
         prob = Problem()
-        root = prob.model = Group()
-        root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         prob.setup()
 
@@ -286,7 +287,7 @@ class TestProblem(unittest.TestCase):
 
     # @unittest.skip('residualss accessor on Problem not implemented yet')
     def test_feature_residuals(self):
-        raise unittest.SkipTest('residualss accessor on Problem not implemented yet')
+        raise unittest.SkipTest('residuals accessors on Problem not implemented yet')
 
         prob = Problem()
         prob.model = SellarDerivatives()
