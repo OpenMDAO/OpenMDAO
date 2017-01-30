@@ -193,56 +193,24 @@ class Group(System):
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
             if out_name not in allprocs_out_names:
-                found = False
-                sys, name = out_name.rsplit('.', 1)
-                for subsys in self._subsystems_allprocs:
-                    for map_name, prom_name in iteritems(subsys._var_maps['output']):
-                        if name == prom_name:
-                            found = True
-                            break
-                if not found:
-                    raise NameError("Output '%s' does not exist for connection "
-                                    "in '%s' from '%s' to '%s'." %
-                                    (out_name, self.name if self.name else 'model',
-                                     out_name, in_name))
+                raise NameError("Output '%s' does not exist for connection "
+                                "in '%s' from '%s' to '%s'." %
+                                (out_name, self.name if self.name else 'model',
+                                 out_name, in_name))
 
             if in_name not in allprocs_in_names:
-                found = False
-                sys, name = in_name.rsplit('.', 1)
-                for subsys in self._subsystems_allprocs:
-                    for map_name, prom_name in iteritems(subsys._var_maps['input']):
-                        if name == prom_name:
-                            found = True
-                            break
-                if not found:
-                    raise NameError("Input '%s' does not exist for connection "
-                                    "in '%s' from '%s' to '%s'." %
-                                    (in_name, self.name if self.name else 'model',
-                                     out_name, in_name))
+                raise NameError("Input '%s' does not exist for connection "
+                                "in '%s' from '%s' to '%s'." %
+                                (in_name, self.name if self.name else 'model',
+                                 out_name, in_name))
 
             # throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
-            if '.' not in out_name:
-                # output var is promoted from a subsys, figure out which one
-                out_subsys = None
-                for subsys in self._subsystems_allprocs:
-                    for name, prom_name in iteritems(subsys._var_maps['output']):
-                        if out_name == prom_name:
-                            out_subsys = subsys.name
-                            break
-            else:
-                out_subsys = out_name.rsplit('.', 1)[0]
+            out_subsys = out_name.rsplit('.', 1)[0] if '.' in out_name \
+                else self._find_subsys_with_promoted_name(out_name, 'output')
 
-            if '.' not in in_name:
-                # input var is promoted from a subsys, figure out which one
-                in_subsys = None
-                for subsys in self._subsystems_allprocs:
-                    for name, prom_name in iteritems(subsys._var_maps['input']):
-                        if in_name == prom_name:
-                            in_subsys = subsys.name
-                            break
-            else:
-                in_subsys = in_name.rsplit('.', 1)[0]
+            in_subsys = in_name.rsplit('.', 1)[0] if '.' in in_name \
+                else self._find_subsys_with_promoted_name(in_name, 'input')
 
             if out_subsys == in_subsys:
                 raise RuntimeError("Input and output are in the same System " +
@@ -276,6 +244,27 @@ class Group(System):
                         src_indices = None
 
         self._var_connections_indices = pairs
+
+    def _find_subsys_with_promoted_name(self, var_name, io_type='output'):
+        """Find subsystem that contains promoted variable.
+
+        Args
+        ----
+        var_name : str
+            variable name
+        io_type : str
+            'output' or 'input'.
+
+        Returns
+        -------
+        str
+            name of subsystem, None if not found.
+        """
+        for subsys in self._subsystems_allprocs:
+            for name, prom_name in iteritems(subsys._var_maps[io_type]):
+                if var_name == prom_name:
+                    return subsys.name
+        return None
 
     def initialize_variables(self):
         """Set up variable name and metadata lists."""
