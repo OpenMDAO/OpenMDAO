@@ -5,6 +5,7 @@ from __future__ import division
 import collections
 
 import numpy
+from scipy.sparse import coo_matrix, csr_matrix
 from six import string_types
 
 from openmdao.core.component import Component
@@ -123,15 +124,51 @@ class ExplicitComponent(Component):
             elif mode == 'rev':
                 d_residuals.set_vec(d_outputs)
 
-    def _linearize(self, initial=False):
-        """Compute jacobian / factorization.
+    def _setup_variables(self, recurse=False):
+        """Assemble variable metadata and names lists.
+
+        Sets the following attributes:
+            _var_allprocs_names
+            _var_myproc_names
+            _var_myproc_metadata
+            _var_pathdict
+            _var_name2path
 
         Args
         ----
-        initial : boolean
-            whether this is the initial call to assemble the Jacobian.
+        recurse : boolean
+            Ignored.
         """
+        super(ExplicitComponent, self)._setup_variables(False)
+
+        for i, out_name in enumerate(self._var_myproc_names['output']):
+            meta = self._var_myproc_metadata['output'][i]
+            size = numpy.prod(meta['shape'])
+            arange = numpy.arange(size)
+            self.declare_partials(out_name, out_name, rows=arange, cols=arange,
+                                  val=numpy.ones(size))
+
+        # a GlobalJacobian will not have been set at this point, so this will
+        # negate values in the DefaultJacobian. These will later be copied
+        # into the GlobalJacobian (if one is set).
+        self._negate_jac()
+
+    def _negate_jac(self):
+        """Negate this component's part of the jacobian."""
+        if self._jacobian._subjacs:
+            for in_name in self._var_myproc_names['input']:
+                for out_name in self._var_myproc_names['output']:
+                    key = (out_name, in_name)
+                    if key in self._jacobian:
+                        self._jacobian._negate(key)
+
+    def _linearize(self):
+        """Compute jacobian / factorization."""
         self._jacobian._system = self
+
+        # negate constant subjacs (and others that will get overwritten)
+        # back to normal
+        self._negate_jac()
 
         self._inputs.scale(self._scaling_to_phys['input'])
         self._outputs.scale(self._scaling_to_phys['output'])
@@ -141,20 +178,22 @@ class ExplicitComponent(Component):
         self._inputs.scale(self._scaling_to_norm['input'])
         self._outputs.scale(self._scaling_to_norm['output'])
 
-        for out_name in self._var_myproc_names['output']:
-            size = len(self._outputs._views_flat[out_name])
-            ones = numpy.ones(size)
-            arange = numpy.arange(size)
-            self._jacobian[out_name, out_name] = (ones, arange, arange)
+        # re-negate the jacobian
+        self._negate_jac()
 
-        for out_name in self._var_myproc_names['output']:
-            for in_name in self._var_myproc_names['input']:
-                if (out_name, in_name) in self._jacobian:
-                    self._jacobian._negate((out_name, in_name))
-
-        self._jacobian._precompute_iter()
-        if not initial and self._jacobian._top_name == self.pathname:
+        if self._jacobian._top_name == self.pathname:
             self._jacobian._update()
+
+    def _set_partials_meta(self):
+        """Set subjacobian info into our jacobian."""
+        oldsys = self._jacobian._system
+        self._jacobian._system = self
+
+        for key, meta, typ in self._iter_partials_matches():
+            # only negate d_output/d_input partials
+            self._jacobian._set_partials_meta(key, meta, typ == 'input')
+
+        self._jacobian._system = oldsys
 
     def compute(self, inputs, outputs):
         """Compute outputs given inputs.

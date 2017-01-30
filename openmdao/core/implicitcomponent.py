@@ -123,14 +123,8 @@ class ImplicitComponent(Component):
                 success = success and tmp
             return success
 
-    def _linearize(self, initial=False):
-        """Compute jacobian / factorization.
-
-        Args
-        ----
-        initial : boolean
-            whether this is the initial call to assemble the Jacobian.
-        """
+    def _linearize(self):
+        """Compute jacobian / factorization."""
         self._jacobian._system = self
 
         self._inputs.scale(self._scaling_to_phys['input'])
@@ -141,8 +135,7 @@ class ImplicitComponent(Component):
         self._inputs.scale(self._scaling_to_norm['input'])
         self._outputs.scale(self._scaling_to_norm['output'])
 
-        self._jacobian._precompute_iter()
-        if not initial and self._jacobian._top_name == self.pathname:
+        if self._jacobian._top_name == self.pathname:
             self._jacobian._update()
 
     def apply_nonlinear(self, inputs, outputs, residuals):

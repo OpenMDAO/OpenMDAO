@@ -9,7 +9,6 @@ from openmdao.test_suite.components.cycle_comps import PSI, ExplicitCycleComp, E
     ExplicitLastComp
 
 
-
 class CycleGroup(ParametericTestGroup):
     """Group with a cycle. Derivatives and values are known."""
 
