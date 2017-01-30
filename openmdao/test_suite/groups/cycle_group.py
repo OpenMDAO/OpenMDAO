@@ -9,7 +9,6 @@ from openmdao.test_suite.components.cycle_comps import PSI, ExplicitCycleComp, E
     ExplicitLastComp
 
 
-
 class CycleGroup(ParametericTestGroup):
     """Group with a cycle. Derivatives and values are known."""
 
@@ -24,7 +23,6 @@ class CycleGroup(ParametericTestGroup):
             'num_var': [3, 1],
             'var_shape': [(2, 3), (3,)],
         })
-
 
     def _initialize_metadata(self):
         self.metadata.declare('num_comp', type_=int, value=2,
