@@ -135,6 +135,51 @@ Detailed docstring rules:
     """
 
 
+Embedding Autodocumentation Snippets into Documentation
+-------------------------------------------------------
+
+Sometimes in a Feature Doc, you want to highlight a particular method or class or module
+right there within the text.  The syntax to do this is provided by the `sphinx.ext.autodoc`
+module, in three commands, `automodule`, `autoclass`, and `automethod`.  The syntax of these
+is detailed in the following example code:
+
+::
+
+    **AUTOMODULE EXAMPLE:**
+
+      .. automodule:: openmdao.core.group
+        :noindex:
+
+    **AUTOCLASS EXAMPLE:**
+
+      .. autoclass:: openmdao.core.group.Group
+        :noindex:
+
+    **AUTOMETHOD EXAMPLE:**
+
+      .. automethod:: openmdao.core.group.Group.add
+        :noindex:
+
+
+The `:noindex:` argument is needed to prevent unwanted replication interactions with the OpenMDAO
+source documentation.  The above syntax will pull docstring info and produce the following output:
+
+**AUTOMODULE EXAMPLE:**
+
+  .. automodule:: openmdao.core.group
+    :noindex:
+
+**AUTOCLASS EXAMPLE:**
+
+  .. autoclass:: openmdao.core.group.Group
+    :noindex:
+
+**AUTOMETHOD EXAMPLE:**
+  .. automethod:: openmdao.core.group.Group.add
+    :noindex:
+
+
+
 
 Feature Docs and their Custom Directives for Including Code in Documentation
 ----------------------------------------------------------------------------
