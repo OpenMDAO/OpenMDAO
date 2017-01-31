@@ -1,4 +1,4 @@
-"""Components for use in `CycleGroup`."""
+"""Components for use in `CycleGroup`. For details, see `CycleGroup`."""
 from __future__ import division, print_function
 
 import numpy as np
@@ -86,7 +86,7 @@ class ExplicitCycleComp(ExplicitComponent):
             self.add_input('x_{}'.format(i), shape=self.var_shape)
             self.add_output('y_{}'.format(i), shape=self.var_shape)
 
-        self.add_input('theta', value=1.)
+        self.add_input('theta', val=1.)
         self.add_output('theta_out', shape=(1,))
 
     def compute(self, inputs, outputs):
@@ -184,7 +184,7 @@ class ExplicitFirstComp(ExplicitCycleComp):
 
     def initialize_variables(self):
         super(ExplicitFirstComp, self).initialize_variables()
-        self.add_input('psi', value=1.)
+        self.add_input('psi', val=1.)
         self.angle_param = 'psi'
 
     def compute(self, inputs, outputs):

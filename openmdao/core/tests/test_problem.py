@@ -17,10 +17,10 @@ class TestProblem(unittest.TestCase):
         # Basic test for the method using default solvers on simple model.
 
         top = Problem()
-        root = top.model = Group()
-        root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model = top.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         top.setup(check=False, mode='fwd')
         top.model.suppress_solver_output = True
@@ -46,10 +46,10 @@ class TestProblem(unittest.TestCase):
     def test_feature_numpyvec_setup(self):
 
         prob = Problem()
-        root = prob.model = Group()
-        root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         prob.setup()
 
@@ -75,10 +75,10 @@ class TestProblem(unittest.TestCase):
     def test_feature_petsc_setup(self):
 
         prob = Problem()
-        root = prob.model = Group()
-        root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         # use PETScVector when using any PETSc linear solvers or running under MPI
         prob.setup(vector_class=PETScVector)
@@ -154,10 +154,10 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        self.assert_rel_error(self, prob['x'], 0.0, 1e-6)
-        self.assert_rel_error(self, prob['y'], [3.160000, 3.755278], 1e-6)
-        self.assert_rel_error(self, prob['z'], [1.977639, 0.000000], 1e-6)
-        self.assert_rel_error(self, prob['obj'], 3.18339, 1e-6)
+        assert_rel_error(self, prob['x'], 0.0, 1e-6)
+        assert_rel_error(self, prob['y'], [3.160000, 3.755278], 1e-6)
+        assert_rel_error(self, prob['z'], [1.977639, 0.000000], 1e-6)
+        assert_rel_error(self, prob['obj'], 3.18339, 1e-6)
 
     def test_feature_simple_promoted_sellar_set_get_outputs(self):
 
