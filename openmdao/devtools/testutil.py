@@ -4,7 +4,7 @@ import numpy as np
 from math import isnan
 
 
-def assert_rel_error(test_case, actual, desired, tolerance):
+def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
     """Check relative error.
 
     Determine that the relative error between `actual` and `desired`
