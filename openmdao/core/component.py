@@ -18,7 +18,7 @@ class Component(System):
     _var2meta : dict
         A mapping of local variable name to its metadata.
     """
-    
+
     INPUT_DEFAULTS = {
         'shape': (1,),
         'units': '',
