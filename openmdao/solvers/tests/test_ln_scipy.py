@@ -375,7 +375,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
 
     def test_converge_diverge_groups(self):
         # Test derivatives for converge-diverge-groups topology.
-        raise unittest.SkipTest("Bug: data not being passed beyond first component.")
+        #raise unittest.SkipTest("Bug: data not being passed beyond first component.")
 
         prob = Problem()
         prob.model = ConvergeDivergeGroups()
