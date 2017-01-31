@@ -202,8 +202,8 @@ class TestJacobian(unittest.TestCase):
         # we get rev_check
         rev_check = np.array([-35., -5., 9., -63., -3., 1., -6., 1.])
 
-        self._check_fwd(self.prob, fwd_check)
-        self._check_rev(self.prob, rev_check)
+        self._check_fwd(prob, fwd_check)
+        self._check_rev(prob, rev_check)
 
     @parameterized.expand(itertools.product(
         [DenseMatrix, CsrMatrix, CooMatrix],

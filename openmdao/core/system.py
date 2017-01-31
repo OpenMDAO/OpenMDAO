@@ -766,6 +766,9 @@ class System(object):
         if jacobian is None:
             jacobian = DefaultJacobian()
         else:
+            if self._pre_setup_jac is jacobian:
+                    self._pre_setup_jac = None
+
             if is_top:
                 jacobian._top_name = self.pathname
                 jacobian._system = self
