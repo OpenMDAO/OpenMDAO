@@ -227,7 +227,7 @@ class ExplicitFirstComp(ExplicitCycleComp):
         return 'Explicit Cycle Component - First'
 
     def initialize_variables(self):
-        self.add_input('psi', value=1.)
+        self.add_input('psi', val=1.)
         self.angle_param = 'psi'
         super(ExplicitFirstComp, self).initialize_variables()
 
