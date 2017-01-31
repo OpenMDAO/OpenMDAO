@@ -250,7 +250,7 @@ class Problem(object):
 
             # check to see if a global jacobian was set prior to setup
             if system._pre_setup_jac is not None:
-                system.set_jacobian(system._pre_setup_jac)
+                system._set_jacobian(system._pre_setup_jac)
                 system._pre_setup_jac = None
 
         if check:
