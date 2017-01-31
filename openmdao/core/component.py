@@ -19,26 +19,6 @@ class Component(System):
         A mapping of local variable name to its metadata.
     """
 
-    INPUT_DEFAULTS = {
-        'shape': (1,),
-        'units': '',
-        'var_set': 0,
-        'indices': None,
-    }
-
-    OUTPUT_DEFAULTS = {
-        'shape': (1,),
-        'units': '',
-        'var_set': 0,
-        'lower': None,
-        'upper': None,
-        'ref': 1.0,
-        'ref0': 0.0,
-        'res_units': '',
-        'res_ref': 1.0,
-        'res_ref0': 0.0,
-    }
-
     def __init__(self, **kwargs):
         """Initialize all attributes.
 
@@ -359,7 +339,8 @@ class Component(System):
         for typ in ['input', 'output']:
             names = self._var_allprocs_names[typ]
             self._var_allprocs_pathnames[typ] = paths = [
-                '.'.join((self.pathname, n)) for n in names]
+                '.'.join((self.pathname, n)) for n in names
+            ]
             for idx, name in enumerate(names):
                 path = paths[idx]
                 self._var_pathdict[path] = PathData(name, idx, typ)
