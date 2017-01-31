@@ -4,9 +4,11 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 from openmdao.devtools.testutil import TestLogger
 from openmdao.error_checking.check_config import get_sccs
 
+
 class MyComp(ExecComp):
     def __init__(self):
         super(MyComp, self).__init__(["y = 2.0*a", "z = 3.0*b"])
+
 
 class TestCheckConfig(unittest.TestCase):
 
@@ -70,8 +72,8 @@ class TestCheckConfig(unittest.TestCase):
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 2)
 
-        self.assertEqual(warnings[0] ,"Group '' has the following cycles: [['C1', 'C2', 'C4']]")
-        self.assertEqual(warnings[1] ,"System 'C3' executes out-of-order with respect to its source systems ['C4']")
+        self.assertEqual(warnings[0], "Group '' has the following cycles: [['C1', 'C2', 'C4']]")
+        self.assertEqual(warnings[1], "System 'C3' executes out-of-order with respect to its source systems ['C4']")
 
     def test_dataflow_multi_level(self):
 
@@ -105,9 +107,9 @@ class TestCheckConfig(unittest.TestCase):
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 3)
 
-        self.assertEqual(warnings[0] ,"Group '' has the following cycles: [['C4', 'G1']]")
-        self.assertEqual(warnings[1] ,"System 'C3' executes out-of-order with respect to its source systems ['C4']")
-        self.assertEqual(warnings[2] ,"System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']")
+        self.assertEqual(warnings[0], "Group '' has the following cycles: [['C4', 'G1']]")
+        self.assertEqual(warnings[1], "System 'C3' executes out-of-order with respect to its source systems ['C4']")
+        self.assertEqual(warnings[2], "System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']")
 
         # test comps_only cycle check
         sccs = [sorted(s) for s in get_sccs(root, comps_only=True) if len(s) > 1]
@@ -155,9 +157,9 @@ class TestCheckConfig(unittest.TestCase):
         self.assertEqual(len(warnings), 4)
 
         self.assertTrue("The following inputs are not connected:" in warnings[0])
-        self.assertEqual(warnings[1] ,"Group '' has the following cycles: [['C11', 'C12', 'C13'], ['C21', 'C22', 'C23'], ['C1', 'C2', 'C3']]")
-        self.assertEqual(warnings[2] ,"System 'C2' executes out-of-order with respect to its source systems ['N3']")
-        self.assertEqual(warnings[3] ,"System 'C3' executes out-of-order with respect to its source systems ['C11']")
+        self.assertEqual(warnings[1], "Group '' has the following cycles: [['C11', 'C12', 'C13'], ['C21', 'C22', 'C23'], ['C1', 'C2', 'C3']]")
+        self.assertEqual(warnings[2], "System 'C2' executes out-of-order with respect to its source systems ['N3']")
+        self.assertEqual(warnings[3], "System 'C3' executes out-of-order with respect to its source systems ['C11']")
 
 
 if __name__ == "__main__":

@@ -28,8 +28,11 @@ Building components
 .. toctree::
    :maxdepth: 1
 
+   features/building_components/building_components
+   features/building_components/declaring_variables
    features/building_components/indepvarcomp
    features/building_components/explicitcomp
+   features/building_components/implicitcomp
 
 Defining partial derivatives
 ================================

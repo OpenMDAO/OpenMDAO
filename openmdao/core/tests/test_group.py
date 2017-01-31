@@ -1,4 +1,7 @@
+import six
 import unittest
+
+import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 
@@ -187,5 +190,106 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['group2.comp2.b'], 40.0)
 
 
-if __name__ == '__main__':
+class TestConnect(unittest.TestCase):
+
+    def setUp(self):
+        prob = Problem(Group())
+
+        sub = prob.model.add_subsystem('sub', Group())
+        sub.add_subsystem('src', IndepVarComp('x', np.zeros(5,)))
+        sub.add_subsystem('tgt', ExecComp('y = x'))
+        sub.add_subsystem('cmp', ExecComp('z = x'))
+
+        self.sub = sub
+        self.prob = prob
+
+    def test_src_indices_as_int_list(self):
+        self.sub.connect('src.x', 'tgt.x', src_indices=[1])
+
+    def test_src_indices_as_int_array(self):
+        self.sub.connect('src.x', 'tgt.x', src_indices=np.zeros(1, dtype=int))
+
+    def test_src_indices_as_float_list(self):
+        msg = "src_indices must contain integers, but src_indices for " + \
+              "connection from 'src.x' to 'tgt.x' contains non-integers."
+
+        with six.assertRaisesRegex(self, TypeError, msg):
+            self.sub.connect('src.x', 'tgt.x', src_indices=[1.0])
+
+    def test_src_indices_as_float_array(self):
+        msg = "src_indices must contain integers, but src_indices for " + \
+              "connection from 'src.x' to 'tgt.x' is <.* 'numpy.float64'>."
+
+        with six.assertRaisesRegex(self, TypeError, msg):
+            self.sub.connect('src.x', 'tgt.x', src_indices=np.zeros(1))
+
+    def test_src_indices_as_str(self):
+        msg = "src_indices must be an index array, " + \
+              "did you mean connect('src.x', [tgt.x, cmp.x])?"
+
+        with six.assertRaisesRegex(self, TypeError, msg):
+            self.sub.connect('src.x', 'tgt.x', 'cmp.x')
+
+    def test_already_connected(self):
+        msg = "Input 'tgt.x' is already connected to 'src.x'."
+
+        self.sub.connect('src.x', 'tgt.x', src_indices=[1])
+        with six.assertRaisesRegex(self, RuntimeError, msg):
+            self.sub.connect('cmp.x', 'tgt.x', src_indices=[1])
+
+    def test_invalid_source(self):
+        msg = "Output 'src.z' does not exist for connection " + \
+              "in 'sub' from 'src.z' to 'tgt.x'."
+
+        # source and target names can't be checked until setup
+        # because initialize_variables is not called until then
+        self.sub.connect('src.z', 'tgt.x', src_indices=[1])
+        with six.assertRaisesRegex(self, NameError, msg):
+            self.prob.setup(check=False)
+
+    def test_invalid_target(self):
+        msg = "Input 'tgt.z' does not exist for connection " + \
+              "in 'sub' from 'src.x' to 'tgt.z'."
+
+        # source and target names can't be checked until setup
+        # because initialize_variables is not called until then
+        self.sub.connect('src.x', 'tgt.z', src_indices=[1])
+        with six.assertRaisesRegex(self, NameError, msg):
+            self.prob.setup(check=False)
+
+    def test_connect_within_system(self):
+        msg = "Input and output are in the same System for connection " + \
+              "from 'tgt.y' to 'tgt.x'."
+
+        with six.assertRaisesRegex(self, RuntimeError, msg):
+            self.sub.connect('tgt.y', 'tgt.x', src_indices=[1])
+
+    def test_connect_within_system_with_promotes(self):
+        prob = Problem(Group())
+
+        sub = prob.model.add_subsystem('sub', Group())
+        sub.add_subsystem('tgt', ExecComp('y = x'), promotes_outputs=['y'])
+        sub.connect('y', 'tgt.x', src_indices=[1])
+
+        msg = "Input and output are in the same System for connection " + \
+              "in 'sub' from 'y' to 'tgt.x'."
+
+        with six.assertRaisesRegex(self, RuntimeError, msg):
+            prob.setup(check=False)
+
+    def test_connect_within_system_with_renames(self):
+        prob = Problem(Group())
+
+        sub = prob.model.add_subsystem('sub', Group())
+        sub.add_subsystem('tgt', ExecComp('y = x'), renames_outputs={'y': 'y2'})
+        sub.connect('y2', 'tgt.x', src_indices=[1])
+
+        msg = "Input and output are in the same System for connection " + \
+              "in 'sub' from 'y2' to 'tgt.x'."
+
+        with six.assertRaisesRegex(self, RuntimeError, msg):
+            prob.setup(check=False)
+
+
+if __name__ == "__main__":
     unittest.main()
