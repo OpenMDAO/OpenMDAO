@@ -278,8 +278,6 @@ class TestJacobian(unittest.TestCase):
         lambda f, n, p: '_'.join(['test_jacobian_set_item', p.args[0][0], p.args[1][0]]))
     def test_jacobian_set_item(self, dtypes, shapes):
 
-
-
         shape, constructor = shapes
         dtype, value = dtypes
 

@@ -30,7 +30,7 @@ class TestBacktrackingLineSearch(unittest.TestCase):
         root = top.model = Group()
         root.add_subsystem('comp', ImplCompOneState())
         root.add_subsystem('p', IndepVarComp('x', 1.2278849186466743))
-        root.connect('p.y', 'comp.x')
+        root.connect('p.x', 'comp.x')
 
         root.nl_solver = NewtonSolver()
         root.ln_solver = ScipyIterativeSolver()
@@ -208,7 +208,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         for ind in range(3):
             assert_rel_error(self, top['comp.z'][ind], 2.5, 1e-8)
 
-    def test_linesearch_wall_bound_enforcement(self):
+    def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
 
         ls = top.model.nl_solver.set_subsolver(
@@ -233,7 +233,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         for ind in range(3):
             assert_rel_error(self, top['comp.z'][ind], self.ub[ind], 1e-8)
 
-    def test_linesearch_wall_bound_enforcement(self):
+    def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
 
         ls = top.model.nl_solver.set_subsolver(

@@ -109,7 +109,8 @@ class ImplCompTwoStatesArrays(ImplicitComponent):
     def initialize_variables(self):
         self.add_input('x', numpy.zeros((3, 1)))
         self.add_output('y', numpy.zeros((3, 1)))
-        self.add_output('z', 2.0*numpy.ones((3, 1)), lower=1.5, upper=[2.6, 2.5, 2.65])
+        self.add_output('z', 2.0*numpy.ones((3, 1)), lower=1.5,
+            upper=numpy.array([2.6, 2.5, 2.65]).reshape((3,1)))
 
         self.maxiter = 10
         self.atol = 1.0e-12
