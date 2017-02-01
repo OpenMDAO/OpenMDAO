@@ -12,9 +12,6 @@ from openmdao.core.group import Group
 class SrcComp(Component):
     """ Source provides degrees Celsius. """
 
-    def __init__(self):
-        super(SrcComp, self).__init__()
-
     def initialize_variables(self):
         self.add_input('x1', 100.0)
         self.add_output('x2', 100.0, units='degC')
@@ -30,8 +27,6 @@ class SrcComp(Component):
 
 class TgtCompF(Component):
     """ Target expressed in degrees F."""
-    def __init__(self):
-        super(TgtCompF, self).__init__()
 
     def initialize_variables(self):
         self.add_input('x2', 100.0, units='degF')
@@ -49,9 +44,6 @@ class TgtCompF(Component):
 class TgtCompFMulti(Component):
     """ Contains some extra inputs that might trip things up.
     """
-
-    def __init__(self):
-        super(TgtCompFMulti, self).__init__()
 
     def initialize_variables(self):
         self.add_input('_x2', 100.0, units='degF')
@@ -81,9 +73,6 @@ class TgtCompFMulti(Component):
 class TgtCompC(Component):
     """ Target expressed in degrees Celsius."""
 
-    def __init__(self):
-        super(TgtCompC, self).__init__()
-
     def initialize_variables(self):
         self.add_input('x2', 100.0, units='degC')
         self.add_output('x3', 100.0)
@@ -99,9 +88,6 @@ class TgtCompC(Component):
 
 class TgtCompK(Component):
     """ Target expressed in degrees Kelvin."""
-
-    def __init__(self):
-        super(TgtCompK, self).__init__()
 
     def initialize_variables(self):
         self.add_input('x2', 100.0, units='degK')
