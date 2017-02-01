@@ -43,7 +43,7 @@ class Group(System):
             to 'promote' up to this group. This is for backwards compatibility
             with older versions of OpenMDAO.
         """
-        warn_deprecation('This method provides backwards compabitibility with '
+        warn_deprecation('This method provides backwards compatibility with '
                          'OpenMDAO <= 1.x ; use add_subsystem instead.')
 
         self.add_subsystem(name, subsys, promotes=promotes)

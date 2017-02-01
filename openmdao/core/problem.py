@@ -14,6 +14,7 @@ from openmdao.error_checking.check_config import check_config
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.core.component import Component
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class FakeComm(object):
@@ -121,6 +122,32 @@ class Problem(object):
             c0, c1 = self.model._scaling_to_norm['input'][ind, :]
             self.model._inputs[name] = c0 + c1 * np.array(value)
 
+    @property
+    def root(self):
+        """Provide 'root' property for backwards compatibility.
+
+        Returns
+        -------
+        <Group>
+            reference to the 'model' property.
+        """
+        warn_deprecation("The 'root' property provides backwards compatibility "
+                         "with OpenMDAO <= 1.x ; use 'model' instead.")
+        return self.model
+
+    @root.setter
+    def root(self, value):
+        """Provide for setting the 'root' property for backwards compatibility.
+
+        Args
+        -------
+        <Group>
+            reference to a <Group> to be assigned to the 'model' property.
+        """
+        warn_deprecation("The 'root' property provides backwards compatibility "
+                         "with OpenMDAO <= 1.x ; use 'model' instead.")
+        self.model = value
+
     def run_model(self):
         """Run the model by calling the root system's solve_nonlinear.
 
@@ -147,7 +174,7 @@ class Problem(object):
         float
             absolute error.
         """
-        warn_deprecation('This method provides backwards compabitibility with '
+        warn_deprecation('This method provides backwards compatibility with '
                          'OpenMDAO <= 1.x ; use run_driver instead.')
 
         return self.run_model()
@@ -164,7 +191,7 @@ class Problem(object):
         float
             absolute error.
         """
-        warn_deprecation('This method provides backwards compabitibility with '
+        warn_deprecation('This method provides backwards compatibility with '
                          'OpenMDAO <= 1.x ; use run_driver instead.')
 
         return self.run_driver()
