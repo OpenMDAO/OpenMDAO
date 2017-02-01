@@ -178,7 +178,6 @@ class System(object):
         self._transfers = None
 
         self._jacobian = DefaultJacobian()
-        self._jacobian._system = self
 
         self._subjacs_info = OrderedDict()
         self._pre_setup_jac = None
@@ -611,6 +610,17 @@ class System(object):
         return maps
 
     @contextmanager
+    def _jacobian_context(self):
+        """Context manager for jacobians.
+
+        Sets this system's _jacobian._system attribute to the current system.
+        """
+        oldsys = self._jacobian._system
+        self._jacobian._system = self
+        yield self._jacobian
+        self._jacobian._system = oldsys
+
+    @contextmanager
     def _matvec_context(self, vec_name, var_inds, mode, clear=True):
         """Context manager for vectors.
 
@@ -781,8 +791,8 @@ class System(object):
             subsys._set_jacobian(jacobian, False)
 
         if not isinstance(jacobian, DefaultJacobian) and is_top:
-            self._jacobian._system = self
-            self._jacobian._initialize()
+            jacobian._system = self
+            jacobian._initialize()
 
     def _set_partials_meta(self):
         """Set subjacobian info into our jacobian.

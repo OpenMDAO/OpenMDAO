@@ -308,13 +308,9 @@ class Component(System):
 
     def _set_partials_meta(self):
         """Set subjacobian info into our jacobian."""
-        oldsys = self._jacobian._system
-        self._jacobian._system = self
-
-        for key, meta, typ in self._iter_partials_matches():
-            self._jacobian._set_partials_meta(key, meta)
-
-        self._jacobian._system = oldsys
+        with self._jacobian_context() as J:
+            for key, meta, typ in self._iter_partials_matches():
+                J._set_partials_meta(key, meta)
 
     def _setup_variables(self, recurse=False):
         """Assemble variable metadata and names lists.

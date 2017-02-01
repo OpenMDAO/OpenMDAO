@@ -271,16 +271,18 @@ class Group(System):
         self._var_pathdict = {}
         self._var_name2path = {}
 
+        start = len(self.pathname) + 1 if self.pathname else 0
         for typ in ['input', 'output']:
             for subsys in self._subsystems_myproc:
                 # Assemble the names list from subsystems
                 subsys._var_maps[typ] = subsys._get_maps(typ)
                 paths = subsys._var_allprocs_pathnames[typ]
+
                 for idx, subname in enumerate(subsys._var_allprocs_names[typ]):
                     name = subsys._var_maps[typ][subname]
                     self._var_allprocs_names[typ].append(name)
                     self._var_allprocs_pathnames[typ].append(paths[idx])
-                    self._var_myproc_names[typ].append(name)
+                    self._var_myproc_names[typ].append(paths[idx][start:])
 
                 # Assemble the metadata list from the subsystems
                 metadata = subsys._var_myproc_metadata[typ]
@@ -346,32 +348,31 @@ class Group(System):
             ranges of variable IDs involved in this matrix-vector product.
             The ordering is [lb1, ub1, lb2, ub2].
         """
-        # Use global Jacobian
-        if self._jacobian._top_name == self.pathname:
-            for vec_name in vec_names:
-                with self._matvec_context(vec_name, var_inds, mode) as vecs:
-                    d_inputs, d_outputs, d_residuals = vecs
-                    self._jacobian._system = self
-                    self._jacobian._apply(d_inputs, d_outputs, d_residuals,
-                                          mode)
-        # Apply recursion
-        else:
-            if mode == 'fwd':
+        with self._jacobian_context() as J:
+            # Use global Jacobian
+            if J._top_name == self.pathname:
                 for vec_name in vec_names:
-                    d_inputs = self._vectors['input'][vec_name]
-                    d_outputs = self._vectors['output'][vec_name]
-                    self._vector_transfers[vec_name][None](
-                        d_inputs, d_outputs, mode)
+                    with self._matvec_context(vec_name, var_inds, mode) as vecs:
+                        d_inputs, d_outputs, d_residuals = vecs
+                        J._apply(d_inputs, d_outputs, d_residuals, mode)
+            # Apply recursion
+            else:
+                if mode == 'fwd':
+                    for vec_name in vec_names:
+                        d_inputs = self._vectors['input'][vec_name]
+                        d_outputs = self._vectors['output'][vec_name]
+                        self._vector_transfers[vec_name][None](
+                            d_inputs, d_outputs, mode)
 
-            for subsys in self._subsystems_myproc:
-                subsys._apply_linear(vec_names, mode, var_inds)
+                for subsys in self._subsystems_myproc:
+                    subsys._apply_linear(vec_names, mode, var_inds)
 
-            if mode == 'rev':
-                for vec_name in vec_names:
-                    d_inputs = self._vectors['input'][vec_name]
-                    d_outputs = self._vectors['output'][vec_name]
-                    self._vector_transfers[vec_name][None](
-                        d_inputs, d_outputs, mode)
+                if mode == 'rev':
+                    for vec_name in vec_names:
+                        d_inputs = self._vectors['input'][vec_name]
+                        d_outputs = self._vectors['output'][vec_name]
+                        self._vector_transfers[vec_name][None](
+                            d_inputs, d_outputs, mode)
 
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.
@@ -396,10 +397,10 @@ class Group(System):
 
     def _linearize(self):
         """Compute jacobian / factorization."""
-        for subsys in self._subsystems_myproc:
-            subsys._linearize()
+        with self._jacobian_context() as J:
+            for subsys in self._subsystems_myproc:
+                subsys._linearize()
 
-        # Update jacobian
-        if self._jacobian._top_name == self.pathname:
-            self._jacobian._system = self
-            self._jacobian._update()
+            # Update jacobian
+            if J._top_name == self.pathname:
+                J._update()

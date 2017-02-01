@@ -185,7 +185,8 @@ class TestExecComp(unittest.TestCase):
 
         C1._linearize()
 
-        assert_rel_error(self, C1._jacobian[('y','x')], -2.0, 0.00001)
+        with C1._jacobian_context() as J:
+            assert_rel_error(self, J[('y','x')], -2.0, 0.00001)
 
     def test_complex_step2(self):
         prob = Problem(Group())

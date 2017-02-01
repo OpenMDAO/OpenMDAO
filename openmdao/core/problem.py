@@ -92,14 +92,47 @@ class Problem(object):
             the requested output/input variable.
         """
         try:
-            self.model._outputs[name]
-            ind = self.model._var_myproc_names['output'].index(name)
+            pdata = self.model._var_pathdict[name]
+        except KeyError:
+            # name is not an absolute path
+            try:
+                paths = self.model._var_name2path[name]
+            except KeyError:
+                raise KeyError("Variable '%s' not found." % name)
+
+            # look for a matching output (shouldn't be more than one)
+            for path in paths:
+                pdata = self.model._var_pathdict[path]
+                if pdata.typ == 'output':
+                    break
+            else:
+                if len(paths) > 1:
+                    raise RuntimeError("Variable name '%s' is not unique and "
+                                       "matches the following: %s. "
+                                       "Use the absolute pathname instead." %
+                                       (name, paths))
+            name = path
+
+        prom = pdata.name
+        if pdata.typ == 'output':
+            ind = self.model._var_myproc_names['output'].index(name) # TODO: fix this
             c0, c1 = self.model._scaling_to_phys['output'][ind, :]
             return c0 + c1 * self.model._outputs[name]
-        except KeyError:
-            ind = self.model._var_myproc_names['input'].index(name)
+        else:
+            ind = self.model._var_myproc_names['input'].index(prom)
             c0, c1 = self.model._scaling_to_phys['input'][ind, :]
             return c0 + c1 * self.model._inputs[name]
+
+
+        # try:
+        #     self.model._outputs[name]
+        #     ind = self.model._var_myproc_names['output'].index(name)
+        #     c0, c1 = self.model._scaling_to_phys['output'][ind, :]
+        #     return c0 + c1 * self.model._outputs[name]
+        # except KeyError:
+        #     ind = self.model._var_myproc_names['input'].index(name)
+        #     c0, c1 = self.model._scaling_to_phys['input'][ind, :]
+        #     return c0 + c1 * self.model._inputs[name]
 
     def __setitem__(self, name, value):
         """Set an output/input variable.

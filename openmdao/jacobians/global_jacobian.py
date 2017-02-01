@@ -93,6 +93,7 @@ class GlobalJacobian(Jacobian):
                                           include_self=True, typ=Component):
             sub_out_inds = s._var_myproc_indices['output']
             sub_in_inds = s._var_myproc_indices['input']
+            start = len(s.pathname) + 1
 
             for re_idx_all in sub_out_inds:
                 re_path = out_paths[re_idx_all]
@@ -105,8 +106,8 @@ class GlobalJacobian(Jacobian):
                         info, shape = self._subjacs_info[key]
                     else:
                         info = SUBJAC_META_DEFAULTS
-                        rname = out_names[re_idx_all]
-                        oname = out_names[out_idx_all]
+                        rname = re_path[start:]
+                        oname = out_path[start:]
                         shape = (system._outputs._views_flat[rname].size,
                                  system._outputs._views_flat[oname].size)
 
@@ -114,7 +115,7 @@ class GlobalJacobian(Jacobian):
                                               out_offsets[out_idx_all],
                                               None, shape)
 
-                for in_count, in_idx_all in enumerate(sub_in_inds):
+                for in_idx_all in sub_in_inds:
                     in_path = in_paths[in_idx_all]
                     key = (re_path, in_path)
                     self._keymap[key] = key
@@ -122,8 +123,8 @@ class GlobalJacobian(Jacobian):
                         info, shape = self._subjacs_info[key]
                     else:
                         info = SUBJAC_META_DEFAULTS
-                        rname = out_names[re_idx_all]
-                        iname = in_names[in_idx_all]
+                        rname = re_path[start:]
+                        iname = in_path[start:]
                         shape = (system._outputs._views_flat[rname].size,
                                  system._inputs._views_flat[iname].size)
 

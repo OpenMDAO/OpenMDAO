@@ -101,12 +101,8 @@ class Jacobian(object):
         in_path : str
             pathname of input variable.
         """
-        out_paths = self._system._var_name2path.get(key[0])
-        in_paths = self._system._var_name2path.get(key[1])
-        if out_paths is None or in_paths is None:
-            return None
-        assert (len(in_paths) == 1 and len(out_paths) == 1)
-        return (out_paths[0], in_paths[0])
+        return (self._system._var_name2path[key[0]][0],
+                self._system._var_name2path[key[1]][0])
 
     def _negate(self, key):
         """Multiply this sub-Jacobian by -1.0, for explicit variables.
@@ -141,23 +137,26 @@ class Jacobian(object):
         """
         system = self._system
         pathdict = system._var_pathdict
-        pathnames = system._var_allprocs_pathnames
+        outpaths = system._var_allprocs_pathnames['output']
+        inpaths = system._var_allprocs_pathnames['input']
         out_offset = system._var_allprocs_range['output'][0]
         in_offset = system._var_allprocs_range['input'][0]
+        in_indices = system._var_myproc_indices['input']
+        out_indices = system._var_myproc_indices['output']
 
         iter_list = []
-        for re_ind in system._var_myproc_indices['output']:
-            re_path = pathnames['output'][re_ind - out_offset]
+        for re_ind in out_indices:
+            re_path = outpaths[re_ind - out_offset]
 
-            for out_ind in system._var_myproc_indices['output']:
-                out_path = pathnames['output'][out_ind - out_offset]
+            for out_ind in out_indices:
+                out_path = outpaths[out_ind - out_offset]
 
                 if (re_path, out_path) in self._subjacs:
                     iter_list.append((pathdict[re_path].name,
                                       pathdict[out_path].name))
 
-            for in_ind in system._var_myproc_indices['input']:
-                in_path = pathnames['input'][in_ind - in_offset]
+            for in_ind in in_indices:
+                in_path = inpaths[in_ind - in_offset]
 
                 if (re_path, in_path) in self._subjacs:
                     iter_list.append((pathdict[re_path].name,
@@ -178,7 +177,14 @@ class Jacobian(object):
         boolean
             return whether sub-Jacobian has been defined.
         """
-        return self._key2unique(key) in self._subjacs
+        out_paths = self._system._var_name2path.get(key[0])
+        if out_paths:
+            in_paths = self._system._var_name2path.get(key[1])
+            if in_paths:
+                for ipath in in_paths:
+                    if (out_paths[0], ipath) in self._subjacs:
+                        return True
+        return False
 
     def __iter__(self):
         """Return iterator from pre-computed _iter_list.
