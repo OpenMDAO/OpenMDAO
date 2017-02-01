@@ -70,12 +70,7 @@ class TestImplicitComponent(unittest.TestCase):
 class TestIndepVarComp(unittest.TestCase):
 
     def test_indep_simple(self):
-        """Define one independent variable and set its value.
-
-        Features
-        --------
-        indepvarcomp
-        """
+        """Define one independent variable and set its value."""
         comp = IndepVarComp('indep_var')
         prob = Problem(comp).setup(check=False)
 
@@ -85,24 +80,14 @@ class TestIndepVarComp(unittest.TestCase):
         assert_rel_error(self, prob['indep_var'], 2.0)
 
     def test_indep_simple_default(self):
-        """Define one independent variable with a default value.
-
-        Features
-        --------
-        indepvarcomp
-        """
+        """Define one independent variable with a default value."""
         comp = IndepVarComp('indep_var', val=2.0)
         prob = Problem(comp).setup(check=False)
 
         assert_rel_error(self, prob['indep_var'], 2.0)
 
     def test_indep_simple_kwargs(self):
-        """Define one independent variable with a default value and additional options.
-
-        Features
-        --------
-        indepvarcomp
-        """
+        """Define one independent variable with a default value and additional options."""
         kwargs = {'units': 'm', 'lower': 0, 'upper': 10,}
         comp = IndepVarComp([
             ('indep_var', 2.0, kwargs),
@@ -112,12 +97,7 @@ class TestIndepVarComp(unittest.TestCase):
         assert_rel_error(self, prob['indep_var'], 2.0)
 
     def test_indep_simple_array(self):
-        """Define one independent array variable.
-
-        Features
-        --------
-        indepvarcomp
-        """
+        """Define one independent array variable."""
         array = numpy.array([
             [1., 2.],
             [3., 4.],
@@ -129,13 +109,7 @@ class TestIndepVarComp(unittest.TestCase):
         assert_rel_error(self, prob['indep_var'], array)
 
     def test_indep_multiple_default(self):
-        """Define two independent variables at once.
-
-        Features
-        --------
-        indepvarcomp
-
-        """
+        """Define two independent variables at once."""
         comp = IndepVarComp((
             ('indep_var_1', 1.0),
             ('indep_var_2', 2.0),
@@ -146,18 +120,11 @@ class TestIndepVarComp(unittest.TestCase):
         assert_rel_error(self, prob['indep_var_1'], 1.0)
         assert_rel_error(self, prob['indep_var_2'], 2.0)
 
-    def test_indep_multiple_kwargs(self):
-        """Define two independent variables at once and additional options.
-
-        Features
-        --------
-        indepvarcomp
-
-        """
-        comp = IndepVarComp((
-            ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
-            ('indep_var_2', 2.0, {'lower': 1., 'upper': 20}),
-        ))
+    def test_indep_add_var(self):
+        """Define two independent variables using the add_var method."""
+        comp = IndepVarComp()
+        comp.add_var('indep_var_1', 1.0, lower=0, upper=10)
+        comp.add_var('indep_var_2', 2.0, lower=1, upper=20)
 
         prob = Problem(comp).setup(check=False)
 

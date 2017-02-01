@@ -49,3 +49,8 @@ Usage
 
 .. embed-test::
     openmdao.core.tests.test_component.TestIndepVarComp.test_indep_multiple_kwargs
+
+7. Define two independent variables using an external method with additional options.
+
+.. embed-test::
+    openmdao.core.tests.test_component.TestIndepVarComp.test_indep_add_var

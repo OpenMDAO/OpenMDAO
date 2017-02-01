@@ -430,31 +430,26 @@ class System(object):
 
         # Scaling coefficients from the src output
         src_units = self._assembler._src_units
-        src_0 = self._assembler._src_scaling_0
-        src_1 = self._assembler._src_scaling_1
+        src_scaling = self._assembler._src_scaling
 
         # Compute scaling arrays for inputs using a0 and a1
         for ind, meta in enumerate(self._var_myproc_metadata['input']):
             global_ind = self._var_myproc_indices['input'][ind]
             self._scaling_to_phys['input'][ind, 0] = \
-                convert_units(src_0[global_ind], src_units[global_ind],
-                              meta['units'])
+                convert_units(src_scaling[global_ind, 0], src_units[global_ind], meta['units'])
             self._scaling_to_phys['input'][ind, 1] = \
-                convert_units(src_1[global_ind], src_units[global_ind],
-                              meta['units'])
+                convert_units(src_scaling[global_ind, 1], src_units[global_ind], meta['units'])
 
         for ind, meta in enumerate(self._var_myproc_metadata['output']):
             # Compute scaling arrays for outputs; no unit conversion needed
             self._scaling_to_phys['output'][ind, 0] = meta['ref0']
-            self._scaling_to_phys['output'][ind, 1] = \
-                meta['ref'] - meta['ref0']
+            self._scaling_to_phys['output'][ind, 1] = meta['ref'] - meta['ref0']
 
             # Compute scaling arrays for residuals; convert units
             self._scaling_to_phys['residual'][ind, 0] = \
                 convert_units(meta['ref0'], meta['units'], meta['res_units'])
             self._scaling_to_phys['residual'][ind, 1] = \
-                convert_units(meta['ref'] - meta['ref0'],
-                              meta['units'], meta['res_units'])
+                convert_units(meta['ref'] - meta['ref0'], meta['units'], meta['res_units'])
 
         # Compute inverse scaling arrays
         for key in ['input', 'output', 'residual']:
