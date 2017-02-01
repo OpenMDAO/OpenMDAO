@@ -11,6 +11,7 @@ class Paraboloid(ExplicitComponent):
     def __init__(self):
         super(Paraboloid, self).__init__()
 
+    def initialize_variables(self):
         self.add_input('x', val=0.0)
         self.add_input('y', val=0.0)
 

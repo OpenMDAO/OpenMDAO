@@ -50,7 +50,7 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
         self._var2meta = {}
 
-    def add_input(self, name, val=1.0, shape=None, indices=None, units='', var_set=0):
+    def add_input(self, name, val=1.0, shape=None, indices=None, units='', desc='', var_set=0):
         """Add an input variable to the component.
 
         Args
@@ -69,6 +69,8 @@ class Component(System):
         units : str
             Units in which this input variable will be provided to the component during execution.
             Default is '', which means it has no units.
+        desc : str
+            description of the variable
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
@@ -128,6 +130,9 @@ class Component(System):
         # units: taken as is
         metadata['units'] = units
 
+        # desc: taken as is
+        metadata['desc'] = desc
+
         # var_set: taken as is
         metadata['var_set'] = var_set
 
@@ -136,7 +141,7 @@ class Component(System):
         self._var_myproc_metadata['input'].append(metadata)
         self._var2meta[name] = metadata
 
-    def add_output(self, name, val=1.0, shape=None, units='', res_units='',
+    def add_output(self, name, val=1.0, shape=None, units='', res_units='', desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
                    res_ref=1.0, res_ref0=0.0, var_set=0):
         """Add an output variable to the component.
@@ -156,6 +161,8 @@ class Component(System):
         res_units : str
             Units in which the residuals of this output will be given to the user when requested.
             Default is '', which means it has no units.
+        desc : str
+            description of the variable
         lower : float or list or tuple or ndarray or None
             lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
@@ -229,6 +236,9 @@ class Component(System):
         # units, res_units: taken as is
         metadata['units'] = units
         metadata['res_units'] = res_units
+
+        # desc: taken as is
+        metadata['desc'] = desc
 
         # lower, upper: check the shape if necessary
         if lower is not None and not numpy.isscalar(lower) and \

@@ -19,6 +19,14 @@ class TestExplicitComponent(unittest.TestCase):
         comp = TestExplCompSimple()
         prob = Problem(comp).setup(check=False)
 
+        # check optional metadata (desc)
+        self.assertEqual(comp._var2meta['length']['desc'],
+                         'length of rectangle')
+        self.assertEqual(comp._var2meta['width']['desc'],
+                         'width of rectangle')
+        self.assertEqual(comp._var2meta['area']['desc'],
+                         'area of rectangle')
+
         prob['length'] = 3.
         prob['width'] = 2.
         prob.run_model()
