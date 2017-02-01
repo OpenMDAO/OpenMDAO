@@ -4,8 +4,8 @@ from sphinx.util.compat import Directive
 from openmdao.docs.utils.docutil import get_source_code_of_class_or_method
 
 
-class EmbedPythonCodeDirective(Directive):
-    """EmbedPythonCodeDirective is a custom directive to allow blocks of
+class EmbedCodeDirective(Directive):
+    """EmbedCodeDirective is a custom directive to allow blocks of
      python code to be shown in feature docs.  An example usage would look like this:
 
     .. embed-code::
@@ -41,4 +41,4 @@ class EmbedPythonCodeDirective(Directive):
 
 def setup(app):
     """add custom directive into Sphinx so that it is found during document parsing"""
-    app.add_directive('embed-code', EmbedPythonCodeDirective)
+    app.add_directive('embed-code', EmbedCodeDirective)
