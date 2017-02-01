@@ -6,7 +6,7 @@ from collections import Iterable
 
 import numpy as np
 
-from openmdao.core.system import System
+from openmdao.core.system import System, PathData
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
 from openmdao.solvers.ln_bgs import LinearBlockGS
 from openmdao.utils.general_utils import warn_deprecation
@@ -268,13 +268,18 @@ class Group(System):
 
     def initialize_variables(self):
         """Set up variable name and metadata lists."""
+        self._var_pathdict = {}
+        self._var_name2path = {}
+
         for typ in ['input', 'output']:
             for subsys in self._subsystems_myproc:
                 # Assemble the names list from subsystems
                 subsys._var_maps[typ] = subsys._get_maps(typ)
-                for sub_name in subsys._var_allprocs_names[typ]:
-                    name = subsys._var_maps[typ][sub_name]
+                paths = subsys._var_allprocs_pathnames[typ]
+                for idx, subname in enumerate(subsys._var_allprocs_names[typ]):
+                    name = subsys._var_maps[typ][subname]
                     self._var_allprocs_names[typ].append(name)
+                    self._var_allprocs_pathnames[typ].append(paths[idx])
                     self._var_myproc_names[typ].append(name)
 
                 # Assemble the metadata list from the subsystems
@@ -287,15 +292,25 @@ class Group(System):
                 # One representative proc from each sub_comm adds names
                 sub_comm = self._subsystems_myproc[0].comm
                 if sub_comm.rank == 0:
-                    names = self._var_allprocs_names[typ]
+                    names = (self._var_allprocs_names[typ],
+                             self._var_allprocs_pathnames[typ])
                 else:
-                    names = []
+                    names = ([], [])
 
                 # Every proc on this comm now has global variable names
-                raw = self.comm.allgather(names)
                 self._var_allprocs_names[typ] = []
-                for names in raw:
+                self._var_allprocs_pathnames[typ] = []
+                for names, pathnames in self.comm.allgather(names):
                     self._var_allprocs_names[typ].extend(names)
+                    self._var_allprocs_pathnames[typ].extend(pathnames)
+
+            for idx, name in enumerate(self._var_allprocs_names[typ]):
+                path = self._var_allprocs_pathnames[typ][idx]
+                self._var_pathdict[path] = PathData(name, idx, typ)
+                if name in self._var_name2path:
+                    self._var_name2path[name].append(path)
+                else:
+                    self._var_name2path[name] = [path]
 
     def _apply_nonlinear(self):
         """Compute residuals."""
@@ -379,19 +394,12 @@ class Group(System):
         """
         return self._ln_solver.solve(vec_names, mode)
 
-    def _linearize(self, initial=False):
-        """Compute jacobian / factorization.
-
-        Args
-        ----
-        initial : boolean
-            whether this is the initial call to assemble the Jacobian.
-        """
+    def _linearize(self):
+        """Compute jacobian / factorization."""
         for subsys in self._subsystems_myproc:
             subsys._linearize()
 
         # Update jacobian
-        if not initial and self._jacobian._top_name == self.pathname:
+        if self._jacobian._top_name == self.pathname:
             self._jacobian._system = self
             self._jacobian._update()
-            self._jacobian._precompute_iter()

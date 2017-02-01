@@ -89,6 +89,8 @@ class ExplicitCycleComp(ExplicitComponent):
         self.add_input('theta', val=1.)
         self.add_output('theta_out', shape=(1,))
 
+        self.setup_jacobian()
+
     def compute(self, inputs, outputs):
         theta = inputs['theta']
         A = _compute_A(self.size, theta)
@@ -129,6 +131,65 @@ class ExplicitCycleComp(ExplicitComponent):
                     dtheta_out = d_outputs['theta_out']
                     d_inputs['theta'] += dtheta_out
 
+    def make_jacobian_entry(self, A, pd_type):
+        if pd_type == 'array':
+            return A
+        if pd_type == 'sparse':
+            return sparse.csr_matrix(A)
+        if pd_type == 'aij':
+            data = []
+            rows = []
+            cols = []
+            A = np.atleast_2d(A)
+            for i in range(A.shape[0]):
+                for j in range(A.shape[1]):
+                    if np.abs(A[i, j]) > 1e-15:
+                        data.append(A[i, j])
+                        rows.append(i)
+                        cols.append(j)
+            return [np.array(data), np.array(rows), np.array(cols)]
+
+        raise ValueError('Unknown partial_type: {}'.format(pd_type))
+
+    def _array2kwargs(self, arr, pd_type):
+        jac = self.make_jacobian_entry(arr, pd_type)
+        if pd_type == 'aij':
+            return {'val':jac[0], 'rows':jac[1], 'cols':jac[2]}
+        else:
+            return {'val': jac}
+
+    def setup_jacobian(self):
+        pd_type = self.metadata['partial_type']
+        if self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
+            num_var = self.num_var
+            var_shape = self.var_shape
+            var_size = np.prod(var_shape)
+            A = np.ones((self.size, self.size))
+            dA = np.ones((self.size, self.size))
+            dA_x = np.ones((self.size, 1))
+            dtheta = np.array([[1.]])
+
+            def array_idx(i):
+                return slice(i * var_size, (i + 1) * var_size)
+
+            # if our subjacs are not dense, we must assign values here that
+            # match their type (data values don't matter, only structure).
+            # Otherwise, we assume they are dense and we'll get an error later
+            # when we assign a subjac with a type that doesn't match.
+            for out_idx in range(num_var):
+                out_var = 'y_{0}'.format(out_idx)
+                for in_idx in range(num_var):
+                    in_var = 'x_{0}'.format(in_idx)
+
+                    self.declare_partials(out_var, in_var,
+                                          **self._array2kwargs(A[array_idx(out_idx), array_idx(in_idx)],
+                                                               pd_type))
+                    self.declare_partials(out_var, self.angle_param,
+                                          **self._array2kwargs(dA_x[array_idx(out_idx)],
+                                                               pd_type))
+
+            self.declare_partials('theta_out', 'theta', **self._array2kwargs(dtheta, pd_type))
+
     def compute_jacobian(self, inputs, outputs, jacobian):
         if self.metadata['jacobian_type'] != 'matvec':
             angle_param = self.angle_param
@@ -147,35 +208,18 @@ class ExplicitCycleComp(ExplicitComponent):
             def array_idx(i):
                 return slice(i * var_size, (i + 1) * var_size)
 
-            def make_jacobian_entry(A, pd_type):
-                if pd_type == 'array':
-                    return A
-                if pd_type == 'sparse':
-                    return sparse.csr_matrix(A)
-                if pd_type == 'aij':
-                    data = []
-                    rows = []
-                    cols = []
-                    for i in range(A.shape[0]):
-                        for j in range(A.shape[1]):
-                            if np.abs(A[i, j]) > 1e-15:
-                                data.append(A[i, j])
-                                rows.append(i)
-                                cols.append(j)
-                    return np.array(data), np.array(rows), np.array(cols)
-
             for out_idx in range(num_var):
                 out_var = 'y_{0}'.format(out_idx)
                 for in_idx in range(num_var):
                     in_var = 'x_{0}'.format(in_idx)
 
-                    J_y_x = make_jacobian_entry(A[array_idx(out_idx), array_idx(in_idx)], pd_type)
-                    J_y_angle = make_jacobian_entry(dA_x[array_idx(out_idx)], pd_type)
+                    J_y_x = self.make_jacobian_entry(A[array_idx(out_idx), array_idx(in_idx)], pd_type)
+                    J_y_angle = self.make_jacobian_entry(dA_x[array_idx(out_idx)], pd_type)
 
                     jacobian[out_var, in_var] = J_y_x
                     jacobian[out_var, angle_param] = J_y_angle
 
-            jacobian['theta_out', 'theta'] = make_jacobian_entry(dtheta, pd_type)
+            jacobian['theta_out', 'theta'] = self.make_jacobian_entry(dtheta, pd_type)
 
 
 class ExplicitFirstComp(ExplicitCycleComp):
@@ -183,9 +227,9 @@ class ExplicitFirstComp(ExplicitCycleComp):
         return 'Explicit Cycle Component - First'
 
     def initialize_variables(self):
-        super(ExplicitFirstComp, self).initialize_variables()
         self.add_input('psi', val=1.)
         self.angle_param = 'psi'
+        super(ExplicitFirstComp, self).initialize_variables()
 
     def compute(self, inputs, outputs):
         theta = inputs['theta']
@@ -201,9 +245,9 @@ class ExplicitLastComp(ExplicitFirstComp):
         return 'Explicit Cycle Component - Last'
 
     def initialize_variables(self):
-        super(ExplicitLastComp, self).initialize_variables()
         self.add_output('x_norm2', shape=(1,))
         self._n = 1
+        super(ExplicitLastComp, self).initialize_variables()
 
     def compute(self, inputs, outputs):
         theta = inputs['theta']
@@ -216,16 +260,30 @@ class ExplicitLastComp(ExplicitFirstComp):
         # theta_out has 1/2 the error as theta does to the correct angle.
         outputs['theta_out'] = theta/2 + (self._n * 2 * np.pi - psi) / (2*k - 2)
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
-        if self.metadata['jacobian_type'] != 'matvec':
+    def setup_jacobian(self):
+        super(ExplicitLastComp, self).setup_jacobian()
 
+        pd_type = self.metadata['partial_type']
+        if self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
+            x = np.ones(self.var_shape)
             for i in range(self.metadata['num_var']):
                 in_var = 'x_{0}'.format(i)
-                jacobian['x_norm2', in_var] = inputs[in_var].flat[:]
+                self.declare_partials('x_norm2', in_var,
+                                      **self._array2kwargs(x.flatten(), pd_type))
+
+            self.declare_partials('theta_out', 'psi',
+                                  **self._array2kwargs(np.array([1.]), pd_type))
+
+    def compute_jacobian(self, inputs, outputs, jacobian):
+        if self.metadata['jacobian_type'] != 'matvec':
+            pd_type = self.metadata['partial_type']
+            for i in range(self.metadata['num_var']):
+                in_var = 'x_{0}'.format(i)
+                jacobian['x_norm2', in_var] = self.make_jacobian_entry(inputs[in_var].flat[:], pd_type)
 
             k = self.metadata['num_comp']
-            jacobian['theta_out', 'theta'] = np.array([.5])
-            jacobian['theta_out', 'psi'] = np.array([-1/(2*k-2)])
+            jacobian['theta_out', 'theta'] = self.make_jacobian_entry(np.array([.5]), pd_type)
+            jacobian['theta_out', 'psi'] = self.make_jacobian_entry(np.array([-1/(2*k-2)]), pd_type)
 
     def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
         if self.metadata['jacobian_type'] == 'matvec':

@@ -3,16 +3,21 @@ from __future__ import division
 
 from fnmatch import fnmatchcase
 from contextlib import contextmanager
+from collections import namedtuple, OrderedDict
 
 import numpy
 
 from six.moves import range
+from six import string_types
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import convert_units
+
+# This is for storing various data mapped to var pathname
+PathData = namedtuple("PathData", ['name', 'idx', 'typ'])
 
 
 class System(object):
@@ -46,6 +51,8 @@ class System(object):
         subsystems (subsystems on all of this system's processors).
     _var_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
         list of names of all owned variables, not just on current proc.
+    _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
+        list of pathnames of all owned variables, not just on current proc.
     _var_allprocs_range : {'input': [int, int], 'output': [int, int]}
         index range of owned variables with respect to all problem variables.
     _var_allprocs_indices : {'input': dict, 'output': dict}
@@ -54,6 +61,10 @@ class System(object):
         list of names of owned variables on current proc.
     _var_myproc_metadata : {'input': list, 'output': list}
         list of metadata dictionaries of variables that exist on this proc.
+    _var_pathdict : dict
+        maps full variable pathname to local name, index and I/O type
+    _var_name2path = dict
+        maps local var name to full pathname
     _var_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
         integer arrays of global indices of variables on this proc.
     _var_maps : {'input': dict, 'output': dict}
@@ -93,6 +104,11 @@ class System(object):
         transfer object; points to _vector_transfers['nonlinear'].
     _jacobian : <Jacobian>
         global <Jacobian> object to be used in apply_linear
+    _subjacs_info : OrderedDict of dict
+        Sub-jacobian metadata for each (output, input) pair added using
+        declare_partials. Members of each pair may be glob patterns.
+    _pre_setup_jac : <GlobalJacobian>
+        Storage for a GlobalJacobian that was set prior to problem setup.
     _nl_solver : <NonlinearSolver>
         nonlinear solver to be used for solve_nonlinear.
     _ln_solver : <LinearSolver>
@@ -126,12 +142,16 @@ class System(object):
         self._subsystems_myproc_inds = []
 
         self._var_allprocs_names = {'input': [], 'output': []}
+        self._var_allprocs_pathnames = {'input': [], 'output': []}
         self._var_allprocs_range = {'input': [0, 0], 'output': [0, 0]}
         self._var_allprocs_indices = {'input': {}, 'output': {}}
 
         self._var_myproc_names = {'input': [], 'output': []}
         self._var_myproc_metadata = {'input': [], 'output': []}
         self._var_myproc_indices = {'input': None, 'output': None}
+
+        self._var_pathdict = {}
+        self._var_name2path = {}
 
         self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
@@ -158,6 +178,10 @@ class System(object):
         self._transfers = None
 
         self._jacobian = DefaultJacobian()
+        self._jacobian._system = self
+
+        self._subjacs_info = OrderedDict()
+        self._pre_setup_jac = None
 
         self._nl_solver = None
         self._ln_solver = None
@@ -247,6 +271,7 @@ class System(object):
             # Empty the lists in case this is part of a reconfiguration
             for typ in ['input', 'output']:
                 self._var_allprocs_names[typ] = []
+                self._var_allprocs_pathnames[typ] = []
                 self._var_myproc_names[typ] = []
                 self._var_myproc_metadata[typ] = []
 
@@ -730,22 +755,73 @@ class System(object):
         is_top : boolean
             whether this is the top; i.e., start of the recursion.
         """
+        # Don't update jacobians if we haven't run setup yet.  Just store
+        # for later and update at the end of setup. _assember is set at
+        # the beginning of setup.  It is assumed here that set_jacobian
+        # will never be called (by a user) during setup.
+        if self._assembler is None:
+            self._pre_setup_jac = jacobian
+            return
+
         if jacobian is None:
-            self._jacobian = DefaultJacobian()
+            jacobian = DefaultJacobian()
         else:
-            self._jacobian = jacobian
+            if self._pre_setup_jac is jacobian:
+                self._pre_setup_jac = None
+
             if is_top:
-                self._jacobian._top_name = self.pathname
-                self._jacobian._system = self
-                self._jacobian._assembler = self._assembler
+                jacobian._top_name = self.pathname
+                jacobian._system = self
+                jacobian._assembler = self._assembler
+
+        jacobian._copy_from(self._jacobian)
+        self._jacobian = jacobian
 
         for subsys in self._subsystems_myproc:
             subsys._set_jacobian(jacobian, False)
 
-        if jacobian is not None and is_top:
-            self._linearize(True)
+        if not isinstance(jacobian, DefaultJacobian) and is_top:
             self._jacobian._system = self
             self._jacobian._initialize()
+
+    def _set_partials_meta(self):
+        """Set subjacobian info into our jacobian.
+
+        Overridden in <Component>.
+        """
+        pass
+
+    def system_iter(self, local=True, include_self=False, recurse=True,
+                    typ=None):
+        """A generator of subsystems of this system.
+
+        Args
+        ----
+        local : bool
+            If True, only iterate over systems on this proc.
+        include_self : bool
+            If True, include this system in the iteration.
+        recurse : bool
+            If True, iterate over the whole tree under this system.
+        typ : type
+            If not None, only yield Systems that match that are instances of the
+            given type.
+        """
+        if local:
+            sysiter = self._subsystems_myproc
+        else:
+            sysiter = self._subsystems_allprocs
+
+        if include_self:
+            if typ is None or isinstance(self, typ):
+                yield self
+
+        for s in sysiter:
+            if typ is None or isinstance(s, typ):
+                yield s
+            if recurse:
+                for sub in s.system_iter(local=local, recurse=True, typ=typ):
+                    yield sub
 
     def _apply_nonlinear(self):
         """Compute residuals."""
@@ -801,14 +877,8 @@ class System(object):
         """
         pass
 
-    def _linearize(self, initial=False):
-        """Compute jacobian / factorization.
-
-        Args
-        ----
-        initial : boolean
-            whether this is the initial call to assemble the Jacobian.
-        """
+    def _linearize(self):
+        """Compute jacobian / factorization."""
         pass
 
     def get_subsystem(self, name):
