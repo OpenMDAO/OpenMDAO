@@ -74,8 +74,14 @@ html: mock redbaron
 	rm -rf $(BUILDDIR)/*
 	rm -rf srcdocs/usr
 	rm -rf srcdocs/dev
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "dev"
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr"
+	# Doing the first command in the background enables doing the two builds in 
+	#    parallel which does speed things up
+	# The -j eliminates the error that you get when each command tries to 
+	#    create the _build/html directory. Somehow sphinx knows it is running
+	#    in parallel so it knows not complain about that? Not really sure
+	#    but it works. 
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "dev" -j 1 &
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr" -j 1
 	rm feature_docs_unit_test_db.sqlite
 	rm -rf tags
 	@echo

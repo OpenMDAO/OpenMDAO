@@ -263,7 +263,7 @@ class ConvergeDivergeGroups(Group):
             'y2 = 3.0*x1'
         ]))
 
-        g2 = g1.add_subsystem('g1', Group())  # ParallelGroup
+        g2 = g1.add_subsystem('g2', Group())  # ParallelGroup
         g2.add_subsystem('c2', ExecComp('y1 = 0.5*x1'))
         g2.add_subsystem('c3', ExecComp('y1 = 3.5*x1'))
 

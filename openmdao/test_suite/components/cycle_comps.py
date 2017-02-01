@@ -271,8 +271,6 @@ class ExplicitLastComp(ExplicitFirstComp):
                 self.declare_partials('x_norm2', in_var,
                                       **self._array2kwargs(x.flatten(), pd_type))
 
-            #self.declare_partials('theta_out', 'theta',
-                                  #**self._array2kwargs(np.array([1.]), pd_type))
             self.declare_partials('theta_out', 'psi',
                                   **self._array2kwargs(np.array([1.]), pd_type))
 
