@@ -10,7 +10,14 @@ From the perspective of a component, they are component outputs that do not depe
 From the perspective of a model, they can be viewed as design variables or model parameters that are set by the user or driver, prior to running the model.
 
 Independent variables are defined via the *IndepVarComp* class.
-The *IndepVarComp* class is instantiated directly (without defining a subclass), passing in during instantiation the name, initial value, and other options of the variable(s).
+The *IndepVarComp* class is instantiated directly (without defining a subclass).
+The name, initial value, and other options of the independent variable(s) to be declared can be either passed in during instantiation and declared via the :code:`add_var` method.
+
+Method signature
+----------------
+
+.. automethod:: openmdao.core.indepvarcomp.IndepVarComp.add_var
+    :noindex:
 
 Usage
 -----
@@ -50,7 +57,7 @@ Usage
 .. embed-test::
     openmdao.core.tests.test_component.TestIndepVarComp.test_indep_multiple_kwargs
 
-7. Define two independent variables using an external method with additional options.
+7. Define two independent variables using the :code:`add_var` method with additional options.
 
 .. embed-test::
     openmdao.core.tests.test_component.TestIndepVarComp.test_indep_add_var

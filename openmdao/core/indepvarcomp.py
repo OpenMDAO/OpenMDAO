@@ -29,8 +29,9 @@ class IndepVarComp(ExplicitComponent):
 
         Args
         ----
-        name : str or [(str, value), ...] or [(str, value, kwargs), ...]
-            name of the variable or list of variables.
+        name : str or [(str, value), ...] or [(str, value, kwargs), ...] or None
+            name of the variable or list of variables. If None, variables will be defined
+            external to this class by calling the add_var method.
         val : float or ndarray
             value of the variable if a single variable is being defined.
         kwargs : dict

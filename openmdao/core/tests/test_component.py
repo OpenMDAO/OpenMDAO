@@ -120,6 +120,18 @@ class TestIndepVarComp(unittest.TestCase):
         assert_rel_error(self, prob['indep_var_1'], 1.0)
         assert_rel_error(self, prob['indep_var_2'], 2.0)
 
+    def test_indep_multiple_kwargs(self):
+        """Define two independent variables at once and additional options."""
+        comp = IndepVarComp((
+            ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
+            ('indep_var_2', 2.0, {'lower': 1., 'upper': 20}),
+        ))
+
+        prob = Problem(comp).setup(check=False)
+
+        assert_rel_error(self, prob['indep_var_1'], 1.0)
+        assert_rel_error(self, prob['indep_var_2'], 2.0)
+
     def test_indep_add_var(self):
         """Define two independent variables using the add_var method."""
         comp = IndepVarComp()
