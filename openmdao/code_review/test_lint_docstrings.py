@@ -130,6 +130,10 @@ class LintTestCase(unittest.TestCase):
                     for class_name in classes:
                         if print_info: print(' '*4, class_name)
                         clss = getattr(mod, class_name)
+                        
+                        # skip namedtuples
+                        if issubclass(clss, tuple):
+                            continue
 
                         # Loop over methods
                         methods = [x for x in dir(clss)

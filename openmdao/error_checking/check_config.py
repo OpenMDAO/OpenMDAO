@@ -10,7 +10,7 @@ import networkx as nx
 
 from openmdao.core.group import Group
 from openmdao.core.component import Component
-from openmdao.devtools.compat import abs_varname_iter, system_iter
+from openmdao.devtools.compat import abs_varname_iter
 
 
 def check_config(problem, logger=None):
@@ -66,7 +66,7 @@ def compute_sys_graph(group, input_src_ids, comps_only=False):
 
     """
     if comps_only:
-        subsystems = list(system_iter(group, recurse=True, typ=Component))
+        subsystems = list(group.system_iter(recurse=True, typ=Component))
     else:
         subsystems = group._subsystems_allprocs
 
@@ -138,8 +138,8 @@ def _check_dataflow(group, logger):
         The object that manages logging output.
 
     """
-    for system in system_iter(group, include_self=True, recurse=True,
-                              typ=Group):
+    for system in group.system_iter(include_self=True, recurse=True,
+                                    typ=Group):
         sccs = get_sccs(system)
         cycles = [sorted(s) for s in sccs if len(s) > 1]
         cycle_idxs = {}

@@ -1,5 +1,5 @@
 """Define the base Matrix class."""
-from __future__ import division, print_function
+from __future__ import division
 import numpy
 
 
@@ -14,13 +14,9 @@ class Matrix(object):
         communicator of the top-level system that owns the <Jacobian>.
     _matrix : object
         implementation-specific representation of the actual matrix.
-    _out_submats : dict
+    _submats : dict
         dictionary of sub-jacobian data keyed by (out_ind, in_ind).
-    _in_submats : dict
-        dictionary of sub-jacobian data keyed by (out_ind, in_ind).
-    _out_metadata : dict
-        implementation-specific data for the sub-jacobians.
-    _in_metadata : dict
+    _metadata : dict
         implementation-specific data for the sub-jacobians.
     """
 
@@ -34,10 +30,8 @@ class Matrix(object):
         """
         self._comm = comm
         self._matrix = None
-        self._out_submats = {}
-        self._in_submats = {}
-        self._out_metadata = {}
-        self._in_metadata = {}
+        self._submats = {}
+        self._metadata = {}
 
     def prod_fwd(self, in_vec, row_range=None):
         """Perform a forward product.
@@ -82,31 +76,15 @@ class Matrix(object):
 
         return self._prod(in_vec, 'rev')
 
-    def _out_add_submat(self, key, jac, irow, icol):
+    def _add_submat(self, key, info, irow, icol, src_indices, shape):
         """Declare a sub-jacobian.
 
         Args
         ----
         key : (int, int)
             the global output and input variable indices.
-        jac : ndarray or scipy.sparse or tuple
-            the sub-jacobian.
-        irow : int
-            the starting row index (offset) for this sub-jacobian.
-        icol : int
-            the starting col index (offset) for this sub-jacobian.
-        """
-        self._out_submats[key] = (jac, irow, icol, None)
-
-    def _in_add_submat(self, key, jac, irow, icol, src_indices):
-        """Declare a sub-jacobian.
-
-        Args
-        ----
-        key : (int, int)
-            the global output and input variable indices.
-        jac : ndarray or scipy.sparse or tuple
-            the sub-jacobian.
+        info : dict
+            sub-jacobian metadata.
         irow : int
             the starting row index (offset) for this sub-jacobian.
         icol : int
@@ -114,32 +92,10 @@ class Matrix(object):
         src_indices : ndarray
             indices from the source variable that an input variable
             connects to.
+        shape : tuple
+            Shape of the specified submatrix.
         """
-        self._in_submats[key] = (jac, irow, icol, src_indices)
-
-    def _out_update_submat(self, key, jac):
-        """Update the values of a sub-jacobian.
-
-        Args
-        ----
-        key : (int, int)
-            the global output and input variable indices.
-        jac : ndarray or scipy.sparse or tuple
-            the sub-jacobian, the same format with which it was declared.
-        """
-        self._update_submat(self._out_submats, self._out_metadata, key, jac)
-
-    def _in_update_submat(self, key, jac):
-        """Update the values of a sub-jacobian.
-
-        Args
-        ----
-        key : (int, int)
-            the global output and input variable indices.
-        jac : ndarray or scipy.sparse or tuple
-            the sub-jacobian, the same format with which it was declared.
-        """
-        self._update_submat(self._in_submats, self._in_metadata, key, jac)
+        self._submats[key] = (info, irow, icol, src_indices, shape)
 
     def _build(self, num_rows, num_cols):
         """Allocate the matrix.
@@ -153,7 +109,7 @@ class Matrix(object):
         """
         pass
 
-    def _update_submat(self, submats, metadata, key, jac):
+    def _update_submat(self, submats, metadata, key, jac, system):
         """Update the values of a sub-jacobian.
 
         Args
@@ -166,6 +122,8 @@ class Matrix(object):
             the global output and input variable indices.
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
+        system : <System>
+            The System that owns the jacobian.
         """
         pass
 

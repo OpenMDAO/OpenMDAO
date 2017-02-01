@@ -183,7 +183,7 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._outputs['y'], 5.0, 0.00001)
 
-        C1._linearize(True)
+        C1._linearize()
 
         assert_rel_error(self, C1._jacobian[('y','x')], -2.0, 0.00001)
 
