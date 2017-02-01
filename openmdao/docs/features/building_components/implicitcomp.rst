@@ -14,7 +14,7 @@ The implicit variables would be considered *outputs* (e.g., :math:`y` in the exa
 ImplicitComponent methods
 -------------------------
 
-The implementation of each method will be illustrated using a simple implicit component that computes the output :math:`x` implicitly via a quadratic equation, :math:`ax^2 + bx+c`, where :math:`a`, :math:`b`, and :math:`c` are inputs to the component.
+The implementation of each method will be illustrated using a simple implicit component that computes the output :math:`x` implicitly via a quadratic equation, :math:`ax^2 + bx + c =0`, where :math:`a`, :math:`b`, and :math:`c` are inputs to the component.
 
 - :code:`initialize_variables()` :
 
