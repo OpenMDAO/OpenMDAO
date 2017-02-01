@@ -136,17 +136,17 @@ class Problem(object):
         return self.model
 
     @root.setter
-    def root(self, value):
+    def root(self, model):
         """Provide for setting the 'root' property for backwards compatibility.
 
         Args
         -------
-        <Group>
+        model : <Group>
             reference to a <Group> to be assigned to the 'model' property.
         """
         warn_deprecation("The 'root' property provides backwards compatibility "
                          "with OpenMDAO <= 1.x ; use 'model' instead.")
-        self.model = value
+        self.model = model
 
     def run_model(self):
         """Run the model by calling the root system's solve_nonlinear.
