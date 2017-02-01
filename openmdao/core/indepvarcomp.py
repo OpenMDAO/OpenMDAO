@@ -19,6 +19,9 @@ class IndepVarComp(ExplicitComponent):
         Tuple (arg1, arg2), where arg1 is str or [(str, value), ...]
         or [(str, value, kwargs), ...] and arg 2 is value.
         The value can be float or ndarray
+    _indep_external : list
+        list of this component's independent variables that are declared externally
+        via the add_var method.
     """
 
     def __init__(self, name=None, val=1.0, **kwargs):
@@ -82,8 +85,8 @@ class IndepVarComp(ExplicitComponent):
         for (name, val, shape, units, res_units, desc, lower, upper,
                 ref, ref0, res_ref, res_ref0, var_set) in self._indep_external:
             self.add_output(name, val=val, shape=shape, units=units, res_units=res_units,
-                desc=desc, lower=lower, upper=upper, ref=ref, ref0=ref0,
-                res_ref=res_ref, res_ref0=res_ref0, var_set=var_set)
+                            desc=desc, lower=lower, upper=upper, ref=ref, ref0=ref0,
+                            res_ref=res_ref, res_ref0=res_ref0, var_set=var_set)
 
     def add_var(self, name, val=1.0, shape=None, units='', res_units='', desc='',
                 lower=None, upper=None, ref=1.0, ref0=0.0,

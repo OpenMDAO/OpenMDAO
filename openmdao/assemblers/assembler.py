@@ -62,8 +62,7 @@ class Assembler(object):
         self._src_indices_range = None
 
         self._src_units = []
-        self._src_scaling_0 = None
-        self._src_scaling_1 = None
+        self._src_scaling = None
 
     def _setup_variables(self, nvars, variable_metadata, variable_indices):
         """Compute the variable sets and sizes.
