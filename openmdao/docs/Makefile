@@ -59,6 +59,8 @@ clean:
 	rm -rf srcdocs/usr
 	rm -rf srcdocs/dev
 	rm -rf tags
+	rm -rf tmp
+	rm feature_docs_unit_test_db.sqlite
 
 mock:
 	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
@@ -69,24 +71,29 @@ redbaron:
 	is required to build the docs. Install with:\n pip install redbaron"; exit 1)
 
 html: mock redbaron
+
+	# Running things before docbuild
 	python utils/preprocess_tags.py
 	python utils/create_feature_docs_unit_test_db.py
+
+	# Cleaning up previously-generated files before docbuild
 	rm -rf $(BUILDDIR)/*
 	rm -rf srcdocs/usr
 	rm -rf srcdocs/dev
-	rm -rf tmp
-  # Making dirs to help fix the race conditions for creating dirs.
-	mkdir -p tmp/html/srcdocs/dev
-	mkdir -p _build/html/srcdocs/dev
-	mkdir -p tmp/doctrees/srcdocs/dev
-	mkdir -p _build/doctrees/srcdocs/dev
-	# Doing the first command in the background enables doing the two builds in
-	#    parallel which does speed things up
-	$(SPHINXBUILD) -b html -d tmp/doctrees  . tmp/html -t "dev" -j 1 &
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr" -j 1
-	cp -R tmp/html/srcdocs/dev _build/html/srcdocs
-	cp -R tmp/doctrees/srcdocs/dev _build/doctrees/srcdocs
-  # clean-up
+
+	# Doing the first command in the background does two builds in parallel
+	#       dev docs get built into tmp/moved into _build later
+	#       to avoid race to create dirs.
+	$(SPHINXBUILD) -b html -d tmp/doctrees  . tmp/html -t "dev" &
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr"
+
+	# Making dirs in which to move things later (fix for parallel build prob)
+	mkdir $(BUILDDIR)/html/srcdocs/dev
+	mkdir $(BUILDDIR)/doctrees/srcdocs/dev
+	cp -R tmp/html/srcdocs/dev $(BUILDDIR)/html/srcdocs
+	cp -R tmp/doctrees/srcdocs/dev $(BUILDDIR)/doctrees/srcdocs
+
+	# post-game clean-up
 	rm feature_docs_unit_test_db.sqlite
 	rm -rf tags
 	rm -rf tmp
