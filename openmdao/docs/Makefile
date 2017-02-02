@@ -87,7 +87,7 @@ html: mock redbaron
 	$(SPHINXBUILD) -b html -d tmp/doctrees  . tmp/html -t "dev" &
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr"
 
-	# Making dirs in which to move things later (fix for parallel build prob)
+	# Making dirs in which to move things, moving things (parallel build prob)
 	mkdir $(BUILDDIR)/html/srcdocs/dev
 	mkdir $(BUILDDIR)/doctrees/srcdocs/dev
 	cp -R tmp/html/srcdocs/dev $(BUILDDIR)/html/srcdocs
