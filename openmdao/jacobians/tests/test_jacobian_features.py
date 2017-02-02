@@ -53,7 +53,7 @@ class SimpleCompConst(SimpleComp):
         self.declare_partials('g', 'z', dependent=False)
 
         self.declare_partials('f', 'x', val=1.)
-        self.declare_partials('f', 'z', val=np.ones((2, 2)))
+        self.declare_partials('f', 'z', val=np.ones((1, 4)))
         self.declare_partials('g', 'y1', val=[[1, 0], [1, 0], [0, 1], [0, 1]])
         self.declare_partials('g', 'y2', val=1., cols=[0, 0, 1, 1], rows=[0, 3, 0, 3])
         self.declare_partials('g', 'x', val=sp.sparse.coo_matrix(((1., 1.), ((0, 3), (0, 0)))))

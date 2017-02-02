@@ -381,6 +381,42 @@ class Component(System):
                 self._var_pathdict[path] = PathData(name, idx, typ)
                 self._var_name2path[name] = (path,)
 
+        for (of, wrt), info in iteritems(self._subjacs_info):
+            if info['dependent']:
+                out_size = numpy.prod(self._var2meta[of]['shape'])
+                in_size = numpy.prod(self._var2meta[wrt]['shape'])
+                rows = info['rows']
+                cols = info['cols']
+                if rows is not None:
+                    if rows.min() < 0:
+                        raise ValueError('d({})/d({}): row indices must be non-negative.'.format(
+                            self._var_name2path[of][0], self._var_name2path[wrt][0]
+                        ))
+                    if cols.min() < 0:
+                        raise ValueError('d({})/d({}): col indices must be non-negative.'.format(
+                            self._var_name2path[of][0], self._var_name2path[wrt][0]
+                        ))
+                    if rows.max() >= out_size or cols.max() >= in_size:
+                        raise ValueError('d({})/d({}): Expected {}x{} but declared {}x{}'.format(
+                            self._var_name2path[of][0], self._var_name2path[wrt][0],
+                            out_size, in_size,
+                            rows.max() + 1, cols.max() + 1
+                        ))
+                val = info['value']
+                if val is not None:
+                    val_shape = val.shape
+                    if len(val_shape) == 1:
+                        val_out, val_in = val_shape[0], 1
+                    else:
+                        val_out, val_in = val.shape
+                    if val_out > out_size or val_in > in_size:
+                        raise ValueError('d({})/d({}): Expected {}x{} but declared {}x{}'.format(
+                            self._var_name2path[of][0], self._var_name2path[wrt][0],
+                            out_size, in_size,
+                            val_out, val_in
+                        ))
+
+
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
         r"""Add this vector and assign sub_vectors to subsystems.
 
