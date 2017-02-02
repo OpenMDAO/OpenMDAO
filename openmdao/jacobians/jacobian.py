@@ -311,9 +311,6 @@ class Jacobian(object):
         negate : bool
             If True negate the given value, if any.
         """
-        if not meta['dependent']:
-            return
-
         ukey = self._key2unique(key)
         if ukey is None:
             raise KeyError("Could not find unique key for %s." % (key,))

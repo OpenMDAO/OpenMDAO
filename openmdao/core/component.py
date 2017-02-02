@@ -5,6 +5,7 @@ from __future__ import division
 from fnmatch import fnmatchcase
 from six import string_types, iteritems
 import numpy
+from scipy.sparse import issparse
 
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
@@ -302,6 +303,11 @@ class Component(System):
             rows = numpy.array(rows, dtype=int)
         if isinstance(cols, (list, tuple)):
             cols = numpy.array(cols, dtype=int)
+        if val is not None and not issparse(val):
+            val = numpy.atleast_1d(val)
+            # numpy.promote_types  will choose the smallest dtype that can contain both arguments
+            safe_dtype = numpy.promote_types(val.dtype, float)
+            val = val.astype(safe_dtype, copy=False)
 
         for of in oflist:
             for wrt in wrtlist:
