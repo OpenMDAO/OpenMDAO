@@ -89,7 +89,7 @@ class IndepVarComp(ExplicitComponent):
                             desc=desc, lower=lower, upper=upper, ref=ref, ref0=ref0,
                             res_ref=res_ref, res_ref0=res_ref0, var_set=var_set)
 
-    def add_var(self, name, val=1.0, shape=None, units='', res_units='', desc='',
+    def add_var(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                 lower=None, upper=None, ref=1.0, ref0=0.0,
                 res_ref=1.0, res_ref0=0.0, var_set=0):
         """Add an independent variable to this component.
@@ -103,12 +103,12 @@ class IndepVarComp(ExplicitComponent):
         shape : int or tuple or list or None
             Shape of this variable, only required if indices not provided and val is not an array.
             Default is None.
-        units : str
+        units : str or None
             Units in which the output variables will be provided to the component during execution.
-            Default is '', which means it has no units.
-        res_units : str
+            Default is None, which means it has no units.
+        res_units : str or None
             Units in which the residuals of this output will be given to the user when requested.
-            Default is '', which means it has no units.
+            Default is None, which means it has no units.
         desc : str
             description of the variable
         lower : float or list or tuple or ndarray or None
