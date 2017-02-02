@@ -335,7 +335,8 @@ class Component(System):
         for typ in ['input', 'output']:
             names = self._var_allprocs_names[typ]
             self._var_allprocs_pathnames[typ] = paths = [
-                '.'.join((self.pathname, n)) for n in names
+                '.'.join((self.pathname, n)) if self.pathname else n
+                for n in names
             ]
             for idx, name in enumerate(names):
                 path = paths[idx]

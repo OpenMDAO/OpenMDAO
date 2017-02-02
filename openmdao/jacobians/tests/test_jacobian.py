@@ -333,7 +333,8 @@ class TestJacobian(unittest.TestCase):
         prob.model._linearize()
 
         expected = constructor(value)
-        jac_out = prob.model._subsystems_allprocs[0]._jacobian['out', 'in'] * -1
+        with prob.model._subsystems_allprocs[0]._jacobian_context() as J:
+            jac_out = J['out', 'in'] * -1
 
         self.assertEqual(len(jac_out.shape), 2)
         expected_dtype = np.promote_types(dtype, float)

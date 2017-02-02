@@ -62,7 +62,7 @@ class IndepVarComp(ExplicitComponent):
                         badtup = tup
                 else:
                     badtup = tup
-                if badtup:
+                if badtup is not None:
                     if isinstance(badtup, string_types):
                         badtup = name
                     raise ValueError(

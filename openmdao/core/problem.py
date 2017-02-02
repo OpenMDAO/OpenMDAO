@@ -113,26 +113,14 @@ class Problem(object):
                                        (name, paths))
             name = path
 
-        prom = pdata.name
         if pdata.typ == 'output':
-            ind = self.model._var_myproc_names['output'].index(name) # TODO: fix this
+            ind = self.model._var_myproc_names['output'].index(name)
             c0, c1 = self.model._scaling_to_phys['output'][ind, :]
             return c0 + c1 * self.model._outputs[name]
         else:
-            ind = self.model._var_myproc_names['input'].index(prom)
+            ind = self.model._var_myproc_names['input'].index(name)
             c0, c1 = self.model._scaling_to_phys['input'][ind, :]
             return c0 + c1 * self.model._inputs[name]
-
-
-        # try:
-        #     self.model._outputs[name]
-        #     ind = self.model._var_myproc_names['output'].index(name)
-        #     c0, c1 = self.model._scaling_to_phys['output'][ind, :]
-        #     return c0 + c1 * self.model._outputs[name]
-        # except KeyError:
-        #     ind = self.model._var_myproc_names['input'].index(name)
-        #     c0, c1 = self.model._scaling_to_phys['input'][ind, :]
-        #     return c0 + c1 * self.model._inputs[name]
 
     def __setitem__(self, name, value):
         """Set an output/input variable.
@@ -145,11 +133,32 @@ class Problem(object):
             value to set this variable to.
         """
         try:
-            self.model._outputs[name]
+            pdata = self.model._var_pathdict[name]
+        except KeyError:
+            # name is not an absolute path
+            try:
+                paths = self.model._var_name2path[name]
+            except KeyError:
+                raise KeyError("Variable '%s' not found." % name)
+
+            # look for a matching output (shouldn't be more than one)
+            for path in paths:
+                pdata = self.model._var_pathdict[path]
+                if pdata.typ == 'output':
+                    break
+            else:
+                if len(paths) > 1:
+                    raise RuntimeError("Variable name '%s' is not unique and "
+                                       "matches the following: %s. "
+                                       "Use the absolute pathname instead." %
+                                       (name, paths))
+            name = path
+
+        if pdata.typ == 'output':
             ind = self.model._var_myproc_names['output'].index(name)
             c0, c1 = self.model._scaling_to_norm['output'][ind, :]
             self.model._outputs[name] = c0 + c1 * np.array(value)
-        except KeyError:
+        else:
             ind = self.model._var_myproc_names['input'].index(name)
             c0, c1 = self.model._scaling_to_norm['input'][ind, :]
             self.model._inputs[name] = c0 + c1 * np.array(value)
@@ -395,6 +404,9 @@ class Problem(object):
         # Linearize Model
         model._linearize()
 
+        of = [(n,) if isinstance(n, string_types) else n for n in of]
+        wrt = [(n,) if isinstance(n, string_types) else n for n in wrt]
+
         # Create data structures (and possibly allocate space) for the total
         # derivatives that we will return.
         if return_format == 'flat_dict':
@@ -402,12 +414,8 @@ class Problem(object):
             totals = OrderedDict()
 
             for okeys in of:
-                if isinstance(okeys, string_types):
-                    okeys = (okeys,)
                 for okey in okeys:
                     for ikeys in wrt:
-                        if isinstance(ikeys, string_types):
-                            ikeys = (ikeys,)
                         for ikey in ikeys:
                             totals[(okey, ikey)] = None
 
@@ -415,11 +423,29 @@ class Problem(object):
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
 
+        # convert of and wrt names from promoted to unpromoted
+        # (which is absolute path since we're at the top)
+        paths = model._var_allprocs_pathnames
+        indices = model._var_allprocs_indices
+        oldof = of
+        of = []
+        for names in oldof:
+            of.append(tuple(paths['output'][indices['output'][name]]
+                            for name in names))
+
+        oldwrt = wrt
+        wrt = []
+        for names in oldwrt:
+            wrt.append(tuple(paths['output'][indices['output'][name]]
+                             for name in names))
+
         if mode == 'fwd':
             input_list, output_list = wrt, of
+            old_input_list, old_output_list = oldwrt, oldof
             input_vec, output_vec = vec_dresid, vec_doutput
         else:
             input_list, output_list = of, wrt
+            old_input_list, old_output_list = oldof, oldwrt
             input_vec, output_vec = vec_doutput, vec_dresid
 
         # TODO : Parallel adjoint setup loop goes here.
@@ -431,42 +457,45 @@ class Problem(object):
 
         # If Forward mode, solve linear system for each 'wrt'
         # If Adjoint mode, solve linear system for each 'of'
-        for input_name in input_list:
-            flat_view = dinputs._views_flat[input_name]
-            n_in = len(flat_view)
-            for idx in range(n_in):
-                # Maybe we don't need to clean up so much at the beginning,
-                # since we clean this every time.
-                dinputs.set_const(0.0)
+        for icount, input_names in enumerate(input_list):
+            for iname_count, input_name in enumerate(input_names):
+                flat_view = dinputs._views_flat[input_name]
+                n_in = len(flat_view)
+                for idx in range(n_in):
+                    # Maybe we don't need to clean up so much at the beginning,
+                    # since we clean this every time.
+                    dinputs.set_const(0.0)
 
-                # Dictionary access returns a scaler for 1d input, and we
-                # need a vector for clean code, so use _views_flat.
-                flat_view[idx] = 1.0
+                    # Dictionary access returns a scaler for 1d input, and we
+                    # need a vector for clean code, so use _views_flat.
+                    flat_view[idx] = 1.0
 
-                # The root system solves here.
-                model._solve_linear([vecname], mode)
+                    # The root system solves here.
+                    model._solve_linear([vecname], mode)
 
-                # Pull out the answers and pack them into our data structure.
-                for output_name in output_list:
+                    # Pull out the answers and pack into our data structure.
+                    for ocount, output_names in enumerate(output_list):
+                        for oname_count, output_name in enumerate(output_names):
+                            deriv_val = doutputs._views_flat[output_name]
+                            len_val = len(deriv_val)
 
-                    deriv_val = doutputs._views_flat[output_name]
-                    len_val = len(deriv_val)
+                            if return_format == 'flat_dict':
+                                if mode == 'fwd':
 
-                    if return_format == 'flat_dict':
-                        if mode == 'fwd':
+                                    key = (old_output_list[ocount][oname_count],
+                                           old_input_list[icount][iname_count])
 
-                            key = (output_name, input_name)
+                                    if totals[key] is None:
+                                        totals[key] = np.zeros((len_val, n_in))
+                                    totals[key][:, idx] = deriv_val
 
-                            if totals[key] is None:
-                                totals[key] = np.zeros((len_val, n_in))
-                            totals[key][:, idx] = deriv_val
+                                else:
 
-                        else:
+                                    key = (old_input_list[icount][iname_count],
+                                           old_output_list[ocount][oname_count])
 
-                            key = (input_name, output_name)
-
-                            if totals[key] is None:
-                                totals[key] = np.zeros((n_in, len_val))
-                            totals[key][idx, :] = deriv_val
+                                    if totals[key] is None:
+                                        totals[key] = np.zeros((n_in, len_val))
+                                    totals[key][idx, :] = deriv_val
 
         return totals

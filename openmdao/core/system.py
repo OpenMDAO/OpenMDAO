@@ -178,6 +178,7 @@ class System(object):
         self._transfers = None
 
         self._jacobian = DefaultJacobian()
+        self._jacobian._system = self
 
         self._subjacs_info = OrderedDict()
         self._pre_setup_jac = None
@@ -614,6 +615,11 @@ class System(object):
         """Context manager for jacobians.
 
         Sets this system's _jacobian._system attribute to the current system.
+
+        Returns
+        -------
+        <Jacobian>
+            The current system's jacobian with its _system set to self.
         """
         oldsys = self._jacobian._system
         self._jacobian._system = self
@@ -775,6 +781,7 @@ class System(object):
 
         if jacobian is None:
             jacobian = DefaultJacobian()
+            jacobian._system = self
         else:
             if self._pre_setup_jac is jacobian:
                 self._pre_setup_jac = None

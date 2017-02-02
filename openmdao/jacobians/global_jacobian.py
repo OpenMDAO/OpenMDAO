@@ -87,13 +87,14 @@ class GlobalJacobian(Jacobian):
         src_indices = {i: meta_in[j]['indices']
                        for j, i in enumerate(var_indices['input'])}
 
+        start = len(system.pathname) + 1 if system.pathname else 0
+
         # avoid circular imports
         from openmdao.core.component import Component
         for s in self._system.system_iter(local=True, recurse=True,
                                           include_self=True, typ=Component):
             sub_out_inds = s._var_myproc_indices['output']
             sub_in_inds = s._var_myproc_indices['input']
-            start = len(s.pathname) + 1
 
             for re_idx_all in sub_out_inds:
                 re_path = out_paths[re_idx_all]
