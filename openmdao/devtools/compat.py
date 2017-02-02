@@ -31,44 +31,6 @@ def convert_file():
 
     sys.stdout.write(contents)
 
-def system_iter(system, local=True, include_self=False, recurse=True, typ=None):
-    """A generator of ancestor systems of the given system.
-
-    Args
-    ----
-
-    system : System
-        Starting System to iterate over.
-
-    local : bool (True)
-        If True, only iterate over systems on this proc.
-
-    include_self : bool (False)
-        If True, include the given system in the iteration.
-
-    recurse : bool (True)
-        If True, iterate over the whole tree under system.
-
-    typ : type
-        If not None, only yield Systems that match that are instances of the
-        given type.
-    """
-    if local:
-        sysiter = system._subsystems_myproc
-    else:
-        sysiter = system._subsystems_allprocs
-
-    if include_self:
-        if typ is None or isinstance(system, typ):
-            yield system
-
-    for s in sysiter:
-        if typ is None or isinstance(s, typ):
-            yield s
-        if recurse:
-            for sub in system_iter(s, local=local, recurse=True, typ=typ):
-                yield sub
-
 def abs_varname_iter(system, typ, local=True):
     """An iter of variable absolute pathnames for the given system.
 
@@ -84,7 +46,7 @@ def abs_varname_iter(system, typ, local=True):
         If True, iterate over only System on the current process.
 
     """
-    for s in system_iter(system, local=local, include_self=True, recurse=True):
+    for s in system.system_iter(local=local, include_self=True, recurse=True):
         # the only place where we can calculate the absolute variable
         # path is at the Component level since the rest of the framework
         # deals only with promoted names.

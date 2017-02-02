@@ -95,6 +95,10 @@ class LintReturnsTestCase(unittest.TestCase):
                     for class_name in classes:
                         if print_info : print('  Class:', class_name)
                         clss = getattr(mod, class_name)
+                        
+                        # skip namedtuple
+                        if issubclass(clss, tuple):
+                            continue
 
 
                         # Loop over methods

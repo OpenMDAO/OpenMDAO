@@ -1,5 +1,6 @@
 """Define the GlobalJacobian class."""
 from __future__ import division
+
 import numpy
 import scipy.sparse
 from six.moves import range
@@ -7,6 +8,18 @@ from six.moves import range
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.generalized_dict import OptionsDictionary
+
+
+SUBJAC_META_DEFAULTS = {
+    'rows': None,
+    'cols': None,
+    'value': None,
+    'approx': None,
+    'step': 1.e-3,
+    'method': 'FD',
+    'form': 'forward',
+    'dependent': True,
+}
 
 
 class GlobalJacobian(Jacobian):
@@ -53,60 +66,92 @@ class GlobalJacobian(Jacobian):
 
     def _initialize(self):
         """Allocate the global matrices."""
-        indices = self._system._var_myproc_indices
-        meta = self._system._var_myproc_metadata['input']
-        ivar1, ivar2 = self._system._var_allprocs_range['output']
+        # var_indices are the *global* indices for variables on this proc
+        system = self._system
+        var_indices = system._var_myproc_indices
+        meta_in = system._var_myproc_metadata['input']
+        meta_out = system._var_myproc_metadata['output']
+        out_names = system._var_allprocs_names['output']
+        out_paths = system._var_allprocs_pathnames['output']
+        in_names = system._var_allprocs_names['input']
+        in_paths = system._var_allprocs_pathnames['input']
+        ivar1, ivar2 = system._var_allprocs_range['output']
 
-        self._int_mtx = self.options['matrix_class'](self._system.comm)
-        self._ext_mtx = self.options['matrix_class'](self._system.comm)
+        self._int_mtx = self.options['matrix_class'](system.comm)
+        self._ext_mtx = self.options['matrix_class'](system.comm)
 
         out_offsets = {i: self._get_var_range(i, 'output')[0]
-                       for i in indices['output']}
+                       for i in var_indices['output']}
         in_offsets = {i: self._get_var_range(i, 'input')[0]
-                      for i in indices['input']}
-        src_indices = {i: meta[j]['indices']
-                       for j, i in enumerate(indices['input'])}
+                      for i in var_indices['input']}
+        src_indices = {i: meta_in[j]['indices']
+                       for j, i in enumerate(var_indices['input'])}
 
-        for re_var_all in indices['output']:
-            re_offset = out_offsets[re_var_all]
+        # avoid circular imports
+        from openmdao.core.component import Component
+        for s in self._system.system_iter(local=True, recurse=True,
+                                          include_self=True, typ=Component):
+            sub_out_inds = s._var_myproc_indices['output']
+            sub_in_inds = s._var_myproc_indices['input']
 
-            for out_var_all in indices['output']:
-                key = (re_var_all, out_var_all)
-                if key in self._out_dict:
-                    jac = self._out_dict[key]
+            for re_idx_all in sub_out_inds:
+                re_path = out_paths[re_idx_all]
+                re_offset = out_offsets[re_idx_all]
 
-                    self._int_mtx._out_add_submat(
-                        key, jac, re_offset, out_offsets[out_var_all])
+                for out_idx_all in sub_out_inds:
+                    out_path = out_paths[out_idx_all]
+                    key = (re_path, out_path)
+                    if key in self._subjacs_info:
+                        info, shape = self._subjacs_info[key]
+                    else:
+                        info = SUBJAC_META_DEFAULTS
+                        rname = out_names[re_idx_all]
+                        oname = out_names[out_idx_all]
+                        shape = (system._outputs._views_flat[rname].size,
+                                 system._outputs._views_flat[oname].size)
 
-            for in_var_all in indices['input']:
-                key = (re_var_all, in_var_all)
-                if key in self._in_dict:
-                    jac = self._in_dict[key]
+                    self._int_mtx._add_submat(key, info, re_offset,
+                                              out_offsets[out_idx_all],
+                                              None, shape)
 
-                    out_var_all = self._assembler._input_src_ids[in_var_all]
-                    if ivar1 <= out_var_all < ivar2:
-                        if src_indices[in_var_all] is None:
-                            self._keymap[key] = key
-                            self._int_mtx._in_add_submat(
-                                key, jac, re_offset, out_offsets[out_var_all],
-                                None)
+                for in_count, in_idx_all in enumerate(sub_in_inds):
+                    in_path = in_paths[in_idx_all]
+                    key = (re_path, in_path)
+                    self._keymap[key] = key
+                    if key in self._subjacs_info:
+                        info, shape = self._subjacs_info[key]
+                    else:
+                        info = SUBJAC_META_DEFAULTS
+                        rname = out_names[re_idx_all]
+                        iname = in_names[in_idx_all]
+                        shape = (system._outputs._views_flat[rname].size,
+                                 system._inputs._views_flat[iname].size)
+
+                    out_idx_all = self._assembler._input_src_ids[in_idx_all]
+                    if ivar1 <= out_idx_all < ivar2:
+                        if src_indices[in_idx_all] is None:
+                            self._int_mtx._add_submat(
+                                key, info, re_offset, out_offsets[out_idx_all],
+                                None, shape)
                         else:
                             # need to add an entry for d(output)/d(source)
                             # instead of d(output)/d(input) when we have
                             # src_indices
-                            key2 = (key[0],
-                                    self._assembler._input_src_ids[in_var_all])
+                            src = self._assembler._input_src_ids[in_idx_all]
+                            in_path = out_paths[src]
+                            key2 = (key[0], in_path)
                             self._keymap[key] = key2
-                            self._int_mtx._in_add_submat(
-                                key2, jac, re_offset, out_offsets[out_var_all],
-                                src_indices[in_var_all])
-                    else:
-                        self._ext_mtx._in_add_submat(
-                            key, jac, re_offset, in_offsets[in_var_all], None)
+                            self._int_mtx._add_submat(key2, info, re_offset,
+                                                      out_offsets[out_idx_all],
+                                                      src_indices[in_idx_all],
+                                                      shape)
+                    elif out_idx_all != -1:  # skip unconnected inputs
+                        self._ext_mtx._add_submat(key, info, re_offset,
+                                                  in_offsets[in_idx_all],
+                                                  None, shape)
 
-        ind1, ind2 = self._system._var_allprocs_range['output']
         out_size = numpy.sum(
-            self._assembler._variable_sizes_all['output'][ind1:ind2])
+            self._assembler._variable_sizes_all['output'][ivar1:ivar2])
 
         ind1, ind2 = self._system._var_allprocs_range['input']
         in_size = numpy.sum(
@@ -117,25 +162,29 @@ class GlobalJacobian(Jacobian):
 
     def _update(self):
         """Read the user's sub-Jacobians and set into the global matrix."""
-        indices = self._system._var_myproc_indices
+        # var_var_indices are the *global* indices for variables on this proc
+        var_indices = self._system._var_myproc_indices
+        var_paths = self._system._var_allprocs_pathnames
         ivar1, ivar2 = self._system._var_allprocs_range['output']
 
-        for re_var_all in indices['output']:
-            for out_var_all in indices['output']:
-                key = (re_var_all, out_var_all)
-                if key in self._out_dict:
-                    self._int_mtx._out_update_submat(key, self._out_dict[key])
+        for re_idx_all in var_indices['output']:
+            re_path = var_paths['output'][re_idx_all]
+            for out_idx_all in var_indices['output']:
+                out_path = var_paths['output'][out_idx_all]
+                key = (re_path, out_path)
+                if key in self._subjacs:
+                    self._int_mtx._update_submat(key, self._subjacs[key])
 
-            for in_var_all in indices['input']:
-                key = (re_var_all, in_var_all)
-                if key in self._in_dict:
-                    out_var_all = self._assembler._input_src_ids[in_var_all]
-                    if ivar1 <= out_var_all < ivar2:
-                        self._int_mtx._in_update_submat(self._keymap[key],
-                                                        self._in_dict[key])
-                    else:
-                        self._ext_mtx._in_update_submat(key,
-                                                        self._in_dict[key])
+            for in_idx_all in var_indices['input']:
+                in_path = var_paths['input'][in_idx_all]
+                key = (re_path, in_path)
+                if key in self._subjacs:
+                    out_idx_all = self._assembler._input_src_ids[in_idx_all]
+                    if ivar1 <= out_idx_all < ivar2:
+                        self._int_mtx._update_submat(self._keymap[key],
+                                                     self._subjacs[key])
+                    elif out_idx_all != -1:  # skip unconnected inputs
+                        self._ext_mtx._update_submat(key, self._subjacs[key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """Compute matrix-vector product.

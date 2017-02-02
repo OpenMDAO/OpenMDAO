@@ -1,4 +1,30 @@
-"""Contains test groups for cycles with easily verified values/derivatives."""
+"""Contains test groups for cycles with easily verified values/derivatives.
+
+The Group contains the following components:
+    - 'first'
+    - (num_comp - 2 copies of) 'middle_i'
+    - 'last'
+
+Components other than the 'last' component take an input vector and rotate that vector by a
+specified angle in the plane spanned by [1, 0, ..., 0, 1] and [0, 1, ..., 1, 0]. 'first' takes a
+parameter 'psi' that corresponds to the initial rotation. The middle components use the rotation
+angle specified by 'theta'. All components (including 'first' and 'last') have an output 'theta_out'
+that is used to pass the 'theta' angle to the next component. The goal of this group is to determine
+a value for 'theta' such that
+    psi + (num_comp-1)*theta = 0 (mod 2*pi),
+i.e., an angle 'theta' such that rotations by the non-first components would return the vector to
+its original location. The 'last' component computes a new value for 'theta_out' that has 1/2 the
+error as the input 'theta'. 'last.theta_out' is connected to 'first.theta' to form a cycle and the
+reduction of error by 1/2 ensures Gauss-Seidel type methods will converge.
+
+To provide support for multiple variables/variable sizes, the vector is constructed from the inputs
+by taking the inputs in order (e.g. x_0, x_1, ...), flattening the array, and concatenating those
+arrays into one vector. The outputs y_i are constructed in the reverse manner.
+
+Note: 'theta' is unique only up to equivalence mod (2*pi)/(num_comp - 1). Test authors should not
+depend on particular values of 'theta' (or 'x_i'/'y_i' values) without taking this in to account.
+"""
+
 from __future__ import print_function, division
 from six.moves import range
 import numpy as np
@@ -7,7 +33,6 @@ from openmdao.api import IndepVarComp
 from openmdao.test_suite.groups.parametric_group import ParametericTestGroup
 from openmdao.test_suite.components.cycle_comps import PSI, ExplicitCycleComp, ExplicitFirstComp,\
     ExplicitLastComp
-
 
 
 class CycleGroup(ParametericTestGroup):
@@ -24,7 +49,6 @@ class CycleGroup(ParametericTestGroup):
             'num_var': [3, 1],
             'var_shape': [(2, 3), (3,)],
         })
-
 
     def _initialize_metadata(self):
         self.metadata.declare('num_comp', type_=int, value=2,

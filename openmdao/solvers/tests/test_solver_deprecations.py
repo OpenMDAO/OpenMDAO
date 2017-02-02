@@ -32,7 +32,7 @@ class TestSolverDeprecations(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
-        ## Make sure we aren't iterating like crazy
+        # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nl_solver._iter_count, 8)
         self.assertEqual(prob.model.ln_solver._iter_count, 0)
         self.assertGreater(prob.model.nl_solver.options['subsolvers']['linear']._iter_count, 0)

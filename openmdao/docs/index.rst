@@ -40,8 +40,11 @@ Building components
 .. toctree::
    :maxdepth: 1
 
+   features/building_components/building_components
+   features/building_components/declaring_variables
    features/building_components/indepvarcomp
    features/building_components/explicitcomp
+   features/building_components/implicitcomp
 
 Defining partial derivatives
 ================================
@@ -61,13 +64,6 @@ Solvers (nonlinear and linear)
 
 Running your models
 ================================
-
-.. toctree::
-   :maxdepth: 1
-
-   features/running/setup_and_run
-   features/running/set_get
-   features/running/check_total_derivatives
 
 Drivers (optimizers and DOE)
 ================================

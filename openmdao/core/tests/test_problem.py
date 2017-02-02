@@ -1,6 +1,7 @@
 """ Unit tests for the problem interface."""
 from __future__ import print_function
 import unittest
+import warnings
 
 import numpy as np
 
@@ -46,29 +47,29 @@ class TestProblem(unittest.TestCase):
     def test_compute_total_derivs_basic(self):
         # Basic test for the method using default solvers on simple model.
 
-        top = Problem()
-        root = top.model = Group()
-        root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        top.setup(check=False, mode='fwd')
-        top.model.suppress_solver_output = True
-        top.run_model()
+        prob.setup(check=False, mode='fwd')
+        prob.model.suppress_solver_output = True
+        prob.run_model()
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = top.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['f_xy', 'x'], -6.0, 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], 8.0, 1e-6)
 
-        top.setup(check=False, mode='rev')
-        top.run_model()
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = top.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['f_xy', 'x'], -6.0, 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], 8.0, 1e-6)
@@ -91,10 +92,10 @@ class TestProblem(unittest.TestCase):
     def test_feature_numpyvec_setup(self):
 
         prob = Problem()
-        root = prob.model = Group()
-        root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         prob.setup()
 
@@ -116,13 +117,14 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['f_xy'], 174.0, 1e-6)
 
+    @unittest.skipUnless(PETScVector, "PETSc is required.")
     def test_feature_petsc_setup(self):
 
         prob = Problem()
-        root = prob.model = Group()
-        root.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        root.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        root.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         # use PETScVector when using any PETSc linear solvers or running under MPI
         prob.setup(vector_class=PETScVector)
@@ -306,15 +308,37 @@ class TestProblem(unittest.TestCase):
     def test_setup_bad_mode(self):
         # Test error message when passing bad mode to setup.
 
-        top = Problem(Group())
+        prob = Problem(Group())
 
         try:
-            top.setup(mode='junk')
+            prob.setup(mode='junk')
         except ValueError as err:
             msg = "Unsupported mode: 'junk'"
             self.assertEqual(str(err), msg)
         else:
             self.fail('Expecting ValueError')
+
+    def test_root_deprecated(self):
+        msg = "The 'root' property provides backwards compatibility " \
+            + "with OpenMDAO <= 1.x ; use 'model' instead."
+
+        prob = Problem()
+
+        # check deprecation on setter
+        with warnings.catch_warnings(record=True) as w:
+            prob.root = Group()
+
+        assert len(w) == 1
+        assert issubclass(w[0].category, DeprecationWarning)
+        assert str(w[0].message) == msg
+
+        # check deprecation on getter
+        with warnings.catch_warnings(record=True) as w:
+            prob.root
+
+        assert len(w) == 1
+        assert issubclass(w[0].category, DeprecationWarning)
+        assert str(w[0].message) == msg
 
 
 if __name__ == "__main__":

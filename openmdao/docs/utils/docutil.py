@@ -114,7 +114,9 @@ def replace_asserts_with_prints(source_code):
     assert_nodes = rb.findAll("NameNode", value='assert_rel_error')
     for assert_node in assert_nodes:
         assert_node = assert_node.parent
-        remove_redbaron_node(assert_node.value[1], -1)  # remove the relative error tolerance
+        # If relative error tolerance is specified, there are 4 arguments
+        if len(assert_node.value[1]) == 4:
+            remove_redbaron_node(assert_node.value[1], -1)  # remove the relative error tolerance
         remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
         remove_redbaron_node(assert_node.value[1], 0)  # remove the first argument which is
         #                                                  the TestCase
@@ -253,8 +255,8 @@ def get_test_source_code_for_feature(feature_name):
 
 def get_skip_predicate_and_message(source, method_name):
     '''
-    Look to see if the method has a unittest.skipUnless or unittest.skip 
-    decorator. 
+    Look to see if the method has a unittest.skipUnless or unittest.skip
+    decorator.
 
     If it has a unittest.skipUnless decorator, return the predicate and the message
     If it has a unittest.skip decorator, return just the message ( set predicate to None )
@@ -265,7 +267,7 @@ def get_skip_predicate_and_message(source, method_name):
     if def_nodes:
         if def_nodes[0].decorators:
             if def_nodes[0].decorators[0].value.dumps() == 'unittest.skipUnless':
-                return ( def_nodes[0].decorators[0].call.value[0].dumps(), 
+                return ( def_nodes[0].decorators[0].call.value[0].dumps(),
                     def_nodes[0].decorators[0].call.value[1].value.to_python() )
             elif def_nodes[0].decorators[0].value.dumps() == 'unittest.skip':
                 return ( None, def_nodes[0].decorators[0].call.value[0].value.to_python() )
