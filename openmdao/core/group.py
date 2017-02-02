@@ -43,7 +43,7 @@ class Group(System):
             to 'promote' up to this group. This is for backwards compatibility
             with older versions of OpenMDAO.
         """
-        warn_deprecation('This method provides backwards compabitibility with '
+        warn_deprecation('This method provides backwards compatibility with '
                          'OpenMDAO <= 1.x ; use add_subsystem instead.')
 
         self.add_subsystem(name, subsys, promotes=promotes)
@@ -311,6 +311,38 @@ class Group(System):
                     self._var_name2path[name].append(path)
                 else:
                     self._var_name2path[name] = [path]
+
+    def get_subsystem(self, name):
+        """Return the system called 'name' in the current namespace.
+
+        Args
+        ----
+        name : str
+            name of the desired system in the current namespace.
+
+        Returns
+        -------
+        System or None
+            System if found else None.
+        """
+        idot = name.find('.')
+
+        # If name does not contain '.', only check the immediate children
+        if idot == -1:
+            for subsys in self._subsystems_allprocs:
+                if subsys.name == name:
+                    return subsys
+        # If name does contain at least one '.', we have to recurse (possibly).
+        else:
+            sub_name = name[:idot]
+            for subsys in self._subsystems_allprocs:
+                # We only check if the prefix matches, and with the prefix removed.
+                if subsys.name == sub_name:
+                    result = subsys.get_subsystem(name[idot + 1:])
+                    if result:
+                        return result
+
+        return None
 
     def _apply_nonlinear(self):
         """Compute residuals."""

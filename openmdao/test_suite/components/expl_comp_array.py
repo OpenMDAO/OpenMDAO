@@ -30,7 +30,6 @@ class TestExplCompArrayDense(TestExplCompArray):
     def compute_jacobian(self, inputs, outputs, jacobian):
         thk = self.metadata['thickness']
 
-        inds = numpy.arange(4)
         jacobian['areas', 'lengths'] = numpy.diag(inputs['widths'].flatten())
         jacobian['areas', 'widths'] = numpy.diag(inputs['lengths'].flatten())
         jacobian['total_volume', 'lengths'] = inputs['widths'].flatten() * thk

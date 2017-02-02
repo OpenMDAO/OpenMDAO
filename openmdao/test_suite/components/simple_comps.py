@@ -1,7 +1,6 @@
 """ Defines a few simple comps that are used in tests."""
 
 import numpy as np
-import scipy.sparse
 
 from openmdao.api import ExplicitComponent
 
@@ -12,6 +11,12 @@ class DoubleArrayComp(ExplicitComponent):
     def __init__(self):
         super(DoubleArrayComp, self).__init__()
 
+        self.JJ = np.array([[1.0, 3.0, -2.0, 7.0],
+                            [6.0, 2.5, 2.0, 4.0],
+                            [-1.0, 0.0, 8.0, 1.0],
+                            [1.0, 4.0, -5.0, 6.0]])
+
+    def initialize_variables(self):
         # Params
         self.add_input('x1', np.zeros([2]))
         self.add_input('x2', np.zeros([2]))
@@ -19,11 +24,6 @@ class DoubleArrayComp(ExplicitComponent):
         # Unknowns
         self.add_output('y1', np.zeros([2]))
         self.add_output('y2', np.zeros([2]))
-
-        self.JJ = np.array([[1.0, 3.0, -2.0, 7.0],
-                            [6.0, 2.5, 2.0, 4.0],
-                            [-1.0, 0.0, 8.0, 1.0],
-                            [1.0, 4.0, -5.0, 6.0]])
 
     def compute(self, inputs, outputs):
         """Execution."""
