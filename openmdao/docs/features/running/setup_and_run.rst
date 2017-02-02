@@ -6,16 +6,15 @@ you need to call the :code:`setup()` method to have the framework do some initia
 You can control some details of that initialization by arguments you pass into setup,
 and it is important to note is that you can not set or get any variable values or run until **after** you call :code:`setup()`.
 
+.. automethod:: openmdao.core.problem.Problem.setup
+    :noindex:
+
 Once setup is done, you can then execute your model in one of two ways:
     #. :code:`run_model()`
     #. :code:`run_driver()`
 
 The first one will execute one pass through your model.
 The second one executes the  <openmdao.core.driver.Driver> running the optimization, DOE, etc. that you've set up.
-
-.. embed-autodoc:
-    openmdao.core.problem.setup
-
 
 Examples
 ---------

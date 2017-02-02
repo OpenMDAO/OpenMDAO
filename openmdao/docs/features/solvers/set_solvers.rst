@@ -1,35 +1,28 @@
 Setting nonlinear and linear solvers
 =====================================
 
-A nonlinear solver, like <openmdao.solvers.nl_bgs.NonlinearBlockGS> or <openmdao.solvers.nl_newton.Newton>, is used to converge the nonlinear analysis.
+A nonlinear solver, like <openmdao.solvers.nl_bgs.NonlinearBlockGS> or <openmdao.solvers.nl_newton.Newton>,
+is used to converge the nonlinear analysis. A nonlinear solver is needed whenever this is either a cyclic dependency between components in your model.
+It might also be needed if you have an <openmdao.core.implicitcomponent.ImplicitComponent> in your model that expects the framework to handle its convergence.
+
+Whenever you use a nonlinear solver on a <openmdao.core.group.Group> or <openmdao.core.component.Component>, if you're going to be working with analytic derivatives,
+you will also need a linear solver.
 A linear solver, like <openmdao.solvers.ln_bgs.LinearBlockGS> or <openmdao.solvers.ln_direct.DirectSolver>,
 is used to solve the linear system that provides total derivatives across the model.
 
-
-At any level of the model hierarchy you can specify both a nonlinear and linear solver,
+You can add nonlinear and linear solvers at any level of the model hierarchy,
 letting you build a hierarchical solver setup to efficiently converge your model and solve for total derivatives across it.
 
 
-Solvers for groups and components
+Solvers for the Sellar problem
 ----------------------------------
 
-Here we show how to define linear and nonlinear solvers to converge a cycle in a group of components. The Sellar model contains two disciplines that can be
-modelled as OpenMDAO `Components`. It contains some external variables that affect one or both components ('x' and 'z') and two coupling variables
-('y1' and 'y2') that define a cycle. The first component looks like this:
+The Sellar (link to sellar problem page) problem has two components with a cyclic dependency,
+so a a nonlinear solver is necessary.
+We'll use the <openmdao.solvers.nl_newton.Newton> nonlinear solver,
+which requires derivatives so a we'll also use the <openmdao.solvers.ln_direct.Direct) linear solver
 
-.. embed-python-code::
-    openmdao.solvers.tests.test_solver_features.SellarDis1
-
-and the second component is defined as:
-
-.. embed-python-code::
-    openmdao.solvers.tests.test_solver_features.SellarDis2
-
-Since the components are interdependent, we need a nonlinear solver to determine values for the coupling variables that satisfy the equations
-in the components. There are several solvers that would work for this problem, so let's use `Newton`.  Newton's method also needs to calculate
-a derivative, so a linear solver is also specified:
-
-.. embed-python-code::
+.. embed-test::
     openmdao.solvers.tests.test_solver_features.TestSolverFeatures.test_specify_solver
 
 The answers given are the expected solution to the problem given the default initial conditions for x and z.

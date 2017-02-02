@@ -123,17 +123,17 @@ class SellarNoDerivatives(Group):
         cycle.ln_solver = ScipyIterativeSolver()
         d1 = cycle.add_subsystem('d1', SellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
         d2 = cycle.add_subsystem('d2', SellarDis2(), promotes=['z', 'y1', 'y2'])
+        d1.deriv_options['type'] = 'fd'
+        d2.deriv_options['type'] = 'fd'
 
         self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                     z=np.array([0.0, 0.0]), x=0.0),
-                 promotes=['x', 'z', 'y1', 'y2', 'obj'])
+                           z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['x', 'z', 'y1', 'y2', 'obj'])
 
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         self.nl_solver = NonlinearBlockGS()
-        d1.deriv_options['type'] = 'fd'
-        d2.deriv_options['type'] = 'fd'
 
 
 class SellarDerivatives(Group):
