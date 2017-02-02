@@ -75,7 +75,7 @@ class TestJacobianFeatures(unittest.TestCase):
         self.problem = Problem(model=model)
         model.suppress_solver_output = True
         model.ln_solver = ScipyIterativeSolver()
-        model.jacobian = GlobalJacobian(matrix_class=CsrMatrix)
+        model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
 
 
     def test_something(self):
