@@ -374,7 +374,7 @@ class BlockLinearSolver(LinearSolver):
             error at the first iteration.
         """
         if isinstance(self._system._jacobian, GlobalJacobian):
-            raise RuntimeError("A BlockLinearSolver is being used with a "
-                               "GlobalJacobian in system '%s'" %
-                               self._system.pathname)
+            raise RuntimeError("A block linear solver '%s' is being used with "
+                               "a GlobalJacobian in system '%s'" %
+                               (self.SOLVER, self._system.pathname))
         return super(BlockLinearSolver, self)._iter_initialize()
