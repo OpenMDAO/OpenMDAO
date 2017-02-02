@@ -147,11 +147,11 @@ class ExplicitComponent(Component):
             self.declare_partials(out_name, out_name, rows=arange, cols=arange,
                                   val=numpy.ones(size))
 
-        with self._jacobian_context():
-            # a GlobalJacobian will not have been set at this point, so this will
-            # negate values in the DefaultJacobian. These will later be copied
-            # into the GlobalJacobian (if one is set).
-            self._negate_jac()
+        # with self._jacobian_context():
+        #     # a GlobalJacobian will not have been set at this point, so this will
+        #     # negate values in the DefaultJacobian. These will later be copied
+        #     # into the GlobalJacobian (if one is set).
+        #     self._negate_jac()
 
     def _negate_jac(self):
         """Negate this component's part of the jacobian."""
