@@ -402,8 +402,8 @@ class Component(System):
                             out_size, in_size,
                             rows.max() + 1, cols.max() + 1
                         ))
-                val = info['value']
-                if val is not None:
+                elif info['value'] is not None:
+                    val = info['value']
                     val_shape = val.shape
                     if len(val_shape) == 1:
                         val_out, val_in = val_shape[0], 1
@@ -415,7 +415,6 @@ class Component(System):
                             out_size, in_size,
                             val_out, val_in
                         ))
-
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
         r"""Add this vector and assign sub_vectors to subsystems.
