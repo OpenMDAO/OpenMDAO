@@ -447,7 +447,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'numpydoc',
     'show_unittest_examples',
-    'embed_python_code',
+    'embed_code',
     'embed_test',
     'tags'
 ]
