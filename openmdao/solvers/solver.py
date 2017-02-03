@@ -4,6 +4,7 @@ from __future__ import division, print_function
 import numpy
 
 from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.jacobians.global_jacobian import GlobalJacobian
 
 
 class Solver(object):
@@ -357,3 +358,23 @@ class LinearSolver(Solver):
             norm += b_vec.get_norm()**2
 
         return norm ** 0.5
+
+
+class BlockLinearSolver(LinearSolver):
+    """A base class for LinearBlockGS and LinearBlockJac."""
+
+    def _iter_initialize(self):
+        """Perform any necessary pre-processing operations.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
+        if isinstance(self._system._jacobian, GlobalJacobian):
+            raise RuntimeError("A block linear solver '%s' is being used with "
+                               "a GlobalJacobian in system '%s'" %
+                               (self.SOLVER, self._system.pathname))
+        return super(BlockLinearSolver, self)._iter_initialize()
