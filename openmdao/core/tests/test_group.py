@@ -5,6 +5,8 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 
+from openmdao.test_suite.groups.unit_conversion_groups import SrcComp
+
 
 class SimpleGroup(Group):
 
@@ -286,6 +288,36 @@ class TestConnect(unittest.TestCase):
 
         msg = "Input and output are in the same System for connection " + \
               "in 'sub' from 'y2' to 'tgt.x'."
+
+        with assertRaisesRegex(self, RuntimeError, msg):
+            prob.setup(check=False)
+
+    def test_connect_units_with_unitless(self):
+        msg = "Units must be specified for both or neither side of " + \
+              "connection in 'model' from 'src.x2' to 'tgt.x'."
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        prob.model.add_subsystem('src', SrcComp())  # output 'x2', degC
+        prob.model.add_subsystem('tgt', ExecComp('y = x'))
+
+        prob.model.connect('px1.x1', 'src.x1')
+        prob.model.connect('src.x2', 'tgt.x')
+
+        with assertRaisesRegex(self, RuntimeError, msg):
+            prob.setup(check=False)
+
+    def test_connect_incompatible_units(self):
+        msg = "Input and output units are not compatible for " + \
+              "connection in 'model' from 'src.x2' to 'tgt.x'."
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        prob.model.add_subsystem('src', SrcComp())  # output 'x2', degC
+        prob.model.add_subsystem('tgt', ExecComp('y = x', units={'x': 'm'}))
+
+        prob.model.connect('px1.x1', 'src.x1')
+        prob.model.connect('src.x2', 'tgt.x')
 
         with assertRaisesRegex(self, RuntimeError, msg):
             prob.setup(check=False)

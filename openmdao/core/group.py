@@ -10,6 +10,7 @@ from openmdao.core.system import System, PathData
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
 from openmdao.solvers.ln_bgs import LinearBlockGS
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.units import is_compatible
 
 
 class Group(System):
@@ -152,6 +153,7 @@ class Group(System):
             raise RuntimeError("Input '%s' is already connected to '%s'." %
                                (in_name, srcname))
 
+        # source and target should not be in the same system
         if out_name.rsplit('.', 1)[0] == in_name.rsplit('.', 1)[0]:
             raise RuntimeError("Input and output are in the same System for " +
                                "connection from '%s' to '%s'." % (out_name, in_name))
@@ -180,8 +182,10 @@ class Group(System):
 
         allprocs_in_names = self._var_allprocs_names['input']
         myproc_in_names = self._var_myproc_names['input']
+        myproc_out_names = self._var_myproc_names['output']
         allprocs_out_names = self._var_allprocs_names['output']
         input_meta = self._var_myproc_metadata['input']
+        output_meta = self._var_myproc_metadata['output']
 
         in_offset = self._var_allprocs_range['input'][0]
         out_offset = self._var_allprocs_range['output'][0]
@@ -214,6 +218,27 @@ class Group(System):
 
             if out_subsys == in_subsys:
                 raise RuntimeError("Input and output are in the same System " +
+                                   "for connection in '%s' from '%s' to '%s'." %
+                                   (self.name if self.name else 'model',
+                                    out_name, in_name))
+
+            out_myproc_index = myproc_out_names.index(out_name)
+            in_myproc_index = myproc_in_names.index(in_name)
+
+            out_units = output_meta[out_myproc_index]['units']
+            in_units = input_meta[in_myproc_index]['units']
+
+            # throw an error if one of the input and output is unitless,
+            # but the other isn't
+            if (out_units and not in_units or in_units and not out_units):
+                raise RuntimeError("Units must be specified for both or neither side " +
+                                   "of connection in '%s' from '%s' to '%s'." %
+                                   (self.name if self.name else 'model',
+                                    out_name, in_name))
+
+            # throw an error if the input and output units are not compatible
+            if not is_compatible(in_units, out_units):
+                raise RuntimeError("Input and output units are not compatible " +
                                    "for connection in '%s' from '%s' to '%s'." %
                                    (self.name if self.name else 'model',
                                     out_name, in_name))
