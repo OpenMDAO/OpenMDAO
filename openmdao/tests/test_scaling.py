@@ -67,8 +67,8 @@ class TestScaling(unittest.TestCase):
 
     def test_speed(self):
         comp = IndepVarComp()
-        comp.add_var('distance', 1., units='km')
-        comp.add_var('time', 1., units='h')
+        comp.add_output('distance', 1., units='km')
+        comp.add_output('time', 1., units='h')
 
         group = Group()
         group.add_subsystem('c1', comp)

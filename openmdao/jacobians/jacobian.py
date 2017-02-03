@@ -241,6 +241,40 @@ class Jacobian(object):
 
         self._subjacs[ukey] = jac
 
+    def __getitem__(self, key):
+        """Get sub-Jacobian.
+
+        Args
+        ----
+        key : (str, str)
+            output name, input name of sub-Jacobian.
+
+        Returns
+        -------
+        jac : ndarray or spmatrix or list[3]
+            sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
+        """
+        system = self._system
+        ukey = self._key2unique(key)
+        jac = self._subjacs[ukey]
+        typ = system._var_pathdict[ukey[1]].typ
+
+        ind = system._var_myproc_names['output'].index(key[0])
+        r_factor = system._scaling_to_phys['residual'][ind, 1]
+
+        ind = system._var_myproc_names[typ].index(key[1])
+        c_factor = system._scaling_to_phys[typ][ind, 1]
+
+        if r_factor != c_factor:
+            if isinstance(jac, numpy.ndarray):
+                jac *= r_factor / c_factor
+            elif isinstance(jac, (coo_matrix, csr_matrix)):
+                jac.data *= r_factor / c_factor
+            elif len(jac) == 3:
+                jac[0] *= r_factor / c_factor
+
+        return jac
+
     def _initialize(self):
         """Allocate the global matrices."""
         pass

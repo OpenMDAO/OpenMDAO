@@ -8,6 +8,7 @@ import numpy
 from six import string_types
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class IndepVarComp(ExplicitComponent):
@@ -16,12 +17,11 @@ class IndepVarComp(ExplicitComponent):
     Attributes
     ----------
     _indep : tuple
-        Tuple (arg1, arg2), where arg1 is str or [(str, value), ...]
-        or [(str, value, kwargs), ...] and arg 2 is value.
-        The value can be float or ndarray
+        List of tuples of the form [(str, value, kwargs), ...].
+        The value can be float or ndarray, and kwargs is a dictionary
     _indep_external : list
         list of this component's independent variables that are declared externally
-        via the add_var method.
+        via the add_output method.
     """
 
     def __init__(self, name=None, val=1.0, **kwargs):
@@ -29,52 +29,43 @@ class IndepVarComp(ExplicitComponent):
 
         Args
         ----
-        name : str or [(str, value), ...] or [(str, value, kwargs), ...] or None
-            name of the variable or list of variables. If None, variables will be defined
-            external to this class by calling the add_var method.
+        name : str or None or [(str, value), ...] or [(str, value, kwargs), ...]
+            name of the variable.
+            If None, variables should be defined external to this class by calling add_output.
+            For backwards compatibility with OpenMDAO v1, this can also be a list of tuples
+            in the case of declaring multiple variables at once.
         val : float or ndarray
             value of the variable if a single variable is being defined.
         kwargs : dict
             keyword arguments.
         """
         super(IndepVarComp, self).__init__(**kwargs)
-        self._indep = (name, val)
+        self._indep = []
         self._indep_external = []
 
-        for illegal in ('promotes', 'promotes_inputs', 'promotes_outputs'):
-            if illegal in kwargs:
-                raise ValueError("IndepVarComp init: '%s' is not supported "
-                                 "in IndepVarComp." % illegal)
-
-    def initialize_variables(self):
-        """Define the independent variables as output variables."""
-        name, val = self._indep
-        kwargs = self.metadata._dict
-
+        # A single variable is declared during instantiation
         if isinstance(name, string_types):
-            self.add_output(name, val, **kwargs)
-
+            self._indep.append((name, val, kwargs))
+        # Mutiple variables are declared during instantiation (deprecated)
         elif isinstance(name, collections.Iterable):
+            warn_deprecation('Declaring multiple variables in this way is deprecated. '
+                             'In OpenMDAO 2.x or later, multiple variables should be declared '
+                             'as separate add_output calls.')
+
+            # Loop through each variable (i.e., each tuple)
             for tup in name:
-                badtup = None
-                if isinstance(tup, tuple):
-                    if len(tup) == 3:
-                        n, v, kw = tup
-                    elif len(tup) == 2:
-                        n, v = tup
-                        kw = {}
-                    else:
-                        badtup = tup
+                # If valid tuple, assign to (name, val, kwargs); otherwise, raise an exception
+                if isinstance(tup, tuple) and len(tup) == 3:
+                    name_, val, kwargs = tup
+                elif isinstance(tup, tuple) and len(tup) == 2:
+                    name_, val = tup
+                    kwargs = {}
                 else:
-                    badtup = tup
-                if badtup:
-                    if isinstance(badtup, string_types):
-                        badtup = name
                     raise ValueError(
                         "IndepVarComp init: arg %s must be a tuple of the "
                         "form (name, value) or (name, value, keyword_dict)." %
-                        str(badtup))
-                self.add_output(n, v, **kw)
+                        str(tup))
+                self._indep.append((name_, val, kwargs))
         elif name is None:
             pass
         else:
@@ -83,15 +74,24 @@ class IndepVarComp(ExplicitComponent):
                 "`str` or an iterable of tuples of the form (name, value) or "
                 "(name, value, keyword_dict).")
 
-        for (name, val, shape, units, res_units, desc, lower, upper,
-                ref, ref0, res_ref, res_ref0, var_set) in self._indep_external:
-            self.add_output(name, val=val, shape=shape, units=units, res_units=res_units,
-                            desc=desc, lower=lower, upper=upper, ref=ref, ref0=ref0,
-                            res_ref=res_ref, res_ref0=res_ref0, var_set=var_set)
+        for illegal in ('promotes', 'promotes_inputs', 'promotes_outputs'):
+            if illegal in kwargs:
+                raise ValueError("IndepVarComp init: '%s' is not supported "
+                                 "in IndepVarComp." % illegal)
 
-    def add_var(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                lower=None, upper=None, ref=1.0, ref0=0.0,
-                res_ref=1.0, res_ref0=0.0, var_set=0):
+    def initialize_variables(self):
+        """Define the independent variables as output variables."""
+        for (name, val, kwargs) in self._indep + self._indep_external:
+            super(IndepVarComp, self).add_output(name, val, **kwargs)
+
+        if len(self._indep) == 0 and len(self._indep_external) == 0:
+            raise RuntimeError("No outputs (independent variables) have been declared for "
+                               "this component. They must either be declared during "
+                               "instantiation or by calling add_output afterwards.")
+
+    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
+                   lower=None, upper=None, ref=1.0, ref0=0.0,
+                   res_ref=1.0, res_ref0=0.0, var_set=0):
         """Add an independent variable to this component.
 
         Args
@@ -137,5 +137,7 @@ class IndepVarComp(ExplicitComponent):
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
         """
-        self._indep_external.append((name, val, shape, units, res_units, desc, lower, upper,
-                                     ref, ref0, res_ref, res_ref0, var_set))
+        kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
+                  'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
+                  'res_ref': res_ref, 'res_ref0': res_ref0, 'var_set': var_set}
+        self._indep_external.append((name, val, kwargs))
