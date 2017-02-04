@@ -35,10 +35,8 @@ def check_config(problem, logger=None):
         console.setLevel(logging.INFO)
         logger.addHandler(console)
 
-    root = problem.model
-
     _check_hanging_inputs(problem, logger)
-    _check_dataflow(root, logger)
+    _check_dataflow(problem.model, logger)
 
 
 def compute_sys_graph(group, input_src_ids, comps_only=False):
