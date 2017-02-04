@@ -15,6 +15,24 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
 
 class TestNewton(unittest.TestCase):
 
+    @unittest.skip('something is broken in the way newton pulls the linear solver from the group')
+    def test_specify_newton_ln_solver_in_system(self):
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.nl_solver = NewtonSolver()
+        # used for analytic derivatives
+        model.ln_solver = DirectSolver()
+
+        prob.setup()
+
+        self.assertIsInstance(model.nl_solver.ln_solver, DirectSolver)
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
     def test_feature_newton_basic(self):
         """ Feature test for slotting a Newton solver and using it to solve
         Sellar.
