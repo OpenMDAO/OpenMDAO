@@ -9,7 +9,7 @@ The first discipline is define by the following equation:
 
 This is built as an openmdao <Component> like this
 
-.. embed-python-code::
+.. embed-code::
     openmdao.test_suite.components.sellar.SellarDis1
 
 ----
@@ -22,7 +22,7 @@ The second discipline is given by another equation:
 
 which is translated into an <Component> like this
 
-.. embed-python-code::
+.. embed-code::
     openmdao.test_suite.components.sellar.SellarDis2
 
 
@@ -42,6 +42,6 @@ The first discipline outputs :math:`y_1`, which is an input to the second discip
     & \ \ \ & y_2 - 24.0 >=0
     \end{align}
 
-.. embed-python-code::
+.. embed-code::
     openmdao.test_suite.components.sellar.SellarNoDerivatives
 

@@ -162,13 +162,12 @@ class TestProblem(unittest.TestCase):
 
         prob.setup()
 
-        prob.driver = ScipyOpt()
-        prob.driver.options['method'] = 'slsqp'
-        prob.driver.add_design_var('x')
-        prob.driver.add_design_var('z')
-        prob.driver.add_objective('obj')
-        prob.driver.add_design_var('con1')
-        prob.driver.add_design_var('con2')
+        prob.model.options['method'] = 'slsqp'
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_design_var('con1')
+        prob.model.add_design_var('con2')
         # re-do setup since we changed the driver and problem inputs/outputs
         prob.setup()
 
@@ -189,12 +188,11 @@ class TestProblem(unittest.TestCase):
         prob.model = SellarDerivatives()
         prob.model.nl_solver = NonlinearBlockGS()
 
-        # TODO: this api is not final, just a placeholder for now
         prob.driver = ScipyOpt()
         prob.driver.options['method'] = 'slsqp'
-        # note: this might differ from clippy api, but is consistent with arg name in scipy.
-        prob.model.add_design_var('x')
-        prob.model.add_design_var('z')
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
         prob.model.add_objective('obj')
         prob.model.add_design_var('con1')
         prob.model.add_design_var('con2')
@@ -240,7 +238,6 @@ class TestProblem(unittest.TestCase):
     # @unittest.skip("set/get inputs via full path name not supported yet")
     def test_feature_promoted_sellar_set_get_inputs(self):
         raise unittest.SkipTest("set/get inputs via full path name not supported yet")
-
 
         prob = Problem()
         prob.model = SellarDerivatives()

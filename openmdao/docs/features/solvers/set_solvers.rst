@@ -30,7 +30,7 @@ which requires derivatives so a we'll also use the <openmdao.solvers.ln_direct.D
 Some models have more complex coupling. There could be top level cycles between groups as well as
 lower level groups that have cycles of their own. The openmdao.test_suite.components.double_sellar.DoubleSellar (TODO: Link to problem page) is a simple example of this kind of model structure. In these problems, you might want to specify a more complex hierarchical solver structure for both nonlinear and linear solvers.
 
-.. embed-python-code::
+.. embed-test::
     openmdao.solvers.tests.test_solver_features.TestSolverFeatures.test_specify_subgroup_solvers
 
 
@@ -42,4 +42,11 @@ lower level groups that have cycles of their own. The openmdao.test_suite.compon
     you should try using the <openmdao.solvers.ln_direct.DirectSolver> instead.
     But first, verify that all your partials derivatives are correct with the check_partial_derivatives method.
 
+
+----
+
+You can also specify solvers as part of the initialization of a Group
+
+.. embed-code::
+    openmdao.test_suite.components.double_sellar.DoubleSellar
 

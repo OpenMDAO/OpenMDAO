@@ -21,6 +21,11 @@ class TestSolverFeatures(unittest.TestCase):
         model = prob.model = SellarDerivatives()
 
         model.nl_solver = NewtonSolver()
+        # using a different linear solver for Newton with a looser tolerance
+        model.nl_solver.ln_solver = ScipyIterativeSolver()
+        model.nl_solver.ln_solver.options['atol'] = 1e-4
+
+        # used for analytic derivatives
         model.ln_solver = DirectSolver()
 
         prob.setup()
@@ -37,18 +42,18 @@ class TestSolverFeatures(unittest.TestCase):
 
         # each SubSellar group converges itself
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NonlinearBlockGS()
-        g1.ln_solver = DirectSolver()
+        g1.nl_solver = NewtonSolver()
+        g1.ln_solver = DirectSolver()  # used for derivatives
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NonlinearBlockGS()
+        g2.nl_solver = NewtonSolver()
         g2.ln_solver = DirectSolver()
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         model.nl_solver = NonlinearBlockGS()
         model.nl_solver.options['rtol'] = 1.0e-5
         model.ln_solver = ScipyIterativeSolver()
-        model.ln_solver.options['subsolvers']['preconditioner'] = LinearBlockGS()
+        model.ln_solver.precon = LinearBlockGS()
 
         prob.setup()
         prob.run_model()
