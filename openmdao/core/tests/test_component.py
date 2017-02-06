@@ -69,13 +69,8 @@ class TestImplicitComponent(unittest.TestCase):
 
 class TestIndepVarComp(unittest.TestCase):
 
-    def test_indep_simple(self):
-        """Define one independent variable and set its value.
-
-        Features
-        --------
-        indepvarcomp
-        """
+    def test_simple(self):
+        """Define one independent variable and set its value."""
         comp = IndepVarComp('indep_var')
         prob = Problem(comp).setup(check=False)
 
@@ -84,40 +79,22 @@ class TestIndepVarComp(unittest.TestCase):
         prob['indep_var'] = 2.0
         assert_rel_error(self, prob['indep_var'], 2.0)
 
-    def test_indep_simple_default(self):
-        """Define one independent variable with a default value.
-
-        Features
-        --------
-        indepvarcomp
-        """
+    def test_simple_default(self):
+        """Define one independent variable with a default value."""
         comp = IndepVarComp('indep_var', val=2.0)
         prob = Problem(comp).setup(check=False)
 
         assert_rel_error(self, prob['indep_var'], 2.0)
 
-    def test_indep_simple_kwargs(self):
-        """Define one independent variable with a default value and additional options.
-
-        Features
-        --------
-        indepvarcomp
-        """
-        kwargs = {'units': 'm', 'lower': 0, 'upper': 10,}
-        comp = IndepVarComp([
-            ('indep_var', 2.0, kwargs),
-        ])
+    def test_simple_kwargs(self):
+        """Define one independent variable with a default value and additional options."""
+        comp = IndepVarComp('indep_var', 2.0, units='m', lower=0, upper=10)
         prob = Problem(comp).setup(check=False)
 
         assert_rel_error(self, prob['indep_var'], 2.0)
 
-    def test_indep_simple_array(self):
-        """Define one independent array variable.
-
-        Features
-        --------
-        indepvarcomp
-        """
+    def test_simple_array(self):
+        """Define one independent array variable."""
         array = numpy.array([
             [1., 2.],
             [3., 4.],
@@ -128,14 +105,8 @@ class TestIndepVarComp(unittest.TestCase):
 
         assert_rel_error(self, prob['indep_var'], array)
 
-    def test_indep_multiple_default(self):
-        """Define two independent variables at once.
-
-        Features
-        --------
-        indepvarcomp
-
-        """
+    def test_multiple_default(self):
+        """Define two independent variables at once."""
         comp = IndepVarComp((
             ('indep_var_1', 1.0),
             ('indep_var_2', 2.0),
@@ -146,14 +117,8 @@ class TestIndepVarComp(unittest.TestCase):
         assert_rel_error(self, prob['indep_var_1'], 1.0)
         assert_rel_error(self, prob['indep_var_2'], 2.0)
 
-    def test_indep_multiple_kwargs(self):
-        """Define two independent variables at once and additional options.
-
-        Features
-        --------
-        indepvarcomp
-
-        """
+    def test_multiple_kwargs(self):
+        """Define two independent variables at once and additional options."""
         comp = IndepVarComp((
             ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
             ('indep_var_2', 2.0, {'lower': 1., 'upper': 20}),
@@ -163,6 +128,54 @@ class TestIndepVarComp(unittest.TestCase):
 
         assert_rel_error(self, prob['indep_var_1'], 1.0)
         assert_rel_error(self, prob['indep_var_2'], 2.0)
+
+    def test_add_output(self):
+        """Define two independent variables using the add_output method."""
+        comp = IndepVarComp()
+        comp.add_output('indep_var_1', 1.0, lower=0, upper=10)
+        comp.add_output('indep_var_2', 2.0, lower=1, upper=20)
+
+        prob = Problem(comp).setup(check=False)
+
+        assert_rel_error(self, prob['indep_var_1'], 1.0)
+        assert_rel_error(self, prob['indep_var_2'], 2.0)
+
+    def test_error_novars(self):
+        try:
+            prob = Problem(IndepVarComp()).setup(check=False)
+        except Exception as err:
+            self.assertEqual(str(err),
+                "No outputs (independent variables) have been declared for "
+                "this component. They must either be declared during "
+                "instantiation or by calling add_output afterwards.")
+        else:
+            self.fail('Exception expected.')
+
+    def test_error_badtup(self):
+        try:
+            comp = IndepVarComp((
+                ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
+                'indep_var_2',
+            ))
+            prob = Problem(comp).setup(check=False)
+        except Exception as err:
+            self.assertEqual(str(err),
+                "IndepVarComp init: arg indep_var_2 must be a tuple of the "
+                "form (name, value) or (name, value, keyword_dict).")
+        else:
+            self.fail('Exception expected.')
+
+    def test_error_bad_arg(self):
+        try:
+            comp = IndepVarComp(1.0)
+            prob = Problem(comp).setup(check=False)
+        except Exception as err:
+            self.assertEqual(str(err),
+                "first argument to IndepVarComp init must be either of type "
+                "`str` or an iterable of tuples of the form (name, value) or "
+                "(name, value, keyword_dict).")
+        else:
+            self.fail('Exception expected.')
 
 
 if __name__ == '__main__':
