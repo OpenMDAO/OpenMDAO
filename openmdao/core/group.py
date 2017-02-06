@@ -155,7 +155,7 @@ class Group(System):
 
         # source and target should not be in the same system
         if out_name.rsplit('.', 1)[0] == in_name.rsplit('.', 1)[0]:
-            raise RuntimeError("Input and output are in the same System for " +
+            raise RuntimeError("Output and input are in the same System for " +
                                "connection from '%s' to '%s'." % (out_name, in_name))
 
         self._var_connections[in_name] = (out_name, src_indices)
@@ -199,14 +199,12 @@ class Group(System):
             if out_name not in allprocs_out_names:
                 raise NameError("Output '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." %
-                                (out_name, self.name if self.name else 'model',
-                                 out_name, in_name))
+                                (out_name, self.name, out_name, in_name))
 
             if in_name not in allprocs_in_names:
                 raise NameError("Input '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." %
-                                (in_name, self.name if self.name else 'model',
-                                 out_name, in_name))
+                                (in_name, self.name, out_name, in_name))
 
             # throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -217,10 +215,9 @@ class Group(System):
                 else self._find_subsys_with_promoted_name(in_name, 'input')
 
             if out_subsys == in_subsys:
-                raise RuntimeError("Input and output are in the same System " +
+                raise RuntimeError("Output and input are in the same System " +
                                    "for connection in '%s' from '%s' to '%s'." %
-                                   (self.name if self.name else 'model',
-                                    out_name, in_name))
+                                   (self.name, out_name, in_name))
 
             out_myproc_index = myproc_out_names.index(out_name)
             in_myproc_index = myproc_in_names.index(in_name)
@@ -228,20 +225,19 @@ class Group(System):
             out_units = output_meta[out_myproc_index]['units']
             in_units = input_meta[in_myproc_index]['units']
 
-            # throw an error if one of the input and output is unitless,
-            # but the other isn't
+            # throw an error if one of input and output is unitless, but the other isn't
             if (out_units and not in_units or in_units and not out_units):
-                raise RuntimeError("Units must be specified for both or neither side " +
-                                   "of connection in '%s' from '%s' to '%s'." %
-                                   (self.name if self.name else 'model',
-                                    out_name, in_name))
+                out_units = "has units '%s'" % out_units if out_units else "is unitless"
+                in_units = "has units '%s'" % in_units if in_units else "is unitless"
+                raise RuntimeError("Units must be specified for both or neither side "
+                                   "of connection in '%s': '%s' %s but '%s' %s." %
+                                   (self.name, out_name, out_units, in_name, in_units))
 
             # throw an error if the input and output units are not compatible
             if not is_compatible(in_units, out_units):
-                raise RuntimeError("Input and output units are not compatible " +
-                                   "for connection in '%s' from '%s' to '%s'." %
-                                   (self.name if self.name else 'model',
-                                    out_name, in_name))
+                raise RuntimeError("Output and input units are not compatible for connection "
+                                   "in '%s': '%s' has units '%s' but '%s' has units '%s'." %
+                                   (self.name, out_name, out_units, in_name, in_units))
 
             for in_index, name in enumerate(allprocs_in_names):
                 if name == in_name:

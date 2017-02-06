@@ -260,7 +260,7 @@ class TestConnect(unittest.TestCase):
             self.prob.setup(check=False)
 
     def test_connect_within_system(self):
-        msg = "Input and output are in the same System for connection " + \
+        msg = "Output and input are in the same System for connection " + \
               "from 'tgt.y' to 'tgt.x'."
 
         with assertRaisesRegex(self, RuntimeError, msg):
@@ -273,7 +273,7 @@ class TestConnect(unittest.TestCase):
         sub.add_subsystem('tgt', ExecComp('y = x'), promotes_outputs=['y'])
         sub.connect('y', 'tgt.x', src_indices=[1])
 
-        msg = "Input and output are in the same System for connection " + \
+        msg = "Output and input are in the same System for connection " + \
               "in 'sub' from 'y' to 'tgt.x'."
 
         with assertRaisesRegex(self, RuntimeError, msg):
@@ -286,7 +286,7 @@ class TestConnect(unittest.TestCase):
         sub.add_subsystem('tgt', ExecComp('y = x'), renames_outputs={'y': 'y2'})
         sub.connect('y2', 'tgt.x', src_indices=[1])
 
-        msg = "Input and output are in the same System for connection " + \
+        msg = "Output and input are in the same System for connection " + \
               "in 'sub' from 'y2' to 'tgt.x'."
 
         with assertRaisesRegex(self, RuntimeError, msg):
@@ -294,11 +294,12 @@ class TestConnect(unittest.TestCase):
 
     def test_connect_units_with_unitless(self):
         msg = "Units must be specified for both or neither side of " + \
-              "connection in 'model' from 'src.x2' to 'tgt.x'."
+              "connection in '': " + \
+              "'src.x2' has units 'degC' but 'tgt.x' is unitless."
 
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
-        prob.model.add_subsystem('src', SrcComp())  # output 'x2', degC
+        prob.model.add_subsystem('src', SrcComp())
         prob.model.add_subsystem('tgt', ExecComp('y = x'))
 
         prob.model.connect('px1.x1', 'src.x1')
@@ -308,8 +309,9 @@ class TestConnect(unittest.TestCase):
             prob.setup(check=False)
 
     def test_connect_incompatible_units(self):
-        msg = "Input and output units are not compatible for " + \
-              "connection in 'model' from 'src.x2' to 'tgt.x'."
+        msg = "Output and input units are not compatible for " + \
+              "connection in '': " + \
+              "'src.x2' has units 'degC' but 'tgt.x' has units 'm'."
 
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
