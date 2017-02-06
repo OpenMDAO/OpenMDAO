@@ -5,6 +5,7 @@ from __future__ import division
 from fnmatch import fnmatchcase
 from six import string_types, iteritems
 import numpy
+from scipy.sparse import issparse
 
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
@@ -278,10 +279,29 @@ class Component(System):
         oflist = [of] if isinstance(of, string_types) else of
         wrtlist = [wrt] if isinstance(wrt, string_types) else wrt
 
-        if isinstance(rows, (list, tuple)):
-            rows = numpy.array(rows, dtype=int)
-        if isinstance(cols, (list, tuple)):
-            cols = numpy.array(cols, dtype=int)
+        # If only one of rows/cols is specified
+        if (rows is None) ^ (cols is None):
+            raise ValueError('If one of rows/cols is specified, then both must be specified')
+
+        if val is not None and not issparse(val):
+            val = numpy.atleast_1d(val)
+            # numpy.promote_types  will choose the smallest dtype that can contain both arguments
+            safe_dtype = numpy.promote_types(val.dtype, float)
+            val = val.astype(safe_dtype, copy=False)
+
+        if rows is not None:
+            if isinstance(rows, (list, tuple)):
+                rows = numpy.array(rows, dtype=int)
+            if isinstance(cols, (list, tuple)):
+                cols = numpy.array(cols, dtype=int)
+
+            if rows.shape != cols.shape:
+                raise ValueError('rows and cols must have the same shape,'
+                                 ' rows: {}, cols: {}'.format(rows.shape, cols.shape))
+
+            if val is not None and val.shape != (1,) and rows.shape != val.shape:
+                raise ValueError('If rows and cols are specified, val must be a scalar or have the '
+                                 'same shape, val: {}, rows/cols: {}'.format(val.shape, rows.shape))
 
         for of in oflist:
             for wrt in wrtlist:
@@ -357,6 +377,41 @@ class Component(System):
                     self._var_name2path[typ][name] = (path,)
                 else:
                     self._var_name2path[typ][name] = path
+
+        for (of, wrt), info in iteritems(self._subjacs_info):
+            if info['dependent']:
+                out_size = numpy.prod(self._var2meta[of]['shape'])
+                in_size = numpy.prod(self._var2meta[wrt]['shape'])
+                rows = info['rows']
+                cols = info['cols']
+                if rows is not None:
+                    if rows.min() < 0:
+                        msg = '{}: d({})/d({}): row indices must be non-negative'
+                        raise ValueError(msg.format(self.pathname, of, wrt))
+                    if cols.min() < 0:
+                        msg = '{}: d({})/d({}): col indices must be non-negative'
+                        raise ValueError(msg.format(self.pathname, of, wrt))
+                    if rows.max() >= out_size or cols.max() >= in_size:
+                        msg = '{}: d({})/d({}): Expected {}x{} but declared at least {}x{}'
+                        raise ValueError(msg.format(
+                            self.pathname, of, wrt,
+                            out_size, in_size,
+                            rows.max() + 1, cols.max() + 1
+                        ))
+                elif info['value'] is not None:
+                    val = info['value']
+                    val_shape = val.shape
+                    if len(val_shape) == 1:
+                        val_out, val_in = val_shape[0], 1
+                    else:
+                        val_out, val_in = val.shape
+                    if val_out > out_size or val_in > in_size:
+                        msg = '{}: d({})/d({}): Expected {}x{} but val is {}x{}'
+                        raise ValueError(msg.format(
+                            self.pathname, of, wrt,
+                            out_size, in_size,
+                            val_out, val_in
+                        ))
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
         r"""Add this vector and assign sub_vectors to subsystems.

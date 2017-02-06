@@ -140,12 +140,17 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._setup_variables(False)
 
+        other_names = []
         for i, out_name in enumerate(self._var_myproc_names['output']):
             meta = self._var_myproc_metadata['output'][i]
             size = numpy.prod(meta['shape'])
             arange = numpy.arange(size)
             self.declare_partials(out_name, out_name, rows=arange, cols=arange,
                                   val=numpy.ones(size))
+            for other_name in other_names:
+                self.declare_partials(out_name, other_name, dependent=False)
+                self.declare_partials(other_name, out_name, dependent=False)
+            other_names.append(out_name)
 
     def _negate_jac(self):
         """Negate this component's part of the jacobian."""
