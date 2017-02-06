@@ -888,18 +888,17 @@ def is_compatible(old_units, new_units):
     return old_unit.is_compatible(new_unit)
 
 
-def convert_units(val, old_units, new_units=''):
+def convert_units(val, old_units, new_units=None):
     """Take a given quantity and return in different units.
 
     Args
     ----
     val : float
         value in original units.
-    old_units : str
-        original units as a string.
-    new_units : str
-        new units to return the value in; if empty str,
-        return in standard units.
+    old_units : str or None
+        original units as a string or None.
+    new_units : str or None
+        new units to return the value in or None.
 
     Returns
     -------
@@ -908,6 +907,11 @@ def convert_units(val, old_units, new_units=''):
     """
     if not old_units and not new_units:  # dimensionless
         return val
+    elif not old_units or not new_units:
+        # A descriptive exception should have been thrown when checking the connection.
+        raise RuntimeError("Units are inconsistent between an input and an output. "
+                           "A descriptive error should have been given earlier. "
+                           "Please contact the developers.")
 
     old_unit = _find_unit(old_units)
     if new_units:
@@ -932,5 +936,6 @@ if __name__ == '__main__':
         (conversion_to_base_units('km'), (0., 1.0e3)),
         (convert_units(3.0, 'mm'), (3.0e-3)),
         (convert_units(3.0, 'mm', 'cm'), (3.0e-1))
+        (convert_units(100, 'degC', 'degF'), (212.))
     ]:
         print(returned, 'should be', expected)
