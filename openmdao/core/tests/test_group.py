@@ -315,7 +315,7 @@ class TestConnect(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
-        prob.model.add_subsystem('src', SrcComp())  # output 'x2', degC
+        prob.model.add_subsystem('src', SrcComp())
         prob.model.add_subsystem('tgt', ExecComp('y = x', units={'x': 'm'}))
 
         prob.model.connect('px1.x1', 'src.x1')
