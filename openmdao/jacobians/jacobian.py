@@ -101,8 +101,12 @@ class Jacobian(object):
         in_path : str
             pathname of input variable.
         """
-        return (self._system._var_name2path[key[0]][0],
-                self._system._var_name2path[key[1]][0])
+        if key[1] in self._system._var_name2path['input']:
+            return (self._system._var_name2path['output'][key[0]],
+                    self._system._var_name2path['input'][key[1]][0])
+        else:
+            return (self._system._var_name2path['output'][key[0]],
+                    self._system._var_name2path['output'][key[1]])
 
     def _negate(self, key):
         """Multiply this sub-Jacobian by -1.0, for explicit variables.
@@ -170,20 +174,24 @@ class Jacobian(object):
         Args
         ----
         key : (str, str)
-            output name, input name of sub-Jacobian.
+            output name, input name of sub-Jacobian. Names are
+            promoted names.
 
         Returns
         -------
         boolean
             return whether sub-Jacobian has been defined.
         """
-        out_paths = self._system._var_name2path.get(key[0])
-        if out_paths:
-            in_paths = self._system._var_name2path.get(key[1])
-            if in_paths:
-                for ipath in in_paths:
-                    if (out_paths[0], ipath) in self._subjacs:
+        if key[0] in self._system._var_name2path['output']:
+            if key[1] in self._system._var_name2path['input']:
+                out_path = self._system._var_name2path['output'][key[0]]
+                for ipath in self._system._var_name2path['input'][key[1]]:
+                    if (out_path, ipath) in self._subjacs:
                         return True
+            elif key[1] in self._system._var_name2path['output']:
+                return (self._system._var_name2path['output'][key[0]],
+                        self._system._var_name2path['output'][key[1]]
+                        ) in self._subjacs
         return False
 
     def __iter__(self):

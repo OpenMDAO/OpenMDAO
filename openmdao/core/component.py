@@ -341,7 +341,7 @@ class Component(System):
 
         # set up absolute path info
         self._var_pathdict = {}
-        self._var_name2path = {}
+        self._var_name2path = {'input': {}, 'output': {}}
         for typ in ['input', 'output']:
             names = self._var_allprocs_names[typ]
             if self.pathname:
@@ -353,7 +353,10 @@ class Component(System):
             for idx, name in enumerate(names):
                 path = paths[idx]
                 self._var_pathdict[path] = PathData(name, idx, idx, typ)
-                self._var_name2path[name] = (path,)
+                if typ is 'input':
+                    self._var_name2path[typ][name] = (path,)
+                else:
+                    self._var_name2path[typ][name] = path
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
         r"""Add this vector and assign sub_vectors to subsystems.

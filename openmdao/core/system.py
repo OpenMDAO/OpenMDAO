@@ -150,7 +150,7 @@ class System(object):
         self._var_myproc_indices = {'input': None, 'output': None}
 
         self._var_pathdict = {}
-        self._var_name2path = {}
+        self._var_name2path = {'input': {}, 'output': {}}
 
         self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': set(), 'output': set(), 'any': set()}

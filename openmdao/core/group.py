@@ -219,25 +219,48 @@ class Group(System):
                                    "for connection in '%s' from '%s' to '%s'." %
                                    (self.name, out_name, in_name))
 
-            out_myproc_index = myproc_out_names.index(out_name)
-            in_myproc_index = myproc_in_names.index(in_name)
+            out_path = self._var_name2path['output'][out_name]
+            pdata = self._var_pathdict[out_path]
+            # TODO: we need to allgather unit information. Otherwise we can't
+            # error check units for any connections that cross processes
+            # because the metadata isn't available.
+            if pdata.myproc_idx is not None:
+                out_units = output_meta[pdata.myproc_idx]['units']
+                in_paths = self._var_name2path['input'][in_name]
 
-            out_units = output_meta[out_myproc_index]['units']
-            in_units = input_meta[in_myproc_index]['units']
+                for in_path in in_paths:
+                    pdata = self._var_pathdict[in_path]
+                    if pdata.myproc_idx is None:
+                        continue
+                    in_units = input_meta[pdata.myproc_idx]['units']
 
-            # throw an error if one of input and output is unitless, but the other isn't
-            if (out_units and not in_units or in_units and not out_units):
-                out_units = "has units '%s'" % out_units if out_units else "is unitless"
-                in_units = "has units '%s'" % in_units if in_units else "is unitless"
-                raise RuntimeError("Units must be specified for both or neither side "
-                                   "of connection in '%s': '%s' %s but '%s' %s." %
-                                   (self.name, out_name, out_units, in_name, in_units))
+                    # throw an error if one of input and output is unitless,
+                    # but the other isn't
+                    if (out_units and not in_units or
+                            in_units and not out_units):
+                        if out_units:
+                            out_units = "has units '%s'" % out_units
+                        else:
+                            otu_units = "is unitless"
+                        if in_units:
+                            in_units = "has units '%s'" % in_units
+                        else:
+                            in_units = "is unitless"
+                        raise RuntimeError("Units must be specified for both or"
+                                           " neither side of connection in "
+                                           "'%s': '%s' %s but '%s' %s." %
+                                           (self.name, out_name, out_units,
+                                            in_name, in_units))
 
-            # throw an error if the input and output units are not compatible
-            if not is_compatible(in_units, out_units):
-                raise RuntimeError("Output and input units are not compatible for connection "
-                                   "in '%s': '%s' has units '%s' but '%s' has units '%s'." %
-                                   (self.name, out_name, out_units, in_name, in_units))
+                    # throw an error if the input and output units are not
+                    # compatible
+                    if not is_compatible(in_units, out_units):
+                        raise RuntimeError("Output and input units are not "
+                                           "compatible for connection in '%s':"
+                                           " '%s' has units '%s' but '%s' has "
+                                           "units '%s'." %
+                                           (self.name, out_name, out_units,
+                                            in_name, in_units))
 
             for in_index, name in enumerate(allprocs_in_names):
                 if name == in_name:
@@ -290,12 +313,14 @@ class Group(System):
     def initialize_variables(self):
         """Set up variable name and metadata lists."""
         self._var_pathdict = {}
-        self._var_name2path = {}
+        self._var_name2path = {'input': {}, 'output': {}}
 
         start = len(self.pathname) + 1 if self.pathname else 0
         for typ in ['input', 'output']:
             my_idx_dict = {}  # maps absolute path to myproc idx
             myproc_names = self._var_myproc_names[typ]
+            name2path = self._var_name2path[typ]
+
             for subsys in self._subsystems_myproc:
                 # Assemble the names list from subsystems
                 subsys._var_maps[typ] = subsys._get_maps(typ)
@@ -334,10 +359,18 @@ class Group(System):
                 path = self._var_allprocs_pathnames[typ][idx]
                 self._var_pathdict[path] = PathData(name, idx,
                                                     my_idx_dict.get(path), typ)
-                if name in self._var_name2path:
-                    self._var_name2path[name].append(path)
+                if name in name2path:
+                    if typ is 'input':
+                        name2path[name].append(path)
+                    else:
+                        raise RuntimeError("Output name '%s' refers to "
+                                           "multiple outputs: %s" %
+                                           (name, [path, name2path[name]]))
                 else:
-                    self._var_name2path[name] = [path]
+                    if typ is 'input':
+                        name2path[name] = [path]
+                    else:
+                        name2path[name] = path
 
     def get_subsystem(self, name):
         """Return the system called 'name' in the current namespace.

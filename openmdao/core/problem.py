@@ -98,21 +98,21 @@ class Problem(object):
         except KeyError:
             # name is not an absolute path
             try:
-                paths = self.model._var_name2path[name]
+                pathname = self.model._var_name2path['output'][name]
             except KeyError:
-                raise KeyError("Variable '%s' not found." % name)
+                try:
+                    paths = self.model._var_name2path['input'][name]
+                except KeyError:
+                    raise KeyError("Variable '%s' not found." % name)
 
-            # look for a matching output (shouldn't be more than one)
-            for pathname in paths:
-                pdata = self.model._var_pathdict[pathname]
-                if pdata.typ == 'output':
-                    break
-            else:
                 if len(paths) > 1:
                     raise RuntimeError("Variable name '%s' is not unique and "
                                        "matches the following: %s. "
                                        "Use the absolute pathname instead." %
                                        (name, paths))
+                pathname = paths[0]
+
+            pdata = self.model._var_pathdict[pathname]
 
         if pdata.myproc_idx is None:
             raise RuntimeError("Variable '%s' is not found in this process" %
