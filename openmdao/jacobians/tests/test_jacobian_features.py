@@ -4,6 +4,7 @@ import scipy as sp
 import itertools
 from scipy.sparse import coo_matrix, csr_matrix, issparse
 from six import iteritems
+from nose_parameterized import parameterized
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
      GlobalJacobian, CsrMatrix, CooMatrix, ScipyIterativeSolver
@@ -43,11 +44,6 @@ class SimpleComp(ExplicitComponent):
         jacobian['g', 'x'] = np.eye(2)
 
 
-class SimpleCompDependence(SimpleComp):
-    def initialize_partials(self):
-        self.declare_partials('f', ['y1', 'y2'], dependent=False)
-        self.declare_partials('g', 'z', dependent=False)
-
 class SimpleCompConst(SimpleComp):
     def initialize_partials(self):
         self.declare_partials('f', ['y1', 'y2'], dependent=False)
@@ -61,6 +57,19 @@ class SimpleCompConst(SimpleComp):
 
     def compute_jacobian(self, inputs, outputs, jacobian):
         pass
+
+
+class SimpleCompKwarg(SimpleComp):
+    def __init__(self, partial_kwargs):
+        self.partial_kwargs = partial_kwargs
+        super(SimpleCompKwarg, self).__init__()
+
+    def initialize_partials(self):
+        self.declare_partials(**self.partial_kwargs)
+
+    def compute_jacobian(self, inputs, outputs, jacobian):
+        pass
+
 
 class TestJacobianFeatures(unittest.TestCase):
 
@@ -104,6 +113,34 @@ class TestJacobianFeatures(unittest.TestCase):
 
         self.assertEqual(jac.nnz, expected_nnz)
 
+    @parameterized.expand([
+        ({'of': 'f', 'wrt': 'z', 'val': np.ones((1, 5))},
+         'simple: d(f)/d(z): Expected 1x4 but val is 1x5'),
+        ({'of': 'f', 'wrt': 'z', 'rows': [0, -1, 4], 'cols': [0, 0, 0]},
+         'simple: d(f)/d(z): row indices must be non-negative'),
+        ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, -1, 4]},
+         'simple: d(f)/d(z): col indices must be non-negative'),
+        ({'of': 'f', 'wrt': 'z', 'rows': [0, 0], 'cols': [0, 4]},
+         'simple: d(f)/d(z): Expected 1x4 but declared at least 1x5'),
+        ({'of': 'f', 'wrt': 'z', 'rows': [0, 10]},
+         'If one of rows/cols is specified, then both must be specified'),
+        ({'of': 'f', 'wrt': 'z', 'cols': [0, 10]},
+         'If one of rows/cols is specified, then both must be specified'),
+        ({'of': 'f', 'wrt': 'z', 'rows': [0], 'cols': [0, 3]},
+         'rows and cols must have the same shape, rows: (1,), cols: (2,)'),
+        ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, 1, 3], 'val':[0, 1]},
+         'If rows and cols are specified, val must be a scalar or have the same shape, '
+         'val: (2,), rows/cols: (3,)'),
+    ])
+    def test_bad_sizes(self, partials_kwargs, error_msg):
+        comp = SimpleCompKwarg(partials_kwargs)
+        problem = self.problem
+        model = problem.model
+        model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'z', 'f', 'g'])
+        with self.assertRaises(ValueError) as ex:
+            problem.setup(check=False)
+
+        self.assertEqual(error_msg, str(ex.exception))
 
 
 if __name__ == '__main__':

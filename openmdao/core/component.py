@@ -299,15 +299,29 @@ class Component(System):
         oflist = [of] if isinstance(of, string_types) else of
         wrtlist = [wrt] if isinstance(wrt, string_types) else wrt
 
-        if isinstance(rows, (list, tuple)):
-            rows = numpy.array(rows, dtype=int)
-        if isinstance(cols, (list, tuple)):
-            cols = numpy.array(cols, dtype=int)
+        # If only one of rows/cols is specified
+        if (rows is None) ^ (cols is None):
+            raise ValueError('If one of rows/cols is specified, then both must be specified')
+
         if val is not None and not issparse(val):
             val = numpy.atleast_1d(val)
             # numpy.promote_types  will choose the smallest dtype that can contain both arguments
             safe_dtype = numpy.promote_types(val.dtype, float)
             val = val.astype(safe_dtype, copy=False)
+
+        if rows is not None:
+            if isinstance(rows, (list, tuple)):
+                rows = numpy.array(rows, dtype=int)
+            if isinstance(cols, (list, tuple)):
+                cols = numpy.array(cols, dtype=int)
+
+            if rows.shape != cols.shape:
+                raise ValueError('rows and cols must have the same shape,'
+                                 ' rows: {}, cols: {}'.format(rows.shape, cols.shape))
+
+            if val is not None and val.shape != (1,) and rows.shape != val.shape:
+                raise ValueError('If rows and cols are specified, val must be a scalar or have the '
+                                 'same shape, val: {}, rows/cols: {}'.format(val.shape, rows.shape))
 
         for of in oflist:
             for wrt in wrtlist:
@@ -395,7 +409,7 @@ class Component(System):
                         msg = '{}: d({})/d({}): col indices must be non-negative'
                         raise ValueError(msg.format(self.pathname, of, wrt))
                     if rows.max() >= out_size or cols.max() >= in_size:
-                        msg = '{}: d({})/d({}): Expected {}x{} but declared {}x{}'
+                        msg = '{}: d({})/d({}): Expected {}x{} but declared at least {}x{}'
                         raise ValueError(msg.format(
                             self.pathname, of, wrt,
                             out_size, in_size,
