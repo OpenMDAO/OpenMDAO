@@ -376,7 +376,7 @@ def get_unit_test_source_and_run_outputs(method_path):
         #     File "/var/folders/l3/9j86k5gn6cx0_p25kdplxgpw1l9vkk/T/tmp215aM1", line 23, in <module>
         #         raise unittest.SkipTest("check_total_derivatives not implemented yet")
         # unittest.case.SkipTest: check_total_derivatives not implemented yet
-        if 'raise unittest.SkipTest' in e.output:
+        if 'raise unittest.SkipTest' in e.output.decode('utf-8'):
             reason_for_skip = e.output.splitlines()[-1][len('unittest.case.SkipTest: '):]
             run_outputs = reason_for_skip
             skipped = True
