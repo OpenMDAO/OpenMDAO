@@ -334,13 +334,15 @@ class Component(System):
         self._var_name2path = {}
         for typ in ['input', 'output']:
             names = self._var_allprocs_names[typ]
-            self._var_allprocs_pathnames[typ] = paths = [
-                '.'.join((self.pathname, n)) if self.pathname else n
-                for n in names
-            ]
+            if self.pathname:
+                self._var_allprocs_pathnames[typ] = paths = [
+                    '.'.join((self.pathname, n)) for n in names
+                ]
+            else:
+                self._var_allprocs_pathnames[typ] = paths = names
             for idx, name in enumerate(names):
                 path = paths[idx]
-                self._var_pathdict[path] = PathData(name, idx, typ)
+                self._var_pathdict[path] = PathData(name, idx, idx, typ)
                 self._var_name2path[name] = (path,)
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):

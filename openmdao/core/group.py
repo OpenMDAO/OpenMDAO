@@ -273,6 +273,8 @@ class Group(System):
 
         start = len(self.pathname) + 1 if self.pathname else 0
         for typ in ['input', 'output']:
+            my_idx_dict = {}  # maps absolute path to myproc idx
+            myproc_names = self._var_myproc_names[typ]
             for subsys in self._subsystems_myproc:
                 # Assemble the names list from subsystems
                 subsys._var_maps[typ] = subsys._get_maps(typ)
@@ -282,7 +284,8 @@ class Group(System):
                     name = subsys._var_maps[typ][subname]
                     self._var_allprocs_names[typ].append(name)
                     self._var_allprocs_pathnames[typ].append(paths[idx])
-                    self._var_myproc_names[typ].append(paths[idx][start:])
+                    my_idx_dict[paths[idx]] = len(myproc_names)
+                    myproc_names.append(paths[idx][start:])
 
                 # Assemble the metadata list from the subsystems
                 metadata = subsys._var_myproc_metadata[typ]
@@ -308,7 +311,8 @@ class Group(System):
 
             for idx, name in enumerate(self._var_allprocs_names[typ]):
                 path = self._var_allprocs_pathnames[typ][idx]
-                self._var_pathdict[path] = PathData(name, idx, typ)
+                self._var_pathdict[path] = PathData(name, idx,
+                                                    my_idx_dict.get(path), typ)
                 if name in self._var_name2path:
                     self._var_name2path[name].append(path)
                 else:

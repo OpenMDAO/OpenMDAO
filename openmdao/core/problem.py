@@ -77,7 +77,48 @@ class Problem(object):
         self._assembler = assembler_class(comm)
         self._use_ref_vector = use_ref_vector
 
-    # TODO: getitem/setitem need to properly handle scaling/units
+    def _get_path_data(self, name):
+        """Get absolute pathname and related data.
+
+        Args
+        ----
+        name : str
+            name of the variable in the root system's namespace. May be
+            a promoted name or an unpromoted name.
+
+        Returns
+        -------
+        str, PathData
+            absolute pathname and PathData namedtuple
+        """
+        try:
+            pdata = self.model._var_pathdict[name]
+            pathname = name
+        except KeyError:
+            # name is not an absolute path
+            try:
+                paths = self.model._var_name2path[name]
+            except KeyError:
+                raise KeyError("Variable '%s' not found." % name)
+
+            # look for a matching output (shouldn't be more than one)
+            for pathname in paths:
+                pdata = self.model._var_pathdict[pathname]
+                if pdata.typ == 'output':
+                    break
+            else:
+                if len(paths) > 1:
+                    raise RuntimeError("Variable name '%s' is not unique and "
+                                       "matches the following: %s. "
+                                       "Use the absolute pathname instead." %
+                                       (name, paths))
+
+        if pdata.myproc_idx is None:
+            raise RuntimeError("Variable '%s' is not found in this process" %
+                               name)
+
+        return pathname, pdata
+
     def __getitem__(self, name):
         """Get an output/input variable.
 
@@ -91,36 +132,14 @@ class Problem(object):
         float or ndarray
             the requested output/input variable.
         """
-        try:
-            pdata = self.model._var_pathdict[name]
-        except KeyError:
-            # name is not an absolute path
-            try:
-                paths = self.model._var_name2path[name]
-            except KeyError:
-                raise KeyError("Variable '%s' not found." % name)
-
-            # look for a matching output (shouldn't be more than one)
-            for path in paths:
-                pdata = self.model._var_pathdict[path]
-                if pdata.typ == 'output':
-                    break
-            else:
-                if len(paths) > 1:
-                    raise RuntimeError("Variable name '%s' is not unique and "
-                                       "matches the following: %s. "
-                                       "Use the absolute pathname instead." %
-                                       (name, paths))
-            name = path
+        pathname, pdata = self._get_path_data(name)
 
         if pdata.typ == 'output':
-            ind = self.model._var_myproc_names['output'].index(name)
-            c0, c1 = self.model._scaling_to_phys['output'][ind, :]
-            return c0 + c1 * self.model._outputs[name]
+            c0, c1 = self.model._scaling_to_phys['output'][pdata.myproc_idx, :]
+            return c0 + c1 * self.model._outputs[pathname]
         else:
-            ind = self.model._var_myproc_names['input'].index(name)
-            c0, c1 = self.model._scaling_to_phys['input'][ind, :]
-            return c0 + c1 * self.model._inputs[name]
+            c0, c1 = self.model._scaling_to_phys['input'][pdata.myproc_idx, :]
+            return c0 + c1 * self.model._inputs[pathname]
 
     def __setitem__(self, name, value):
         """Set an output/input variable.
@@ -132,36 +151,14 @@ class Problem(object):
         value : float or ndarray or list
             value to set this variable to.
         """
-        try:
-            pdata = self.model._var_pathdict[name]
-        except KeyError:
-            # name is not an absolute path
-            try:
-                paths = self.model._var_name2path[name]
-            except KeyError:
-                raise KeyError("Variable '%s' not found." % name)
-
-            # look for a matching output (shouldn't be more than one)
-            for path in paths:
-                pdata = self.model._var_pathdict[path]
-                if pdata.typ == 'output':
-                    break
-            else:
-                if len(paths) > 1:
-                    raise RuntimeError("Variable name '%s' is not unique and "
-                                       "matches the following: %s. "
-                                       "Use the absolute pathname instead." %
-                                       (name, paths))
-            name = path
+        pathname, pdata = self._get_path_data(name)
 
         if pdata.typ == 'output':
-            ind = self.model._var_myproc_names['output'].index(name)
-            c0, c1 = self.model._scaling_to_norm['output'][ind, :]
-            self.model._outputs[name] = c0 + c1 * np.array(value)
+            c0, c1 = self.model._scaling_to_norm['output'][pdata.myproc_idx, :]
+            self.model._outputs[pathname] = c0 + c1 * np.array(value)
         else:
-            ind = self.model._var_myproc_names['input'].index(name)
-            c0, c1 = self.model._scaling_to_norm['input'][ind, :]
-            self.model._inputs[name] = c0 + c1 * np.array(value)
+            c0, c1 = self.model._scaling_to_norm['input'][pdata.myproc_idx, :]
+            self.model._inputs[pathname] = c0 + c1 * np.array(value)
 
     def run_model(self):
         """Run the model by calling the root system's solve_nonlinear.

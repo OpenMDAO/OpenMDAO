@@ -17,7 +17,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import convert_units
 
 # This is for storing various data mapped to var pathname
-PathData = namedtuple("PathData", ['name', 'idx', 'typ'])
+PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
 
 
 class System(object):
@@ -50,7 +50,7 @@ class System(object):
         list of indices of subsystems on this proc among all of this system's
         subsystems (subsystems on all of this system's processors).
     _var_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
-        list of names of all owned variables, not just on current proc.
+        list of promoted names of all owned variables, not just on current proc.
     _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
         list of pathnames of all owned variables, not just on current proc.
     _var_allprocs_range : {'input': [int, int], 'output': [int, int]}
@@ -58,7 +58,7 @@ class System(object):
     _var_allprocs_indices : {'input': dict, 'output': dict}
         dictionary of global indices keyed by the variable name.
     _var_myproc_names : {'input': [str, ...], 'output': [str, ...]}
-        list of names of owned variables on current proc.
+        list of unpromoted names of owned variables on current proc.
     _var_myproc_metadata : {'input': list, 'output': list}
         list of metadata dictionaries of variables that exist on this proc.
     _var_pathdict : dict
