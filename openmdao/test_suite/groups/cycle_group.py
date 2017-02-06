@@ -126,7 +126,9 @@ class CycleGroup(ParametericTestGroup):
         }
 
         self.add_subsystem('psi_comp', IndepVarComp('psi', PSI))
-        self.add_subsystem('x0_comp', IndepVarComp([('x_{0}'.format(i), np.ones(var_shape)) for i in range(num_var)]))
+        indep_var_comp = self.add_subsystem('x0_comp', IndepVarComp())
+        for i in range(num_var):
+            indep_var_comp.add_output('x_{0}'.format(i), np.ones(var_shape))
 
         self._add_cycle_comp(conn_type, first_class, first_name, 0, comp_args)
         prev_name = first_name

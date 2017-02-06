@@ -50,7 +50,7 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
         self._var2meta = {}
 
-    def add_input(self, name, val=1.0, shape=None, indices=None, units='', desc='', var_set=0):
+    def add_input(self, name, val=1.0, shape=None, indices=None, units=None, desc='', var_set=0):
         """Add an input variable to the component.
 
         Args
@@ -66,9 +66,9 @@ class Component(System):
             The indices of the source variable to transfer data from.
             If val is given as an array_like object, the shapes of val and indices must match.
             A value of None implies this input depends on all entries of source. Default is None.
-        units : str
+        units : str or None
             Units in which this input variable will be provided to the component during execution.
-            Default is '', which means it has no units.
+            Default is None, which means it has no units.
         desc : str
             description of the variable
         var_set : hashable object
@@ -84,8 +84,8 @@ class Component(System):
             raise TypeError('The shape argument should be an int, tuple, or list')
         if indices is not None and not isinstance(indices, (int, list, tuple, numpy.ndarray)):
             raise TypeError('The indices argument should be an int, list, tuple, or ndarray')
-        if units != '' and not isinstance(units, str):
-            raise TypeError('The units argument should be a str')
+        if units is not None and not isinstance(units, str):
+            raise TypeError('The units argument should be a str or None')
 
         if shape is not None:
             if isinstance(shape, int):
@@ -141,7 +141,7 @@ class Component(System):
         self._var_myproc_metadata['input'].append(metadata)
         self._var2meta[name] = metadata
 
-    def add_output(self, name, val=1.0, shape=None, units='', res_units='', desc='',
+    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
                    res_ref=1.0, res_ref0=0.0, var_set=0):
         """Add an output variable to the component.
@@ -155,14 +155,14 @@ class Component(System):
         shape : int or tuple or list or None
             Shape of this variable, only required if indices not provided and val is not an array.
             Default is None.
-        units : str
+        units : str or None
             Units in which the output variables will be provided to the component during execution.
-            Default is '', which means it has no units.
-        res_units : str
+            Default is None, which means it has no units.
+        res_units : str or None
             Units in which the residuals of this output will be given to the user when requested.
-            Default is '', which means it has no units.
+            Default is None, which means it has no units.
         desc : str
-            description of the variable
+            description of the variable.
         lower : float or list or tuple or ndarray or None
             lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
@@ -196,10 +196,10 @@ class Component(System):
             raise TypeError('The val argument should be a float, list, tuple, or ndarray')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
-        if units != '' and not isinstance(units, str):
-            raise TypeError('The units argument should be a str')
-        if res_units != '' and not isinstance(res_units, str):
-            raise TypeError('The res_units argument should be a str')
+        if units is not None and not isinstance(units, str):
+            raise TypeError('The units argument should be a str or None')
+        if res_units is not None and not isinstance(res_units, str):
+            raise TypeError('The res_units argument should be a str or None')
         if lower is not None and not numpy.isscalar(lower) and \
                 not isinstance(lower, (list, tuple, numpy.ndarray)):
             raise TypeError('The lower argument should be a float, list, tuple, or ndarray')
