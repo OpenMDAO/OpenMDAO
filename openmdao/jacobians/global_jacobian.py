@@ -98,6 +98,7 @@ class GlobalJacobian(Jacobian):
 
             for re_idx_all in sub_out_inds:
                 re_path = out_paths[re_idx_all]
+                re_unprom = re_path[start:]
                 re_offset = out_offsets[re_idx_all]
 
                 for out_idx_all in sub_out_inds:
@@ -107,9 +108,8 @@ class GlobalJacobian(Jacobian):
                         info, shape = self._subjacs_info[key]
                     else:
                         info = SUBJAC_META_DEFAULTS
-                        rname = re_path[start:]
                         oname = out_path[start:]
-                        shape = (system._outputs._views_flat[rname].size,
+                        shape = (system._outputs._views_flat[re_unprom].size,
                                  system._outputs._views_flat[oname].size)
 
                     self._int_mtx._add_submat(key, info, re_offset,
@@ -124,9 +124,8 @@ class GlobalJacobian(Jacobian):
                         info, shape = self._subjacs_info[key]
                     else:
                         info = SUBJAC_META_DEFAULTS
-                        rname = re_path[start:]
                         iname = in_path[start:]
-                        shape = (system._outputs._views_flat[rname].size,
+                        shape = (system._outputs._views_flat[re_unprom].size,
                                  system._inputs._views_flat[iname].size)
 
                     out_idx_all = self._assembler._input_src_ids[in_idx_all]

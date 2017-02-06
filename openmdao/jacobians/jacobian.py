@@ -133,10 +133,11 @@ class Jacobian(object):
         -------
         list
             List of (output, input) pairs found in the jacobian
-            for the current System.
+            for the current System. input and output are unpromoted
+            names.
         """
         system = self._system
-        pathdict = system._var_pathdict
+        start = len(system.pathname) + 1 if system.pathname else 0
         outpaths = system._var_allprocs_pathnames['output']
         inpaths = system._var_allprocs_pathnames['input']
         out_offset = system._var_allprocs_range['output'][0]
@@ -147,20 +148,19 @@ class Jacobian(object):
         iter_list = []
         for re_ind in out_indices:
             re_path = outpaths[re_ind - out_offset]
+            re_unprom = re_path[start:]
 
             for out_ind in out_indices:
                 out_path = outpaths[out_ind - out_offset]
 
                 if (re_path, out_path) in self._subjacs:
-                    iter_list.append((pathdict[re_path].name,
-                                      pathdict[out_path].name))
+                    iter_list.append((re_unprom, out_path[start:]))
 
             for in_ind in in_indices:
                 in_path = inpaths[in_ind - in_offset]
 
                 if (re_path, in_path) in self._subjacs:
-                    iter_list.append((pathdict[re_path].name,
-                                      pathdict[in_path].name))
+                    iter_list.append((re_unprom, in_path[start:]))
 
         return iter_list
 
