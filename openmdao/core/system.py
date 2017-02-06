@@ -673,9 +673,10 @@ class System(object):
         # TODO: check if we can loop over myproc vars to save time
         out_names = []
         res_names = []
+        var_ids = self._vector_var_ids[vec_name]
         out_ind = self._var_allprocs_range['output'][0]
         for out_name in self._var_allprocs_names['output']:
-            if out_ind in self._vector_var_ids[vec_name]:
+            if out_ind in var_ids:
                 res_names.append(out_name)
                 if var_inds is None or (var_inds[0] <= out_ind < var_inds[1] or
                                         var_inds[2] <= out_ind < var_inds[3]):
@@ -686,7 +687,7 @@ class System(object):
         in_ind = self._var_allprocs_range['input'][0]
         for in_name in self._var_allprocs_names['input']:
             out_ind = self._assembler._input_src_ids[in_ind]
-            if out_ind in self._vector_var_ids[vec_name]:
+            if out_ind in var_ids:
                 if var_inds is None or (var_inds[0] <= out_ind < var_inds[1] or
                                         var_inds[2] <= out_ind < var_inds[3]):
                     in_names.append(in_name)
