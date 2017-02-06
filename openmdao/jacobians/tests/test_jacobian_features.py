@@ -3,6 +3,7 @@ import numpy as np
 import scipy as sp
 import itertools
 from scipy.sparse import coo_matrix, csr_matrix, issparse
+from six import iteritems
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
      GlobalJacobian, CsrMatrix, CooMatrix, ScipyIterativeSolver
@@ -75,22 +76,7 @@ class TestJacobianFeatures(unittest.TestCase):
         self.problem = Problem(model=model)
         model.suppress_solver_output = True
         model.ln_solver = ScipyIterativeSolver()
-        # model.jacobian = GlobalJacobian(matrix_class=CsrMatrix)
-
-
-    def test_something(self):
-        problem = self.problem
-        model = problem.model
-        model.add_subsystem('simple', SimpleComp(), promotes=['x', 'y1', 'y2', 'z', 'f', 'g'])
-        problem.setup(check=False)
-        problem['x'] = 2.
-        problem['y1'] = [1, 2]
-        problem['y2'] = [1, 2]
-        problem['z'] = [[1, 2], [3, 4]]
-
-        problem.run_model()
-        assert_rel_error(self, problem['f'], 12)
-        assert_rel_error(self, problem['g'], np.array([[3, 2], [2, 6]]))
+        model.jacobian = GlobalJacobian(matrix_class=CooMatrix)
 
     def test_dependence(self):
         problem = self.problem
@@ -98,12 +84,26 @@ class TestJacobianFeatures(unittest.TestCase):
         model.add_subsystem('simple', SimpleCompConst(), promotes=['x', 'y1', 'y2', 'z', 'f', 'g'])
         problem.setup(check=False)
         problem.run_model()
-        totals = problem.compute_total_derivs(
-            of=['f', 'g'],
-            wrt=['x', 'y1', 'y2', 'z']
-        )
 
-        raise ValueError(totals)
+        # Note: since this test is looking for something not user-facing, it is inherently fragile
+        # w.r.t. internal implementations.
+        model._linearize()
+        jac = model._jacobian._int_mtx._matrix
+
+        # Testing dependence by examining the number of entries in the Jacobian. If non-zeros are
+        # removed during array creation (e.g. `eliminate_zeros` function on scipy.sparse matrices),
+        # then this test will fail since there are zero entries in the sub-Jacobians.
+
+        # 14 for outputs w.r.t. themselves
+        # 1 for df/dx
+        # 4 for df/dz
+        # 8 for dg/dy1
+        # 4 for dg/dy2
+        # 2 for dg/dx
+        expected_nnz = 14 + 1 + 4 + 8 + 4 + 2
+
+        self.assertEqual(jac.nnz, expected_nnz)
+
 
 
 if __name__ == '__main__':

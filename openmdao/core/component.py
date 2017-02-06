@@ -389,16 +389,15 @@ class Component(System):
                 cols = info['cols']
                 if rows is not None:
                     if rows.min() < 0:
-                        raise ValueError('d({})/d({}): row indices must be non-negative.'.format(
-                            self._var_name2path[of][0], self._var_name2path[wrt][0]
-                        ))
+                        msg = '{}: d({})/d({}): row indices must be non-negative'
+                        raise ValueError(msg.format(self.pathname, of, wrt))
                     if cols.min() < 0:
-                        raise ValueError('d({})/d({}): col indices must be non-negative.'.format(
-                            self._var_name2path[of][0], self._var_name2path[wrt][0]
-                        ))
+                        msg = '{}: d({})/d({}): col indices must be non-negative'
+                        raise ValueError(msg.format(self.pathname, of, wrt))
                     if rows.max() >= out_size or cols.max() >= in_size:
-                        raise ValueError('d({})/d({}): Expected {}x{} but declared {}x{}'.format(
-                            self._var_name2path[of][0], self._var_name2path[wrt][0],
+                        msg = '{}: d({})/d({}): Expected {}x{} but declared {}x{}'
+                        raise ValueError(msg.format(
+                            self.pathname, of, wrt,
                             out_size, in_size,
                             rows.max() + 1, cols.max() + 1
                         ))
@@ -410,8 +409,9 @@ class Component(System):
                     else:
                         val_out, val_in = val.shape
                     if val_out > out_size or val_in > in_size:
-                        raise ValueError('d({})/d({}): Expected {}x{} but declared {}x{}'.format(
-                            self._var_name2path[of][0], self._var_name2path[wrt][0],
+                        msg = '{}: d({})/d({}): Expected {}x{} but val is {}x{}'
+                        raise ValueError(msg.format(
+                            self.pathname, of, wrt,
                             out_size, in_size,
                             val_out, val_in
                         ))
