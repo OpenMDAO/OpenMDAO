@@ -699,8 +699,6 @@ class System(object):
     def nl_solver(self, solver):
         """Set this system's nonlinear solver and perform setup."""
         self._nl_solver = solver
-        if solver is not None:
-            self._nl_solver._setup_solvers(self, 0)
 
     @property
     def ln_solver(self):

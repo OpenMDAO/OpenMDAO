@@ -25,10 +25,8 @@ class Group(System):
         # called nl_solver and ln_solver without documenting them.
         if not self._nl_solver:
             self._nl_solver = NonlinearBlockGS()
-            self._nl_solver._setup_solvers(self, 0)
         if not self._ln_solver:
             self._ln_solver = LinearBlockGS()
-            self._ln_solver._setup_solvers(self, 0)
 
     def add(self, name, subsys, promotes=None):
         """Deprecated version of <Group.add_subsystem>.
