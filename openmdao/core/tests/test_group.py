@@ -191,6 +191,16 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['group2.comp1.b'], 20.0)
         self.assertEqual(p['group2.comp2.b'], 40.0)
 
+    def test_reused_output_names(self):
+        prob = Problem(Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        G1 = prob.model.add_subsystem('G1', Group())
+        G1.add_subsystem("C1", ExecComp("y=2.0*x"), promotes=['y'])
+        G1.add_subsystem("C2", ExecComp("y=2.0*x"), promotes=['y'])
+        msg = "Output name 'y' refers to multiple outputs: \['G1.C2.y', 'G1.C1.y'\]."
+        with assertRaisesRegex(self, Exception, msg):
+            prob.setup(check=False)
+
 
 class TestConnect(unittest.TestCase):
 

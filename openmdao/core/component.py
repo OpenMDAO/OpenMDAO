@@ -20,26 +20,6 @@ class Component(System):
         A mapping of local variable name to its metadata.
     """
 
-    INPUT_DEFAULTS = {
-        'shape': (1,),
-        'units': '',
-        'var_set': 0,
-        'indices': None,
-    }
-
-    OUTPUT_DEFAULTS = {
-        'shape': (1,),
-        'units': '',
-        'var_set': 0,
-        'lower': None,
-        'upper': None,
-        'ref': 1.0,
-        'ref0': 0.0,
-        'res_units': '',
-        'res_ref': 1.0,
-        'res_ref0': 0.0,
-    }
-
     def __init__(self, **kwargs):
         """Initialize all attributes.
 
@@ -358,13 +338,9 @@ class Component(System):
 
     def _set_partials_meta(self):
         """Set subjacobian info into our jacobian."""
-        oldsys = self._jacobian._system
-        self._jacobian._system = self
-
-        for key, meta, typ in self._iter_partials_matches():
-            self._jacobian._set_partials_meta(key, meta)
-
-        self._jacobian._system = oldsys
+        with self._jacobian_context() as J:
+            for key, meta, typ in self._iter_partials_matches():
+                J._set_partials_meta(key, meta)
 
     def _setup_variables(self, recurse=False):
         """Assemble variable metadata and names lists.
@@ -385,15 +361,22 @@ class Component(System):
 
         # set up absolute path info
         self._var_pathdict = {}
-        self._var_name2path = {}
+        self._var_name2path = {'input': {}, 'output': {}}
         for typ in ['input', 'output']:
             names = self._var_allprocs_names[typ]
-            self._var_allprocs_pathnames[typ] = paths = [
-                '.'.join((self.pathname, n)) for n in names]
+            if self.pathname:
+                self._var_allprocs_pathnames[typ] = paths = [
+                    '.'.join((self.pathname, n)) for n in names
+                ]
+            else:
+                self._var_allprocs_pathnames[typ] = paths = names
             for idx, name in enumerate(names):
                 path = paths[idx]
-                self._var_pathdict[path] = PathData(name, idx, typ)
-                self._var_name2path[name] = (path,)
+                self._var_pathdict[path] = PathData(name, idx, idx, typ)
+                if typ is 'input':
+                    self._var_name2path[typ][name] = (path,)
+                else:
+                    self._var_name2path[typ][name] = path
 
         for (of, wrt), info in iteritems(self._subjacs_info):
             if info['dependent']:
