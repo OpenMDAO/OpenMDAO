@@ -364,7 +364,7 @@ class Group(System):
                         name2path[name].append(path)
                     else:
                         raise RuntimeError("Output name '%s' refers to "
-                                           "multiple outputs: %s" %
+                                           "multiple outputs: %s." %
                                            (name, [path, name2path[name]]))
                 else:
                     if typ is 'input':
