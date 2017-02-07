@@ -55,7 +55,7 @@ class TestLinearSystem(unittest.TestCase):
         lingrp = prob.model.get_subsystem('lingrp')
         lingrp.ln_solver = ScipyIterativeSolver()
 
-        prob.setup()
+        prob.setup(check=False)
         prob.run_model()
 
         # Forward mode with RHS of self.b

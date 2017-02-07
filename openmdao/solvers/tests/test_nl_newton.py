@@ -6,7 +6,8 @@ from six import iteritems
 import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
-    NewtonSolver, ExecComp, ScipyIterativeSolver, ImplicitComponent
+    NewtonSolver, ExecComp, ScipyIterativeSolver, ImplicitComponent, \
+    DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarNoDerivatives, SellarDerivatives, \
@@ -15,7 +16,6 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
 
 class TestNewton(unittest.TestCase):
 
-    @unittest.skip('something is broken in the way newton pulls the linear solver from the group')
     def test_specify_newton_ln_solver_in_system(self):
         prob = Problem()
         model = prob.model = SellarDerivatives()
