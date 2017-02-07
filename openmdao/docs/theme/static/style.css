@@ -104,3 +104,9 @@ a code {
   border: 0;
   color: navy;
 }
+
+
+div.skipped pre {
+  background-color: rgba(213, 236, 22, 0.35);
+}
+
