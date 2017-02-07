@@ -1,7 +1,33 @@
 from docutils import nodes
+import sys
+
+import sphinx
 from sphinx.util.compat import Directive
+from sphinx.writers.html import HTMLTranslator
 
 from openmdao.docs.utils.docutil import get_unit_test_source_and_run_outputs
+
+if sys.version_info[0] == 2:
+    import cgi as cgiesc
+else:
+    import html as cgiesc
+
+
+class skipped_or_failed_node(nodes.Element):
+    pass
+
+
+def visit_skipped_or_failed_node(self, node):
+    pass
+
+
+def depart_skipped_or_failed_node(self, node):
+    if not isinstance(self, HTMLTranslator):
+        self.body.append("output only available for HTML\n")
+        return
+
+    html = '<div class="{}"><pre>{}</pre></div>'.format(node["kind"], cgiesc.escape(node["text"]))
+    self.body.append(html)
 
 
 class EmbedTestDirective(Directive):
@@ -27,22 +53,24 @@ class EmbedTestDirective(Directive):
         # create a list of document nodes to return
         doc_nodes = []
 
-        method_path = self.arguments[0]
-
         # grabbing source, and output of a test segment
-        (src, output, skipped) = get_unit_test_source_and_run_outputs(method_path)
+        method_path = self.arguments[0]
+        (src, output, skipped, failed) = get_unit_test_source_and_run_outputs(method_path)
 
         # we want the body of test code to be formatted and code highlighted
         body = nodes.literal_block(src, src)
         body['language'] = 'python'
+        doc_nodes.append(body)
 
-        # we want the output block to also be formatted similarly
+        # we want the output block to also be formatted similarly unless test was skipped
         if skipped:
             output = "Test skipped because " + output
-        output_node = nodes.literal_block(output, output)
+            output_node = skipped_or_failed_node(text=output, kind="skipped")
+        elif failed:
+            output_node = skipped_or_failed_node(text=output, kind="failed")
+        else:
+            output_node = nodes.literal_block(output, output)
 
-        # put the nodes we've created in the list, and return them
-        doc_nodes.append(body)
         doc_nodes.append(output_node)
 
         return doc_nodes
@@ -50,4 +78,8 @@ class EmbedTestDirective(Directive):
 
 def setup(app):
     """add custom directive into Sphinx so that it is found during document parsing"""
+
     app.add_directive('embed-test', EmbedTestDirective)
+    app.add_node(skipped_or_failed_node, html=(visit_skipped_or_failed_node, depart_skipped_or_failed_node))
+
+    return {'version': sphinx.__display_version__, 'parallel_read_safe': True}
