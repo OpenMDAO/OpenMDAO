@@ -136,7 +136,7 @@ class PetscKSP(LinearSolver):
     Attributes
     ----------
     precon : Solver
-        preconditioner.
+        Preconditioner for linear solve. Default is None for no preconditioner.
     _print_name : str ('KSP')
         print name.
     _ksp : dist

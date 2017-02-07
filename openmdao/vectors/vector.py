@@ -167,12 +167,12 @@ class Vector(object):
 
         self._ivar_map = ivar_map
 
-    def get_data(self, array=None):
+    def get_data(self, new_array=None):
         """Get the array combining the data of all the varsets.
 
         Args
         ----
-        array : ndarray or None
+        new_array : ndarray or None
             Array to fill in with the values; otherwise new array created.
 
         Returns
@@ -180,16 +180,16 @@ class Vector(object):
         ndarray
             Array combining the data of all the varsets.
         """
-        if array is None:
+        if new_array is None:
             inds = self._system._var_myproc_indices[self._typ]
             sizes = self._assembler._variable_sizes_all[self._typ][self._iproc,
                                                                    inds]
-            array = numpy.zeros(numpy.sum(sizes))
+            new_array = numpy.zeros(numpy.sum(sizes))
 
         for ind, data in enumerate(self._data):
-            array[self._indices[ind]] = data
+            new_array[self._indices[ind]] = data
 
-        return array
+        return new_array
 
     def set_data(self, array):
         """Set the incoming array combining the data of all the varsets.
