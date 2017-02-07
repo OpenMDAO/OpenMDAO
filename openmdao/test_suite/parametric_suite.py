@@ -171,7 +171,7 @@ class ParameterizedInstance(object):
             if PETScVector is None:
                 raise SkipTest('PETSc not available.')
 
-        self.problem = prob = Problem(group).setup(vec_class, check=False)
+        self.problem = prob = Problem(group)
 
         if args['global_jac']:
             jacobian_type = args['jacobian_type']
@@ -187,6 +187,8 @@ class ParameterizedInstance(object):
         prob.model.nl_solver = self.solver_class(**self.solver_options)
 
         prob.model.suppress_solver_output = True
+
+        prob.setup(vec_class, check=False)
 
         fail, rele, abse = prob.run_model()
         if fail:

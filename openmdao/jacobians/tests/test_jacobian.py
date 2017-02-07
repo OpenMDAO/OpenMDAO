@@ -182,16 +182,16 @@ class TestJacobian(unittest.TestCase):
         top.connect('C1.f', 'C2.z', src_indices=[1])
 
         top.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
-        prob.setup(check=False)
 
-        top.nl_solver = NewtonSolver(
-            subsolvers={'linear': ScipyIterativeSolver(
-                maxiter=100,
-            )}
-        )
+        top.nl_solver = NewtonSolver()
+        top.nl_solver.ln_solver = ScipyIterativeSolver(maxiter=100)
+
         top.ln_solver = ScipyIterativeSolver(
             maxiter=200, atol=1e-10, rtol=1e-10)
         prob.model.suppress_solver_output = True
+
+        prob.setup(check=False)
+
         prob.run_model()
 
         # if we multiply our jacobian (at x,y = ones) by our work vec of 1's,
@@ -250,16 +250,14 @@ class TestJacobian(unittest.TestCase):
         top.connect('indep.a', 'C2.w', src_indices=[0,2,1])
         top.connect('C1.f', 'C2.z', src_indices=[1])
 
-        prob.setup(check=False)
         top.jacobian = GlobalJacobian(matrix_class=mat_class)
-        top.nl_solver = NewtonSolver(
-            subsolvers={'linear': ScipyIterativeSolver(
-                maxiter=100,
-            )}
-        )
+        top.nl_solver = NewtonSolver()
+        top.nl_solver.ln_solver = ScipyIterativeSolver(maxiter=100)
         top.ln_solver = ScipyIterativeSolver(
             maxiter=200, atol=1e-10, rtol=1e-10)
         prob.model.suppress_solver_output = True
+
+        prob.setup(check=False)
 
         prob.run_model()
 
@@ -333,7 +331,8 @@ class TestJacobian(unittest.TestCase):
         prob.model._linearize()
 
         expected = constructor(value)
-        jac_out = prob.model._subsystems_allprocs[0]._jacobian['out', 'in'] * -1
+        with prob.model._subsystems_allprocs[0]._jacobian_context() as J:
+            jac_out = J['out', 'in'] * -1
 
         self.assertEqual(len(jac_out.shape), 2)
         expected_dtype = np.promote_types(dtype, float)

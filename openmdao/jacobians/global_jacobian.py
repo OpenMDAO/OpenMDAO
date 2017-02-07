@@ -87,6 +87,8 @@ class GlobalJacobian(Jacobian):
         src_indices = {i: meta_in[j]['indices']
                        for j, i in enumerate(var_indices['input'])}
 
+        start = len(system.pathname) + 1 if system.pathname else 0
+
         # avoid circular imports
         from openmdao.core.component import Component
         for s in self._system.system_iter(local=True, recurse=True,
@@ -96,6 +98,7 @@ class GlobalJacobian(Jacobian):
 
             for re_idx_all in sub_out_inds:
                 re_path = out_paths[re_idx_all]
+                re_unprom = re_path[start:]
                 re_offset = out_offsets[re_idx_all]
 
                 for out_idx_all in sub_out_inds:
@@ -105,16 +108,15 @@ class GlobalJacobian(Jacobian):
                         info, shape = self._subjacs_info[key]
                     else:
                         info = SUBJAC_META_DEFAULTS
-                        rname = out_names[re_idx_all]
-                        oname = out_names[out_idx_all]
-                        shape = (system._outputs._views_flat[rname].size,
+                        oname = out_path[start:]
+                        shape = (system._outputs._views_flat[re_unprom].size,
                                  system._outputs._views_flat[oname].size)
 
                     self._int_mtx._add_submat(key, info, re_offset,
                                               out_offsets[out_idx_all],
                                               None, shape)
 
-                for in_count, in_idx_all in enumerate(sub_in_inds):
+                for in_idx_all in sub_in_inds:
                     in_path = in_paths[in_idx_all]
                     key = (re_path, in_path)
                     self._keymap[key] = key
@@ -122,9 +124,8 @@ class GlobalJacobian(Jacobian):
                         info, shape = self._subjacs_info[key]
                     else:
                         info = SUBJAC_META_DEFAULTS
-                        rname = out_names[re_idx_all]
-                        iname = in_names[in_idx_all]
-                        shape = (system._outputs._views_flat[rname].size,
+                        iname = in_path[start:]
+                        shape = (system._outputs._views_flat[re_unprom].size,
                                  system._inputs._views_flat[iname].size)
 
                     out_idx_all = self._assembler._input_src_ids[in_idx_all]
