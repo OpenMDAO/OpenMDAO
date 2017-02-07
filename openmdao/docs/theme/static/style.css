@@ -110,3 +110,7 @@ div.skipped pre {
   background-color: rgba(213, 236, 22, 0.35);
 }
 
+div.failed pre {
+  background-color: rgba(255, 0, 0, 0.35);
+}
+
