@@ -319,6 +319,12 @@ class Problem(object):
             if system._pre_setup_jac is not None:
                 to_set.append(system)
 
+            # While we are recursing, we can set up all the solvers.
+            if system._nl_solver is not None:
+                system._nl_solver._setup_solvers(system, 0)
+            if system._ln_solver is not None:
+                system._ln_solver._setup_solvers(system, 0)
+
         for system in to_set:
             system._set_jacobian(system._pre_setup_jac, True)
 

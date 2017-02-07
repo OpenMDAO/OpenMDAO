@@ -18,6 +18,7 @@ from redbaron import RedBaron
 sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
 table_name = 'feature_unit_tests'   # name of the table to be queried
 
+
 def remove_docstrings(source):
     """
     Returns 'source' minus docstrings.
@@ -267,10 +268,10 @@ def get_skip_predicate_and_message(source, method_name):
     if def_nodes:
         if def_nodes[0].decorators:
             if def_nodes[0].decorators[0].value.dumps() == 'unittest.skipUnless':
-                return ( def_nodes[0].decorators[0].call.value[0].dumps(),
-                    def_nodes[0].decorators[0].call.value[1].value.to_python() )
+                return (def_nodes[0].decorators[0].call.value[0].dumps(),
+                        def_nodes[0].decorators[0].call.value[1].value.to_python())
             elif def_nodes[0].decorators[0].value.dumps() == 'unittest.skip':
-                return ( None, def_nodes[0].decorators[0].call.value[0].value.to_python() )
+                return (None, def_nodes[0].decorators[0].call.value[0].value.to_python())
     return None
 
 
@@ -302,14 +303,10 @@ def get_unit_test_source_and_run_outputs(method_path):
     meth = getattr(cls, method_name)
     class_source_code = inspect.getsource(cls)
 
-    # Does not work correctly for methods that are decorated
-    #method_source = inspect.getsource(meth)
-
     rb = RedBaron(class_source_code)
     def_nodes = rb.findAll("DefNode", name=method_name)
     def_nodes[0].value.decrease_indentation(8)
     method_source = def_nodes[0].value.dumps()
-
 
     # Remove docstring from source code
     source_minus_docstrings = remove_docstrings(method_source)
@@ -340,8 +337,7 @@ def get_unit_test_source_and_run_outputs(method_path):
 
     # If the test method has a skipUnless or skip decorator, we need to convert it to a
     #   raise call
-    skip_predicate_and_message = \
-            get_skip_predicate_and_message(class_source_code, method_name)
+    skip_predicate_and_message = get_skip_predicate_and_message(class_source_code, method_name)
     if skip_predicate_and_message:
         # predicate, message = skip_unless_predicate_and_message
         predicate, message = skip_predicate_and_message
@@ -361,6 +357,7 @@ def get_unit_test_source_and_run_outputs(method_path):
     # Write it to a file so we can run it. Tried using exec but ran into problems with that
     fd, code_to_run_path = tempfile.mkstemp()
     skipped = False
+    failed = False
     try:
         with os.fdopen(fd, 'w') as tmp:
             tmp.write(code_to_run)
@@ -381,11 +378,13 @@ def get_unit_test_source_and_run_outputs(method_path):
             run_outputs = reason_for_skip
             skipped = True
         else:
-            print("Running of embedded test " + method_path + " in docs failed due to: " + e.output)
-            raise
+            run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(method_path, e.output.decode('utf-8'))
+            failed = True
+            # print("Running of embedded test " + method_path + " in docs failed due to: " + e.output.decode('utf-8'))
+            # raise
     finally:
         os.remove(code_to_run_path)
 
     if PY3:
         run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
-    return source_minus_docstrings_with_prints_cleaned, run_outputs, skipped
+    return source_minus_docstrings_with_prints_cleaned, run_outputs, skipped, failed
