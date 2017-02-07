@@ -8,7 +8,6 @@ from collections import namedtuple, OrderedDict
 import numpy
 
 from six.moves import range
-from six import string_types
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
@@ -431,31 +430,35 @@ class System(object):
 
         # Scaling coefficients from the src output
         src_units = self._assembler._src_units
-        src_0 = self._assembler._src_scaling_0
-        src_1 = self._assembler._src_scaling_1
+        src_scaling = self._assembler._src_scaling
 
         # Compute scaling arrays for inputs using a0 and a1
+        # Example:
+        #   Let x, x_src, x_tgt be the variable in dimensionless, source, and target units, resp.
+        #   x_src = a0 + a1 x
+        #   x_tgt = b0 + b1 x
+        #   x_tgt = g(x_src) = d0 + d1 x_src
+        #   b0 + b1 x = d0 + d1 a0 + d1 a1 x
+        #   b0 = d0 + d1 a0
+        #   b0 = g(a0)
+        #   b1 = d0 + d1 a1 - d0
+        #   b1 = g(a1) - g(0)
         for ind, meta in enumerate(self._var_myproc_metadata['input']):
             global_ind = self._var_myproc_indices['input'][ind]
             self._scaling_to_phys['input'][ind, 0] = \
-                convert_units(src_0[global_ind], src_units[global_ind],
-                              meta['units'])
+                convert_units(src_scaling[global_ind, 0], src_units[global_ind], meta['units'])
             self._scaling_to_phys['input'][ind, 1] = \
-                convert_units(src_1[global_ind], src_units[global_ind],
-                              meta['units'])
+                convert_units(src_scaling[global_ind, 1], src_units[global_ind], meta['units']) - \
+                convert_units(0., src_units[global_ind], meta['units'])
 
         for ind, meta in enumerate(self._var_myproc_metadata['output']):
             # Compute scaling arrays for outputs; no unit conversion needed
             self._scaling_to_phys['output'][ind, 0] = meta['ref0']
-            self._scaling_to_phys['output'][ind, 1] = \
-                meta['ref'] - meta['ref0']
+            self._scaling_to_phys['output'][ind, 1] = meta['ref'] - meta['ref0']
 
             # Compute scaling arrays for residuals; convert units
-            self._scaling_to_phys['residual'][ind, 0] = \
-                convert_units(meta['ref0'], meta['units'], meta['res_units'])
-            self._scaling_to_phys['residual'][ind, 1] = \
-                convert_units(meta['ref'] - meta['ref0'],
-                              meta['units'], meta['res_units'])
+            self._scaling_to_phys['residual'][ind, 0] = meta['ref0']
+            self._scaling_to_phys['residual'][ind, 1] = meta['ref'] - meta['ref0']
 
         # Compute inverse scaling arrays
         for key in ['input', 'output', 'residual']:
@@ -880,38 +883,6 @@ class System(object):
     def _linearize(self):
         """Compute jacobian / factorization."""
         pass
-
-    def get_subsystem(self, name):
-        """Return the system called 'name' in the current namespace.
-
-        Args
-        ----
-        name : str
-            name of the desired system in the current namespace.
-
-        Returns
-        -------
-        System or None
-            System if found else None.
-        """
-        idot = name.find('.')
-
-        # If name does not contain '.', only check the immediate children
-        if idot == -1:
-            for subsys in self._subsystems_allprocs:
-                if subsys.name == name:
-                    return subsys
-        # If name does contain at least one '.', we have to recurse (possibly).
-        else:
-            sub_name = name[:idot]
-            for subsys in self._subsystems_allprocs:
-                # We only check if the prefix matches, and with the prefix removed.
-                if subsys.name == sub_name:
-                    result = subsys.get_subsystem(name[idot + 1:])
-                    if result:
-                        return result
-
-        return None
 
     def initialize(self):
         """Optional user-defined method run once during instantiation.

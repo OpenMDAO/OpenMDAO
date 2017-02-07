@@ -23,7 +23,9 @@ class SellarDis1(ExplicitComponent):
 
     def __init__(self):
         super(SellarDis1, self).__init__()
+        self.execution_count = 0
 
+    def initialize_variables(self):
         # Global Design Variable
         self.add_input('z', val=np.zeros(2))
 
@@ -35,8 +37,6 @@ class SellarDis1(ExplicitComponent):
 
         # Coupling output
         self.add_output('y1', val=1.0)
-
-        self.execution_count = 0
 
     def compute(self, params, unknowns):
         """Evaluates the equation
@@ -68,7 +68,9 @@ class SellarDis2(ExplicitComponent):
 
     def __init__(self):
         super(SellarDis2, self).__init__()
+        self.execution_count = 0
 
+    def initialize_variables(self):
         # Global Design Variable
         self.add_input('z', val=np.zeros(2))
 
@@ -77,8 +79,6 @@ class SellarDis2(ExplicitComponent):
 
         # Coupling output
         self.add_output('y2', val=1.0)
-
-        self.execution_count = 0
 
     def compute(self, params, unknowns):
         """Evaluates the equation
@@ -123,17 +123,17 @@ class SellarNoDerivatives(Group):
         cycle.ln_solver = ScipyIterativeSolver()
         d1 = cycle.add_subsystem('d1', SellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
         d2 = cycle.add_subsystem('d2', SellarDis2(), promotes=['z', 'y1', 'y2'])
+        d1.deriv_options['type'] = 'fd'
+        d2.deriv_options['type'] = 'fd'
 
         self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                     z=np.array([0.0, 0.0]), x=0.0),
-                 promotes=['x', 'z', 'y1', 'y2', 'obj'])
+                           z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['x', 'z', 'y1', 'y2', 'obj'])
 
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         self.nl_solver = NonlinearBlockGS()
-        d1.deriv_options['type'] = 'fd'
-        d2.deriv_options['type'] = 'fd'
 
 
 class SellarDerivatives(Group):
@@ -200,8 +200,8 @@ class SellarDerivativesGrouped(Group):
 
         mda = self.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
         mda.ln_solver = ScipyIterativeSolver()
-        d1 = mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        d2 = mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+        mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
         self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                      z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
@@ -222,6 +222,7 @@ class StateConnection(ImplicitComponent):
     def __init__(self):
         super(StateConnection, self).__init__()
 
+    def initialize_variables(self):
         # Inputs
         self.add_input('y2_actual', 1.0)
 

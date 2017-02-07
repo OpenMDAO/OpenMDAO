@@ -10,6 +10,7 @@ from openmdao.core.system import System, PathData
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
 from openmdao.solvers.ln_bgs import LinearBlockGS
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.units import is_compatible
 
 
 class Group(System):
@@ -43,7 +44,7 @@ class Group(System):
             to 'promote' up to this group. This is for backwards compatibility
             with older versions of OpenMDAO.
         """
-        warn_deprecation('This method provides backwards compabitibility with '
+        warn_deprecation('This method provides backwards compatibility with '
                          'OpenMDAO <= 1.x ; use add_subsystem instead.')
 
         self.add_subsystem(name, subsys, promotes=promotes)
@@ -152,8 +153,9 @@ class Group(System):
             raise RuntimeError("Input '%s' is already connected to '%s'." %
                                (in_name, srcname))
 
+        # source and target should not be in the same system
         if out_name.rsplit('.', 1)[0] == in_name.rsplit('.', 1)[0]:
-            raise RuntimeError("Input and output are in the same System for " +
+            raise RuntimeError("Output and input are in the same System for " +
                                "connection from '%s' to '%s'." % (out_name, in_name))
 
         self._var_connections[in_name] = (out_name, src_indices)
@@ -180,8 +182,10 @@ class Group(System):
 
         allprocs_in_names = self._var_allprocs_names['input']
         myproc_in_names = self._var_myproc_names['input']
+        myproc_out_names = self._var_myproc_names['output']
         allprocs_out_names = self._var_allprocs_names['output']
         input_meta = self._var_myproc_metadata['input']
+        output_meta = self._var_myproc_metadata['output']
 
         in_offset = self._var_allprocs_range['input'][0]
         out_offset = self._var_allprocs_range['output'][0]
@@ -195,14 +199,12 @@ class Group(System):
             if out_name not in allprocs_out_names:
                 raise NameError("Output '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." %
-                                (out_name, self.name if self.name else 'model',
-                                 out_name, in_name))
+                                (out_name, self.name, out_name, in_name))
 
             if in_name not in allprocs_in_names:
                 raise NameError("Input '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." %
-                                (in_name, self.name if self.name else 'model',
-                                 out_name, in_name))
+                                (in_name, self.name, out_name, in_name))
 
             # throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -213,10 +215,29 @@ class Group(System):
                 else self._find_subsys_with_promoted_name(in_name, 'input')
 
             if out_subsys == in_subsys:
-                raise RuntimeError("Input and output are in the same System " +
+                raise RuntimeError("Output and input are in the same System " +
                                    "for connection in '%s' from '%s' to '%s'." %
-                                   (self.name if self.name else 'model',
-                                    out_name, in_name))
+                                   (self.name, out_name, in_name))
+
+            out_myproc_index = myproc_out_names.index(out_name)
+            in_myproc_index = myproc_in_names.index(in_name)
+
+            out_units = output_meta[out_myproc_index]['units']
+            in_units = input_meta[in_myproc_index]['units']
+
+            # throw an error if one of input and output is unitless, but the other isn't
+            if (out_units and not in_units or in_units and not out_units):
+                out_units = "has units '%s'" % out_units if out_units else "is unitless"
+                in_units = "has units '%s'" % in_units if in_units else "is unitless"
+                raise RuntimeError("Units must be specified for both or neither side "
+                                   "of connection in '%s': '%s' %s but '%s' %s." %
+                                   (self.name, out_name, out_units, in_name, in_units))
+
+            # throw an error if the input and output units are not compatible
+            if not is_compatible(in_units, out_units):
+                raise RuntimeError("Output and input units are not compatible for connection "
+                                   "in '%s': '%s' has units '%s' but '%s' has units '%s'." %
+                                   (self.name, out_name, out_units, in_name, in_units))
 
             for in_index, name in enumerate(allprocs_in_names):
                 if name == in_name:
@@ -311,6 +332,38 @@ class Group(System):
                     self._var_name2path[name].append(path)
                 else:
                     self._var_name2path[name] = [path]
+
+    def get_subsystem(self, name):
+        """Return the system called 'name' in the current namespace.
+
+        Args
+        ----
+        name : str
+            name of the desired system in the current namespace.
+
+        Returns
+        -------
+        System or None
+            System if found else None.
+        """
+        idot = name.find('.')
+
+        # If name does not contain '.', only check the immediate children
+        if idot == -1:
+            for subsys in self._subsystems_allprocs:
+                if subsys.name == name:
+                    return subsys
+        # If name does contain at least one '.', we have to recurse (possibly).
+        else:
+            sub_name = name[:idot]
+            for subsys in self._subsystems_allprocs:
+                # We only check if the prefix matches, and with the prefix removed.
+                if subsys.name == sub_name:
+                    result = subsys.get_subsystem(name[idot + 1:])
+                    if result:
+                        return result
+
+        return None
 
     def _apply_nonlinear(self):
         """Compute residuals."""

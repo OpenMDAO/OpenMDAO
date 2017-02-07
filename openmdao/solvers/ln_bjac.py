@@ -1,8 +1,8 @@
 """Define the LinearBlockJac class."""
-from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.solver import BlockLinearSolver
 
 
-class LinearBlockJac(LinearSolver):
+class LinearBlockJac(BlockLinearSolver):
     """Linear block Jacobi solver."""
 
     SOLVER = 'LN: LNBJ'

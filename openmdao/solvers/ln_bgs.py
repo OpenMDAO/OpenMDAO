@@ -1,8 +1,8 @@
 """Define the LinearBlockJac class."""
-from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.solver import BlockLinearSolver
 
 
-class LinearBlockGS(LinearSolver):
+class LinearBlockGS(BlockLinearSolver):
     """Linear block Gauss-Seidel solver."""
 
     SOLVER = 'LN: LNBGS'

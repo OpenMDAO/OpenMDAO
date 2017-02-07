@@ -1,9 +1,11 @@
-import six
 import unittest
+from six import assertRaisesRegex
 
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+
+from openmdao.test_suite.groups.unit_conversion_groups import SrcComp
 
 
 class SimpleGroup(Group):
@@ -213,28 +215,28 @@ class TestConnect(unittest.TestCase):
         msg = "src_indices must contain integers, but src_indices for " + \
               "connection from 'src.x' to 'tgt.x' contains non-integers."
 
-        with six.assertRaisesRegex(self, TypeError, msg):
+        with assertRaisesRegex(self, TypeError, msg):
             self.sub.connect('src.x', 'tgt.x', src_indices=[1.0])
 
     def test_src_indices_as_float_array(self):
         msg = "src_indices must contain integers, but src_indices for " + \
               "connection from 'src.x' to 'tgt.x' is <.* 'numpy.float64'>."
 
-        with six.assertRaisesRegex(self, TypeError, msg):
+        with assertRaisesRegex(self, TypeError, msg):
             self.sub.connect('src.x', 'tgt.x', src_indices=np.zeros(1))
 
     def test_src_indices_as_str(self):
         msg = "src_indices must be an index array, " + \
               "did you mean connect('src.x', [tgt.x, cmp.x])?"
 
-        with six.assertRaisesRegex(self, TypeError, msg):
+        with assertRaisesRegex(self, TypeError, msg):
             self.sub.connect('src.x', 'tgt.x', 'cmp.x')
 
     def test_already_connected(self):
         msg = "Input 'tgt.x' is already connected to 'src.x'."
 
         self.sub.connect('src.x', 'tgt.x', src_indices=[1])
-        with six.assertRaisesRegex(self, RuntimeError, msg):
+        with assertRaisesRegex(self, RuntimeError, msg):
             self.sub.connect('cmp.x', 'tgt.x', src_indices=[1])
 
     def test_invalid_source(self):
@@ -244,7 +246,7 @@ class TestConnect(unittest.TestCase):
         # source and target names can't be checked until setup
         # because initialize_variables is not called until then
         self.sub.connect('src.z', 'tgt.x', src_indices=[1])
-        with six.assertRaisesRegex(self, NameError, msg):
+        with assertRaisesRegex(self, NameError, msg):
             self.prob.setup(check=False)
 
     def test_invalid_target(self):
@@ -254,14 +256,14 @@ class TestConnect(unittest.TestCase):
         # source and target names can't be checked until setup
         # because initialize_variables is not called until then
         self.sub.connect('src.x', 'tgt.z', src_indices=[1])
-        with six.assertRaisesRegex(self, NameError, msg):
+        with assertRaisesRegex(self, NameError, msg):
             self.prob.setup(check=False)
 
     def test_connect_within_system(self):
-        msg = "Input and output are in the same System for connection " + \
+        msg = "Output and input are in the same System for connection " + \
               "from 'tgt.y' to 'tgt.x'."
 
-        with six.assertRaisesRegex(self, RuntimeError, msg):
+        with assertRaisesRegex(self, RuntimeError, msg):
             self.sub.connect('tgt.y', 'tgt.x', src_indices=[1])
 
     def test_connect_within_system_with_promotes(self):
@@ -271,10 +273,10 @@ class TestConnect(unittest.TestCase):
         sub.add_subsystem('tgt', ExecComp('y = x'), promotes_outputs=['y'])
         sub.connect('y', 'tgt.x', src_indices=[1])
 
-        msg = "Input and output are in the same System for connection " + \
+        msg = "Output and input are in the same System for connection " + \
               "in 'sub' from 'y' to 'tgt.x'."
 
-        with six.assertRaisesRegex(self, RuntimeError, msg):
+        with assertRaisesRegex(self, RuntimeError, msg):
             prob.setup(check=False)
 
     def test_connect_within_system_with_renames(self):
@@ -284,10 +286,42 @@ class TestConnect(unittest.TestCase):
         sub.add_subsystem('tgt', ExecComp('y = x'), renames_outputs={'y': 'y2'})
         sub.connect('y2', 'tgt.x', src_indices=[1])
 
-        msg = "Input and output are in the same System for connection " + \
+        msg = "Output and input are in the same System for connection " + \
               "in 'sub' from 'y2' to 'tgt.x'."
 
-        with six.assertRaisesRegex(self, RuntimeError, msg):
+        with assertRaisesRegex(self, RuntimeError, msg):
+            prob.setup(check=False)
+
+    def test_connect_units_with_unitless(self):
+        msg = "Units must be specified for both or neither side of " + \
+              "connection in '': " + \
+              "'src.x2' has units 'degC' but 'tgt.x' is unitless."
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        prob.model.add_subsystem('src', SrcComp())
+        prob.model.add_subsystem('tgt', ExecComp('y = x'))
+
+        prob.model.connect('px1.x1', 'src.x1')
+        prob.model.connect('src.x2', 'tgt.x')
+
+        with assertRaisesRegex(self, RuntimeError, msg):
+            prob.setup(check=False)
+
+    def test_connect_incompatible_units(self):
+        msg = "Output and input units are not compatible for " + \
+              "connection in '': " + \
+              "'src.x2' has units 'degC' but 'tgt.x' has units 'm'."
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        prob.model.add_subsystem('src', SrcComp())
+        prob.model.add_subsystem('tgt', ExecComp('y = x', units={'x': 'm'}))
+
+        prob.model.connect('px1.x1', 'src.x1')
+        prob.model.connect('src.x2', 'tgt.x')
+
+        with assertRaisesRegex(self, RuntimeError, msg):
             prob.setup(check=False)
 
 

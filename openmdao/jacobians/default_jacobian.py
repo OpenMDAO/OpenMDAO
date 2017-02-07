@@ -25,7 +25,8 @@ class DefaultJacobian(Jacobian):
             'fwd' or 'rev'.
         """
         for out_name, in_name in self:
-            jac = self[out_name, in_name]
+            ukey = self._key2unique((out_name, in_name))
+            jac = self._subjacs[ukey]
 
             if type(jac) is numpy.ndarray or scipy.sparse.issparse(jac):
                 if out_name in d_residuals and in_name in d_outputs:
