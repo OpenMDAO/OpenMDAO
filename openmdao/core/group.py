@@ -241,7 +241,7 @@ class Group(System):
                         if out_units:
                             out_units = "has units '%s'" % out_units
                         else:
-                            otu_units = "is unitless"
+                            out_units = "is unitless"
                         if in_units:
                             in_units = "has units '%s'" % in_units
                         else:
