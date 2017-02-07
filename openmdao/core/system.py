@@ -18,6 +18,20 @@ from openmdao.utils.units import convert_units
 # This is for storing various data mapped to var pathname
 PathData = namedtuple("PathData", ['name', 'idx', 'typ'])
 
+# Design Variables
+DesignVariable = namedtuple('DesignVariable', ['name', 'lower', 'upper',
+                                               'scaler', 'adder', 'ref',
+                                               'ref0', 'indices', 'metadata'])
+
+# Constraint
+Constraint = namedtuple('Constraint', ['name', 'lower', 'upper', 'equals',
+                                       'scaler', 'adder', 'ref', 'ref0',
+                                       'indices', 'metadata'])
+
+# Objective
+Objective = namedtuple('Objective', ['name', 'scaler', 'adder', 'ref',
+                                     'ref0', 'indices', 'metadata'])
+
 
 class System(object):
     """Base class for all systems in OpenMDAO.
@@ -115,6 +129,17 @@ class System(object):
     _suppress_solver_output : boolean
         flag that turns off all solver output for this System and all
         of its descendants if False.
+    _design_vars : list of namedtuple
+        list of all driver design vars added to the system.  Each dict contains
+        {'path': str, 'lower': ndarray[:], 'upper': ndarray[:],
+         'scaler': ndarray[:], 'adder': ndarray[:],
+         'ref': ndarray[:], 'ref0': ndarray[:]}
+    _responses : list of namedtuple
+        list of all driver responses added to the system.  Each dict contains
+        {'path': str, 'lower': ndarray[:], 'upper': ndarray[:],
+         'scaler': ndarray[:], 'adder': ndarray[:],
+         'ref': ndarray[:], 'ref0': ndarray[:]}
+
     """
 
     def __init__(self, **kwargs):
@@ -185,6 +210,9 @@ class System(object):
         self._nl_solver = None
         self._ln_solver = None
         self._suppress_solver_output = False
+
+        self._design_vars = {}
+        self._responses = {}
 
         self.initialize()
 
@@ -914,3 +942,299 @@ class System(object):
             metadata (local and global)
         """
         pass
+
+    def add_design_var(self, name, lower=None, upper=None, ref=None,
+                       ref0=None, indices=None, adder=0.0, scaler=1.0,
+                       **kwargs):
+        """
+        Adds a design variable to this system.
+
+        Args
+        ----
+        name : string
+           Name of the design variable in the system.
+
+        lower : float or ndarray, optional
+            Lower boundary for the param
+
+        upper : upper or ndarray, optional
+            Upper boundary for the param
+
+        ref : float or ndarray, optional
+            Value of design var that scales to 1.0 in the driver.
+
+        ref0 : upper or ndarray, optional
+            Value of design var that scales to 0.0 in the driver.
+
+        indices : iter of int, optional
+            If a param is an array, these indicate which entries are of
+            interest for this particular response.
+
+        adder : float or ndarray, optional
+            Value to add to the model value to get the scaled value. Adder
+            is first in precedence.
+
+        scaler : float or ndarray, optional
+            value to multiply the model value to get the scaled value. Scaler
+            is second in precedence.
+
+        kwargs : optional
+            Keyword arguments that are saved as metadata for the
+            design variable.
+        """
+        meta = kwargs if kwargs else None
+        self._design_vars[name] = DesignVariable(name=name, lower=lower,
+                                                 upper=upper, scaler=scaler,
+                                                 adder=adder, ref=ref,
+                                                 ref0=ref0, indices=indices,
+                                                 metadata=meta)
+
+    def add_response(self, name, type, lower=None, upper=None, equals=None,
+                     ref=None, ref0=None, indices=None, adder=0.0, scaler=1.0,
+                     **kwargs):
+        """
+        Adds a response variable to this system.
+
+        Args
+        ----
+        name : string
+           Name of the response variable in the system.
+
+        type : string
+           The type of response.  Currently supported values are 'con' and 'obj'
+
+        lower : float or ndarray, optional
+            Lower boundary for the variable
+
+        upper : upper or ndarray, optional
+            Upper boundary for the variable
+
+        equals : equals or ndarray, optional
+            Equality constraint value for the variable
+
+        ref : float or ndarray, optional
+            Value of response variable that scales to 1.0 in the driver.
+
+        ref0 : upper or ndarray, optional
+            Value of response variable that scales to 0.0 in the driver.
+
+        indices : iter of int, optional
+            If variable is an array, these indicate which entries are of
+            interest for this particular response.
+
+        adder : float or ndarray, optional
+            Value to add to the model value to get the scaled value. Adder
+            is first in precedence.
+
+        scaler : float or ndarray, optional
+            value to multiply the model value to get the scaled value. Scaler
+            is second in precedence.
+
+        kwargs : optional
+            Keyword arguments that are saved as metadata for the
+            design variable.
+        """
+        meta = kwargs if kwargs else None
+        if type == 'obj':
+            self._responses[name] = Objective(name=name, scaler=scaler,
+                                              adder=adder, ref=ref, ref0=ref0,
+                                              indices=indices, metadata=meta)
+        elif type == 'con':
+            self._responses[name] = Constraint(name=name, lower=lower,
+                                               upper=upper, equals=equals,
+                                               scaler=scaler, adder=adder,
+                                               ref=ref, ref0=ref0,
+                                               indices=indices, metadata=meta)
+        else:
+            raise ValueError('Unrecognized type for response.  Expected'
+                             ' one of [\'obj\', \'con\']:  ({0})'.format(type))
+
+    def add_constraint(self, name, lower=None, upper=None, equals=None,
+                       ref=None, ref0=None, adder=0.0, scaler=1.0,
+                       indices=None, **kwargs):
+        """
+        Adds a response variable to this system.
+
+        Args
+        ----
+        name : string
+           Name of the response variable in the system.
+
+        type : string
+           The type of response.  Currently supported values are 'con' and 'obj'
+
+        lower : float or ndarray, optional
+            Lower boundary for the variable
+
+        upper : upper or ndarray, optional
+            Upper boundary for the variable
+
+        equals : equals or ndarray, optional
+            Equality constraint value for the variable
+
+        ref : float or ndarray, optional
+            Value of response variable that scales to 1.0 in the driver.
+
+        ref0 : upper or ndarray, optional
+            Value of response variable that scales to 0.0 in the driver.
+
+        indices : iter of int, optional
+            If variable is an array, these indicate which entries are of
+            interest for this particular response.
+
+        adder : float or ndarray, optional
+            Value to add to the model value to get the scaled value. Adder
+            is first in precedence.
+
+        scaler : float or ndarray, optional
+            value to multiply the model value to get the scaled value. Scaler
+            is second in precedence.
+
+        kwargs : optional
+            Keyword arguments that are saved as metadata for the
+            design variable.
+        """
+        meta = kwargs if kwargs else None
+        self._responses[name] = Constraint(name=name, lower=lower,
+                                           upper=upper, equals=equals,
+                                           scaler=scaler, adder=adder,
+                                           ref=ref, ref0=ref0,
+                                           indices=indices, metadata=meta)
+
+    def add_objective(self, name, lower=None, upper=None, equals=None,
+                      ref=None, ref0=None, indices=None, adder=0.0, scaler=1.0,
+                      **kwargs):
+        """
+        Adds a response variable to this system.
+
+        Args
+        ----
+        name : string
+           Name of the response variable in the system.
+
+        type : string
+           The type of response.  Currently supported values are 'con' and 'obj'
+
+        lower : float or ndarray, optional
+            Lower boundary for the variable
+
+        upper : upper or ndarray, optional
+            Upper boundary for the variable
+
+        equals : equals or ndarray, optional
+            Equality constraint value for the variable
+
+        ref : float or ndarray, optional
+            Value of response variable that scales to 1.0 in the driver.
+
+        ref0 : upper or ndarray, optional
+            Value of response variable that scales to 0.0 in the driver.
+
+        indices : iter of int, optional
+            If variable is an array, these indicate which entries are of
+            interest for this particular response.
+
+        adder : float or ndarray, optional
+            Value to add to the model value to get the scaled value. Adder
+            is first in precedence.
+
+        scaler : float or ndarray, optional
+            value to multiply the model value to get the scaled value. Scaler
+            is second in precedence.
+
+        kwargs : optional
+            Keyword arguments that are saved as metadata for the
+            design variable.
+        """
+        meta = kwargs if kwargs else None
+        self._responses[name] = Objective(name=name, scaler=scaler, adder=adder,
+                                          ref=ref, ref0=ref0, indices=indices,
+                                          metadata=meta)
+
+    def get_design_vars(self, recurse=True):
+        """
+        Retrieve all design variables from the system and, if recurse is True,
+        all of its subsystems.
+
+        Args
+        ----
+        recurse : bool
+            If True, recurse through the subsystems and return the path of
+            all design vars relative to the this system.
+
+        Returns
+        -------
+            The design variables defined in the current system and, if
+            recurse=True, its subsystems.
+
+        """
+        out = self._design_vars.copy()
+        if recurse:
+            for subsys in self._subsystems_allprocs:
+                subsys_design_vars = subsys.get_design_vars(recurse=True)
+                for key in subsys_design_vars:
+                    out[subsys.name + '.' + key] = subsys_design_vars[key]
+        return out
+
+    def get_responses(self, recurse=True):
+        """
+        Retrieve all response variables from the system.
+
+        Args
+        ----
+        recurse : bool
+            If True, recurse through the subsystems and return the path of
+            all responses relative to the this system.
+
+        Returns
+        -------
+            The recurse defined in the current system and, if
+            recurse=True, its subsystems.
+
+        """
+        out = self._responses.copy()
+        if recurse:
+            for subsys in self._subsystems_allprocs:
+                subsys_design_vars = subsys.get_responses(recurse=True)
+                for key in subsys_design_vars:
+                    out[subsys.name + '.' + key] = subsys_design_vars[key]
+        return out
+
+    def get_constraints(self, recurse=True):
+        """
+        Retrieve the constraints for the current system.
+
+        Args
+        ----
+        recurse : bool
+            If True, recurse through the subsystems and return the path of
+            all constraints relative to the this system.
+
+        Returns
+        -------
+            The constraints defined in the current system.
+
+        """
+        return dict((key, response) for (key, response) in
+                     self.get_responses(recurse=True).items()
+                     if isinstance(response, Constraint))
+
+    def get_objectives(self, recurse=True):
+        """
+        Retrieve all objectives from the system.
+
+        Args
+        ----
+        recurse : bool
+            If True, recurse through the subsystems and return the path of
+            all objective relative to the this system.
+
+        Returns
+        -------
+            The objectives defined in the current system.
+
+        """
+        return dict((key, response) for (key, response) in
+                     self.get_responses(recurse=True).items()
+                     if isinstance(response, Objective))
+
