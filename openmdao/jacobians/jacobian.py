@@ -182,15 +182,15 @@ class Jacobian(object):
         boolean
             return whether sub-Jacobian has been defined.
         """
-        if key[0] in self._system._var_name2path['output']:
+        outname2path = self._system._var_name2path['output']
+        if key[0] in outname2path:
             if key[1] in self._system._var_name2path['input']:
-                out_path = self._system._var_name2path['output'][key[0]]
+                out_path = outname2path[key[0]]
                 for ipath in self._system._var_name2path['input'][key[1]]:
                     if (out_path, ipath) in self._subjacs:
                         return True
-            elif key[1] in self._system._var_name2path['output']:
-                return (self._system._var_name2path['output'][key[0]],
-                        self._system._var_name2path['output'][key[1]]
+            elif key[1] in outname2path:
+                return (outname2path[key[0]], outname2path[key[1]]
                         ) in self._subjacs
         return False
 
