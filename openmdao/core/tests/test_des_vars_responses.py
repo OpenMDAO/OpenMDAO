@@ -124,7 +124,7 @@ class TestDesVarsResponses(unittest.TestCase):
 
         prob.setup()
 
-        des_vars = prob.model.get_des_vars()
+        des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
         constraints = prob.model.get_constraints()
 
@@ -163,3 +163,256 @@ class TestDesVarsResponses(unittest.TestCase):
         self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
         self.assertEqual(set(obj.keys()), {'obj_cmp.obj',})
         self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
+
+
+class TestDesvarOnModel(unittest.TestCase):
+
+    def test_desvar_affine_and_scaleradder(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_design_var('x', lower=-100, upper=100, ref=1.0,
+                                      scaler=0.5)
+
+        self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
+                                                 ' exclusive with'
+                                                 ' scaler/adder')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_design_var('x', lower=-100, upper=100, ref=0.0,
+                                      adder=0.5)
+
+        self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
+                                                 ' exclusive with'
+                                                 ' scaler/adder')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_design_var('x', lower=-100, upper=100, ref0=0.0,
+                                      adder=0.5)
+
+        self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
+                                                 ' exclusive with'
+                                                 ' scaler/adder')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_design_var('x', lower=-100, upper=100, ref0=0.0,
+                                      scaler=0.5)
+
+        self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
+                                                 ' exclusive with' \
+                                                 ' scaler/adder')
+
+    def test_desvar_affine_mapping(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100, ref0=-100.0,
+                                  ref=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1')
+        prob.model.add_constraint('con2')
+
+        prob.setup()
+
+        des_vars = prob.model.get_design_vars()
+
+
+        x_ref0 = des_vars['x'].ref0
+        x_ref = des_vars['x'].ref
+        x_scaler = des_vars['x'].scaler
+        x_adder = des_vars['x'].adder
+
+        self.assertAlmostEqual( x_scaler*(x_ref0 + x_adder), 0.0, places=12)
+        self.assertAlmostEqual( x_scaler*(x_ref + x_adder), 1.0, places=12)
+
+    def test_desvar_invalid_name(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_design_var(42, lower=-100, upper=100, ref0=-100.0,
+                                      ref=100)
+
+        self.assertEqual(str(context.exception), 'The name argument should '
+                                                 'be a string, got 42')
+
+    def test_desvar_invalid_bounds(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_design_var('x', lower='foo', upper=[0, 100],
+                                      ref0=-100.0, ref=100)
+
+        self.assertEqual(str(context.exception), 'Expected values of lower to be an '
+                                                 'Iterable of numeric values, '
+                                                 'or a scalar numeric value. '
+                                                 'Got foo instead.')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_design_var('x', lower=0.0, upper=['a', 'b'],
+                                      ref0=-100.0, ref=100)
+
+        self.assertEqual(str(context.exception), 'could not convert string '
+                                                 'to float: \'a\'')
+
+
+
+
+class TestConstraintOnModel(unittest.TestCase):
+
+    def test_constraint_affine_and_scaleradder(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_constraint('con1', lower=-100, upper=100, ref=1.0,
+                                      scaler=0.5)
+
+        self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
+                                                 ' exclusive with'
+                                                 ' scaler/adder')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_constraint('con1', lower=-100, upper=100, ref=0.0,
+                                      adder=0.5)
+
+        self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
+                                                 ' exclusive with'
+                                                 ' scaler/adder')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_constraint('x', lower=-100, upper=100, ref0=0.0,
+                                      adder=0.5)
+
+        self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
+                                                 ' exclusive with'
+                                                 ' scaler/adder')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_constraint('con1', lower=-100, upper=100, ref0=0.0,
+                                      scaler=0.5)
+
+        self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
+                                                 ' exclusive with' \
+                                                 ' scaler/adder')
+
+    def test_constraint_affine_mapping(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', lower=-100, upper=100, ref0=-100.0,
+                                  ref=100)
+        prob.model.add_constraint('con2')
+
+        prob.setup()
+
+        constraints = prob.model.get_constraints()
+
+        con1_ref0 = constraints['con1'].ref0
+        con1_ref = constraints['con1'].ref
+        con1_scaler = constraints['con1'].scaler
+        con1_adder = constraints['con1'].adder
+
+        self.assertAlmostEqual( con1_scaler*(con1_ref0 + con1_adder), 0.0,
+                                places=12)
+        self.assertAlmostEqual( con1_scaler*(con1_ref + con1_adder), 1.0,
+                                places=12)
+
+    def test_constraint_invalid_name(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_design_var(42, lower=-100, upper=100, ref0=-100.0,
+                                      ref=100)
+
+        self.assertEqual(str(context.exception), 'The name argument should '
+                                                 'be a string, got 42')
+
+    def test_constraint_invalid_bounds(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_design_var('x', lower='foo', upper=[0, 100],
+                                      ref0=-100.0, ref=100)
+
+        self.assertEqual(str(context.exception), 'Expected values of lower to'
+                                                 ' be an Iterable of numeric'
+                                                 ' values, or a scalar numeric'
+                                                 ' value. Got foo instead.')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_design_var('x', lower=0.0, upper=['a', 'b'],
+                                      ref0=-100.0, ref=100)
+
+        self.assertEqual(str(context.exception), 'could not convert string '
+                                                 'to float: \'a\'')
+
+    def test_constraint_invalid_name(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_constraint(42, lower=-100, upper=100, ref0=-100.0,
+                                      ref=100)
+
+        self.assertEqual(str(context.exception), 'The name argument should '
+                                                 'be a string, got 42')
+
+    def test_constraint_invalid_bounds(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_constraint('con1', lower='foo', upper=[0, 100],
+                                      ref0=-100.0, ref=100)
+
+        self.assertEqual(str(context.exception), 'Expected values of lower to be an '
+                                                 'Iterable of numeric values, '
+                                                 'or a scalar numeric value. '
+                                                 'Got foo instead.')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_constraint('con1', lower=0.0, upper=['a', 'b'],
+                                      ref0=-100.0, ref=100)
+
+        self.assertEqual(str(context.exception), 'could not convert string '
+                                                 'to float: \'a\'')
+

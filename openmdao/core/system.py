@@ -3,10 +3,13 @@ from __future__ import division
 
 from fnmatch import fnmatchcase
 from contextlib import contextmanager
-from collections import namedtuple, OrderedDict
+from collections import namedtuple, OrderedDict, Iterable
+import numbers
+import sys
 
 import numpy
 
+from six import string_types
 from six.moves import range
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
@@ -31,7 +34,6 @@ Constraint = namedtuple('Constraint', ['name', 'lower', 'upper', 'equals',
 # Objective
 Objective = namedtuple('Objective', ['name', 'scaler', 'adder', 'ref',
                                      'ref0', 'indices', 'metadata'])
-
 
 class System(object):
     """Base class for all systems in OpenMDAO.
@@ -1121,8 +1123,51 @@ class System(object):
         """
         pass
 
+    def _format_driver_array_option(self, option_name, var_name, values,
+                                    val_if_none=0.0):
+        """
+        Parameters
+        ----------
+        option_name : str
+            Name of the option being set
+        var_name : str
+            The path of the variable relative to the current system.
+        values : float or numpy ndarray or Iterable
+            Values of the array option to be formatted to the expected form.
+        val_if_none : If values is None,
+
+        Returns
+        -------
+        float or numpy.ndarray
+            Values transformed to the expected form.
+
+        Raises
+        ------
+        ValueError
+            If values is Iterable but cannot be converted to a numpy ndarray
+        TypeError
+            If values is scalar, not None, and not a Number.
+
+        """
+
+        # Convert adder to ndarray/float as necessary
+        if isinstance(values, numpy.ndarray):
+            pass
+        elif not isinstance(values, string_types) \
+            and isinstance(values, Iterable):
+            values = numpy.asarray(values, dtype=float)
+        elif values is None:
+            values = val_if_none
+        elif isinstance(values, numbers.Number):
+            values = float(values)
+        else:
+            raise TypeError('Expected values of {0} to be an Iterable of '
+                            'numeric values, or a scalar numeric value. '
+                            'Got {1} instead.'.format(option_name, values))
+        return values
+
     def add_design_var(self, name, lower=None, upper=None, ref=None,
-                       ref0=None, indices=None, adder=0.0, scaler=1.0,
+                       ref0=None, indices=None, adder=None, scaler=None,
                        **kwargs):
         """
         Adds a design variable to this system.
@@ -1159,7 +1204,70 @@ class System(object):
         kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
+
+        Notes
+        -----
+        The design variablre can be scaled using scaler and adder, where
+
+        ..math::
+
+            x_{scaled} = scaler(x + adder)
+
+        or through the use of ref/ref0, which map to scaler and adder through
+        the equations:
+
+        ..math::
+
+            0 = scaler(ref_0 + adder)
+
+            1 = scaler(ref + adder)
+
+        which results in:
+
+        ..math::
+
+            adder = -ref_0
+
+            scaler = \frac{1}{ref_1 + adder}
         """
+        if name in self._design_vars:
+            msg = "Design Variable '{}' already exists."
+            raise RuntimeError(msg.format(name))
+
+        # Name must be a string
+        if not isinstance(name, string_types):
+            raise TypeError('The name argument should be a string, got {0}'.format(name))
+
+        # Affine scaling cannot be used with scalers/adders
+        if ref0 is not None or ref is not None:
+            if scaler is not None or adder is not None:
+                raise ValueError('Inputs ref/ref0 are mutually exclusive '
+                                 'with scaler/adder')
+            # Convert ref/ref0 to scaler/adder so we can scale the bounds
+            adder = -ref0
+            scaler = 1/(ref + adder)
+        else:
+            if scaler is None:
+                scaler = 1.0
+            if adder is None:
+                adder = 0.0
+
+        # Convert adder to ndarray/float as necessary
+        adder = self._format_driver_array_option('adder', name, adder, val_if_none=0.0)
+
+        # Convert scaler to ndarray/float as necessary
+        scaler = self._format_driver_array_option('scaler', name, scaler, val_if_none=1.0)
+
+        # Convert lower to ndarray/float as necessary
+        lower = self._format_driver_array_option('lower', name, lower, val_if_none=-sys.float_info.max)
+
+        # Convert upper to ndarray/float as necessary
+        upper = self._format_driver_array_option('upper', name, upper, val_if_none=sys.float_info.max)
+
+        # Apply scaler/adder to lower and upper
+        lower = (lower + adder)*scaler
+        upper = (upper + adder)*scaler
+
         meta = kwargs if kwargs else None
         self._design_vars[name] = DesignVariable(name=name, lower=lower,
                                                  upper=upper, scaler=scaler,
@@ -1168,7 +1276,7 @@ class System(object):
                                                  metadata=meta)
 
     def add_response(self, name, type, lower=None, upper=None, equals=None,
-                     ref=None, ref0=None, indices=None, adder=0.0, scaler=1.0,
+                     ref=None, ref0=None, indices=None, adder=None, scaler=None,
                      **kwargs):
         """
         Adds a response variable to this system.
@@ -1196,7 +1304,7 @@ class System(object):
         ref0 : upper or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
 
-        indices : iter of int, optional
+        indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
 
@@ -1211,7 +1319,106 @@ class System(object):
         kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
+
+        Notes
+        -----
+        The response can be scaled using scaler and adder, where
+
+        ..math::
+
+            x_{scaled} = scaler(x + adder)
+
+        or through the use of ref/ref0, which map to scaler and adder through
+        the equations:
+
+        ..math::
+
+            0 = scaler(ref_0 + adder)
+
+            1 = scaler(ref + adder)
+
+        which results in:
+
+        ..math::
+
+            adder = -ref_0
+
+            scaler = \frac{1}{ref_1 + adder}
         """
+        # Name must be a string
+        if not isinstance(name, string_types):
+            raise TypeError('The name argument should be a string, '
+                            'got {0}'.format(name))
+
+        # Type must be a string and one of 'con' or 'obj'
+        if not isinstance(type, string_types):
+            raise TypeError('The type argument should be a string')
+        elif not type in ('con', 'obj'):
+            raise ValueError('The type must be one of \'con\' or \'obj\': '
+                             'Got \'{0}\' instead'.format(name))
+
+        if name in self._responses:
+            typemap = {'con': 'Constraint', 'obj': 'Objective'}
+            msg = '{0} \'{1}\' already exists.'.format(typemap[type], name)
+            raise RuntimeError(msg.format(name))
+
+        # Affine scaling cannot be used with scalers/adders
+        if ref0 is not None or ref is not None:
+            if scaler is not None or adder is not None:
+                raise ValueError('Inputs ref/ref0 are mutually exclusive '
+                                 'with scaler/adder')
+            # Convert ref/ref0 to scaler/adder so we can scale the bounds
+            adder = -ref0
+            scaler = 1/(ref + adder)
+        else:
+            if scaler is None:
+                scaler = 1.0
+            if adder is None:
+                adder = 0.0
+
+        # A constraint cannot be an equality and inequality constraint
+        if equals is not None and (lower is not None or upper is not None):
+            msg = "Constraint '{}' cannot be both equality and inequality."
+            raise ValueError(msg.format(name))
+
+        # If given, indices must be a sequence
+        if indices is not None and not isinstance(indices, Iterable):
+            msg = "If specified, indices must be a sequence."
+            raise ValueError(msg)
+
+        # Currently ref and ref0 must be scalar
+        if ref is not None:
+            ref = float(ref)
+
+        if ref0 is not None:
+            ref0 = float(ref0)
+
+        # Convert adder to ndarray/float as necessary
+        adder = self._format_driver_array_option('adder', name, adder, val_if_none=0.0)
+
+        # Convert scaler to ndarray/float as necessary
+        scaler = self._format_driver_array_option('scaler', name, scaler, val_if_none=1.0)
+
+        # Convert lower to ndarray/float as necessary
+        lower = self._format_driver_array_option('lower', name, lower, val_if_none=-sys.float_info.max)
+
+        # Convert upper to ndarray/float as necessary
+        upper = self._format_driver_array_option('upper', name, upper, val_if_none=sys.float_info.max)
+
+        # Convert equals to ndarray/float as necessary
+        if equals is not None:
+            equals = self._format_driver_array_option('equals', name, equals)
+
+        # Scale the bounds
+        if lower is not None:
+            lower = (lower + adder)*scaler
+
+        if upper is not None:
+            upper = (upper + adder)*scaler
+
+        if equals is not None:
+            equals = (equals + adder)*scaler
+
         meta = kwargs if kwargs else None
         if type == 'obj':
             self._responses[name] = Objective(name=name, scaler=scaler,
@@ -1228,7 +1435,7 @@ class System(object):
                              ' one of [\'obj\', \'con\']:  ({0})'.format(type))
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
-                       ref=None, ref0=None, adder=0.0, scaler=1.0,
+                       ref=None, ref0=None, adder=None, scaler=None,
                        indices=None, **kwargs):
         """
         Adds a response variable to this system.
@@ -1256,7 +1463,7 @@ class System(object):
         ref0 : upper or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
 
-        indices : iter of int, optional
+        indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
 
@@ -1271,16 +1478,40 @@ class System(object):
         kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
+
+        Notes
+        -----
+        The constraint can be scaled using scaler and adder, where
+
+        ..math::
+
+            x_{scaled} = scaler(x + adder)
+
+        or through the use of ref/ref0, which map to scaler and adder through
+        the equations:
+
+        ..math::
+
+            0 = scaler(ref_0 + adder)
+
+            1 = scaler(ref + adder)
+
+        which results in:
+
+        ..math::
+
+            adder = -ref_0
+
+            scaler = \frac{1}{ref_1 + adder}
         """
         meta = kwargs if kwargs else None
-        self._responses[name] = Constraint(name=name, lower=lower,
-                                           upper=upper, equals=equals,
-                                           scaler=scaler, adder=adder,
-                                           ref=ref, ref0=ref0,
-                                           indices=indices, metadata=meta)
+
+        self.add_response(name=name, type='con', lower=lower, upper=upper,
+                          equals=equals, scaler=scaler, adder=adder, ref=ref,
+                          ref0=ref0, indices=indices, metadata=meta)
 
     def add_objective(self, name, lower=None, upper=None, equals=None,
-                      ref=None, ref0=None, indices=None, adder=0.0, scaler=1.0,
+                      ref=None, ref0=None, indices=None, adder=None, scaler=None,
                       **kwargs):
         """
         Adds a response variable to this system.
@@ -1308,7 +1539,7 @@ class System(object):
         ref0 : upper or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
 
-        indices : iter of int, optional
+        indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
 
@@ -1323,11 +1554,35 @@ class System(object):
         kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
+
+        Notes
+        -----
+        The objective can be scaled using scaler and adder, where
+
+        ..math::
+
+            x_{scaled} = scaler(x + adder)
+
+        or through the use of ref/ref0, which map to scaler and adder through
+        the equations:
+
+        ..math::
+
+            0 = scaler(ref_0 + adder)
+
+            1 = scaler(ref + adder)
+
+        which results in:
+
+        ..math::
+
+            adder = -ref_0
+
+            scaler = \frac{1}{ref_1 + adder}
         """
         meta = kwargs if kwargs else None
-        self._responses[name] = Objective(name=name, scaler=scaler, adder=adder,
-                                          ref=ref, ref0=ref0, indices=indices,
-                                          metadata=meta)
+        self.add_response(name, type='obj', scaler=scaler, adder=adder,
+                          ref=ref, ref0=ref0, indices=indices, metadata=meta)
 
     def get_design_vars(self, recurse=True):
         """
@@ -1349,7 +1604,7 @@ class System(object):
         out = self._design_vars.copy()
         if recurse:
             for subsys in self._subsystems_allprocs:
-                subsys_design_vars = subsys.get_design_vars(recurse=True)
+                subsys_design_vars = subsys.get_design_vars(recurse=recurse)
                 for key in subsys_design_vars:
                     out[subsys.name + '.' + key] = subsys_design_vars[key]
         return out
@@ -1360,7 +1615,7 @@ class System(object):
 
         Args
         ----
-        recurse : bool
+        recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all responses relative to the this system.
 
@@ -1373,7 +1628,7 @@ class System(object):
         out = self._responses.copy()
         if recurse:
             for subsys in self._subsystems_allprocs:
-                subsys_design_vars = subsys.get_responses(recurse=True)
+                subsys_design_vars = subsys.get_responses(recurse=recurse)
                 for key in subsys_design_vars:
                     out[subsys.name + '.' + key] = subsys_design_vars[key]
         return out
@@ -1384,7 +1639,7 @@ class System(object):
 
         Args
         ----
-        recurse : bool
+        recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all constraints relative to the this system.
 
@@ -1394,7 +1649,7 @@ class System(object):
 
         """
         return dict((key, response) for (key, response) in
-                     self.get_responses(recurse=True).items()
+                     self.get_responses(recurse=recurse).items()
                      if isinstance(response, Constraint))
 
     def get_objectives(self, recurse=True):
@@ -1403,7 +1658,7 @@ class System(object):
 
         Args
         ----
-        recurse : bool
+        recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all objective relative to the this system.
 
@@ -1413,6 +1668,6 @@ class System(object):
 
         """
         return dict((key, response) for (key, response) in
-                     self.get_responses(recurse=True).items()
+                     self.get_responses(recurse=recurse).items()
                      if isinstance(response, Objective))
 
