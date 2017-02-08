@@ -34,11 +34,9 @@ class TestBacktrackingLineSearch(unittest.TestCase):
 
         root.nl_solver = NewtonSolver()
         root.ln_solver = ScipyIterativeSolver()
-        ls = root.nl_solver.set_subsolver('linesearch',
-                                          BacktrackingLineSearch(rtol=0.9))
+        ls = root.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9)
         ls.options['maxiter'] = 100
         ls.options['alpha'] = 10.0
-        root.nl_solver.set_subsolver('linear', root.ln_solver)
 
         top.setup(check=False)
         top['comp.y'] = 1.0
@@ -60,7 +58,6 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
         top.model.nl_solver = NewtonSolver()
         top.model.nl_solver.options['maxiter'] = 10
         top.model.ln_solver = ScipyIterativeSolver()
-        top.model.nl_solver.set_subsolver('linear', top.model.ln_solver)
 
         top.setup(check=False)
 
@@ -84,10 +81,13 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
     def test_linesearch_bounds_vector(self):
         top = self.top
 
-        ls = top.model.nl_solver.set_subsolver(
-            'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='vector'))
+        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
+                                                                     bound_enforcement='vector')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
+
+        # Setup again because we assigned a new linesearch
+        top.setup(check=False)
 
         # Test lower bound: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -106,10 +106,13 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
     def test_linesearch_bounds_wall(self):
         top = self.top
 
-        ls = top.model.nl_solver.set_subsolver(
-            'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='wall'))
+        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
+                                                                     bound_enforcement='wall')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
+
+        # Setup again because we assigned a new linesearch
+        top.setup(check=False)
 
         # Test lower bound: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -128,10 +131,13 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
     def test_linesearch_bounds_scalar(self):
         top = self.top
 
-        ls = top.model.nl_solver.set_subsolver(
-            'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='scalar'))
+        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
+                                                                     bound_enforcement='scalar')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
+
+        # Setup again because we assigned a new linesearch
+        top.setup(check=False)
 
         # Test lower bound: should stop just short of the lower bound
         top['px.x'] = 2.0
@@ -160,7 +166,6 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top.model.nl_solver = NewtonSolver()
         top.model.nl_solver.options['maxiter'] = 10
         top.model.ln_solver = ScipyIterativeSolver()
-        top.model.nl_solver.set_subsolver('linear', top.model.ln_solver)
 
         top.setup(check=False)
 
@@ -187,10 +192,13 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
 
-        ls = top.model.nl_solver.set_subsolver(
-            'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='vector'))
+        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
+                                                                     bound_enforcement='vector')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
+
+        # Setup again because we assigned a new linesearch
+        top.setup(check=False)
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0*numpy.ones((3,1))
@@ -211,10 +219,13 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
 
-        ls = top.model.nl_solver.set_subsolver(
-            'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='wall'))
+        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
+                                                                     bound_enforcement='wall')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
+
+        # Setup again because we assigned a new linesearch
+        top.setup(check=False)
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0*numpy.ones((3,1))
@@ -236,10 +247,13 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
 
-        ls = top.model.nl_solver.set_subsolver(
-            'linesearch', BacktrackingLineSearch(rtol=0.9, bound_enforcement='scalar'))
+        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
+                                                                     bound_enforcement='scalar')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
+
+        # Setup again because we assigned a new linesearch
+        top.setup(check=False)
 
         # Test lower bounds: should stop just short of the lower bound
         top['px.x'] = 2.0*numpy.ones((3,1))

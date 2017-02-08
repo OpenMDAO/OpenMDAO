@@ -16,7 +16,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import convert_units
 
 # This is for storing various data mapped to var pathname
-PathData = namedtuple("PathData", ['name', 'idx', 'typ'])
+PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
 
 
 class System(object):
@@ -49,7 +49,7 @@ class System(object):
         list of indices of subsystems on this proc among all of this system's
         subsystems (subsystems on all of this system's processors).
     _var_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
-        list of names of all owned variables, not just on current proc.
+        list of promoted names of all owned variables, not just on current proc.
     _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
         list of pathnames of all owned variables, not just on current proc.
     _var_allprocs_range : {'input': [int, int], 'output': [int, int]}
@@ -57,7 +57,7 @@ class System(object):
     _var_allprocs_indices : {'input': dict, 'output': dict}
         dictionary of global indices keyed by the variable name.
     _var_myproc_names : {'input': [str, ...], 'output': [str, ...]}
-        list of names of owned variables on current proc.
+        list of unpromoted names of owned variables on current proc.
     _var_myproc_metadata : {'input': list, 'output': list}
         list of metadata dictionaries of variables that exist on this proc.
     _var_pathdict : dict
@@ -150,7 +150,7 @@ class System(object):
         self._var_myproc_indices = {'input': None, 'output': None}
 
         self._var_pathdict = {}
-        self._var_name2path = {}
+        self._var_name2path = {'input': {}, 'output': {}}
 
         self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
@@ -614,12 +614,28 @@ class System(object):
         return maps
 
     @contextmanager
+    def _jacobian_context(self):
+        """Context manager for jacobians.
+
+        Sets this system's _jacobian._system attribute to the current system.
+
+        Returns
+        -------
+        <Jacobian>
+            The current system's jacobian with its _system set to self.
+        """
+        oldsys = self._jacobian._system
+        self._jacobian._system = self
+        yield self._jacobian
+        self._jacobian._system = oldsys
+
+    @contextmanager
     def _matvec_context(self, vec_name, var_inds, mode, clear=True):
         """Context manager for vectors.
 
         For the given vec_name, return vectors that use a set of
         internal variables that are relevant to the current matrix-vector
-        product.
+        product.  This is called only from _apply_linear.
 
         Args
         ----
@@ -657,12 +673,12 @@ class System(object):
                 d_inputs.set_const(0.0)
                 d_outputs.set_const(0.0)
 
-        # TODO: check if we can loop over myproc vars to save time
         out_names = []
         res_names = []
+        var_ids = self._vector_var_ids[vec_name]
         out_ind = self._var_allprocs_range['output'][0]
         for out_name in self._var_allprocs_names['output']:
-            if out_ind in self._vector_var_ids[vec_name]:
+            if out_ind in var_ids:
                 res_names.append(out_name)
                 if var_inds is None or (var_inds[0] <= out_ind < var_inds[1] or
                                         var_inds[2] <= out_ind < var_inds[3]):
@@ -673,7 +689,7 @@ class System(object):
         in_ind = self._var_allprocs_range['input'][0]
         for in_name in self._var_allprocs_names['input']:
             out_ind = self._assembler._input_src_ids[in_ind]
-            if out_ind in self._vector_var_ids[vec_name]:
+            if out_ind in var_ids:
                 if var_inds is None or (var_inds[0] <= out_ind < var_inds[1] or
                                         var_inds[2] <= out_ind < var_inds[3]):
                     in_names.append(in_name)
@@ -699,8 +715,6 @@ class System(object):
     def nl_solver(self, solver):
         """Set this system's nonlinear solver and perform setup."""
         self._nl_solver = solver
-        if solver is not None:
-            self._nl_solver._setup_solvers(self, 0)
 
     @property
     def ln_solver(self):
@@ -711,8 +725,6 @@ class System(object):
     def ln_solver(self, solver):
         """Set this system's linear (adjoint) solver and perform setup."""
         self._ln_solver = solver
-        if solver is not None:
-            self._ln_solver._setup_solvers(self, 0)
 
     @property
     def suppress_solver_output(self):
@@ -768,6 +780,7 @@ class System(object):
 
         if jacobian is None:
             jacobian = DefaultJacobian()
+            jacobian._system = self
         else:
             if self._pre_setup_jac is jacobian:
                 self._pre_setup_jac = None
@@ -784,8 +797,8 @@ class System(object):
             subsys._set_jacobian(jacobian, False)
 
         if not isinstance(jacobian, DefaultJacobian) and is_top:
-            self._jacobian._system = self
-            self._jacobian._initialize()
+            jacobian._system = self
+            jacobian._initialize()
 
     def _set_partials_meta(self):
         """Set subjacobian info into our jacobian.
@@ -825,6 +838,171 @@ class System(object):
             if recurse:
                 for sub in s.system_iter(local=local, recurse=True, typ=typ):
                     yield sub
+
+    def get_input(self, name, units=None):
+        """Return the named input value using the unpromoted name.
+
+        Args
+        ----
+        name : str
+            name of the variable.
+        units : str or None
+            if not None, return the value in the given units.
+
+        Returns
+        -------
+        float or ndarray
+            The value of the named variable.
+        """
+        if units is not None:
+            raise NotImplementedError("units arg not supported yet")
+        if self._inputs is None:
+            raise RuntimeError("Cannot access input '%s'. Setup has not been "
+                               "called." % name)
+        try:
+            return self._inputs[name]
+        except KeyError:
+            raise KeyError("%s: input '%s' not found." % (self.pathname,
+                                                          name))
+
+    def set_input(self, name, value):
+        """Set the value of the named input using the unpromoted name.
+
+        Args
+        ----
+        name : str
+            name of the variable.
+        value : float or ndarray
+            value to be set.
+        """
+        if self._inputs is None:
+            raise RuntimeError("Cannot access input '%s'. Setup has not been "
+                               "called." % name)
+        try:
+            self._inputs[name] = value
+        except KeyError:
+            raise KeyError("%s: input '%s' not found." % (self.pathname,
+                                                          name))
+
+    def get_output(self, name, scaled=False, units=None):
+        """Return the named output value using promoted or unpromoted name.
+
+        Args
+        ----
+        name : str
+            name of the variable.
+        scaled : bool
+            If True, return the scaled value.
+        units : str or None
+            If not None, return the value in the given units.
+
+        Returns
+        -------
+        float or ndarray
+            The value of the named variable.
+        """
+        if scaled or units is not None:
+            raise NotImplementedError("scaled and units args not supported yet")
+        if self._outputs is None:
+            raise RuntimeError("Cannot access output '%s'. Setup has not been "
+                               "called." % name)
+        try:
+            return self._outputs[name]
+        except KeyError:
+            # check for promoted name
+            start = len(self.pathname) + 1 if self.pathname else 0
+            try:
+                unprom = self._var_name2path['output'][name][start:]
+                return self._outputs[unprom]
+            except KeyError:
+                raise KeyError("%s: output '%s' not found." % (self.pathname,
+                                                               name))
+
+    def set_output(self, name, value):
+        """Return the named output value using promoted or unpromoted name.
+
+        Args
+        ----
+        name : str
+            name of the variable.
+        value : float or ndarray
+            the value to be set.
+        """
+        if self._outputs is None:
+            raise RuntimeError("Cannot access output '%s'. Setup has not been "
+                               "called." % name)
+        try:
+            self._outputs[name] = value
+        except KeyError:
+            # check for promoted name
+            start = len(self.pathname) + 1 if self.pathname else 0
+            try:
+                unprom = self._var_name2path['output'][name][start:]
+                self._outputs[unprom] = value
+            except KeyError:
+                raise KeyError("%s: output '%s' not found." % (self.pathname,
+                                                               name))
+
+    def get_residual(self, name, scaled=False, units=None):
+        """Return the named residual value using promoted or unpromoted name.
+
+        Args
+        ----
+        name : str
+            name of the variable.
+        scaled : bool
+            If True, return the scaled value.
+        units : str or None
+            If not None, return the value in the given units.
+
+        Returns
+        -------
+        float or ndarray
+            The value of the named residual.
+        """
+        if scaled or units is not None:
+            raise NotImplementedError("scaled and units args not supported yet")
+        if self._residuals is None:
+            raise RuntimeError("Cannot access residual '%s'. Setup has not been "
+                               "called." % name)
+
+        try:
+            return self._residuals[name]
+        except KeyError:
+            # check for promoted name
+            start = len(self.pathname) + 1 if self.pathname else 0
+            try:
+                unprom = self._var_name2path['output'][name][start:]
+                return self._residuals[unprom]
+            except KeyError:
+                raise KeyError("%s: residual '%s' not found." % (self.pathname,
+                                                                 name))
+
+    def set_residual(self, name, value):
+        """Set value of named residual using promoted or unpromoted name.
+
+        Args
+        ----
+        name : str
+            name of the variable.
+        value : float or ndarray
+            the value to be set.
+        """
+        if self._residuals is None:
+            raise RuntimeError("Cannot access residual '%s'. Setup has not been "
+                               "called." % name)
+
+        try:
+            self._residuals[name] = value
+        except KeyError:
+            # check for promoted name
+            start = len(self.pathname) + 1 if self.pathname else 0
+            try:
+                unprom = self._var_name2path['output'][name][start:]
+                self._residuals[unprom] = value
+            except KeyError:
+                raise KeyError("%s: residual '%s' not found." % (self.pathname,
+                                                                 name))
 
     def _apply_nonlinear(self):
         """Compute residuals."""
