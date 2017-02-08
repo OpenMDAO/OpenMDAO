@@ -267,8 +267,8 @@ class TestDesvarOnModel(unittest.TestCase):
             prob.model.add_design_var('x', lower=0.0, upper=['a', 'b'],
                                       ref0=-100.0, ref=100)
 
-        self.assertEqual(str(context.exception), 'could not convert string '
-                                                 'to float: \'a\'')
+        self.assert_(str(context.exception).startswith('could not convert'
+                                                       'string to float'))
 
 
 class TestConstraintOnModel(unittest.TestCase):
@@ -373,9 +373,8 @@ class TestConstraintOnModel(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             prob.model.add_design_var('x', lower=0.0, upper=['a', 'b'],
                                       ref0=-100.0, ref=100)
-
-        self.assertEqual(str(context.exception), 'could not convert string '
-                                                 'to float: \'a\'')
+        self.assert_(str(context.exception).startswith('could not convert'
+                                                       'string to float'))
 
     def test_constraint_invalid_name(self):
 

@@ -36,6 +36,55 @@ Constraint = namedtuple('Constraint', ['name', 'lower', 'upper', 'equals',
 Objective = namedtuple('Objective', ['name', 'scaler', 'adder', 'ref',
                                      'ref0', 'indices', 'metadata'])
 
+
+def _format_driver_array_option(option_name, var_name, values,
+                                val_if_none=0.0):
+    """Format driver array option values.
+
+    Checks that the given array values are either None, float, or an
+    iterable of numeric values.  On output all interables of numeric values
+    are converted to numpy.ndarray.  If values is scalar, it is converted
+    to float.
+
+    Args
+    ----
+    option_name : str
+        Name of the option being set
+    var_name : str
+        The path of the variable relative to the current system.
+    values : float or numpy ndarray or Iterable
+        Values of the array option to be formatted to the expected form.
+    val_if_none : If values is None,
+
+    Returns
+    -------
+    float or numpy.ndarray
+        Values transformed to the expected form.
+
+    Raises
+    ------
+    ValueError
+        If values is Iterable but cannot be converted to a numpy ndarray
+    TypeError
+        If values is scalar, not None, and not a Number.
+    """
+    # Convert adder to ndarray/float as necessary
+    if isinstance(values, numpy.ndarray):
+        pass
+    elif not isinstance(values, string_types) \
+            and isinstance(values, Iterable):
+        values = numpy.asarray(values, dtype=float)
+    elif values is None:
+        values = val_if_none
+    elif isinstance(values, numbers.Number):
+        values = float(values)
+    else:
+        raise TypeError('Expected values of {0} to be an Iterable of '
+                        'numeric values, or a scalar numeric value. '
+                        'Got {1} instead.'.format(option_name, values))
+    return values
+
+
 class System(object):
     """Base class for all systems in OpenMDAO.
 
@@ -132,16 +181,10 @@ class System(object):
     _suppress_solver_output : boolean
         flag that turns off all solver output for this System and all
         of its descendants if False.
-    _design_vars : list of namedtuple
-        list of all driver design vars added to the system.  Each dict contains
-        {'path': str, 'lower': ndarray[:], 'upper': ndarray[:],
-         'scaler': ndarray[:], 'adder': ndarray[:],
-         'ref': ndarray[:], 'ref0': ndarray[:]}
-    _responses : list of namedtuple
-        list of all driver responses added to the system.  Each dict contains
-        {'path': str, 'lower': ndarray[:], 'upper': ndarray[:],
-         'scaler': ndarray[:], 'adder': ndarray[:],
-         'ref': ndarray[:], 'ref0': ndarray[:]}
+    _design_vars : dict of namedtuple
+        dict of all driver design vars added to the system.
+    _responses : dict of namedtuple
+        dict of all driver responses added to the system.
 
     """
 
@@ -1110,54 +1153,10 @@ class System(object):
         """
         pass
 
-    def _format_driver_array_option(self, option_name, var_name, values,
-                                    val_if_none=0.0):
-        """
-        Parameters
-        ----------
-        option_name : str
-            Name of the option being set
-        var_name : str
-            The path of the variable relative to the current system.
-        values : float or numpy ndarray or Iterable
-            Values of the array option to be formatted to the expected form.
-        val_if_none : If values is None,
-
-        Returns
-        -------
-        float or numpy.ndarray
-            Values transformed to the expected form.
-
-        Raises
-        ------
-        ValueError
-            If values is Iterable but cannot be converted to a numpy ndarray
-        TypeError
-            If values is scalar, not None, and not a Number.
-
-        """
-
-        # Convert adder to ndarray/float as necessary
-        if isinstance(values, numpy.ndarray):
-            pass
-        elif not isinstance(values, string_types) \
-            and isinstance(values, Iterable):
-            values = numpy.asarray(values, dtype=float)
-        elif values is None:
-            values = val_if_none
-        elif isinstance(values, numbers.Number):
-            values = float(values)
-        else:
-            raise TypeError('Expected values of {0} to be an Iterable of '
-                            'numeric values, or a scalar numeric value. '
-                            'Got {1} instead.'.format(option_name, values))
-        return values
-
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
                        **kwargs):
-        """
-        Adds a design variable to this system.
+        r"""Add a design variable to this system.
 
         Args
         ----
@@ -1194,7 +1193,7 @@ class System(object):
 
         Notes
         -----
-        The design variablre can be scaled using scaler and adder, where
+        The design variable can be scaled using scaler and adder, where
 
         ..math::
 
@@ -1232,7 +1231,7 @@ class System(object):
                                  'with scaler/adder')
             # Convert ref/ref0 to scaler/adder so we can scale the bounds
             adder = -ref0
-            scaler = 1/(ref + adder)
+            scaler = 1.0 / (ref + adder)
         else:
             if scaler is None:
                 scaler = 1.0
@@ -1240,20 +1239,20 @@ class System(object):
                 adder = 0.0
 
         # Convert adder to ndarray/float as necessary
-        adder = self._format_driver_array_option('adder', name, adder, val_if_none=0.0)
+        adder = _format_driver_array_option('adder', name, adder, val_if_none=0.0)
 
         # Convert scaler to ndarray/float as necessary
-        scaler = self._format_driver_array_option('scaler', name, scaler, val_if_none=1.0)
+        scaler = _format_driver_array_option('scaler', name, scaler, val_if_none=1.0)
 
         # Convert lower to ndarray/float as necessary
-        lower = self._format_driver_array_option('lower', name, lower, val_if_none=-sys.float_info.max)
+        lower = _format_driver_array_option('lower', name, lower, val_if_none=-sys.float_info.max)
 
         # Convert upper to ndarray/float as necessary
-        upper = self._format_driver_array_option('upper', name, upper, val_if_none=sys.float_info.max)
+        upper = _format_driver_array_option('upper', name, upper, val_if_none=sys.float_info.max)
 
         # Apply scaler/adder to lower and upper
-        lower = (lower + adder)*scaler
-        upper = (upper + adder)*scaler
+        lower = (lower + adder) * scaler
+        upper = (upper + adder) * scaler
 
         meta = kwargs if kwargs else None
         self._design_vars[name] = DesignVariable(name=name, lower=lower,
@@ -1265,8 +1264,7 @@ class System(object):
     def add_response(self, name, type, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, adder=None, scaler=None,
                      **kwargs):
-        """
-        Adds a response variable to this system.
+        r"""Add a response variable to this system.
 
         Args
         ----
@@ -1340,7 +1338,7 @@ class System(object):
         # Type must be a string and one of 'con' or 'obj'
         if not isinstance(type, string_types):
             raise TypeError('The type argument should be a string')
-        elif not type in ('con', 'obj'):
+        elif type not in ('con', 'obj'):
             raise ValueError('The type must be one of \'con\' or \'obj\': '
                              'Got \'{0}\' instead'.format(name))
 
@@ -1356,7 +1354,7 @@ class System(object):
                                  'with scaler/adder')
             # Convert ref/ref0 to scaler/adder so we can scale the bounds
             adder = -ref0
-            scaler = 1/(ref + adder)
+            scaler = 1.0 / (ref + adder)
         else:
             if scaler is None:
                 scaler = 1.0
@@ -1372,18 +1370,16 @@ class System(object):
         err = False
         if indices is not None:
             if isinstance(indices, string_types):
-                err=True
+                err = True
             elif isinstance(indices, Iterable):
-                all_int = all([ isinstance(item, int) for item in indices])
+                all_int = all([isinstance(item, int) for item in indices])
                 if not all_int:
-                    err=True
+                    err = True
             else:
                 err = True
         if err:
             msg = "If specified, indices must be a sequence of integers."
             raise ValueError(msg)
-
-
 
         # Currently ref and ref0 must be scalar
         if ref is not None:
@@ -1393,30 +1389,30 @@ class System(object):
             ref0 = float(ref0)
 
         # Convert adder to ndarray/float as necessary
-        adder = self._format_driver_array_option('adder', name, adder, val_if_none=0.0)
+        adder = _format_driver_array_option('adder', name, adder, val_if_none=0.0)
 
         # Convert scaler to ndarray/float as necessary
-        scaler = self._format_driver_array_option('scaler', name, scaler, val_if_none=1.0)
+        scaler = _format_driver_array_option('scaler', name, scaler, val_if_none=1.0)
 
         # Convert lower to ndarray/float as necessary
-        lower = self._format_driver_array_option('lower', name, lower, val_if_none=-sys.float_info.max)
+        lower = _format_driver_array_option('lower', name, lower, val_if_none=-sys.float_info.max)
 
         # Convert upper to ndarray/float as necessary
-        upper = self._format_driver_array_option('upper', name, upper, val_if_none=sys.float_info.max)
+        upper = _format_driver_array_option('upper', name, upper, val_if_none=sys.float_info.max)
 
         # Convert equals to ndarray/float as necessary
         if equals is not None:
-            equals = self._format_driver_array_option('equals', name, equals)
+            equals = _format_driver_array_option('equals', name, equals)
 
         # Scale the bounds
         if lower is not None:
-            lower = (lower + adder)*scaler
+            lower = (lower + adder) * scaler
 
         if upper is not None:
-            upper = (upper + adder)*scaler
+            upper = (upper + adder) * scaler
 
         if equals is not None:
-            equals = (equals + adder)*scaler
+            equals = (equals + adder) * scaler
 
         meta = kwargs if kwargs else None
         if type == 'obj':
@@ -1436,8 +1432,7 @@ class System(object):
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
                        indices=None, **kwargs):
-        """
-        Adds a response variable to this system.
+        r"""Add a response variable to this system.
 
         Args
         ----
@@ -1511,25 +1506,12 @@ class System(object):
 
     def add_objective(self, name, ref=None, ref0=None, indices=None,
                       adder=None, scaler=None, **kwargs):
-        """
-        Adds a response variable to this system.
+        r"""Add a response variable to this system.
 
         Args
         ----
         name : string
            Name of the response variable in the system.
-
-        type : string
-           The type of response.  Currently supported values are 'con' and 'obj'
-
-        lower : float or ndarray, optional
-            Lower boundary for the variable
-
-        upper : upper or ndarray, optional
-            Upper boundary for the variable
-
-        equals : equals or ndarray, optional
-            Equality constraint value for the variable
 
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
@@ -1585,9 +1567,10 @@ class System(object):
                           ref=ref, ref0=ref0, indices=indices, metadata=meta)
 
     def get_design_vars(self, recurse=True):
-        """
-        Retrieve all design variables from the system and, if recurse is True,
-        all of its subsystems.
+        """Get the DesignVariable settings from this system.
+
+        Retrieve all design variable settings from the system and, if recurse
+        is True, all of its subsystems.
 
         Args
         ----
@@ -1597,6 +1580,7 @@ class System(object):
 
         Returns
         -------
+        dict
             The design variables defined in the current system and, if
             recurse=True, its subsystems.
 
@@ -1610,8 +1594,10 @@ class System(object):
         return out
 
     def get_responses(self, recurse=True):
-        """
-        Retrieve all response variables from the system.
+        """Get the response variable settings from this system.
+
+        Retrieve all response variable settings from the system as a dict,
+        keyed by variable name.
 
         Args
         ----
@@ -1621,7 +1607,8 @@ class System(object):
 
         Returns
         -------
-            The recurse defined in the current system and, if
+        dict
+            The responses defined in the current system and, if
             recurse=True, its subsystems.
 
         """
@@ -1634,8 +1621,10 @@ class System(object):
         return out
 
     def get_constraints(self, recurse=True):
-        """
-        Retrieve the constraints for the current system.
+        """Get the Constraint settings from this system.
+
+        Retrieve the constraint settings for the current system as a dict,
+        keyed by variable name.
 
         Args
         ----
@@ -1645,16 +1634,18 @@ class System(object):
 
         Returns
         -------
+        dict
             The constraints defined in the current system.
 
         """
         return dict((key, response) for (key, response) in
-                     self.get_responses(recurse=recurse).items()
-                     if isinstance(response, Constraint))
+                    self.get_responses(recurse=recurse).items() if isinstance(response, Constraint))
 
     def get_objectives(self, recurse=True):
-        """
-        Retrieve all objectives from the system.
+        """Get the Objective settings from this system.
+
+        Retrieve all objectives settings from the system as a dict, keyed
+        by variable name.
 
         Args
         ----
@@ -1664,9 +1655,9 @@ class System(object):
 
         Returns
         -------
+        dict
             The objectives defined in the current system.
 
         """
         return dict((key, response) for (key, response) in
-                     self.get_responses(recurse=recurse).items()
-                     if isinstance(response, Objective))
+                    self.get_responses(recurse=recurse).items() if isinstance(response, Objective))
