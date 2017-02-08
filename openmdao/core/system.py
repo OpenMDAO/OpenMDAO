@@ -524,11 +524,7 @@ class System(object):
     @jacobian.setter
     def jacobian(self, jacobian):
         """Set the Jacobian."""
-        if isinstance(jacobian, GlobalJacobian):
-            self._owns_global_jac = True
-        else:
-            self._owns_global_jac = False
-
+        self._owns_global_jac = isinstance(jacobian, GlobalJacobian)
         self._jacobian = jacobian
 
         # TODO: we need to set some sort of flag to tell us that setup
