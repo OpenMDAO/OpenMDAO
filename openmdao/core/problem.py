@@ -115,10 +115,17 @@ class Problem(object):
         try:
             self.model._outputs[name]
             ind = self.model._var_myproc_names['output'].index(name)
+            meta = self.model._var_myproc_metadata['output'][ind]
+            if 'shape' in meta:
+                _check_shape(meta, value)
             c0, c1 = self.model._scaling_to_norm['output'][ind, :]
             self.model._outputs[name] = c0 + c1 * np.array(value)
+
         except KeyError:
             ind = self.model._var_myproc_names['input'].index(name)
+            meta = self.model._var_myproc_metadata['input'][ind]
+            if 'shape' in meta:
+                _check_shape(meta, value)
             c0, c1 = self.model._scaling_to_norm['input'][ind, :]
             self.model._inputs[name] = c0 + c1 * np.array(value)
 
@@ -464,3 +471,22 @@ class Problem(object):
                             totals[key][idx, :] = deriv_val
 
         return totals
+
+
+def _check_shape(meta, val):
+    """Check that the shape of a value matches the metadata for a variable.
+
+    Args
+    ----
+    meta : dict
+        metadata for a variable.
+    val : float or ndarray or list
+        value to check.
+    """
+    if not np.isscalar(val):
+        val_shape = np.atleast_1d(val).shape
+    else:
+        val_shape = (1,)
+    if val_shape != meta['shape']:
+        raise ValueError("Incorrect size during assignment. Expected "
+                         "%s but got %s." % (meta['shape'], val_shape))

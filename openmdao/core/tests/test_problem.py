@@ -1,7 +1,9 @@
 """ Unit tests for the problem interface."""
 from __future__ import print_function
+
 import unittest
 import warnings
+from six import assertRaisesRegex
 
 import numpy as np
 
@@ -32,17 +34,49 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['indeps.X_c'], new_val.reshape((3,)), 1e-10)
         assert_rel_error(self, prob['indeps.X_c'][:, 0], new_val, 1e-10)
 
-        # Reassignment syntax
-        try:
-            prob['indeps.X_c'] = new_val
-        except ValueError as err:
-            self.assertEqual(err, 'Incorrect size during assignment. Expected (10,1), but got (10,)')
-        else:
-            self.fail("execption expected")
+    def test_set_checks_shape(self):
 
-        new_val = -10*np.ones((10, 1)).tolist()
-        prob['indeps.X_c'] = new_val
-        assert_rel_error(self, prob['indeps.X_c'], new_val, 1e-10)
+        model = Group()
+
+        indep = model.add_subsystem('indep', IndepVarComp())
+        indep.add_output('num')
+        indep.add_output('arr', shape=(10, 1))
+
+        prob = Problem(model)
+        prob.setup()
+
+        # check valid scalar value
+        new_val = -10.
+        prob['indep.num'] = new_val
+        assert_rel_error(self, prob['indep.num'], new_val, 1e-10)
+
+        # check bad scalar value
+        bad_val = -10*np.ones((10))
+        msg = "Incorrect size during assignment. Expected .* but got .*"
+        with assertRaisesRegex(self, ValueError, msg):
+            prob['indep.num'] = bad_val
+
+        # check valid array value
+        new_val = -10*np.ones((10, 1))
+        prob['indep.arr'] = new_val
+        assert_rel_error(self, prob['indep.arr'], new_val, 1e-10)
+
+        # check bad array value
+        bad_val = -10*np.ones((10))
+        msg = "Incorrect size during assignment. Expected .* but got .*"
+        with assertRaisesRegex(self, ValueError, msg):
+            prob['indep.arr'] = bad_val
+
+        # check valid list value
+        new_val = new_val.tolist()
+        prob['indep.arr'] = new_val
+        assert_rel_error(self, prob['indep.arr'], new_val, 1e-10)
+
+        # check bad list value
+        bad_val = bad_val.tolist()
+        msg = "Incorrect size during assignment. Expected .* but got .*"
+        with assertRaisesRegex(self, ValueError, msg):
+            prob['indep.arr'] = bad_val
 
     def test_compute_total_derivs_basic(self):
         # Basic test for the method using default solvers on simple model.
