@@ -179,8 +179,8 @@ class ExplicitComponent(Component):
             # re-negate the jacobian
             self._negate_jac()
 
-            if J._top_name == self.pathname:
-                J._update()
+            if self._owns_global_jac:
+                J._update(self._assembler)
 
     def _set_partials_meta(self):
         """Set subjacobian info into our jacobian."""

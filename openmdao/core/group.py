@@ -438,7 +438,7 @@ class Group(System):
         """
         with self._jacobian_context() as J:
             # Use global Jacobian
-            if J._top_name == self.pathname:
+            if self._owns_global_jac:
                 for vec_name in vec_names:
                     with self._matvec_context(vec_name, var_inds, mode) as vecs:
                         d_inputs, d_outputs, d_residuals = vecs
@@ -490,5 +490,5 @@ class Group(System):
                 subsys._linearize()
 
             # Update jacobian
-            if J._top_name == self.pathname:
-                J._update()
+            if self._owns_global_jac:
+                J._update(self._assembler)

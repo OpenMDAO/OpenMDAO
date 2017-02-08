@@ -11,6 +11,7 @@ from six.moves import range
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
+from openmdao.jacobians.global_jacobian import GlobalJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import convert_units
@@ -102,12 +103,12 @@ class System(object):
     _transfers : dict of <Transfer>
         transfer object; points to _vector_transfers['nonlinear'].
     _jacobian : <Jacobian>
-        global <Jacobian> object to be used in apply_linear
+        <Jacobian> object to be used in apply_linear.
+    _owns_global_jac : bool
+        If True, we are owners of the GlobalJacobian in self._jacobian.
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
-    _pre_setup_jac : <GlobalJacobian>
-        Storage for a GlobalJacobian that was set prior to problem setup.
     _nl_solver : <NonlinearSolver>
         nonlinear solver to be used for solve_nonlinear.
     _ln_solver : <LinearSolver>
@@ -178,9 +179,9 @@ class System(object):
 
         self._jacobian = DefaultJacobian()
         self._jacobian._system = self
+        self._owns_global_jac = False
 
         self._subjacs_info = OrderedDict()
-        self._pre_setup_jac = None
 
         self._nl_solver = None
         self._ln_solver = None
@@ -515,6 +516,46 @@ class System(object):
             sub_upper_bounds = upper_bounds._create_subvector(subsys)
             subsys._setup_bounds_vectors(sub_lower_bounds, sub_upper_bounds, False)
 
+    @property
+    def jacobian(self):
+        """A Jacobian object or None."""
+        return self._jacobian
+
+    @jacobian.setter
+    def jacobian(self, jacobian):
+        """Set the Jacobian."""
+        if isinstance(jacobian, GlobalJacobian):
+            self._owns_global_jac = True
+        else:
+            self._owns_global_jac = False
+
+        self._jacobian = jacobian
+
+        # TODO: we need to set some sort of flag to tell us that setup
+        #  is now required since our jacobian has changed.
+
+    def _setup_jacobians(self, jacobian=None):
+        """Set and populate jacobians down through the system tree.
+
+        Args
+        ----
+        jacobian : <GlobalJacobian> or None
+            The global jacobian to populate for this system.
+        """
+        if self._owns_global_jac:
+            jacobian = self._jacobian
+        elif jacobian is not None:
+            self._jacobian = jacobian
+
+        self._set_partials_meta()
+
+        for subsys in self._subsystems_myproc:
+            subsys._setup_jacobians(jacobian)
+
+        if self._owns_global_jac:
+            self._jacobian._system = self
+            self._jacobian._initialize(self._assembler)
+
     def _get_transfers(self, vectors):
         """Compute transfers.
 
@@ -749,56 +790,6 @@ class System(object):
     def proc_allocator(self, value):
         """Set the processor allocator object."""
         self._mpi_proc_allocator = value
-
-    @property
-    def jacobian(self):
-        """A Jacobian object or None."""
-        return self._jacobian
-
-    @jacobian.setter
-    def jacobian(self, jacobian):
-        """Set the Jacobian."""
-        self._set_jacobian(jacobian, True)
-
-    def _set_jacobian(self, jacobian, is_top):
-        """Recursively set the system's jacobian attribute.
-
-        Args
-        ----
-        jacobian : <Jacobian> or None
-            Global jacobian to be set; if None, reset to <DefaultJacobian>.
-        is_top : boolean
-            whether this is the top; i.e., start of the recursion.
-        """
-        # Don't update jacobians if we haven't run setup yet.  Just store
-        # for later and update at the end of setup. _assember is set at
-        # the beginning of setup.  It is assumed here that set_jacobian
-        # will never be called (by a user) during setup.
-        if self._assembler is None:
-            self._pre_setup_jac = jacobian
-            return
-
-        if jacobian is None:
-            jacobian = DefaultJacobian()
-            jacobian._system = self
-        else:
-            if self._pre_setup_jac is jacobian:
-                self._pre_setup_jac = None
-
-            if is_top:
-                jacobian._top_name = self.pathname
-                jacobian._system = self
-                jacobian._assembler = self._assembler
-
-        jacobian._copy_from(self._jacobian)
-        self._jacobian = jacobian
-
-        for subsys in self._subsystems_myproc:
-            subsys._set_jacobian(jacobian, False)
-
-        if not isinstance(jacobian, DefaultJacobian) and is_top:
-            jacobian._system = self
-            jacobian._initialize()
 
     def _set_partials_meta(self):
         """Set subjacobian info into our jacobian.

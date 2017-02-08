@@ -195,8 +195,8 @@ class Component(BaseComponent):
                         if (out_name, in_name) in self._jacobian:
                             self._jacobian._negate((out_name, in_name))
 
-            if self._jacobian._top_name == self.pathname:
-                self._jacobian._update()
+            if self._owns_global_jac:
+                self._jacobian._update(self._assembler)
 
     def apply_nonlinear(self, params, unknowns, residuals):
         """Compute residuals given params and unknowns.

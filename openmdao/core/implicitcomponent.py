@@ -134,8 +134,8 @@ class ImplicitComponent(Component):
             self._inputs.scale(self._scaling_to_norm['input'])
             self._outputs.scale(self._scaling_to_norm['output'])
 
-            if J._top_name == self.pathname:
-                J._update()
+            if self._owns_global_jac:
+                J._update(self._assembler)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """Compute residuals given inputs and outputs.

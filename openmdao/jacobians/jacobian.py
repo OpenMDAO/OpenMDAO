@@ -15,10 +15,6 @@ class Jacobian(object):
 
     Attributes
     ----------
-    _top_name : str
-        name of the system at which we allocate the global Jacobian.
-    _assembler : <Assembler>
-        pointer to the assembler.
     _system : <System>
         pointer to the system that is currently operating on this Jacobian.
     _subjacs : dict
@@ -46,8 +42,6 @@ class Jacobian(object):
         **kwargs : dict
             options dictionary.
         """
-        self._top_name = None
-        self._assembler = None
         self._system = None
 
         self._subjacs = {}
@@ -289,8 +283,14 @@ class Jacobian(object):
 
         return jac
 
-    def _initialize(self):
-        """Allocate the global matrices."""
+    def _initialize(self, assembler):
+        """Allocate the global matrices.
+
+        Args
+        ----
+        assembler : <Assembler>
+            Owning system's assember object.
+        """
         pass
 
     def _update(self):
