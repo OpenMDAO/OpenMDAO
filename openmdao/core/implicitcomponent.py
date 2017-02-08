@@ -63,27 +63,27 @@ class ImplicitComponent(Component):
             ranges of variable IDs involved in this matrix-vector product.
             The ordering is [lb1, ub1, lb2, ub2].
         """
-        for vec_name in vec_names:
-            with self._matvec_context(vec_name, var_inds, mode) as vecs:
-                d_inputs, d_outputs, d_residuals = vecs
+        with self._jacobian_context() as J:
+            for vec_name in vec_names:
+                with self._matvec_context(vec_name, var_inds, mode) as vecs:
+                    d_inputs, d_outputs, d_residuals = vecs
 
-                self._inputs.scale(self._scaling_to_phys['input'])
-                self._outputs.scale(self._scaling_to_phys['output'])
-                d_inputs.scale(self._scaling_to_phys['input'])
-                d_outputs.scale(self._scaling_to_phys['output'])
-                d_residuals.scale(self._scaling_to_phys['residual'])
+                    self._inputs.scale(self._scaling_to_phys['input'])
+                    self._outputs.scale(self._scaling_to_phys['output'])
+                    d_inputs.scale(self._scaling_to_phys['input'])
+                    d_outputs.scale(self._scaling_to_phys['output'])
+                    d_residuals.scale(self._scaling_to_phys['residual'])
 
-                self.apply_linear(self._inputs, self._outputs,
-                                  d_inputs, d_outputs, d_residuals, mode)
+                    self.apply_linear(self._inputs, self._outputs,
+                                      d_inputs, d_outputs, d_residuals, mode)
 
-                self._inputs.scale(self._scaling_to_norm['input'])
-                self._outputs.scale(self._scaling_to_norm['output'])
-                d_inputs.scale(self._scaling_to_norm['input'])
-                d_outputs.scale(self._scaling_to_norm['output'])
-                d_residuals.scale(self._scaling_to_norm['residual'])
+                    self._inputs.scale(self._scaling_to_norm['input'])
+                    self._outputs.scale(self._scaling_to_norm['output'])
+                    d_inputs.scale(self._scaling_to_norm['input'])
+                    d_outputs.scale(self._scaling_to_norm['output'])
+                    d_residuals.scale(self._scaling_to_norm['residual'])
 
-                self._jacobian._system = self
-                self._jacobian._apply(d_inputs, d_outputs, d_residuals, mode)
+                    J._apply(d_inputs, d_outputs, d_residuals, mode)
 
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.
@@ -125,18 +125,17 @@ class ImplicitComponent(Component):
 
     def _linearize(self):
         """Compute jacobian / factorization."""
-        self._jacobian._system = self
+        with self._jacobian_context() as J:
+            self._inputs.scale(self._scaling_to_phys['input'])
+            self._outputs.scale(self._scaling_to_phys['output'])
 
-        self._inputs.scale(self._scaling_to_phys['input'])
-        self._outputs.scale(self._scaling_to_phys['output'])
+            self.linearize(self._inputs, self._outputs, J)
 
-        self.linearize(self._inputs, self._outputs, self._jacobian)
+            self._inputs.scale(self._scaling_to_norm['input'])
+            self._outputs.scale(self._scaling_to_norm['output'])
 
-        self._inputs.scale(self._scaling_to_norm['input'])
-        self._outputs.scale(self._scaling_to_norm['output'])
-
-        if self._jacobian._top_name == self.pathname:
-            self._jacobian._update()
+            if self._owns_global_jac:
+                J._update()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """Compute residuals given inputs and outputs.

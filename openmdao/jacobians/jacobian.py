@@ -15,10 +15,6 @@ class Jacobian(object):
 
     Attributes
     ----------
-    _top_name : str
-        name of the system at which we allocate the global Jacobian.
-    _assembler : <Assembler>
-        pointer to the assembler.
     _system : <System>
         pointer to the system that is currently operating on this Jacobian.
     _subjacs : dict
@@ -46,8 +42,6 @@ class Jacobian(object):
         **kwargs : dict
             options dictionary.
         """
-        self._top_name = None
-        self._assembler = None
         self._system = None
 
         self._subjacs = {}
@@ -101,12 +95,12 @@ class Jacobian(object):
         in_path : str
             pathname of input variable.
         """
-        out_paths = self._system._var_name2path.get(key[0])
-        in_paths = self._system._var_name2path.get(key[1])
-        if out_paths is None or in_paths is None:
-            return None
-        assert (len(in_paths) == 1 and len(out_paths) == 1)
-        return (out_paths[0], in_paths[0])
+        if key[1] in self._system._var_name2path['input']:
+            return (self._system._var_name2path['output'][key[0]],
+                    self._system._var_name2path['input'][key[1]][0])
+        else:
+            return (self._system._var_name2path['output'][key[0]],
+                    self._system._var_name2path['output'][key[1]])
 
     def _negate(self, key):
         """Multiply this sub-Jacobian by -1.0, for explicit variables.
@@ -137,31 +131,34 @@ class Jacobian(object):
         -------
         list
             List of (output, input) pairs found in the jacobian
-            for the current System.
+            for the current System. input and output are unpromoted
+            names.
         """
         system = self._system
-        pathdict = system._var_pathdict
-        pathnames = system._var_allprocs_pathnames
+        start = len(system.pathname) + 1 if system.pathname else 0
+        outpaths = system._var_allprocs_pathnames['output']
+        inpaths = system._var_allprocs_pathnames['input']
         out_offset = system._var_allprocs_range['output'][0]
         in_offset = system._var_allprocs_range['input'][0]
+        in_indices = system._var_myproc_indices['input']
+        out_indices = system._var_myproc_indices['output']
 
         iter_list = []
-        for re_ind in system._var_myproc_indices['output']:
-            re_path = pathnames['output'][re_ind - out_offset]
+        for re_ind in out_indices:
+            re_path = outpaths[re_ind - out_offset]
+            re_unprom = re_path[start:]
 
-            for out_ind in system._var_myproc_indices['output']:
-                out_path = pathnames['output'][out_ind - out_offset]
+            for out_ind in out_indices:
+                out_path = outpaths[out_ind - out_offset]
 
                 if (re_path, out_path) in self._subjacs:
-                    iter_list.append((pathdict[re_path].name,
-                                      pathdict[out_path].name))
+                    iter_list.append((re_unprom, out_path[start:]))
 
-            for in_ind in system._var_myproc_indices['input']:
-                in_path = pathnames['input'][in_ind - in_offset]
+            for in_ind in in_indices:
+                in_path = inpaths[in_ind - in_offset]
 
                 if (re_path, in_path) in self._subjacs:
-                    iter_list.append((pathdict[re_path].name,
-                                      pathdict[in_path].name))
+                    iter_list.append((re_unprom, in_path[start:]))
 
         return iter_list
 
@@ -171,14 +168,25 @@ class Jacobian(object):
         Args
         ----
         key : (str, str)
-            output name, input name of sub-Jacobian.
+            output name, input name of sub-Jacobian. Names are
+            promoted names.
 
         Returns
         -------
         boolean
             return whether sub-Jacobian has been defined.
         """
-        return self._key2unique(key) in self._subjacs
+        outname2path = self._system._var_name2path['output']
+        if key[0] in outname2path:
+            if key[1] in self._system._var_name2path['input']:
+                out_path = outname2path[key[0]]
+                for ipath in self._system._var_name2path['input'][key[1]]:
+                    if (out_path, ipath) in self._subjacs:
+                        return True
+            elif key[1] in outname2path:
+                return (outname2path[key[0]], outname2path[key[1]]
+                        ) in self._subjacs
+        return False
 
     def __iter__(self):
         """Return iterator from pre-computed _iter_list.
@@ -311,9 +319,6 @@ class Jacobian(object):
         negate : bool
             If True negate the given value, if any.
         """
-        if not meta['dependent']:
-            return
-
         ukey = self._key2unique(key)
         if ukey is None:
             raise KeyError("Could not find unique key for %s." % (key,))

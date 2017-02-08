@@ -67,13 +67,9 @@ class DepCompTestCase(unittest.TestCase):
 
         p = Problem()
         p.model = group
-        p.model.nl_solver = NewtonSolver(
-            subsolvers={'linear': ScipyIterativeSolver()})
+        p.model.nl_solver.ln_solver = ScipyIterativeSolver()
         p.setup(check=False)
         p.model.suppress_solver_output = True
-
-        #p.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
-        #print(p.model.jacobian._int_mtx._matrix)
 
         p.run_model()
 
