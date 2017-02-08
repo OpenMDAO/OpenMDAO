@@ -45,6 +45,8 @@ class TestProblem(unittest.TestCase):
         prob = Problem(model)
         prob.setup()
 
+        msg = "Incorrect size during assignment. Expected .* but got .*"
+
         # check valid scalar value
         new_val = -10.
         prob['indep.num'] = new_val
@@ -52,7 +54,6 @@ class TestProblem(unittest.TestCase):
 
         # check bad scalar value
         bad_val = -10*np.ones((10))
-        msg = "Incorrect size during assignment. Expected .* but got .*"
         with assertRaisesRegex(self, ValueError, msg):
             prob['indep.num'] = bad_val
 
@@ -63,7 +64,6 @@ class TestProblem(unittest.TestCase):
 
         # check bad array value
         bad_val = -10*np.ones((10))
-        msg = "Incorrect size during assignment. Expected .* but got .*"
         with assertRaisesRegex(self, ValueError, msg):
             prob['indep.arr'] = bad_val
 
@@ -74,7 +74,6 @@ class TestProblem(unittest.TestCase):
 
         # check bad list value
         bad_val = bad_val.tolist()
-        msg = "Incorrect size during assignment. Expected .* but got .*"
         with assertRaisesRegex(self, ValueError, msg):
             prob['indep.arr'] = bad_val
 
