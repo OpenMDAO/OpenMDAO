@@ -55,7 +55,7 @@ class GlobalJacobian(Jacobian):
         int
             the ending index in the Jacobian.
         """
-        sizes_all = self._assembler._variable_sizes_all
+        sizes_all = self._system._assembler._variable_sizes_all
         iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
         ivar_all0 = self._system._var_allprocs_range['output'][0]
 
@@ -68,6 +68,7 @@ class GlobalJacobian(Jacobian):
         """Allocate the global matrices."""
         # var_indices are the *global* indices for variables on this proc
         system = self._system
+        assembler = system._assembler
         var_indices = system._var_myproc_indices
         meta_in = system._var_myproc_metadata['input']
         meta_out = system._var_myproc_metadata['output']
@@ -128,7 +129,7 @@ class GlobalJacobian(Jacobian):
                         shape = (system._outputs._views_flat[re_unprom].size,
                                  system._inputs._views_flat[iname].size)
 
-                    out_idx_all = self._assembler._input_src_ids[in_idx_all]
+                    out_idx_all = assembler._input_src_ids[in_idx_all]
                     if ivar1 <= out_idx_all < ivar2:
                         if src_indices[in_idx_all] is None:
                             self._int_mtx._add_submat(
@@ -138,7 +139,7 @@ class GlobalJacobian(Jacobian):
                             # need to add an entry for d(output)/d(source)
                             # instead of d(output)/d(input) when we have
                             # src_indices
-                            src = self._assembler._input_src_ids[in_idx_all]
+                            src = assembler._input_src_ids[in_idx_all]
                             in_path = out_paths[src]
                             key2 = (key[0], in_path)
                             self._keymap[key] = key2
@@ -152,11 +153,11 @@ class GlobalJacobian(Jacobian):
                                                   None, shape)
 
         out_size = numpy.sum(
-            self._assembler._variable_sizes_all['output'][ivar1:ivar2])
+            assembler._variable_sizes_all['output'][ivar1:ivar2])
 
         ind1, ind2 = self._system._var_allprocs_range['input']
         in_size = numpy.sum(
-            self._assembler._variable_sizes_all['input'][ind1:ind2])
+            assembler._variable_sizes_all['input'][ind1:ind2])
 
         self._int_mtx._build(out_size, out_size)
         self._ext_mtx._build(out_size, in_size)
@@ -167,6 +168,7 @@ class GlobalJacobian(Jacobian):
         var_indices = self._system._var_myproc_indices
         var_paths = self._system._var_allprocs_pathnames
         ivar1, ivar2 = self._system._var_allprocs_range['output']
+        assembler = self._system._assembler
 
         for re_idx_all in var_indices['output']:
             re_path = var_paths['output'][re_idx_all]
@@ -180,7 +182,7 @@ class GlobalJacobian(Jacobian):
                 in_path = var_paths['input'][in_idx_all]
                 key = (re_path, in_path)
                 if key in self._subjacs:
-                    out_idx_all = self._assembler._input_src_ids[in_idx_all]
+                    out_idx_all = assembler._input_src_ids[in_idx_all]
                     if ivar1 <= out_idx_all < ivar2:
                         self._int_mtx._update_submat(self._keymap[key],
                                                      self._subjacs[key])

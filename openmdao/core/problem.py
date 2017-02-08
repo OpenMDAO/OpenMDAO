@@ -308,25 +308,14 @@ class Problem(object):
         # Vector setup for the linear vector
         self.setup_vector('linear', vector_class, self._use_ref_vector)
 
-        to_set = []
+        model._setup_jacobians()
+
         for system in model.system_iter(include_self=True, recurse=True):
-            # set info from our _subjacs_info into DefaultJacobian.
-            # If a GlobalJacobian is set later, it will copy the subjac
-            # info from the DefaultJacobian.
-            system._set_partials_meta()
-
-            # check to see if a global jacobian was set prior to setup
-            if system._pre_setup_jac is not None:
-                to_set.append(system)
-
-            # While we are recursing, we can set up all the solvers.
+            # set up all the solvers.
             if system._nl_solver is not None:
                 system._nl_solver._setup_solvers(system, 0)
             if system._ln_solver is not None:
                 system._ln_solver._setup_solvers(system, 0)
-
-        for system in to_set:
-            system._set_jacobian(system._pre_setup_jac, True)
 
         if check:
             check_config(self, logger)

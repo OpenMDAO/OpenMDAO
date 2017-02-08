@@ -179,7 +179,7 @@ class ExplicitComponent(Component):
             # re-negate the jacobian
             self._negate_jac()
 
-            if J._top_name == self.pathname:
+            if self._owns_global_jac:
                 J._update()
 
     def _set_partials_meta(self):
