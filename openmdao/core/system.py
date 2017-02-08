@@ -1382,9 +1382,21 @@ class System(object):
             raise ValueError(msg.format(name))
 
         # If given, indices must be a sequence
-        if indices is not None and not isinstance(indices, Iterable):
-            msg = "If specified, indices must be a sequence."
+        err = False
+        if indices is not None:
+            if isinstance(indices, string_types):
+                err=True
+            elif isinstance(indices, Iterable):
+                all_int = all([ isinstance(item, int) for item in indices])
+                if not all_int:
+                    err=True
+            else:
+                err = True
+        if err:
+            msg = "If specified, indices must be a sequence of integers."
             raise ValueError(msg)
+
+
 
         # Currently ref and ref0 must be scalar
         if ref is not None:
@@ -1510,9 +1522,8 @@ class System(object):
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, metadata=meta)
 
-    def add_objective(self, name, lower=None, upper=None, equals=None,
-                      ref=None, ref0=None, indices=None, adder=None, scaler=None,
-                      **kwargs):
+    def add_objective(self, name, ref=None, ref0=None, indices=None,
+                      adder=None, scaler=None, **kwargs):
         """
         Adds a response variable to this system.
 
@@ -1581,6 +1592,8 @@ class System(object):
             scaler = \frac{1}{ref_1 + adder}
         """
         meta = kwargs if kwargs else None
+        if 'lower' in kwargs or 'upper' in kwargs or 'equals' in kwargs:
+            raise RuntimeError('Bounds may not be set on objectives')
         self.add_response(name, type='obj', scaler=scaler, adder=adder,
                           ref=ref, ref0=ref0, indices=indices, metadata=meta)
 
@@ -1670,4 +1683,3 @@ class System(object):
         return dict((key, response) for (key, response) in
                      self.get_responses(recurse=recurse).items()
                      if isinstance(response, Objective))
-

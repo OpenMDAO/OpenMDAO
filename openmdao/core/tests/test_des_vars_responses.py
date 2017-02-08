@@ -271,8 +271,6 @@ class TestDesvarOnModel(unittest.TestCase):
                                                  'to float: \'a\'')
 
 
-
-
 class TestConstraintOnModel(unittest.TestCase):
 
     def test_constraint_affine_and_scaleradder(self):
@@ -416,3 +414,139 @@ class TestConstraintOnModel(unittest.TestCase):
         self.assertEqual(str(context.exception), 'could not convert string '
                                                  'to float: \'a\'')
 
+    def test_constraint_invalid_indices(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_constraint('con1', lower=0.0, upper=5.0,
+                                      indices='foo')
+
+        self.assertEqual(str(context.exception), 'If specified, indices must '
+                                                 'be a sequence of integers.')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_constraint('con1', lower=0.0, upper=5.0,
+                                      indices=1)
+
+        self.assertEqual(str(context.exception), 'If specified, indices must '
+                                                 'be a sequence of integers.')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_constraint('con1', lower=0.0, upper=5.0,
+                                      indices=[1, 'k'])
+
+        self.assertEqual(str(context.exception), 'If specified, indices must '
+                                                 'be a sequence of integers.')
+
+
+class TestObjectiveOnModel(unittest.TestCase):
+
+    def test_objective_affine_and_scaleradder(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.model.add_objective('con1', lower=-100, upper=100, ref=1.0,
+                                      scaler=0.5)
+
+        self.assertEqual(str(context.exception), 'Bounds may not be set '
+                                                 'on objectives')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_objective('con1', ref=0.0, scaler=0.5)
+
+        self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
+                                                 ' exclusive with'
+                                                 ' scaler/adder')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_objective('con1', ref=0.0, adder=0.5)
+
+        self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
+                                                 ' exclusive with'
+                                                 ' scaler/adder')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_objective('x', ref0=0.0, adder=0.5)
+
+        self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
+                                                 ' exclusive with'
+                                                 ' scaler/adder')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_objective('con1', ref0=0.0, scaler=0.5)
+
+        self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
+                                                 ' exclusive with' \
+                                                 ' scaler/adder')
+
+    def test_objective_affine_mapping(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj', ref0=1000, ref=1010)
+        prob.model.add_objective('con2')
+
+        prob.setup()
+
+        objectives = prob.model.get_objectives()
+
+        obj_ref0 = objectives['obj'].ref0
+        obj_ref = objectives['obj'].ref
+        obj_scaler = objectives['obj'].scaler
+        obj_adder = objectives['obj'].adder
+
+        self.assertAlmostEqual( obj_scaler*(obj_ref0 + obj_adder), 0.0,
+                                places=12)
+        self.assertAlmostEqual( obj_scaler*(obj_ref + obj_adder), 1.0,
+                                places=12)
+
+    def test_objective_invalid_name(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_objective(42, ref0=-100.0, ref=100)
+
+        self.assertEqual(str(context.exception), 'The name argument should '
+                                                 'be a string, got 42')
+
+    def test_objective_invalid_indices(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_objective('obj', indices='foo')
+
+        self.assertEqual(str(context.exception), 'If specified, indices must '
+                                                 'be a sequence of integers.')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_objective('obj', indices=1)
+
+        self.assertEqual(str(context.exception), 'If specified, indices must '
+                                                 'be a sequence of integers.')
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_objective('obj', indices=[1, 'k'])
+
+        self.assertEqual(str(context.exception), 'If specified, indices must '
+                                                 'be a sequence of integers.')
