@@ -71,9 +71,6 @@ class DepCompTestCase(unittest.TestCase):
         p.setup(check=False)
         p.model.suppress_solver_output = True
 
-        #p.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
-        #print(p.model.jacobian._int_mtx._matrix)
-
         p.run_model()
 
         assert_rel_error(self, p['sys3.z1'], 8., 1e-10)
