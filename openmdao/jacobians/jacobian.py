@@ -283,14 +283,8 @@ class Jacobian(object):
 
         return jac
 
-    def _initialize(self, assembler):
-        """Allocate the global matrices.
-
-        Args
-        ----
-        assembler : <Assembler>
-            Owning system's assember object.
-        """
+    def _initialize(self):
+        """Allocate the global matrices."""
         pass
 
     def _update(self):
