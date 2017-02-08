@@ -180,7 +180,7 @@ class ExplicitComponent(Component):
             self._negate_jac()
 
             if self._owns_global_jac:
-                J._update(self._assembler)
+                J._update()
 
     def _set_partials_meta(self):
         """Set subjacobian info into our jacobian."""

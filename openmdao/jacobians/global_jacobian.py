@@ -38,7 +38,7 @@ class GlobalJacobian(Jacobian):
                              desc='<Matrix> class to use in this <Jacobian>.')
         self.options.update(kwargs)
 
-    def _get_var_range(self, ivar_all, typ, assembler):
+    def _get_var_range(self, ivar_all, typ):
         """Look up the variable name and <Jacobian> index range.
 
         Args
@@ -47,8 +47,6 @@ class GlobalJacobian(Jacobian):
             index of a variable in the global ordering.
         typ : str
             'input' or 'output'.
-        assembler : <Assembler>
-            Owning system's assember object.
 
         Returns
         -------
@@ -57,7 +55,7 @@ class GlobalJacobian(Jacobian):
         int
             the ending index in the Jacobian.
         """
-        sizes_all = assembler._variable_sizes_all
+        sizes_all = self._system._assembler._variable_sizes_all
         iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
         ivar_all0 = self._system._var_allprocs_range['output'][0]
 
@@ -66,16 +64,11 @@ class GlobalJacobian(Jacobian):
 
         return ind1, ind2
 
-    def _initialize(self, assembler):
-        """Allocate the global matrices.
-
-        Args
-        ----
-        assembler : <Assembler>
-            Owning system's assember object.
-        """
+    def _initialize(self):
+        """Allocate the global matrices."""
         # var_indices are the *global* indices for variables on this proc
         system = self._system
+        assembler = system._assembler
         var_indices = system._var_myproc_indices
         meta_in = system._var_myproc_metadata['input']
         meta_out = system._var_myproc_metadata['output']
@@ -88,9 +81,9 @@ class GlobalJacobian(Jacobian):
         self._int_mtx = self.options['matrix_class'](system.comm)
         self._ext_mtx = self.options['matrix_class'](system.comm)
 
-        out_offsets = {i: self._get_var_range(i, 'output', assembler)[0]
+        out_offsets = {i: self._get_var_range(i, 'output')[0]
                        for i in var_indices['output']}
-        in_offsets = {i: self._get_var_range(i, 'input', assembler)[0]
+        in_offsets = {i: self._get_var_range(i, 'input')[0]
                       for i in var_indices['input']}
         src_indices = {i: meta_in[j]['indices']
                        for j, i in enumerate(var_indices['input'])}
@@ -169,18 +162,13 @@ class GlobalJacobian(Jacobian):
         self._int_mtx._build(out_size, out_size)
         self._ext_mtx._build(out_size, in_size)
 
-    def _update(self, assembler):
-        """Read the user's sub-Jacobians and set into the global matrix.
-
-        Args
-        ----
-        assembler : <Assembler>
-            Owning system's assember object.
-        """
+    def _update(self):
+        """Read the user's sub-Jacobians and set into the global matrix."""
         # var_var_indices are the *global* indices for variables on this proc
         var_indices = self._system._var_myproc_indices
         var_paths = self._system._var_allprocs_pathnames
         ivar1, ivar2 = self._system._var_allprocs_range['output']
+        assembler = self._system._assembler
 
         for re_idx_all in var_indices['output']:
             re_path = var_paths['output'][re_idx_all]

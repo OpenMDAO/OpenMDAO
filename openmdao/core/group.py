@@ -491,4 +491,4 @@ class Group(System):
 
             # Update jacobian
             if self._owns_global_jac:
-                J._update(self._assembler)
+                J._update()

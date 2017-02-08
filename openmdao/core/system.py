@@ -554,7 +554,7 @@ class System(object):
 
         if self._owns_global_jac:
             self._jacobian._system = self
-            self._jacobian._initialize(self._assembler)
+            self._jacobian._initialize()
 
     def _get_transfers(self, vectors):
         """Compute transfers.
