@@ -37,8 +37,8 @@ class Jacobian(object):
     def __init__(self, **kwargs):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs : dict
             options dictionary.
         """
@@ -60,8 +60,8 @@ class Jacobian(object):
         This assumes that no inputs and outputs share the same name,
         so it should only be called from a Component, never from a Group.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (str, str)
             output name, input name of sub-Jacobian.
 
@@ -83,8 +83,8 @@ class Jacobian(object):
         key parts are all outputs.  If the key contains an input name, that
         may not be unique in a Group context.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (str, str)
             output name, input name of sub-Jacobian.
 
@@ -105,8 +105,8 @@ class Jacobian(object):
     def _negate(self, key):
         """Multiply this sub-Jacobian by -1.0, for explicit variables.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (str, str)
             output name, input name of sub-Jacobian.
         """
@@ -165,8 +165,8 @@ class Jacobian(object):
     def __contains__(self, key):
         """Map output-input pairs names to indices.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (str, str)
             output name, input name of sub-Jacobian. Names are
             promoted names.
@@ -203,8 +203,8 @@ class Jacobian(object):
     def __setitem__(self, key, jac):
         """Set sub-Jacobian.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (str, str)
             output name, input name of sub-Jacobian.
         jac : int or float or ndarray or sparse matrix
@@ -252,8 +252,8 @@ class Jacobian(object):
     def __getitem__(self, key):
         """Get sub-Jacobian.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (str, str)
             output name, input name of sub-Jacobian.
 
@@ -294,8 +294,8 @@ class Jacobian(object):
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """Compute matrix-vector product.
 
-        Args
-        ----
+        Parameters
+        ----------
         d_inputs : Vector
             inputs linear vector.
         d_outputs : Vector
@@ -310,8 +310,8 @@ class Jacobian(object):
     def _set_partials_meta(self, key, meta, negate=False):
         """Store subjacobian metadata.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (str, str)
             output name, input name of sub-Jacobian.
         meta : dict
@@ -335,8 +335,8 @@ class Jacobian(object):
     def _copy_from(self, jac):
         """Copy the subjac contents of the given jacobian into self.
 
-        Args
-        ----
+        Parameters
+        ----------
         jac : Jacobian
             The jacobian to be copied.
         """

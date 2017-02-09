@@ -96,8 +96,8 @@ class Monitor(object):
     def __init__(self, solver):
         """Store pointer to the openmdao solver and initialize norms.
 
-        Args
-        ----
+        Parameters
+        ----------
         solver : object
             the openmdao solver.
         """
@@ -108,8 +108,8 @@ class Monitor(object):
     def __call__(self, ksp, counter, norm):
         """Store norm if first iteration, and print norm.
 
-        Args
-        ----
+        Parameters
+        ----------
         ksp : object
             the KSP solver.
         counter : int
@@ -148,8 +148,8 @@ class PetscKSP(LinearSolver):
     def __init__(self, **kwargs):
         """Declare the solver options.
 
-        Args
-        ----
+        Parameters
+        ----------
         kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
@@ -177,8 +177,8 @@ class PetscKSP(LinearSolver):
     def _setup_solvers(self, system, depth):
         """Assign system instance, set depth, and optionally perform setup.
 
-        Args
-        ----
+        Parameters
+        ----------
         system : <System>
             pointer to the owning system.
         depth : int
@@ -202,8 +202,8 @@ class PetscKSP(LinearSolver):
         _mode : str
             'fwd' or 'rev'.
 
-        Args
-        ----
+        Parameters
+        ----------
         mat : PETSc.Mat
             PETSc matrix object.
         in_vec : PetSC Vector
@@ -238,8 +238,8 @@ class PetscKSP(LinearSolver):
 
         The full solution vector is returned.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : list
             list of vector names.
         mode : string
@@ -288,8 +288,8 @@ class PetscKSP(LinearSolver):
     def apply(self, mat, in_vec, result):
         """Apply preconditioner.
 
-        Args
-        ----
+        Parameters
+        ----------
         mat : PETSc.Mat
             PETSc matrix object.
         in_vec : PETSc.Vector
@@ -327,8 +327,8 @@ class PetscKSP(LinearSolver):
 
         Instances will be created on first request and cached for future use.
 
-        Args
-        ----
+        Parameters
+        ----------
         system : `System`
             Parent `System` object.
         vec_name : string

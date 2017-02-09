@@ -62,8 +62,8 @@ class ExplicitComponent(Component):
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -99,8 +99,8 @@ class ExplicitComponent(Component):
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -133,8 +133,8 @@ class ExplicitComponent(Component):
             _var_pathdict
             _var_name2path
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : boolean
             Ignored.
         """
@@ -192,8 +192,8 @@ class ExplicitComponent(Component):
     def compute(self, inputs, outputs):
         """Compute outputs given inputs.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -204,8 +204,8 @@ class ExplicitComponent(Component):
     def compute_jacobian(self, inputs, outputs, jacobian):
         """Compute sub-jacobian parts / factorization.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -224,8 +224,8 @@ class ExplicitComponent(Component):
 
             'rev': d_outputs \|-> d_inputs
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector

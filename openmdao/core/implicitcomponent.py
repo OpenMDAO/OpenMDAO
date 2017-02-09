@@ -53,8 +53,8 @@ class ImplicitComponent(Component):
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -88,8 +88,8 @@ class ImplicitComponent(Component):
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -140,8 +140,8 @@ class ImplicitComponent(Component):
     def apply_nonlinear(self, inputs, outputs, residuals):
         """Compute residuals given inputs and outputs.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -154,8 +154,8 @@ class ImplicitComponent(Component):
     def solve_nonlinear(self, inputs, outputs):
         """Compute outputs given inputs.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -172,8 +172,8 @@ class ImplicitComponent(Component):
 
             'rev': d_residuals \|-> (d_inputs, d_outputs)
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -197,8 +197,8 @@ class ImplicitComponent(Component):
 
             'rev': d_outputs \|-> d_residuals
 
-        Args
-        ----
+        Parameters
+        ----------
         d_outputs : Vector
             unscaled, dimensional quantities read via d_outputs[key]
         d_residuals : Vector
@@ -211,8 +211,8 @@ class ImplicitComponent(Component):
     def linearize(self, inputs, outputs, jacobian):
         """Compute sub-jacobian parts / factorization.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector

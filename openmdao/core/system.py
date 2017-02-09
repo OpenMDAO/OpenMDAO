@@ -121,8 +121,8 @@ class System(object):
     def __init__(self, **kwargs):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs: dict of keyword arguments
             available here and in all descendants of this system.
         """
@@ -201,8 +201,8 @@ class System(object):
             _subsystems_myproc
             _subsystems_myproc_inds
 
-        Args
-        ----
+        Parameters
+        ----------
         path : str
             parent names to prepend to name to get the pathname
         comm : MPI.Comm or <FakeComm>
@@ -253,8 +253,8 @@ class System(object):
             _var_myproc_names
             _var_myproc_metadata
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : boolean
             recursion is not performed if traversing up the tree after reconf.
         """
@@ -285,8 +285,8 @@ class System(object):
             _var_allprocs_indices
             _var_myproc_indices
 
-        Args
-        ----
+        Parameters
+        ----------
         global_index : {'input': int, 'output': int}
             current global variable counter.
         recurse : boolean
@@ -373,8 +373,8 @@ class System(object):
 
         * If vec_name is None - i.e., we are setting up the nonlinear vector
 
-        Args
-        ----
+        Parameters
+        ----------
         vectors : {'input': <Vector>, 'output': <Vector>, 'residual': <Vector>}
             Vector objects corresponding to 'name'.
         vector_var_ids : ndarray[:]
@@ -478,8 +478,8 @@ class System(object):
             _lower_bounds
             _upper_bounds
 
-        Args
-        ----
+        Parameters
+        ----------
         lower_bounds : <Vector>
             lower bound vector allocated in <Problem>.
         upper_bounds : <Vector>
@@ -533,8 +533,8 @@ class System(object):
     def _setup_jacobians(self, jacobian=None):
         """Set and populate jacobians down through the system tree.
 
-        Args
-        ----
+        Parameters
+        ----------
         jacobian : <GlobalJacobian> or None
             The global jacobian to populate for this system.
         """
@@ -555,8 +555,8 @@ class System(object):
     def _get_transfers(self, vectors):
         """Compute transfers.
 
-        Args
-        ----
+        Parameters
+        ----------
         vectors : {'input': Vector, 'output': Vector, 'residual': Vector}
             dictionary of <Vector> objects
 
@@ -601,8 +601,8 @@ class System(object):
     def _get_maps(self, typ):
         """Define variable maps based on promotes and renames lists.
 
-        Args
-        ----
+        Parameters
+        ----------
         typ : str
             Either 'input' or 'output'.
 
@@ -674,8 +674,8 @@ class System(object):
         internal variables that are relevant to the current matrix-vector
         product.  This is called only from _apply_linear.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_name : str
             Name of the vector to use.
         var_inds : [int, int, int, int] or None
@@ -798,8 +798,8 @@ class System(object):
                     typ=None):
         """A generator of subsystems of this system.
 
-        Args
-        ----
+        Parameters
+        ----------
         local : bool
             If True, only iterate over systems on this proc.
         include_self : bool
@@ -829,8 +829,8 @@ class System(object):
     def get_input(self, name, units=None):
         """Return the named input value using the unpromoted name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable.
         units : str or None
@@ -855,8 +855,8 @@ class System(object):
     def set_input(self, name, value):
         """Set the value of the named input using the unpromoted name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable.
         value : float or ndarray
@@ -874,8 +874,8 @@ class System(object):
     def get_output(self, name, scaled=False, units=None):
         """Return the named output value using promoted or unpromoted name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable.
         scaled : bool
@@ -908,8 +908,8 @@ class System(object):
     def set_output(self, name, value):
         """Return the named output value using promoted or unpromoted name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable.
         value : float or ndarray
@@ -933,8 +933,8 @@ class System(object):
     def get_residual(self, name, scaled=False, units=None):
         """Return the named residual value using promoted or unpromoted name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable.
         scaled : bool
@@ -968,8 +968,8 @@ class System(object):
     def set_residual(self, name, value):
         """Set value of named residual using promoted or unpromoted name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable.
         value : float or ndarray
@@ -1012,8 +1012,8 @@ class System(object):
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -1027,8 +1027,8 @@ class System(object):
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str

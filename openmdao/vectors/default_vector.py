@@ -16,8 +16,8 @@ class DefaultTransfer(Transfer):
     def __call__(self, in_vec, out_vec, mode='fwd'):
         """Perform transfer.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : <Vector>
             pointer to the input vector.
         out_vec : <Vector>
@@ -122,8 +122,8 @@ class DefaultVector(Vector):
 
         - _data
 
-        Args
-        ----
+        Parameters
+        ----------
         root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
@@ -195,8 +195,8 @@ class DefaultVector(Vector):
     def __iadd__(self, vec):
         """Perform in-place vector addition.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec : <Vector>
             vector to add to self.
 
@@ -212,8 +212,8 @@ class DefaultVector(Vector):
     def __isub__(self, vec):
         """Perform in-place vector substraction.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec : <Vector>
             vector to subtract from self.
 
@@ -229,8 +229,8 @@ class DefaultVector(Vector):
     def __imul__(self, val):
         """Perform in-place scalar multiplication.
 
-        Args
-        ----
+        Parameters
+        ----------
         val : int or float
             scalar to multiply self.
 
@@ -246,8 +246,8 @@ class DefaultVector(Vector):
     def add_scal_vec(self, val, vec):
         """Perform in-place addition of a vector times a scalar.
 
-        Args
-        ----
+        Parameters
+        ----------
         val : int or float
             scalar.
         vec : <Vector>
@@ -259,8 +259,8 @@ class DefaultVector(Vector):
     def set_vec(self, vec):
         """Set the value of this vector to that of the incoming vector.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec : <Vector>
             the vector whose values self is set to.
         """
@@ -270,8 +270,8 @@ class DefaultVector(Vector):
     def set_const(self, val):
         """Set the value of this vector to a constant scalar value.
 
-        Args
-        ----
+        Parameters
+        ----------
         val : int or float
             scalar to set self to.
         """
@@ -294,8 +294,8 @@ class DefaultVector(Vector):
     def scale(self, coeffs):
         """Change the scaling state.
 
-        Args
-        ----
+        Parameters
+        ----------
         coeffs : int ndarray[nvar_myproc, 2]
             0th and 1st order coefficients for scaling/unscaling.
         """
@@ -308,8 +308,8 @@ class DefaultVector(Vector):
 
         This method modifies both self (u) and step (du) in-place.
 
-        Args
-        ----
+        Parameters
+        ----------
         du : <Vector>
             Newton step; the backtracking is applied to this vector in-place.
         alpha : float
@@ -365,8 +365,8 @@ class DefaultVector(Vector):
 
         This method modifies both self (u) and step (du) in-place.
 
-        Args
-        ----
+        Parameters
+        ----------
         du : <Vector>
             Newton step; the backtracking is applied to this vector in-place.
         alpha : float
@@ -408,8 +408,8 @@ class DefaultVector(Vector):
 
         This method modifies both self (u) and step (du) in-place.
 
-        Args
-        ----
+        Parameters
+        ----------
         du : <Vector>
             Newton step; the backtracking is applied to this vector in-place.
         alpha : float

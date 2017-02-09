@@ -39,8 +39,8 @@ class NumberDict(OrderedDict):
     def __getitem__(self, item):
         """Get the item, or 0.
 
-        Args
-        ----
+        Parameters
+        ----------
         item : key
             key to get the item
 
@@ -57,8 +57,8 @@ class NumberDict(OrderedDict):
     def __coerce__(self, other):
         """Change other dict to NumberDicts.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : Dict
             the dict instance to be coerced
 
@@ -74,8 +74,8 @@ class NumberDict(OrderedDict):
     def __add__(self, other):
         """Add another NumberDict to myself.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : NumberDict
             the other NumberDict Instance
 
@@ -94,8 +94,8 @@ class NumberDict(OrderedDict):
     def __sub__(self, other):
         """Add another NumberDict from myself.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : NumberDict
             the other NumberDict Instance
 
@@ -114,8 +114,8 @@ class NumberDict(OrderedDict):
     def __rsub__(self, other):
         """Add subtract myself from another NumberDict.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : NumberDict
             the other NumberDict Instance
 
@@ -134,8 +134,8 @@ class NumberDict(OrderedDict):
     def __mul__(self, other):
         """Multiply myself by another NumberDict.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : NumberDict
             the other NumberDict Instance
 
@@ -154,8 +154,8 @@ class NumberDict(OrderedDict):
     def __div__(self, other):
         """Divide myself by another NumberDict.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : int
             value to divide by
 
@@ -174,8 +174,8 @@ class NumberDict(OrderedDict):
     def __repr__(self):
         """Return a string deceleration of myself.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : NumberDict
             the other NumberDict Instance
 
@@ -212,8 +212,8 @@ class PhysicalUnit(object):
     def __init__(self, names, factor, powers, offset=0):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         names : dict or str
             A dictionary mapping each name component to its
             associated integer power (e.g., C{{'m': 1, 's': -1}})
@@ -259,8 +259,8 @@ class PhysicalUnit(object):
     def __lt__(self, other):
         """Compare myself to other.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             The other physical unit to be compared to
 
@@ -277,8 +277,8 @@ class PhysicalUnit(object):
     def __gt__(self, other):
         """Compare myself to other.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             The other physical unit to be compared to
 
@@ -294,8 +294,8 @@ class PhysicalUnit(object):
     def __eq__(self, other):
         """Test for equality.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             The other physical unit to be compared to
 
@@ -311,8 +311,8 @@ class PhysicalUnit(object):
     def __mul__(self, other):
         """Multiply myself by other.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             The other physical unit to be compared to
 
@@ -340,8 +340,8 @@ class PhysicalUnit(object):
     def __div__(self, other):
         """Divide myself by other.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             The other physical unit to be operated on
 
@@ -367,8 +367,8 @@ class PhysicalUnit(object):
     def __rdiv__(self, other):
         """Divide other by myself.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             The other physical unit to be operated on
 
@@ -386,8 +386,8 @@ class PhysicalUnit(object):
     def __pow__(self, other):
         """Raise myself to a power.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : float or int
             power to raise self by
 
@@ -451,8 +451,8 @@ class PhysicalUnit(object):
     def conversion_tuple_to(self, other):
         """Compute the tuple of (factor, offset) for conversion.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             Another unit.
 
@@ -487,8 +487,8 @@ class PhysicalUnit(object):
     def is_compatible(self, other):
         """Check for compatibility with another unit.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             Another unit.
 
@@ -523,8 +523,8 @@ class PhysicalUnit(object):
     def set_name(self, name):
         """Set the name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             the name
         """
@@ -564,8 +564,8 @@ class PhysicalUnit(object):
 def _new_unit(name, factor, powers):
     """Create new Unit.
 
-    Args
-    ----
+    Parameters
+    ----------
     factor : float
         conversion factor to base units
     powers : [int, ...]
@@ -578,8 +578,8 @@ def _new_unit(name, factor, powers):
 def add_offset_unit(name, baseunit, factor, offset, comment=''):
     """Adding Offset Unit.
 
-    Args
-    ----
+    Parameters
+    ----------
     unit : str
         newly defined unit
     offset : float
@@ -608,8 +608,8 @@ def add_offset_unit(name, baseunit, factor, offset, comment=''):
 def add_unit(name, unit, comment=''):
     """Adding Unit.
 
-    Args
-    ----
+    Parameters
+    ----------
     unit : str
         newly defined unit
     comment : str
@@ -645,8 +645,8 @@ _UNIT_LIB.optionxform = _do_nothing
 def import_library(libfilepointer):
     """Import a units library, replacing any existing definitions.
 
-    Args
-    ----
+    Parameters
+    ----------
     libfilepointer : file
         new library file to work with
 
@@ -701,8 +701,8 @@ def import_library(libfilepointer):
 def update_library(filename):
     """Update units in current library from `filename`.
 
-    Args
-    ----
+    Parameters
+    ----------
     filename: string or file
         Source of units configuration data.
     """
@@ -722,8 +722,8 @@ def update_library(filename):
 def _update_library(cfg):
     """Update library from :class:`ConfigParser` `cfg`.
 
-    Args
-    ----
+    Parameters
+    ----------
     cfg: ConfigParser
         ConfigParser loaded with unit_lib.ini data
     """
@@ -780,8 +780,8 @@ _UNIT_CACHE = {}
 def _find_unit(unit):
     """Find unit helper function.
 
-    Args
-    ----
+    Parameters
+    ----------
     unit: str
         str representing the desired unit
 
@@ -843,8 +843,8 @@ def _find_unit(unit):
 def conversion_to_base_units(units):
     """Get the offset and scaler to convert from given units to base units.
 
-    Args
-    ----
+    Parameters
+    ----------
     units : str
         String representation of the units.
 
@@ -867,8 +867,8 @@ def is_compatible(old_units, new_units):
 
     e.g., m/s is compatible with ft/hr
 
-    Args
-    ----
+    Parameters
+    ----------
     old_units : str
         original units as a string.
     new_units : str or None
@@ -891,8 +891,8 @@ def is_compatible(old_units, new_units):
 def convert_units(val, old_units, new_units=None):
     """Take a given quantity and return in different units.
 
-    Args
-    ----
+    Parameters
+    ----------
     val : float
         value in original units.
     old_units : str or None

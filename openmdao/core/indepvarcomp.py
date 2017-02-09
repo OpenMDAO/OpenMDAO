@@ -27,8 +27,8 @@ class IndepVarComp(ExplicitComponent):
     def __init__(self, name=None, val=1.0, **kwargs):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str or None or [(str, value), ...] or [(str, value, kwargs), ...]
             name of the variable.
             If None, variables should be defined external to this class by calling add_output.
@@ -94,8 +94,8 @@ class IndepVarComp(ExplicitComponent):
                    res_ref=1.0, res_ref0=0.0, var_set=0):
         """Add an independent variable to this component.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in this component's namespace.
         val : float or list or tuple or ndarray

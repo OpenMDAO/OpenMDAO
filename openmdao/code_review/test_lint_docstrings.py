@@ -6,6 +6,8 @@ import importlib
 import inspect
 from six import PY3
 
+from numpydoc.docscrape import NumpyDocString
+
 directories = [
     'assemblers',
     'core',
@@ -17,11 +19,11 @@ directories = [
     'vectors',
 ]
 
-
 class LintTestCase(unittest.TestCase):
 
     def check_method(self, dir_name, file_name,
                      class_name, method_name, method):
+
         if PY3:
             argspec = inspect.getfullargspec(method)
         else:
@@ -39,63 +41,60 @@ class LintTestCase(unittest.TestCase):
         if doc[:3] == 'See':
             return
 
-        # Check if there are args
+        nds = NumpyDocString(doc)
+
+        fail_msg = '{0}, {1} : {2} {3}'.format(dir_name, file_name, class_name,
+                                               method_name)
+
         if len(argspec.args) > 1:
-            loc = doc.find('Args\n----')
 
-            # Check if args section exists in docstrings
-            if loc == -1:
-                self.fail('%s, %s : %s.%s ' %
-                    (dir_name, file_name, class_name,
-                     method_name) +
-                    '... missing Args section in docstring')
+            if not nds['Parameters']:
+                self.fail(fail_msg + '... does not have a Parameters section')
 
-            # Read the Args section in the docstring
-            istart = loc + 10
-            index = doc[istart:].find('\n\n')
-            if index == -1:
-                iend = len(doc)
-            else:
-                iend = istart + index
-            entries = doc[istart:iend].split('\n')
+            # Check formatting
+            for entry in nds['Parameters']:
+                name = entry[0]
+                type_ = entry[1]
+                desc = '\n'.join(entry[2])
 
-            num_args = len(argspec.args) - 1 + \
-                int(argspec.varargs is not None) + \
-                int(argspec.keywords is not None)
-            index = 0
-            # Check the Args section line-by-line
-            for line in entries:
-                if line[:4] == ' '*4 and line[4] != ' ':
-                    pass
-                else:
-                    # If currently on one of the args
-                    if index < len(argspec.args) - 1:
-                        arg = argspec.args[index+1]
-                        ind = len(arg)
-                        valid = line[:ind] == arg
-                        valid = valid and line[ind:ind+3] == ' : '
-                        if not valid:
-                            self.fail('%s, %s : %s.%s , %s ' %
-                                (dir_name, file_name, class_name,
-                                 method_name, arg) +
-                                '... formatting incorrect')
-                        index += 1
-                    # If currently on varargs or kwargs
-                    elif index < num_args:
-                        index += 1
-                    # If we've exceeded the counter
-                    else:
-                        self.fail('%s, %s : %s.%s ' %
-                            (dir_name, file_name, class_name,
-                             method_name) +
-                            '... formatting incorrect ' +
-                            'or too many arg docstrings')
-            # If we haven't reached the end
-            if index < num_args:
-                self.fail('%s, %s : %s.%s ' %
-                    (dir_name, file_name, class_name,
-                     method_name) +
-                    'missing arg docstrings')
+                if ':' in name:
+                    self.fail(fail_msg + '...colon after parameter '
+                                         'name \'{0}\' and before type must '
+                                         'be surrounded by '
+                                         'spaces'.format(name.split(':')[0]))
+                if type_ == '':
+                    self.fail(fail_msg + '...no type info given for '
+                                         '{0}'.format(name))
+                if desc == '':
+                    self.fail(fail_msg + '...no description given for '
+                                         '{0}'.format(name))
+
+            documented_arg_set = set(item[0] for item in nds['Parameters'])
+
+            arg_set = set(argspec.args)
+
+            # Require documentation of *args and **kwargs
+            if argspec.varargs:
+                arg_set |= set([argspec.varargs])
+
+            if argspec.keywords:
+                arg_set |= set([argspec.keywords])
+
+            # Don't require documentation of self
+            if 'self' in arg_set:
+                arg_set.remove('self')
+
+            # Arguments that aren't documented
+            undocumented = arg_set - documented_arg_set
+            if undocumented:
+                self.fail(fail_msg + '... is missing documentation for: '
+                                     '{0}'.format(str(list(undocumented))))
+
+            # Arguments that are documented but don't exist
+            overdocumented = documented_arg_set - arg_set
+            if overdocumented:
+                self.fail(fail_msg + '... documents nonexisting parameters: '
+                                     '{0}'.format(str(list(overdocumented))))
 
     def test_docstrings(self):
         topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

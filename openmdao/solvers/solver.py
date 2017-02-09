@@ -34,8 +34,8 @@ class Solver(object):
     def __init__(self, **kwargs):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs : dict
             options dictionary.
         """
@@ -68,8 +68,8 @@ class Solver(object):
     def _setup_solvers(self, system, depth):
         """Assign system instance, set depth, and optionally perform setup.
 
-        Args
-        ----
+        Parameters
+        ----------
         system : <System>
             pointer to the owning system.
         depth : int
@@ -81,8 +81,8 @@ class Solver(object):
     def _mpi_print(self, iteration, res, res0):
         """Print residuals from an iteration.
 
-        Args
-        ----
+        Parameters
+        ----------
         iteration : int
             iteration counter, 0-based.
         res : float
@@ -243,8 +243,8 @@ class LinearSolver(Solver):
     def solve(self, vec_names, mode):
         """Run the solver.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str

@@ -45,8 +45,8 @@ class Assembler(object):
     def __init__(self, comm):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         comm : MPI.Comm or <FakeComm>
             same instance as the <Problem>'s communicator.
         """
@@ -73,8 +73,8 @@ class Assembler(object):
             _variable_set_IDs
             _variable_set_indices
 
-        Args
-        ----
+        Parameters
+        ----------
         nvars : {'input': int, 'output': int}
             global number of variables.
         variable_metadata : {'input': list, 'output': list}
@@ -154,8 +154,8 @@ class Assembler(object):
         Sets the following attributes:
             _input_src_ids
 
-        Args
-        ----
+        Parameters
+        ----------
         connections : [(int, int), ...]
             index pairs representing user defined variable connections
             (in_ind, out_ind).
@@ -189,8 +189,8 @@ class Assembler(object):
             _src_indices
             _src_indices_range
 
-        Args
-        ----
+        Parameters
+        ----------
         input_metadata : [{}, ...]
             list of metadata dictionaries of inputs that exist on this proc.
         myproc_var_global_indices : ndarray[:]
@@ -227,8 +227,8 @@ class Assembler(object):
     def _setup_src_data(self, variable_metadata, variable_indices):
         """Compute and store unit/scaling information for inputs.
 
-        Args
-        ----
+        Parameters
+        ----------
         variable_metadata : list of dict
             list of metadata dictionaries for outputs of root system.
         variable_indices : int ndarray
@@ -291,8 +291,8 @@ class Assembler(object):
 
         Must be implemented by the subclass.
 
-        Args
-        ----
+        Parameters
+        ----------
         nsub_allprocs : int
             number of subsystems on all procs.
         var_range : [int, int]
