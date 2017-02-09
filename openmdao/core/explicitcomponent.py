@@ -20,18 +20,12 @@ class ExplicitComponent(Component):
         outputs = self._outputs
         residuals = self._residuals
 
-        residuals.set_vec(outputs)
-
-        self._inputs.scale(self._scaling_to_phys['input'])
-        self._outputs.scale(self._scaling_to_phys['output'])
-
-        self.compute(inputs, outputs)
-
-        self._inputs.scale(self._scaling_to_norm['input'])
-        self._outputs.scale(self._scaling_to_norm['output'])
-
-        residuals -= outputs
-        outputs += residuals
+        with self._units_scaling_context(inputs=[inputs], outputs=[outputs],
+                                         residuals=[residuals]):
+            residuals.set_vec(outputs)
+            self.compute(inputs, outputs)
+            residuals -= outputs
+            outputs += residuals
 
     def _solve_nonlinear(self):
         """Compute outputs.
@@ -45,19 +39,10 @@ class ExplicitComponent(Component):
         float
             absolute error.
         """
-        inputs = self._inputs
-        outputs = self._outputs
-        residuals = self._residuals
-
-        residuals.set_const(0.0)
-
-        self._inputs.scale(self._scaling_to_phys['input'])
-        self._outputs.scale(self._scaling_to_phys['output'])
-
-        self.compute(inputs, outputs)
-
-        self._inputs.scale(self._scaling_to_norm['input'])
-        self._outputs.scale(self._scaling_to_norm['output'])
+        with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
+                                         residuals=[self._residuals]):
+            self._residuals.set_const(0.0)
+            self.compute(self._inputs, self._outputs)
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product.
@@ -78,23 +63,14 @@ class ExplicitComponent(Component):
                     d_inputs, d_outputs, d_residuals = vecs
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
 
-                    self._inputs.scale(self._scaling_to_phys['input'])
-                    self._outputs.scale(self._scaling_to_phys['output'])
-                    d_inputs.scale(self._scaling_to_phys['input'])
-                    d_residuals.scale(self._scaling_to_phys['residual'])
-
-                    d_residuals *= -1.0
-
-                    self.compute_jacvec_product(
-                        self._inputs, self._outputs,
-                        d_inputs, d_residuals, mode)
-
-                    d_residuals *= -1.0
-
-                    self._inputs.scale(self._scaling_to_norm['input'])
-                    self._outputs.scale(self._scaling_to_norm['output'])
-                    d_inputs.scale(self._scaling_to_norm['input'])
-                    d_residuals.scale(self._scaling_to_norm['residual'])
+                    with self._units_scaling_context(inputs=[self._inputs, d_inputs],
+                                                     outputs=[self._outputs],
+                                                     residuals=[d_residuals]):
+                        d_residuals *= -1.0
+                        self.compute_jacvec_product(
+                            self._inputs, self._outputs,
+                            d_inputs, d_residuals, mode)
+                        d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.
@@ -118,10 +94,28 @@ class ExplicitComponent(Component):
         for vec_name in vec_names:
             d_outputs = self._vectors['output'][vec_name]
             d_residuals = self._vectors['residual'][vec_name]
-            if mode == 'fwd':
-                d_outputs.set_vec(d_residuals)
-            elif mode == 'rev':
-                d_residuals.set_vec(d_outputs)
+            with self._units_scaling_context(outputs=[d_outputs], residuals=[d_residuals]):
+                if mode == 'fwd':
+                    d_outputs.set_vec(d_residuals)
+                elif mode == 'rev':
+                    d_residuals.set_vec(d_outputs)
+
+    def _linearize(self):
+        """Compute jacobian / factorization."""
+        with self._jacobian_context() as J:
+            # negate constant subjacs (and others that will get overwritten)
+            # back to normal
+            self._negate_jac()
+
+            with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
+                                             scale_jac=True):
+                self.compute_jacobian(self._inputs, self._outputs, J)
+
+            # re-negate the jacobian
+            self._negate_jac()
+
+            if self._owns_global_jac:
+                J._update()
 
     def _setup_variables(self, recurse=False):
         """Assemble variable metadata and names lists.
@@ -159,28 +153,7 @@ class ExplicitComponent(Component):
                 for out_name in self._var_myproc_names['output']:
                     key = (out_name, in_name)
                     if key in self._jacobian:
-                        self._jacobian._negate(key)
-
-    def _linearize(self):
-        """Compute jacobian / factorization."""
-        with self._jacobian_context() as J:
-            # negate constant subjacs (and others that will get overwritten)
-            # back to normal
-            self._negate_jac()
-
-            self._inputs.scale(self._scaling_to_phys['input'])
-            self._outputs.scale(self._scaling_to_phys['output'])
-
-            self.compute_jacobian(self._inputs, self._outputs, J)
-
-            self._inputs.scale(self._scaling_to_norm['input'])
-            self._outputs.scale(self._scaling_to_norm['output'])
-
-            # re-negate the jacobian
-            self._negate_jac()
-
-            if self._owns_global_jac:
-                J._update()
+                        self._jacobian._multiply_subjac(key, -1.0)
 
     def _set_partials_meta(self):
         """Set subjacobian info into our jacobian."""
