@@ -1211,7 +1211,7 @@ class System(object):
 
             adder = -ref_0
 
-            scaler = \frac{1}{ref_1 + adder}
+            scaler = \frac{1}{ref + adder}
         """
         if name in self._design_vars:
             msg = "Design Variable '{}' already exists."
@@ -1325,7 +1325,7 @@ class System(object):
 
             adder = -ref_0
 
-            scaler = \frac{1}{ref_1 + adder}
+            scaler = \frac{1}{ref + adder}
         """
         # Name must be a string
         if not isinstance(name, string_types):
@@ -1451,10 +1451,6 @@ class System(object):
         ref0 : upper or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
 
-        indices : sequence of int, optional
-            If variable is an array, these indicate which entries are of
-            interest for this particular response.
-
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
@@ -1462,6 +1458,10 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
+
+        indices : sequence of int, optional
+            If variable is an array, these indicate which entries are of
+            interest for this particular response.
 
         kwargs : optional
             Keyword arguments that are saved as metadata for the
@@ -1490,7 +1490,7 @@ class System(object):
 
             adder = -ref_0
 
-            scaler = \frac{1}{ref_1 + adder}
+            scaler = \frac{1}{ref + adder}
         """
         meta = kwargs if kwargs else None
 
@@ -1552,7 +1552,7 @@ class System(object):
 
             adder = -ref_0
 
-            scaler = \frac{1}{ref_1 + adder}
+            scaler = \frac{1}{ref + adder}
         """
         meta = kwargs if kwargs else None
         if 'lower' in kwargs or 'upper' in kwargs or 'equals' in kwargs:
