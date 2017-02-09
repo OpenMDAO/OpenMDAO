@@ -22,17 +22,14 @@ from openmdao.utils.units import convert_units
 # This is for storing various data mapped to var pathname
 PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
 
-# Design Variables
 DesignVariable = namedtuple('DesignVariable', ['name', 'lower', 'upper',
                                                'scaler', 'adder', 'ref',
                                                'ref0', 'indices', 'metadata'])
 
-# Constraint
 Constraint = namedtuple('Constraint', ['name', 'lower', 'upper', 'equals',
                                        'scaler', 'adder', 'ref', 'ref0',
                                        'indices', 'metadata'])
 
-# Objective
 Objective = namedtuple('Objective', ['name', 'scaler', 'adder', 'ref',
                                      'ref0', 'indices', 'metadata'])
 
@@ -1437,10 +1434,7 @@ class System(object):
         Args
         ----
         name : string
-           Name of the response variable in the system.
-
-        type : string
-           The type of response.  Currently supported values are 'con' and 'obj'
+            Name of the response variable in the system.
 
         lower : float or ndarray, optional
             Lower boundary for the variable

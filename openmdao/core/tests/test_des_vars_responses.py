@@ -267,10 +267,6 @@ class TestDesvarOnModel(unittest.TestCase):
             prob.model.add_design_var('x', lower=0.0, upper=['a', 'b'],
                                       ref0=-100.0, ref=100)
 
-        self.assert_(str(context.exception).startswith('could not convert'
-                                                       'string to float'))
-
-
 class TestConstraintOnModel(unittest.TestCase):
 
     def test_constraint_affine_and_scaleradder(self):
