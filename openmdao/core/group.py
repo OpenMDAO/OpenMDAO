@@ -383,7 +383,6 @@ class Group(System):
         System or None
             System if found else None.
         """
-        sub = None
         system = self
         for subname in name.split('.'):
             for sub in system._subsystems_allprocs:
@@ -392,7 +391,7 @@ class Group(System):
                     break
             else:
                 return None
-        return sub
+        return system
 
     def _apply_nonlinear(self):
         """Compute residuals."""

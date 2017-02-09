@@ -184,6 +184,9 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(c2_1.name, 'comp1')
         self.assertEqual(c2_2.name, 'comp2')
 
+        s = p.model.get_subsystem('')
+        self.assertEqual(s, None)
+
         p.run_model()
 
         self.assertEqual(p['group1.comp1.x'],  5.0)
