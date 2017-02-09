@@ -37,8 +37,8 @@ class TestExplicitComponent(unittest.TestCase):
         comp = TestExplCompArray(thickness=1.)
         prob = Problem(comp).setup(check=False)
 
-        prob['lengths'] = 3.*numpy.ones((2, 2))
-        prob['widths'] = 2.*numpy.ones((2, 2))
+        prob['lengths'] = 3.
+        prob['widths'] = 2.
         prob.run_model()
         assert_rel_error(self, prob['total_volume'], 24.)
 

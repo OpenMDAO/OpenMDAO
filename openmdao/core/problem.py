@@ -157,13 +157,19 @@ class Problem(object):
         if pdata.typ == 'output':
             meta = self.model._var_myproc_metadata['output'][pdata.myproc_idx]
             if 'shape' in meta:
-                _check_shape(meta, value)
+                if np.isscalar(value):
+                    value = np.ones(meta['shape']) * value
+                else:
+                    _check_shape(meta['shape'], value)
             c0, c1 = self.model._scaling_to_norm['output'][pdata.myproc_idx, :]
             self.model._outputs[pathname] = c0 + c1 * np.array(value)
         else:
             meta = self.model._var_myproc_metadata['input'][pdata.myproc_idx]
             if 'shape' in meta:
-                _check_shape(meta, value)
+                if np.isscalar(value):
+                    value = np.ones(meta['shape']) * value
+                else:
+                    _check_shape(meta['shape'], value)
             c0, c1 = self.model._scaling_to_norm['input'][pdata.myproc_idx, :]
             self.model._inputs[pathname] = c0 + c1 * np.array(value)
 
@@ -537,7 +543,7 @@ class Problem(object):
         return totals
 
 
-def _check_shape(meta, val):
+def _check_shape(shape, val):
     """Check that the shape of a value matches the metadata for a variable.
 
     Args
@@ -547,10 +553,7 @@ def _check_shape(meta, val):
     val : float or ndarray or list
         value to check.
     """
-    if not np.isscalar(val):
-        val_shape = np.atleast_1d(val).shape
-    else:
-        val_shape = (1,)
-    if val_shape != meta['shape']:
+    val_shape = np.atleast_1d(val).shape
+    if val_shape != shape:
         raise ValueError("Incorrect size during assignment. Expected "
-                         "%s but got %s." % (meta['shape'], val_shape))
+                         "%s but got %s." % (shape, val_shape))

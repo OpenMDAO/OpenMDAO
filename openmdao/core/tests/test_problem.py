@@ -57,6 +57,11 @@ class TestProblem(unittest.TestCase):
         with assertRaisesRegex(self, ValueError, msg):
             prob['indep.num'] = bad_val
 
+        # check assign scalar to array
+        arr_val = new_val*np.ones((10, 1))
+        prob['indep.arr'] = new_val
+        assert_rel_error(self, prob['indep.arr'], arr_val, 1e-10)
+
         # check valid array value
         new_val = -10*np.ones((10, 1))
         prob['indep.arr'] = new_val
