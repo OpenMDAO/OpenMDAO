@@ -69,9 +69,9 @@ class LintTestCase(unittest.TestCase):
 
             # Require documentation of *args and **kwargs
             if argspec.varargs:
-                arg_set |= set([argspec.varargs])
+                arg_set |= {argspec.varargs}
             if argspec.keywords:
-                arg_set |= set([argspec.keywords])
+                arg_set |= {argspec.keywords}
 
             # Don't require documentation of self
             if 'self' in arg_set:
