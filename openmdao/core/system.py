@@ -1429,7 +1429,7 @@ class System(object):
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
                        indices=None, **kwargs):
-        r"""Add a response variable to this system.
+        r"""Add a constraint variable to this system.
 
         Args
         ----
