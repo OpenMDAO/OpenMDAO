@@ -1272,7 +1272,7 @@ class System(object):
            Name of the response variable in the system.
 
         type : string
-           The type of response.  Currently supported values are 'con' and 'obj'
+           The type of response. Supported values are 'con' and 'obj'
 
         lower : float or ndarray, optional
             Lower boundary for the variable
