@@ -383,24 +383,16 @@ class Group(System):
         System or None
             System if found else None.
         """
-        idot = name.find('.')
-
-        # If name does not contain '.', only check the immediate children
-        if idot == -1:
-            for subsys in self._subsystems_allprocs:
-                if subsys.name == name:
-                    return subsys
-        # If name does contain at least one '.', we have to recurse (possibly).
-        else:
-            sub_name = name[:idot]
-            for subsys in self._subsystems_allprocs:
-                # We only check if the prefix matches, and with the prefix removed.
-                if subsys.name == sub_name:
-                    result = subsys.get_subsystem(name[idot + 1:])
-                    if result:
-                        return result
-
-        return None
+        sub = None
+        system = self
+        for subname in name.split('.'):
+            for sub in system._subsystems_allprocs:
+                if sub.name == subname:
+                    system = sub
+                    break
+            else:
+                return None
+        return sub
 
     def _apply_nonlinear(self):
         """Compute residuals."""

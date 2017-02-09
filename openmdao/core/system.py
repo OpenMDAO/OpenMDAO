@@ -844,8 +844,8 @@ class System(object):
         if units is not None:
             raise NotImplementedError("units arg not supported yet")
         if self._inputs is None:
-            raise RuntimeError("Cannot access input '%s'. Setup has not been "
-                               "called." % name)
+            raise RuntimeError("%s: Cannot access input '%s'. Setup has not "
+                               "been called." % (self.name, name))
         try:
             return self._inputs[name]
         except KeyError:
@@ -863,8 +863,8 @@ class System(object):
             value to be set.
         """
         if self._inputs is None:
-            raise RuntimeError("Cannot access input '%s'. Setup has not been "
-                               "called." % name)
+            raise RuntimeError("%s: Cannot access input '%s'. Setup has not "
+                               "been called." % (self.name, name))
         try:
             self._inputs[name] = value
         except KeyError:
@@ -891,8 +891,8 @@ class System(object):
         if scaled or units is not None:
             raise NotImplementedError("scaled and units args not supported yet")
         if self._outputs is None:
-            raise RuntimeError("Cannot access output '%s'. Setup has not been "
-                               "called." % name)
+            raise RuntimeError("%s: Cannot access output '%s'. Setup has not "
+                               "been called." % (self.name, name))
         try:
             return self._outputs[name]
         except KeyError:
@@ -916,8 +916,8 @@ class System(object):
             the value to be set.
         """
         if self._outputs is None:
-            raise RuntimeError("Cannot access output '%s'. Setup has not been "
-                               "called." % name)
+            raise RuntimeError("%s: Cannot access output '%s'. Setup has not "
+                               "been called." % (self.name, name))
         try:
             self._outputs[name] = value
         except KeyError:
@@ -950,8 +950,8 @@ class System(object):
         if scaled or units is not None:
             raise NotImplementedError("scaled and units args not supported yet")
         if self._residuals is None:
-            raise RuntimeError("Cannot access residual '%s'. Setup has not been "
-                               "called." % name)
+            raise RuntimeError("%s: Cannot access residual '%s'. Setup has not "
+                               "been called." % (self.name, name))
 
         try:
             return self._residuals[name]
@@ -976,8 +976,8 @@ class System(object):
             the value to be set.
         """
         if self._residuals is None:
-            raise RuntimeError("Cannot access residual '%s'. Setup has not been "
-                               "called." % name)
+            raise RuntimeError("%s: Cannot access residual '%s'. Setup has not "
+                               "been called." % (self.name, name))
 
         try:
             self._residuals[name] = value
