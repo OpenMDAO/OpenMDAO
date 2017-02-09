@@ -24,31 +24,6 @@ from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
 
 class TestBGSSolver(unittest.TestCase):
 
-    def test_solve_linear_scipy(self):
-        """Solve implicit system with LinearBlockGS."""
-
-        group = TestImplicitGroup(lnSolverClass=LinearBlockGS)
-
-        p = Problem(group)
-        p.setup(check=False)
-        #p.model.suppress_solver_output = True
-
-        # forward
-        group._vectors['residual']['linear'].set_const(1.0)
-        group._vectors['output']['linear'].set_const(0.0)
-        group._solve_linear(['linear'], 'fwd')
-        output = group._vectors['output']['linear']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
-
-        # reverse
-        group._vectors['output']['linear'].set_const(1.0)
-        group._vectors['residual']['linear'].set_const(0.0)
-        group._solve_linear(['linear'], 'rev')
-        output = group._vectors['residual']['linear']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
-
     def test_solve_linear_maxiter(self):
         """Verify that LinearBlockGS abides by the 'maxiter' option."""
 
