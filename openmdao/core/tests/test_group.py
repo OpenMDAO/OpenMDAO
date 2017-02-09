@@ -5,6 +5,8 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 
+from openmdao.test_suite.groups.unit_conversion_groups import SrcComp
+
 
 class SimpleGroup(Group):
 
@@ -189,6 +191,16 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['group2.comp1.b'], 20.0)
         self.assertEqual(p['group2.comp2.b'], 40.0)
 
+    def test_reused_output_names(self):
+        prob = Problem(Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        G1 = prob.model.add_subsystem('G1', Group())
+        G1.add_subsystem("C1", ExecComp("y=2.0*x"), promotes=['y'])
+        G1.add_subsystem("C2", ExecComp("y=2.0*x"), promotes=['y'])
+        msg = "Output name 'y' refers to multiple outputs: \['G1.C2.y', 'G1.C1.y'\]."
+        with assertRaisesRegex(self, Exception, msg):
+            prob.setup(check=False)
+
 
 class TestConnect(unittest.TestCase):
 
@@ -258,7 +270,7 @@ class TestConnect(unittest.TestCase):
             self.prob.setup(check=False)
 
     def test_connect_within_system(self):
-        msg = "Input and output are in the same System for connection " + \
+        msg = "Output and input are in the same System for connection " + \
               "from 'tgt.y' to 'tgt.x'."
 
         with assertRaisesRegex(self, RuntimeError, msg):
@@ -271,7 +283,7 @@ class TestConnect(unittest.TestCase):
         sub.add_subsystem('tgt', ExecComp('y = x'), promotes_outputs=['y'])
         sub.connect('y', 'tgt.x', src_indices=[1])
 
-        msg = "Input and output are in the same System for connection " + \
+        msg = "Output and input are in the same System for connection " + \
               "in 'sub' from 'y' to 'tgt.x'."
 
         with assertRaisesRegex(self, RuntimeError, msg):
@@ -284,8 +296,40 @@ class TestConnect(unittest.TestCase):
         sub.add_subsystem('tgt', ExecComp('y = x'), renames_outputs={'y': 'y2'})
         sub.connect('y2', 'tgt.x', src_indices=[1])
 
-        msg = "Input and output are in the same System for connection " + \
+        msg = "Output and input are in the same System for connection " + \
               "in 'sub' from 'y2' to 'tgt.x'."
+
+        with assertRaisesRegex(self, RuntimeError, msg):
+            prob.setup(check=False)
+
+    def test_connect_units_with_unitless(self):
+        msg = "Units must be specified for both or neither side of " + \
+              "connection in '': " + \
+              "'src.x2' has units 'degC' but 'tgt.x' is unitless."
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        prob.model.add_subsystem('src', SrcComp())
+        prob.model.add_subsystem('tgt', ExecComp('y = x'))
+
+        prob.model.connect('px1.x1', 'src.x1')
+        prob.model.connect('src.x2', 'tgt.x')
+
+        with assertRaisesRegex(self, RuntimeError, msg):
+            prob.setup(check=False)
+
+    def test_connect_incompatible_units(self):
+        msg = "Output and input units are not compatible for " + \
+              "connection in '': " + \
+              "'src.x2' has units 'degC' but 'tgt.x' has units 'm'."
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        prob.model.add_subsystem('src', SrcComp())
+        prob.model.add_subsystem('tgt', ExecComp('y = x', units={'x': 'm'}))
+
+        prob.model.connect('px1.x1', 'src.x1')
+        prob.model.connect('src.x2', 'tgt.x')
 
         with assertRaisesRegex(self, RuntimeError, msg):
             prob.setup(check=False)

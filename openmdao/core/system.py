@@ -11,12 +11,13 @@ from six.moves import range
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
+from openmdao.jacobians.global_jacobian import GlobalJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import convert_units
 
 # This is for storing various data mapped to var pathname
-PathData = namedtuple("PathData", ['name', 'idx', 'typ'])
+PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
 
 
 class System(object):
@@ -49,7 +50,7 @@ class System(object):
         list of indices of subsystems on this proc among all of this system's
         subsystems (subsystems on all of this system's processors).
     _var_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
-        list of names of all owned variables, not just on current proc.
+        list of promoted names of all owned variables, not just on current proc.
     _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
         list of pathnames of all owned variables, not just on current proc.
     _var_allprocs_range : {'input': [int, int], 'output': [int, int]}
@@ -57,7 +58,7 @@ class System(object):
     _var_allprocs_indices : {'input': dict, 'output': dict}
         dictionary of global indices keyed by the variable name.
     _var_myproc_names : {'input': [str, ...], 'output': [str, ...]}
-        list of names of owned variables on current proc.
+        list of unpromoted names of owned variables on current proc.
     _var_myproc_metadata : {'input': list, 'output': list}
         list of metadata dictionaries of variables that exist on this proc.
     _var_pathdict : dict
@@ -102,12 +103,12 @@ class System(object):
     _transfers : dict of <Transfer>
         transfer object; points to _vector_transfers['nonlinear'].
     _jacobian : <Jacobian>
-        global <Jacobian> object to be used in apply_linear
+        <Jacobian> object to be used in apply_linear.
+    _owns_global_jac : bool
+        If True, we are owners of the GlobalJacobian in self._jacobian.
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
-    _pre_setup_jac : <GlobalJacobian>
-        Storage for a GlobalJacobian that was set prior to problem setup.
     _nl_solver : <NonlinearSolver>
         nonlinear solver to be used for solve_nonlinear.
     _ln_solver : <LinearSolver>
@@ -150,7 +151,7 @@ class System(object):
         self._var_myproc_indices = {'input': None, 'output': None}
 
         self._var_pathdict = {}
-        self._var_name2path = {}
+        self._var_name2path = {'input': {}, 'output': {}}
 
         self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
@@ -178,9 +179,9 @@ class System(object):
 
         self._jacobian = DefaultJacobian()
         self._jacobian._system = self
+        self._owns_global_jac = False
 
         self._subjacs_info = OrderedDict()
-        self._pre_setup_jac = None
 
         self._nl_solver = None
         self._ln_solver = None
@@ -430,31 +431,35 @@ class System(object):
 
         # Scaling coefficients from the src output
         src_units = self._assembler._src_units
-        src_0 = self._assembler._src_scaling_0
-        src_1 = self._assembler._src_scaling_1
+        src_scaling = self._assembler._src_scaling
 
         # Compute scaling arrays for inputs using a0 and a1
+        # Example:
+        #   Let x, x_src, x_tgt be the variable in dimensionless, source, and target units, resp.
+        #   x_src = a0 + a1 x
+        #   x_tgt = b0 + b1 x
+        #   x_tgt = g(x_src) = d0 + d1 x_src
+        #   b0 + b1 x = d0 + d1 a0 + d1 a1 x
+        #   b0 = d0 + d1 a0
+        #   b0 = g(a0)
+        #   b1 = d0 + d1 a1 - d0
+        #   b1 = g(a1) - g(0)
         for ind, meta in enumerate(self._var_myproc_metadata['input']):
             global_ind = self._var_myproc_indices['input'][ind]
             self._scaling_to_phys['input'][ind, 0] = \
-                convert_units(src_0[global_ind], src_units[global_ind],
-                              meta['units'])
+                convert_units(src_scaling[global_ind, 0], src_units[global_ind], meta['units'])
             self._scaling_to_phys['input'][ind, 1] = \
-                convert_units(src_1[global_ind], src_units[global_ind],
-                              meta['units'])
+                convert_units(src_scaling[global_ind, 1], src_units[global_ind], meta['units']) - \
+                convert_units(0., src_units[global_ind], meta['units'])
 
         for ind, meta in enumerate(self._var_myproc_metadata['output']):
             # Compute scaling arrays for outputs; no unit conversion needed
             self._scaling_to_phys['output'][ind, 0] = meta['ref0']
-            self._scaling_to_phys['output'][ind, 1] = \
-                meta['ref'] - meta['ref0']
+            self._scaling_to_phys['output'][ind, 1] = meta['ref'] - meta['ref0']
 
             # Compute scaling arrays for residuals; convert units
-            self._scaling_to_phys['residual'][ind, 0] = \
-                convert_units(meta['ref0'], meta['units'], meta['res_units'])
-            self._scaling_to_phys['residual'][ind, 1] = \
-                convert_units(meta['ref'] - meta['ref0'],
-                              meta['units'], meta['res_units'])
+            self._scaling_to_phys['residual'][ind, 0] = meta['ref0']
+            self._scaling_to_phys['residual'][ind, 1] = meta['ref'] - meta['ref0']
 
         # Compute inverse scaling arrays
         for key in ['input', 'output', 'residual']:
@@ -510,6 +515,42 @@ class System(object):
             sub_lower_bounds = lower_bounds._create_subvector(subsys)
             sub_upper_bounds = upper_bounds._create_subvector(subsys)
             subsys._setup_bounds_vectors(sub_lower_bounds, sub_upper_bounds, False)
+
+    @property
+    def jacobian(self):
+        """A Jacobian object or None."""
+        return self._jacobian
+
+    @jacobian.setter
+    def jacobian(self, jacobian):
+        """Set the Jacobian."""
+        self._owns_global_jac = isinstance(jacobian, GlobalJacobian)
+        self._jacobian = jacobian
+
+        # TODO: we need to set some sort of flag to tell us that setup
+        #  is now required since our jacobian has changed.
+
+    def _setup_jacobians(self, jacobian=None):
+        """Set and populate jacobians down through the system tree.
+
+        Args
+        ----
+        jacobian : <GlobalJacobian> or None
+            The global jacobian to populate for this system.
+        """
+        if self._owns_global_jac:
+            jacobian = self._jacobian
+        elif jacobian is not None:
+            self._jacobian = jacobian
+
+        self._set_partials_meta()
+
+        for subsys in self._subsystems_myproc:
+            subsys._setup_jacobians(jacobian)
+
+        if self._owns_global_jac:
+            self._jacobian._system = self
+            self._jacobian._initialize()
 
     def _get_transfers(self, vectors):
         """Compute transfers.
@@ -610,12 +651,28 @@ class System(object):
         return maps
 
     @contextmanager
+    def _jacobian_context(self):
+        """Context manager for jacobians.
+
+        Sets this system's _jacobian._system attribute to the current system.
+
+        Returns
+        -------
+        <Jacobian>
+            The current system's jacobian with its _system set to self.
+        """
+        oldsys = self._jacobian._system
+        self._jacobian._system = self
+        yield self._jacobian
+        self._jacobian._system = oldsys
+
+    @contextmanager
     def _matvec_context(self, vec_name, var_inds, mode, clear=True):
         """Context manager for vectors.
 
         For the given vec_name, return vectors that use a set of
         internal variables that are relevant to the current matrix-vector
-        product.
+        product.  This is called only from _apply_linear.
 
         Args
         ----
@@ -653,12 +710,12 @@ class System(object):
                 d_inputs.set_const(0.0)
                 d_outputs.set_const(0.0)
 
-        # TODO: check if we can loop over myproc vars to save time
         out_names = []
         res_names = []
+        var_ids = self._vector_var_ids[vec_name]
         out_ind = self._var_allprocs_range['output'][0]
         for out_name in self._var_allprocs_names['output']:
-            if out_ind in self._vector_var_ids[vec_name]:
+            if out_ind in var_ids:
                 res_names.append(out_name)
                 if var_inds is None or (var_inds[0] <= out_ind < var_inds[1] or
                                         var_inds[2] <= out_ind < var_inds[3]):
@@ -669,7 +726,7 @@ class System(object):
         in_ind = self._var_allprocs_range['input'][0]
         for in_name in self._var_allprocs_names['input']:
             out_ind = self._assembler._input_src_ids[in_ind]
-            if out_ind in self._vector_var_ids[vec_name]:
+            if out_ind in var_ids:
                 if var_inds is None or (var_inds[0] <= out_ind < var_inds[1] or
                                         var_inds[2] <= out_ind < var_inds[3]):
                     in_names.append(in_name)
@@ -695,8 +752,6 @@ class System(object):
     def nl_solver(self, solver):
         """Set this system's nonlinear solver and perform setup."""
         self._nl_solver = solver
-        if solver is not None:
-            self._nl_solver._setup_solvers(self, 0)
 
     @property
     def ln_solver(self):
@@ -707,8 +762,6 @@ class System(object):
     def ln_solver(self, solver):
         """Set this system's linear (adjoint) solver and perform setup."""
         self._ln_solver = solver
-        if solver is not None:
-            self._ln_solver._setup_solvers(self, 0)
 
     @property
     def suppress_solver_output(self):
@@ -733,55 +786,6 @@ class System(object):
     def proc_allocator(self, value):
         """Set the processor allocator object."""
         self._mpi_proc_allocator = value
-
-    @property
-    def jacobian(self):
-        """A Jacobian object or None."""
-        return self._jacobian
-
-    @jacobian.setter
-    def jacobian(self, jacobian):
-        """Set the Jacobian."""
-        self._set_jacobian(jacobian, True)
-
-    def _set_jacobian(self, jacobian, is_top):
-        """Recursively set the system's jacobian attribute.
-
-        Args
-        ----
-        jacobian : <Jacobian> or None
-            Global jacobian to be set; if None, reset to <DefaultJacobian>.
-        is_top : boolean
-            whether this is the top; i.e., start of the recursion.
-        """
-        # Don't update jacobians if we haven't run setup yet.  Just store
-        # for later and update at the end of setup. _assember is set at
-        # the beginning of setup.  It is assumed here that set_jacobian
-        # will never be called (by a user) during setup.
-        if self._assembler is None:
-            self._pre_setup_jac = jacobian
-            return
-
-        if jacobian is None:
-            jacobian = DefaultJacobian()
-        else:
-            if self._pre_setup_jac is jacobian:
-                self._pre_setup_jac = None
-
-            if is_top:
-                jacobian._top_name = self.pathname
-                jacobian._system = self
-                jacobian._assembler = self._assembler
-
-        jacobian._copy_from(self._jacobian)
-        self._jacobian = jacobian
-
-        for subsys in self._subsystems_myproc:
-            subsys._set_jacobian(jacobian, False)
-
-        if not isinstance(jacobian, DefaultJacobian) and is_top:
-            self._jacobian._system = self
-            self._jacobian._initialize()
 
     def _set_partials_meta(self):
         """Set subjacobian info into our jacobian.
@@ -821,6 +825,171 @@ class System(object):
             if recurse:
                 for sub in s.system_iter(local=local, recurse=True, typ=typ):
                     yield sub
+
+    def get_input(self, name, units=None):
+        """Return the named input value using the unpromoted name.
+
+        Args
+        ----
+        name : str
+            name of the variable.
+        units : str or None
+            if not None, return the value in the given units.
+
+        Returns
+        -------
+        float or ndarray
+            The value of the named variable.
+        """
+        if units is not None:
+            raise NotImplementedError("units arg not supported yet")
+        if self._inputs is None:
+            raise RuntimeError("Cannot access input '%s'. Setup has not been "
+                               "called." % name)
+        try:
+            return self._inputs[name]
+        except KeyError:
+            raise KeyError("%s: input '%s' not found." % (self.pathname,
+                                                          name))
+
+    def set_input(self, name, value):
+        """Set the value of the named input using the unpromoted name.
+
+        Args
+        ----
+        name : str
+            name of the variable.
+        value : float or ndarray
+            value to be set.
+        """
+        if self._inputs is None:
+            raise RuntimeError("Cannot access input '%s'. Setup has not been "
+                               "called." % name)
+        try:
+            self._inputs[name] = value
+        except KeyError:
+            raise KeyError("%s: input '%s' not found." % (self.pathname,
+                                                          name))
+
+    def get_output(self, name, scaled=False, units=None):
+        """Return the named output value using promoted or unpromoted name.
+
+        Args
+        ----
+        name : str
+            name of the variable.
+        scaled : bool
+            If True, return the scaled value.
+        units : str or None
+            If not None, return the value in the given units.
+
+        Returns
+        -------
+        float or ndarray
+            The value of the named variable.
+        """
+        if scaled or units is not None:
+            raise NotImplementedError("scaled and units args not supported yet")
+        if self._outputs is None:
+            raise RuntimeError("Cannot access output '%s'. Setup has not been "
+                               "called." % name)
+        try:
+            return self._outputs[name]
+        except KeyError:
+            # check for promoted name
+            start = len(self.pathname) + 1 if self.pathname else 0
+            try:
+                unprom = self._var_name2path['output'][name][start:]
+                return self._outputs[unprom]
+            except KeyError:
+                raise KeyError("%s: output '%s' not found." % (self.pathname,
+                                                               name))
+
+    def set_output(self, name, value):
+        """Return the named output value using promoted or unpromoted name.
+
+        Args
+        ----
+        name : str
+            name of the variable.
+        value : float or ndarray
+            the value to be set.
+        """
+        if self._outputs is None:
+            raise RuntimeError("Cannot access output '%s'. Setup has not been "
+                               "called." % name)
+        try:
+            self._outputs[name] = value
+        except KeyError:
+            # check for promoted name
+            start = len(self.pathname) + 1 if self.pathname else 0
+            try:
+                unprom = self._var_name2path['output'][name][start:]
+                self._outputs[unprom] = value
+            except KeyError:
+                raise KeyError("%s: output '%s' not found." % (self.pathname,
+                                                               name))
+
+    def get_residual(self, name, scaled=False, units=None):
+        """Return the named residual value using promoted or unpromoted name.
+
+        Args
+        ----
+        name : str
+            name of the variable.
+        scaled : bool
+            If True, return the scaled value.
+        units : str or None
+            If not None, return the value in the given units.
+
+        Returns
+        -------
+        float or ndarray
+            The value of the named residual.
+        """
+        if scaled or units is not None:
+            raise NotImplementedError("scaled and units args not supported yet")
+        if self._residuals is None:
+            raise RuntimeError("Cannot access residual '%s'. Setup has not been "
+                               "called." % name)
+
+        try:
+            return self._residuals[name]
+        except KeyError:
+            # check for promoted name
+            start = len(self.pathname) + 1 if self.pathname else 0
+            try:
+                unprom = self._var_name2path['output'][name][start:]
+                return self._residuals[unprom]
+            except KeyError:
+                raise KeyError("%s: residual '%s' not found." % (self.pathname,
+                                                                 name))
+
+    def set_residual(self, name, value):
+        """Set value of named residual using promoted or unpromoted name.
+
+        Args
+        ----
+        name : str
+            name of the variable.
+        value : float or ndarray
+            the value to be set.
+        """
+        if self._residuals is None:
+            raise RuntimeError("Cannot access residual '%s'. Setup has not been "
+                               "called." % name)
+
+        try:
+            self._residuals[name] = value
+        except KeyError:
+            # check for promoted name
+            start = len(self.pathname) + 1 if self.pathname else 0
+            try:
+                unprom = self._var_name2path['output'][name][start:]
+                self._residuals[unprom] = value
+            except KeyError:
+                raise KeyError("%s: residual '%s' not found." % (self.pathname,
+                                                                 name))
 
     def _apply_nonlinear(self):
         """Compute residuals."""

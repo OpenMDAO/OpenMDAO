@@ -11,6 +11,7 @@ from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.problem import Problem
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.solvers.ln_bgs import LinearBlockGS
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver, gmres
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec, \
      TestExplCompSimpleDense
@@ -485,6 +486,39 @@ class TestScipyIterativeSolver(unittest.TestCase):
         J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
         for key, val in iteritems(Jbase):
             assert_rel_error(self, J[key], val, .00001)
+
+    def test_solve_linear_precon(self):
+        """Solve implicit system with PetscKSP using a preconditioner."""
+
+        group = TestImplicitGroup(lnSolverClass=ScipyIterativeSolver)
+        precon = group.ln_solver.precon = LinearBlockGS()
+        precon.options['maxiter'] = 1
+
+        p = Problem(group)
+        p.setup(check=False)
+        p.model.suppress_solver_output = True
+
+        # forward
+        group._vectors['residual']['linear'].set_const(1.0)
+        group._vectors['output']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'fwd')
+
+        output = group._vectors['output']['linear']._data
+        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
+        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+
+        self.assertTrue(precon._iter_count > 0)
+
+        # reverse
+        group._vectors['output']['linear'].set_const(1.0)
+        group._vectors['residual']['linear'].set_const(0.0)
+        group._solve_linear(['linear'], 'rev')
+
+        output = group._vectors['residual']['linear']._data
+        assert_rel_error(self, output[0], group.expected_solution[0], 3e-15)
+        assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
+
+        self.assertTrue(precon._iter_count > 0)
 
 if __name__ == "__main__":
     unittest.main()

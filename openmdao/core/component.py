@@ -5,6 +5,7 @@ from __future__ import division
 from fnmatch import fnmatchcase
 from six import string_types, iteritems
 import numpy
+from scipy.sparse import issparse
 
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
@@ -19,26 +20,6 @@ class Component(System):
         A mapping of local variable name to its metadata.
     """
 
-    INPUT_DEFAULTS = {
-        'shape': (1,),
-        'units': '',
-        'var_set': 0,
-        'indices': None,
-    }
-
-    OUTPUT_DEFAULTS = {
-        'shape': (1,),
-        'units': '',
-        'var_set': 0,
-        'lower': None,
-        'upper': None,
-        'ref': 1.0,
-        'ref0': 0.0,
-        'res_units': '',
-        'res_ref': 1.0,
-        'res_ref0': 0.0,
-    }
-
     def __init__(self, **kwargs):
         """Initialize all attributes.
 
@@ -50,7 +31,7 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
         self._var2meta = {}
 
-    def add_input(self, name, val=1.0, shape=None, indices=None, units='', desc='', var_set=0):
+    def add_input(self, name, val=1.0, shape=None, indices=None, units=None, desc='', var_set=0):
         """Add an input variable to the component.
 
         Args
@@ -66,9 +47,9 @@ class Component(System):
             The indices of the source variable to transfer data from.
             If val is given as an array_like object, the shapes of val and indices must match.
             A value of None implies this input depends on all entries of source. Default is None.
-        units : str
+        units : str or None
             Units in which this input variable will be provided to the component during execution.
-            Default is '', which means it has no units.
+            Default is None, which means it has no units.
         desc : str
             description of the variable
         var_set : hashable object
@@ -84,8 +65,8 @@ class Component(System):
             raise TypeError('The shape argument should be an int, tuple, or list')
         if indices is not None and not isinstance(indices, (int, list, tuple, numpy.ndarray)):
             raise TypeError('The indices argument should be an int, list, tuple, or ndarray')
-        if units != '' and not isinstance(units, str):
-            raise TypeError('The units argument should be a str')
+        if units is not None and not isinstance(units, str):
+            raise TypeError('The units argument should be a str or None')
 
         if shape is not None:
             if isinstance(shape, int):
@@ -141,7 +122,7 @@ class Component(System):
         self._var_myproc_metadata['input'].append(metadata)
         self._var2meta[name] = metadata
 
-    def add_output(self, name, val=1.0, shape=None, units='', res_units='', desc='',
+    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
                    res_ref=1.0, res_ref0=0.0, var_set=0):
         """Add an output variable to the component.
@@ -155,14 +136,14 @@ class Component(System):
         shape : int or tuple or list or None
             Shape of this variable, only required if indices not provided and val is not an array.
             Default is None.
-        units : str
+        units : str or None
             Units in which the output variables will be provided to the component during execution.
-            Default is '', which means it has no units.
-        res_units : str
+            Default is None, which means it has no units.
+        res_units : str or None
             Units in which the residuals of this output will be given to the user when requested.
-            Default is '', which means it has no units.
+            Default is None, which means it has no units.
         desc : str
-            description of the variable
+            description of the variable.
         lower : float or list or tuple or ndarray or None
             lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
@@ -196,10 +177,10 @@ class Component(System):
             raise TypeError('The val argument should be a float, list, tuple, or ndarray')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
-        if units != '' and not isinstance(units, str):
-            raise TypeError('The units argument should be a str')
-        if res_units != '' and not isinstance(res_units, str):
-            raise TypeError('The res_units argument should be a str')
+        if units is not None and not isinstance(units, str):
+            raise TypeError('The units argument should be a str or None')
+        if res_units is not None and not isinstance(res_units, str):
+            raise TypeError('The res_units argument should be a str or None')
         if lower is not None and not numpy.isscalar(lower) and \
                 not isinstance(lower, (list, tuple, numpy.ndarray)):
             raise TypeError('The lower argument should be a float, list, tuple, or ndarray')
@@ -298,10 +279,29 @@ class Component(System):
         oflist = [of] if isinstance(of, string_types) else of
         wrtlist = [wrt] if isinstance(wrt, string_types) else wrt
 
-        if isinstance(rows, (list, tuple)):
-            rows = numpy.array(rows, dtype=int)
-        if isinstance(cols, (list, tuple)):
-            cols = numpy.array(cols, dtype=int)
+        # If only one of rows/cols is specified
+        if (rows is None) ^ (cols is None):
+            raise ValueError('If one of rows/cols is specified, then both must be specified')
+
+        if val is not None and not issparse(val):
+            val = numpy.atleast_1d(val)
+            # numpy.promote_types  will choose the smallest dtype that can contain both arguments
+            safe_dtype = numpy.promote_types(val.dtype, float)
+            val = val.astype(safe_dtype, copy=False)
+
+        if rows is not None:
+            if isinstance(rows, (list, tuple)):
+                rows = numpy.array(rows, dtype=int)
+            if isinstance(cols, (list, tuple)):
+                cols = numpy.array(cols, dtype=int)
+
+            if rows.shape != cols.shape:
+                raise ValueError('rows and cols must have the same shape,'
+                                 ' rows: {}, cols: {}'.format(rows.shape, cols.shape))
+
+            if val is not None and val.shape != (1,) and rows.shape != val.shape:
+                raise ValueError('If rows and cols are specified, val must be a scalar or have the '
+                                 'same shape, val: {}, rows/cols: {}'.format(val.shape, rows.shape))
 
         for of in oflist:
             for wrt in wrtlist:
@@ -338,13 +338,9 @@ class Component(System):
 
     def _set_partials_meta(self):
         """Set subjacobian info into our jacobian."""
-        oldsys = self._jacobian._system
-        self._jacobian._system = self
-
-        for key, meta, typ in self._iter_partials_matches():
-            self._jacobian._set_partials_meta(key, meta)
-
-        self._jacobian._system = oldsys
+        with self._jacobian_context() as J:
+            for key, meta, typ in self._iter_partials_matches():
+                J._set_partials_meta(key, meta)
 
     def _setup_variables(self, recurse=False):
         """Assemble variable metadata and names lists.
@@ -365,15 +361,57 @@ class Component(System):
 
         # set up absolute path info
         self._var_pathdict = {}
-        self._var_name2path = {}
+        self._var_name2path = {'input': {}, 'output': {}}
         for typ in ['input', 'output']:
             names = self._var_allprocs_names[typ]
-            self._var_allprocs_pathnames[typ] = paths = [
-                '.'.join((self.pathname, n)) for n in names]
+            if self.pathname:
+                self._var_allprocs_pathnames[typ] = paths = [
+                    '.'.join((self.pathname, n)) for n in names
+                ]
+            else:
+                self._var_allprocs_pathnames[typ] = paths = names
             for idx, name in enumerate(names):
                 path = paths[idx]
-                self._var_pathdict[path] = PathData(name, idx, typ)
-                self._var_name2path[name] = (path,)
+                self._var_pathdict[path] = PathData(name, idx, idx, typ)
+                if typ is 'input':
+                    self._var_name2path[typ][name] = (path,)
+                else:
+                    self._var_name2path[typ][name] = path
+
+        for (of, wrt), info in iteritems(self._subjacs_info):
+            if info['dependent']:
+                out_size = numpy.prod(self._var2meta[of]['shape'])
+                in_size = numpy.prod(self._var2meta[wrt]['shape'])
+                rows = info['rows']
+                cols = info['cols']
+                if rows is not None:
+                    if rows.min() < 0:
+                        msg = '{}: d({})/d({}): row indices must be non-negative'
+                        raise ValueError(msg.format(self.pathname, of, wrt))
+                    if cols.min() < 0:
+                        msg = '{}: d({})/d({}): col indices must be non-negative'
+                        raise ValueError(msg.format(self.pathname, of, wrt))
+                    if rows.max() >= out_size or cols.max() >= in_size:
+                        msg = '{}: d({})/d({}): Expected {}x{} but declared at least {}x{}'
+                        raise ValueError(msg.format(
+                            self.pathname, of, wrt,
+                            out_size, in_size,
+                            rows.max() + 1, cols.max() + 1
+                        ))
+                elif info['value'] is not None:
+                    val = info['value']
+                    val_shape = val.shape
+                    if len(val_shape) == 1:
+                        val_out, val_in = val_shape[0], 1
+                    else:
+                        val_out, val_in = val.shape
+                    if val_out > out_size or val_in > in_size:
+                        msg = '{}: d({})/d({}): Expected {}x{} but val is {}x{}'
+                        raise ValueError(msg.format(
+                            self.pathname, of, wrt,
+                            out_size, in_size,
+                            val_out, val_in
+                        ))
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
         r"""Add this vector and assign sub_vectors to subsystems.

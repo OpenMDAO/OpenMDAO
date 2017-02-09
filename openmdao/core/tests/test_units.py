@@ -6,22 +6,145 @@ from six.moves import cStringIO
 
 import numpy as np
 
-from openmdao.api import Problem
+from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.test_suite.groups.unit_conversion_groups import UnitConvGroup
+
+
+class SrcComp(ExplicitComponent):
+    """Source provides degrees Celsius."""
+
+    def initialize_variables(self):
+        self.add_input('x1', 100.0)
+        self.add_output('x2', 100.0, units='degC')
+
+    def compute(self, inputs, outputs):
+        """ Pass through."""
+        outputs['x2'] = inputs['x1']
+
+    def compute_jacobian(self, inputs, outputs, partials):
+        """ Derivative is 1.0"""
+        partials['x2', 'x1'] = 1.0
+
+
+class TgtCompF(ExplicitComponent):
+    """Target expressed in degrees F."""
+
+    def initialize_variables(self):
+        self.add_input('x2', 100.0, units='degF')
+        self.add_output('x3', 100.0)
+
+    def compute(self, inputs, outputs):
+        """ Pass through."""
+        outputs['x3'] = inputs['x2']
+
+    def compute_jacobian(self, inputs, outputs, partials):
+        """ Derivative is 1.0"""
+        partials['x3', 'x2'] = 1.0
+
+
+class TgtCompC(ExplicitComponent):
+    """Target expressed in degrees Celsius."""
+
+    def initialize_variables(self):
+        self.add_input('x2', 100.0, units='degC')
+        self.add_output('x3', 100.0)
+
+    def compute(self, inputs, outputs):
+        """ Pass through."""
+        outputs['x3'] = inputs['x2']
+
+    def compute_jacobian(self, inputs, outputs, partials):
+        """ Derivative is 1.0"""
+        partials['x3', 'x2'] = 1.0
+
+
+class TgtCompK(ExplicitComponent):
+    """Target expressed in degrees Kelvin."""
+
+    def initialize_variables(self):
+        self.add_input('x2', 100.0, units='degK')
+        self.add_output('x3', 100.0)
+
+    def compute(self, inputs, outputs):
+        """ Pass through."""
+        outputs['x3'] = inputs['x2']
+
+    def compute_jacobian(self, inputs, outputs, partials):
+        """ Derivative is 1.0"""
+        partials['x3', 'x2'] = 1.0
+
+
+class TgtCompFMulti(ExplicitComponent):
+    """Contains some extra inputs that might trip things up."""
+
+    def initialize_variables(self):
+        self.add_input('_x2', 100.0, units='degF')
+        self.add_input('x2', 100.0, units='degF')
+        self.add_input('x2_', 100.0, units='degF')
+        self.add_output('_x3', 100.0)
+        self.add_output('x3', 100.0)
+        self.add_output('x3_', 100.0)
+
+    def compute(self, params, unknowns):
+        """ Pass through."""
+        unknowns['x3'] = params['x2']
+
+    def compute_jacobian(self, params, unknowns, resids, J):
+        """ Derivative is 1.0"""
+        J['_x3', 'x2'] = np.array([1.0])
+        J['_x3', '_x2'] = 0.0
+        J['_x3', 'x2_'] = 0.0
+        J['x3', 'x2'] = np.array([1.0])
+        J['x3', '_x2'] = 0.0
+        J['x3', 'x2_'] = 0.0
+        J['x3_', 'x2'] = np.array([1.0])
+        J['x3_', '_x2'] = 0.0
+        J['x3_', 'x2_'] = 0.0
+
+
+class UnitConvGroup(Group):
+    """Group containing a degC source that feeds into three targets with
+    units degF, degC, and degK respectively. Good for testing unit
+    conversion."""
+
+    def initialize(self):
+        self.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        self.add_subsystem('src', SrcComp())
+        self.add_subsystem('tgtF', TgtCompF())
+        self.add_subsystem('tgtC', TgtCompC())
+        self.add_subsystem('tgtK', TgtCompK())
+
+        self.connect('px1.x1', 'src.x1')
+        self.connect('src.x2', 'tgtF.x2')
+        self.connect('src.x2', 'tgtC.x2')
+        self.connect('src.x2', 'tgtK.x2')
+
+
+class UnitConvGroupImplicitConns(Group):
+    """ Group containing a defF source that feeds into three targets with
+    units degF, degC, and degK respectively. Good for testing unit
+    conversion.
+
+    In this version, all connections are Implicit.
+    """
+
+    def initialize(self):
+        self.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
+        self.add_subsystem('src', SrcComp(), promotes=['x1', 'x2'])
+        self.add_subsystem('tgtF', TgtCompF(), promotes=['x2'])
+        self.add_subsystem('tgtC', TgtCompC(), promotes=['x2'])
+        self.add_subsystem('tgtK', TgtCompK(), promotes=['x2'])
 
 
 class TestUnitConversion(unittest.TestCase):
     """ Testing automatic unit conversion."""
 
     def test_basic(self):
-
-        raise unittest.SkipTest('Unit Conversion not working robustly at present.')
-
-        prob = Problem()
-        prob.model = UnitConvGroup()
+        prob = Problem(model=UnitConvGroup())
 
         prob.setup(check=False, mode='fwd')
+
+        # Check the outputs after running to test the unit conversions
         prob.run_model()
 
         assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
@@ -29,31 +152,23 @@ class TestUnitConversion(unittest.TestCase):
         assert_rel_error(self, prob['tgtC.x3'], 100.0, 1e-6)
         assert_rel_error(self, prob['tgtK.x3'], 373.15, 1e-6)
 
-        wrt = ['x1']
+        # Check the total derivatives in forward mode
+        wrt = ['px1.x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
         J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
 
-        assert_rel_error(self, J['tgtF.x3', 'x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3', 'x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3', 'x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+        assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
+        # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
-        prob.run()
-
+        prob.run_model()
         J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
 
-        assert_rel_error(self, J['tgtF.x3', 'x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3', 'x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3', 'x1'][0][0], 1.0, 1e-6)
-
-        # TODO - support FD
-
-        #J = prob.calc_gradient(indep_list, unknown_list, mode='fd',
-                               #return_format='dict')
-
-        #assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        #assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        #assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+        assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
         ## Need to clean up after FD gradient call, so just rerun.
         #prob.run()

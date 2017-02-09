@@ -59,6 +59,8 @@ clean:
 	rm -rf srcdocs/usr
 	rm -rf srcdocs/dev
 	rm -rf tags
+	rm -rf tmp
+	rm feature_docs_unit_test_db.sqlite
 
 mock:
 	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
@@ -69,21 +71,33 @@ redbaron:
 	is required to build the docs. Install with:\n pip install redbaron"; exit 1)
 
 html: mock redbaron
+
+	# Running things before docbuild
 	python utils/preprocess_tags.py
 	python utils/create_feature_docs_unit_test_db.py
+
+	# Cleaning up previously-generated files before docbuild
 	rm -rf $(BUILDDIR)/*
 	rm -rf srcdocs/usr
 	rm -rf srcdocs/dev
-	# Doing the first command in the background enables doing the two builds in 
-	#    parallel which does speed things up
-	# The -j eliminates the error that you get when each command tries to 
-	#    create the _build/html directory. Somehow sphinx knows it is running
-	#    in parallel so it knows not complain about that? Not really sure
-	#    but it works. 
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "dev" -j 1 &
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr" -j 1
+
+	# Doing the first command in the background does two builds in parallel
+	#       dev docs get built into tmp/moved into _build later
+	#       to avoid race to create dirs.
+	$(SPHINXBUILD) -b html -d tmp/doctrees  . tmp/html -t "dev" &
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr"
+
+	# Making dirs in which to move things, moving things (parallel build prob)
+	mkdir $(BUILDDIR)/html/srcdocs/dev
+	mkdir $(BUILDDIR)/doctrees/srcdocs/dev
+	cp -R tmp/html/srcdocs/dev $(BUILDDIR)/html/srcdocs
+	cp -R tmp/doctrees/srcdocs/dev $(BUILDDIR)/doctrees/srcdocs
+
+	# post-game clean-up
 	rm feature_docs_unit_test_db.sqlite
 	rm -rf tags
+	rm -rf tmp
+
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
