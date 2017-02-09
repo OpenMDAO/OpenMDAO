@@ -181,8 +181,7 @@ class Jacobian(object):
             if key[1] in self._system._var_name2path['input']:
                 out_path = outname2path[key[0]]
                 for ipath in self._system._var_name2path['input'][key[1]]:
-                    if (out_path, ipath) in self._subjacs:
-                        return True
+                    return (out_path, ipath) in self._subjacs
             elif key[1] in outname2path:
                 return (outname2path[key[0]], outname2path[key[1]]
                         ) in self._subjacs
@@ -331,17 +330,3 @@ class Jacobian(object):
             if meta['rows'] is not None:
                 val = [val, meta['rows'], meta['cols']]
             self.__setitem__(key, val)
-
-    def _copy_from(self, jac):
-        """Copy the subjac contents of the given jacobian into self.
-
-        Args
-        ----
-        jac : Jacobian
-            The jacobian to be copied.
-        """
-        old_subjacs = jac._subjacs_info
-        for key in old_subjacs:
-            self._subjacs_info[key] = old_subjacs[key]
-        for key in jac._subjacs:
-            self._subjacs[key] = jac._subjacs[key]
