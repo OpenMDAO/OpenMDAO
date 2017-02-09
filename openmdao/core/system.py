@@ -1158,32 +1158,24 @@ class System(object):
         Args
         ----
         name : string
-           Name of the design variable in the system.
-
+            Name of the design variable in the system.
         lower : float or ndarray, optional
             Lower boundary for the param
-
         upper : upper or ndarray, optional
             Upper boundary for the param
-
         ref : float or ndarray, optional
             Value of design var that scales to 1.0 in the driver.
-
         ref0 : upper or ndarray, optional
             Value of design var that scales to 0.0 in the driver.
-
         indices : iter of int, optional
             If a param is an array, these indicate which entries are of
             interest for this particular response.
-
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
-
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-
         kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
@@ -1266,38 +1258,28 @@ class System(object):
         Args
         ----
         name : string
-           Name of the response variable in the system.
-
+            Name of the response variable in the system.
         type : string
-           The type of response. Supported values are 'con' and 'obj'
-
+            The type of response. Supported values are 'con' and 'obj'
         lower : float or ndarray, optional
             Lower boundary for the variable
-
         upper : upper or ndarray, optional
             Upper boundary for the variable
-
         equals : equals or ndarray, optional
             Equality constraint value for the variable
-
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
-
         ref0 : upper or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
-
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
-
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
-
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-
         kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
@@ -1435,34 +1417,25 @@ class System(object):
         ----
         name : string
             Name of the response variable in the system.
-
         lower : float or ndarray, optional
             Lower boundary for the variable
-
         upper : upper or ndarray, optional
             Upper boundary for the variable
-
         equals : equals or ndarray, optional
             Equality constraint value for the variable
-
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
-
         ref0 : upper or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
-
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
-
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
-
         kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
@@ -1505,26 +1478,20 @@ class System(object):
         Args
         ----
         name : string
-           Name of the response variable in the system.
-
+            Name of the response variable in the system.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
-
         ref0 : upper or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
-
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
-
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
-
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-
         kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
