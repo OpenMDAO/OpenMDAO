@@ -290,7 +290,7 @@ class Component(System):
             Row indices for each nonzero entry.  For sparse subjacobians only.
         cols : ndarray of int or None
             Column indices for each nonzero entry.  For sparse subjacobians only.
-        val : float or ndarray of float
+        val : float or ndarray of float or scipy.sparse
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
 
