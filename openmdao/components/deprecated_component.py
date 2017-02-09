@@ -112,9 +112,9 @@ class Component(BaseComponent):
         for vec_name in vec_names:
             with self._matvec_context(vec_name, var_inds, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
-                self._jacobian._system = self
-                self._jacobian._apply(d_inputs, d_outputs, d_residuals,
-                                      mode)
+                with self._jacobian_context():
+                    self._jacobian._apply(d_inputs, d_outputs, d_residuals,
+                                          mode)
 
                 self._inputs.scale(self._scaling_to_phys['input'])
                 self._outputs.scale(self._scaling_to_phys['output'])
@@ -170,34 +170,33 @@ class Component(BaseComponent):
 
     def _linearize(self):
         """See System._linearize."""
-        self._jacobian._system = self
+        with self._jacobian_context():
+            self._inputs.scale(self._scaling_to_phys['input'])
+            self._outputs.scale(self._scaling_to_phys['output'])
 
-        self._inputs.scale(self._scaling_to_phys['input'])
-        self._outputs.scale(self._scaling_to_phys['output'])
+            J = self.linearize(self._inputs, self._outputs, self._residuals)
+            if J is not None:
+                for k in J:
+                    self._jacobian[k] = J[k]
 
-        J = self.linearize(self._inputs, self._outputs, self._residuals)
-        if J is not None:
-            for k in J:
-                self._jacobian[k] = J[k]
+            self._inputs.scale(self._scaling_to_norm['input'])
+            self._outputs.scale(self._scaling_to_norm['output'])
 
-        self._inputs.scale(self._scaling_to_norm['input'])
-        self._outputs.scale(self._scaling_to_norm['output'])
+            for out_name in self._var_myproc_names['output']:
+                if out_name in self._output_names:
+                    size = len(self._outputs._views_flat[out_name])
+                    ones = numpy.ones(size)
+                    arange = numpy.arange(size)
+                    self._jacobian[out_name, out_name] = (ones, arange, arange)
 
-        for out_name in self._var_myproc_names['output']:
-            if out_name in self._output_names:
-                size = len(self._outputs._views_flat[out_name])
-                ones = numpy.ones(size)
-                arange = numpy.arange(size)
-                self._jacobian[out_name, out_name] = (ones, arange, arange)
+            for out_name in self._var_myproc_names['output']:
+                if out_name in self._output_names:
+                    for in_name in self._var_myproc_names['input']:
+                        if (out_name, in_name) in self._jacobian:
+                            self._jacobian._negate((out_name, in_name))
 
-        for out_name in self._var_myproc_names['output']:
-            if out_name in self._output_names:
-                for in_name in self._var_myproc_names['input']:
-                    if (out_name, in_name) in self._jacobian:
-                        self._jacobian._negate((out_name, in_name))
-
-        if self._jacobian._top_name == self.pathname:
-            self._jacobian._update()
+            if self._owns_global_jac:
+                self._jacobian._update()
 
     def apply_nonlinear(self, params, unknowns, residuals):
         """Compute residuals given params and unknowns.

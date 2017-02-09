@@ -10,6 +10,7 @@ from openmdao.core.system import System, PathData
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
 from openmdao.solvers.ln_bgs import LinearBlockGS
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.units import is_compatible
 
 
 class Group(System):
@@ -24,10 +25,8 @@ class Group(System):
         # called nl_solver and ln_solver without documenting them.
         if not self._nl_solver:
             self._nl_solver = NonlinearBlockGS()
-            self._nl_solver._setup_solvers(self, 0)
         if not self._ln_solver:
             self._ln_solver = LinearBlockGS()
-            self._ln_solver._setup_solvers(self, 0)
 
     def add(self, name, subsys, promotes=None):
         """Deprecated version of <Group.add_subsystem>.
@@ -152,8 +151,9 @@ class Group(System):
             raise RuntimeError("Input '%s' is already connected to '%s'." %
                                (in_name, srcname))
 
+        # source and target should not be in the same system
         if out_name.rsplit('.', 1)[0] == in_name.rsplit('.', 1)[0]:
-            raise RuntimeError("Input and output are in the same System for " +
+            raise RuntimeError("Output and input are in the same System for " +
                                "connection from '%s' to '%s'." % (out_name, in_name))
 
         self._var_connections[in_name] = (out_name, src_indices)
@@ -180,8 +180,10 @@ class Group(System):
 
         allprocs_in_names = self._var_allprocs_names['input']
         myproc_in_names = self._var_myproc_names['input']
+        myproc_out_names = self._var_myproc_names['output']
         allprocs_out_names = self._var_allprocs_names['output']
         input_meta = self._var_myproc_metadata['input']
+        output_meta = self._var_myproc_metadata['output']
 
         in_offset = self._var_allprocs_range['input'][0]
         out_offset = self._var_allprocs_range['output'][0]
@@ -195,14 +197,12 @@ class Group(System):
             if out_name not in allprocs_out_names:
                 raise NameError("Output '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." %
-                                (out_name, self.name if self.name else 'model',
-                                 out_name, in_name))
+                                (out_name, self.name, out_name, in_name))
 
             if in_name not in allprocs_in_names:
                 raise NameError("Input '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." %
-                                (in_name, self.name if self.name else 'model',
-                                 out_name, in_name))
+                                (in_name, self.name, out_name, in_name))
 
             # throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -213,10 +213,52 @@ class Group(System):
                 else self._find_subsys_with_promoted_name(in_name, 'input')
 
             if out_subsys == in_subsys:
-                raise RuntimeError("Input and output are in the same System " +
+                raise RuntimeError("Output and input are in the same System " +
                                    "for connection in '%s' from '%s' to '%s'." %
-                                   (self.name if self.name else 'model',
-                                    out_name, in_name))
+                                   (self.name, out_name, in_name))
+
+            out_path = self._var_name2path['output'][out_name]
+            pdata = self._var_pathdict[out_path]
+            # TODO: we need to allgather unit information. Otherwise we can't
+            # error check units for any connections that cross processes
+            # because the metadata isn't available.
+            if pdata.myproc_idx is not None:
+                out_units = output_meta[pdata.myproc_idx]['units']
+                in_paths = self._var_name2path['input'][in_name]
+
+                for in_path in in_paths:
+                    pdata = self._var_pathdict[in_path]
+                    if pdata.myproc_idx is None:
+                        continue
+                    in_units = input_meta[pdata.myproc_idx]['units']
+
+                    # throw an error if one of input and output is unitless,
+                    # but the other isn't
+                    if (out_units and not in_units or
+                            in_units and not out_units):
+                        if out_units:
+                            out_units = "has units '%s'" % out_units
+                        else:
+                            out_units = "is unitless"
+                        if in_units:
+                            in_units = "has units '%s'" % in_units
+                        else:
+                            in_units = "is unitless"
+                        raise RuntimeError("Units must be specified for both or"
+                                           " neither side of connection in "
+                                           "'%s': '%s' %s but '%s' %s." %
+                                           (self.name, out_name, out_units,
+                                            in_name, in_units))
+
+                    # throw an error if the input and output units are not
+                    # compatible
+                    if not is_compatible(in_units, out_units):
+                        raise RuntimeError("Output and input units are not "
+                                           "compatible for connection in '%s':"
+                                           " '%s' has units '%s' but '%s' has "
+                                           "units '%s'." %
+                                           (self.name, out_name, out_units,
+                                            in_name, in_units))
 
             for in_index, name in enumerate(allprocs_in_names):
                 if name == in_name:
@@ -269,18 +311,25 @@ class Group(System):
     def initialize_variables(self):
         """Set up variable name and metadata lists."""
         self._var_pathdict = {}
-        self._var_name2path = {}
+        self._var_name2path = {'input': {}, 'output': {}}
 
+        start = len(self.pathname) + 1 if self.pathname else 0
         for typ in ['input', 'output']:
+            my_idx_dict = {}  # maps absolute path to myproc idx
+            myproc_names = self._var_myproc_names[typ]
+            name2path = self._var_name2path[typ]
+
             for subsys in self._subsystems_myproc:
                 # Assemble the names list from subsystems
                 subsys._var_maps[typ] = subsys._get_maps(typ)
                 paths = subsys._var_allprocs_pathnames[typ]
+
                 for idx, subname in enumerate(subsys._var_allprocs_names[typ]):
                     name = subsys._var_maps[typ][subname]
                     self._var_allprocs_names[typ].append(name)
                     self._var_allprocs_pathnames[typ].append(paths[idx])
-                    self._var_myproc_names[typ].append(name)
+                    my_idx_dict[paths[idx]] = len(myproc_names)
+                    myproc_names.append(paths[idx][start:])
 
                 # Assemble the metadata list from the subsystems
                 metadata = subsys._var_myproc_metadata[typ]
@@ -306,11 +355,20 @@ class Group(System):
 
             for idx, name in enumerate(self._var_allprocs_names[typ]):
                 path = self._var_allprocs_pathnames[typ][idx]
-                self._var_pathdict[path] = PathData(name, idx, typ)
-                if name in self._var_name2path:
-                    self._var_name2path[name].append(path)
+                self._var_pathdict[path] = PathData(name, idx,
+                                                    my_idx_dict.get(path), typ)
+                if name in name2path:
+                    if typ is 'input':
+                        name2path[name].append(path)
+                    else:
+                        raise RuntimeError("Output name '%s' refers to "
+                                           "multiple outputs: %s." %
+                                           (name, [path, name2path[name]]))
                 else:
-                    self._var_name2path[name] = [path]
+                    if typ is 'input':
+                        name2path[name] = [path]
+                    else:
+                        name2path[name] = path
 
     def get_subsystem(self, name):
         """Return the system called 'name' in the current namespace.
@@ -325,24 +383,15 @@ class Group(System):
         System or None
             System if found else None.
         """
-        idot = name.find('.')
-
-        # If name does not contain '.', only check the immediate children
-        if idot == -1:
-            for subsys in self._subsystems_allprocs:
-                if subsys.name == name:
-                    return subsys
-        # If name does contain at least one '.', we have to recurse (possibly).
-        else:
-            sub_name = name[:idot]
-            for subsys in self._subsystems_allprocs:
-                # We only check if the prefix matches, and with the prefix removed.
-                if subsys.name == sub_name:
-                    result = subsys.get_subsystem(name[idot + 1:])
-                    if result:
-                        return result
-
-        return None
+        system = self
+        for subname in name.split('.'):
+            for sub in system._subsystems_allprocs:
+                if sub.name == subname:
+                    system = sub
+                    break
+            else:
+                return None
+        return system
 
     def _apply_nonlinear(self):
         """Compute residuals."""
@@ -378,32 +427,31 @@ class Group(System):
             ranges of variable IDs involved in this matrix-vector product.
             The ordering is [lb1, ub1, lb2, ub2].
         """
-        # Use global Jacobian
-        if self._jacobian._top_name == self.pathname:
-            for vec_name in vec_names:
-                with self._matvec_context(vec_name, var_inds, mode) as vecs:
-                    d_inputs, d_outputs, d_residuals = vecs
-                    self._jacobian._system = self
-                    self._jacobian._apply(d_inputs, d_outputs, d_residuals,
-                                          mode)
-        # Apply recursion
-        else:
-            if mode == 'fwd':
+        with self._jacobian_context() as J:
+            # Use global Jacobian
+            if self._owns_global_jac:
                 for vec_name in vec_names:
-                    d_inputs = self._vectors['input'][vec_name]
-                    d_outputs = self._vectors['output'][vec_name]
-                    self._vector_transfers[vec_name][None](
-                        d_inputs, d_outputs, mode)
+                    with self._matvec_context(vec_name, var_inds, mode) as vecs:
+                        d_inputs, d_outputs, d_residuals = vecs
+                        J._apply(d_inputs, d_outputs, d_residuals, mode)
+            # Apply recursion
+            else:
+                if mode == 'fwd':
+                    for vec_name in vec_names:
+                        d_inputs = self._vectors['input'][vec_name]
+                        d_outputs = self._vectors['output'][vec_name]
+                        self._vector_transfers[vec_name][None](
+                            d_inputs, d_outputs, mode)
 
-            for subsys in self._subsystems_myproc:
-                subsys._apply_linear(vec_names, mode, var_inds)
+                for subsys in self._subsystems_myproc:
+                    subsys._apply_linear(vec_names, mode, var_inds)
 
-            if mode == 'rev':
-                for vec_name in vec_names:
-                    d_inputs = self._vectors['input'][vec_name]
-                    d_outputs = self._vectors['output'][vec_name]
-                    self._vector_transfers[vec_name][None](
-                        d_inputs, d_outputs, mode)
+                if mode == 'rev':
+                    for vec_name in vec_names:
+                        d_inputs = self._vectors['input'][vec_name]
+                        d_outputs = self._vectors['output'][vec_name]
+                        self._vector_transfers[vec_name][None](
+                            d_inputs, d_outputs, mode)
 
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.
@@ -428,10 +476,10 @@ class Group(System):
 
     def _linearize(self):
         """Compute jacobian / factorization."""
-        for subsys in self._subsystems_myproc:
-            subsys._linearize()
+        with self._jacobian_context() as J:
+            for subsys in self._subsystems_myproc:
+                subsys._linearize()
 
-        # Update jacobian
-        if self._jacobian._top_name == self.pathname:
-            self._jacobian._system = self
-            self._jacobian._update()
+            # Update jacobian
+            if self._owns_global_jac:
+                J._update()

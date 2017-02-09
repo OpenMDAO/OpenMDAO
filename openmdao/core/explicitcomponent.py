@@ -57,21 +57,20 @@ class ExplicitComponent(Component):
             ranges of variable IDs involved in this matrix-vector product.
             The ordering is [lb1, ub1, lb2, ub2].
         """
-        for vec_name in vec_names:
-            with self._matvec_context(vec_name, var_inds, mode) as vecs:
-                d_inputs, d_outputs, d_residuals = vecs
-                self._jacobian._system = self
-                self._jacobian._apply(d_inputs, d_outputs, d_residuals,
-                                      mode)
+        with self._jacobian_context() as J:
+            for vec_name in vec_names:
+                with self._matvec_context(vec_name, var_inds, mode) as vecs:
+                    d_inputs, d_outputs, d_residuals = vecs
+                    J._apply(d_inputs, d_outputs, d_residuals, mode)
 
-                with self._units_scaling_context(inputs=[self._inputs, d_inputs],
-                                                 outputs=[self._outputs],
-                                                 residuals=[d_residuals]):
-                    d_residuals *= -1.0
-                    self.compute_jacvec_product(
-                        self._inputs, self._outputs,
-                        d_inputs, d_residuals, mode)
-                    d_residuals *= -1.0
+                    with self._units_scaling_context(inputs=[self._inputs, d_inputs],
+                                                     outputs=[self._outputs],
+                                                     residuals=[d_residuals]):
+                        d_residuals *= -1.0
+                        self.compute_jacvec_product(
+                            self._inputs, self._outputs,
+                            d_inputs, d_residuals, mode)
+                        d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.
@@ -135,17 +134,17 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._setup_variables(False)
 
+        other_names = []
         for i, out_name in enumerate(self._var_myproc_names['output']):
             meta = self._var_myproc_metadata['output'][i]
             size = numpy.prod(meta['shape'])
             arange = numpy.arange(size)
             self.declare_partials(out_name, out_name, rows=arange, cols=arange,
                                   val=numpy.ones(size))
-
-        # a GlobalJacobian will not have been set at this point, so this will
-        # negate values in the DefaultJacobian. These will later be copied
-        # into the GlobalJacobian (if one is set).
-        self._negate_jac()
+            for other_name in other_names:
+                self.declare_partials(out_name, other_name, dependent=False)
+                self.declare_partials(other_name, out_name, dependent=False)
+            other_names.append(out_name)
 
     def _negate_jac(self):
         """Negate this component's part of the jacobian."""
@@ -158,14 +157,10 @@ class ExplicitComponent(Component):
 
     def _set_partials_meta(self):
         """Set subjacobian info into our jacobian."""
-        oldsys = self._jacobian._system
-        self._jacobian._system = self
-
-        for key, meta, typ in self._iter_partials_matches():
-            # only negate d_output/d_input partials
-            self._jacobian._set_partials_meta(key, meta, typ == 'input')
-
-        self._jacobian._system = oldsys
+        with self._jacobian_context() as J:
+            for key, meta, typ in self._iter_partials_matches():
+                # only negate d_output/d_input partials
+                J._set_partials_meta(key, meta, typ == 'input')
 
     def compute(self, inputs, outputs):
         """Compute outputs given inputs.

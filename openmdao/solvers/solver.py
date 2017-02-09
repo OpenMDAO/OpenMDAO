@@ -4,6 +4,7 @@ from __future__ import division, print_function
 import numpy
 
 from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.jacobians.global_jacobian import GlobalJacobian
 
 
 class Solver(object):
@@ -53,8 +54,6 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', type_=int, value=1,
                              desc='whether to print output')
-        self.options.declare('subsolvers', type_=dict, value={},
-                             desc='dictionary of solvers called by this one')
 
         self._declare_options()
         self.options.update(kwargs)
@@ -78,9 +77,6 @@ class Solver(object):
         """
         self._system = system
         self._depth = depth
-
-        for solver in self.options['subsolvers'].values():
-            solver._setup_solvers(system, depth + 1)
 
     def _mpi_print(self, iteration, res, res0):
         """Print residuals from an iteration.
@@ -185,41 +181,6 @@ class Solver(object):
             error at the first iteration.
         """
         pass
-
-    def set_subsolver(self, name, solver):
-        """Add a subsolver to this solver.
-
-        Args
-        ----
-        name : str
-            name of the subsolver.
-        solver : <Solver>
-            the subsolver instance.
-
-        Returns
-        -------
-        <Solver>
-            the subsolver instance.
-        """
-        self.options['subsolvers'][name] = solver
-        self.options['subsolvers'][name]._setup_solvers(self._system,
-                                                        self._depth + 1)
-        return solver
-
-    def get_subsolver(self, name):
-        """Get a subsolver.
-
-        Args
-        ----
-        name : str
-            name of the subsolver.
-
-        Returns
-        -------
-        <Solver>
-            the instance of the requested subsolver.
-        """
-        return self.options['subsolvers'][name]
 
     def __str__(self):
         """Return a string representation of the solver.
@@ -357,3 +318,23 @@ class LinearSolver(Solver):
             norm += b_vec.get_norm()**2
 
         return norm ** 0.5
+
+
+class BlockLinearSolver(LinearSolver):
+    """A base class for LinearBlockGS and LinearBlockJac."""
+
+    def _iter_initialize(self):
+        """Perform any necessary pre-processing operations.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
+        if isinstance(self._system._jacobian, GlobalJacobian):
+            raise RuntimeError("A block linear solver '%s' is being used with "
+                               "a GlobalJacobian in system '%s'" %
+                               (self.SOLVER, self._system.pathname))
+        return super(BlockLinearSolver, self)._iter_initialize()

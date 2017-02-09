@@ -104,8 +104,8 @@ class ImplicitComponent(Component):
                                              scale_jac=True):
                 self.linearize(self._inputs, self._outputs, J)
 
-        if self._jacobian._top_name == self.pathname:
-            self._jacobian._update()
+            if self._owns_global_jac:
+                J._update()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """Compute residuals given inputs and outputs.

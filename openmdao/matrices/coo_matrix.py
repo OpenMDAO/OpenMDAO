@@ -32,8 +32,10 @@ class CooMatrix(Matrix):
 
         submats = self._submats
         metadata = self._metadata
-
+        pre_metadata = {}
         for key, (info, irow, icol, src_indices, shape) in iteritems(submats):
+            if not info['dependent']:
+                continue
             val = info['value']
             rows = info['rows']
             dense = (rows is None and (val is None or
@@ -46,17 +48,17 @@ class CooMatrix(Matrix):
             else:
                 counter += len(rows)
             ind2 = counter
-            metadata[key] = (ind1, ind2, None)
+            pre_metadata[key] = (ind1, ind2, None)
 
         data = numpy.zeros(counter)
         rows = -numpy.ones(counter, int)
         cols = -numpy.ones(counter, int)
 
-        for key, (info, irow, icol, src_indices, shape) in iteritems(submats):
+        for key, (ind1, ind2, idxs) in iteritems(pre_metadata):
+            info, irow, icol, src_indices, shape = submats[key]
             val = info['value']
             dense = (info['rows'] is None and (val is None or
                      isinstance(val, ndarray)))
-            ind1, ind2, idxs = metadata[key]
 
             if dense:
                 jac_type = ndarray
