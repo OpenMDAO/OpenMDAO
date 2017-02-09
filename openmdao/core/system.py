@@ -15,6 +15,8 @@ from openmdao.jacobians.global_jacobian import GlobalJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import convert_units
+from openmdao.utils.general_utils import make_compatible
+
 
 # This is for storing various data mapped to var pathname
 PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
@@ -866,6 +868,11 @@ class System(object):
             raise RuntimeError("Cannot access input '%s'. Setup has not been "
                                "called." % name)
         try:
+            path = '.'.join((self.pathname, name)) if self.pathname else name
+            pdata = self._var_pathdict[path]
+            meta = self._var_myproc_metadata['input'][pdata.myproc_idx]
+            if 'shape' in meta:
+                value = make_compatible(meta, value)
             self._inputs[name] = value
         except KeyError:
             raise KeyError("%s: input '%s' not found." % (self.pathname,
@@ -919,6 +926,11 @@ class System(object):
             raise RuntimeError("Cannot access output '%s'. Setup has not been "
                                "called." % name)
         try:
+            path = '.'.join((self.pathname, name)) if self.pathname else name
+            pdata = self._var_pathdict[path]
+            meta = self._var_myproc_metadata['input'][pdata.myproc_idx]
+            if 'shape' in meta:
+                value = make_compatible(meta, value)
             self._outputs[name] = value
         except KeyError:
             # check for promoted name

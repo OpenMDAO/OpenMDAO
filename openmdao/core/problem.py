@@ -14,7 +14,7 @@ from openmdao.error_checking.check_config import check_config
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.core.component import Component
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import warn_deprecation, make_compatible
 
 
 class FakeComm(object):
@@ -157,19 +157,13 @@ class Problem(object):
         if pdata.typ == 'output':
             meta = self.model._var_myproc_metadata['output'][pdata.myproc_idx]
             if 'shape' in meta:
-                if np.isscalar(value):
-                    value = np.ones(meta['shape']) * value
-                else:
-                    _check_shape(meta['shape'], value)
+                value = make_compatible(meta, value)
             c0, c1 = self.model._scaling_to_norm['output'][pdata.myproc_idx, :]
             self.model._outputs[pathname] = c0 + c1 * np.array(value)
         else:
             meta = self.model._var_myproc_metadata['input'][pdata.myproc_idx]
             if 'shape' in meta:
-                if np.isscalar(value):
-                    value = np.ones(meta['shape']) * value
-                else:
-                    _check_shape(meta['shape'], value)
+                value = make_compatible(meta, value)
             c0, c1 = self.model._scaling_to_norm['input'][pdata.myproc_idx, :]
             self.model._inputs[pathname] = c0 + c1 * np.array(value)
 
@@ -530,19 +524,3 @@ class Problem(object):
                                     totals[key][idx, :] = deriv_val
 
         return totals
-
-
-def _check_shape(shape, val):
-    """Check that the shape of a value matches the metadata for a variable.
-
-    Args
-    ----
-    meta : dict
-        metadata for a variable.
-    val : float or ndarray or list
-        value to check.
-    """
-    val_shape = np.atleast_1d(val).shape
-    if val_shape != shape:
-        raise ValueError("Incorrect size during assignment. Expected "
-                         "%s but got %s." % (shape, val_shape))
