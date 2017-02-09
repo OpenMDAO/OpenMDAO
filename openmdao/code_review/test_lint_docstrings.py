@@ -19,6 +19,7 @@ directories = [
     'vectors',
 ]
 
+
 class LintTestCase(unittest.TestCase):
 
     def check_method(self, dir_name, file_name,
@@ -30,21 +31,18 @@ class LintTestCase(unittest.TestCase):
             argspec = inspect.getargspec(method)
         doc = inspect.getdoc(method)
 
+        fail_msg = '{0}, {1} : {2} {3}'.format(dir_name, file_name, class_name,
+                                               method_name)
+
         # Check if docstring is missing
         if doc is None:
-            self.fail('%s, %s : %s.%s ' %
-                (dir_name, file_name, class_name,
-                 method_name) +
-                '... missing docstring')
+            self.fail(fail_msg + '... missing docstring')
 
         # Check if docstring references another method
         if doc[:3] == 'See':
             return
 
         nds = NumpyDocString(doc)
-
-        fail_msg = '{0}, {1} : {2} {3}'.format(dir_name, file_name, class_name,
-                                               method_name)
 
         if len(argspec.args) > 1:
 
@@ -112,13 +110,15 @@ class LintTestCase(unittest.TestCase):
             # Loop over files
             for file_name in os.listdir(dirpath):
                 if file_name != '__init__.py' and file_name[-3:] == '.py':
-                    if print_info: print(file_name)
+                    if print_info:
+                        print(file_name)
 
                     module_name = 'openmdao.%s.%s' % (dir_name, file_name[:-3])
                     try:
                         mod = importlib.import_module(module_name)
                     except ImportError as err:
-                        if print_info: print('Skipped:', err)
+                        if print_info:
+                            print('Skipped:', err)
                         # e.g. PETSc is not installed
                         continue
 
@@ -127,9 +127,10 @@ class LintTestCase(unittest.TestCase):
                                if inspect.isclass(getattr(mod, x)) and
                                getattr(mod, x).__module__ == module_name]
                     for class_name in classes:
-                        if print_info: print(' '*4, class_name)
+                        if print_info:
+                            print(' '*4, class_name)
                         clss = getattr(mod, class_name)
-                        
+
                         # skip namedtuples
                         if issubclass(clss, tuple):
                             continue
@@ -139,11 +140,12 @@ class LintTestCase(unittest.TestCase):
                                    if inspect.ismethod(getattr(clss, x)) and
                                    x in clss.__dict__]
                         for method_name in methods:
-                            if print_info: print(' '*8, method_name)
+                            if print_info:
+                                print(' '*8, method_name)
                             method = getattr(clss, method_name)
 
-                            self.check_method(dir_name, file_name,
-                                class_name, method_name, method)
+                            self.check_method(dir_name, file_name, class_name,
+                                              method_name, method)
 
 
 if __name__ == '__main__':
