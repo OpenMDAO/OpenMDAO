@@ -134,7 +134,7 @@ class ImplicitComponent(Component):
             self._inputs.scale(self._scaling_to_norm['input'])
             self._outputs.scale(self._scaling_to_norm['output'])
 
-            if J._top_name == self.pathname:
+            if self._owns_global_jac:
                 J._update()
 
     def apply_nonlinear(self, inputs, outputs, residuals):

@@ -155,9 +155,21 @@ class Problem(object):
         pathname, pdata = self._get_path_data(name)
 
         if pdata.typ == 'output':
+            meta = self.model._var_myproc_metadata['output'][pdata.myproc_idx]
+            if 'shape' in meta:
+                if np.isscalar(value):
+                    value = np.ones(meta['shape']) * value
+                else:
+                    _check_shape(meta['shape'], value)
             c0, c1 = self.model._scaling_to_norm['output'][pdata.myproc_idx, :]
             self.model._outputs[pathname] = c0 + c1 * np.array(value)
         else:
+            meta = self.model._var_myproc_metadata['input'][pdata.myproc_idx]
+            if 'shape' in meta:
+                if np.isscalar(value):
+                    value = np.ones(meta['shape']) * value
+                else:
+                    _check_shape(meta['shape'], value)
             c0, c1 = self.model._scaling_to_norm['input'][pdata.myproc_idx, :]
             self.model._inputs[pathname] = c0 + c1 * np.array(value)
 
@@ -308,25 +320,14 @@ class Problem(object):
         # Vector setup for the linear vector
         self.setup_vector('linear', vector_class, self._use_ref_vector)
 
-        to_set = []
+        model._setup_jacobians()
+
         for system in model.system_iter(include_self=True, recurse=True):
-            # set info from our _subjacs_info into DefaultJacobian.
-            # If a GlobalJacobian is set later, it will copy the subjac
-            # info from the DefaultJacobian.
-            system._set_partials_meta()
-
-            # check to see if a global jacobian was set prior to setup
-            if system._pre_setup_jac is not None:
-                to_set.append(system)
-
-            # While we are recursing, we can set up all the solvers.
+            # set up all the solvers.
             if system._nl_solver is not None:
                 system._nl_solver._setup_solvers(system, 0)
             if system._ln_solver is not None:
                 system._ln_solver._setup_solvers(system, 0)
-
-        for system in to_set:
-            system._set_jacobian(system._pre_setup_jac, True)
 
         if check:
             check_config(self, logger)
@@ -529,3 +530,19 @@ class Problem(object):
                                     totals[key][idx, :] = deriv_val
 
         return totals
+
+
+def _check_shape(shape, val):
+    """Check that the shape of a value matches the metadata for a variable.
+
+    Args
+    ----
+    meta : dict
+        metadata for a variable.
+    val : float or ndarray or list
+        value to check.
+    """
+    val_shape = np.atleast_1d(val).shape
+    if val_shape != shape:
+        raise ValueError("Incorrect size during assignment. Expected "
+                         "%s but got %s." % (shape, val_shape))

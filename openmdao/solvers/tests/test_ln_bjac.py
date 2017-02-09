@@ -24,8 +24,8 @@ class TestLinearBlockGSSolver(unittest.TestCase):
         model.ln_solver = LinearBlockGS()
         model.suppress_solver_output = True
 
-        prob.setup(check=False, mode='fwd')
         prob.model.jacobian = GlobalJacobian()
+        prob.setup(check=False, mode='fwd')
         
         prob['width'] = 2.0
         prob.run_model()
@@ -54,8 +54,8 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         model.ln_solver = LinearBlockJac()
         model.suppress_solver_output = True
 
-        prob.setup(check=False, mode='fwd')
         prob.model.jacobian = GlobalJacobian()
+        prob.setup(check=False, mode='fwd')
         
         prob['width'] = 2.0
         prob.run_model()
