@@ -164,47 +164,6 @@ def _test_func_name(func, num, param):
 
 
 class TestJacobian(unittest.TestCase):
-
-    def test_jacobian_pre_setup(self):
-        prob = Problem(model=Group())
-        top = prob.model
-
-        top.add_subsystem('indep',
-                          IndepVarComp((
-                              ('a', np.ones(3)),
-                              ('b', np.ones(2)),
-                          )))
-        C1 = top.add_subsystem('C1', MyExplicitComp(np.array))
-        C2 = top.add_subsystem('C2', MyExplicitComp2(np.array))
-        top.connect('indep.a', 'C1.x', src_indices=[2, 0])
-        top.connect('indep.b', 'C1.y')
-        top.connect('indep.a', 'C2.w', src_indices=[0, 2, 1])
-        top.connect('C1.f', 'C2.z', src_indices=[1])
-
-        top.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
-
-        top.nl_solver = NewtonSolver()
-        top.nl_solver.ln_solver = ScipyIterativeSolver(maxiter=100)
-
-        top.ln_solver = ScipyIterativeSolver(
-            maxiter=200, atol=1e-10, rtol=1e-10)
-        prob.model.suppress_solver_output = True
-
-        prob.setup(check=False)
-
-        prob.run_model()
-
-        # if we multiply our jacobian (at x,y = ones) by our work vec of 1's,
-        # we get fwd_check
-        fwd_check = np.array([1.0, 1.0, 1.0, 1.0, 1.0, -24., -74., -8.])
-
-        # if we multiply our jacobian's transpose by our work vec of 1's,
-        # we get rev_check
-        rev_check = np.array([-35., -5., 9., -63., -3., 1., -6., 1.])
-
-        self._check_fwd(prob, fwd_check)
-        self._check_rev(prob, rev_check)
-
     @parameterized.expand(itertools.product(
         [DenseMatrix, CsrMatrix, CooMatrix],
         [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist],

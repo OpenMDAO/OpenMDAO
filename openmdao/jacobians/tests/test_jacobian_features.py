@@ -49,8 +49,17 @@ class SimpleCompDependence(SimpleComp):
         self.declare_partials('f', ['y1', 'y2'], dependent=False)
         self.declare_partials('g', 'z', dependent=False)
 
-class SimpleCompConst(SimpleComp):
-    def initialize_partials(self):
+
+class SimpleCompConst(ExplicitComponent):
+    def initialize_variables(self):
+        self.add_input('x', shape=1)
+        self.add_input('y1', shape=2)
+        self.add_input('y2', shape=2)
+        self.add_input('z', shape=(2, 2))
+
+        self.add_output('f', shape=1)
+        self.add_output('g', shape=(2, 2))
+
         self.declare_partials('f', ['y1', 'y2'], dependent=False)
         self.declare_partials('g', 'z', dependent=False)
 
@@ -60,9 +69,9 @@ class SimpleCompConst(SimpleComp):
         self.declare_partials('g', 'y2', val=1., cols=[0, 0, 1, 1], rows=[0, 3, 0, 3])
         self.declare_partials('g', 'x', val=sp.sparse.coo_matrix(((1., 1.), ((0, 3), (0, 0)))))
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
-        pass
-
+    def compute(self, inputs, outputs):
+        outputs['f'] = np.sum(inputs['z']) + inputs['x']
+        outputs['g'] = np.outer(inputs['y1'], inputs['y2']) + inputs['x'] * np.eye(2)
 
 class SimpleCompKwarg(SimpleComp):
     def __init__(self, partial_kwargs):
