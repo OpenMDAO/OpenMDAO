@@ -24,7 +24,6 @@ class LintTestCase(unittest.TestCase):
 
     def check_method(self, dir_name, file_name,
                      class_name, method_name, method):
-
         if PY3:
             argspec = inspect.getfullargspec(method)
         else:
@@ -33,7 +32,6 @@ class LintTestCase(unittest.TestCase):
 
         fail_msg = '{0}, {1} : {2} {3}'.format(dir_name, file_name, class_name,
                                                method_name)
-
         # Check if docstring is missing
         if doc is None:
             self.fail(fail_msg + '... missing docstring')
@@ -54,7 +52,6 @@ class LintTestCase(unittest.TestCase):
                 name = entry[0]
                 type_ = entry[1]
                 desc = '\n'.join(entry[2])
-
                 if ':' in name:
                     self.fail(fail_msg + '...colon after parameter '
                                          'name \'{0}\' and before type must '
@@ -68,13 +65,11 @@ class LintTestCase(unittest.TestCase):
                                          '{0}'.format(name))
 
             documented_arg_set = set(item[0] for item in nds['Parameters'])
-
             arg_set = set(argspec.args)
 
             # Require documentation of *args and **kwargs
             if argspec.varargs:
                 arg_set |= set([argspec.varargs])
-
             if argspec.keywords:
                 arg_set |= set([argspec.keywords])
 
