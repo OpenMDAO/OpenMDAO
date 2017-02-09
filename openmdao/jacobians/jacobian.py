@@ -108,7 +108,8 @@ class Jacobian(object):
         Args
         ----
         key : (str, str)
-            output name, input name of sub-Jacobian.
+            Output name, input name of sub-Jacobian.
+            The names are in the current system's namespace, unpromoted.
         val : float
             value to multiply by.
         """
@@ -264,14 +265,14 @@ class Jacobian(object):
         val = coeffs['residual'][ind0, 1] / coeffs[typ][ind1, 1]
         self._multiply_subjac(key, val)
 
-    def scale(self, coeffs):
-        """Change the scaling state.
+    def _scale(self, coeffs):
+        """Change the scaling state for all subjacs under the current system.
 
         Args
         ----
         coeffs : dict of ndarray[nvar_myproc, 2]
             0th and 1st order coefficients for scaling/unscaling.
-            The keys are 'input', 'output', and 'residual'
+            The keys are 'input', 'output', and 'residual'.
         """
         for key in self:
             self._scale_subjac(key, coeffs)

@@ -16,16 +16,12 @@ class ExplicitComponent(Component):
 
     def _apply_nonlinear(self):
         """Compute residuals."""
-        inputs = self._inputs
-        outputs = self._outputs
-        residuals = self._residuals
-
-        with self._units_scaling_context(inputs=[inputs], outputs=[outputs],
-                                         residuals=[residuals]):
-            residuals.set_vec(outputs)
-            self.compute(inputs, outputs)
-            residuals -= outputs
-            outputs += residuals
+        with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
+                                         residuals=[self._residuals]):
+            self._residuals.set_vec(self._outputs)
+            self.compute(self._inputs, self._outputs)
+            self._residuals -= self._outputs
+            self._outputs += self._residuals
 
     def _solve_nonlinear(self):
         """Compute outputs.
@@ -57,20 +53,23 @@ class ExplicitComponent(Component):
             ranges of variable IDs involved in this matrix-vector product.
             The ordering is [lb1, ub1, lb2, ub2].
         """
-        with self._jacobian_context() as J:
-            for vec_name in vec_names:
-                with self._matvec_context(vec_name, var_inds, mode) as vecs:
-                    d_inputs, d_outputs, d_residuals = vecs
+        for vec_name in vec_names:
+            with self._matvec_context(vec_name, var_inds, mode) as vecs:
+                d_inputs, d_outputs, d_residuals = vecs
+
+                # Jacobian and vectors are all scaled, unitless
+                with self._jacobian_context() as J:
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
 
-                    with self._units_scaling_context(inputs=[self._inputs, d_inputs],
-                                                     outputs=[self._outputs],
-                                                     residuals=[d_residuals]):
-                        d_residuals *= -1.0
-                        self.compute_jacvec_product(
-                            self._inputs, self._outputs,
-                            d_inputs, d_residuals, mode)
-                        d_residuals *= -1.0
+                # Jacobian and vectors are all unscaled, dimensional
+                with self._units_scaling_context(inputs=[self._inputs, d_inputs],
+                                                 outputs=[self._outputs],
+                                                 residuals=[d_residuals]):
+                    d_residuals *= -1.0
+                    self.compute_jacvec_product(
+                        self._inputs, self._outputs,
+                        d_inputs, d_residuals, mode)
+                    d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.
@@ -94,6 +93,7 @@ class ExplicitComponent(Component):
         for vec_name in vec_names:
             d_outputs = self._vectors['output'][vec_name]
             d_residuals = self._vectors['residual'][vec_name]
+
             with self._units_scaling_context(outputs=[d_outputs], residuals=[d_residuals]):
                 if mode == 'fwd':
                     d_outputs.set_vec(d_residuals)

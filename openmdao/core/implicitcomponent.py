@@ -50,17 +50,20 @@ class ImplicitComponent(Component):
             ranges of variable IDs involved in this matrix-vector product.
             The ordering is [lb1, ub1, lb2, ub2].
         """
-        with self._jacobian_context() as J:
-            for vec_name in vec_names:
-                with self._matvec_context(vec_name, var_inds, mode) as vecs:
-                    d_inputs, d_outputs, d_residuals = vecs
+        for vec_name in vec_names:
+            with self._matvec_context(vec_name, var_inds, mode) as vecs:
+                d_inputs, d_outputs, d_residuals = vecs
+
+                # Jacobian and vectors are all scaled, unitless
+                with self._jacobian_context() as J:
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
 
-                    with self._units_scaling_context(inputs=[self._inputs, d_inputs],
-                                                     outputs=[self._outputs, d_outputs],
-                                                     residuals=[d_residuals]):
-                        self.apply_linear(self._inputs, self._outputs,
-                                          d_inputs, d_outputs, d_residuals, mode)
+                # Jacobian and vectors are all unscaled, dimensional
+                with self._units_scaling_context(inputs=[self._inputs, d_inputs],
+                                                 outputs=[self._outputs, d_outputs],
+                                                 residuals=[d_residuals]):
+                    self.apply_linear(self._inputs, self._outputs,
+                                      d_inputs, d_outputs, d_residuals, mode)
 
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.

@@ -741,10 +741,11 @@ class System(object):
 
     @contextmanager
     def _units_scaling_context(self, inputs=[], outputs=[], residuals=[], scale_jac=False):
-        """Context manager for units and scaling for vectors.
+        """Context manager for units and scaling for vectors and Jacobians.
 
-        Yield vectors that are physical and unscaled, because internally,
-        the standard state is for vectors to be dimensionless and scaled.
+        Temporarily puts vectors in a physical and unscaled state, because
+        internally, vectors are nominally in a dimensionless and scaled state.
+        The same applies (optionally) for Jacobians.
 
         Args
         ----
@@ -762,26 +763,26 @@ class System(object):
         None
         """
         for vec in inputs:
-            vec.scale(self._scaling_to_phys['input'])
+            vec._scale(self._scaling_to_phys['input'])
         for vec in outputs:
-            vec.scale(self._scaling_to_phys['output'])
+            vec._scale(self._scaling_to_phys['output'])
         for vec in residuals:
-            vec.scale(self._scaling_to_phys['residual'])
+            vec._scale(self._scaling_to_phys['residual'])
         if scale_jac:
             self._jacobian._precompute_iter()
-            self._jacobian.scale(self._scaling_to_phys)
+            self._jacobian._scale(self._scaling_to_phys)
 
         yield
 
         for vec in inputs:
-            vec.scale(self._scaling_to_norm['input'])
+            vec._scale(self._scaling_to_norm['input'])
         for vec in outputs:
-            vec.scale(self._scaling_to_norm['output'])
+            vec._scale(self._scaling_to_norm['output'])
         for vec in residuals:
-            vec.scale(self._scaling_to_norm['residual'])
+            vec._scale(self._scaling_to_norm['residual'])
         if scale_jac:
             self._jacobian._precompute_iter()
-            self._jacobian.scale(self._scaling_to_norm)
+            self._jacobian._scale(self._scaling_to_norm)
 
     @contextmanager
     def _matvec_context(self, vec_name, var_inds, mode, clear=True):

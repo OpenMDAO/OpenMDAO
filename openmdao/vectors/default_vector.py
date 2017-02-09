@@ -291,7 +291,7 @@ class DefaultVector(Vector):
             global_sum += numpy.sum(data**2)
         return global_sum ** 0.5
 
-    def scale(self, coeffs):
+    def _scale(self, coeffs):
         """Change the scaling state.
 
         Args
