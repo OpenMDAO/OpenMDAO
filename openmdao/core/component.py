@@ -9,6 +9,7 @@ from scipy.sparse import issparse
 
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.utils.units import valid_units
 
 
 class Component(System):
@@ -67,6 +68,10 @@ class Component(System):
             raise TypeError('The indices argument should be an int, list, tuple, or ndarray')
         if units is not None and not isinstance(units, str):
             raise TypeError('The units argument should be a str or None')
+
+        # Check that units are valid
+        if units is not None and not valid_units(units):
+            raise ValueError("The units '%s' are invalid" % units)
 
         if shape is not None:
             if isinstance(shape, int):
@@ -190,6 +195,10 @@ class Component(System):
         for item in [ref, ref0, res_ref, res_ref]:
             if not numpy.isscalar(item):
                 raise TypeError('The %s argument should be a float' % (item.__name__))
+
+        # Check that units are valid
+        if units is not None and not valid_units(units):
+            raise ValueError("The units '%s' are invalid" % units)
 
         if shape is not None:
             if isinstance(shape, int):

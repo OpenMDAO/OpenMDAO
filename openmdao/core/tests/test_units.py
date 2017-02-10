@@ -6,7 +6,8 @@ from six.moves import cStringIO
 
 import numpy as np
 
-from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp
+from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp
+from openmdao.api import ExecComp
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -129,22 +130,22 @@ class UnitConvGroupImplicitConns(Group):
     """
 
     def initialize(self):
-        self.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        self.add_subsystem('src', SrcComp(), promotes=['x1', 'x2'])
-        self.add_subsystem('tgtF', TgtCompF(), promotes=['x2'])
-        self.add_subsystem('tgtC', TgtCompC(), promotes=['x2'])
-        self.add_subsystem('tgtK', TgtCompK(), promotes=['x2'])
+        self.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs='x1')
+        self.add_subsystem('src', SrcComp(), promotes_inputs='x1', promotes_outputs='x2')
+        self.add_subsystem('tgtF', TgtCompF(), promotes_inputs='x2')
+        self.add_subsystem('tgtC', TgtCompC(), promotes_inputs='x2')
+        self.add_subsystem('tgtK', TgtCompK(), promotes_inputs='x2')
 
 
 class TestUnitConversion(unittest.TestCase):
     """ Testing automatic unit conversion."""
 
     def test_basic(self):
+        """Test that output values and total derivatives are correct."""
         prob = Problem(model=UnitConvGroup())
 
-        prob.setup(check=False, mode='fwd')
-
         # Check the outputs after running to test the unit conversions
+        prob.setup(check=False, mode='fwd')
         prob.run_model()
 
         assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
@@ -264,153 +265,77 @@ class TestUnitConversion(unittest.TestCase):
         #self.assertTrue((('src.x2', 'tgtF.x2'), ('degC', 'degF')) in conv)
         #self.assertTrue((('src.x2', 'tgtK.x2'), ('degC', 'degK')) in conv)
 
-    #def test_bad_units(self):
+    def test_bad_units(self):
+        """Test error handling when invalid units are declared."""
+        class Comp1(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x', 0.0, units='junk')
 
-        #class Comp1(Component):
-            #def __init__(self):
-                #super(Comp1, self).__init__()
-                #self.add_param('x', 0.0, unit='junk')
+        class Comp2(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_output('x', 0.0, units='junk')
 
-        #class Comp2(Component):
-            #def __init__(self):
-                #super(Comp2, self).__init__()
-                #self.add_state('x', 0.0, unit='junk')
+        with self.assertRaises(Exception) as cm:
+            prob = Problem(model=Comp1())
+            prob.setup()
+        expected_msg = "The units 'junk' are invalid"
+        self.assertTrue(expected_msg in str(cm.exception))
 
-        #class Comp3(Component):
-            #def __init__(self):
-                #super(Comp3, self).__init__()
-                #self.add_output('x', 0.0, unit='junk')
+        with self.assertRaises(Exception) as cm:
+            prob = Problem(model=Comp2())
+            prob.setup()
+        expected_msg = "The units 'junk' are invalid"
+        self.assertTrue(expected_msg in str(cm.exception))
 
-        #top = Problem()
-        #root = top.root = Group()
+    def test_incompatible_units(self):
+        """Test error handling when only one of src and tgt have units."""
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs='x1')
+        prob.model.add_subsystem('src', SrcComp(), promotes_inputs='x1')
+        prob.model.add_subsystem('tgt', ExecComp('yy=xx', xx=0.0))
+        prob.model.connect('src.x2', 'tgt.xx')
 
-        #with self.assertRaises(Exception) as cm:
-            #root.add('comp', Comp1())
+        with self.assertRaises(Exception) as cm:
+            prob.setup()
+        expected_msg = "Units must be specified for both or neither side of connection " + \
+                       "in '': 'src.x2' has units 'degC' but 'tgt.xx' is unitless."
+        self.assertTrue(expected_msg in str(cm.exception))
 
-        #expected_msg = "Unit 'junk' is not a valid unit or combination of units."
-        #self.assertTrue(expected_msg in str(cm.exception))
+    def test_basic_implicit_conn(self):
+        """Test units with all implicit connections."""
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs='x1')
+        prob.model.add_subsystem('src', SrcComp(), promotes_inputs='x1', promotes_outputs='x2')
+        prob.model.add_subsystem('tgtF', TgtCompF(), promotes_inputs='x2')
+        prob.model.add_subsystem('tgtC', TgtCompC(), promotes_inputs='x2')
+        prob.model.add_subsystem('tgtK', TgtCompK(), promotes_inputs='x2')
 
-        #with self.assertRaises(Exception) as cm:
-            #root.add('comp', Comp2())
+        # Check the outputs after running to test the unit conversions
+        prob.setup(check=False)
+        prob.run_model()
 
-        #expected_msg = "Unit 'junk' is not a valid unit or combination of units."
-        #self.assertTrue(expected_msg in str(cm.exception))
+        assert_rel_error(self, prob['x2'], 100.0, 1e-6)
+        assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
+        assert_rel_error(self, prob['tgtC.x3'], 100.0, 1e-6)
+        assert_rel_error(self, prob['tgtK.x3'], 373.15, 1e-6)
 
-        #with self.assertRaises(Exception) as cm:
-            #root.add('comp', Comp3())
+        # Check the total derivatives in forward mode
+        wrt = ['x1']
+        of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
 
-        #expected_msg = "Unit 'junk' is not a valid unit or combination of units."
-        #self.assertTrue(expected_msg in str(cm.exception))
+        assert_rel_error(self, J['tgtF.x3', 'x1'][0][0], 1.8, 1e-6)
+        assert_rel_error(self, J['tgtC.x3', 'x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['tgtK.x3', 'x1'][0][0], 1.0, 1e-6)
 
-    #def test_list_unit_conversions_no_unit(self):
+        # Check the total derivatives in reverse mode
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
 
-        #prob = Problem()
-        #prob.root = Group()
-        #prob.root.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        #prob.root.add('src', SrcComp())
-        #prob.root.add('tgt', ExecComp('yy=xx', xx=0.0))
-        #prob.root.connect('src.x2', 'tgt.xx')
-
-        #prob.setup(check=False)
-        #prob.run()
-
-        #stream = cStringIO()
-        #conv = prob.root.list_unit_conv(stream=stream)
-        #self.assertTrue((('src.x2', 'tgt.xx'), ('degC', None)) in conv)
-
-    #def test_basic_input_input(self):
-
-        #prob = Problem()
-        #prob.root = Group()
-        #prob.root.add('src', SrcComp())
-        #prob.root.add('tgtF', TgtCompF())
-        #prob.root.add('tgtC', TgtCompC())
-        #prob.root.add('tgtK', TgtCompK())
-        #prob.root.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        #prob.root.connect('x1', 'src.x1')
-        #prob.root.connect('src.x2', 'tgtC.x2')
-        #prob.root.connect('tgtC.x2', 'tgtF.x2')
-        #prob.root.connect('tgtC.x2', 'tgtK.x2')
-
-        #prob.setup(check=False)
-        #prob.run()
-
-        #assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
-        #assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
-        #assert_rel_error(self, prob['tgtC.x3'], 100.0, 1e-6)
-        #assert_rel_error(self, prob['tgtK.x3'], 373.15, 1e-6)
-
-        ## Make sure we don't convert equal units
-        #self.assertEqual(prob.root.params.metadata('tgtC.x2').get('unit_conv'),
-                         #None)
-
-        #indep_list = ['x1']
-        #unknown_list = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
-        #J = prob.calc_gradient(indep_list, unknown_list, mode='fwd',
-                               #return_format='dict')
-
-        #assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        #assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        #assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
-
-        #J = prob.calc_gradient(indep_list, unknown_list, mode='rev',
-                               #return_format='dict')
-
-        #assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        #assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        #assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
-
-        #J = prob.calc_gradient(indep_list, unknown_list, mode='fd',
-                               #return_format='dict')
-
-        #assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        #assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        #assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
-
-    #def test_basic_implicit_conn(self):
-
-        #prob = Problem()
-        #prob.root = Group()
-        #prob.root.add('src', SrcComp(), promotes=['x1', 'x2'])
-        #prob.root.add('tgtF', TgtCompF(), promotes=['x2'])
-        #prob.root.add('tgtC', TgtCompC(), promotes=['x2'])
-        #prob.root.add('tgtK', TgtCompK(), promotes=['x2'])
-        #prob.root.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-
-        #prob.setup(check=False)
-        #prob.run()
-
-        #assert_rel_error(self, prob['x2'], 100.0, 1e-6)
-        #assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
-        #assert_rel_error(self, prob['tgtC.x3'], 100.0, 1e-6)
-        #assert_rel_error(self, prob['tgtK.x3'], 373.15, 1e-6)
-
-        ## Make sure we don't convert equal units
-        #self.assertEqual(prob.root.params.metadata('tgtC.x2').get('unit_conv'),
-                         #None)
-
-        #indep_list = ['x1']
-        #unknown_list = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
-        #J = prob.calc_gradient(indep_list, unknown_list, mode='fwd',
-                               #return_format='dict')
-
-        #assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        #assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        #assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
-
-        #J = prob.calc_gradient(indep_list, unknown_list, mode='rev',
-                               #return_format='dict')
-
-        #assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        #assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        #assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
-
-        #J = prob.calc_gradient(indep_list, unknown_list, mode='fd',
-                               #return_format='dict')
-
-        #assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        #assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        #assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['tgtF.x3', 'x1'][0][0], 1.8, 1e-6)
+        assert_rel_error(self, J['tgtC.x3', 'x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['tgtK.x3', 'x1'][0][0], 1.0, 1e-6)
 
     #def test_basic_grouped(self):
 

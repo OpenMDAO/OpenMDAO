@@ -282,7 +282,7 @@ class Assembler(object):
                 self._src_units[ivar_in] = out_units[ind]
                 self._src_scaling[ivar_in, :] = out_scaling[ind, :]
             else:
-                self._src_units[ivar_in] = ''
+                self._src_units[ivar_in] = None
                 self._src_scaling[ivar_in, :] = [0., 1.]
 
     def _compute_transfers(self, nsub_allprocs, var_range,
