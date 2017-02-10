@@ -27,15 +27,22 @@ class ImplicitComponent(Component):
         boolean
             Failure flag; True if failed to converge, False is successful.
         float
-            relative error.
-        float
             absolute error.
+        float
+            relative error.
         """
         if self._nl_solver is not None:
-            self._nl_solver.solve()
+            return self._nl_solver.solve()
         else:
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs]):
-                self.solve_nonlinear(self._inputs, self._outputs)
+                result = self.solve_nonlinear(self._inputs, self._outputs)
+
+            if result is None:
+                return False
+            elif type(result) is bool:
+                return result, 0., 0.
+            else:
+                return result
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product.
@@ -80,14 +87,16 @@ class ImplicitComponent(Component):
         boolean
             Failure flag; True if failed to converge, False is successful.
         float
-            relative error.
-        float
             absolute error.
+        float
+            relative error.
         """
         if self._ln_solver is not None:
             return self._ln_solver(vec_names, mode)
         else:
-            success = True
+            failed = True
+            abs_errors = []
+            rel_errors = []
             for vec_name in vec_names:
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
@@ -95,10 +104,12 @@ class ImplicitComponent(Component):
                 with self._units_scaling_context(inputs=[],
                                                  outputs=[d_outputs],
                                                  residuals=[d_residuals]):
-                    tmp = self.solve_linear(d_outputs, d_residuals, mode)
+                    result = self.solve_linear(d_outputs, d_residuals, mode)
 
-                success = success and tmp
-            return success
+                success = success and result[0]
+                abs_errors.append(result[1])
+                rel_errors.append(result[2])
+            return success, numpy.linalg.norm(abs_errors), numpy.linalg.norm(rel_errors)
 
     def _linearize(self):
         """Compute jacobian / factorization."""

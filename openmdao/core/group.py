@@ -91,6 +91,13 @@ class Group(System):
         self._subsystems_allprocs.append(subsys)
         subsys.name = name
 
+        if isinstance(promotes, string_types):
+            promotes = [promotes]
+        if isinstance(promotes_inputs, string_types):
+            promotes_inputs = [promotes_inputs]
+        if isinstance(promotes_outputs, string_types):
+            promotes_outputs = [promotes_outputs]
+
         if promotes:
             subsys._var_promotes['any'] = set(promotes)
         if promotes_inputs:

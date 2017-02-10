@@ -31,14 +31,16 @@ class ExplicitComponent(Component):
         boolean
             Failure flag; True if failed to converge, False is successful.
         float
-            relative error.
-        float
             absolute error.
+        float
+            relative error.
         """
         with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                          residuals=[self._residuals]):
             self._residuals.set_const(0.0)
-            self.compute(self._inputs, self._outputs)
+            failed = self.compute(self._inputs, self._outputs)
+
+        return bool(failed), 0., 0.
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product.
@@ -86,9 +88,9 @@ class ExplicitComponent(Component):
         boolean
             Failure flag; True if failed to converge, False is successful.
         float
-            relative error.
-        float
             absolute error.
+        float
+            relative error.
         """
         for vec_name in vec_names:
             d_outputs = self._vectors['output'][vec_name]
@@ -99,6 +101,8 @@ class ExplicitComponent(Component):
                     d_outputs.set_vec(d_residuals)
                 elif mode == 'rev':
                     d_residuals.set_vec(d_outputs)
+
+        return False, 0., 0.
 
     def _linearize(self):
         """Compute jacobian / factorization."""
