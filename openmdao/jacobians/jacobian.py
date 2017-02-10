@@ -242,7 +242,6 @@ class Jacobian(object):
         jac : ndarray or spmatrix or list[3]
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        system = self._system
         ukey = self._key2unique(key)
         return self._subjacs[ukey]
 
