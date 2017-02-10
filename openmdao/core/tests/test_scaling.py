@@ -15,6 +15,7 @@ from openmdao.devtools.testutil import assert_rel_error
 
 
 class PassThroughLength(ExplicitComponent):
+    """Units/scaling test component taking length in cm and passing it through in km."""
 
     def initialize_variables(self):
         self.add_input('old_length', val=1., units='cm')
@@ -28,6 +29,7 @@ class PassThroughLength(ExplicitComponent):
 
 
 class SpeedComputationWithUnits(ExplicitComponent):
+    """Simple speed computation from distance and time with unit conversations."""
 
     def initialize_variables(self):
         self.add_input('distance', 1.0, units='m')
