@@ -1,7 +1,7 @@
 from docutils import nodes
 from sphinx.util.compat import Directive
 
-from openmdao.docs.utils.docutil import get_unit_test_source_and_run_outputs
+from openmdao.docs._utils.docutil import get_unit_test_source_and_run_outputs
 
 
 class EmbedTestDirective(Directive):

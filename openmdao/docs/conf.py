@@ -76,10 +76,10 @@ OpenMDAO User Source Documentation
    :maxdepth: 1
 """
 
-    # need to set up the srcdocs directory structure, relative to docs.
+    # need to set up the _srcdocs directory structure, relative to docs.
     docs_dir = os.path.dirname(__file__)
 
-    doc_dir = os.path.join(docs_dir, "srcdocs", doctype)
+    doc_dir = os.path.join(docs_dir, "_srcdocs", doctype)
     if os.path.isdir(doc_dir):
         import shutil
         shutil.rmtree(doc_dir)
@@ -93,7 +93,7 @@ OpenMDAO User Source Documentation
 
     # look for directories in the openmdao level, one up from docs
     # those directories will be the openmdao packages
-    # auto-generate the top-level index.rst file for srcdocs, based on
+    # auto-generate the top-level index.rst file for _srcdocs, based on
     # openmdao packages:
 
     # to improve the order that the user sees in the source docs, put
@@ -110,7 +110,7 @@ OpenMDAO User Source Documentation
             if listing not in IGNORE_LIST and listing not in packages:
                 packages.append(listing)
 
-    # begin writing the 'srcdocs/index.rst' file at mid  level.
+    # begin writing the '_srcdocs/index.rst' file at mid  level.
     index_filename = os.path.join(doc_dir, "index.rst")
     index = open(index_filename, "w")
     if doctype == "dev":
@@ -144,11 +144,11 @@ OpenMDAO User Source Documentation
             # stuff in the file to have fwd slashes.
             index.write("   packages/openmdao." + package + "\n")
 
-            # make subpkg directory (e.g. srcdocs/packages/core) for ref sheets
+            # make subpkg directory (e.g. _srcdocs/packages/core) for ref sheets
             package_dir = os.path.join(packages_dir, package)
             os.mkdir(package_dir)
 
-            # create/write a package index file: (e.g. "srcdocs/packages/openmdao.core.rst")
+            # create/write a package index file: (e.g. "_srcdocs/packages/openmdao.core.rst")
             package_file = open(package_filename, "w")
             package_file.write(package_name + "\n")
             package_file.write("-" * len(package_name) + "\n")
@@ -173,7 +173,7 @@ OpenMDAO User Source Documentation
                     ref_sheet.write(".. _" + doctype + "_" + package_name + "." +
                                     filename + ":\n\n")
                     ref_sheet.write(filename + "\n")
-                    ref_sheet.write("+" * len(filename) + "\n\n")
+                    ref_sheet.write("-" * len(filename) + "\n\n")
                     ref_sheet.write(".. automodule:: " + package_name + "." + sub_package)
 
                     # finish and close each reference sheet.
@@ -419,13 +419,13 @@ def setup(app):
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('./exts'))
+sys.path.insert(0, os.path.abspath('./_exts'))
 
 if type == "usr":
-    absp = os.path.join('.', 'srcdocs', 'usr')
+    absp = os.path.join('.', '_srcdocs', 'usr')
     sys.path.insert(0, os.path.abspath(absp))
 elif type == "dev":
-    absp = os.path.join('.', 'srcdocs', 'dev')
+    absp = os.path.join('.', '_srcdocs', 'dev')
     sys.path.insert(0, os.path.abspath(absp))
 
 
@@ -492,10 +492,10 @@ language = None
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 if tags.has("usr"):
-    exclude_patterns = ['_build', 'srcdocs/dev']
+    exclude_patterns = ['_build', '_srcdocs/dev']
 
 if tags.has("dev"):
-    exclude_patterns = ['_build', 'srcdocs/usr']
+    exclude_patterns = ['_build', '_srcdocs/usr']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -507,7 +507,7 @@ todo_include_todos = False
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'theme'
+html_theme = '_theme'
 # html_theme = 'sphinxdoc'
 
 # Add any paths that contain custom themes here, relative to this directory.

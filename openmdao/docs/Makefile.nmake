@@ -51,8 +51,8 @@ help:
 
 clean:
 	IF EXIST $(BUILDDIR) rmdir /s /q $(BUILDDIR)
-	IF EXIST srcdocs\usr rmdir /s /q srcdocs\usr
-	IF EXIST srcdocs\dev rmdir /s /q srcdocs\dev
+	IF EXIST _srcdocs\usr rmdir /s /q _srcdocs\usr
+	IF EXIST _srcdocs\dev rmdir /s /q _srcdocs\dev
 	IF EXIST tags rmdir /s /q tags
 
 
@@ -62,8 +62,8 @@ html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "dev"
 	rm feature_docs_unit_test_db.sqlite
 	IF EXIST $(BUILDDIR) rmdir /s /q $(BUILDDIR)
-	IF EXIST srcdocs\usr rmdir /s /q srcdocs\usr
-	IF EXIST srcdocs\dev rmdir /s /q srcdocs\dev
+	IF EXIST _srcdocs\usr rmdir /s /q _srcdocs\usr
+	IF EXIST _srcdocs\dev rmdir /s /q _srcdocs\dev
 	IF EXIST tags rmdir /s /q tags
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)\html."

@@ -7,7 +7,7 @@ The first discipline is define by the following equation:
 
     y_1(x, y_2, z_1, z_2) = z_1^2 + x_1 + z_2 - 0.2y_2
 
-This is built as an openmdao <Component> like this
+This is built as an openmdao :ref:`Component <usr_openmdao.core.component.py>` like this
 
 .. embed-code::
     openmdao.test_suite.components.sellar.SellarDis1
@@ -20,7 +20,7 @@ The second discipline is given by another equation:
 
   y_2(x, y_1, z_1, z_2) = \sqrt{y_1} + z_1 + z_2
 
-which is translated into an <Component> like this
+which is translated into a :ref:`Component <usr_openmdao.core.component.py>` like this
 
 .. embed-code::
     openmdao.test_suite.components.sellar.SellarDis2
@@ -44,4 +44,3 @@ The first discipline outputs :math:`y_1`, which is an input to the second discip
 
 .. embed-code::
     openmdao.test_suite.components.sellar.SellarNoDerivatives
-

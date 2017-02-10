@@ -14,7 +14,7 @@ Once setup is done, you can then execute your model in one of two ways:
     #. :code:`run_driver()`
 
 The first one will execute one pass through your model.
-The second one executes the  <openmdao.core.driver.Driver> running the optimization, DOE, etc. that you've set up.
+The second one executes the driver running the optimization, DOE, etc. that you've set up.
 
 Examples
 ---------

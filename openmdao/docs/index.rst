@@ -85,15 +85,15 @@ Visualization
 `Source Documentation`_
 ============================
 
-.. _OpenMDAO Reference Sheets: srcdocs/index.html
+.. _OpenMDAO Reference Sheets: _srcdocs/index.html
 
 `OpenMDAO Developer Source Documentation`__
 
-.. __: srcdocs/dev/index.html
+.. __: _srcdocs/dev/index.html
 
 `OpenMDAO User Source Documentation`__
 
-.. __: srcdocs/usr/index.html
+.. __: _srcdocs/usr/index.html
 
 .. toctree::
    :maxdepth: 1

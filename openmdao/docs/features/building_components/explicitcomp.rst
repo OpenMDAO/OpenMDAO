@@ -8,7 +8,7 @@ Basic component types: 2. ExplicitComponent
 Explicit variables are those that are computed as an explicit function of other variables.
 For instance, :math:`z` would be an explicit variable, given :math:`z = \sin(y)`, while :math:`y` would not be, given that it is defined implicitly by the nonlinear equation, :math:`\cos(x \cdot y) - z \cdot y = 0`.
 
-In OpenMDAO, Explicit variables are defined by writing a class that inherits from the <ExplicitComponent> class.
+In OpenMDAO, Explicit variables are defined by writing a class that inherits from the  :ref:`Explicit Component <usr_openmdao.core.explicitcomponent.py>` class.
 The explicit variables would be considered *outputs* while the variables on which they depend would be considered *inputs* (e.g., :math:`y` in :math:`z = \sin(y)`).
 
 ExplicitComponent methods
