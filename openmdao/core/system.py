@@ -530,8 +530,8 @@ class System(object):
             self._scaling_to_phys['output'][ind, 1] = meta['ref'] - meta['ref0']
 
             # Compute scaling arrays for residuals; convert units
-            self._scaling_to_phys['residual'][ind, 0] = meta['ref0']
-            self._scaling_to_phys['residual'][ind, 1] = meta['ref'] - meta['ref0']
+            self._scaling_to_phys['residual'][ind, 0] = meta['res_ref0']
+            self._scaling_to_phys['residual'][ind, 1] = meta['res_ref'] - meta['res_ref0']
 
         # Compute inverse scaling arrays
         for key in ['input', 'output', 'residual']:
