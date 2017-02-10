@@ -14,8 +14,8 @@ class DefaultAssembler(Assembler):
                            subsystems_myproc, subsystems_inds):
         """Compute the transfer indices.
 
-        Args
-        ----
+        Parameters
+        ----------
         nsub_allprocs : int
             number of subsystems on all procs.
         var_range : [int, int]
