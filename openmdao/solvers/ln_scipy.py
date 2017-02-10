@@ -124,10 +124,12 @@ class ScipyIterativeSolver(LinearSolver):
 
         Returns
         -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
         float
-            initial error.
+            absolute error.
         float
-            error at the first iteration.
+            relative error.
         """
         self._vec_names = vec_names
         self._mode = mode
@@ -167,6 +169,10 @@ class ScipyIterativeSolver(LinearSolver):
                 solver(linop, b_vec.get_data(), M=M,
                        x0=x_vec_combined, maxiter=maxiter, tol=atol,
                        callback=self._monitor)[0])
+
+        # TODO: implement this properly
+
+        return False, 0., 0.
 
     def _apply_precon(self, in_vec):
         """Apply preconditioner.

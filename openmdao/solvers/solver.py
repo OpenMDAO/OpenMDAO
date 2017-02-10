@@ -121,11 +121,11 @@ class Solver(object):
         Returns
         -------
         boolean
-            True is unconverged or diverged; False is successful.
+            Failure flag; True if failed to converge, False is successful.
         float
-            relative error at termination.
+            absolute error.
         float
-            absolute error at termination.
+            relative error.
         """
         maxiter = self.options['maxiter']
         atol = self.options['atol']
@@ -142,7 +142,7 @@ class Solver(object):
             self._mpi_print(self._iter_count, norm / norm0, norm)
         fail = (numpy.isinf(norm) or numpy.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
-        return fail, norm / norm0, norm
+        return fail, norm, norm / norm0
 
     def _iter_initialize(self):
         """Perform any necessary pre-processing operations.

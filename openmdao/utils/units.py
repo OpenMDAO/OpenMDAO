@@ -828,16 +828,34 @@ def _find_unit(unit):
 
                         # no prefixes found, unknown unit
                         else:
-                            raise ValueError("no unit named '%s' is defined"
-                                             % item)
+                            return None
+                            # raise ValueError("no unit named '%s' is defined"
+                            #                  % item)
 
                 unit = eval(name, {'__builtins__': None}, _UNIT_LIB.unit_table)
 
             _UNIT_CACHE[name] = unit
 
     if not isinstance(unit, PhysicalUnit):
-        raise TypeError(str(unit) + ' is not a unit')
+        return None
+
     return unit
+
+
+def valid_units(unit):
+    """Return whether the given units are vaild.
+
+    Args
+    ----
+    units : str
+        String representation of the units.
+
+    Returns
+    -------
+    bool
+        True for valid, False for invalid.
+    """
+    return _find_unit(unit) is not None
 
 
 def conversion_to_base_units(units):
