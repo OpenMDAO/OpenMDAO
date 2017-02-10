@@ -375,6 +375,26 @@ class LintTestCase(unittest.TestCase):
             else:
                 failures[key] = new_failures
 
+    def check_class(self, dir_name, file_name, class_name, clss, failures):
+
+        new_failures = []
+        doc = inspect.getdoc(clss)
+
+        # Check if docstring is missing
+        if doc is None:
+            new_failures.append('is missing docstring')
+
+        if not clss.__doc__.startswith('\n'):
+            new_failures.append('### docstring should start with a new line')
+
+        if new_failures:
+            key = '{0}/{1}:{2}'.format(dir_name, file_name, class_name)
+            if key in failures:
+                failures[key] += new_failures
+            else:
+                failures[key] = new_failures
+
+
     def test_docstrings(self):
         topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -417,6 +437,9 @@ class LintTestCase(unittest.TestCase):
                         # skip namedtuples
                         if issubclass(clss, tuple):
                             continue
+
+                        self.check_class(dir_name, file_name, class_name, clss,
+                                         failures)
 
                         # Loop over methods
                         methods = [x for x in dir(clss)
