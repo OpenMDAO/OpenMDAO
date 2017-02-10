@@ -92,7 +92,7 @@ class LintTestCase(unittest.TestCase):
     def check_method_parameters(self, dir_name, file_name, class_name,
                                 method_name, argspec, numpy_doc_string,
                                 failures):
-        """
+        """ Check that the parameters section is correct.
 
         Parameters
         ----------
@@ -114,13 +114,6 @@ class LintTestCase(unittest.TestCase):
             so that we can fail once at the end of the check_method method
             with information about every failure. Form is
             { 'dir_name/file_name:class_name.method_name': [ messages ] }
-
-        Returns
-        -------
-        bool
-            True if *no* failures were encountered for the method, otherwise
-            False.
-
         """
         new_failures = []
 
@@ -182,6 +175,26 @@ class LintTestCase(unittest.TestCase):
 
     def check_method_returns(self, dir_name, file_name, class_name,
                              method_name, method, numpy_doc_string, failures):
+        """ Check that the returns section is correct.
+
+        Parameters
+        ----------
+        dir_name : str
+            The name of the directory in which the method is defined.
+        file_name : str
+            The name of the file in which the method is defined.
+        class_name : str
+            The name of the class to which the method belongs
+        method_name : str
+            The name of the method
+        numpy_doc_string : numpydoc.docscrape.NumpyDocString
+            An instance of the NumpyDocString parsed from the method
+        failures : dict
+            The failures encountered by the method.  These are all stored
+            so that we can fail once at the end of the check_method method
+            with information about every failure. Form is
+            { 'dir_name/file_name:class_name.method_name': [ messages ] }
+        """
         new_failures = []
 
         method_src = inspect.getsource(method)
@@ -194,18 +207,18 @@ class LintTestCase(unittest.TestCase):
         if f.passes:
             return
 
-        returns = numpy_doc_string['Returns']
+        doc_returns = numpy_doc_string['Returns']
 
-        if returns and not f.has_return:
+        if doc_returns and not f.has_return:
             new_failures.append('method returns no value but found '
-                                'unnecessary \'Returns\' sections '
+                                'unnecessary \'Returns\' section '
                                 'in docstring')
-        elif f.has_return and not returns:
+        elif f.has_return and not doc_returns:
             new_failures.append('method returns value(s) but found '
-                                'no \'Returns\' sections in docstring')
-        elif f.has_return and returns:
+                                'no \'Returns\' section in docstring')
+        elif f.has_return and doc_returns:
             # Check formatting
-            for entry in returns:
+            for entry in doc_returns:
                 name = entry[0]
                 desc = '\n'.join(entry[2])
                 if not name:
@@ -221,6 +234,26 @@ class LintTestCase(unittest.TestCase):
 
     def check_method(self, dir_name, file_name,
                      class_name, method_name, method, failures):
+        """ Perform docstring checks on each method.
+
+        Parameters
+        ----------
+        dir_name : str
+            The name of the directory in which the method is defined.
+        file_name : str
+            The name of the file in which the method is defined.
+        class_name : str
+            The name of the class to which the method belongs
+        method_name : str
+            The name of the method
+        method : instancemethod
+            The method being tested.
+        failures : dict
+            The failures encountered by the method.  These are all stored
+            so that we can fail once at the end of the check_method method
+            with information about every failure. Form is
+            { 'dir_name/file_name:class_name.method_name': [ messages ] }
+        """
         if PY3:
             argspec = inspect.getfullargspec(method)
         else:
