@@ -74,6 +74,8 @@ class ReturnFinder(ast.NodeVisitor):
             # Recurse through subnodes
             for subnode in node.body:
                 self.visit(subnode)
+
+        # If the node is an If it will have an orelse section to visit
         if hasattr(node, 'orelse'):
             for subnode in node.orelse:
                 self.visit(subnode)
@@ -88,13 +90,44 @@ class ReturnFinder(ast.NodeVisitor):
 class LintTestCase(unittest.TestCase):
 
     def check_method_parameters(self, dir_name, file_name, class_name,
-                                method_name, argspec, numpy_doc_string):
+                                method_name, argspec, numpy_doc_string,
+                                failures):
+        """
 
-        fail_msg = '{0}, {1} : {2} {3}'.format(dir_name, file_name, class_name,
-                                               method_name)
+        Parameters
+        ----------
+        dir_name : str
+            The name of the directory in which the method is defined.
+        file_name : str
+            The name of the file in which the method is defined.
+        class_name : str
+            The name of the class to which the method belongs
+        method_name : str
+            The name of the method
+        argspec : namedtuple
+            Method argument information from inspect.getargspec (python2) or
+            inspect.getfullargspec (python3)
+        numpy_doc_string : numpydoc.docscrape.NumpyDocString
+            An instance of the NumpyDocString parsed from the method
+        failures : dict
+            The failures encountered by the method.  These are all stored
+            so that we can fail once at the end of the check_method method
+            with information about every failure. Form is
+            { 'dir_name/file_name:class_name.method_name': [ messages ] }
+
+        Returns
+        -------
+        bool
+            True if *no* failures were encountered for the method, otherwise
+            False.
+
+        """
+        new_failures = []
+
         if len(argspec.args) > 1:
             if not numpy_doc_string['Parameters']:
-                self.fail(fail_msg + '... does not have a Parameters section')
+                new_failures.append('does not have a Parameters section')
+                #self.fail(fail_msg + '... does not have a Parameters section')
 
             # Check formatting
             for entry in numpy_doc_string['Parameters']:
@@ -102,15 +135,15 @@ class LintTestCase(unittest.TestCase):
                 type_ = entry[1]
                 desc = '\n'.join(entry[2])
                 if ':' in name:
-                    self.fail(fail_msg + '...colon after parameter '
+                    new_failures.append('colon after parameter '
                                          'name \'{0}\' and before type must '
                                          'be surrounded by '
                                          'spaces'.format(name.split(':')[0]))
                 if type_ == '':
-                    self.fail(fail_msg + '...no type info given for '
-                                         'Parameter {0}'.format(name))
+                    new_failures.append('no type info given for '
+                                        'Parameter {0}'.format(name))
                 if desc == '':
-                    self.fail(fail_msg + '...no description given for '
+                    new_failures.append('no description given for '
                                          'Parameter {0}'.format(name))
 
             documented_arg_set = set(item[0] for item in
@@ -132,19 +165,25 @@ class LintTestCase(unittest.TestCase):
             # Arguments that aren't documented
             undocumented = arg_set - documented_arg_set
             if undocumented:
-                self.fail(fail_msg + '... is missing documentation for: '
+                new_failures.append('missing documentation for: '
                                      '{0}'.format(str(list(undocumented))))
 
             # Arguments that are documented but don't exist
             overdocumented = documented_arg_set - arg_set
             if overdocumented:
-                self.fail(fail_msg + '... documents nonexisting parameters: '
+                new_failures.append('documents nonexisting parameters: '
                                      '{0}'.format(str(list(overdocumented))))
 
+        if new_failures:
+            key = '{0}/{1}:{2}.{3}'.format(dir_name, file_name, class_name,
+                                           method_name)
+            failures[key] = new_failures
+
+
     def check_method_returns(self, dir_name, file_name, class_name,
-                             method_name, method, numpy_doc_string):
-        fail_msg = '{0}, {1} : {2} {3}'.format(dir_name, file_name, class_name,
-                                               method_name)
+                             method_name, method, numpy_doc_string, failures):
+        new_failures = []
+
         method_src = inspect.getsource(method)
         dedented_src = textwrap.dedent(method_src)
 
@@ -158,26 +197,30 @@ class LintTestCase(unittest.TestCase):
         returns = numpy_doc_string['Returns']
 
         if returns and not f.has_return:
-            self.fail(fail_msg + '... method returns no value but found '
-                                 'unnecessary \'Returns\' sections '
-                                 'in docstring')
+            new_failures.append('method returns no value but found '
+                                'unnecessary \'Returns\' sections '
+                                'in docstring')
         elif f.has_return and not returns:
-            self.fail(fail_msg + '... method returns value(s) but found '
-                                 'no \'Returns\' sections in docstring')
+            new_failures.append('method returns value(s) but found '
+                                'no \'Returns\' sections in docstring')
         elif f.has_return and returns:
             # Check formatting
             for entry in returns:
                 name = entry[0]
                 desc = '\n'.join(entry[2])
                 if not name:
-                    self.fail(fail_msg + '...no detectable name for Return '
-                                         'value'.format(name))
+                    new_failures.append('no detectable name for Return '
+                                        'value'.format(name))
                 if desc == '':
-                    self.fail(fail_msg + '...no description given for Return '
-                                         '{0}'.format(name))
+                    new_failures.append('no description given for Return '
+                                        '{0}'.format(name))
+        if new_failures:
+            key = '{0}/{1}:{2}.{3}'.format(dir_name, file_name, class_name,
+                                           method_name)
+            failures[key] = new_failures
 
     def check_method(self, dir_name, file_name,
-                     class_name, method_name, method):
+                     class_name, method_name, method, failures):
         if PY3:
             argspec = inspect.getfullargspec(method)
         else:
@@ -196,16 +239,18 @@ class LintTestCase(unittest.TestCase):
 
         nds = NumpyDocString(doc)
 
-        self.check_method_parameters(dir_name, file_name, class_name, method_name,
-                                     argspec, nds)
+        self.check_method_parameters(dir_name, file_name, class_name,
+                                     method_name, argspec, nds, failures)
 
         self.check_method_returns(dir_name, file_name, class_name, method_name,
-                                  method, nds)
+                                  method, nds, failures)
 
     def test_docstrings(self):
         topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
         print_info = False
+
+        failures = {}
 
         # Loop over directories
         for dir_name in directories:
@@ -253,7 +298,16 @@ class LintTestCase(unittest.TestCase):
                             method = getattr(clss, method_name)
 
                             self.check_method(dir_name, file_name, class_name,
-                                              method_name, method)
+                                              method_name, method, failures)
+
+            if failures:
+                msg = '\n'
+                for key in failures:
+                    msg += '{0}\n'.format(key)
+                    for failure in failures[key]:
+                        msg += '    {0}\n'.format(failure)
+
+                self.fail(msg)
 
 
 if __name__ == '__main__':

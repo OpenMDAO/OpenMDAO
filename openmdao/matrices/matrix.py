@@ -33,49 +33,6 @@ class Matrix(object):
         self._submats = {}
         self._metadata = {}
 
-    def prod_fwd(self, in_vec, row_range=None):
-        """Perform a forward product.
-
-        Parameters
-        ----------
-        in_vec : ndarray[:]
-            incoming vector to multiply.
-        row_range : [int, int] or None
-            the row index range for which to compute the product.
-
-        Returns
-        -------
-        out_vec : ndarray[:]
-            vector resulting from the product.
-        """
-        out_vec = self._prod(in_vec, 'fwd')
-        if row_range is None:
-            return out_vec
-        else:
-            return out_vec[row_range[0]:row_range[1]]
-
-    def prod_rev(self, in_vec, row_range=None):
-        """Perform a reverse product.
-
-        Parameters
-        ----------
-        in_vec : ndarray[:]
-            incoming vector to multiply.
-        row_range : [int, int] or None
-            the row index range with which to compute the product.
-
-        Returns
-        -------
-        out_vec : ndarray[:]
-            vector resulting from the product.
-        """
-        if row_range is not None:
-            in_vec = numpy.array(in_vec)
-            in_vec[:row_range[0]] = 0.
-            in_vec[row_range[1]:] = 0.
-
-        return self._prod(in_vec, 'rev')
-
     def _add_submat(self, key, info, irow, icol, src_indices, shape):
         """Declare a sub-jacobian.
 

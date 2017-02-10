@@ -186,7 +186,7 @@ class ScipyIterativeSolver(LinearSolver):
         mode = self._mode
 
         # Need to clear out any junk from the inputs.
-        system._vectors['input']['linear'].set_const(0.0)
+        system._vectors['input'][vec_name].set_const(0.0)
 
         # assign x and b vectors based on mode
         if mode == 'fwd':

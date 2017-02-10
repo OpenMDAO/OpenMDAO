@@ -360,8 +360,7 @@ class Problem(object):
 
         # TODO: implement this properly
         ind1, ind2 = self.model._var_allprocs_range['output']
-        import numpy
-        vector_var_ids = numpy.arange(ind1, ind2)
+        vector_var_ids = np.arange(ind1, ind2)
 
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
 
