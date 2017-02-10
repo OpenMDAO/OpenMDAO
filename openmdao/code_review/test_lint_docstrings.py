@@ -74,6 +74,9 @@ class ReturnFinder(ast.NodeVisitor):
             # Recurse through subnodes
             for subnode in node.body:
                 self.visit(subnode)
+        if hasattr(node, 'orelse'):
+            for subnode in node.orelse:
+                self.visit(subnode)
 
         # Reduce function_depth on exit if this is a FunctionDef
         if is_function_def:
@@ -120,9 +123,11 @@ class LintTestCase(unittest.TestCase):
             if argspec.keywords:
                 arg_set |= {argspec.keywords}
 
-            # Don't require documentation of self
+            # Don't require documentation of self or cls
             if 'self' in arg_set:
                 arg_set.remove('self')
+            if 'cls' in arg_set:
+                arg_set.remove('cls')
 
             # Arguments that aren't documented
             undocumented = arg_set - documented_arg_set
@@ -142,6 +147,7 @@ class LintTestCase(unittest.TestCase):
                                                method_name)
         method_src = inspect.getsource(method)
         dedented_src = textwrap.dedent(method_src)
+
         f = ReturnFinder()
         f.visit(ast.parse(dedented_src))
 
