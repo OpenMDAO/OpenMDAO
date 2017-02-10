@@ -31,20 +31,22 @@ class ExplicitComponent(Component):
         boolean
             Failure flag; True if failed to converge, False is successful.
         float
-            relative error.
-        float
             absolute error.
+        float
+            relative error.
         """
         with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                          residuals=[self._residuals]):
             self._residuals.set_const(0.0)
-            self.compute(self._inputs, self._outputs)
+            failed = self.compute(self._inputs, self._outputs)
+
+        return bool(failed), 0., 0.
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -74,8 +76,8 @@ class ExplicitComponent(Component):
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -86,9 +88,9 @@ class ExplicitComponent(Component):
         boolean
             Failure flag; True if failed to converge, False is successful.
         float
-            relative error.
-        float
             absolute error.
+        float
+            relative error.
         """
         for vec_name in vec_names:
             d_outputs = self._vectors['output'][vec_name]
@@ -99,6 +101,8 @@ class ExplicitComponent(Component):
                     d_outputs.set_vec(d_residuals)
                 elif mode == 'rev':
                     d_residuals.set_vec(d_outputs)
+
+        return False, 0., 0.
 
     def _linearize(self):
         """Compute jacobian / factorization."""
@@ -127,8 +131,8 @@ class ExplicitComponent(Component):
             _var_pathdict
             _var_name2path
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : boolean
             Ignored.
         """
@@ -165,20 +169,25 @@ class ExplicitComponent(Component):
     def compute(self, inputs, outputs):
         """Compute outputs given inputs.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
+
+        Returns
+        -------
+        bool or None
+            None or False if run successfully; True if there was a failure.
         """
         pass
 
     def compute_jacobian(self, inputs, outputs, jacobian):
         """Compute sub-jacobian parts / factorization.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -197,8 +206,8 @@ class ExplicitComponent(Component):
 
             'rev': d_outputs \|-> d_inputs
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector

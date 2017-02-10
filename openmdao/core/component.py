@@ -9,6 +9,7 @@ from scipy.sparse import issparse
 
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.utils.units import valid_units
 
 
 class Component(System):
@@ -23,8 +24,8 @@ class Component(System):
     def __init__(self, **kwargs):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs: dict of keyword arguments
             available here and in all descendants of this system.
         """
@@ -34,8 +35,8 @@ class Component(System):
     def add_input(self, name, val=1.0, shape=None, indices=None, units=None, desc='', var_set=0):
         """Add an input variable to the component.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
@@ -67,6 +68,10 @@ class Component(System):
             raise TypeError('The indices argument should be an int, list, tuple, or ndarray')
         if units is not None and not isinstance(units, str):
             raise TypeError('The units argument should be a str or None')
+
+        # Check that units are valid
+        if units is not None and not valid_units(units):
+            raise ValueError("The units '%s' are invalid" % units)
 
         if shape is not None:
             if isinstance(shape, int):
@@ -127,8 +132,8 @@ class Component(System):
                    res_ref=1.0, res_ref0=0.0, var_set=0):
         """Add an output variable to the component.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
@@ -191,6 +196,10 @@ class Component(System):
             if not numpy.isscalar(item):
                 raise TypeError('The %s argument should be a float' % (item.__name__))
 
+        # Check that units are valid
+        if units is not None and not valid_units(units):
+            raise ValueError("The units '%s' are invalid" % units)
+
         if shape is not None:
             if isinstance(shape, int):
                 shape = (shape,)
@@ -249,8 +258,8 @@ class Component(System):
                          rows=None, cols=None, val=None):
         """Store subjacobian metadata for later use.
 
-        Args
-        ----
+        Parameters
+        ----------
         of : str or list of str
             The name of the residual(s) that derivatives are being computed for.
             May also contain a glob pattern.
@@ -352,8 +361,8 @@ class Component(System):
             _var_pathdict
             _var_name2path
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : boolean
             Ignored.
         """
@@ -427,8 +436,8 @@ class Component(System):
 
         \* If vec_name is 'nonlinear'
 
-        Args
-        ----
+        Parameters
+        ----------
         vectors : {'input': <Vector>, 'output': <Vector>, 'residual': <Vector>}
             <Vector> objects corresponding to 'name'.
         vector_var_ids : ndarray[:]

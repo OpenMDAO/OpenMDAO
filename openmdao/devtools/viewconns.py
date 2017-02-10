@@ -27,8 +27,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     Generates a self-contained html file containing a detailed connection
     viewer.  Optionally pops up a web browser to view the file.
 
-    Args
-    ----
+    Parameters
+    ----------
     root : system or Problem
         The root for the desired tree.
 

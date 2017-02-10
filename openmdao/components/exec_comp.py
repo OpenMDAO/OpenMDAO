@@ -19,8 +19,8 @@ VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
 def array_idx_iter(shape):
     """Return an iterator over the indices into a n-dimensional array.
 
-    Args
-    ----
+    Parameters
+    ----------
     shape : tuple
         shape of the array.
     """
@@ -57,8 +57,8 @@ class ExecComp(ExplicitComponent):
         type float unless the initial value for that variable is supplied
         in \*\*kwargs or inits.  Derivatives are calculated using complex step.
 
-        Args
-        ----
+        Parameters
+        ----------
         exprs : str or list of str
             An assignment statement or iter of them. These express how the
             outputs are calculated based on the inputs.
@@ -185,8 +185,8 @@ class ExecComp(ExplicitComponent):
     def compute(self, inputs, outputs):
         """Execute this component's assignment statemens.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : `Vector`
             `Vector` containing inputs.
 
@@ -200,8 +200,8 @@ class ExecComp(ExplicitComponent):
     def compute_jacobian(self, params, unknowns, jacobian):
         """Use complex step method to update the given Jacobian.
 
-        Args
-        ----
+        Parameters
+        ----------
         params : `VecWrapper`
             `VecWrapper` containing parameters. (p)
 
@@ -273,8 +273,8 @@ class _TmpDict(object):
     def __init__(self, inner, return_complex=False):
         """Construct the dictionary object.
 
-        Args
-        ----
+        Parameters
+        ----------
         inner : dict-like
             The dictionary to be wrapped.
 
@@ -318,8 +318,8 @@ class _IODict(object):
     def __init__(self, outputs, inputs, to_colons):
         """Create the dict wrapper.
 
-        Args
-        ----
+        Parameters
+        ----------
         outputs : dict-like
             The outputs object to be wrapped.
 
@@ -350,8 +350,8 @@ class _IODict(object):
 def _import_functs(mod, dct, names=None):
     """Map attributes attrs from the given module into the given dict.
 
-    Args
-    ----
+    Parameters
+    ----------
     dct : dict
         Dictionary that will contain the mapping
 
