@@ -150,6 +150,11 @@ class ImplicitComponent(Component):
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
+
+        Returns
+        -------
+        None or bool or (bool, float, float)
+            The bool is the failure flag; and the two floats are absolute and relative error.
         """
         pass
 
@@ -195,6 +200,11 @@ class ImplicitComponent(Component):
             unscaled, dimensional quantities read via d_residuals[key]
         mode : str
             either 'fwd' or 'rev'
+
+        Returns
+        -------
+        None or bool or (bool, float, float)
+            The bool is the failure flag; and the two floats are absolute and relative error.
         """
         pass
 

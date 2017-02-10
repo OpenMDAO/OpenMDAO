@@ -175,6 +175,11 @@ class ExplicitComponent(Component):
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
+
+        Returns
+        -------
+        bool or None
+            None or False if run successfully; True if there was a failure.
         """
         pass
 
