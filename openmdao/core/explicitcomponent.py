@@ -186,6 +186,7 @@ class ExplicitComponent(Component):
         """Set subjacobian info into our jacobian."""
         with self._jacobian_context() as J:
             for key, meta, typ in self._iter_partials_matches():
+                self._check_partials_meta(key, meta)
                 # only negate d_output/d_input partials
                 J._set_partials_meta(key, meta, typ == 'input')
 

@@ -48,6 +48,10 @@ Building components
 
 Defining partial derivatives
 ================================
+.. toctree::
+   :maxdepth: 1
+
+   features/defining_partials/specifying_partials
 
 Grouping components for more complex models
 ================================================================
