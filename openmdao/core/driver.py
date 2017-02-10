@@ -31,16 +31,24 @@ class Driver(object):
 
         This is the final thing to run during setup.
 
-        Args
-        ----
+        Parameters
+        ----------
         problem : <`Problem`>
             Pointer to the containing problem.
         """
         self.problem = problem
         model = problem.model
 
-        # Gather up the information for design vars and responses.
+        # Gather up the information for design vars.
         self._designvars = model.get_design_vars(recurse=True)
+
+        # Error checking is only possible now.
+        for name in self._designvars:
+            if name not in model._outputs:
+                msg = "Output not found for design variable '{0}'."
+                raise RuntimeError(msg.format(name))
+
+
         self._responses = model.get_responses(recurse=True)
         self._objs = model.get_objectives(recurse=True)
         self._cons = model.get_constraints(recurse=True)
@@ -95,8 +103,8 @@ class Driver(object):
 
         These derivatives are of the responses with respect to the design vars.
 
-        Args
-        ----
+        Parameters
+        ----------
         return_format : string
             Format for the derivatives. Default is 'string'.
         """

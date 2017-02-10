@@ -167,6 +167,20 @@ class TestDesVarsResponses(unittest.TestCase):
 
 class TestDesvarOnModel(unittest.TestCase):
 
+    def test_design_var_invalid_name(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('junk')
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup(check=False)
+
+        self.assertEqual(str(context.exception), "Output not found for design variable 'junk'.")
+
     def test_desvar_affine_and_scaleradder(self):
 
         prob = Problem()
@@ -268,6 +282,20 @@ class TestDesvarOnModel(unittest.TestCase):
                                       ref0=-100.0, ref=100)
 
 class TestConstraintOnModel(unittest.TestCase):
+
+    def test_constraint_invalid_name(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        prob.model.add_constraint('junk')
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup(check=False)
+
+        self.assertEqual(str(context.exception), "Output not found for constraint 'junk'.")
 
     def test_constraint_affine_and_scaleradder(self):
 
@@ -434,6 +462,20 @@ class TestConstraintOnModel(unittest.TestCase):
 
 
 class TestObjectiveOnModel(unittest.TestCase):
+
+    def test_design_var_invalid_name(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        prob.model.add_objective('junk')
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup(check=False)
+
+        self.assertEqual(str(context.exception), "Output not found for objective 'junk'.")
 
     def test_objective_affine_and_scaleradder(self):
 

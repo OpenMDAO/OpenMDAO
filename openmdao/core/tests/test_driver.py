@@ -23,7 +23,7 @@ class TestDriver(unittest.TestCase):
         prob.run_driver()
 
         designvars = prob.driver.get_design_var_values()
-        self.assertEqual(designvars['x'], 2.0)
+        self.assertEqual(designvars['x'], 2.0 )
 
 if __name__ == "__main__":
     unittest.main()
