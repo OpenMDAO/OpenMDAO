@@ -302,6 +302,9 @@ class PetscKSP(LinearSolver):
             vec_name = self._vec_name
             mode = self._mode
 
+            # Need to clear out any junk from the inputs.
+            system._vectors['input'][vec_name].set_const(0.0)
+
             # assign x and b vectors based on mode
             if mode == 'fwd':
                 x_vec = system._vectors['output'][vec_name]

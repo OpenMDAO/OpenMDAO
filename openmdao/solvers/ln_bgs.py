@@ -33,6 +33,7 @@ class LinearBlockGS(BlockLinearSolver):
                     b_vec *= -1.0
                     b_vec += self._rhs_vecs[vec_name]
                 subsys._solve_linear(vec_names, mode)
+
         elif mode == 'rev':
             system._subsystems_myproc.reverse()
             system._subsystems_myproc_inds.reverse()
