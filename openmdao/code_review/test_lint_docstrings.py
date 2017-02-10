@@ -343,11 +343,14 @@ class LintTestCase(unittest.TestCase):
             argspec = inspect.getargspec(method)
         doc = inspect.getdoc(method)
 
-        fail_msg = '{0}, {1} : {2} {3}'.format(dir_name, file_name, class_name,
-                                               method_name)
+        new_failures = []
+
         # Check if docstring is missing
         if doc is None:
-            self.fail(fail_msg + '... missing docstring')
+            new_failures.append('is missing docstring')
+
+        if not method.__doc__.startswith('\n'):
+            new_failures.append('docstring should start with a new line')
 
         # Check if docstring references another method
         if doc[:3] == 'See':
@@ -363,6 +366,14 @@ class LintTestCase(unittest.TestCase):
 
         self.check_method_returns(dir_name, file_name, class_name, method_name,
                                   method, nds, failures)
+
+        if new_failures:
+            key = '{0}/{1}:{2}.{3}'.format(dir_name, file_name, class_name,
+                                           method_name)
+            if key in failures:
+                failures[key] += new_failures
+            else:
+                failures[key] = new_failures
 
     def test_docstrings(self):
         topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -421,11 +432,13 @@ class LintTestCase(unittest.TestCase):
 
         if failures:
             msg = '\n'
+            count = 0
             for key in failures:
                 msg += '{0}\n'.format(key)
+                count += len(failures[key])
                 for failure in failures[key]:
                     msg += '    {0}\n'.format(failure)
-
+            msg += 'Found {0} issues in docstrings'.format(count)
             self.fail(msg)
 
 
