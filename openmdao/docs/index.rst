@@ -50,7 +50,12 @@ Defining partial derivatives
 ================================
 
 Grouping components for more complex models
-================================================================
+===========================================
+
+.. toctree::
+    :maxdepth: 1
+
+    features/grouping_components/grouping_components
 
 Solvers (nonlinear and linear)
 ================================

@@ -34,17 +34,13 @@ class TestGroup(unittest.TestCase):
     def test_group_simple(self):
         """Simple example for adding subsystems to a group and issuing connections."""
         p = Problem(model=Group())
-        p.model.add_subsystem('comp1', IndepVarComp('x', 5.0))
-        p.model.add_subsystem('comp2', ExecComp('b=2*a'))
-        p.model.connect('comp1.x', 'comp2.a')
+        c1 = p.model.add_subsystem('comp1', IndepVarComp('x', 5.0))
+        c2 = p.model.add_subsystem('comp2', ExecComp('b=2*a'))
+        c3 = p.model.connect('comp1.x', 'comp2.a')
         p.setup()
 
-        c1 = p.model.get_subsystem('comp1')
-        c2 = p.model.get_subsystem('comp2')
-        cx = p.model.get_subsystem('comp')
         self.assertEqual(c1.name, 'comp1')
         self.assertEqual(c2.name, 'comp2')
-        self.assertEqual(cx, None)
 
         p.run_model()
         self.assertEqual(p['comp2.b'], 10.0)
@@ -194,7 +190,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['group2.comp1.b'], 20.0)
         self.assertEqual(p['group2.comp2.b'], 40.0)
 
-    def test_reused_output_names(self):
+    def test_reused_output_promoted_names(self):
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
         G1 = prob.model.add_subsystem('G1', Group())
