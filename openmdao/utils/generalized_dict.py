@@ -21,8 +21,8 @@ class GeneralizedDictionary(object):
     def __init__(self):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_dict : dict or None
             optional dictionary with which to initialize.
         """
@@ -33,8 +33,8 @@ class GeneralizedDictionary(object):
     def _check_type_and_value(self, name, value):
         """If declared, check that value has the right type and is valid.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             the name of the entry, which may or may not have been declared.
         value : -
@@ -56,8 +56,8 @@ class GeneralizedDictionary(object):
                 value=None, values=None, required=False):
         """Declare an entry.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             the name of the entry.
         type_ : type or None
@@ -86,8 +86,8 @@ class GeneralizedDictionary(object):
     def update(self, in_dict):
         """Update the internal dictionary with the given one.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_dict : dict
             the incoming dictionary to add to / overwrite the internal one.
         """
@@ -97,8 +97,8 @@ class GeneralizedDictionary(object):
     def _assemble_global_dict(self, parents_dict):
         """Incorporate the dictionary passed down from the systems above.
 
-        Args
-        ----
+        Parameters
+        ----------
         parents_dict : dict
             combination of the dict entries of all systems above this one.
         """
@@ -131,8 +131,8 @@ class GeneralizedDictionary(object):
     def __contain__(self, key):
         """Check if the key is in the local dictionary.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : str
             name of the entry.
 
@@ -146,8 +146,8 @@ class GeneralizedDictionary(object):
     def __setitem__(self, name, value):
         """Set an entry in the local dictionary.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the entry.
         value : -
@@ -162,8 +162,8 @@ class GeneralizedDictionary(object):
     def __getitem__(self, name):
         """Get an entry from the local dict, global dict, or declared default.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the entry.
 
@@ -205,8 +205,8 @@ class OptionsDictionary(GeneralizedDictionary):
     def __setitem__(self, name, value):
         """Set an entry in the local dictionary.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the entry.
         value : -
@@ -221,8 +221,8 @@ class OptionsDictionary(GeneralizedDictionary):
     def _assemble_global_dict(self, parents_dict):
         """Incorporate the dictionary passed down from the systems above.
 
-        Args
-        ----
+        Parameters
+        ----------
         parents_dict : dict
             combination of the dict entries of all systems above this one.
         """

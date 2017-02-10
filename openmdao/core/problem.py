@@ -53,8 +53,8 @@ class Problem(object):
                  use_ref_vector=True):
         """Initialize attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         model : <System> or None
             pointer to the top-level <System> object (root node in the tree).
         comm : MPI.Comm or <FakeComm> or None
@@ -81,8 +81,8 @@ class Problem(object):
     def _get_path_data(self, name):
         """Get absolute pathname and related data.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in the root system's namespace. May be
             a promoted name or an unpromoted name.
@@ -123,8 +123,8 @@ class Problem(object):
     def __getitem__(self, name):
         """Get an output/input variable.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in the root system's namespace.
 
@@ -145,8 +145,8 @@ class Problem(object):
     def __setitem__(self, name, value):
         """Set an output/input variable.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the output/input variable in the root system's namespace.
         value : float or ndarray or list
@@ -190,7 +190,7 @@ class Problem(object):
     def root(self, model):
         """Provide for setting the 'root' property for backwards compatibility.
 
-        Args
+        Parameters
         -------
         model : <Group>
             reference to a <Group> to be assigned to the 'model' property.
@@ -251,8 +251,8 @@ class Problem(object):
               mode='auto'):
         """Set up everything (model, assembler, vector, solvers, drivers).
 
-        Args
-        ----
+        Parameters
+        ----------
         vector_class : type (DefaultVector)
             reference to an actual <Vector> class; not an instance.
         check : boolean (True)
@@ -337,8 +337,8 @@ class Problem(object):
     def setup_vector(self, vec_name, vector_class, use_ref_vector):
         """Set up the 'vec_name' <Vector>.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_name : str
             name of the vector.
         vector_class : type
@@ -367,8 +367,8 @@ class Problem(object):
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
         """Compute derivatives of desired quantities with respect to desired inputs.
 
-        Args
-        ----
+        Parameters
+        ----------
         of : list of variable name strings or None
             Variables whose derivatives will be computed. Default is None, which
             uses the driver's objectives and constraints.
@@ -534,8 +534,8 @@ class Problem(object):
 def _check_shape(shape, val):
     """Check that the shape of a value matches the metadata for a variable.
 
-    Args
-    ----
+    Parameters
+    ----------
     meta : dict
         metadata for a variable.
     val : float or ndarray or list

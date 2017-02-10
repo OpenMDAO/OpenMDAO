@@ -35,8 +35,8 @@ class PETScTransfer(DefaultTransfer):
     def __call__(self, in_vec, out_vec, mode='fwd'):
         """Perform transfer.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : <Vector>
             pointer to the input vector.
         out_vec : <Vector>
@@ -77,8 +77,8 @@ class PETScVector(DefaultVector):
 
         - _data
 
-        Args
-        ----
+        Parameters
+        ----------
         root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
