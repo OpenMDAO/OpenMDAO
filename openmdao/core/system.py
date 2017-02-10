@@ -148,10 +148,12 @@ class System(object):
         dict of transfer objects.
     _vector_var_ids : dict
         dictionary of index arrays of relevant variables for this vector
-    _scaling_to_norm : dict of ndarray
+    _scaling_to_norm : {'input': ndarray[nvar_in, 2], 'output': ndarray[nvar_out, 2]}
         coefficients to convert vectors to normalized values.
-    _scaling_to_phys : dict of ndarray
+        In the integer arrays, nvar_in and nvar_out are counts of variables on myproc.
+    _scaling_to_phys : {'input': ndarray[nvar_in, 2], 'output': ndarray[nvar_out, 2]}
         coefficients to convert vectors to physical values.
+        In the integer arrays, nvar_in and nvar_out are counts of variables on myproc.
     _lower_bounds : <Vector>
         vector of lower bounds, scaled and dimensionless.
     _upper_bounds : <Vector>
@@ -733,8 +735,54 @@ class System(object):
         """
         oldsys = self._jacobian._system
         self._jacobian._system = self
+        self._jacobian._precompute_iter()
         yield self._jacobian
         self._jacobian._system = oldsys
+
+    @contextmanager
+    def _units_scaling_context(self, inputs=[], outputs=[], residuals=[], scale_jac=False):
+        """Context manager for units and scaling for vectors and Jacobians.
+
+        Temporarily puts vectors in a physical and unscaled state, because
+        internally, vectors are nominally in a dimensionless and scaled state.
+        The same applies (optionally) for Jacobians.
+
+        Args
+        ----
+        inputs : list of input <Vector> objects
+            List of input vectors to apply the unit and scaling conversions.
+        outputs : list of output <Vector> objects
+            List of output vectors to apply the unit and scaling conversions.
+        residuals : list of residual <Vector> objects
+            List of residual vectors to apply the unit and scaling conversions.
+        scale_jac : bool
+            If True, scale the Jacobian as well.
+
+        Returns
+        -------
+        None
+        """
+        for vec in inputs:
+            vec._scale(self._scaling_to_phys['input'])
+        for vec in outputs:
+            vec._scale(self._scaling_to_phys['output'])
+        for vec in residuals:
+            vec._scale(self._scaling_to_phys['residual'])
+        if scale_jac:
+            self._jacobian._precompute_iter()
+            self._jacobian._scale(self._scaling_to_phys)
+
+        yield
+
+        for vec in inputs:
+            vec._scale(self._scaling_to_norm['input'])
+        for vec in outputs:
+            vec._scale(self._scaling_to_norm['output'])
+        for vec in residuals:
+            vec._scale(self._scaling_to_norm['residual'])
+        if scale_jac:
+            self._jacobian._precompute_iter()
+            self._jacobian._scale(self._scaling_to_norm)
 
     @contextmanager
     def _matvec_context(self, vec_name, var_inds, mode, clear=True):
