@@ -38,7 +38,7 @@ class ImplicitComponent(Component):
                 result = self.solve_nonlinear(self._inputs, self._outputs)
 
             if result is None:
-                return False
+                return False, 0., 0.
             elif type(result) is bool:
                 return result, 0., 0.
             else:
@@ -94,7 +94,7 @@ class ImplicitComponent(Component):
         if self._ln_solver is not None:
             return self._ln_solver(vec_names, mode)
         else:
-            failed = True
+            failed = False
             abs_errors = []
             rel_errors = []
             for vec_name in vec_names:
@@ -106,10 +106,16 @@ class ImplicitComponent(Component):
                                                  residuals=[d_residuals]):
                     result = self.solve_linear(d_outputs, d_residuals, mode)
 
-                success = success and result[0]
+                if result is None:
+                    result = False, 0., 0.
+                elif type(result) is bool:
+                    result = result, 0., 0.
+
+                failed = failed or result[0]
                 abs_errors.append(result[1])
                 rel_errors.append(result[2])
-            return success, numpy.linalg.norm(abs_errors), numpy.linalg.norm(rel_errors)
+
+            return failed, numpy.linalg.norm(abs_errors), numpy.linalg.norm(rel_errors)
 
     def _linearize(self):
         """Compute jacobian / factorization."""

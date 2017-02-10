@@ -843,7 +843,19 @@ def _find_unit(unit):
 
 
 def valid_units(unit):
-    return _find_unit(unit)
+    """Return whether the given units are vaild.
+
+    Args
+    ----
+    units : str
+        String representation of the units.
+
+    Returns
+    -------
+    bool
+        True for valid, False for invalid.
+    """
+    return _find_unit(unit) is not None
 
 
 def conversion_to_base_units(units):

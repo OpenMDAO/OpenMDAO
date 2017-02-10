@@ -91,6 +91,7 @@ class Group(System):
         self._subsystems_allprocs.append(subsys)
         subsys.name = name
 
+        # If we're given a string, turn into a list
         if isinstance(promotes, string_types):
             promotes = [promotes]
         if isinstance(promotes_inputs, string_types):

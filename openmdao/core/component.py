@@ -70,7 +70,7 @@ class Component(System):
             raise TypeError('The units argument should be a str or None')
 
         # Check that units are valid
-        if units is not None and valid_units(units) is None:
+        if units is not None and not valid_units(units):
             raise ValueError("The units '%s' are invalid" % units)
 
         if shape is not None:
@@ -197,7 +197,7 @@ class Component(System):
                 raise TypeError('The %s argument should be a float' % (item.__name__))
 
         # Check that units are valid
-        if units is not None and valid_units(units) is None:
+        if units is not None and not valid_units(units):
             raise ValueError("The units '%s' are invalid" % units)
 
         if shape is not None:
