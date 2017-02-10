@@ -202,7 +202,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
-        top['comp.y'] = 0.0
+        top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
@@ -210,7 +210,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
 
         # Test upper bounds: should go to the minimum upper bound and stall
         top['px.x'] = 0.5
-        top['comp.y'] = 0.0
+        top['comp.y'] = 0.
         top['comp.z'] = 2.4
         top.run_model()
         for ind in range(3):
@@ -229,7 +229,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
-        top['comp.y'] = 0.0
+        top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
@@ -238,7 +238,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
 
         # Test upper bounds: should go to the upper bound and stall
         top['px.x'] = 0.5
-        top['comp.y'] = 0.0
+        top['comp.y'] = 0.
         top['comp.z'] = 2.4
         top.run_model()
         for ind in range(3):
@@ -257,7 +257,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
 
         # Test lower bounds: should stop just short of the lower bound
         top['px.x'] = 2.0
-        top['comp.y'] = 0.0
+        top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
@@ -265,7 +265,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
 
         # Test upper bounds: should stop just short of the minimum upper bound
         top['px.x'] = 0.5
-        top['comp.y'] = 0.0
+        top['comp.y'] = 0.
         top['comp.z'] = 2.4
         top.run_model()
         for ind in range(3):
