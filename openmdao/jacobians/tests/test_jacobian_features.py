@@ -68,6 +68,7 @@ class SimpleCompConst(ExplicitComponent):
         outputs['f'] = np.sum(inputs['z']) + inputs['x']
         outputs['g'] = np.outer(inputs['y1'] + inputs['y3'], inputs['y2']) + inputs['x'] * np.eye(2)
 
+
 class SimpleCompKwarg(SimpleComp):
     def __init__(self, partial_kwargs):
         self.partial_kwargs = partial_kwargs
@@ -85,9 +86,16 @@ class TestJacobianFeatures(unittest.TestCase):
     def setUp(self):
         self.model = model = Group()
         comp = IndepVarComp()
-        for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),('z', np.ones((2, 2)))):
+        variables = (
+            ('x', 1.),
+            ('y1', np.ones(2)),
+            ('y2', np.ones(2)),
+            ('y3', np.ones(2)),
+            ('z', np.ones((2, 2))),
+        )
+        for name, val in variables:
             comp.add_output(name, val)
-        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'z'])
+        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
 
         self.problem = Problem(model=model)
         model.suppress_solver_output = True
@@ -97,7 +105,8 @@ class TestJacobianFeatures(unittest.TestCase):
     def test_dependence(self):
         problem = self.problem
         model = problem.model
-        model.add_subsystem('simple', SimpleCompConst(), promotes=['x', 'y1', 'y2', 'z', 'f', 'g'])
+        model.add_subsystem('simple', SimpleCompConst(),
+                            promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
         problem.run_model()
 
@@ -110,13 +119,14 @@ class TestJacobianFeatures(unittest.TestCase):
         # removed during array creation (e.g. `eliminate_zeros` function on scipy.sparse matrices),
         # then this test will fail since there are zero entries in the sub-Jacobians.
 
-        # 14 for outputs w.r.t. themselves
+        # 16 for outputs w.r.t. themselves
         # 1 for df/dx
         # 4 for df/dz
         # 8 for dg/dy1
         # 4 for dg/dy2
+        # 8 for dg/dy3
         # 2 for dg/dx
-        expected_nnz = 14 + 1 + 4 + 8 + 4 + 2
+        expected_nnz = 16 + 1 + 4 + 8 + 4 + 8 + 2
 
         self.assertEqual(jac.nnz, expected_nnz)
 
@@ -143,7 +153,7 @@ class TestJacobianFeatures(unittest.TestCase):
         comp = SimpleCompKwarg(partials_kwargs)
         problem = self.problem
         model = problem.model
-        model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'z', 'f', 'g'])
+        model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         with self.assertRaises(ValueError) as ex:
             problem.setup(check=False)
         self.assertRegexpMatches(str(ex.exception), error_msg)
@@ -160,7 +170,8 @@ class TestJacobianFeatures(unittest.TestCase):
         model.suppress_solver_output = True
         model.ln_solver = ScipyIterativeSolver()
         model.jacobian = GlobalJacobian(matrix_class=CooMatrix)
-        model.add_subsystem('simple', SimpleCompConst(), promotes=['x', 'y1', 'y2', 'z', 'f', 'g'])
+        model.add_subsystem('simple', SimpleCompConst(),
+                            promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
         problem.run_model()
 

@@ -364,8 +364,7 @@ class Component(System):
                     raise ValueError(msg.format(
                         self.pathname, of, wrt,
                         out_size, in_size,
-                        rows.max() + 1, cols.max() + 1
-                    ))
+                        rows.max() + 1, cols.max() + 1))
             elif meta['value'] is not None:
                 val = meta['value']
                 val_shape = val.shape
@@ -378,8 +377,7 @@ class Component(System):
                     raise ValueError(msg.format(
                         self.pathname, of, wrt,
                         out_size, in_size,
-                        val_out, val_in
-                    ))
+                        val_out, val_in))
 
     def _set_partials_meta(self):
         """Set subjacobian info into our jacobian."""
