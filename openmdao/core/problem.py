@@ -10,11 +10,11 @@ from six.moves import range
 import numpy as np
 
 from openmdao.assemblers.default_assembler import DefaultAssembler
+from openmdao.core.component import Component
+from openmdao.core.driver import Driver
 from openmdao.error_checking.check_config import check_config
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.core.component import Component
-from openmdao.utils.general_utils import warn_deprecation
 
 
 class FakeComm(object):
@@ -43,6 +43,9 @@ class Problem(object):
         pointer to the top-level <System> object (root node in the tree).
     comm : MPI.Comm or <FakeComm>
         the global communicator; the same as that of assembler and model.
+    driver : <Driver>
+        Slot for the driver. The default driver is `Driver`, which just runs
+        the model once.
     _assembler : <Assembler>
         pointer to the global <Assembler> object.
     _use_ref_vector : bool
@@ -75,6 +78,8 @@ class Problem(object):
 
         self.model = model
         self.comm = comm
+        self.driver = Driver()
+
         self._assembler = assembler_class(comm)
         self._use_ref_vector = use_ref_vector
 
@@ -213,6 +218,20 @@ class Problem(object):
         """
         return self.model._solve_nonlinear()
 
+    def run_driver(self):
+        """Run the driver on the model.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        return self.driver.run()
+
     def run_once(self):
         """Backward compatible call for run_model.
 
@@ -328,6 +347,9 @@ class Problem(object):
                 system._nl_solver._setup_solvers(system, 0)
             if system._ln_solver is not None:
                 system._ln_solver._setup_solvers(system, 0)
+
+        # Finally, prepare the driver for execution.
+        self.driver._setup_driver(self)
 
         if check:
             check_config(self, logger)
