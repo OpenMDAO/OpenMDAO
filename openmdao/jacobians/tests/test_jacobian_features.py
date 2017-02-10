@@ -44,20 +44,29 @@ class SimpleComp(ExplicitComponent):
         jacobian['g', 'x'] = np.eye(2)
 
 
-class SimpleCompConst(SimpleComp):
-    def initialize_partials(self):
-        self.declare_partials('f', ['y1', 'y2'], dependent=False)
+class SimpleCompConst(ExplicitComponent):
+    def initialize_variables(self):
+        self.add_input('x', shape=1)
+        self.add_input('y1', shape=2)
+        self.add_input('y2', shape=2)
+        self.add_input('y3', shape=2)
+        self.add_input('z', shape=(2, 2))
+
+        self.add_output('f', shape=1)
+        self.add_output('g', shape=(2, 2))
+
+        self.declare_partials('f', 'y*', dependent=False)
         self.declare_partials('g', 'z', dependent=False)
 
         self.declare_partials('f', 'x', val=1.)
         self.declare_partials('f', 'z', val=np.ones((1, 4)))
-        self.declare_partials('g', 'y1', val=[[1, 0], [1, 0], [0, 1], [0, 1]])
+        self.declare_partials('g', 'y[13]', val=[[1, 0], [1, 0], [0, 1], [0, 1]])
         self.declare_partials('g', 'y2', val=1., cols=[0, 0, 1, 1], rows=[0, 3, 0, 3])
         self.declare_partials('g', 'x', val=sp.sparse.coo_matrix(((1., 1.), ((0, 3), (0, 0)))))
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
-        pass
-
+    def compute(self, inputs, outputs):
+        outputs['f'] = np.sum(inputs['z']) + inputs['x']
+        outputs['g'] = np.outer(inputs['y1'] + inputs['y3'], inputs['y2']) + inputs['x'] * np.eye(2)
 
 class SimpleCompKwarg(SimpleComp):
     def __init__(self, partial_kwargs):
@@ -75,12 +84,10 @@ class TestJacobianFeatures(unittest.TestCase):
 
     def setUp(self):
         self.model = model = Group()
-        model.add_subsystem('input_comp', IndepVarComp(
-            (('x', 1.),
-             ('y1', np.ones(2)),
-             ('y2', np.ones(2)),
-             ('z', np.ones((2, 2))))
-            ), promotes=['x', 'y1', 'y2', 'z'])
+        comp = IndepVarComp()
+        for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),('z', np.ones((2, 2)))):
+            comp.add_output(name, val)
+        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'z'])
 
         self.problem = Problem(model=model)
         model.suppress_solver_output = True
@@ -140,6 +147,22 @@ class TestJacobianFeatures(unittest.TestCase):
         with self.assertRaises(ValueError) as ex:
             problem.setup(check=False)
         self.assertRegexpMatches(str(ex.exception), error_msg)
+
+    def test_const_jacobian(self):
+        model = Group()
+        comp = IndepVarComp()
+        for name, val in (
+        ('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)), ('z', np.ones((2, 2)))):
+            comp.add_output(name, val)
+        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'z'])
+
+        problem = Problem(model=model)
+        model.suppress_solver_output = True
+        model.ln_solver = ScipyIterativeSolver()
+        model.jacobian = GlobalJacobian(matrix_class=CooMatrix)
+        model.add_subsystem('simple', SimpleCompConst(), promotes=['x', 'y1', 'y2', 'z', 'f', 'g'])
+        problem.setup(check=False)
+        problem.run_model()
 
 
 if __name__ == '__main__':
