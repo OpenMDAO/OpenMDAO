@@ -43,8 +43,8 @@ def _format_driver_array_option(option_name, var_name, values,
     are converted to numpy.ndarray.  If values is scalar, it is converted
     to float.
 
-    Args
-    ----
+    Parameters
+    ----------
     option_name : str
         Name of the option being set
     var_name : str
@@ -747,8 +747,8 @@ class System(object):
         internally, vectors are nominally in a dimensionless and scaled state.
         The same applies (optionally) for Jacobians.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : list of input <Vector> objects
             List of input vectors to apply the unit and scaling conversions.
         outputs : list of output <Vector> objects
@@ -757,10 +757,6 @@ class System(object):
             List of residual vectors to apply the unit and scaling conversions.
         scale_jac : bool
             If True, scale the Jacobian as well.
-
-        Returns
-        -------
-        None
         """
         for vec in inputs:
             vec._scale(self._scaling_to_phys['input'])
@@ -1203,8 +1199,8 @@ class System(object):
                        **kwargs):
         r"""Add a design variable to this system.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : string
             Name of the design variable in the system.
         lower : float or ndarray, optional
@@ -1303,8 +1299,8 @@ class System(object):
                      **kwargs):
         r"""Add a response variable to this system.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : string
             Name of the response variable in the system.
         type : string
@@ -1461,8 +1457,8 @@ class System(object):
                        indices=None, **kwargs):
         r"""Add a constraint variable to this system.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : string
             Name of the response variable in the system.
         lower : float or ndarray, optional
@@ -1523,8 +1519,8 @@ class System(object):
                       adder=None, scaler=None, **kwargs):
         r"""Add a response variable to this system.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : string
             Name of the response variable in the system.
         ref : float or ndarray, optional
@@ -1581,8 +1577,8 @@ class System(object):
         Retrieve all design variable settings from the system and, if recurse
         is True, all of its subsystems.
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : bool
             If True, recurse through the subsystems and return the path of
             all design vars relative to the this system.
@@ -1608,8 +1604,8 @@ class System(object):
         Retrieve all response variable settings from the system as a dict,
         keyed by variable name.
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all responses relative to the this system.
@@ -1635,8 +1631,8 @@ class System(object):
         Retrieve the constraint settings for the current system as a dict,
         keyed by variable name.
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all constraints relative to the this system.
@@ -1656,8 +1652,8 @@ class System(object):
         Retrieve all objectives settings from the system as a dict, keyed
         by variable name.
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all objective relative to the this system.

@@ -45,7 +45,8 @@ class ReturnFinder(ast.NodeVisitor):
     def __init__(self):
         self.has_return = False
         self.passes = False
-        self._function_depth = 0
+        self._func_depth = 0
+        self.is_context_manager = False
         self._depth = 0
 
     def visit(self, node):
@@ -53,22 +54,22 @@ class ReturnFinder(ast.NodeVisitor):
 
         self._depth += 1
 
-        is_function_def = isinstance(node, ast.FunctionDef)
+        is_func_def = isinstance(node, ast.FunctionDef)
 
         # Increase function_depth if node is a FunctionDef
-        if is_function_def:
-            self._function_depth += 1
+        if is_func_def:
+            self._func_depth += 1
 
         # If node is a Return, and we're at a function depth of 1,
         # and the value attribute is not None, then it
         # returns meaningful (non None) values.
-        if isinstance(node, ast.Return) and self._function_depth == 1:
+        if isinstance(node, ast.Return) and self._func_depth == 1:
             if node.value is not None:
                 self.has_return = True
 
         if hasattr(node, 'body'):
             # If the top level function does nothing but pass, note it.
-            if is_function_def and self._depth == 2 and len(node.body) <= 2 \
+            if is_func_def and self._depth == 2 and len(node.body) <= 2 \
                      and isinstance(node.body[-1], ast.Pass):
                 self.passes = True
             # Recurse through subnodes
@@ -80,14 +81,74 @@ class ReturnFinder(ast.NodeVisitor):
             for subnode in node.orelse:
                 self.visit(subnode)
 
+        # If we're in a context manager top-level function, ignore its return
+        if is_func_def and self._func_depth == 1 \
+                and hasattr(node, 'decorator_list') and node.decorator_list:
+            try:
+                wrapper = node.body[0].value.func.id
+                if 'ContextManager' in wrapper:
+                    self.is_context_manager = True
+            except AttributeError:
+                pass
+
         # Reduce function_depth on exit if this is a FunctionDef
-        if is_function_def:
-            self._function_depth -= 1
+        if is_func_def:
+            self._func_depth -= 1
 
         self._depth -= 1
 
 
 class LintTestCase(unittest.TestCase):
+
+    def check_method_summary(self, dir_name, file_name,
+                                           class_name, method_name,
+                                           numpy_doc_string, failures):
+        """
+
+        Parameters
+        ----------
+        dir_name : str
+            The name of the directory in which the method is defined.
+        file_name : str
+            The name of the file in which the method is defined.
+        class_name : str
+            The name of the class to which the method belongs
+        method_name : str
+            The name of the method
+        numpy_doc_string : numpydoc.docscrape.NumpyDocString
+            An instance of the NumpyDocString parsed from the method
+        failures : dict
+            The failures encountered by the method.  These are all stored
+            so that we can fail once at the end of the check_method method
+            with information about every failure. Form is
+            { 'dir_name/file_name:class_name.method_name': [ messages ] }
+        """
+        new_failures = []
+        summary = numpy_doc_string['Summary']
+
+        # Check that summary is present
+        if not summary:
+            new_failures.append('is missing a summary.')
+        # Summary should be a single line.
+        if len(summary) > 1:
+            new_failures.append('summary should be only one line.')
+        summary = summary[0]
+        # Summary should have no leading/trailing whitespace.
+        if summary[0].isspace() or summary[-1].isspace():
+            new_failures.append('summary should not contain leading or '
+                                'trailing whitespace.')
+        # Summary should end with a period.
+        if not summary.endswith('.'):
+            new_failures.append('Summary should end with a period.')
+
+        if new_failures:
+            key = '{0}/{1}:{2}.{3}'.format(dir_name, file_name, class_name,
+                                           method_name)
+            if key in failures:
+                failures[key] += new_failures
+            else:
+                failures[key] = new_failures
+
 
     def check_method_parameters(self, dir_name, file_name, class_name,
                                 method_name, argspec, numpy_doc_string,
@@ -170,7 +231,10 @@ class LintTestCase(unittest.TestCase):
         if new_failures:
             key = '{0}/{1}:{2}.{3}'.format(dir_name, file_name, class_name,
                                            method_name)
-            failures[key] = new_failures
+            if key in failures:
+                failures[key] += new_failures
+            else:
+                failures[key] = new_failures
 
 
     def check_method_returns(self, dir_name, file_name, class_name,
@@ -195,6 +259,8 @@ class LintTestCase(unittest.TestCase):
             with information about every failure. Form is
             { 'dir_name/file_name:class_name.method_name': [ messages ] }
         """
+        #print(dir_name, file_name, class_name, method_name)
+
         new_failures = []
 
         method_src = inspect.getsource(method)
@@ -208,8 +274,19 @@ class LintTestCase(unittest.TestCase):
             return
 
         doc_returns = numpy_doc_string['Returns']
+        doc_yields = numpy_doc_string['Yields']
 
-        if doc_returns and not f.has_return:
+        # TODO:  Enforce Yields in docs for contextmanagers
+        # Static analysis can't see inside the function being wrapped by the
+        # contextmanager, so we have no way of knowing if it yields None or
+        # a meaningful value.
+
+        # if f.is_context_manager and not doc_yields:
+        #     new_failures.append('method is a context manager but does not '
+        #                         'have a \'Yields\' section in docstring')
+        if f.is_context_manager:
+            pass
+        elif doc_returns and not f.has_return:
             new_failures.append('method returns no value but found '
                                 'unnecessary \'Returns\' section '
                                 'in docstring')
@@ -230,7 +307,13 @@ class LintTestCase(unittest.TestCase):
         if new_failures:
             key = '{0}/{1}:{2}.{3}'.format(dir_name, file_name, class_name,
                                            method_name)
-            failures[key] = new_failures
+            if key in failures:
+                failures[key] += new_failures
+            else:
+                failures[key] = new_failures
+
+        # if method_name == '_jacobian_context':
+        #     exit(0)
 
     def check_method(self, dir_name, file_name,
                      class_name, method_name, method, failures):
@@ -271,6 +354,9 @@ class LintTestCase(unittest.TestCase):
             return
 
         nds = NumpyDocString(doc)
+
+        self.check_method_summary(dir_name, file_name, class_name, method_name,
+                                  nds, failures)
 
         self.check_method_parameters(dir_name, file_name, class_name,
                                      method_name, argspec, nds, failures)
@@ -333,14 +419,14 @@ class LintTestCase(unittest.TestCase):
                             self.check_method(dir_name, file_name, class_name,
                                               method_name, method, failures)
 
-            if failures:
-                msg = '\n'
-                for key in failures:
-                    msg += '{0}\n'.format(key)
-                    for failure in failures[key]:
-                        msg += '    {0}\n'.format(failure)
+        if failures:
+            msg = '\n'
+            for key in failures:
+                msg += '{0}\n'.format(key)
+                for failure in failures[key]:
+                    msg += '    {0}\n'.format(failure)
 
-                self.fail(msg)
+            self.fail(msg)
 
 
 if __name__ == '__main__':

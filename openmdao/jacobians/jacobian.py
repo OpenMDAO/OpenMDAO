@@ -126,12 +126,8 @@ class Jacobian(object):
     def _precompute_iter(self):
         """Assemble list of output-input pairs by name.
 
-        Returns
-        -------
-        list
-            List of (output, input) pairs found in the jacobian
-            for the current System. input and output are unpromoted
-            names.
+        Sets self._iter_list to a list of (output, input) pairs found in the
+        jacobian for the current System. input and output are unpromoted names.
         """
         system = self._system
         start = len(system.pathname) + 1 if system.pathname else 0
