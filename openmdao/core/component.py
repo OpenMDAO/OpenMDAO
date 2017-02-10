@@ -2,7 +2,7 @@
 
 from __future__ import division
 
-import fnmatch
+from fnmatch import fnmatchcase
 import numpy
 from itertools import product
 from six import string_types, iteritems
@@ -330,9 +330,9 @@ class Component(System):
         tvlists = (('output', outs), ('input', ins))
 
         for (of_pattern, wrt_pattern), meta in iteritems(self._subjacs_info):
-            of_matches = fnmatch.filter(outs, of_pattern)
+            of_matches = [name for name in outs if fnmatchcase(name, of_pattern)]
             for typ, vnames in tvlists:
-                wrt_matches = fnmatch.filter(vnames, wrt_pattern)
+                wrt_matches = [name for name in vnames if fnmatchcase(name, wrt_pattern)]
                 for (of, wrt) in product(of_matches, wrt_matches):
                     yield (of, wrt), meta, typ
 
