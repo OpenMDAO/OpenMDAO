@@ -40,10 +40,6 @@ class ReturnFinder(ast.NodeVisitor):
     passes : bool
         Set to True if the method does nothing but pass (i.e. is not yet
         implemented or is a 'virtual' method in a base class)
-    num_returns : int
-        If the function returns a Tuple, the number of elements in the Tuple.
-        If the function returns a single value, this is 1.
-        Otherwise if the function returns None, this is 0.
 
     """
     def __init__(self):
@@ -51,7 +47,6 @@ class ReturnFinder(ast.NodeVisitor):
         self.passes = False
         self._function_depth = 0
         self._depth = 0
-        self.num_returns = 0
 
     def visit(self, node):
         """ Visit nodes in the syntax tree to find instances of return. """
@@ -70,10 +65,6 @@ class ReturnFinder(ast.NodeVisitor):
         if isinstance(node, ast.Return) and self._function_depth == 1:
             if node.value is not None:
                 self.has_return = True
-                if isinstance(node.value, ast.Tuple):
-                    self.num_returns = len(node.value.elts)
-                else:
-                    self.num_returns = 1
 
         if hasattr(node, 'body'):
             # If the top level function does nothing but pass, note it.
@@ -93,8 +84,8 @@ class ReturnFinder(ast.NodeVisitor):
 
 class LintTestCase(unittest.TestCase):
 
-    def check_parameters(self, dir_name, file_name, class_name, method_name,
-                         argspec, numpy_doc_string):
+    def check_method_parameters(self, dir_name, file_name, class_name,
+                                method_name, argspec, numpy_doc_string):
 
         fail_msg = '{0}, {1} : {2} {3}'.format(dir_name, file_name, class_name,
                                                method_name)
@@ -145,8 +136,8 @@ class LintTestCase(unittest.TestCase):
                 self.fail(fail_msg + '... documents nonexisting parameters: '
                                      '{0}'.format(str(list(overdocumented))))
 
-    def check_returns(self, dir_name, file_name, class_name, method_name,
-                      method, numpy_doc_string):
+    def check_method_returns(self, dir_name, file_name, class_name,
+                             method_name, method, numpy_doc_string):
         fail_msg = '{0}, {1} : {2} {3}'.format(dir_name, file_name, class_name,
                                                method_name)
         method_src = inspect.getsource(method)
@@ -158,15 +149,19 @@ class LintTestCase(unittest.TestCase):
         if f.passes:
             return
 
-        if numpy_doc_string['Returns']:
-            if not f.has_return:
-                self.fail(fail_msg + '... method returns no value but found '
-                                     'unnecessary \'Returns\' sections '
-                                     'in docstring')
+        returns = numpy_doc_string['Returns']
+
+        if returns and not f.has_return:
+            self.fail(fail_msg + '... method returns no value but found '
+                                 'unnecessary \'Returns\' sections '
+                                 'in docstring')
+        elif f.has_return and not returns:
+            self.fail(fail_msg + '... method returns value(s) but found '
+                                 'no \'Returns\' sections in docstring')
+        elif f.has_return and returns:
             # Check formatting
-            for entry in numpy_doc_string['Returns']:
+            for entry in returns:
                 name = entry[0]
-                type_ = entry[1]
                 desc = '\n'.join(entry[2])
                 if not name:
                     self.fail(fail_msg + '...no detectable name for Return '
@@ -174,9 +169,6 @@ class LintTestCase(unittest.TestCase):
                 if desc == '':
                     self.fail(fail_msg + '...no description given for Return '
                                          '{0}'.format(name))
-        elif f.has_return:
-            self.fail(fail_msg + '... method returns value(s) but found '
-                                 'no \'Returns\' sections in docstring')
 
     def check_method(self, dir_name, file_name,
                      class_name, method_name, method):
@@ -198,11 +190,11 @@ class LintTestCase(unittest.TestCase):
 
         nds = NumpyDocString(doc)
 
-        self.check_parameters(dir_name, file_name, class_name, method_name,
-                              argspec, nds)
+        self.check_method_parameters(dir_name, file_name, class_name, method_name,
+                                     argspec, nds)
 
-        self.check_returns(dir_name, file_name, class_name, method_name,
-                           method, nds)
+        self.check_method_returns(dir_name, file_name, class_name, method_name,
+                                  method, nds)
 
     def test_docstrings(self):
         topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
