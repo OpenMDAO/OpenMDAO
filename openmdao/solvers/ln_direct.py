@@ -23,8 +23,8 @@ class DirectSolver(LinearSolver):
     def __init__(self, **kwargs):
         """Declare the solver option.
 
-        Args
-        ----
+        Parameters
+        ----------
         kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
@@ -42,8 +42,8 @@ class DirectSolver(LinearSolver):
     def _mat_vec(self, in_vec):
         """Compute matrix-vector product.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : ndarray
             the incoming array (combines all varsets).
 

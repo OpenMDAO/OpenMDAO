@@ -34,8 +34,8 @@ def convert_file():
 def abs_varname_iter(system, typ, local=True):
     """An iter of variable absolute pathnames for the given system.
 
-    Args
-    ----
+    Parameters
+    ----------
     system : System
         The System where the iteration starts.
 
@@ -57,8 +57,8 @@ def abs_varname_iter(system, typ, local=True):
 def abs_meta_iter(system, typ):
     """An iter of (abs_var_name, metadata) for all local vars.
 
-    Args
-    ----
+    Parameters
+    ----------
     system : System
         The System where the iteration starts.
 
@@ -80,8 +80,8 @@ def abs_conn_iter(system):
 def get_abs_proms(system, typ, local=True):
     """An iter of (absname, promname) for all vars.
 
-    Args
-    ----
+    Parameters
+    ----------
     system : System
         The System where the iteration starts.
 
@@ -103,8 +103,8 @@ def get_abs_proms(system, typ, local=True):
 def prom2abs_map(system, typ, local=True):
     """Return a dict mapping promname to absname(s) for all vars.
 
-    Args
-    ----
+    Parameters
+    ----------
     system : System
         The System where the iteration starts.
 
@@ -126,8 +126,8 @@ def prom2abs_map(system, typ, local=True):
 def abs2prom_map(system, typ, local=True):
     """Return a dict mapping absname to promname for all vars.
 
-    Args
-    ----
+    Parameters
+    ----------
     system : System
         The System where the iteration starts.
 

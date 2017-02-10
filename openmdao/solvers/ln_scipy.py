@@ -22,8 +22,8 @@ class ScipyIterativeSolver(LinearSolver):
     def __init__(self, **kwargs):
         """Declare the solver option.
 
-        Args
-        ----
+        Parameters
+        ----------
         kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
@@ -47,8 +47,8 @@ class ScipyIterativeSolver(LinearSolver):
     def _setup_solvers(self, system, depth):
         """Assign system instance, set depth, and optionally perform setup.
 
-        Args
-        ----
+        Parameters
+        ----------
         system : <System>
             pointer to the owning system.
         depth : int
@@ -62,8 +62,8 @@ class ScipyIterativeSolver(LinearSolver):
     def _mat_vec(self, in_vec):
         """Compute matrix-vector product.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : ndarray
             the incoming array (combines all varsets).
 
@@ -98,8 +98,8 @@ class ScipyIterativeSolver(LinearSolver):
     def _monitor(self, res):
         """Print the residual and iteration number (callback from SciPy).
 
-        Args
-        ----
+        Parameters
+        ----------
         res : ndarray
             the current residual vector.
         """
@@ -115,8 +115,8 @@ class ScipyIterativeSolver(LinearSolver):
     def solve(self, vec_names, mode):
         """Run the solver.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -177,8 +177,8 @@ class ScipyIterativeSolver(LinearSolver):
     def _apply_precon(self, in_vec):
         """Apply preconditioner.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : ndarray
             Incoming vector.
 

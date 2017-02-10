@@ -37,8 +37,8 @@ class LinearSystemComp(ImplicitComponent):
     def apply_nonlinear(self, inputs, outputs, residuals):
         """R = Ax - b.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -51,8 +51,8 @@ class LinearSystemComp(ImplicitComponent):
     def solve_nonlinear(self, inputs, outputs):
         """Use numpy to solve Ax=b for x.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -66,8 +66,8 @@ class LinearSystemComp(ImplicitComponent):
                      d_residuals, mode):
         r"""Compute jac-vector product.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -107,8 +107,8 @@ class LinearSystemComp(ImplicitComponent):
 
             'rev': d_outputs \|-> d_residuals
 
-        Args
-        ----
+        Parameters
+        ----------
         d_outputs : Vector
             unscaled, dimensional quantities read via d_outputs[key]
         d_residuals : Vector

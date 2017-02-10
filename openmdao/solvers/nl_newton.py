@@ -23,8 +23,8 @@ class NewtonSolver(NonlinearSolver):
     def __init__(self, **kwargs):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs : dict
             options dictionary.
         """
@@ -39,8 +39,8 @@ class NewtonSolver(NonlinearSolver):
     def _setup_solvers(self, system, depth):
         """Assign system instance, set depth, and optionally perform setup.
 
-        Args
-        ----
+        Parameters
+        ----------
         system : <System>
             pointer to the owning system.
         depth : int

@@ -33,8 +33,8 @@ class Component(BaseComponent):
     def add_param(self, name, val=1.0, **kwargs):
         """Add an param variable to the component.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in this component's namespace.
         val : object
@@ -47,8 +47,8 @@ class Component(BaseComponent):
     def add_state(self, name, val=1.0, **kwargs):
         """Add a state variable to the component.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in this component's namespace.
         val : object
@@ -65,8 +65,8 @@ class Component(BaseComponent):
     def add_output(self, name, val=1.0, **kwargs):
         """Add an output variable to the component.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in this component's namespace.
         val : object
@@ -201,8 +201,8 @@ class Component(BaseComponent):
     def apply_nonlinear(self, params, unknowns, residuals):
         """Compute residuals given params and unknowns.
 
-        Args
-        ----
+        Parameters
+        ----------
         params : Vector
             unscaled, dimensional param variables read via params[key]
         unknowns : Vector
@@ -215,8 +215,8 @@ class Component(BaseComponent):
     def solve_nonlinear(self, params, unknowns, residuals):
         """Compute unknowns given params.
 
-        Args
-        ----
+        Parameters
+        ----------
         params : Vector
             unscaled, dimensional param variables read via params[key]
         unknowns : Vector
@@ -235,8 +235,8 @@ class Component(BaseComponent):
 
             'rev': d_residuals \|-> (d_params, unknowns)
 
-        Args
-        ----
+        Parameters
+        ----------
         params : Vector
             unscaled, dimensional param variables read via params[key]
         unknowns : Vector
@@ -260,8 +260,8 @@ class Component(BaseComponent):
 
             'rev': d_unknowns \|-> d_residuals
 
-        Args
-        ----
+        Parameters
+        ----------
         d_unknowns_dict : dict of <Vector>
             unscaled, dimensional quantities read via d_unknowns[key]
         d_residuals_dict : dict of <Vector>
@@ -276,8 +276,8 @@ class Component(BaseComponent):
     def linearize(self, params, unknowns, jacobian):
         """Compute sub-jacobian parts / factorization.
 
-        Args
-        ----
+        Parameters
+        ----------
         params : Vector
             unscaled, dimensional param variables read via params[key]
         unknowns : Vector

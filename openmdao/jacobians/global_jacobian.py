@@ -28,8 +28,8 @@ class GlobalJacobian(Jacobian):
     def __init__(self, **kwargs):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs : dict
             options dictionary.
         """
@@ -41,8 +41,8 @@ class GlobalJacobian(Jacobian):
     def _get_var_range(self, ivar_all, typ):
         """Look up the variable name and <Jacobian> index range.
 
-        Args
-        ----
+        Parameters
+        ----------
         ivar_all : int
             index of a variable in the global ordering.
         typ : str
@@ -192,8 +192,8 @@ class GlobalJacobian(Jacobian):
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """Compute matrix-vector product.
 
-        Args
-        ----
+        Parameters
+        ----------
         d_inputs : Vector
             inputs linear vector.
         d_outputs : Vector

@@ -21,8 +21,8 @@ class ProcAllocator(object):
     def __init__(self, **kwargs):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs : dict
             Contains options.
         """
@@ -34,8 +34,8 @@ class ProcAllocator(object):
     def __call__(self, nsub, comm, proc_range):
         """Perform the allocation if parallel.
 
-        Args
-        ----
+        Parameters
+        ----------
         nsub : int
             Number of subsystems.
         comm : MPI.Comm or <FakeComm>
@@ -65,8 +65,8 @@ class ProcAllocator(object):
     def _divide_procs(self, nsub, comm, proc_range):
         """Perform the parallel processor allocation.
 
-        Args
-        ----
+        Parameters
+        ----------
         nsub : int
             Number of subsystems.
         comm : MPI.Comm or <FakeComm>
