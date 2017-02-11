@@ -1228,14 +1228,14 @@ class System(object):
         -----
         The design variable can be scaled using scaler and adder, where
 
-        ..math::
+        .. math::
 
             x_{scaled} = scaler(x + adder)
 
         or through the use of ref/ref0, which map to scaler and adder through
         the equations:
 
-        ..math::
+        .. math::
 
             0 = scaler(ref_0 + adder)
 
@@ -1243,7 +1243,7 @@ class System(object):
 
         which results in:
 
-        ..math::
+        .. math::
 
             adder = -ref_0
 
@@ -1332,14 +1332,14 @@ class System(object):
         -----
         The response can be scaled using scaler and adder, where
 
-        ..math::
+        .. math::
 
             x_{scaled} = scaler(x + adder)
 
         or through the use of ref/ref0, which map to scaler and adder through
         the equations:
 
-        ..math::
+        .. math::
 
             0 = scaler(ref_0 + adder)
 
@@ -1347,7 +1347,7 @@ class System(object):
 
         which results in:
 
-        ..math::
+        .. math::
 
             adder = -ref_0
 
@@ -1488,14 +1488,14 @@ class System(object):
         -----
         The constraint can be scaled using scaler and adder, where
 
-        ..math::
+        .. math::
 
             x_{scaled} = scaler(x + adder)
 
         or through the use of ref/ref0, which map to scaler and adder through
         the equations:
 
-        ..math::
+        .. math::
 
             0 = scaler(ref_0 + adder)
 
@@ -1503,7 +1503,7 @@ class System(object):
 
         which results in:
 
-        ..math::
+        .. math::
 
             adder = -ref_0
 
@@ -1544,14 +1544,14 @@ class System(object):
         -----
         The objective can be scaled using scaler and adder, where
 
-        ..math::
+        .. math::
 
             x_{scaled} = scaler(x + adder)
 
         or through the use of ref/ref0, which map to scaler and adder through
         the equations:
 
-        ..math::
+        .. math::
 
             0 = scaler(ref_0 + adder)
 
@@ -1559,7 +1559,7 @@ class System(object):
 
         which results in:
 
-        ..math::
+        .. math::
 
             adder = -ref_0
 

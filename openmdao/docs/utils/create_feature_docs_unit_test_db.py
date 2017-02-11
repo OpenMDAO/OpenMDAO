@@ -78,11 +78,10 @@ def __str_SphinxDocString__(self, indent=0, func_role="obj"):
     out += self._str_index() + ['']
     out += self._str_summary()
     out += self._str_extended_summary()
-    out += self._str_param_list('Args')
+    out += self._str_param_list('Parameters')
     out += self._str_options('Options')
-    out += self._str_options('Params')
     out += self._str_returns()
-    for param_list in ('Other Args', 'Raises', 'Warns'):
+    for param_list in ('Other Parameters', 'Raises', 'Warns'):
         out += self._str_param_list(param_list)
     out += self._str_warnings()
     out += self._str_see_also(func_role)
