@@ -27,7 +27,8 @@ ignores = {
     ],
     'pep257': [
         'D203',  # 1 blank required before class docstrings
-        'D213',  # Multi-line doc strings start on second line (see: D212)
+        'D212',  # Multi-line doc strings start on second line (see: D212)
+        'D200',  # One-line docstring should fit on one line with quotes
     ]
 }
 
@@ -80,7 +81,7 @@ class StringReport(pycodestyle.StandardReport):
 
 
 class LintTestCase(unittest.TestCase):
-    
+
     def test_pep8(self):
         pep8opts = pycodestyle.StyleGuide(
             ignore=ignores['pep8'],

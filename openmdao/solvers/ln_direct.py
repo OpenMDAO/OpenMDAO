@@ -83,6 +83,13 @@ class DirectSolver(LinearSolver):
         """
         Run the solver.
 
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
         Returns
         -------
         boolean
