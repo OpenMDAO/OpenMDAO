@@ -6,7 +6,9 @@ from openmdao.api import ExplicitComponent
 
 
 class DoubleArrayComp(ExplicitComponent):
-    """A fairly simple array component."""
+    """
+    A fairly simple array component.
+    """
 
     def __init__(self):
         super(DoubleArrayComp, self).__init__()
@@ -26,14 +28,18 @@ class DoubleArrayComp(ExplicitComponent):
         self.add_output('y2', np.zeros([2]))
 
     def compute(self, inputs, outputs):
-        """Execution."""
+        """
+        Execution.
+        """
         outputs['y1'] = self.JJ[0:2, 0:2].dot(inputs['x1']) + \
                          self.JJ[0:2, 2:4].dot(inputs['x2'])
         outputs['y2'] = self.JJ[2:4, 0:2].dot(inputs['x1']) + \
                          self.JJ[2:4, 2:4].dot(inputs['x2'])
 
     def compute_jacobian(self, inputs, outputs, jacobian):
-        """Analytical derivatives."""
+        """
+        Analytical derivatives.
+        """
         jacobian[('y1', 'x1')] = self.JJ[0:2, 0:2]
         jacobian[('y1', 'x2')] = self.JJ[0:2, 2:4]
         jacobian[('y2', 'x1')] = self.JJ[2:4, 0:2]

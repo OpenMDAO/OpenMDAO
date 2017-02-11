@@ -2,7 +2,8 @@
 
 
 def overrides_method(method_name, obj, base):
-    """Return True if the named base class method is overridden by obj.
+    """
+    Return True if the named base class method is overridden by obj.
 
     Parameters
     ----------

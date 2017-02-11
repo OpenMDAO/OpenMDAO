@@ -9,7 +9,8 @@ from openmdao.utils.units import conversion_to_base_units, convert_units
 
 
 class Assembler(object):
-    """Base Assembler class.
+    """
+    Base Assembler class.
 
     The primary purpose of the Assembler class is to set up transfers.
 
@@ -43,7 +44,8 @@ class Assembler(object):
     """
 
     def __init__(self, comm):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
         Parameters
         ----------
@@ -65,7 +67,8 @@ class Assembler(object):
         self._src_scaling = None
 
     def _setup_variables(self, nvars, variable_metadata, variable_indices):
-        """Compute the variable sets and sizes.
+        """
+        Compute the variable sets and sizes.
 
         Sets the following attributes:
             _variable_sizes_all
@@ -149,7 +152,8 @@ class Assembler(object):
                                      self._variable_sizes_all[typ])
 
     def _setup_connections(self, connections, variable_allprocs_names):
-        """Identify implicit connections and combine with explicit ones.
+        """
+        Identify implicit connections and combine with explicit ones.
 
         Sets the following attributes:
             _input_src_ids
@@ -183,7 +187,8 @@ class Assembler(object):
         self._input_src_ids = _input_src_ids
 
     def _setup_src_indices(self, input_metadata, myproc_var_global_indices):
-        """Assemble global list of src_indices.
+        """
+        Assemble global list of src_indices.
 
         Sets the following attributes:
             _src_indices
@@ -225,7 +230,8 @@ class Assembler(object):
             ind1 += isize
 
     def _setup_src_data(self, variable_metadata, variable_indices):
-        """Compute and store unit/scaling information for inputs.
+        """
+        Compute and store unit/scaling information for inputs.
 
         Parameters
         ----------
@@ -287,7 +293,8 @@ class Assembler(object):
 
     def _compute_transfers(self, nsub_allprocs, var_range,
                            subsystems_myproc, subsystems_inds):
-        """Compute the transfer indices.
+        """
+        Compute the transfer indices.
 
         Must be implemented by the subclass.
 

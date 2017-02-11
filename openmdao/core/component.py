@@ -13,7 +13,8 @@ from openmdao.utils.units import valid_units
 
 
 class Component(System):
-    """Base Component class; not to be directly instantiated.
+    """
+    Base Component class; not to be directly instantiated.
 
     Attributes
     ----------
@@ -22,7 +23,8 @@ class Component(System):
     """
 
     def __init__(self, **kwargs):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
         Parameters
         ----------
@@ -33,7 +35,8 @@ class Component(System):
         self._var2meta = {}
 
     def add_input(self, name, val=1.0, shape=None, indices=None, units=None, desc='', var_set=0):
-        """Add an input variable to the component.
+        """
+        Add an input variable to the component.
 
         Parameters
         ----------
@@ -130,7 +133,8 @@ class Component(System):
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
                    res_ref=1.0, res_ref0=0.0, var_set=0):
-        """Add an output variable to the component.
+        """
+        Add an output variable to the component.
 
         Parameters
         ----------
@@ -256,7 +260,8 @@ class Component(System):
 
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):
-        """Store subjacobian metadata for later use.
+        """
+        Store subjacobian metadata for later use.
 
         Parameters
         ----------
@@ -332,7 +337,9 @@ class Component(System):
                 self._subjacs_info[key] = meta2
 
     def _iter_partials_matches(self):
-        """Generate all (of, wrt) name pairs to add to jacobian."""
+        """
+        Generate all (of, wrt) name pairs to add to jacobian.
+        """
         outs = self._var_allprocs_names['output']
         ins = self._var_allprocs_names['input']
         tvlists = (('output', outs), ('input', ins))
@@ -346,13 +353,16 @@ class Component(System):
                             yield (ofmatch, wrtname), meta, typ
 
     def _set_partials_meta(self):
-        """Set subjacobian info into our jacobian."""
+        """
+        Set subjacobian info into our jacobian.
+        """
         with self._jacobian_context() as J:
             for key, meta, typ in self._iter_partials_matches():
                 J._set_partials_meta(key, meta)
 
     def _setup_variables(self, recurse=False):
-        """Assemble variable metadata and names lists.
+        """
+        Assemble variable metadata and names lists.
 
         Sets the following attributes:
             _var_allprocs_names
@@ -423,7 +433,8 @@ class Component(System):
                         ))
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
-        r"""Add this vector and assign sub_vectors to subsystems.
+        r"""
+        Add this vector and assign sub_vectors to subsystems.
 
         Sets the following attributes:
 

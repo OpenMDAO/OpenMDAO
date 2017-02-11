@@ -40,8 +40,8 @@ class ReturnFinder(ast.NodeVisitor):
     passes : bool
         Set to True if the method does nothing but pass (i.e. is not yet
         implemented or is a 'virtual' method in a base class)
-
     """
+
     def __init__(self):
         self.has_return = False
         self.passes = False
@@ -50,8 +50,9 @@ class ReturnFinder(ast.NodeVisitor):
         self._depth = 0
 
     def visit(self, node):
-        """ Visit nodes in the syntax tree to find instances of return. """
-
+        """
+        Visit nodes in the syntax tree to find instances of return.
+        """
         self._depth += 1
 
         is_func_def = isinstance(node, ast.FunctionDef)
@@ -104,7 +105,6 @@ class LintTestCase(unittest.TestCase):
                                            class_name, method_name,
                                            numpy_doc_string, failures):
         """
-
         Parameters
         ----------
         dir_name : str
@@ -153,7 +153,8 @@ class LintTestCase(unittest.TestCase):
     def check_method_parameters(self, dir_name, file_name, class_name,
                                 method_name, argspec, numpy_doc_string,
                                 failures):
-        """ Check that the parameters section is correct.
+        """
+        Check that the parameters section is correct.
 
         Parameters
         ----------
@@ -239,7 +240,8 @@ class LintTestCase(unittest.TestCase):
 
     def check_method_returns(self, dir_name, file_name, class_name,
                              method_name, method, numpy_doc_string, failures):
-        """ Check that the returns section is correct.
+        """
+        Check that the returns section is correct.
 
         Parameters
         ----------
@@ -317,7 +319,8 @@ class LintTestCase(unittest.TestCase):
 
     def check_method(self, dir_name, file_name,
                      class_name, method_name, method, failures):
-        """ Perform docstring checks on each method.
+        """
+        Perform docstring checks on each method.
 
         Parameters
         ----------
