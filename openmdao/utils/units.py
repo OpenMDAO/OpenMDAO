@@ -635,7 +635,22 @@ _UNIT_LIB = ConfigParser()
 
 
 def _do_nothing(string):
-    """Make the ConfigParser case sensitive."""
+    """
+    Make the ConfigParser case sensitive.
+
+    Defines an optionxform for the units configparser that
+    does nothing, resulting in a case-sensitive parser.
+
+    Parameters
+    ----------
+    string : str
+        The string to be transformed for the ConfigParser
+
+    Returns
+    -------
+    str
+        The same string that was given as a parameter.
+    """
     return string
 
 
@@ -845,8 +860,8 @@ def _find_unit(unit):
 def valid_units(unit):
     """Return whether the given units are vaild.
 
-    Args
-    ----
+    Parameters
+    ----------
     units : str
         String representation of the units.
 
