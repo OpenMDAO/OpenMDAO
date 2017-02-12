@@ -475,8 +475,8 @@ class LintTestCase(unittest.TestCase):
                                               method_name, method, failures)
 
                     # Loop over functions
-                    with open(os.path.join(dir_name, file_name)) as f:
-                        tree = ast.parse(f.read())
+                    tree = ast.parse(inspect.getsource(mod))
+
                     if hasattr(tree, 'body'):
                         funcs = [node.name for node in tree.body if isinstance(node, ast.FunctionDef)]
                     else:
