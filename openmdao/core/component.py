@@ -348,8 +348,8 @@ class Component(System):
     def _check_partials_meta(self, key, meta):
         """Check a given partial derivative and metadata for the correct shapes.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : tuple(str,str)
             The of/wrt pair defining the partial derivative.
         meta : dict
