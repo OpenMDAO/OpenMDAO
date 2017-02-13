@@ -127,8 +127,11 @@ class TestSystem(unittest.TestCase):
         model.add_subsystem('Sink', ExecComp(('c=2*b', 'z=2*y')),
                                              promotes=['b', 'y'])
 
-        prob = Problem(model=model)
-        prob.setup()
+        p = Problem(model=model)
+        p.setup()
+
+        p.model.suppress_solver_output = True
+        p.run_model()
 
         msg = "Incompatible shape for assignment. Expected .* but got .*"
 
@@ -147,12 +150,10 @@ class TestSystem(unittest.TestCase):
         # assign scalar to array
         g2.set_input('C2.x', num_val)
         assert_rel_error(self, model.get_input('G1.G2.C2.x'), arr_val, 1e-10)
-        assert_rel_error(self, g1.get_input('G2.C2.x'), arr_val, 1e-10)
 
         # assign array to array
         g2.set_input('C2.x', arr_val)
         assert_rel_error(self, model.get_input('G1.G2.C2.x'), arr_val, 1e-10)
-        assert_rel_error(self, g1.get_input('G2.C2.x'), arr_val, 1e-10)
 
         # assign bad array shape to array
         with assertRaisesRegex(self, ValueError, msg):
@@ -161,7 +162,6 @@ class TestSystem(unittest.TestCase):
         # assign list to array
         g2.set_input('C2.x', arr_val.tolist())
         assert_rel_error(self, model.get_input('G1.G2.C2.x'), arr_val, 1e-10)
-        assert_rel_error(self, g1.get_input('G2.C2.x'), arr_val, 1e-10)
 
         # assign bad list shape to array
         with assertRaisesRegex(self, ValueError, msg):
@@ -178,12 +178,10 @@ class TestSystem(unittest.TestCase):
         # assign scalar to array
         g2.set_output('C2.y', num_val)
         assert_rel_error(self, model.get_output('G1.G2.C2.y'), arr_val, 1e-10)
-        assert_rel_error(self, g1.get_output('G2.C2.y'), arr_val, 1e-10)
 
         # assign array to array
         g2.set_output('C2.y', arr_val)
         assert_rel_error(self, model.get_output('G1.G2.C2.y'), arr_val, 1e-10)
-        assert_rel_error(self, g1.get_output('G2.C2.y'), arr_val, 1e-10)
 
         # assign bad array shape to array
         with assertRaisesRegex(self, ValueError, msg):
@@ -192,7 +190,6 @@ class TestSystem(unittest.TestCase):
         # assign list to array
         g2.set_output('C2.y', arr_val.tolist())
         assert_rel_error(self, model.get_output('G1.G2.C2.y'), arr_val, 1e-10)
-        assert_rel_error(self, g1.get_output('G2.C2.y'), arr_val, 1e-10)
 
         # assign bad list shape to array
         with assertRaisesRegex(self, ValueError, msg):
@@ -208,13 +205,11 @@ class TestSystem(unittest.TestCase):
 
         # assign scalar to array
         g2.set_residual('y', num_val)
-        assert_rel_error(self, model.get_input('G1.G2.C2.y'), arr_val, 1e-10)
-        assert_rel_error(self, g1.get_input('G2.C2.y'), arr_val, 1e-10)
+        assert_rel_error(self, model.get_residual('G1.G2.C2.y'), arr_val, 1e-10)
 
         # assign array to array
         g2.set_residual('y', arr_val)
-        assert_rel_error(self, model.get_input('G1.G2.C2.y'), arr_val, 1e-10)
-        assert_rel_error(self, g1.get_input('G2.C2.y'), arr_val, 1e-10)
+        assert_rel_error(self, model.get_residual('G1.G2.C2.y'), arr_val, 1e-10)
 
         # assign bad array shape to array
         with assertRaisesRegex(self, ValueError, msg):
@@ -222,8 +217,7 @@ class TestSystem(unittest.TestCase):
 
         # assign list to array
         g2.set_residual('y', arr_val.tolist())
-        assert_rel_error(self, model.get_input('G1.G2.C2.y'), arr_val, 1e-10)
-        assert_rel_error(self, g1.get_input('G2.C2.y'), arr_val, 1e-10)
+        assert_rel_error(self, model.get_residual('G1.G2.C2.y'), arr_val, 1e-10)
 
         # assign bad list shape to array
         with assertRaisesRegex(self, ValueError, msg):

@@ -1083,10 +1083,9 @@ class System(object):
             raise RuntimeError("%s: Cannot access output '%s'. Setup has not "
                                "been called." % (self.name, name))
         try:
-            # path = '.'.join((self.pathname, name)) if self.pathname else name
-            path = self._var_name2path['output'][name]
+            path = '.'.join((self.pathname, name)) if self.pathname else name
             pdata = self._var_pathdict[path]
-            meta = self._var_myproc_metadata['input'][pdata.myproc_idx]
+            meta = self._var_myproc_metadata['output'][pdata.myproc_idx]
             if 'shape' in meta:
                 value = make_compatible(meta, value)
             self._outputs[name] = value
@@ -1095,6 +1094,11 @@ class System(object):
             start = len(self.pathname) + 1 if self.pathname else 0
             try:
                 unprom = self._var_name2path['output'][name][start:]
+                path = '.'.join((self.pathname, unprom)) if self.pathname else unprom
+                pdata = self._var_pathdict[path]
+                meta = self._var_myproc_metadata['output'][pdata.myproc_idx]
+                if 'shape' in meta:
+                    value = make_compatible(meta, value)
                 self._outputs[unprom] = value
             except KeyError:
                 raise KeyError("%s: output '%s' not found." % (self.pathname,
@@ -1152,18 +1156,6 @@ class System(object):
                                "been called." % (self.name, name))
 
         try:
-            from pprint import pprint
-            print(self.pathname, 'set', name, '=', value)
-            print(self.pathname, 'outputs:', self._outputs._names)
-            print(self.pathname, 'self._var_name2path:')
-            pprint(self._var_name2path)
-            print('----------------')
-            print(self.pathname, 'self._var_pathdict:')
-            pprint(self._var_pathdict)
-            print('----------------')
-            print(self.pathname, 'self._var_myproc_metadata:')
-            pprint(self._var_myproc_metadata)
-
             path = '.'.join((self.pathname, name)) if self.pathname else name
             pdata = self._var_pathdict[path]
             meta = self._var_myproc_metadata['output'][pdata.myproc_idx]
@@ -1175,6 +1167,11 @@ class System(object):
             start = len(self.pathname) + 1 if self.pathname else 0
             try:
                 unprom = self._var_name2path['output'][name][start:]
+                path = '.'.join((self.pathname, unprom)) if self.pathname else unprom
+                pdata = self._var_pathdict[path]
+                meta = self._var_myproc_metadata['output'][pdata.myproc_idx]
+                if 'shape' in meta:
+                    value = make_compatible(meta, value)
                 self._residuals[unprom] = value
             except KeyError:
                 raise KeyError("%s: residual '%s' not found." % (self.pathname,

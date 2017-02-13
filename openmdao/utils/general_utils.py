@@ -23,7 +23,8 @@ def warn_deprecation(msg):
 
 
 def make_compatible(meta, value):
-    """Make value compatible with the variable described in metadata.
+    """
+    Make value compatible with the variable described in metadata.
 
     Args
     ----
