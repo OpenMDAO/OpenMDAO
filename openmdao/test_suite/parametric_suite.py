@@ -197,8 +197,8 @@ class ParameterizedInstance(object):
     def compute_totals(self, mode='fwd'):
         """Computes the total derivatives across the model.
 
-        Args
-        ----
+        Parameters
+        ----------
         mode : str
             Which mode to use for computing the total derivatives. Must be understood by
             `Problem.setup()`.

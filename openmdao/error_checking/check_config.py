@@ -16,8 +16,8 @@ from openmdao.devtools.compat import abs_varname_iter
 def check_config(problem, logger=None):
     """Perform optional error checks on a Problem.
 
-    Args
-    ----
+    Parameters
+    ----------
     problem : Problem
         The Problem being checked.
 
@@ -42,8 +42,8 @@ def check_config(problem, logger=None):
 def compute_sys_graph(group, input_src_ids, comps_only=False):
     """Compute a dependency graph for subsystems in the given group.
 
-    Args
-    ----
+    Parameters
+    ----------
     group : <Group>
         The Group we're computing the graph for.
 
@@ -97,8 +97,8 @@ def compute_sys_graph(group, input_src_ids, comps_only=False):
 def get_sccs(group, comps_only=False):
     """Return strongly connected subsystems of the given Group.
 
-    Args
-    ----
+    Parameters
+    ----------
     group : <Group>
         The strongly connected components will be computed for this Group.
 
@@ -127,8 +127,8 @@ def get_sccs(group, comps_only=False):
 def _check_dataflow(group, logger):
     """Report any cycles and out of order Systems to the logger.
 
-    Args
-    ----
+    Parameters
+    ----------
     group : <Group>
         The Group being checked for dataflow issues.
 
@@ -172,8 +172,8 @@ def _check_dataflow(group, logger):
 def _get_out_of_order_subs(group, input_src_ids):
     """Return Systems that are executed out of dataflow order.
 
-    Args
-    ----
+    Parameters
+    ----------
     group : <Group>
         The Group where we're checking subsystem order.
 
@@ -223,8 +223,8 @@ def _get_out_of_order_subs(group, input_src_ids):
 def _check_hanging_inputs(problem, logger):
     """Issue a logger warning if any inputs are not connected.
 
-    Args
-    ----
+    Parameters
+    ----------
     problem : <Problem>
         The problem being checked.
 

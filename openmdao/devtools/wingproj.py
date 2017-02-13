@@ -22,8 +22,8 @@ def find_up(name, path=None):
     assumed to be a basename, not a path.  Returns the absolute path
     of the file or directory if found, or None otherwise.
 
-    Args
-    ----
+    Parameters
+    ----------
     name : str
         Base name of the file or directory being searched for.
 

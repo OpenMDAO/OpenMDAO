@@ -43,8 +43,8 @@ def _format_driver_array_option(option_name, var_name, values,
     are converted to numpy.ndarray.  If values is scalar, it is converted
     to float.
 
-    Args
-    ----
+    Parameters
+    ----------
     option_name : str
         Name of the option being set
     var_name : str
@@ -148,10 +148,12 @@ class System(object):
         dict of transfer objects.
     _vector_var_ids : dict
         dictionary of index arrays of relevant variables for this vector
-    _scaling_to_norm : dict of ndarray
+    _scaling_to_norm : {'input': ndarray[nvar_in, 2], 'output': ndarray[nvar_out, 2]}
         coefficients to convert vectors to normalized values.
-    _scaling_to_phys : dict of ndarray
+        In the integer arrays, nvar_in and nvar_out are counts of variables on myproc.
+    _scaling_to_phys : {'input': ndarray[nvar_in, 2], 'output': ndarray[nvar_out, 2]}
         coefficients to convert vectors to physical values.
+        In the integer arrays, nvar_in and nvar_out are counts of variables on myproc.
     _lower_bounds : <Vector>
         vector of lower bounds, scaled and dimensionless.
     _upper_bounds : <Vector>
@@ -188,8 +190,8 @@ class System(object):
     def __init__(self, **kwargs):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs: dict of keyword arguments
             available here and in all descendants of this system.
         """
@@ -271,8 +273,8 @@ class System(object):
             _subsystems_myproc
             _subsystems_myproc_inds
 
-        Args
-        ----
+        Parameters
+        ----------
         path : str
             parent names to prepend to name to get the pathname
         comm : MPI.Comm or <FakeComm>
@@ -323,8 +325,8 @@ class System(object):
             _var_myproc_names
             _var_myproc_metadata
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : boolean
             recursion is not performed if traversing up the tree after reconf.
         """
@@ -355,8 +357,8 @@ class System(object):
             _var_allprocs_indices
             _var_myproc_indices
 
-        Args
-        ----
+        Parameters
+        ----------
         global_index : {'input': int, 'output': int}
             current global variable counter.
         recurse : boolean
@@ -443,8 +445,8 @@ class System(object):
 
         * If vec_name is None - i.e., we are setting up the nonlinear vector
 
-        Args
-        ----
+        Parameters
+        ----------
         vectors : {'input': <Vector>, 'output': <Vector>, 'residual': <Vector>}
             Vector objects corresponding to 'name'.
         vector_var_ids : ndarray[:]
@@ -528,8 +530,8 @@ class System(object):
             self._scaling_to_phys['output'][ind, 1] = meta['ref'] - meta['ref0']
 
             # Compute scaling arrays for residuals; convert units
-            self._scaling_to_phys['residual'][ind, 0] = meta['ref0']
-            self._scaling_to_phys['residual'][ind, 1] = meta['ref'] - meta['ref0']
+            self._scaling_to_phys['residual'][ind, 0] = meta['res_ref0']
+            self._scaling_to_phys['residual'][ind, 1] = meta['res_ref'] - meta['res_ref0']
 
         # Compute inverse scaling arrays
         for key in ['input', 'output', 'residual']:
@@ -548,8 +550,8 @@ class System(object):
             _lower_bounds
             _upper_bounds
 
-        Args
-        ----
+        Parameters
+        ----------
         lower_bounds : <Vector>
             lower bound vector allocated in <Problem>.
         upper_bounds : <Vector>
@@ -603,8 +605,8 @@ class System(object):
     def _setup_jacobians(self, jacobian=None):
         """Set and populate jacobians down through the system tree.
 
-        Args
-        ----
+        Parameters
+        ----------
         jacobian : <GlobalJacobian> or None
             The global jacobian to populate for this system.
         """
@@ -625,8 +627,8 @@ class System(object):
     def _get_transfers(self, vectors):
         """Compute transfers.
 
-        Args
-        ----
+        Parameters
+        ----------
         vectors : {'input': Vector, 'output': Vector, 'residual': Vector}
             dictionary of <Vector> objects
 
@@ -671,8 +673,8 @@ class System(object):
     def _get_maps(self, typ):
         """Define variable maps based on promotes and renames lists.
 
-        Args
-        ----
+        Parameters
+        ----------
         typ : str
             Either 'input' or 'output'.
 
@@ -733,8 +735,50 @@ class System(object):
         """
         oldsys = self._jacobian._system
         self._jacobian._system = self
+        self._jacobian._precompute_iter()
         yield self._jacobian
         self._jacobian._system = oldsys
+
+    @contextmanager
+    def _units_scaling_context(self, inputs=[], outputs=[], residuals=[], scale_jac=False):
+        """Context manager for units and scaling for vectors and Jacobians.
+
+        Temporarily puts vectors in a physical and unscaled state, because
+        internally, vectors are nominally in a dimensionless and scaled state.
+        The same applies (optionally) for Jacobians.
+
+        Parameters
+        ----------
+        inputs : list of input <Vector> objects
+            List of input vectors to apply the unit and scaling conversions.
+        outputs : list of output <Vector> objects
+            List of output vectors to apply the unit and scaling conversions.
+        residuals : list of residual <Vector> objects
+            List of residual vectors to apply the unit and scaling conversions.
+        scale_jac : bool
+            If True, scale the Jacobian as well.
+        """
+        for vec in inputs:
+            vec._scale(self._scaling_to_phys['input'])
+        for vec in outputs:
+            vec._scale(self._scaling_to_phys['output'])
+        for vec in residuals:
+            vec._scale(self._scaling_to_phys['residual'])
+        if scale_jac:
+            self._jacobian._precompute_iter()
+            self._jacobian._scale(self._scaling_to_phys)
+
+        yield
+
+        for vec in inputs:
+            vec._scale(self._scaling_to_norm['input'])
+        for vec in outputs:
+            vec._scale(self._scaling_to_norm['output'])
+        for vec in residuals:
+            vec._scale(self._scaling_to_norm['residual'])
+        if scale_jac:
+            self._jacobian._precompute_iter()
+            self._jacobian._scale(self._scaling_to_norm)
 
     @contextmanager
     def _matvec_context(self, vec_name, var_inds, mode, clear=True):
@@ -744,8 +788,8 @@ class System(object):
         internal variables that are relevant to the current matrix-vector
         product.  This is called only from _apply_linear.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_name : str
             Name of the vector to use.
         var_inds : [int, int, int, int] or None
@@ -868,8 +912,8 @@ class System(object):
                     typ=None):
         """A generator of subsystems of this system.
 
-        Args
-        ----
+        Parameters
+        ----------
         local : bool
             If True, only iterate over systems on this proc.
         include_self : bool
@@ -899,8 +943,8 @@ class System(object):
     def get_input(self, name, units=None):
         """Return the named input value using the unpromoted name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable.
         units : str or None
@@ -925,8 +969,8 @@ class System(object):
     def set_input(self, name, value):
         """Set the value of the named input using the unpromoted name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable.
         value : float or ndarray
@@ -944,8 +988,8 @@ class System(object):
     def get_output(self, name, scaled=False, units=None):
         """Return the named output value using promoted or unpromoted name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable.
         scaled : bool
@@ -978,8 +1022,8 @@ class System(object):
     def set_output(self, name, value):
         """Return the named output value using promoted or unpromoted name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable.
         value : float or ndarray
@@ -1003,8 +1047,8 @@ class System(object):
     def get_residual(self, name, scaled=False, units=None):
         """Return the named residual value using promoted or unpromoted name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable.
         scaled : bool
@@ -1038,8 +1082,8 @@ class System(object):
     def set_residual(self, name, value):
         """Set value of named residual using promoted or unpromoted name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable.
         value : float or ndarray
@@ -1082,8 +1126,8 @@ class System(object):
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -1097,8 +1141,8 @@ class System(object):
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -1155,8 +1199,8 @@ class System(object):
                        **kwargs):
         r"""Add a design variable to this system.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : string
             Name of the design variable in the system.
         lower : float or ndarray, optional
@@ -1184,14 +1228,14 @@ class System(object):
         -----
         The design variable can be scaled using scaler and adder, where
 
-        ..math::
+        .. math::
 
             x_{scaled} = scaler(x + adder)
 
         or through the use of ref/ref0, which map to scaler and adder through
         the equations:
 
-        ..math::
+        .. math::
 
             0 = scaler(ref_0 + adder)
 
@@ -1199,7 +1243,7 @@ class System(object):
 
         which results in:
 
-        ..math::
+        .. math::
 
             adder = -ref_0
 
@@ -1255,8 +1299,8 @@ class System(object):
                      **kwargs):
         r"""Add a response variable to this system.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : string
             Name of the response variable in the system.
         type : string
@@ -1288,14 +1332,14 @@ class System(object):
         -----
         The response can be scaled using scaler and adder, where
 
-        ..math::
+        .. math::
 
             x_{scaled} = scaler(x + adder)
 
         or through the use of ref/ref0, which map to scaler and adder through
         the equations:
 
-        ..math::
+        .. math::
 
             0 = scaler(ref_0 + adder)
 
@@ -1303,7 +1347,7 @@ class System(object):
 
         which results in:
 
-        ..math::
+        .. math::
 
             adder = -ref_0
 
@@ -1413,8 +1457,8 @@ class System(object):
                        indices=None, **kwargs):
         r"""Add a constraint variable to this system.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : string
             Name of the response variable in the system.
         lower : float or ndarray, optional
@@ -1444,14 +1488,14 @@ class System(object):
         -----
         The constraint can be scaled using scaler and adder, where
 
-        ..math::
+        .. math::
 
             x_{scaled} = scaler(x + adder)
 
         or through the use of ref/ref0, which map to scaler and adder through
         the equations:
 
-        ..math::
+        .. math::
 
             0 = scaler(ref_0 + adder)
 
@@ -1459,7 +1503,7 @@ class System(object):
 
         which results in:
 
-        ..math::
+        .. math::
 
             adder = -ref_0
 
@@ -1475,8 +1519,8 @@ class System(object):
                       adder=None, scaler=None, **kwargs):
         r"""Add a response variable to this system.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : string
             Name of the response variable in the system.
         ref : float or ndarray, optional
@@ -1500,14 +1544,14 @@ class System(object):
         -----
         The objective can be scaled using scaler and adder, where
 
-        ..math::
+        .. math::
 
             x_{scaled} = scaler(x + adder)
 
         or through the use of ref/ref0, which map to scaler and adder through
         the equations:
 
-        ..math::
+        .. math::
 
             0 = scaler(ref_0 + adder)
 
@@ -1515,7 +1559,7 @@ class System(object):
 
         which results in:
 
-        ..math::
+        .. math::
 
             adder = -ref_0
 
@@ -1533,8 +1577,8 @@ class System(object):
         Retrieve all design variable settings from the system and, if recurse
         is True, all of its subsystems.
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : bool
             If True, recurse through the subsystems and return the path of
             all design vars relative to the this system.
@@ -1560,8 +1604,8 @@ class System(object):
         Retrieve all response variable settings from the system as a dict,
         keyed by variable name.
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all responses relative to the this system.
@@ -1587,8 +1631,8 @@ class System(object):
         Retrieve the constraint settings for the current system as a dict,
         keyed by variable name.
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all constraints relative to the this system.
@@ -1608,8 +1652,8 @@ class System(object):
         Retrieve all objectives settings from the system as a dict, keyed
         by variable name.
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all objective relative to the this system.
