@@ -14,10 +14,14 @@ from openmdao.utils.units import is_compatible
 
 
 class Group(System):
-    """Class used to group systems together; instantiate or inherit."""
+    """
+    Class used to group systems together; instantiate or inherit.
+    """
 
     def __init__(self, **kwargs):
-        """Set the solvers to nonlinear and linear block Gauss--Seidel by default."""
+        """
+        Set the solvers to nonlinear and linear block Gauss--Seidel by default.
+        """
         super(Group, self).__init__(**kwargs)
 
         # TODO: we cannot set the solvers with property setters at the moment
@@ -29,7 +33,8 @@ class Group(System):
             self._ln_solver = LinearBlockGS()
 
     def add(self, name, subsys, promotes=None):
-        """Deprecated version of <Group.add_subsystem>.
+        """
+        Deprecated version of <Group.add_subsystem>.
 
         Parameters
         ----------
@@ -50,7 +55,8 @@ class Group(System):
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,
                       renames_inputs=None, renames_outputs=None):
-        """Add a subsystem.
+        """
+        Add a subsystem.
 
         Parameters
         ----------
@@ -81,7 +87,6 @@ class Group(System):
             the subsystem that was passed in. This is returned to
             enable users to instantiate and add a subsystem at the
             same time, and get the pointer back.
-
         """
         for sub in self._subsystems_allprocs:
             if name == sub.name:
@@ -113,7 +118,8 @@ class Group(System):
         return subsys
 
     def connect(self, out_name, in_name, src_indices=None):
-        """Connect output out_name to input in_name in this namespace.
+        """
+        Connect output out_name to input in_name in this namespace.
 
         Parameters
         ----------
@@ -167,7 +173,8 @@ class Group(System):
         self._var_connections[in_name] = (out_name, src_indices)
 
     def _setup_connections(self):
-        """Recursively assemble a list of input-output connections.
+        """
+        Recursively assemble a list of input-output connections.
 
         Sets the following attributes:
             _var_connections_indices
@@ -296,7 +303,8 @@ class Group(System):
         self._var_connections_indices = pairs
 
     def _find_subsys_with_promoted_name(self, var_name, io_type='output'):
-        """Find subsystem that contains promoted variable.
+        """
+        Find subsystem that contains promoted variable.
 
         Parameters
         ----------
@@ -317,7 +325,9 @@ class Group(System):
         return None
 
     def initialize_variables(self):
-        """Set up variable name and metadata lists."""
+        """
+        Set up variable name and metadata lists.
+        """
         self._var_pathdict = {}
         self._var_name2path = {'input': {}, 'output': {}}
 
@@ -379,7 +389,8 @@ class Group(System):
                         name2path[name] = path
 
     def get_subsystem(self, name):
-        """Return the system called 'name' in the current namespace.
+        """
+        Return the system called 'name' in the current namespace.
 
         Parameters
         ----------
@@ -402,14 +413,17 @@ class Group(System):
         return system
 
     def _apply_nonlinear(self):
-        """Compute residuals."""
+        """
+        Compute residuals.
+        """
         self._transfers[None](self._inputs, self._outputs, 'fwd')
         # Apply recursion
         for subsys in self._subsystems_myproc:
             subsys._apply_nonlinear()
 
     def _solve_nonlinear(self):
-        """Compute outputs.
+        """
+        Compute outputs.
 
         Returns
         -------
@@ -423,7 +437,8 @@ class Group(System):
         return self._nl_solver.solve()
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """Compute jac-vec product.
+        """
+        Compute jac-vec product.
 
         Parameters
         ----------
@@ -462,7 +477,8 @@ class Group(System):
                             d_inputs, d_outputs, mode)
 
     def _solve_linear(self, vec_names, mode):
-        """Apply inverse jac product.
+        """
+        Apply inverse jac product.
 
         Parameters
         ----------
@@ -483,7 +499,9 @@ class Group(System):
         return self._ln_solver.solve(vec_names, mode)
 
     def _linearize(self):
-        """Compute jacobian / factorization."""
+        """
+        Compute jacobian / factorization.
+        """
         with self._jacobian_context() as J:
             for subsys in self._subsystems_myproc:
                 subsys._linearize()

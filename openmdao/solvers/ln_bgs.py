@@ -3,12 +3,16 @@ from openmdao.solvers.solver import BlockLinearSolver
 
 
 class LinearBlockGS(BlockLinearSolver):
-    """Linear block Gauss-Seidel solver."""
+    """
+    Linear block Gauss-Seidel solver.
+    """
 
     SOLVER = 'LN: LNBGS'
 
     def _iter_execute(self):
-        """Perform the operations in the iteration loop."""
+        """
+        Perform the operations in the iteration loop.
+        """
         system = self._system
         mode = self._mode
         vec_names = self._vec_names

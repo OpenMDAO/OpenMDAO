@@ -10,7 +10,8 @@ from openmdao.solvers.solver import LinearSolver
 
 
 class DirectSolver(LinearSolver):
-    """LinearSolver that uses linalg.solve or LU factor/solve.
+    """
+    LinearSolver that uses linalg.solve or LU factor/solve.
 
     Attributes
     ----------
@@ -21,7 +22,8 @@ class DirectSolver(LinearSolver):
     SOLVER = 'LN: Direct'
 
     def __init__(self, **kwargs):
-        """Declare the solver option.
+        """
+        Declare the solver option.
 
         Parameters
         ----------
@@ -33,14 +35,17 @@ class DirectSolver(LinearSolver):
         self._print_name = 'Direct'
 
     def _declare_options(self):
-        """Declare options before kwargs are processed in the init method."""
+        """
+        Declare options before kwargs are processed in the init method.
+        """
         self.options.declare('method', value='solve', values=['LU', 'solve'],
                              desc="Solution method, either 'solve' for " +
                              "linalg.solve, or 'LU' for linalg.lu_factor " +
                              "and linalg.lu_solve.")
 
     def _mat_vec(self, in_vec):
-        """Compute matrix-vector product.
+        """
+        Compute matrix-vector product.
 
         Parameters
         ----------
@@ -75,7 +80,25 @@ class DirectSolver(LinearSolver):
         return b_vec.get_data()
 
     def solve(self, vec_names, mode):
-        """See LinearSolver."""
+        """
+        Run the solver.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            absolute error.
+        float
+            relative error.
+        """
         self._vec_names = vec_names
         self._mode = mode
 
@@ -107,3 +130,5 @@ class DirectSolver(LinearSolver):
                 result = numpy.linalg.solve(jacobian, b_data)
 
             x_vec.set_data(result)
+
+        return False, 0., 0.
