@@ -4,7 +4,8 @@ import warnings
 
 
 def warn_deprecation(msg):
-    """Raise a warning and prints a deprecation message to stdout.
+    """
+    Raise a warning and prints a deprecation message to stdout.
 
     Parameters
     ----------

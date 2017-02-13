@@ -5,7 +5,8 @@ from openmdao.api import Group
 
 
 class ParametericTestGroup(Group):
-    """Test Group expected by `ParametricInstance`. Groups inheriting from this should extend
+    """
+    Test Group expected by `ParametricInstance`. Groups inheriting from this should extend
     `default_params` to include valid parametric options for that model.
 
     Attributes
