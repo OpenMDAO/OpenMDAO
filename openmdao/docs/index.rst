@@ -46,9 +46,6 @@ Building components
    features/building_components/explicitcomp
    features/building_components/implicitcomp
 
-Defining partial derivatives
-================================
-
 Grouping components for more complex models
 ===========================================
 
@@ -56,6 +53,12 @@ Grouping components for more complex models
     :maxdepth: 1
 
     features/grouping_components/grouping_components
+    features/grouping_components/add_subsystem
+    features/grouping_components/get_subsystem
+
+
+Defining partial derivatives
+================================
 
 Solvers (nonlinear and linear)
 ================================

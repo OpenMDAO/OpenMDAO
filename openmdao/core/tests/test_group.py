@@ -32,31 +32,116 @@ class TestGroup(unittest.TestCase):
             self.fail('Exception expected.')
 
     def test_group_simple(self):
-        """Simple example for adding subsystems to a group and issuing connections."""
         p = Problem(model=Group())
-        c1 = p.model.add_subsystem('comp1', IndepVarComp('x', 5.0))
-        c2 = p.model.add_subsystem('comp2', ExecComp('b=2*a'))
-        c3 = p.model.connect('comp1.x', 'comp2.a')
+        p.model.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0))
+
         p.setup()
 
-        self.assertEqual(c1.name, 'comp1')
-        self.assertEqual(c2.name, 'comp2')
+        self.assertEqual(p['comp1.a'], 3.0)
+        self.assertEqual(p['comp1.b'], 6.0)
 
-        p.run_model()
-        self.assertEqual(p['comp2.b'], 10.0)
+    def test_group_simple_promoted(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
+                              promotes_inputs=['a'], promotes_outputs=['b'])
 
-    def test_group_inmethod(self):
-        """Example for adding subsystems and connections in the Group implementation."""
-        p = Problem(model=SimpleGroup())
         p.setup()
 
-        c1 = p.model.get_subsystem('comp1')
-        c2 = p.model.get_subsystem('comp2')
-        self.assertEqual(c1.name, 'comp1')
-        self.assertEqual(c2.name, 'comp2')
+        self.assertEqual(p['comp1.a'], 3.0) # still use unpromoted name
+        self.assertEqual(p['b'], 6.0)
 
-        p.run_model()
-        self.assertEqual(p['comp2.b'], 10.0)
+    def test_group_simple_renamed(self):
+        raise unittest.SkipTest("The add_subsystem has not yet been updated for renames")
+        p = Problem(model=Group())
+        p.model.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
+                              promotes_inputs=[('a','new_a')],
+                              promotes_outputs=[('b', 'new_b')])
+
+        p.setup()
+
+        self.assertEqual(p['comp1.a'], 3.0) # still use unpromoted name
+        self.assertEqual(p['new_b'], 6.0)
+
+    def test_group_simple_renamed_dict(self):
+        raise unittest.SkipTest("The add_subsystem has not yet been updated for renames")
+        p = Problem(model=Group())
+        p.model.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
+                              promotes_inputs=[{'a': 'new_a'}],
+                              promotes_outputs=[{'b': 'new_b'}])
+
+        p.setup()
+
+        self.assertEqual(p['comp1.a'], 3.0) # still use unpromoted name
+        self.assertEqual(p['new_b'], 6.0)
+
+    def test_group_nested(self):
+        p = Problem(model=Group())
+        g1 = p.model.add_subsystem('G1', Group())
+        g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0))
+        g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
+
+        p.setup()
+
+        self.assertEqual(p['G1.comp1.a'], 3.0)
+        self.assertEqual(p['G1.comp1.b'], 6.0)
+        self.assertEqual(p['G1.comp2.a'], 4.0)
+        self.assertEqual(p['G1.comp2.b'], 12.0)
+
+    def test_group_nested_promoted1(self):
+        p = Problem(model=Group())
+        g1 = p.model.add_subsystem('G1', Group())
+        g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
+                         promotes_inputs=['a'], promotes_outputs=['b'])
+        g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0),
+                         promotes_inputs=['a'])
+        p.setup()
+
+        # output G1.comp1.b is promoted
+        self.assertEqual(p['G1.b'], 6.0)
+        # output G1.comp2.b is not promoted
+        self.assertEqual(p['G1.comp2.b'], 12.0)
+
+        # use unpromoted names for the following 2 promoted inputs
+        self.assertEqual(p['G1.comp1.a'], 3.0)
+        self.assertEqual(p['G1.comp2.a'], 4.0)
+
+    def test_group_nested_promoted2(self):
+        p = Problem(model=Group())
+        g1 = Group()
+        g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0))
+        g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
+        p.model.add_subsystem('G1', g1,
+                              promotes_inputs=['comp?.a'],
+                              promotes_outputs=['comp?.b'])
+        p.setup()
+
+        # output G1.comp1.b is promoted
+        self.assertEqual(p['comp1.b'], 6.0)
+        # output G1.comp2.b is promoted
+        self.assertEqual(p['comp2.b'], 12.0)
+
+        # access both promoted inputs using unpromoted names.
+        self.assertEqual(p['G1.comp1.a'], 3.0)
+        self.assertEqual(p['G1.comp2.a'], 4.0)
+
+    def test_group_nested_renamed(self):
+        raise unittest.SkipTest("The add_subsystem has not yet been updated for renames")
+        p = Problem(model=Group())
+        g1 = p.model.add_subsystem('G1', Group())
+        g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
+                         promotes_inputs=[('a', 'new_a')], promotes_outputs=[('b', 'new_b')])
+        g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0),
+                         promotes_inputs=[('a', 'new_a')])
+        p.setup()
+
+        # output G1.comp1.b is promoted and renamed
+        self.assertEqual(p['G1.new_b'], 6.0)
+        # output G1.comp2.b is not promoted
+        self.assertEqual(p['G1.comp2.b'], 12.0)
+
+        # access both renamed inputs using unpromoted names.
+        self.assertEqual(p['G1.comp1.a'], 3.0)
+        self.assertEqual(p['G1.comp2.a'], 4.0)
 
     def test_group_promotes(self):
         """Promoting a single variable."""
@@ -106,7 +191,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['x'], 5)
         self.assertEqual(p['comp2.y'], 10)
 
-    def test_group_renames(self):
+    def test_group_renames_conn(self):
         """Renaming variables and using implicit connections."""
         raise unittest.SkipTest("The add_subsystem has not yet been updated for renames")
         p = Problem(model=Group())
@@ -142,53 +227,12 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp2.x'], 5)
         self.assertEqual(p['comp2.y'], 10)
 
-    def test_group_nested(self):
+    def test_group_nested_conn(self):
         """Example of adding subsystems and issuing connections with nested groups."""
         g1 = Group()
         c1_1 = g1.add_subsystem('comp1', IndepVarComp('x', 5.0))
         c1_2 = g1.add_subsystem('comp2', ExecComp('b=2*a'))
         g1.connect('comp1.x', 'comp2.a')
-
-        g2 = Group()
-        c2_1 = g2.add_subsystem('comp1', ExecComp('b=2*a'))
-        c2_2 = g2.add_subsystem('comp2', ExecComp('b=2*a'))
-        g2.connect('comp1.b', 'comp2.a')
-
-        model = Group()
-        model.add_subsystem('group1', g1)
-        model.add_subsystem('group2', g2)
-        model.connect('group1.comp2.b', 'group2.comp1.a')
-
-        p = Problem(model=model)
-        p.setup()
-
-        c1_1 = p.model.get_subsystem('group1.comp1')
-        c1_2 = p.model.get_subsystem('group1.comp2')
-        c2_1 = p.model.get_subsystem('group2.comp1')
-        c2_2 = p.model.get_subsystem('group2.comp2')
-        self.assertEqual(c1_1.name, 'comp1')
-        self.assertEqual(c1_2.name, 'comp2')
-        self.assertEqual(c2_1.name, 'comp1')
-        self.assertEqual(c2_2.name, 'comp2')
-
-        c1_1 = p.model.get_subsystem('group1').get_subsystem('comp1')
-        c1_2 = p.model.get_subsystem('group1').get_subsystem('comp2')
-        c2_1 = p.model.get_subsystem('group2').get_subsystem('comp1')
-        c2_2 = p.model.get_subsystem('group2').get_subsystem('comp2')
-        self.assertEqual(c1_1.name, 'comp1')
-        self.assertEqual(c1_2.name, 'comp2')
-        self.assertEqual(c2_1.name, 'comp1')
-        self.assertEqual(c2_2.name, 'comp2')
-
-        s = p.model.get_subsystem('')
-        self.assertEqual(s, None)
-
-        p.run_model()
-
-        self.assertEqual(p['group1.comp1.x'],  5.0)
-        self.assertEqual(p['group1.comp2.b'], 10.0)
-        self.assertEqual(p['group2.comp1.b'], 20.0)
-        self.assertEqual(p['group2.comp2.b'], 40.0)
 
     def test_reused_output_promoted_names(self):
         prob = Problem(Group())

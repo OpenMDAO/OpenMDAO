@@ -1,27 +1,12 @@
-:orphan:
 
 .. `Grouping components - overview`
 
-Grouping components - overview
-==============================
+Overview
+========
 
-The feature docs for grouping components explain how to use Groups to arrange your
-OpenMDAO model into a tree structure, how to connect variables between subsystems,
-and how to access subsystems within the tree.
-
-
-Adding subsystems to a Group
-----------------------------
-
-To add a Component or a Group to a Group, use the add_subsystem method.
-
-
-.. automethod:: openmdao.core.group.Group.add_subsystem
-    :noindex:
-
-
-Usage
------
-
-.. embed-test::
-    openmdao.core.tests.test_group.TestGroup.test_group_simple
+It's often desirable to represent a complex model as a collection of components.
+Using Group objects, we can group components, as well as other Groups,
+together to form a tree structure.  These feature docs explain how to create that
+tree structure, how to access subsystems and variables within the tree, and how
+to connect those variables.  These docs will also explain how to *promote* a
+variable from a subsystem up to its parent.
