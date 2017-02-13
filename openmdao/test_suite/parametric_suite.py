@@ -171,7 +171,7 @@ class ParameterizedInstance(object):
             if PETScVector is None:
                 raise SkipTest('PETSc not available.')
 
-        self.problem = prob = Problem(group).setup(vec_class, check=False)
+        self.problem = prob = Problem(group)
 
         if args['global_jac']:
             jacobian_type = args['jacobian_type']
@@ -188,6 +188,8 @@ class ParameterizedInstance(object):
 
         prob.model.suppress_solver_output = True
 
+        prob.setup(vec_class, check=False)
+
         fail, rele, abse = prob.run_model()
         if fail:
             raise RuntimeError('Problem run failed: re %f ; ae %f' % (rele, abse))
@@ -195,8 +197,8 @@ class ParameterizedInstance(object):
     def compute_totals(self, mode='fwd'):
         """Computes the total derivatives across the model.
 
-        Args
-        ----
+        Parameters
+        ----------
         mode : str
             Which mode to use for computing the total derivatives. Must be understood by
             `Problem.setup()`.

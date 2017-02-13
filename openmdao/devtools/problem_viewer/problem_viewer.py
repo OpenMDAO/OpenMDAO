@@ -109,8 +109,8 @@ def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_brows
     of the specified type.  Optionally pops up a web browser to
     view the file.
 
-    Args
-    ----
+    Parameters
+    ----------
     problem_or_filename : Either a Problem() or a string
         Problem() : The Problem (after problem.setup()) for the desired tree.
         string : The filename of the case recorder file containing the data required to build the tree.

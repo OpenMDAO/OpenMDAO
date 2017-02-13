@@ -12,8 +12,8 @@ class DenseMatrix(Matrix):
     def _build(self, num_rows, num_cols):
         """Allocate the matrix.
 
-        Args
-        ----
+        Parameters
+        ----------
         num_rows : int
             number of rows in the matrix.
         num_cols : int
@@ -70,8 +70,8 @@ class DenseMatrix(Matrix):
     def _update_submat(self, key, jac):
         """Update the values of a sub-jacobian.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (int, int)
             the global output and input variable indices.
         jac : ndarray or scipy.sparse or tuple
@@ -93,8 +93,8 @@ class DenseMatrix(Matrix):
     def _prod(self, in_vec, mode):
         """Perform a matrix vector product.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : ndarray[:]
             incoming vector to multiply.
         mode : str

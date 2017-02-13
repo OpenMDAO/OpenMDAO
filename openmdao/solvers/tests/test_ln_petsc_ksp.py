@@ -113,7 +113,7 @@ class TestPetscKSP(unittest.TestCase):
         """Solve implicit system with PetscKSP using a preconditioner."""
 
         group = TestImplicitGroup(lnSolverClass=PetscKSP)
-        precon = group.ln_solver.set_subsolver('precon', LinearBlockGS())
+        precon = group.ln_solver.precon = LinearBlockGS()
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)

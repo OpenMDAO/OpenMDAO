@@ -23,8 +23,8 @@ class Matrix(object):
     def __init__(self, comm):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         comm : MPI.Comm or <FakeComm>
             communicator of the top-level system that owns the <Jacobian>.
         """
@@ -33,54 +33,11 @@ class Matrix(object):
         self._submats = {}
         self._metadata = {}
 
-    def prod_fwd(self, in_vec, row_range=None):
-        """Perform a forward product.
-
-        Args
-        ----
-        in_vec : ndarray[:]
-            incoming vector to multiply.
-        row_range : [int, int] or None
-            the row index range for which to compute the product.
-
-        Returns
-        -------
-        out_vec : ndarray[:]
-            vector resulting from the product.
-        """
-        out_vec = self._prod(in_vec, 'fwd')
-        if row_range is None:
-            return out_vec
-        else:
-            return out_vec[row_range[0]:row_range[1]]
-
-    def prod_rev(self, in_vec, row_range=None):
-        """Perform a reverse product.
-
-        Args
-        ----
-        in_vec : ndarray[:]
-            incoming vector to multiply.
-        row_range : [int, int] or None
-            the row index range with which to compute the product.
-
-        Returns
-        -------
-        out_vec : ndarray[:]
-            vector resulting from the product.
-        """
-        if row_range is not None:
-            in_vec = numpy.array(in_vec)
-            in_vec[:row_range[0]] = 0.
-            in_vec[row_range[1]:] = 0.
-
-        return self._prod(in_vec, 'rev')
-
     def _add_submat(self, key, info, irow, icol, src_indices, shape):
         """Declare a sub-jacobian.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (int, int)
             the global output and input variable indices.
         info : dict
@@ -100,8 +57,8 @@ class Matrix(object):
     def _build(self, num_rows, num_cols):
         """Allocate the matrix.
 
-        Args
-        ----
+        Parameters
+        ----------
         num_rows : int
             number of rows in the matrix.
         num_cols : int
@@ -112,8 +69,8 @@ class Matrix(object):
     def _update_submat(self, submats, metadata, key, jac, system):
         """Update the values of a sub-jacobian.
 
-        Args
-        ----
+        Parameters
+        ----------
         submats : dict
             dictionary of sub-jacobian data keyed by (out_ind, in_ind).
         metadata : dict
@@ -130,8 +87,8 @@ class Matrix(object):
     def _prod(self, vec, mode):
         """Perform a matrix vector product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec : ndarray[:]
             incoming vector to multiply.
         mode : str
@@ -148,8 +105,8 @@ class Matrix(object):
 def _compute_index_map(jrows, jcols, irow, icol, src_indices):
     """Return row/column indices to map sub-jacobian to global jac.
 
-    Args
-    ----
+    Parameters
+    ----------
     jrows : index array
         Array of row indices.
     jcols : index array

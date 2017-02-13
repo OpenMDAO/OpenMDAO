@@ -96,8 +96,8 @@ class Monitor(object):
     def __init__(self, solver):
         """Store pointer to the openmdao solver and initialize norms.
 
-        Args
-        ----
+        Parameters
+        ----------
         solver : object
             the openmdao solver.
         """
@@ -108,8 +108,8 @@ class Monitor(object):
     def __call__(self, ksp, counter, norm):
         """Store norm if first iteration, and print norm.
 
-        Args
-        ----
+        Parameters
+        ----------
         ksp : object
             the KSP solver.
         counter : int
@@ -135,12 +135,12 @@ class PetscKSP(LinearSolver):
 
     Attributes
     ----------
+    precon : Solver
+        Preconditioner for linear solve. Default is None for no preconditioner.
     _print_name : str ('KSP')
         print name.
     _ksp : dist
         dictionary of KSP instances (keyed on vector name).
-    _precon : Solver
-        preconditioner.
     """
 
     SOLVER = 'LN: PetscKSP'
@@ -148,8 +148,8 @@ class PetscKSP(LinearSolver):
     def __init__(self, **kwargs):
         """Declare the solver options.
 
-        Args
-        ----
+        Parameters
+        ----------
         kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
@@ -164,7 +164,7 @@ class PetscKSP(LinearSolver):
         self._ksp = {}
 
         # initialize preconditioner to None
-        self._precon = None
+        self.precon = None
 
     def _declare_options(self):
         """Declare options before kwargs are processed in the init method."""
@@ -173,6 +173,21 @@ class PetscKSP(LinearSolver):
 
         # changing the default maxiter from the base class
         self.options['maxiter'] = 100
+
+    def _setup_solvers(self, system, depth):
+        """Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : <System>
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super(PetscKSP, self)._setup_solvers(system, depth)
+
+        if self.precon is not None:
+            self.precon._setup_solvers(self._system, self._depth + 1)
 
     def mult(self, mat, in_vec, result):
         """Apply Jacobian matrix (KSP Callback).
@@ -187,8 +202,8 @@ class PetscKSP(LinearSolver):
         _mode : str
             'fwd' or 'rev'.
 
-        Args
-        ----
+        Parameters
+        ----------
         mat : PETSc.Mat
             PETSc matrix object.
         in_vec : PetSC Vector
@@ -223,16 +238,13 @@ class PetscKSP(LinearSolver):
 
         The full solution vector is returned.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : list
             list of vector names.
         mode : string
             Derivative mode, can be 'fwd' or 'rev'.
         """
-        if 'precon' in self.options['subsolvers']:
-            self._precon = self.options['subsolvers']['precon']
-
         self._vec_names = vec_names
         self._mode = mode
 
@@ -276,8 +288,8 @@ class PetscKSP(LinearSolver):
     def apply(self, mat, in_vec, result):
         """Apply preconditioner.
 
-        Args
-        ----
+        Parameters
+        ----------
         mat : PETSc.Mat
             PETSc matrix object.
         in_vec : PETSc.Vector
@@ -285,10 +297,13 @@ class PetscKSP(LinearSolver):
         result : PETSc.Vector
             Empty vector in which the preconditioned in_vec is stored.
         """
-        if self._precon:
+        if self.precon:
             system = self._system
             vec_name = self._vec_name
             mode = self._mode
+
+            # Need to clear out any junk from the inputs.
+            system._vectors['input'][vec_name].set_const(0.0)
 
             # assign x and b vectors based on mode
             if mode == 'fwd':
@@ -302,7 +317,7 @@ class PetscKSP(LinearSolver):
             b_vec.set_data(_get_petsc_vec_array(in_vec))
 
             # call the preconditioner
-            self._precon.solve([vec_name], mode)
+            self.precon.solve([vec_name], mode)
 
             # stuff resulting value of x vector into result for KSP
             x_vec.get_data(result.array)
@@ -315,8 +330,8 @@ class PetscKSP(LinearSolver):
 
         Instances will be created on first request and cached for future use.
 
-        Args
-        ----
+        Parameters
+        ----------
         system : `System`
             Parent `System` object.
         vec_name : string

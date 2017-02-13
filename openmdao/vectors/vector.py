@@ -48,8 +48,8 @@ class Vector(object):
     def __init__(self, name, typ, system, root_vector=None):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             right-hand-side (RHS) name.
         typ : str
@@ -89,8 +89,8 @@ class Vector(object):
     def _create_subvector(self, system):
         """Return a smaller vector for a subsystem.
 
-        Args
-        ----
+        Parameters
+        ----------
         system : <System>
             system for the subvector that is a subsystem of self._system.
 
@@ -105,8 +105,8 @@ class Vector(object):
     def _clone(self, initialize_views=False):
         """Return a copy that optionally provides view access to its data.
 
-        Args
-        ----
+        Parameters
+        ----------
         initialize_views : bool
             Whether to initialize the views into the clone.
 
@@ -167,12 +167,12 @@ class Vector(object):
 
         self._ivar_map = ivar_map
 
-    def get_data(self, array=None):
+    def get_data(self, new_array=None):
         """Get the array combining the data of all the varsets.
 
-        Args
-        ----
-        array : ndarray or None
+        Parameters
+        ----------
+        new_array : ndarray or None
             Array to fill in with the values; otherwise new array created.
 
         Returns
@@ -180,22 +180,22 @@ class Vector(object):
         ndarray
             Array combining the data of all the varsets.
         """
-        if array is None:
+        if new_array is None:
             inds = self._system._var_myproc_indices[self._typ]
             sizes = self._assembler._variable_sizes_all[self._typ][self._iproc,
                                                                    inds]
-            array = numpy.zeros(numpy.sum(sizes))
+            new_array = numpy.zeros(numpy.sum(sizes))
 
         for ind, data in enumerate(self._data):
-            array[self._indices[ind]] = data
+            new_array[self._indices[ind]] = data
 
-        return array
+        return new_array
 
     def set_data(self, array):
         """Set the incoming array combining the data of all the varsets.
 
-        Args
-        ----
+        Parameters
+        ----------
         array : ndarray
             Array to set to the data for all the varsets.
         """
@@ -205,8 +205,8 @@ class Vector(object):
     def iadd_data(self, array):
         """In-place add the incoming combined array.
 
-        Args
-        ----
+        Parameters
+        ----------
         array : ndarray
             Array to set to the data for all the varsets.
         """
@@ -216,8 +216,8 @@ class Vector(object):
     def __contains__(self, key):
         """Check if the variable is involved in the current mat-vec product.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : str
             variable name in the owning system's namespace.
 
@@ -241,8 +241,8 @@ class Vector(object):
     def __getitem__(self, key):
         """Get the unscaled variable value in true units.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : str
             variable name in the owning system's namespace.
 
@@ -259,8 +259,8 @@ class Vector(object):
     def __setitem__(self, key, value):
         """Set the unscaled variable value in true units.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : str
             variable name in the owning system's namespace.
         value : float or list or tuple or ndarray
@@ -284,8 +284,8 @@ class Vector(object):
 
         - _data
 
-        Args
-        ----
+        Parameters
+        ----------
         root_vector : <Vector> or None
             the root's vector instance or None, if we are at the root.
         """
@@ -317,8 +317,8 @@ class Vector(object):
 
         Must be implemented by the subclass.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec : <Vector>
             vector to add to self.
         """
@@ -329,8 +329,8 @@ class Vector(object):
 
         Must be implemented by the subclass.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec : <Vector>
             vector to subtract from self.
         """
@@ -341,8 +341,8 @@ class Vector(object):
 
         Must be implemented by the subclass.
 
-        Args
-        ----
+        Parameters
+        ----------
         val : int or float
             scalar to multiply self.
         """
@@ -353,8 +353,8 @@ class Vector(object):
 
         Must be implemented by the subclass.
 
-        Args
-        ----
+        Parameters
+        ----------
         val : int or float
             scalar.
         vec : <Vector>
@@ -367,8 +367,8 @@ class Vector(object):
 
         Must be implemented by the subclass.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec : <Vector>
             the vector whose values self is set to.
         """
@@ -379,8 +379,8 @@ class Vector(object):
 
         Must be implemented by the subclass.
 
-        Args
-        ----
+        Parameters
+        ----------
         val : int or float
             scalar to set self to.
         """
@@ -401,8 +401,8 @@ class Vector(object):
     def change_scaling_state(self, c0, c1):
         """Change the scaling state.
 
-        Args
-        ----
+        Parameters
+        ----------
         c0 : int ndarray[nvar_myproc]
             0th order coefficients for scaling/unscaling.
         c1 : int ndarray[nvar_myproc]
@@ -415,8 +415,8 @@ class Vector(object):
 
         This method modifies both self (u) and step (du) in-place.
 
-        Args
-        ----
+        Parameters
+        ----------
         du : <Vector>
             Newton step; the backtracking is applied to this vector in-place.
         alpha : float
@@ -433,8 +433,8 @@ class Vector(object):
 
         This method modifies both self (u) and step (du) in-place.
 
-        Args
-        ----
+        Parameters
+        ----------
         du : <Vector>
             Newton step; the backtracking is applied to this vector in-place.
         alpha : float
@@ -451,8 +451,8 @@ class Vector(object):
 
         This method modifies both self (u) and step (du) in-place.
 
-        Args
-        ----
+        Parameters
+        ----------
         du : <Vector>
             Newton step; the backtracking is applied to this vector in-place.
         alpha : float
@@ -490,8 +490,8 @@ class Transfer(object):
     def __init__(self, in_vec, out_vec, in_inds, out_inds, comm):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : <Vector>
             pointer to the input vector.
         out_vec : <Vector>
@@ -523,8 +523,8 @@ class Transfer(object):
 
         Must be implemented by the subclass.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : <Vector>
             pointer to the input vector.
         out_vec : <Vector>

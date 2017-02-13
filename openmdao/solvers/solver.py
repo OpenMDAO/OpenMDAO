@@ -34,8 +34,8 @@ class Solver(object):
     def __init__(self, **kwargs):
         """Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs : dict
             options dictionary.
         """
@@ -54,8 +54,6 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', type_=int, value=1,
                              desc='whether to print output')
-        self.options.declare('subsolvers', type_=dict, value={},
-                             desc='dictionary of solvers called by this one')
 
         self._declare_options()
         self.options.update(kwargs)
@@ -70,8 +68,8 @@ class Solver(object):
     def _setup_solvers(self, system, depth):
         """Assign system instance, set depth, and optionally perform setup.
 
-        Args
-        ----
+        Parameters
+        ----------
         system : <System>
             pointer to the owning system.
         depth : int
@@ -80,14 +78,11 @@ class Solver(object):
         self._system = system
         self._depth = depth
 
-        for solver in self.options['subsolvers'].values():
-            solver._setup_solvers(system, depth + 1)
-
     def _mpi_print(self, iteration, res, res0):
         """Print residuals from an iteration.
 
-        Args
-        ----
+        Parameters
+        ----------
         iteration : int
             iteration counter, 0-based.
         res : float
@@ -126,11 +121,11 @@ class Solver(object):
         Returns
         -------
         boolean
-            True is unconverged or diverged; False is successful.
+            Failure flag; True if failed to converge, False is successful.
         float
-            relative error at termination.
+            absolute error.
         float
-            absolute error at termination.
+            relative error.
         """
         maxiter = self.options['maxiter']
         atol = self.options['atol']
@@ -147,7 +142,7 @@ class Solver(object):
             self._mpi_print(self._iter_count, norm / norm0, norm)
         fail = (numpy.isinf(norm) or numpy.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
-        return fail, norm / norm0, norm
+        return fail, norm, norm / norm0
 
     def _iter_initialize(self):
         """Perform any necessary pre-processing operations.
@@ -186,41 +181,6 @@ class Solver(object):
             error at the first iteration.
         """
         pass
-
-    def set_subsolver(self, name, solver):
-        """Add a subsolver to this solver.
-
-        Args
-        ----
-        name : str
-            name of the subsolver.
-        solver : <Solver>
-            the subsolver instance.
-
-        Returns
-        -------
-        <Solver>
-            the subsolver instance.
-        """
-        self.options['subsolvers'][name] = solver
-        self.options['subsolvers'][name]._setup_solvers(self._system,
-                                                        self._depth + 1)
-        return solver
-
-    def get_subsolver(self, name):
-        """Get a subsolver.
-
-        Args
-        ----
-        name : str
-            name of the subsolver.
-
-        Returns
-        -------
-        <Solver>
-            the instance of the requested subsolver.
-        """
-        return self.options['subsolvers'][name]
 
     def __str__(self):
         """Return a string representation of the solver.
@@ -283,8 +243,8 @@ class LinearSolver(Solver):
     def solve(self, vec_names, mode):
         """Run the solver.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str

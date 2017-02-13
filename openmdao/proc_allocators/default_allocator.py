@@ -12,8 +12,8 @@ class DefaultAllocator(ProcAllocator):
     def _divide_procs(self, nsub, comm, proc_range):
         """Perform the parallel processor allocation.
 
-        Args
-        ----
+        Parameters
+        ----------
         nsub : int
             Number of subsystems.
         comm : MPI.Comm or <FakeComm>
