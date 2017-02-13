@@ -103,59 +103,98 @@ class TestSystem(unittest.TestCase):
         arr_val = -10*np.ones((5, 1))
         bad_val = -10*np.ones((10))
 
-        # set_input, assign array to scalar
+        #
+        # set input
+        #
+
+        # assign array to scalar
         with assertRaisesRegex(self, ValueError, msg):
             g2.set_input('C1.a', arr_val)
 
-        # set_input, assign scalar to array
+        # assign scalar to array
         g2.set_input('C2.x', num_val)
         assert_rel_error(self, model.get_input('G1.G2.C2.x'), arr_val, 1e-10)
         assert_rel_error(self, g1.get_input('G2.C2.x'), arr_val, 1e-10)
 
-        # set_input, assign array to array
+        # assign array to array
         g2.set_input('C2.x', arr_val)
         assert_rel_error(self, model.get_input('G1.G2.C2.x'), arr_val, 1e-10)
         assert_rel_error(self, g1.get_input('G2.C2.x'), arr_val, 1e-10)
 
-        # set_input, assign bad array shape to array
+        # assign bad array shape to array
         with assertRaisesRegex(self, ValueError, msg):
             g2.set_input('C2.x', bad_val)
 
-        # set_input, assign list to array
+        # assign list to array
         g2.set_input('C2.x', arr_val.tolist())
         assert_rel_error(self, model.get_input('G1.G2.C2.x'), arr_val, 1e-10)
         assert_rel_error(self, g1.get_input('G2.C2.x'), arr_val, 1e-10)
 
-        # set_input, assign bad list shape to array
+        # assign bad list shape to array
         with assertRaisesRegex(self, ValueError, msg):
             g2.set_input('C2.x', bad_val.tolist())
 
-        # set_output, assign array to scalar
+        #
+        # set_output
+        #
+
+        # assign array to scalar
         with assertRaisesRegex(self, ValueError, msg):
             g2.set_output('C1.a', arr_val)
 
-        # set_output, assign scalar to array
+        # assign scalar to array
         g2.set_output('C2.y', num_val)
         assert_rel_error(self, model.get_output('G1.G2.C2.y'), arr_val, 1e-10)
         assert_rel_error(self, g1.get_output('G2.C2.y'), arr_val, 1e-10)
 
-        # set_output, assign array to array
+        # assign array to array
         g2.set_output('C2.y', arr_val)
         assert_rel_error(self, model.get_output('G1.G2.C2.y'), arr_val, 1e-10)
         assert_rel_error(self, g1.get_output('G2.C2.y'), arr_val, 1e-10)
 
-        # set_output, assign bad array shape to array
+        # assign bad array shape to array
         with assertRaisesRegex(self, ValueError, msg):
             g2.set_output('C2.y', bad_val)
 
-        # set_output, assign list to array
+        # assign list to array
         g2.set_output('C2.y', arr_val.tolist())
         assert_rel_error(self, model.get_output('G1.G2.C2.y'), arr_val, 1e-10)
         assert_rel_error(self, g1.get_output('G2.C2.y'), arr_val, 1e-10)
 
-        # set_output, assign bad list shape to array
+        # assign bad list shape to array
         with assertRaisesRegex(self, ValueError, msg):
             g2.set_output('C2.y', bad_val.tolist())
+
+        #
+        # set_residual
+        #
+
+        # assign array to scalar
+        with assertRaisesRegex(self, ValueError, msg):
+            model.set_residual('b', arr_val)
+
+        # assign scalar to array
+        g2.set_residual('y', num_val)
+        assert_rel_error(self, model.get_input('G1.G2.C2.y'), arr_val, 1e-10)
+        assert_rel_error(self, g1.get_input('G2.C2.y'), arr_val, 1e-10)
+
+        # assign array to array
+        g2.set_residual('y', arr_val)
+        assert_rel_error(self, model.get_input('G1.G2.C2.y'), arr_val, 1e-10)
+        assert_rel_error(self, g1.get_input('G2.C2.y'), arr_val, 1e-10)
+
+        # assign bad array shape to array
+        with assertRaisesRegex(self, ValueError, msg):
+            g2.set_residual('y', bad_val)
+
+        # assign list to array
+        g2.set_residual('y', arr_val.tolist())
+        assert_rel_error(self, model.get_input('G1.G2.C2.y'), arr_val, 1e-10)
+        assert_rel_error(self, g1.get_input('G2.C2.y'), arr_val, 1e-10)
+
+        # assign bad list shape to array
+        with assertRaisesRegex(self, ValueError, msg):
+            g2.set_residual('y', bad_val.tolist())
 
 
 if __name__ == "__main__":

@@ -913,7 +913,7 @@ class System(object):
                                                                name))
 
     def set_output(self, name, value):
-        """Return the named output value using promoted or unpromoted name.
+        """Set value of the named output using promoted or unpromoted name.
 
         Args
         ----
@@ -926,7 +926,8 @@ class System(object):
             raise RuntimeError("Cannot access output '%s'. Setup has not been "
                                "called." % name)
         try:
-            path = '.'.join((self.pathname, name)) if self.pathname else name
+            # path = '.'.join((self.pathname, name)) if self.pathname else name
+            path = self._var_name2path['output'][name]
             pdata = self._var_pathdict[path]
             meta = self._var_myproc_metadata['input'][pdata.myproc_idx]
             if 'shape' in meta:
@@ -992,6 +993,23 @@ class System(object):
                                "called." % name)
 
         try:
+            from pprint import pprint
+            print(self.pathname, 'set', name, '=', value)
+            print(self.pathname, 'outputs:', self._outputs._names)
+            print(self.pathname, 'self._var_name2path:')
+            pprint(self._var_name2path)
+            print('----------------')
+            print(self.pathname, 'self._var_pathdict:')
+            pprint(self._var_pathdict)
+            print('----------------')
+            print(self.pathname, 'self._var_myproc_metadata:')
+            pprint(self._var_myproc_metadata)
+
+            path = '.'.join((self.pathname, name)) if self.pathname else name
+            pdata = self._var_pathdict[path]
+            meta = self._var_myproc_metadata['output'][pdata.myproc_idx]
+            if 'shape' in meta:
+                value = make_compatible(meta, value)
             self._residuals[name] = value
         except KeyError:
             # check for promoted name
