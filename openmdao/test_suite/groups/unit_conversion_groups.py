@@ -10,7 +10,9 @@ from openmdao.core.group import Group
 
 
 class SrcComp(Component):
-    """ Source provides degrees Celsius. """
+    """
+    Source provides degrees Celsius.
+    """
 
     def initialize_variables(self):
         self.add_input('x1', 100.0)
@@ -26,7 +28,9 @@ class SrcComp(Component):
 
 
 class TgtCompF(Component):
-    """ Target expressed in degrees F."""
+    """
+    Target expressed in degrees F.
+    """
 
     def initialize_variables(self):
         self.add_input('x2', 100.0, units='degF')
@@ -42,7 +46,8 @@ class TgtCompF(Component):
 
 
 class TgtCompFMulti(Component):
-    """ Contains some extra inputs that might trip things up.
+    """
+    Contains some extra inputs that might trip things up.
     """
 
     def initialize_variables(self):
@@ -103,7 +108,8 @@ class TgtCompK(Component):
 
 
 class UnitConvGroup(Group):
-    """ Group containing a defF source that feeds into three targets with
+    """
+    Group containing a defF source that feeds into three targets with
     units degF, degC, and degK respectively. Good for testing unit
     conversion."""
 
@@ -124,7 +130,8 @@ class UnitConvGroup(Group):
 
 
 class UnitConvGroupImplicitConns(Group):
-    """ Group containing a defF source that feeds into three targets with
+    """
+    Group containing a defF source that feeds into three targets with
     units degF, degC, and degK respectively. Good for testing unit
     conversion.
 

@@ -27,13 +27,16 @@ ignores = {
     ],
     'pep257': [
         'D203',  # 1 blank required before class docstrings
-        'D213',  # Multi-line doc strings start on second line (see: D212)
+        'D212',  # Multi-line doc strings start on second line (see: D212)
+        'D200',  # One-line docstring should fit on one line with quotes
     ]
 }
 
 
 def _get_files():
-    """A generator of files to check for pep8/pep257 violations."""
+    """
+    A generator of files to check for pep8/pep257 violations.
+    """
     topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     for dirpath, dnames, fnames in os.walk(topdir):
@@ -50,6 +53,7 @@ def _get_files():
 
 
 class StringReport(pycodestyle.StandardReport):
+
     def get_failures(self):
         """
         Returns the list of failures, including source lines, as a formatted
@@ -77,6 +81,7 @@ class StringReport(pycodestyle.StandardReport):
 
 
 class LintTestCase(unittest.TestCase):
+
     def test_pep8(self):
         pep8opts = pycodestyle.StyleGuide(
             ignore=ignores['pep8'],
