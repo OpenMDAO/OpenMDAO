@@ -52,8 +52,7 @@ from openmdao.docs.config_params import IGNORE_LIST
 
 from openmdao.docs._utils.docutil import remove_docstrings, get_method_body, \
         replace_asserts_with_prints, remove_initial_empty_lines_from_source, \
-        get_lines_before_test_cases
-from openmdao.docs.utils.docutil import sqlite_file, table_name, get_unit_test_source_and_run_outputs
+        get_lines_before_test_cases, sqlite_file, table_name, get_unit_test_source_and_run_outputs
 
 # pylint: disable=C0103
 

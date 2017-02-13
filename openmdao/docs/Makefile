@@ -95,7 +95,7 @@ html: mock redbaron
 
 	# post-game clean-up
 	rm feature_docs_unit_test_db.sqlite
-	rm -rf tags
+	#rm -rf tags
 	rm -rf tmp
 
 	@echo
