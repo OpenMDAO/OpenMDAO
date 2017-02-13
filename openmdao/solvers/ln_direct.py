@@ -3,13 +3,13 @@
 from __future__ import division, print_function
 
 import numpy
-import scipy.linalg, scipy.sparse.linalg
+import scipy.linalg
+import scipy.sparse.linalg
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.matrices.coo_matrix import CooMatrix
 from openmdao.matrices.csr_matrix import CsrMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
-
 
 
 class DirectSolver(LinearSolver):
