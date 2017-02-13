@@ -27,7 +27,7 @@ ignores = {
     ],
     'pep257': [
         'D203',  # 1 blank required before class docstrings
-        'D212',  # Multi-line doc strings start on second line (see: D212)
+        'D212',  # Multi-line doc strings start on second line (see: D213)
         'D200',  # One-line docstring should fit on one line with quotes
     ]
 }
