@@ -16,6 +16,18 @@ class SimpleGroup(Group):
         self.connect('comp1.x', 'comp2.a')
 
 
+class BranchGroup(Group):
+
+    def initialize(self):
+        b1 = self.add_subsystem('Branch1', Group())
+        g1 = b1.add_subsystem('G1', Group())
+        g2 = g1.add_subsystem('G2', Group())
+        g2.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0))
+
+        b2 = self.add_subsystem('Branch2', Group())
+        g3 = b2.add_subsystem('G3', Group())
+        g3.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
+
 class TestGroup(unittest.TestCase):
 
     def test_same_sys_name(self):
@@ -86,6 +98,24 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['G1.comp1.b'], 6.0)
         self.assertEqual(p['G1.comp2.a'], 4.0)
         self.assertEqual(p['G1.comp2.b'], 12.0)
+
+    def test_group_getsystem_top(self):
+        p = Problem(model=BranchGroup())
+        p.setup()
+
+        c1 = p.model.get_subsystem('Branch1.G1.G2.comp1')
+        self.assertEqual(c1.pathname, 'Branch1.G1.G2.comp1')
+
+        c2 = p.model.get_subsystem('Branch2.G3.comp2')
+        self.assertEqual(c2.pathname, 'Branch2.G3.comp2')
+
+    def test_group_getsystem_middle(self):
+        p = Problem(model=BranchGroup())
+        p.setup()
+
+        grp = p.model.get_subsystem('Branch1.G1')
+        c1 = grp.get_subsystem('G2.comp1')
+        self.assertEqual(c1.pathname, 'Branch1.G1.G2.comp1')
 
     def test_group_nested_promoted1(self):
         p = Problem(model=Group())
