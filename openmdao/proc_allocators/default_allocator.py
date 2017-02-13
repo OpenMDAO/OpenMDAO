@@ -7,10 +7,13 @@ from openmdao.proc_allocators.proc_allocator import ProcAllocator
 
 
 class DefaultAllocator(ProcAllocator):
-    """Default processor allocator."""
+    """
+    Default processor allocator.
+    """
 
     def _divide_procs(self, nsub, comm, proc_range):
-        """Perform the parallel processor allocation.
+        """
+        Perform the parallel processor allocation.
 
         Parameters
         ----------

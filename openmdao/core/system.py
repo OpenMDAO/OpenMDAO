@@ -36,7 +36,8 @@ Objective = namedtuple('Objective', ['name', 'scaler', 'adder', 'ref',
 
 def _format_driver_array_option(option_name, var_name, values,
                                 val_if_none=0.0):
-    """Format driver array option values.
+    """
+    Format driver array option values.
 
     Checks that the given array values are either None, float, or an
     iterable of numeric values.  On output all interables of numeric values
@@ -83,7 +84,8 @@ def _format_driver_array_option(option_name, var_name, values,
 
 
 class System(object):
-    """Base class for all systems in OpenMDAO.
+    """
+    Base class for all systems in OpenMDAO.
 
     Never instantiated; subclassed by <Group> or <Component>.
     All subclasses have their attributes defined here.
@@ -188,7 +190,8 @@ class System(object):
     """
 
     def __init__(self, **kwargs):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
         Parameters
         ----------
@@ -263,7 +266,8 @@ class System(object):
 
     def _setup_processors(self, path, comm, global_dict,
                           assembler, proc_range):
-        """Recursively split comms and define local subsystems.
+        """
+        Recursively split comms and define local subsystems.
 
         Sets the following attributes:
             pathname
@@ -318,7 +322,8 @@ class System(object):
                                          sub_proc_range)
 
     def _setup_variables(self, recurse=True):
-        """Assemble variable metadata and names lists.
+        """
+        Assemble variable metadata and names lists.
 
         Sets the following attributes:
             _var_allprocs_names
@@ -350,7 +355,8 @@ class System(object):
             self.initialize_variables()
 
     def _setup_variable_indices(self, global_index, recurse=True):
-        """Define the variable indices and range.
+        """
+        Define the variable indices and range.
 
         Sets the following attributes:
             _var_allprocs_range
@@ -426,14 +432,16 @@ class System(object):
                 idx += 1
 
     def _setup_connections(self):
-        """Recursively assemble a list of input-output connections.
+        """
+        Recursively assemble a list of input-output connections.
 
         Overridden in <Group>.
         """
         pass
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
-        """Add this vector and assign sub_vectors to subsystems.
+        """
+        Add this vector and assign sub_vectors to subsystems.
 
         Sets the following attributes:
             _vectors
@@ -488,7 +496,9 @@ class System(object):
             subsys._setup_vector(sub_vectors, vector_var_ids, use_ref_vector)
 
     def _setup_scaling(self):
-        """Set up scaling vectors."""
+        """
+        Set up scaling vectors.
+        """
         nvar_in = len(self._var_myproc_metadata['input'])
         nvar_out = len(self._var_myproc_metadata['output'])
 
@@ -544,7 +554,8 @@ class System(object):
             subsys._setup_scaling()
 
     def _setup_bounds_vectors(self, lower_bounds, upper_bounds, is_top):
-        """Set up the lower and upper bounds vectors.
+        """
+        Set up the lower and upper bounds vectors.
 
         Sets the following attributes:
             _lower_bounds
@@ -590,12 +601,16 @@ class System(object):
 
     @property
     def jacobian(self):
-        """A Jacobian object or None."""
+        """
+        A Jacobian object or None.
+        """
         return self._jacobian
 
     @jacobian.setter
     def jacobian(self, jacobian):
-        """Set the Jacobian."""
+        """
+        Set the Jacobian.
+        """
         self._owns_global_jac = isinstance(jacobian, GlobalJacobian)
         self._jacobian = jacobian
 
@@ -603,7 +618,8 @@ class System(object):
         #  is now required since our jacobian has changed.
 
     def _setup_jacobians(self, jacobian=None):
-        """Set and populate jacobians down through the system tree.
+        """
+        Set and populate jacobians down through the system tree.
 
         Parameters
         ----------
@@ -625,7 +641,8 @@ class System(object):
             self._jacobian._initialize()
 
     def _get_transfers(self, vectors):
-        """Compute transfers.
+        """
+        Compute transfers.
 
         Parameters
         ----------
@@ -671,7 +688,8 @@ class System(object):
         return transfers
 
     def _get_maps(self, typ):
-        """Define variable maps based on promotes and renames lists.
+        """
+        Define variable maps based on promotes and renames lists.
 
         Parameters
         ----------
@@ -724,7 +742,8 @@ class System(object):
 
     @contextmanager
     def _jacobian_context(self):
-        """Context manager for jacobians.
+        """
+        Context manager for jacobians.
 
         Sets this system's _jacobian._system attribute to the current system.
 
@@ -741,7 +760,8 @@ class System(object):
 
     @contextmanager
     def _units_scaling_context(self, inputs=[], outputs=[], residuals=[], scale_jac=False):
-        """Context manager for units and scaling for vectors and Jacobians.
+        """
+        Context manager for units and scaling for vectors and Jacobians.
 
         Temporarily puts vectors in a physical and unscaled state, because
         internally, vectors are nominally in a dimensionless and scaled state.
@@ -782,7 +802,8 @@ class System(object):
 
     @contextmanager
     def _matvec_context(self, vec_name, var_inds, mode, clear=True):
-        """Context manager for vectors.
+        """
+        Context manager for vectors.
 
         For the given vec_name, return vectors that use a set of
         internal variables that are relevant to the current matrix-vector
@@ -859,32 +880,44 @@ class System(object):
 
     @property
     def nl_solver(self):
-        """The nonlinear solver for this system."""
+        """
+        The nonlinear solver for this system.
+        """
         return self._nl_solver
 
     @nl_solver.setter
     def nl_solver(self, solver):
-        """Set this system's nonlinear solver and perform setup."""
+        """
+        Set this system's nonlinear solver and perform setup.
+        """
         self._nl_solver = solver
 
     @property
     def ln_solver(self):
-        """The linear (adjoint) solver for this system."""
+        """
+        The linear (adjoint) solver for this system.
+        """
         return self._ln_solver
 
     @ln_solver.setter
     def ln_solver(self, solver):
-        """Set this system's linear (adjoint) solver and perform setup."""
+        """
+        Set this system's linear (adjoint) solver and perform setup.
+        """
         self._ln_solver = solver
 
     @property
     def suppress_solver_output(self):
-        """The value of the global toggle to disable solver printing."""
+        """
+        The value of the global toggle to disable solver printing.
+        """
         return self._suppress_solver_output
 
     @suppress_solver_output.setter
     def suppress_solver_output(self, value):
-        """Recursively set the solver print suppression toggle."""
+        """
+        Recursively set the solver print suppression toggle.
+        """
         self._suppress_solver_output = value
         # loop over _subsystems_allprocs here because _subsystems_myprocs
         # is empty until setup
@@ -893,16 +926,21 @@ class System(object):
 
     @property
     def proc_allocator(self):
-        """The current system's processor allocator object."""
+        """
+        The current system's processor allocator object.
+        """
         return self._mpi_proc_allocator
 
     @proc_allocator.setter
     def proc_allocator(self, value):
-        """Set the processor allocator object."""
+        """
+        Set the processor allocator object.
+        """
         self._mpi_proc_allocator = value
 
     def _set_partials_meta(self):
-        """Set subjacobian info into our jacobian.
+        """
+        Set subjacobian info into our jacobian.
 
         Overridden in <Component>.
         """
@@ -910,7 +948,8 @@ class System(object):
 
     def system_iter(self, local=True, include_self=False, recurse=True,
                     typ=None):
-        """A generator of subsystems of this system.
+        """
+        A generator of subsystems of this system.
 
         Parameters
         ----------
@@ -941,7 +980,8 @@ class System(object):
                     yield sub
 
     def get_input(self, name, units=None):
-        """Return the named input value using the unpromoted name.
+        """
+        Return the named input value using the unpromoted name.
 
         Parameters
         ----------
@@ -967,7 +1007,8 @@ class System(object):
                                                           name))
 
     def set_input(self, name, value):
-        """Set the value of the named input using the unpromoted name.
+        """
+        Set the value of the named input using the unpromoted name.
 
         Parameters
         ----------
@@ -986,7 +1027,8 @@ class System(object):
                                                           name))
 
     def get_output(self, name, scaled=False, units=None):
-        """Return the named output value using promoted or unpromoted name.
+        """
+        Return the named output value using promoted or unpromoted name.
 
         Parameters
         ----------
@@ -1020,7 +1062,8 @@ class System(object):
                                                                name))
 
     def set_output(self, name, value):
-        """Return the named output value using promoted or unpromoted name.
+        """
+        Return the named output value using promoted or unpromoted name.
 
         Parameters
         ----------
@@ -1045,7 +1088,8 @@ class System(object):
                                                                name))
 
     def get_residual(self, name, scaled=False, units=None):
-        """Return the named residual value using promoted or unpromoted name.
+        """
+        Return the named residual value using promoted or unpromoted name.
 
         Parameters
         ----------
@@ -1080,7 +1124,8 @@ class System(object):
                                                                  name))
 
     def set_residual(self, name, value):
-        """Set value of named residual using promoted or unpromoted name.
+        """
+        Set value of named residual using promoted or unpromoted name.
 
         Parameters
         ----------
@@ -1106,11 +1151,14 @@ class System(object):
                                                                  name))
 
     def _apply_nonlinear(self):
-        """Compute residuals."""
+        """
+        Compute residuals.
+        """
         pass
 
     def _solve_nonlinear(self):
-        """Compute outputs.
+        """
+        Compute outputs.
 
         Returns
         -------
@@ -1124,7 +1172,8 @@ class System(object):
         pass
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """Compute jac-vec product.
+        """
+        Compute jac-vec product.
 
         Parameters
         ----------
@@ -1139,7 +1188,8 @@ class System(object):
         pass
 
     def _solve_linear(self, vec_names, mode):
-        """Apply inverse jac product.
+        """
+        Apply inverse jac product.
 
         Parameters
         ----------
@@ -1160,11 +1210,14 @@ class System(object):
         pass
 
     def _linearize(self):
-        """Compute jacobian / factorization."""
+        """
+        Compute jacobian / factorization.
+        """
         pass
 
     def initialize(self):
-        """Optional user-defined method run once during instantiation.
+        """
+        Optional user-defined method run once during instantiation.
 
         Available attributes:
             name
@@ -1173,7 +1226,8 @@ class System(object):
         pass
 
     def initialize_processors(self):
-        """Optional user-defined method run after repartitioning/rebalancing.
+        """
+        Optional user-defined method run after repartitioning/rebalancing.
 
         Available attributes:
             name
@@ -1184,7 +1238,8 @@ class System(object):
         pass
 
     def initialize_variables(self):
-        """Required method for components to declare inputs and outputs.
+        """
+        Required method for components to declare inputs and outputs.
 
         Available attributes:
             name
@@ -1197,7 +1252,8 @@ class System(object):
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
                        **kwargs):
-        r"""Add a design variable to this system.
+        r"""
+        Add a design variable to this system.
 
         Parameters
         ----------
@@ -1297,7 +1353,8 @@ class System(object):
     def add_response(self, name, type, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, adder=None, scaler=None,
                      **kwargs):
-        r"""Add a response variable to this system.
+        r"""
+        Add a response variable to this system.
 
         Parameters
         ----------
@@ -1455,7 +1512,8 @@ class System(object):
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
                        indices=None, **kwargs):
-        r"""Add a constraint variable to this system.
+        r"""
+        Add a constraint variable to this system.
 
         Parameters
         ----------
@@ -1517,7 +1575,8 @@ class System(object):
 
     def add_objective(self, name, ref=None, ref0=None, indices=None,
                       adder=None, scaler=None, **kwargs):
-        r"""Add a response variable to this system.
+        r"""
+        Add a response variable to this system.
 
         Parameters
         ----------
@@ -1572,7 +1631,8 @@ class System(object):
                           ref=ref, ref0=ref0, indices=indices, metadata=meta)
 
     def get_design_vars(self, recurse=True):
-        """Get the DesignVariable settings from this system.
+        """
+        Get the DesignVariable settings from this system.
 
         Retrieve all design variable settings from the system and, if recurse
         is True, all of its subsystems.
@@ -1599,7 +1659,8 @@ class System(object):
         return out
 
     def get_responses(self, recurse=True):
-        """Get the response variable settings from this system.
+        """
+        Get the response variable settings from this system.
 
         Retrieve all response variable settings from the system as a dict,
         keyed by variable name.
@@ -1626,7 +1687,8 @@ class System(object):
         return out
 
     def get_constraints(self, recurse=True):
-        """Get the Constraint settings from this system.
+        """
+        Get the Constraint settings from this system.
 
         Retrieve the constraint settings for the current system as a dict,
         keyed by variable name.
@@ -1647,7 +1709,8 @@ class System(object):
                     self.get_responses(recurse=recurse).items() if isinstance(response, Constraint))
 
     def get_objectives(self, recurse=True):
-        """Get the Objective settings from this system.
+        """
+        Get the Objective settings from this system.
 
         Retrieve all objectives settings from the system as a dict, keyed
         by variable name.

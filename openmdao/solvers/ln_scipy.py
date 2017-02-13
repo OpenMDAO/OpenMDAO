@@ -9,7 +9,8 @@ from openmdao.solvers.solver import LinearSolver
 
 
 class ScipyIterativeSolver(LinearSolver):
-    """The Krylov iterative solvers in scipy.sparse.linalg.
+    """
+    The Krylov iterative solvers in scipy.sparse.linalg.
 
     Attributes
     ----------
@@ -20,7 +21,8 @@ class ScipyIterativeSolver(LinearSolver):
     SOLVER = 'LN: SCIPY'
 
     def __init__(self, **kwargs):
-        """Declare the solver option.
+        """
+        Declare the solver option.
 
         Parameters
         ----------
@@ -33,7 +35,9 @@ class ScipyIterativeSolver(LinearSolver):
         self.precon = None
 
     def _declare_options(self):
-        """Declare options before kwargs are processed in the init method."""
+        """
+        Declare options before kwargs are processed in the init method.
+        """
         # TODO : These are the defaults we used in OpenMDAO Alpha
         # self.options['maxiter'] = 1000
         # self.options['atol'] = 1.0e-12
@@ -45,7 +49,8 @@ class ScipyIterativeSolver(LinearSolver):
         self.options['maxiter'] = 100
 
     def _setup_solvers(self, system, depth):
-        """Assign system instance, set depth, and optionally perform setup.
+        """
+        Assign system instance, set depth, and optionally perform setup.
 
         Parameters
         ----------
@@ -60,7 +65,8 @@ class ScipyIterativeSolver(LinearSolver):
             self.precon._setup_solvers(self._system, self._depth + 1)
 
     def _mat_vec(self, in_vec):
-        """Compute matrix-vector product.
+        """
+        Compute matrix-vector product.
 
         Parameters
         ----------
@@ -96,7 +102,8 @@ class ScipyIterativeSolver(LinearSolver):
         return b_vec.get_data()
 
     def _monitor(self, res):
-        """Print the residual and iteration number (callback from SciPy).
+        """
+        Print the residual and iteration number (callback from SciPy).
 
         Parameters
         ----------
@@ -113,7 +120,8 @@ class ScipyIterativeSolver(LinearSolver):
         self._iter_count += 1
 
     def solve(self, vec_names, mode):
-        """Run the solver.
+        """
+        Run the solver.
 
         Parameters
         ----------
@@ -175,7 +183,8 @@ class ScipyIterativeSolver(LinearSolver):
         return False, 0., 0.
 
     def _apply_precon(self, in_vec):
-        """Apply preconditioner.
+        """
+        Apply preconditioner.
 
         Parameters
         ----------

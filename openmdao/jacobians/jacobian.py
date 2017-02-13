@@ -8,7 +8,8 @@ from openmdao.utils.generalized_dict import OptionsDictionary
 
 
 class Jacobian(object):
-    """Base Jacobian class.
+    """
+    Base Jacobian class.
 
     This class provides a dictionary interface for sub-Jacobians and
     performs matrix-vector products when apply_linear is called.
@@ -35,7 +36,8 @@ class Jacobian(object):
     """
 
     def __init__(self, **kwargs):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
         Parameters
         ----------
@@ -55,7 +57,8 @@ class Jacobian(object):
         self.options.update(kwargs)
 
     def _key2shape(self, key):
-        """Return shape of sub-jacobian for variables making up the key tuple.
+        """
+        Return shape of sub-jacobian for variables making up the key tuple.
 
         This assumes that no inputs and outputs share the same name,
         so it should only be called from a Component, never from a Group.
@@ -77,7 +80,8 @@ class Jacobian(object):
                 numpy.prod(self._system._var2meta[in_name]['shape']))
 
     def _key2unique(self, key):
-        """Map output-input local name pair to a unique key.
+        """
+        Map output-input local name pair to a unique key.
 
         This should only be called when self._system is a Component or
         key parts are all outputs.  If the key contains an input name, that
@@ -103,7 +107,8 @@ class Jacobian(object):
                     self._system._var_name2path['output'][key[1]])
 
     def _multiply_subjac(self, key, val):
-        """Multiply this sub-Jacobian by val.
+        """
+        Multiply this sub-Jacobian by val.
 
         Parameters
         ----------
@@ -124,7 +129,8 @@ class Jacobian(object):
             self._subjacs[ukey][0] *= val
 
     def _precompute_iter(self):
-        """Assemble list of output-input pairs by name.
+        """
+        Assemble list of output-input pairs by name.
 
         Sets self._iter_list to a list of (output, input) pairs found in the
         jacobian for the current System. input and output are unpromoted names.
@@ -158,7 +164,8 @@ class Jacobian(object):
         self._iter_list = iter_list
 
     def __contains__(self, key):
-        """Map output-input pairs names to indices.
+        """
+        Map output-input pairs names to indices.
 
         Parameters
         ----------
@@ -183,7 +190,8 @@ class Jacobian(object):
         return False
 
     def __iter__(self):
-        """Return iterator from pre-computed _iter_list.
+        """
+        Return iterator from pre-computed _iter_list.
 
         Returns
         -------
@@ -193,7 +201,8 @@ class Jacobian(object):
         return iter(self._iter_list)
 
     def __setitem__(self, key, jac):
-        """Set sub-Jacobian.
+        """
+        Set sub-Jacobian.
 
         Parameters
         ----------
@@ -226,7 +235,8 @@ class Jacobian(object):
         self._subjacs[ukey] = jac
 
     def __getitem__(self, key):
-        """Get sub-Jacobian.
+        """
+        Get sub-Jacobian.
 
         Parameters
         ----------
@@ -242,7 +252,8 @@ class Jacobian(object):
         return self._subjacs[ukey]
 
     def _scale_subjac(self, key, coeffs):
-        """Change the scaling state of a single subjac.
+        """
+        Change the scaling state of a single subjac.
 
         Parameters
         ----------
@@ -261,7 +272,8 @@ class Jacobian(object):
         self._multiply_subjac(key, val)
 
     def _scale(self, coeffs):
-        """Change the scaling state for all subjacs under the current system.
+        """
+        Change the scaling state for all subjacs under the current system.
 
         Parameters
         ----------
@@ -273,15 +285,20 @@ class Jacobian(object):
             self._scale_subjac(key, coeffs)
 
     def _initialize(self):
-        """Allocate the global matrices."""
+        """
+        Allocate the global matrices.
+        """
         pass
 
     def _update(self):
-        """Read the user's sub-Jacobians and set into the global matrix."""
+        """
+        Read the user's sub-Jacobians and set into the global matrix.
+        """
         pass
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
-        """Compute matrix-vector product.
+        """
+        Compute matrix-vector product.
 
         Parameters
         ----------
@@ -297,7 +314,8 @@ class Jacobian(object):
         pass
 
     def _set_partials_meta(self, key, meta, negate=False):
-        """Store subjacobian metadata.
+        """
+        Store subjacobian metadata.
 
         Parameters
         ----------

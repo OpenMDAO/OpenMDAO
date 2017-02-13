@@ -18,7 +18,8 @@ from openmdao.utils.general_utils import warn_deprecation
 
 
 class FakeComm(object):
-    """Fake MPI communicator class used if mpi4py is not installed.
+    """
+    Fake MPI communicator class used if mpi4py is not installed.
 
     Attributes
     ----------
@@ -29,13 +30,16 @@ class FakeComm(object):
     """
 
     def __init__(self):
-        """Initialize attributes."""
+        """
+        Initialize attributes.
+        """
         self.rank = 0
         self.size = 1
 
 
 class Problem(object):
-    """Top-level container for the systems and drivers.
+    """
+    Top-level container for the systems and drivers.
 
     Attributes
     ----------
@@ -51,7 +55,8 @@ class Problem(object):
 
     def __init__(self, model=None, comm=None, assembler_class=None,
                  use_ref_vector=True):
-        """Initialize attributes.
+        """
+        Initialize attributes.
 
         Parameters
         ----------
@@ -79,7 +84,8 @@ class Problem(object):
         self._use_ref_vector = use_ref_vector
 
     def _get_path_data(self, name):
-        """Get absolute pathname and related data.
+        """
+        Get absolute pathname and related data.
 
         Parameters
         ----------
@@ -121,7 +127,8 @@ class Problem(object):
         return pathname, pdata
 
     def __getitem__(self, name):
-        """Get an output/input variable.
+        """
+        Get an output/input variable.
 
         Parameters
         ----------
@@ -143,7 +150,8 @@ class Problem(object):
             return c0 + c1 * self.model._inputs[pathname]
 
     def __setitem__(self, name, value):
-        """Set an output/input variable.
+        """
+        Set an output/input variable.
 
         Parameters
         ----------
@@ -175,7 +183,8 @@ class Problem(object):
 
     @property
     def root(self):
-        """Provide 'root' property for backwards compatibility.
+        """
+        Provide 'root' property for backwards compatibility.
 
         Returns
         -------
@@ -188,7 +197,8 @@ class Problem(object):
 
     @root.setter
     def root(self, model):
-        """Provide for setting the 'root' property for backwards compatibility.
+        """
+        Provide for setting the 'root' property for backwards compatibility.
 
         Parameters
         -------
@@ -200,7 +210,8 @@ class Problem(object):
         self.model = model
 
     def run_model(self):
-        """Run the model by calling the root system's solve_nonlinear.
+        """
+        Run the model by calling the root system's solve_nonlinear.
 
         Returns
         -------
@@ -214,7 +225,8 @@ class Problem(object):
         return self.model._solve_nonlinear()
 
     def run_once(self):
-        """Backward compatible call for run_model.
+        """
+        Backward compatible call for run_model.
 
         Returns
         -------
@@ -231,7 +243,8 @@ class Problem(object):
         return self.run_model()
 
     def run(self):
-        """Backward compatible call for run_driver.
+        """
+        Backward compatible call for run_driver.
 
         Returns
         -------
@@ -249,7 +262,8 @@ class Problem(object):
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None,
               mode='auto'):
-        """Set up everything (model, assembler, vector, solvers, drivers).
+        """
+        Set up everything (model, assembler, vector, solvers, drivers).
 
         Parameters
         ----------
@@ -335,7 +349,8 @@ class Problem(object):
         return self
 
     def setup_vector(self, vec_name, vector_class, use_ref_vector):
-        """Set up the 'vec_name' <Vector>.
+        """
+        Set up the 'vec_name' <Vector>.
 
         Parameters
         ----------
@@ -365,7 +380,8 @@ class Problem(object):
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
-        """Compute derivatives of desired quantities with respect to desired inputs.
+        """
+        Compute derivatives of desired quantities with respect to desired inputs.
 
         Parameters
         ----------
@@ -532,7 +548,8 @@ class Problem(object):
 
 
 def _check_shape(shape, val):
-    """Check that the shape of a value matches the metadata for a variable.
+    """
+    Check that the shape of a value matches the metadata for a variable.
 
     Parameters
     ----------
