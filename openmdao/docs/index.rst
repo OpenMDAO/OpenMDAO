@@ -46,11 +46,19 @@ Building components
    features/building_components/explicitcomp
    features/building_components/implicitcomp
 
+Grouping components for more complex models
+===========================================
+
+.. toctree::
+    :maxdepth: 1
+
+    features/grouping_components/grouping_components
+    features/grouping_components/add_subsystem
+    features/grouping_components/get_subsystem
+
+
 Defining partial derivatives
 ================================
-
-Grouping components for more complex models
-================================================================
 
 Solvers (nonlinear and linear)
 ================================
