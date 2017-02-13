@@ -1311,7 +1311,7 @@ class System(object):
         scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0)
 
         # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.min)
+        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max)
 
         # Convert upper to ndarray/float as necessary
         upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max)
@@ -1452,7 +1452,7 @@ class System(object):
         scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0)
 
         # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.min)
+        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max)
 
         # Convert upper to ndarray/float as necessary
         upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max)

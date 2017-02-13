@@ -196,10 +196,10 @@ class Component(System):
             raise TypeError('The res_units argument should be a str or None')
 
         # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.min)
+        lower = format_as_float_or_array('lower', lower, val_if_none=None)
 
         # Convert upper to ndarray/float as necessary
-        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max)
+        upper = format_as_float_or_array('upper', upper, val_if_none=None)
 
         for item in [ref, ref0, res_ref, res_ref]:
             if not numpy.isscalar(item):
