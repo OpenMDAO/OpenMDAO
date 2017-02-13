@@ -194,12 +194,10 @@ class Component(System):
             raise TypeError('The units argument should be a str or None')
         if res_units is not None and not isinstance(res_units, str):
             raise TypeError('The res_units argument should be a str or None')
-
-        # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=None)
-
-        # Convert upper to ndarray/float as necessary
-        upper = format_as_float_or_array('upper', upper, val_if_none=None)
+        if lower is not None:
+            lower = format_as_float_or_array('lower', lower)
+        if upper is not None:
+            upper = format_as_float_or_array('upper', upper)
 
         for item in [ref, ref0, res_ref, res_ref]:
             if not numpy.isscalar(item):
