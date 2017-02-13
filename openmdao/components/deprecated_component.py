@@ -9,7 +9,8 @@ from openmdao.utils.general_utils import warn_deprecation
 
 
 class Component(BaseComponent):
-    """Component Class for backwards compatibility.
+    """
+    Component Class for backwards compatibility.
 
     Attributes
     ----------
@@ -20,7 +21,9 @@ class Component(BaseComponent):
     """
 
     def __init__(self, **kwargs):
-        """Add a few more attributes."""
+        """
+        Add a few more attributes.
+        """
         super(Component, self).__init__(**kwargs)
         self._state_names = []
         self._output_names = []
@@ -31,10 +34,11 @@ class Component(BaseComponent):
                          'this Component class is deprecated')
 
     def add_param(self, name, val=1.0, **kwargs):
-        """Add an param variable to the component.
+        """
+        Add an param variable to the component.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in this component's namespace.
         val : object
@@ -45,10 +49,11 @@ class Component(BaseComponent):
         self.add_input(name, val, **kwargs)
 
     def add_state(self, name, val=1.0, **kwargs):
-        """Add a state variable to the component.
+        """
+        Add a state variable to the component.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in this component's namespace.
         val : object
@@ -63,10 +68,11 @@ class Component(BaseComponent):
         self._state_names.append(name)
 
     def add_output(self, name, val=1.0, **kwargs):
-        """Add an output variable to the component.
+        """
+        Add an output variable to the component.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in this component's namespace.
         val : object
@@ -81,34 +87,59 @@ class Component(BaseComponent):
         self._output_names.append(name)
 
     def _apply_nonlinear(self):
-        """See System._apply_nonlinear."""
-        self._inputs.scale(self._scaling_to_phys['input'])
-        self._outputs.scale(self._scaling_to_phys['output'])
-        self._residuals.scale(self._scaling_to_phys['residual'])
+        """
+        Compute residuals.
+        """
+        self._inputs._scale(self._scaling_to_phys['input'])
+        self._outputs._scale(self._scaling_to_phys['output'])
+        self._residuals._scale(self._scaling_to_phys['residual'])
 
         self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
-        self._inputs.scale(self._scaling_to_norm['input'])
-        self._outputs.scale(self._scaling_to_norm['output'])
-        self._residuals.scale(self._scaling_to_norm['residual'])
+        self._inputs._scale(self._scaling_to_norm['input'])
+        self._outputs._scale(self._scaling_to_norm['output'])
+        self._residuals._scale(self._scaling_to_norm['residual'])
 
     def _solve_nonlinear(self):
-        """See System._solve_nonlinear."""
+        """
+        Compute outputs.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
         if self._nl_solver is not None:
             self._nl_solver.solve()
         else:
-            self._inputs.scale(self._scaling_to_phys['input'])
-            self._outputs.scale(self._scaling_to_phys['output'])
-            self._residuals.scale(self._scaling_to_phys['residual'])
+            self._inputs._scale(self._scaling_to_phys['input'])
+            self._outputs._scale(self._scaling_to_phys['output'])
+            self._residuals._scale(self._scaling_to_phys['residual'])
 
             self.solve_nonlinear(self._inputs, self._outputs, self._residuals)
 
-            self._inputs.scale(self._scaling_to_norm['input'])
-            self._outputs.scale(self._scaling_to_norm['output'])
-            self._residuals.scale(self._scaling_to_norm['residual'])
+            self._inputs._scale(self._scaling_to_norm['input'])
+            self._outputs._scale(self._scaling_to_norm['output'])
+            self._residuals._scale(self._scaling_to_norm['residual'])
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """See System._apply_linear."""
+        """
+        Compute jac-vec product.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+        var_inds : [int, int, int, int] or None
+            ranges of variable IDs involved in this matrix-vector product.
+            The ordering is [lb1, ub1, lb2, ub2].
+        """
         for vec_name in vec_names:
             with self._matvec_context(vec_name, var_inds, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
@@ -116,11 +147,11 @@ class Component(BaseComponent):
                     self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                           mode)
 
-                self._inputs.scale(self._scaling_to_phys['input'])
-                self._outputs.scale(self._scaling_to_phys['output'])
-                d_inputs.scale(self._scaling_to_phys['input'])
-                d_outputs.scale(self._scaling_to_phys['output'])
-                d_residuals.scale(self._scaling_to_phys['residual'])
+                self._inputs._scale(self._scaling_to_phys['input'])
+                self._outputs._scale(self._scaling_to_phys['output'])
+                d_inputs._scale(self._scaling_to_phys['input'])
+                d_outputs._scale(self._scaling_to_phys['output'])
+                d_residuals._scale(self._scaling_to_phys['residual'])
 
                 for name in d_residuals:
                     if name in self._output_names:
@@ -133,14 +164,32 @@ class Component(BaseComponent):
                     if name in self._output_names:
                         d_residuals[name] *= -1.0
 
-                self._inputs.scale(self._scaling_to_norm['input'])
-                self._outputs.scale(self._scaling_to_norm['output'])
-                d_inputs.scale(self._scaling_to_norm['input'])
-                d_outputs.scale(self._scaling_to_norm['output'])
-                d_residuals.scale(self._scaling_to_norm['residual'])
+                self._inputs._scale(self._scaling_to_norm['input'])
+                self._outputs._scale(self._scaling_to_norm['output'])
+                d_inputs._scale(self._scaling_to_norm['input'])
+                d_outputs._scale(self._scaling_to_norm['output'])
+                d_residuals._scale(self._scaling_to_norm['residual'])
 
     def _solve_linear(self, vec_names, mode):
-        """See System._solve_linear."""
+        """
+        Apply inverse jac product.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
         if self._ln_solver is not None:
             return self._ln_solver(vec_names, mode)
         else:
@@ -148,8 +197,8 @@ class Component(BaseComponent):
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
-                d_outputs.scale(self._scaling_to_phys['output'])
-                d_residuals.scale(self._scaling_to_phys['residual'])
+                d_outputs._scale(self._scaling_to_phys['output'])
+                d_residuals._scale(self._scaling_to_phys['residual'])
 
             success = self.solve_linear(self._vectors['output'],
                                         self._vectors['residual'],
@@ -163,24 +212,26 @@ class Component(BaseComponent):
                         elif mode == 'rev':
                             d_residuals[name] = d_outputs[name]
 
-                d_outputs.scale(self._scaling_to_norm['output'])
-                d_residuals.scale(self._scaling_to_norm['residual'])
+                d_outputs._scale(self._scaling_to_norm['output'])
+                d_residuals._scale(self._scaling_to_norm['residual'])
 
             return success
 
     def _linearize(self):
-        """See System._linearize."""
+        """
+        Compute jacobian / factorization.
+        """
         with self._jacobian_context():
-            self._inputs.scale(self._scaling_to_phys['input'])
-            self._outputs.scale(self._scaling_to_phys['output'])
+            self._inputs._scale(self._scaling_to_phys['input'])
+            self._outputs._scale(self._scaling_to_phys['output'])
 
             J = self.linearize(self._inputs, self._outputs, self._residuals)
             if J is not None:
                 for k in J:
                     self._jacobian[k] = J[k]
 
-            self._inputs.scale(self._scaling_to_norm['input'])
-            self._outputs.scale(self._scaling_to_norm['output'])
+            self._inputs._scale(self._scaling_to_norm['input'])
+            self._outputs._scale(self._scaling_to_norm['output'])
 
             for out_name in self._var_myproc_names['output']:
                 if out_name in self._output_names:
@@ -199,10 +250,11 @@ class Component(BaseComponent):
                 self._jacobian._update()
 
     def apply_nonlinear(self, params, unknowns, residuals):
-        """Compute residuals given params and unknowns.
+        """
+        Compute residuals given params and unknowns.
 
-        Args
-        ----
+        Parameters
+        ----------
         params : Vector
             unscaled, dimensional param variables read via params[key]
         unknowns : Vector
@@ -213,10 +265,11 @@ class Component(BaseComponent):
         pass
 
     def solve_nonlinear(self, params, unknowns, residuals):
-        """Compute unknowns given params.
+        """
+        Compute unknowns given params.
 
-        Args
-        ----
+        Parameters
+        ----------
         params : Vector
             unscaled, dimensional param variables read via params[key]
         unknowns : Vector
@@ -228,15 +281,16 @@ class Component(BaseComponent):
 
     def apply_linear(self, params, unknowns,
                      d_params, d_unknowns, d_residuals, mode):
-        r"""Compute jac-vector product.
+        r"""
+        Compute jac-vector product.
 
         If mode is:
             'fwd': (d_params, unknowns) \|-> d_residuals
 
             'rev': d_residuals \|-> (d_params, unknowns)
 
-        Args
-        ----
+        Parameters
+        ----------
         params : Vector
             unscaled, dimensional param variables read via params[key]
         unknowns : Vector
@@ -253,15 +307,16 @@ class Component(BaseComponent):
         pass
 
     def solve_linear(self, d_unknowns_dict, d_residuals_dict, vec_names, mode):
-        r"""Apply inverse jac product.
+        r"""
+        Apply inverse jac product.
 
         If mode is:
             'fwd': d_residuals \|-> d_unknowns
 
             'rev': d_unknowns \|-> d_residuals
 
-        Args
-        ----
+        Parameters
+        ----------
         d_unknowns_dict : dict of <Vector>
             unscaled, dimensional quantities read via d_unknowns[key]
         d_residuals_dict : dict of <Vector>
@@ -274,10 +329,11 @@ class Component(BaseComponent):
         pass
 
     def linearize(self, params, unknowns, jacobian):
-        """Compute sub-jacobian parts / factorization.
+        """
+        Compute sub-jacobian parts / factorization.
 
-        Args
-        ----
+        Parameters
+        ----------
         params : Vector
             unscaled, dimensional param variables read via params[key]
         unknowns : Vector

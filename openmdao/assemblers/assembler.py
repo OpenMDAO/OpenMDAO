@@ -9,7 +9,8 @@ from openmdao.utils.units import conversion_to_base_units, convert_units
 
 
 class Assembler(object):
-    """Base Assembler class.
+    """
+    Base Assembler class.
 
     The primary purpose of the Assembler class is to set up transfers.
 
@@ -43,10 +44,11 @@ class Assembler(object):
     """
 
     def __init__(self, comm):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         comm : MPI.Comm or <FakeComm>
             same instance as the <Problem>'s communicator.
         """
@@ -65,7 +67,8 @@ class Assembler(object):
         self._src_scaling = None
 
     def _setup_variables(self, nvars, variable_metadata, variable_indices):
-        """Compute the variable sets and sizes.
+        """
+        Compute the variable sets and sizes.
 
         Sets the following attributes:
             _variable_sizes_all
@@ -73,8 +76,8 @@ class Assembler(object):
             _variable_set_IDs
             _variable_set_indices
 
-        Args
-        ----
+        Parameters
+        ----------
         nvars : {'input': int, 'output': int}
             global number of variables.
         variable_metadata : {'input': list, 'output': list}
@@ -149,13 +152,14 @@ class Assembler(object):
                                      self._variable_sizes_all[typ])
 
     def _setup_connections(self, connections, variable_allprocs_names):
-        """Identify implicit connections and combine with explicit ones.
+        """
+        Identify implicit connections and combine with explicit ones.
 
         Sets the following attributes:
             _input_src_ids
 
-        Args
-        ----
+        Parameters
+        ----------
         connections : [(int, int), ...]
             index pairs representing user defined variable connections
             (in_ind, out_ind).
@@ -183,14 +187,15 @@ class Assembler(object):
         self._input_src_ids = _input_src_ids
 
     def _setup_src_indices(self, input_metadata, myproc_var_global_indices):
-        """Assemble global list of src_indices.
+        """
+        Assemble global list of src_indices.
 
         Sets the following attributes:
             _src_indices
             _src_indices_range
 
-        Args
-        ----
+        Parameters
+        ----------
         input_metadata : [{}, ...]
             list of metadata dictionaries of inputs that exist on this proc.
         myproc_var_global_indices : ndarray[:]
@@ -225,10 +230,11 @@ class Assembler(object):
             ind1 += isize
 
     def _setup_src_data(self, variable_metadata, variable_indices):
-        """Compute and store unit/scaling information for inputs.
+        """
+        Compute and store unit/scaling information for inputs.
 
-        Args
-        ----
+        Parameters
+        ----------
         variable_metadata : list of dict
             list of metadata dictionaries for outputs of root system.
         variable_indices : int ndarray
@@ -282,17 +288,18 @@ class Assembler(object):
                 self._src_units[ivar_in] = out_units[ind]
                 self._src_scaling[ivar_in, :] = out_scaling[ind, :]
             else:
-                self._src_units[ivar_in] = ''
+                self._src_units[ivar_in] = None
                 self._src_scaling[ivar_in, :] = [0., 1.]
 
     def _compute_transfers(self, nsub_allprocs, var_range,
                            subsystems_myproc, subsystems_inds):
-        """Compute the transfer indices.
+        """
+        Compute the transfer indices.
 
         Must be implemented by the subclass.
 
-        Args
-        ----
+        Parameters
+        ----------
         nsub_allprocs : int
             number of subsystems on all procs.
         var_range : [int, int]

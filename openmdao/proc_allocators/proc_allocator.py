@@ -7,7 +7,8 @@ from openmdao.utils.generalized_dict import OptionsDictionary
 
 
 class ProcAllocator(object):
-    """Algorithm for allocating processors to a given system's subsystems.
+    """
+    Algorithm for allocating processors to a given system's subsystems.
 
     Attributes
     ----------
@@ -19,10 +20,11 @@ class ProcAllocator(object):
     """
 
     def __init__(self, **kwargs):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs : dict
             Contains options.
         """
@@ -32,10 +34,11 @@ class ProcAllocator(object):
         self.options.update(kwargs)
 
     def __call__(self, nsub, comm, proc_range):
-        """Perform the allocation if parallel.
+        """
+        Perform the allocation if parallel.
 
-        Args
-        ----
+        Parameters
+        ----------
         nsub : int
             Number of subsystems.
         comm : MPI.Comm or <FakeComm>
@@ -63,10 +66,11 @@ class ProcAllocator(object):
             return self._divide_procs(nsub, comm, proc_range)
 
     def _divide_procs(self, nsub, comm, proc_range):
-        """Perform the parallel processor allocation.
+        """
+        Perform the parallel processor allocation.
 
-        Args
-        ----
+        Parameters
+        ----------
         nsub : int
             Number of subsystems.
         comm : MPI.Comm or <FakeComm>

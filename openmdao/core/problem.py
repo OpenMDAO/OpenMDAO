@@ -18,7 +18,8 @@ from openmdao.utils.general_utils import warn_deprecation, make_compatible
 
 
 class FakeComm(object):
-    """Fake MPI communicator class used if mpi4py is not installed.
+    """
+    Fake MPI communicator class used if mpi4py is not installed.
 
     Attributes
     ----------
@@ -29,13 +30,16 @@ class FakeComm(object):
     """
 
     def __init__(self):
-        """Initialize attributes."""
+        """
+        Initialize attributes.
+        """
         self.rank = 0
         self.size = 1
 
 
 class Problem(object):
-    """Top-level container for the systems and drivers.
+    """
+    Top-level container for the systems and drivers.
 
     Attributes
     ----------
@@ -51,10 +55,11 @@ class Problem(object):
 
     def __init__(self, model=None, comm=None, assembler_class=None,
                  use_ref_vector=True):
-        """Initialize attributes.
+        """
+        Initialize attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         model : <System> or None
             pointer to the top-level <System> object (root node in the tree).
         comm : MPI.Comm or <FakeComm> or None
@@ -79,10 +84,11 @@ class Problem(object):
         self._use_ref_vector = use_ref_vector
 
     def _get_path_data(self, name):
-        """Get absolute pathname and related data.
+        """
+        Get absolute pathname and related data.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in the root system's namespace. May be
             a promoted name or an unpromoted name.
@@ -121,10 +127,11 @@ class Problem(object):
         return pathname, pdata
 
     def __getitem__(self, name):
-        """Get an output/input variable.
+        """
+        Get an output/input variable.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in the root system's namespace.
 
@@ -143,10 +150,11 @@ class Problem(object):
             return c0 + c1 * self.model._inputs[pathname]
 
     def __setitem__(self, name, value):
-        """Set an output/input variable.
+        """
+        Set an output/input variable.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the output/input variable in the root system's namespace.
         value : float or ndarray or list
@@ -169,7 +177,8 @@ class Problem(object):
 
     @property
     def root(self):
-        """Provide 'root' property for backwards compatibility.
+        """
+        Provide 'root' property for backwards compatibility.
 
         Returns
         -------
@@ -182,9 +191,10 @@ class Problem(object):
 
     @root.setter
     def root(self, model):
-        """Provide for setting the 'root' property for backwards compatibility.
+        """
+        Provide for setting the 'root' property for backwards compatibility.
 
-        Args
+        Parameters
         -------
         model : <Group>
             reference to a <Group> to be assigned to the 'model' property.
@@ -194,7 +204,8 @@ class Problem(object):
         self.model = model
 
     def run_model(self):
-        """Run the model by calling the root system's solve_nonlinear.
+        """
+        Run the model by calling the root system's solve_nonlinear.
 
         Returns
         -------
@@ -208,7 +219,8 @@ class Problem(object):
         return self.model._solve_nonlinear()
 
     def run_once(self):
-        """Backward compatible call for run_model.
+        """
+        Backward compatible call for run_model.
 
         Returns
         -------
@@ -225,7 +237,8 @@ class Problem(object):
         return self.run_model()
 
     def run(self):
-        """Backward compatible call for run_driver.
+        """
+        Backward compatible call for run_driver.
 
         Returns
         -------
@@ -243,10 +256,11 @@ class Problem(object):
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None,
               mode='auto'):
-        """Set up everything (model, assembler, vector, solvers, drivers).
+        """
+        Set up everything (model, assembler, vector, solvers, drivers).
 
-        Args
-        ----
+        Parameters
+        ----------
         vector_class : type (DefaultVector)
             reference to an actual <Vector> class; not an instance.
         check : boolean (True)
@@ -329,10 +343,11 @@ class Problem(object):
         return self
 
     def setup_vector(self, vec_name, vector_class, use_ref_vector):
-        """Set up the 'vec_name' <Vector>.
+        """
+        Set up the 'vec_name' <Vector>.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_name : str
             name of the vector.
         vector_class : type
@@ -354,16 +369,16 @@ class Problem(object):
 
         # TODO: implement this properly
         ind1, ind2 = self.model._var_allprocs_range['output']
-        import numpy
-        vector_var_ids = numpy.arange(ind1, ind2)
+        vector_var_ids = np.arange(ind1, ind2)
 
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
-        """Compute derivatives of desired quantities with respect to desired inputs.
+        """
+        Compute derivatives of desired quantities with respect to desired inputs.
 
-        Args
-        ----
+        Parameters
+        ----------
         of : list of variable name strings or None
             Variables whose derivatives will be computed. Default is None, which
             uses the driver's objectives and constraints.

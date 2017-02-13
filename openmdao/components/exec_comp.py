@@ -17,10 +17,11 @@ VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
 
 
 def array_idx_iter(shape):
-    """Return an iterator over the indices into a n-dimensional array.
+    """
+    Return an iterator over the indices into a n-dimensional array.
 
-    Args
-    ----
+    Parameters
+    ----------
     shape : tuple
         shape of the array.
     """
@@ -34,7 +35,9 @@ def _parse_for_vars(s):
 
 
 def _valid_name(s, exprs):
-    """Generate a locally unique replacement for a dotted name."""
+    """
+    Generate a locally unique replacement for a dotted name.
+    """
     i = 0
     check = ' '.join(exprs)
     while True:
@@ -45,10 +48,13 @@ def _valid_name(s, exprs):
 
 
 class ExecComp(ExplicitComponent):
-    """A <Component> defined by an expression string."""
+    """
+    A component defined by an expression string.
+    """
 
     def __init__(self, exprs, inits=None, units=None, **kwargs):
-        r"""Create a <Component> using only an expression string.
+        r"""
+        Create a <Component> using only an expression string.
 
         Given a list of assignment statements, this component creates
         input and output variables at construction time.  All variables
@@ -57,8 +63,8 @@ class ExecComp(ExplicitComponent):
         type float unless the initial value for that variable is supplied
         in \*\*kwargs or inits.  Derivatives are calculated using complex step.
 
-        Args
-        ----
+        Parameters
+        ----------
         exprs : str or list of str
             An assignment statement or iter of them. These express how the
             outputs are calculated based on the inputs.
@@ -83,9 +89,11 @@ class ExecComp(ExplicitComponent):
         ExecComp that takes an array 'x' as input and outputs a float variable
         'y' which is the sum of the entries in 'x'.
 
-        >>> import numpy
-        >>> from openmdao.api import ExecComp
-        >>> excomp = ExecComp('y=numpy.sum(x)', x=numpy.ones(10,dtype=float))
+        ::
+
+            import numpy
+            from openmdao.api import ExecComp
+            excomp = ExecComp('y=numpy.sum(x)', x=numpy.ones(10,dtype=float))
 
         In this example, 'y' would be assumed to be the default type of float
         and would be given the default initial value of 0.0, while 'x' would be
@@ -172,36 +180,41 @@ class ExecComp(ExplicitComponent):
         return [compile(expr, expr, 'exec') for expr in exprs]
 
     def __getstate__(self):
-        """Return state as a dict."""
+        """
+        Return state as a dict.
+        """
         state = self.__dict__.copy()
         del state['_codes']
         return state
 
     def __setstate__(self, state):
-        """Restore state from `state`."""
+        """
+        Restore state from `state`.
+        """
         self.__dict__.update(state)
         self._codes = self._compile_exprs(self._exprs)
 
     def compute(self, inputs, outputs):
-        """Execute this component's assignment statemens.
+        """
+        Execute this component's assignment statemens.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : `Vector`
             `Vector` containing inputs.
 
         outputs : `Vector`
             `Vector` containing outputs.
-
         """
         for expr in self._codes:
             exec(expr, _expr_dict, _IODict(outputs, inputs, self._to_colons))
 
     def compute_jacobian(self, params, unknowns, jacobian):
-        """Use complex step method to update the given Jacobian.
+        """
+        Use complex step method to update the given Jacobian.
 
-        Args
-        ----
+        Parameters
+        ----------
         params : `VecWrapper`
             `VecWrapper` containing parameters. (p)
 
@@ -210,7 +223,6 @@ class ExecComp(ExplicitComponent):
 
         jacobians : `Jacobian`
             Contains sub-jacobians.
-
         """
         # our complex step
         step = self.complex_stepsize * 1j
@@ -261,7 +273,8 @@ class ExecComp(ExplicitComponent):
 
 
 class _TmpDict(object):
-    """Dict wrapper that allows modification without changing the wrapped dict.
+    """
+    Dict wrapper that allows modification without changing the wrapped dict.
 
     It will allow getting of values
     from its inner dict unless those values get modified via
@@ -271,10 +284,11 @@ class _TmpDict(object):
     """
 
     def __init__(self, inner, return_complex=False):
-        """Construct the dictionary object.
+        """
+        Construct the dictionary object.
 
-        Args
-        ----
+        Parameters
+        ----------
         inner : dict-like
             The dictionary to be wrapped.
 
@@ -309,17 +323,19 @@ class _TmpDict(object):
 
 
 class _IODict(object):
-    """A dict wrapper that contains 2 different dicts.
+    """
+    A dict wrapper that contains 2 different dicts.
 
     Items are first looked for in the outputs
     and then the inputs.
     """
 
     def __init__(self, outputs, inputs, to_colons):
-        """Create the dict wrapper.
+        """
+        Create the dict wrapper.
 
-        Args
-        ----
+        Parameters
+        ----------
         outputs : dict-like
             The outputs object to be wrapped.
 
@@ -348,10 +364,11 @@ class _IODict(object):
 
 
 def _import_functs(mod, dct, names=None):
-    """Map attributes attrs from the given module into the given dict.
+    """
+    Map attributes attrs from the given module into the given dict.
 
-    Args
-    ----
+    Parameters
+    ----------
     dct : dict
         Dictionary that will contain the mapping
 

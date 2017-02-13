@@ -11,13 +11,16 @@ from openmdao.matrices.matrix import Matrix, _compute_index_map
 
 
 class CooMatrix(Matrix):
-    """Sparse matrix in Coordinate list format."""
+    """
+    Sparse matrix in Coordinate list format.
+    """
 
     def _build_sparse(self, num_rows, num_cols):
-        """Allocate the data, rows, and cols for the sparse matrix.
+        """
+        Allocate the data, rows, and cols for the sparse matrix.
 
-        Args
-        ----
+        Parameters
+        ----------
         num_rows : int
             number of rows in the matrix.
         num_cols : int
@@ -106,10 +109,11 @@ class CooMatrix(Matrix):
         return data, rows, cols
 
     def _build(self, num_rows, num_cols):
-        """Allocate the matrix.
+        """
+        Allocate the matrix.
 
-        Args
-        ----
+        Parameters
+        ----------
         num_rows : int
             number of rows in the matrix.
         num_cols : int
@@ -130,10 +134,11 @@ class CooMatrix(Matrix):
                                   shape=(num_rows, num_cols))
 
     def _update_submat(self, key, jac):
-        """Update the values of a sub-jacobian.
+        """
+        Update the values of a sub-jacobian.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (int, int)
             the global output and input variable indices.
         jac : ndarray or scipy.sparse or tuple
@@ -153,10 +158,11 @@ class CooMatrix(Matrix):
             self._matrix.data[idxs] = jac[0]
 
     def _prod(self, in_vec, mode):
-        """Perform a matrix vector product.
+        """
+        Perform a matrix vector product.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : ndarray[:]
             incoming vector to multiply.
         mode : str

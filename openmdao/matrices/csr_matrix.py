@@ -11,13 +11,16 @@ from openmdao.matrices.coo_matrix import CooMatrix
 
 
 class CsrMatrix(CooMatrix):
-    """Sparse matrix in Compressed Row Storage format."""
+    """
+    Sparse matrix in Compressed Row Storage format.
+    """
 
     def _build(self, num_rows, num_cols):
-        """Allocate the matrix.
+        """
+        Allocate the matrix.
 
-        Args
-        ----
+        Parameters
+        ----------
         num_rows : int
             number of rows in the matrix.
         num_cols : int

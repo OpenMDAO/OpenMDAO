@@ -5,8 +5,8 @@ import sys
 def allproc_var_dump(system, out=sys.stdout):
     """Dump various variable info across all procs.
 
-    Args
-    ----
+    Parameters
+    ----------
     system : System
         System to dump variable info for.
 

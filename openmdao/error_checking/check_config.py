@@ -14,16 +14,16 @@ from openmdao.devtools.compat import abs_varname_iter
 
 
 def check_config(problem, logger=None):
-    """Perform optional error checks on a Problem.
+    """
+    Perform optional error checks on a Problem.
 
-    Args
-    ----
+    Parameters
+    ----------
     problem : Problem
         The Problem being checked.
 
     logger : object
         Logging object.
-
     """
     if logger is None:
         logger = logging.getLogger("config_check")
@@ -40,10 +40,11 @@ def check_config(problem, logger=None):
 
 
 def compute_sys_graph(group, input_src_ids, comps_only=False):
-    """Compute a dependency graph for subsystems in the given group.
+    """
+    Compute a dependency graph for subsystems in the given group.
 
-    Args
-    ----
+    Parameters
+    ----------
     group : <Group>
         The Group we're computing the graph for.
 
@@ -61,7 +62,6 @@ def compute_sys_graph(group, input_src_ids, comps_only=False):
     -------
     DiGraph
         A directed graph containing names of subsystems and their connections.
-
     """
     if comps_only:
         subsystems = list(group.system_iter(recurse=True, typ=Component))
@@ -95,10 +95,11 @@ def compute_sys_graph(group, input_src_ids, comps_only=False):
 
 
 def get_sccs(group, comps_only=False):
-    """Return strongly connected subsystems of the given Group.
+    """
+    Return strongly connected subsystems of the given Group.
 
-    Args
-    ----
+    Parameters
+    ----------
     group : <Group>
         The strongly connected components will be computed for this Group.
 
@@ -125,16 +126,16 @@ def get_sccs(group, comps_only=False):
 
 
 def _check_dataflow(group, logger):
-    """Report any cycles and out of order Systems to the logger.
+    """
+    Report any cycles and out of order Systems to the logger.
 
-    Args
-    ----
+    Parameters
+    ----------
     group : <Group>
         The Group being checked for dataflow issues.
 
     logger : object
         The object that manages logging output.
-
     """
     for system in group.system_iter(include_self=True, recurse=True,
                                     typ=Group):
@@ -170,10 +171,11 @@ def _check_dataflow(group, logger):
 
 
 def _get_out_of_order_subs(group, input_src_ids):
-    """Return Systems that are executed out of dataflow order.
+    """
+    Return Systems that are executed out of dataflow order.
 
-    Args
-    ----
+    Parameters
+    ----------
     group : <Group>
         The Group where we're checking subsystem order.
 
@@ -187,7 +189,6 @@ def _get_out_of_order_subs(group, input_src_ids):
     dict
         A dict mapping names of target Systems to a list of names of their
         source Systems that execute after them.
-
     """
     subsystems = group._subsystems_allprocs
 
@@ -221,16 +222,16 @@ def _get_out_of_order_subs(group, input_src_ids):
 
 
 def _check_hanging_inputs(problem, logger):
-    """Issue a logger warning if any inputs are not connected.
+    """
+    Issue a logger warning if any inputs are not connected.
 
-    Args
-    ----
+    Parameters
+    ----------
     problem : <Problem>
         The problem being checked.
 
     logger : object
         The object that managers logging output.
-
     """
     input_src_ids = problem._assembler._input_src_ids
 

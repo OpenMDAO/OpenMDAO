@@ -11,13 +11,16 @@ real_types = tuple([numbers.Real, numpy.float32, numpy.float64])
 
 
 class DefaultTransfer(Transfer):
-    """Default NumPy transfer."""
+    """
+    Default NumPy transfer.
+    """
 
     def __call__(self, in_vec, out_vec, mode='fwd'):
-        """Perform transfer.
+        """
+        Perform transfer.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : <Vector>
             pointer to the input vector.
         out_vec : <Vector>
@@ -48,12 +51,15 @@ class DefaultTransfer(Transfer):
 
 
 class DefaultVector(Vector):
-    """Default NumPy vector."""
+    """
+    Default NumPy vector.
+    """
 
     TRANSFER = DefaultTransfer
 
     def _create_data(self):
-        """Allocate list of arrays, one for each var_set.
+        """
+        Allocate list of arrays, one for each var_set.
 
         Returns
         -------
@@ -84,7 +90,8 @@ class DefaultVector(Vector):
         return data, indices
 
     def _extract_data(self):
-        """Extract views of arrays from root_vector.
+        """
+        Extract views of arrays from root_vector.
 
         Returns
         -------
@@ -116,14 +123,15 @@ class DefaultVector(Vector):
         return data, indices
 
     def _initialize_data(self, root_vector):
-        """Internally allocate vectors.
+        """
+        Internally allocate vectors.
 
         Sets the following attributes:
 
         - _data
 
-        Args
-        ----
+        Parameters
+        ----------
         root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
@@ -133,7 +141,8 @@ class DefaultVector(Vector):
             self._data, self._indices = self._extract_data()
 
     def _initialize_views(self):
-        """Internally assemble views onto the vectors.
+        """
+        Internally assemble views onto the vectors.
 
         Sets the following attributes:
 
@@ -187,16 +196,19 @@ class DefaultVector(Vector):
         self._idxs = idxs
 
     def _clone_data(self):
-        """For each item in _data, replace it with a copy of the data."""
+        """
+        For each item in _data, replace it with a copy of the data.
+        """
         for iset in range(len(self._data)):
             data = self._data[iset]
             self._data[iset] = numpy.array(data)
 
     def __iadd__(self, vec):
-        """Perform in-place vector addition.
+        """
+        Perform in-place vector addition.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec : <Vector>
             vector to add to self.
 
@@ -210,10 +222,11 @@ class DefaultVector(Vector):
         return self
 
     def __isub__(self, vec):
-        """Perform in-place vector substraction.
+        """
+        Perform in-place vector substraction.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec : <Vector>
             vector to subtract from self.
 
@@ -227,10 +240,11 @@ class DefaultVector(Vector):
         return self
 
     def __imul__(self, val):
-        """Perform in-place scalar multiplication.
+        """
+        Perform in-place scalar multiplication.
 
-        Args
-        ----
+        Parameters
+        ----------
         val : int or float
             scalar to multiply self.
 
@@ -244,10 +258,11 @@ class DefaultVector(Vector):
         return self
 
     def add_scal_vec(self, val, vec):
-        """Perform in-place addition of a vector times a scalar.
+        """
+        Perform in-place addition of a vector times a scalar.
 
-        Args
-        ----
+        Parameters
+        ----------
         val : int or float
             scalar.
         vec : <Vector>
@@ -257,10 +272,11 @@ class DefaultVector(Vector):
             data += val * vec_data
 
     def set_vec(self, vec):
-        """Set the value of this vector to that of the incoming vector.
+        """
+        Set the value of this vector to that of the incoming vector.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec : <Vector>
             the vector whose values self is set to.
         """
@@ -268,10 +284,11 @@ class DefaultVector(Vector):
             data[:] = vec_data
 
     def set_const(self, val):
-        """Set the value of this vector to a constant scalar value.
+        """
+        Set the value of this vector to a constant scalar value.
 
-        Args
-        ----
+        Parameters
+        ----------
         val : int or float
             scalar to set self to.
         """
@@ -279,7 +296,8 @@ class DefaultVector(Vector):
             data[:] = val
 
     def get_norm(self):
-        """Return the norm of this vector.
+        """
+        Return the norm of this vector.
 
         Returns
         -------
@@ -291,11 +309,12 @@ class DefaultVector(Vector):
             global_sum += numpy.sum(data**2)
         return global_sum ** 0.5
 
-    def scale(self, coeffs):
-        """Change the scaling state.
+    def _scale(self, coeffs):
+        """
+        Change the scaling state.
 
-        Args
-        ----
+        Parameters
+        ----------
         coeffs : int ndarray[nvar_myproc, 2]
             0th and 1st order coefficients for scaling/unscaling.
         """
@@ -304,12 +323,13 @@ class DefaultVector(Vector):
                 coeffs[self._ivar_map[iset], 1] * data
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
-        """Enforce lower/upper bounds, backtracking the entire vector together.
+        """
+        Enforce lower/upper bounds, backtracking the entire vector together.
 
         This method modifies both self (u) and step (du) in-place.
 
-        Args
-        ----
+        Parameters
+        ----------
         du : <Vector>
             Newton step; the backtracking is applied to this vector in-place.
         alpha : float
@@ -361,12 +381,13 @@ class DefaultVector(Vector):
         du *= 1 - d_alpha / alpha
 
     def _enforce_bounds_scalar(self, du, alpha, lower_bounds, upper_bounds):
-        """Enforce lower/upper bounds on each scalar separately, then backtrack as a vector.
+        """
+        Enforce lower/upper bounds on each scalar separately, then backtrack as a vector.
 
         This method modifies both self (u) and step (du) in-place.
 
-        Args
-        ----
+        Parameters
+        ----------
         du : <Vector>
             Newton step; the backtracking is applied to this vector in-place.
         alpha : float
@@ -404,12 +425,13 @@ class DefaultVector(Vector):
             du_data += change / alpha
 
     def _enforce_bounds_wall(self, du, alpha, lower_bounds, upper_bounds):
-        """Enforce lower/upper bounds on each scalar separately, then backtrack along the wall.
+        """
+        Enforce lower/upper bounds on each scalar separately, then backtrack along the wall.
 
         This method modifies both self (u) and step (du) in-place.
 
-        Args
-        ----
+        Parameters
+        ----------
         du : <Vector>
             Newton step; the backtracking is applied to this vector in-place.
         alpha : float

@@ -3,7 +3,8 @@ from __future__ import division, print_function
 
 
 class GeneralizedDictionary(object):
-    """Dictionary with type-checking and default values of declared keys.
+    """
+    Dictionary with type-checking and default values of declared keys.
 
     This class is instantiated for:
         1. the metadata attribute in systems.
@@ -19,10 +20,11 @@ class GeneralizedDictionary(object):
     """
 
     def __init__(self):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_dict : dict or None
             optional dictionary with which to initialize.
         """
@@ -31,10 +33,11 @@ class GeneralizedDictionary(object):
         self._declared_entries = {}
 
     def _check_type_and_value(self, name, value):
-        """If declared, check that value has the right type and is valid.
+        """
+        If declared, check that value has the right type and is valid.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             the name of the entry, which may or may not have been declared.
         value : -
@@ -54,10 +57,11 @@ class GeneralizedDictionary(object):
 
     def declare(self, name, type_=None, desc='',
                 value=None, values=None, required=False):
-        """Declare an entry.
+        """
+        Declare an entry.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             the name of the entry.
         type_ : type or None
@@ -84,10 +88,11 @@ class GeneralizedDictionary(object):
             self._check_type_and_value(name, self._dict[name])
 
     def update(self, in_dict):
-        """Update the internal dictionary with the given one.
+        """
+        Update the internal dictionary with the given one.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_dict : dict
             the incoming dictionary to add to / overwrite the internal one.
         """
@@ -95,10 +100,11 @@ class GeneralizedDictionary(object):
             self[key] = in_dict[key]
 
     def _assemble_global_dict(self, parents_dict):
-        """Incorporate the dictionary passed down from the systems above.
+        """
+        Incorporate the dictionary passed down from the systems above.
 
-        Args
-        ----
+        Parameters
+        ----------
         parents_dict : dict
             combination of the dict entries of all systems above this one.
         """
@@ -119,7 +125,8 @@ class GeneralizedDictionary(object):
         self._global_dict.update(self._dict)
 
     def __iter__(self):
-        """Provide an iterator.
+        """
+        Provide an iterator.
 
         Returns
         -------
@@ -129,10 +136,11 @@ class GeneralizedDictionary(object):
         return iter(self._dict)
 
     def __contain__(self, key):
-        """Check if the key is in the local dictionary.
+        """
+        Check if the key is in the local dictionary.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : str
             name of the entry.
 
@@ -144,10 +152,11 @@ class GeneralizedDictionary(object):
         return key in self._dict
 
     def __setitem__(self, name, value):
-        """Set an entry in the local dictionary.
+        """
+        Set an entry in the local dictionary.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the entry.
         value : -
@@ -160,10 +169,11 @@ class GeneralizedDictionary(object):
         self._dict[name] = value
 
     def __getitem__(self, name):
-        """Get an entry from the local dict, global dict, or declared default.
+        """
+        Get an entry from the local dict, global dict, or declared default.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the entry.
 
@@ -196,17 +206,19 @@ class GeneralizedDictionary(object):
 
 
 class OptionsDictionary(GeneralizedDictionary):
-    """Dictionary with enforced type-checking and default values of declared keys.
+    """
+    Dictionary with enforced type-checking and default values of declared keys.
 
     This class is instantiated for:
         1. the options attribute in solvers, drivers, and processor allocators
     """
 
     def __setitem__(self, name, value):
-        """Set an entry in the local dictionary.
+        """
+        Set an entry in the local dictionary.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the entry.
         value : -
@@ -219,10 +231,11 @@ class OptionsDictionary(GeneralizedDictionary):
         self._dict[name] = value
 
     def _assemble_global_dict(self, parents_dict):
-        """Incorporate the dictionary passed down from the systems above.
+        """
+        Incorporate the dictionary passed down from the systems above.
 
-        Args
-        ----
+        Parameters
+        ----------
         parents_dict : dict
             combination of the dict entries of all systems above this one.
         """

@@ -6,10 +6,11 @@ import numpy as np
 
 
 def warn_deprecation(msg):
-    """Raise a warning and prints a deprecation message to stdout.
+    """
+    Raise a warning and prints a deprecation message to stdout.
 
-    Args
-    ----
+    Parameters
+    ----------
     msg : str
         Message that will be printed to stdout.
     """

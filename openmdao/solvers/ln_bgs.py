@@ -3,12 +3,16 @@ from openmdao.solvers.solver import BlockLinearSolver
 
 
 class LinearBlockGS(BlockLinearSolver):
-    """Linear block Gauss-Seidel solver."""
+    """
+    Linear block Gauss-Seidel solver.
+    """
 
     SOLVER = 'LN: LNBGS'
 
     def _iter_execute(self):
-        """Perform the operations in the iteration loop."""
+        """
+        Perform the operations in the iteration loop.
+        """
         system = self._system
         mode = self._mode
         vec_names = self._vec_names
@@ -33,6 +37,7 @@ class LinearBlockGS(BlockLinearSolver):
                     b_vec *= -1.0
                     b_vec += self._rhs_vecs[vec_name]
                 subsys._solve_linear(vec_names, mode)
+
         elif mode == 'rev':
             system._subsystems_myproc.reverse()
             system._subsystems_myproc_inds.reverse()

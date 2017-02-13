@@ -12,7 +12,8 @@ from openmdao.utils.general_utils import warn_deprecation
 
 
 class IndepVarComp(ExplicitComponent):
-    """Class to inherit from when all output variables are independent.
+    """
+    Class to inherit from when all output variables are independent.
 
     Attributes
     ----------
@@ -25,10 +26,11 @@ class IndepVarComp(ExplicitComponent):
     """
 
     def __init__(self, name=None, val=1.0, **kwargs):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str or None or [(str, value), ...] or [(str, value, kwargs), ...]
             name of the variable.
             If None, variables should be defined external to this class by calling add_output.
@@ -80,7 +82,9 @@ class IndepVarComp(ExplicitComponent):
                                  "in IndepVarComp." % illegal)
 
     def initialize_variables(self):
-        """Define the independent variables as output variables."""
+        """
+        Define the independent variables as output variables.
+        """
         for (name, val, kwargs) in self._indep + self._indep_external:
             super(IndepVarComp, self).add_output(name, val, **kwargs)
 
@@ -92,10 +96,11 @@ class IndepVarComp(ExplicitComponent):
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
                    res_ref=1.0, res_ref0=0.0, var_set=0):
-        """Add an independent variable to this component.
+        """
+        Add an independent variable to this component.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in this component's namespace.
         val : float or list or tuple or ndarray

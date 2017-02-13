@@ -3,16 +3,19 @@
 from __future__ import division
 
 from fnmatch import fnmatchcase
-from six import string_types, iteritems
 import numpy
+from itertools import product
+from six import string_types, iteritems
 from scipy.sparse import issparse
 
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.utils.units import valid_units
 
 
 class Component(System):
-    """Base Component class; not to be directly instantiated.
+    """
+    Base Component class; not to be directly instantiated.
 
     Attributes
     ----------
@@ -21,10 +24,11 @@ class Component(System):
     """
 
     def __init__(self, **kwargs):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs: dict of keyword arguments
             available here and in all descendants of this system.
         """
@@ -32,10 +36,11 @@ class Component(System):
         self._var2meta = {}
 
     def add_input(self, name, val=1.0, shape=None, indices=None, units=None, desc='', var_set=0):
-        """Add an input variable to the component.
+        """
+        Add an input variable to the component.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
@@ -67,6 +72,10 @@ class Component(System):
             raise TypeError('The indices argument should be an int, list, tuple, or ndarray')
         if units is not None and not isinstance(units, str):
             raise TypeError('The units argument should be a str or None')
+
+        # Check that units are valid
+        if units is not None and not valid_units(units):
+            raise ValueError("The units '%s' are invalid" % units)
 
         if shape is not None:
             if isinstance(shape, int):
@@ -125,10 +134,11 @@ class Component(System):
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
                    res_ref=1.0, res_ref0=0.0, var_set=0):
-        """Add an output variable to the component.
+        """
+        Add an output variable to the component.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
@@ -191,6 +201,10 @@ class Component(System):
             if not numpy.isscalar(item):
                 raise TypeError('The %s argument should be a float' % (item.__name__))
 
+        # Check that units are valid
+        if units is not None and not valid_units(units):
+            raise ValueError("The units '%s' are invalid" % units)
+
         if shape is not None:
             if isinstance(shape, int):
                 shape = (shape,)
@@ -247,10 +261,11 @@ class Component(System):
 
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):
-        """Store subjacobian metadata for later use.
+        """
+        Store subjacobian metadata for later use.
 
-        Args
-        ----
+        Parameters
+        ----------
         of : str or list of str
             The name of the residual(s) that derivatives are being computed for.
             May also contain a glob pattern.
@@ -271,7 +286,7 @@ class Component(System):
             Row indices for each nonzero entry.  For sparse subjacobians only.
         cols : ndarray of int or None
             Column indices for each nonzero entry.  For sparse subjacobians only.
-        val : float or ndarray of float
+        val : float or ndarray of float or scipy.sparse
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
 
@@ -323,27 +338,76 @@ class Component(System):
                 self._subjacs_info[key] = meta2
 
     def _iter_partials_matches(self):
-        """Generate all (of, wrt) name pairs to add to jacobian."""
+        """
+        Generate all (of, wrt) name pairs to add to jacobian.
+        """
         outs = self._var_allprocs_names['output']
         ins = self._var_allprocs_names['input']
         tvlists = (('output', outs), ('input', ins))
 
-        for (of, wrt), meta in iteritems(self._subjacs_info):
-            ofmatches = [n for n in outs if n == of or fnmatchcase(n, of)]
+        for (of_pattern, wrt_pattern), meta in iteritems(self._subjacs_info):
+            of_matches = [name for name in outs if fnmatchcase(name, of_pattern)]
             for typ, vnames in tvlists:
-                for wrtname in vnames:
-                    if wrtname == wrt or fnmatchcase(wrtname, wrt):
-                        for ofmatch in ofmatches:
-                            yield (ofmatch, wrtname), meta, typ
+                wrt_matches = [name for name in vnames if fnmatchcase(name, wrt_pattern)]
+                for (of, wrt) in product(of_matches, wrt_matches):
+                    yield (of, wrt), meta, typ
+
+    def _check_partials_meta(self, key, meta):
+        """
+        Check a given partial derivative and metadata for the correct shapes.
+
+        Parameters
+        ----------
+        key : tuple(str,str)
+            The of/wrt pair defining the partial derivative.
+        meta : dict
+            Metadata dictionary from declare_partials.
+        """
+        of, wrt = key
+        if meta['dependent']:
+            out_size = numpy.prod(self._var2meta[of]['shape'])
+            in_size = numpy.prod(self._var2meta[wrt]['shape'])
+            rows = meta['rows']
+            cols = meta['cols']
+            if rows is not None:
+                if rows.min() < 0:
+                    msg = '{}: d({})/d({}): row indices must be non-negative'
+                    raise ValueError(msg.format(self.pathname, of, wrt))
+                if cols.min() < 0:
+                    msg = '{}: d({})/d({}): col indices must be non-negative'
+                    raise ValueError(msg.format(self.pathname, of, wrt))
+                if rows.max() >= out_size or cols.max() >= in_size:
+                    msg = '{}: d({})/d({}): Expected {}x{} but declared at least {}x{}'
+                    raise ValueError(msg.format(
+                        self.pathname, of, wrt,
+                        out_size, in_size,
+                        rows.max() + 1, cols.max() + 1))
+            elif meta['value'] is not None:
+                val = meta['value']
+                val_shape = val.shape
+                if len(val_shape) == 1:
+                    val_out, val_in = val_shape[0], 1
+                else:
+                    val_out, val_in = val.shape
+                if val_out > out_size or val_in > in_size:
+                    msg = '{}: d({})/d({}): Expected {}x{} but val is {}x{}'
+                    raise ValueError(msg.format(
+                        self.pathname, of, wrt,
+                        out_size, in_size,
+                        val_out, val_in))
 
     def _set_partials_meta(self):
-        """Set subjacobian info into our jacobian."""
+        """
+        Set subjacobian info into our jacobian.
+        """
         with self._jacobian_context() as J:
             for key, meta, typ in self._iter_partials_matches():
+                self._check_partials_meta(key, meta)
                 J._set_partials_meta(key, meta)
 
     def _setup_variables(self, recurse=False):
-        """Assemble variable metadata and names lists.
+        """
+        Assemble variable metadata and names lists.
 
         Sets the following attributes:
             _var_allprocs_names
@@ -352,8 +416,8 @@ class Component(System):
             _var_pathdict
             _var_name2path
 
-        Args
-        ----
+        Parameters
+        ----------
         recurse : boolean
             Ignored.
         """
@@ -378,43 +442,9 @@ class Component(System):
                 else:
                     self._var_name2path[typ][name] = path
 
-        for (of, wrt), info in iteritems(self._subjacs_info):
-            if info['dependent']:
-                out_size = numpy.prod(self._var2meta[of]['shape'])
-                in_size = numpy.prod(self._var2meta[wrt]['shape'])
-                rows = info['rows']
-                cols = info['cols']
-                if rows is not None:
-                    if rows.min() < 0:
-                        msg = '{}: d({})/d({}): row indices must be non-negative'
-                        raise ValueError(msg.format(self.pathname, of, wrt))
-                    if cols.min() < 0:
-                        msg = '{}: d({})/d({}): col indices must be non-negative'
-                        raise ValueError(msg.format(self.pathname, of, wrt))
-                    if rows.max() >= out_size or cols.max() >= in_size:
-                        msg = '{}: d({})/d({}): Expected {}x{} but declared at least {}x{}'
-                        raise ValueError(msg.format(
-                            self.pathname, of, wrt,
-                            out_size, in_size,
-                            rows.max() + 1, cols.max() + 1
-                        ))
-                elif info['value'] is not None:
-                    val = info['value']
-                    val_shape = val.shape
-                    if len(val_shape) == 1:
-                        val_out, val_in = val_shape[0], 1
-                    else:
-                        val_out, val_in = val.shape
-                    if val_out > out_size or val_in > in_size:
-                        msg = '{}: d({})/d({}): Expected {}x{} but val is {}x{}'
-                        raise ValueError(msg.format(
-                            self.pathname, of, wrt,
-                            out_size, in_size,
-                            val_out, val_in
-                        ))
-
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
-        r"""Add this vector and assign sub_vectors to subsystems.
+        r"""
+        Add this vector and assign sub_vectors to subsystems.
 
         Sets the following attributes:
 
@@ -427,8 +457,8 @@ class Component(System):
 
         \* If vec_name is 'nonlinear'
 
-        Args
-        ----
+        Parameters
+        ----------
         vectors : {'input': <Vector>, 'output': <Vector>, 'residual': <Vector>}
             <Vector> objects corresponding to 'name'.
         vector_var_ids : ndarray[:]

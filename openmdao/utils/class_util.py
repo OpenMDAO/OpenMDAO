@@ -2,10 +2,11 @@
 
 
 def overrides_method(method_name, obj, base):
-    """Return True if the named base class method is overridden by obj.
+    """
+    Return True if the named base class method is overridden by obj.
 
-    Args
-    ----
+    Parameters
+    ----------
 
     method_name: str
         Name of the method to search for.
