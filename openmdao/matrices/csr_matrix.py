@@ -16,8 +16,8 @@ class CsrMatrix(CooMatrix):
     def _build(self, num_rows, num_cols):
         """Allocate the matrix.
 
-        Args
-        ----
+        Parameters
+        ----------
         num_rows : int
             number of rows in the matrix.
         num_cols : int

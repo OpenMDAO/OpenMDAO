@@ -31,8 +31,8 @@ class Group(System):
     def add(self, name, subsys, promotes=None):
         """Deprecated version of <Group.add_subsystem>.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             Name of the subsystem being added
         subsys : System
@@ -52,8 +52,8 @@ class Group(System):
                       renames_inputs=None, renames_outputs=None):
         """Add a subsystem.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             Name of the subsystem being added
         subsys : <System>
@@ -91,6 +91,14 @@ class Group(System):
         self._subsystems_allprocs.append(subsys)
         subsys.name = name
 
+        # If we're given a string, turn into a list
+        if isinstance(promotes, string_types):
+            promotes = [promotes]
+        if isinstance(promotes_inputs, string_types):
+            promotes_inputs = [promotes_inputs]
+        if isinstance(promotes_outputs, string_types):
+            promotes_outputs = [promotes_outputs]
+
         if promotes:
             subsys._var_promotes['any'] = set(promotes)
         if promotes_inputs:
@@ -107,8 +115,8 @@ class Group(System):
     def connect(self, out_name, in_name, src_indices=None):
         """Connect output out_name to input in_name in this namespace.
 
-        Args
-        ----
+        Parameters
+        ----------
         out_name : str
             name of the output (source) variable to connect
         in_name : str or [str, ... ] or (str, ...)
@@ -290,8 +298,8 @@ class Group(System):
     def _find_subsys_with_promoted_name(self, var_name, io_type='output'):
         """Find subsystem that contains promoted variable.
 
-        Args
-        ----
+        Parameters
+        ----------
         var_name : str
             variable name
         io_type : str
@@ -373,8 +381,8 @@ class Group(System):
     def get_subsystem(self, name):
         """Return the system called 'name' in the current namespace.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the desired system in the current namespace.
 
@@ -383,24 +391,15 @@ class Group(System):
         System or None
             System if found else None.
         """
-        idot = name.find('.')
-
-        # If name does not contain '.', only check the immediate children
-        if idot == -1:
-            for subsys in self._subsystems_allprocs:
-                if subsys.name == name:
-                    return subsys
-        # If name does contain at least one '.', we have to recurse (possibly).
-        else:
-            sub_name = name[:idot]
-            for subsys in self._subsystems_allprocs:
-                # We only check if the prefix matches, and with the prefix removed.
-                if subsys.name == sub_name:
-                    result = subsys.get_subsystem(name[idot + 1:])
-                    if result:
-                        return result
-
-        return None
+        system = self
+        for subname in name.split('.'):
+            for sub in system._subsystems_allprocs:
+                if sub.name == subname:
+                    system = sub
+                    break
+            else:
+                return None
+        return system
 
     def _apply_nonlinear(self):
         """Compute residuals."""
@@ -426,8 +425,8 @@ class Group(System):
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """Compute jac-vec product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -465,8 +464,8 @@ class Group(System):
     def _solve_linear(self, vec_names, mode):
         """Apply inverse jac product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
