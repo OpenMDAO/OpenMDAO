@@ -530,8 +530,8 @@ class System(object):
             self._scaling_to_phys['output'][ind, 1] = meta['ref'] - meta['ref0']
 
             # Compute scaling arrays for residuals; convert units
-            self._scaling_to_phys['residual'][ind, 0] = meta['ref0']
-            self._scaling_to_phys['residual'][ind, 1] = meta['ref'] - meta['ref0']
+            self._scaling_to_phys['residual'][ind, 0] = meta['res_ref0']
+            self._scaling_to_phys['residual'][ind, 1] = meta['res_ref'] - meta['res_ref0']
 
         # Compute inverse scaling arrays
         for key in ['input', 'output', 'residual']:
@@ -1228,14 +1228,14 @@ class System(object):
         -----
         The design variable can be scaled using scaler and adder, where
 
-        ..math::
+        .. math::
 
             x_{scaled} = scaler(x + adder)
 
         or through the use of ref/ref0, which map to scaler and adder through
         the equations:
 
-        ..math::
+        .. math::
 
             0 = scaler(ref_0 + adder)
 
@@ -1243,7 +1243,7 @@ class System(object):
 
         which results in:
 
-        ..math::
+        .. math::
 
             adder = -ref_0
 
@@ -1332,14 +1332,14 @@ class System(object):
         -----
         The response can be scaled using scaler and adder, where
 
-        ..math::
+        .. math::
 
             x_{scaled} = scaler(x + adder)
 
         or through the use of ref/ref0, which map to scaler and adder through
         the equations:
 
-        ..math::
+        .. math::
 
             0 = scaler(ref_0 + adder)
 
@@ -1347,7 +1347,7 @@ class System(object):
 
         which results in:
 
-        ..math::
+        .. math::
 
             adder = -ref_0
 
@@ -1488,14 +1488,14 @@ class System(object):
         -----
         The constraint can be scaled using scaler and adder, where
 
-        ..math::
+        .. math::
 
             x_{scaled} = scaler(x + adder)
 
         or through the use of ref/ref0, which map to scaler and adder through
         the equations:
 
-        ..math::
+        .. math::
 
             0 = scaler(ref_0 + adder)
 
@@ -1503,7 +1503,7 @@ class System(object):
 
         which results in:
 
-        ..math::
+        .. math::
 
             adder = -ref_0
 
@@ -1544,14 +1544,14 @@ class System(object):
         -----
         The objective can be scaled using scaler and adder, where
 
-        ..math::
+        .. math::
 
             x_{scaled} = scaler(x + adder)
 
         or through the use of ref/ref0, which map to scaler and adder through
         the equations:
 
-        ..math::
+        .. math::
 
             0 = scaler(ref_0 + adder)
 
@@ -1559,7 +1559,7 @@ class System(object):
 
         which results in:
 
-        ..math::
+        .. math::
 
             adder = -ref_0
 
