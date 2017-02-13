@@ -285,6 +285,12 @@ class LinearSolver(Solver):
         self._mode = mode
         return self._run_iterator()
 
+    def _linearize(self):
+        """
+        Perform any required initialization operations such as matrix factorization.
+        """
+        pass
+
     def _iter_initialize(self):
         """
         Perform any necessary pre-processing operations.

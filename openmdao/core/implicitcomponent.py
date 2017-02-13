@@ -136,6 +136,9 @@ class ImplicitComponent(Component):
             if self._owns_global_jac:
                 J._update()
 
+        if self._ln_solver is not None:
+            self._ln_solver._linearize()
+
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
         Compute residuals given inputs and outputs.
