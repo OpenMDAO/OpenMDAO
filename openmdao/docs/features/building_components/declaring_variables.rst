@@ -1,6 +1,6 @@
 :orphan:
 
-.. `Calling add_input and add_output`
+.. _declaring-variables:
 
 Calling add_input and add_output
 ================================

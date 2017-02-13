@@ -89,8 +89,8 @@ Detailed docstring rules:
 
      Paragraph 1.
 
-     Args
-     ----
+     Parameters
+     ----------
      argument_name : Type
          description ending with a period.
 
@@ -112,8 +112,8 @@ Detailed docstring rules:
 
      Paragraph 1.
 
-     Args
-     ----
+     Parameters
+     ----------
      argument_name : Type
          description ending with a period.
 

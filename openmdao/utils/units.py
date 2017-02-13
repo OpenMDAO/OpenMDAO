@@ -883,8 +883,8 @@ def valid_units(unit):
     """
     Return whether the given units are vaild.
 
-    Args
-    ----
+    Parameters
+    ----------
     units : str
         String representation of the units.
 

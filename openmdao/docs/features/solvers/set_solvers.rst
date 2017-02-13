@@ -1,4 +1,8 @@
-Setting nonlinear and linear solvers
+:orphan:
+
+.. _set-solvers:
+
+Setting Nonlinear and Linear Solvers
 =====================================
 
 A nonlinear solver, like :ref:`NonlinearBlockGS <usr_openmdao.solvers.nl_bgs.py>` or :ref:`Newton <usr_openmdao.solvers.nl_newton.py>`,
@@ -14,11 +18,10 @@ You can add nonlinear and linear solvers at any level of the model hierarchy,
 letting you build a hierarchical solver setup to efficiently converge your model and solve for total derivatives across it.
 
 
-Solvers for the Sellar problem
+Solvers for the Sellar Problem
 ----------------------------------
 
-The Sellar (link to sellar problem page) problem has two components with a cyclic dependency,
-so a a nonlinear solver is necessary.
+The Sellar Problem has two components with a cyclic dependency, so a a nonlinear solver is necessary.
 We'll use the :ref:`Newton <usr_openmdao.solvers.nl_newton.py>` nonlinear solver,
 which requires derivatives so we'll also use the :ref:`Direct <usr_openmdao.solvers.ln_direct.py>` linear solver
 
