@@ -2,6 +2,8 @@
 
 from __future__ import division
 
+import sys
+
 from fnmatch import fnmatchcase
 import numpy
 from itertools import product
@@ -11,6 +13,7 @@ from scipy.sparse import issparse
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
+from openmdao.utils.general_utils import format_as_float_or_array
 
 
 class Component(System):
@@ -191,12 +194,13 @@ class Component(System):
             raise TypeError('The units argument should be a str or None')
         if res_units is not None and not isinstance(res_units, str):
             raise TypeError('The res_units argument should be a str or None')
-        if lower is not None and not numpy.isscalar(lower) and \
-                not isinstance(lower, (list, tuple, numpy.ndarray)):
-            raise TypeError('The lower argument should be a float, list, tuple, or ndarray')
-        if upper is not None and not numpy.isscalar(upper) and \
-                not isinstance(upper, (list, tuple, numpy.ndarray)):
-            raise TypeError('The upper argument should be a float, list, tuple, or ndarray')
+
+        # Convert lower to ndarray/float as necessary
+        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.min)
+
+        # Convert upper to ndarray/float as necessary
+        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max)
+
         for item in [ref, ref0, res_ref, res_ref]:
             if not numpy.isscalar(item):
                 raise TypeError('The %s argument should be a float' % (item.__name__))

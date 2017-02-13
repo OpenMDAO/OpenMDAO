@@ -4,7 +4,6 @@ from __future__ import division
 from fnmatch import fnmatchcase
 from contextlib import contextmanager
 from collections import namedtuple, OrderedDict, Iterable
-import numbers
 import sys
 
 import numpy
@@ -18,7 +17,7 @@ from openmdao.jacobians.global_jacobian import GlobalJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import convert_units
-from openmdao.utils.general_utils import make_compatible
+from openmdao.utils.general_utils import make_compatible, format_as_float_or_array
 
 
 # This is for storing various data mapped to var pathname
@@ -34,55 +33,6 @@ Constraint = namedtuple('Constraint', ['name', 'lower', 'upper', 'equals',
 
 Objective = namedtuple('Objective', ['name', 'scaler', 'adder', 'ref',
                                      'ref0', 'indices', 'metadata'])
-
-
-def _format_driver_array_option(option_name, var_name, values,
-                                val_if_none=0.0):
-    """
-    Format driver array option values.
-
-    Checks that the given array values are either None, float, or an
-    iterable of numeric values.  On output all interables of numeric values
-    are converted to numpy.ndarray.  If values is scalar, it is converted
-    to float.
-
-    Parameters
-    ----------
-    option_name : str
-        Name of the option being set
-    var_name : str
-        The path of the variable relative to the current system.
-    values : float or numpy ndarray or Iterable
-        Values of the array option to be formatted to the expected form.
-    val_if_none : If values is None,
-
-    Returns
-    -------
-    float or numpy.ndarray
-        Values transformed to the expected form.
-
-    Raises
-    ------
-    ValueError
-        If values is Iterable but cannot be converted to a numpy ndarray
-    TypeError
-        If values is scalar, not None, and not a Number.
-    """
-    # Convert adder to ndarray/float as necessary
-    if isinstance(values, numpy.ndarray):
-        pass
-    elif not isinstance(values, string_types) \
-            and isinstance(values, Iterable):
-        values = numpy.asarray(values, dtype=float)
-    elif values is None:
-        values = val_if_none
-    elif isinstance(values, numbers.Number):
-        values = float(values)
-    else:
-        raise TypeError('Expected values of {0} to be an Iterable of '
-                        'numeric values, or a scalar numeric value. '
-                        'Got {1} instead.'.format(option_name, values))
-    return values
 
 
 class System(object):
@@ -1355,16 +1305,16 @@ class System(object):
                 adder = 0.0
 
         # Convert adder to ndarray/float as necessary
-        adder = _format_driver_array_option('adder', name, adder, val_if_none=0.0)
+        adder = format_as_float_or_array('adder', adder, val_if_none=0.0)
 
         # Convert scaler to ndarray/float as necessary
-        scaler = _format_driver_array_option('scaler', name, scaler, val_if_none=1.0)
+        scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0)
 
         # Convert lower to ndarray/float as necessary
-        lower = _format_driver_array_option('lower', name, lower, val_if_none=-sys.float_info.max)
+        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.min)
 
         # Convert upper to ndarray/float as necessary
-        upper = _format_driver_array_option('upper', name, upper, val_if_none=sys.float_info.max)
+        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max)
 
         # Apply scaler/adder to lower and upper
         lower = (lower + adder) * scaler
@@ -1496,20 +1446,20 @@ class System(object):
             ref0 = float(ref0)
 
         # Convert adder to ndarray/float as necessary
-        adder = _format_driver_array_option('adder', name, adder, val_if_none=0.0)
+        adder = format_as_float_or_array('adder', adder, val_if_none=0.0)
 
         # Convert scaler to ndarray/float as necessary
-        scaler = _format_driver_array_option('scaler', name, scaler, val_if_none=1.0)
+        scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0)
 
         # Convert lower to ndarray/float as necessary
-        lower = _format_driver_array_option('lower', name, lower, val_if_none=-sys.float_info.max)
+        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.min)
 
         # Convert upper to ndarray/float as necessary
-        upper = _format_driver_array_option('upper', name, upper, val_if_none=sys.float_info.max)
+        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max)
 
         # Convert equals to ndarray/float as necessary
         if equals is not None:
-            equals = _format_driver_array_option('equals', name, equals)
+            equals = format_as_float_or_array('equals', equals)
 
         # Scale the bounds
         if lower is not None:

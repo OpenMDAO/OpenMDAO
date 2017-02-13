@@ -1,6 +1,11 @@
 """Some miscellaneous utility functions."""
+from __future__ import division
 
 import warnings
+from six import string_types
+
+from collections import Iterable
+import numbers
 
 import numpy as np
 
@@ -48,3 +53,49 @@ def make_compatible(meta, value):
                          "Expected %s but got %s." %
                          (tgt_shape, value.shape))
     return value
+
+
+def format_as_float_or_array(name, values, val_if_none=0.0):
+    """
+    Format values as a numpy array.
+
+    Checks that the given array values are either None, float, or an
+    iterable of numeric values.  On output all iterables of numeric values
+    are converted to numpy.ndarray.  If values is scalar, it is converted
+    to float.
+
+    Parameters
+    ----------
+    option_name : str
+        Name of the option being set
+    values : float or numpy ndarray or Iterable
+        Values of the array option to be formatted to the expected form.
+    val_if_none : If values is None,
+
+    Returns
+    -------
+    float or numpy.ndarray
+        Values transformed to the expected form.
+
+    Raises
+    ------
+    ValueError
+        If values is Iterable but cannot be converted to a numpy ndarray
+    TypeError
+        If values is scalar, not None, and not a Number.
+    """
+    # Convert to ndarray/float as necessary
+    if isinstance(values, np.ndarray):
+        pass
+    elif not isinstance(values, string_types) \
+            and isinstance(values, Iterable):
+        values = np.asarray(values, dtype=float)
+    elif values is None:
+        values = val_if_none
+    elif isinstance(values, numbers.Number):
+        values = float(values)
+    else:
+        raise TypeError('Expected values of {0} to be an Iterable of '
+                        'numeric values, or a scalar numeric value. '
+                        'Got {1} instead.'.format(name, values))
+    return values
