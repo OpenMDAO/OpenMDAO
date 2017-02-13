@@ -51,7 +51,7 @@ class DirectSolver(LinearSolver):
                 self._lup = scipy.linalg.lu_factor(mtx._matrix)
             elif isinstance(mtx, (CooMatrix, CsrMatrix)):
                 numpy.set_printoptions(precision=3)
-                self._lu = scipy.sparse.linalg.splu(scipy.sparse.csc_matrix(mtx._matrix))
+                self._lu = scipy.sparse.linalg.splu(mtx._matrix)
             else:
                 raise RuntimeError('Direct solver not implemented for mtx type %s in system %s'
                                    % (type(mtx), system.pathname))
