@@ -233,6 +233,46 @@ class TestGroup(unittest.TestCase):
         c1_1 = g1.add_subsystem('comp1', IndepVarComp('x', 5.0))
         c1_2 = g1.add_subsystem('comp2', ExecComp('b=2*a'))
         g1.connect('comp1.x', 'comp2.a')
+        g2 = Group()
+        c2_1 = g2.add_subsystem('comp1', ExecComp('b=2*a'))
+        c2_2 = g2.add_subsystem('comp2', ExecComp('b=2*a'))
+        g2.connect('comp1.b', 'comp2.a')
+
+        model = Group()
+        model.add_subsystem('group1', g1)
+        model.add_subsystem('group2', g2)
+        model.connect('group1.comp2.b', 'group2.comp1.a')
+
+        p = Problem(model=model)
+        p.setup()
+
+        c1_1 = p.model.get_subsystem('group1.comp1')
+        c1_2 = p.model.get_subsystem('group1.comp2')
+        c2_1 = p.model.get_subsystem('group2.comp1')
+        c2_2 = p.model.get_subsystem('group2.comp2')
+        self.assertEqual(c1_1.name, 'comp1')
+        self.assertEqual(c1_2.name, 'comp2')
+        self.assertEqual(c2_1.name, 'comp1')
+        self.assertEqual(c2_2.name, 'comp2')
+
+        c1_1 = p.model.get_subsystem('group1').get_subsystem('comp1')
+        c1_2 = p.model.get_subsystem('group1').get_subsystem('comp2')
+        c2_1 = p.model.get_subsystem('group2').get_subsystem('comp1')
+        c2_2 = p.model.get_subsystem('group2').get_subsystem('comp2')
+        self.assertEqual(c1_1.name, 'comp1')
+        self.assertEqual(c1_2.name, 'comp2')
+        self.assertEqual(c2_1.name, 'comp1')
+        self.assertEqual(c2_2.name, 'comp2')
+
+        s = p.model.get_subsystem('')
+        self.assertEqual(s, None)
+
+        p.run_model()
+
+        self.assertEqual(p['group1.comp1.x'],  5.0)
+        self.assertEqual(p['group1.comp2.b'], 10.0)
+        self.assertEqual(p['group2.comp1.b'], 20.0)
+        self.assertEqual(p['group2.comp2.b'], 40.0)
 
     def test_reused_output_promoted_names(self):
         prob = Problem(Group())
