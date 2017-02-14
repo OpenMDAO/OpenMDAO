@@ -1,15 +1,16 @@
 
 import unittest
-
+import itertools
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, issparse
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
      GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CsrMatrix, CooMatrix
+from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from nose_parameterized import parameterized
-import itertools
+from six import assertRaisesRegex
 
 
 
@@ -165,46 +166,6 @@ def _test_func_name(func, num, param):
 
 class TestJacobian(unittest.TestCase):
 
-    def test_jacobian_pre_setup(self):
-        prob = Problem(model=Group())
-        top = prob.model
-
-        top.add_subsystem('indep',
-                          IndepVarComp((
-                              ('a', np.ones(3)),
-                              ('b', np.ones(2)),
-                          )))
-        C1 = top.add_subsystem('C1', MyExplicitComp(np.array))
-        C2 = top.add_subsystem('C2', MyExplicitComp2(np.array))
-        top.connect('indep.a', 'C1.x', src_indices=[2, 0])
-        top.connect('indep.b', 'C1.y')
-        top.connect('indep.a', 'C2.w', src_indices=[0, 2, 1])
-        top.connect('C1.f', 'C2.z', src_indices=[1])
-
-        top.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
-
-        top.nl_solver = NewtonSolver()
-        top.nl_solver.ln_solver = ScipyIterativeSolver(maxiter=100)
-
-        top.ln_solver = ScipyIterativeSolver(
-            maxiter=200, atol=1e-10, rtol=1e-10)
-        prob.model.suppress_solver_output = True
-
-        prob.setup(check=False)
-
-        prob.run_model()
-
-        # if we multiply our jacobian (at x,y = ones) by our work vec of 1's,
-        # we get fwd_check
-        fwd_check = np.array([1.0, 1.0, 1.0, 1.0, 1.0, -24., -74., -8.])
-
-        # if we multiply our jacobian's transpose by our work vec of 1's,
-        # we get rev_check
-        rev_check = np.array([-35., -5., 9., -63., -3., 1., -6., 1.])
-
-        self._check_fwd(prob, fwd_check)
-        self._check_rev(prob, rev_check)
-
     @parameterized.expand(itertools.product(
         [DenseMatrix, CsrMatrix, CooMatrix],
         [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist],
@@ -338,3 +299,47 @@ class TestJacobian(unittest.TestCase):
         expected_dtype = np.promote_types(dtype, float)
         self.assertEqual(jac_out.dtype, expected_dtype)
         assert_rel_error(self, jac_out.squeeze(), expected, 1e-15)
+
+    def test_component_global_jac(self):
+        # this was crashing during setup when reported by Justin.
+        # If it sets up and runs without crashing, consider it fixed.
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NewtonSolver() #NonlinearBlockGS()
+
+        d1 = prob.model.get_subsystem('d1')
+        d2 = prob.model.get_subsystem('d2')
+
+        d1.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+
+        prob.setup()
+        prob.run_model()
+
+    def test_jacobian_changed_group(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NewtonSolver()
+
+        prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+
+        prob.setup()
+
+        prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+
+        msg = ": jacobian has changed and setup was not called."
+        with assertRaisesRegex(self, Exception, msg):
+            prob.run_model()
+
+    def test_jacobian_changed_component(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NewtonSolver()
+
+        prob.setup()
+
+        d1 = prob.model.get_subsystem('d1')
+        d1.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+
+        msg = "d1: jacobian has changed and setup was not called."
+        with assertRaisesRegex(self, Exception, msg):
+            prob.run_model()

@@ -21,6 +21,12 @@ class Group(System):
     def __init__(self, **kwargs):
         """
         Set the solvers to nonlinear and linear block Gauss--Seidel by default.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            dict of arguments available here and in all descendants of this
+            Group.
         """
         super(Group, self).__init__(**kwargs)
 

@@ -26,7 +26,7 @@ class ScipyIterativeSolver(LinearSolver):
 
         Parameters
         ----------
-        kwargs : {}
+        **kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
         super(ScipyIterativeSolver, self).__init__(**kwargs)

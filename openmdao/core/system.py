@@ -52,7 +52,8 @@ def _format_driver_array_option(option_name, var_name, values,
         The path of the variable relative to the current system.
     values : float or numpy ndarray or Iterable
         Values of the array option to be formatted to the expected form.
-    val_if_none : If values is None,
+    val_if_none : float or numpy ndarray
+        The default value for the option if values is None.
 
     Returns
     -------
@@ -170,6 +171,8 @@ class System(object):
         transfer object; points to _vector_transfers['nonlinear'].
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
+    _jacobian_changed : bool
+        If True, the jacobian has changed since the last call to setup.
     _owns_global_jac : bool
         If True, we are owners of the GlobalJacobian in self._jacobian.
     _subjacs_info : OrderedDict of dict
@@ -195,7 +198,7 @@ class System(object):
 
         Parameters
         ----------
-        **kwargs: dict of keyword arguments
+        **kwargs : dict of keyword arguments
             available here and in all descendants of this system.
         """
         self.name = ''
@@ -251,6 +254,7 @@ class System(object):
 
         self._jacobian = DefaultJacobian()
         self._jacobian._system = self
+        self._jacobian_changed = True
         self._owns_global_jac = False
 
         self._subjacs_info = OrderedDict()
@@ -613,9 +617,7 @@ class System(object):
         """
         self._owns_global_jac = isinstance(jacobian, GlobalJacobian)
         self._jacobian = jacobian
-
-        # TODO: we need to set some sort of flag to tell us that setup
-        #  is now required since our jacobian has changed.
+        self._jacobian_changed = True
 
     def _setup_jacobians(self, jacobian=None):
         """
@@ -626,6 +628,8 @@ class System(object):
         jacobian : <GlobalJacobian> or None
             The global jacobian to populate for this system.
         """
+        self._jacobian_changed = False
+
         if self._owns_global_jac:
             jacobian = self._jacobian
         elif jacobian is not None:
@@ -752,6 +756,9 @@ class System(object):
         <Jacobian>
             The current system's jacobian with its _system set to self.
         """
+        if self._jacobian_changed:
+            raise RuntimeError("%s: jacobian has changed and setup was not "
+                               "called." % self.pathname)
         oldsys = self._jacobian._system
         self._jacobian._system = self
         self._jacobian._precompute_iter()
@@ -1276,7 +1283,7 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        kwargs : optional
+        **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
 
@@ -1381,7 +1388,7 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        kwargs : optional
+        **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
 
@@ -1538,7 +1545,7 @@ class System(object):
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
-        kwargs : optional
+        **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
 
@@ -1595,7 +1602,7 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        kwargs : optional
+        **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
 

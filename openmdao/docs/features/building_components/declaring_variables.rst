@@ -1,6 +1,6 @@
 :orphan:
 
-.. `Calling add_input and add_output`
+.. _declaring-variables:
 
 Calling add_input and add_output
 ================================
@@ -14,7 +14,7 @@ An example is given below.
 .. embed-code::
     openmdao.test_suite.components.expl_comp_simple.TestExplCompSimple
 
-Method signature
+Method Signature
 ----------------
 
 .. automethod:: openmdao.core.component.Component.add_input
