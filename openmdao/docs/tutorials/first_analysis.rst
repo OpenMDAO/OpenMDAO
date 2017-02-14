@@ -40,11 +40,11 @@ The minimum of this function is located at
             y = inputs['y']
             outputs['f'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
 
-        def compute_jacobian(self, inputs, outputs, jacobian):
+        def compute_partial_derivs(self, inputs, outputs, partials):
             x = inputs['x']
             y = inputs['y']
-            jacobian['f', 'x'] = 2.0*x - 6.0 + y
-            jacobian['f', 'y'] = 2.0*y + 8.0 + x
+            partials['f', 'x'] = 2.0*x - 6.0 + y
+            partials['f', 'y'] = 2.0*y + 8.0 + x
 
 
     if __name__ == '__main__':
@@ -87,7 +87,7 @@ The component is the basic building block of a model. You will always define com
 
     - `initialize_variables`: define all your inputs and outputs here
     - `compute`: calculation of all output values for the given inputs
-    - `compute_jacobian`: derivatives of all the outputs values with respect to all the inputs
+    - `compute_partial_derivs`: derivatives of all the outputs values with respect to all the inputs
 
 .. note::
 
@@ -108,7 +108,7 @@ The component is the basic building block of a model. You will always define com
             y = inputs['y']
             outputs['f'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
 
-        def compute_jacobian(self, inputs, outputs, jacobian):
+        def compute_partial_derivs(self, inputs, outputs, jacobian):
             x = inputs['x']
             y = inputs['y']
             jacobian['f', 'x'] = 2.0*x - 6.0 + y

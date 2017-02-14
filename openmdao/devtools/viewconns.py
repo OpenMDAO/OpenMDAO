@@ -70,7 +70,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     src2tgts = {}
     # units = {n: m.get('units','') for n,m in chain(iteritems(system._unknowns_dict),
-    #                                                iteritems(system._params_dict))}
+    #                                                iteritems(system._inputs_dict))}
     units = {}  # no units yet
     vals = {}
 

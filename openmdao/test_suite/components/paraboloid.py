@@ -16,23 +16,23 @@ class Paraboloid(ExplicitComponent):
 
         self.add_output('f_xy', val=0.0)
 
-    def compute(self, params, unknowns):
+    def compute(self, inputs, outputs):
         """
         f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
 
         Optimal solution (minimum): x = 6.6667; y = -7.3333
         """
-        x = params['x']
-        y = params['y']
+        x = inputs['x']
+        y = inputs['y']
 
-        unknowns['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+        outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
 
-    def compute_jacobian(self, params, unknowns, J):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """
         Jacobian for our paraboloid.
         """
-        x = params['x']
-        y = params['y']
+        x = inputs['x']
+        y = inputs['y']
 
-        J['f_xy', 'x'] = 2.0*x - 6.0 + y
-        J['f_xy', 'y'] = 2.0*y + 8.0 + x
+        partials['f_xy', 'x'] = 2.0*x - 6.0 + y
+        partials['f_xy', 'y'] = 2.0*y + 8.0 + x
