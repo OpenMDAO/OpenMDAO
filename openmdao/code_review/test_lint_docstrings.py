@@ -219,8 +219,12 @@ class LintTestCase(unittest.TestCase):
         # Do require documentation of *args and **kwargs
         if argspec.varargs:
             arg_set |= {'*' + argspec.varargs}
-        if argspec.keywords:
-            arg_set |= {'**' + argspec.keywords}
+        if PY3:
+            if argspec.varkw:
+                arg_set |= {'**' + argspec.varkw}
+        else:
+            if argspec.keywords:
+                arg_set |= {'**' + argspec.keywords}
 
         if len(arg_set) >= 1:
             if not numpy_doc_string['Parameters']:
@@ -352,6 +356,7 @@ class LintTestCase(unittest.TestCase):
         # Check if docstring is missing
         if doc is None:
             new_failures.append('is missing docstring')
+            return
 
         if not method.__doc__.startswith('\n'):
             new_failures.append('docstring should start with a new line')
@@ -384,9 +389,10 @@ class LintTestCase(unittest.TestCase):
         # Check if docstring is missing
         if doc is None:
             new_failures.append('is missing docstring')
+            return
 
         if not clss.__doc__.startswith('\n'):
-            new_failures.append('### docstring should start with a new line')
+            new_failures.append('docstring should start with a new line')
 
         if new_failures:
             key = '{0}/{1}:{2}'.format(dir_name, file_name, class_name)
@@ -426,9 +432,11 @@ class LintTestCase(unittest.TestCase):
         # If the method is decorated with @contextmanager, skip it for now
         if _is_context_manager(func):
             return
+
         # Check if docstring is missing
         if doc is None:
             new_failures.append('is missing docstring')
+            return
 
         if not func.__doc__.startswith('\n'):
             new_failures.append('docstring should start with a new line')
