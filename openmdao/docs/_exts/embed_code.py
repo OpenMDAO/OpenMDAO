@@ -1,7 +1,7 @@
 from docutils import nodes
 from sphinx.util.compat import Directive
 
-from openmdao.docs.utils.docutil import get_source_code_of_class_or_method
+from openmdao.docs._utils.docutil import get_source_code_of_class_or_method
 
 
 class EmbedCodeDirective(Directive):

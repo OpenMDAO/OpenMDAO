@@ -33,8 +33,8 @@ and a method that looks like this and has the decorator applied to it:
         """
         Compute sub-jacobian parts / factorization.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -62,8 +62,8 @@ But if we add the call signature of the method to the docstring as the first lin
         compute_jacobian(self, inputs, outputs, jacobian)
         Compute sub-jacobian parts / factorization.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector

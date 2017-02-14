@@ -8,12 +8,16 @@ from openmdao.solvers.solver import NonlinearSolver
 
 
 class BacktrackingLineSearch(NonlinearSolver):
-    """Backtracking line search."""
+    """
+    Backtracking line search.
+    """
 
     SOLVER = 'NL: BKTKG'
 
     def _declare_options(self):
-        """Declare options before kwargs are processed in the init method."""
+        """
+        Declare options before kwargs are processed in the init method.
+        """
         opt = self.options
         opt['maxiter'] = 5
         opt.declare(
@@ -29,7 +33,8 @@ class BacktrackingLineSearch(NonlinearSolver):
         # opt.declare('c', value=0.5, desc="Slope check trigger.")
 
     def _iter_initialize(self):
-        """Perform any necessary pre-processing operations.
+        """
+        Perform any necessary pre-processing operations.
 
         Returns
         -------
@@ -61,7 +66,9 @@ class BacktrackingLineSearch(NonlinearSolver):
         return norm0, norm
 
     def _iter_execute(self):
-        """Perform the operations in the iteration loop."""
+        """
+        Perform the operations in the iteration loop.
+        """
         system = self._system
         u = system._outputs
         du = system._vectors['output']['linear']

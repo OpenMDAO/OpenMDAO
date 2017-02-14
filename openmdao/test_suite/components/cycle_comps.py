@@ -60,6 +60,7 @@ def _vector_to_outputs(vec, outputs, num_var, var_shape):
         outputs['y_{}'.format(i)] = y_i
 
 class ExplicitCycleComp(ExplicitComponent):
+
     def __str__(self):
         return 'Explicit Cycle Component'
 

@@ -23,10 +23,13 @@ SUBJAC_META_DEFAULTS = {
 
 
 class GlobalJacobian(Jacobian):
-    """Assemble dense global <Jacobian>."""
+    """
+    Assemble dense global <Jacobian>.
+    """
 
     def __init__(self, **kwargs):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
         Parameters
         ----------
@@ -39,7 +42,8 @@ class GlobalJacobian(Jacobian):
         self.options.update(kwargs)
 
     def _get_var_range(self, ivar_all, typ):
-        """Look up the variable name and <Jacobian> index range.
+        """
+        Look up the variable name and <Jacobian> index range.
 
         Parameters
         ----------
@@ -65,7 +69,9 @@ class GlobalJacobian(Jacobian):
         return ind1, ind2
 
     def _initialize(self):
-        """Allocate the global matrices."""
+        """
+        Allocate the global matrices.
+        """
         # var_indices are the *global* indices for variables on this proc
         system = self._system
         assembler = system._assembler
@@ -163,7 +169,9 @@ class GlobalJacobian(Jacobian):
         self._ext_mtx._build(out_size, in_size)
 
     def _update(self):
-        """Read the user's sub-Jacobians and set into the global matrix."""
+        """
+        Read the user's sub-Jacobians and set into the global matrix.
+        """
         # var_var_indices are the *global* indices for variables on this proc
         var_indices = self._system._var_myproc_indices
         var_paths = self._system._var_allprocs_pathnames
@@ -190,7 +198,8 @@ class GlobalJacobian(Jacobian):
                         self._ext_mtx._update_submat(key, self._subjacs[key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
-        """Compute matrix-vector product.
+        """
+        Compute matrix-vector product.
 
         Parameters
         ----------

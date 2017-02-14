@@ -7,10 +7,13 @@ from openmdao.matrices.matrix import Matrix, _compute_index_map
 
 
 class DenseMatrix(Matrix):
-    """Dense global matrix."""
+    """
+    Dense global matrix.
+    """
 
     def _build(self, num_rows, num_cols):
-        """Allocate the matrix.
+        """
+        Allocate the matrix.
 
         Parameters
         ----------
@@ -68,7 +71,8 @@ class DenseMatrix(Matrix):
                 metadata[key] = (irows, icols, list)
 
     def _update_submat(self, key, jac):
-        """Update the values of a sub-jacobian.
+        """
+        Update the values of a sub-jacobian.
 
         Parameters
         ----------
@@ -91,7 +95,8 @@ class DenseMatrix(Matrix):
             self._matrix[irows, icols] = jac[0]
 
     def _prod(self, in_vec, mode):
-        """Perform a matrix vector product.
+        """
+        Perform a matrix vector product.
 
         Parameters
         ----------

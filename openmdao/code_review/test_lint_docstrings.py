@@ -40,8 +40,8 @@ class ReturnFinder(ast.NodeVisitor):
     passes : bool
         Set to True if the method does nothing but pass (i.e. is not yet
         implemented or is a 'virtual' method in a base class)
-
     """
+
     def __init__(self):
         self.has_return = False
         self.passes = False
@@ -50,8 +50,9 @@ class ReturnFinder(ast.NodeVisitor):
         self._depth = 0
 
     def visit(self, node):
-        """ Visit nodes in the syntax tree to find instances of return. """
-
+        """
+        Visit nodes in the syntax tree to find instances of return.
+        """
         self._depth += 1
 
         is_func_def = isinstance(node, ast.FunctionDef)
@@ -102,7 +103,6 @@ class LintTestCase(unittest.TestCase):
 
     def check_summary(self, numpy_doc_string):
         """
-
         Parameters
         ----------
         numpy_doc_string : numpydoc.docscrape.NumpyDocString
@@ -134,6 +134,7 @@ class LintTestCase(unittest.TestCase):
         return new_failures
 
 
+<<<<<<< HEAD
     def check_parameters(self, argspec, numpy_doc_string):
         """ Check that the parameters section is correct.
 
@@ -213,8 +214,15 @@ class LintTestCase(unittest.TestCase):
         return new_failures
 
 
+<<<<<<< HEAD
     def check_returns(self, method, numpy_doc_string):
         """ Check that the returns section is correct.
+=======
+    def check_method_returns(self, dir_name, file_name, class_name,
+                             method_name, method, numpy_doc_string, failures):
+        """
+        Check that the returns section is correct.
+>>>>>>> 0c200d2c7330849aaf07a0d692821357a992b763
 
         Parameters
         ----------
@@ -287,7 +295,8 @@ class LintTestCase(unittest.TestCase):
 
     def check_method(self, dir_name, file_name,
                      class_name, method_name, method, failures):
-        """ Perform docstring checks on each method.
+        """
+        Perform docstring checks on each method.
 
         Parameters
         ----------
