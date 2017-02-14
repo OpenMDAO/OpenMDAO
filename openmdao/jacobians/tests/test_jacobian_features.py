@@ -31,7 +31,7 @@ class SimpleComp(ExplicitComponent):
         outputs['f'] = np.sum(inputs['z']) + inputs['x']
         outputs['g'] = np.outer(inputs['y1'], inputs['y2']) + inputs['x']*np.eye(2)
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         partials['f', 'x'] = 1.
         partials['f', 'z'] = np.ones((2, 2)).flat[:]
 
@@ -77,7 +77,7 @@ class SimpleCompKwarg(SimpleComp):
     def initialize_partials(self):
         self.declare_partials(**self.partial_kwargs)
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         pass
 
 

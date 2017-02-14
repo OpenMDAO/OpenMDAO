@@ -63,7 +63,7 @@ class SellarDis1withDerivatives(SellarDis1):
     Component containing Discipline 1 -- derivatives version.
     """
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """
         Jacobian for Sellar discipline 1.
         """
@@ -117,7 +117,7 @@ class SellarDis2withDerivatives(SellarDis2):
     Component containing Discipline 2 -- derivatives version.
     """
 
-    def compute_partials(self, inputs, outputs, J):
+    def compute_partial_derivs(self, inputs, outputs, J):
         """
         Jacobian for Sellar discipline 2.
         """

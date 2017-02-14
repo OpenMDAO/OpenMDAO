@@ -21,7 +21,7 @@ class TestExplCompSimpleCompute(ExplicitComponent):
 
 class TestExplCompSimplePartial(TestExplCompSimpleCompute):
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         partials['area', 'length'] = inputs['width']
         partials['area', 'width'] = inputs['length']
 

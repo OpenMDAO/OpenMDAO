@@ -19,14 +19,14 @@ class TestExplCompSimple(ExplicitComponent):
 
 class TestExplCompSimpleDense(TestExplCompSimple):
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         partials['area', 'length'] = inputs['width']
         partials['area', 'width'] = inputs['length']
 
 
 class TestExplCompSimpleSpmtx(TestExplCompSimple):
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         partials['area', 'length'] = scipy.sparse.csr_matrix(
             (inputs['width'], (0, 0)))
         partials['area', 'width'] = scipy.sparse.csr_matrix(
@@ -35,7 +35,7 @@ class TestExplCompSimpleSpmtx(TestExplCompSimple):
 
 class TestExplCompSimpleSparse(TestExplCompSimple):
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         partials['area', 'length'] = (inputs['width'], 0, 0)
         partials['area', 'width'] = (inputs['length'], 0, 0)
 

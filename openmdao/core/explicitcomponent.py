@@ -122,7 +122,7 @@ class ExplicitComponent(Component):
 
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                              scale_jac=True):
-                self.compute_partials(self._inputs, self._outputs, J)
+                self.compute_partial_derivs(self._inputs, self._outputs, J)
 
             # re-negate the jacobian
             self._negate_jac()
@@ -199,7 +199,7 @@ class ExplicitComponent(Component):
         """
         pass
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """
         Compute sub-jacobian parts / factorization.
 

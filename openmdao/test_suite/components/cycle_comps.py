@@ -191,7 +191,7 @@ class ExplicitCycleComp(ExplicitComponent):
 
             self.declare_partials('theta_out', 'theta', **self._array2kwargs(dtheta, pd_type))
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         if self.metadata['jacobian_type'] != 'matvec':
             angle_param = self.angle_param
             angle = inputs[angle_param]
@@ -275,7 +275,7 @@ class ExplicitLastComp(ExplicitFirstComp):
             self.declare_partials('theta_out', 'psi',
                                   **self._array2kwargs(np.array([1.]), pd_type))
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         if self.metadata['jacobian_type'] != 'matvec':
             pd_type = self.metadata['partial_type']
             for i in range(self.metadata['num_var']):

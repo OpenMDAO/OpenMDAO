@@ -37,7 +37,7 @@ The implementation of each method will be illustrated using a simple explicit co
   The :code:`outputs` are also provided for convenience.
 
   .. embed-code::
-      openmdao.core.tests.test_expl_comp.TestExplCompSimplePartial.compute_partials
+      openmdao.core.tests.test_expl_comp.TestExplCompSimplePartial.compute_partial_derivs
 
 - :code:`compute_jacvec_product(inputs, outputs, d_inputs, d_outputs, mode)` :
 

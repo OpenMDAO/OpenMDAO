@@ -22,7 +22,7 @@ class SrcComp(ExplicitComponent):
         """ Pass through."""
         outputs['x2'] = inputs['x1']
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
         partials['x2', 'x1'] = 1.0
 
@@ -38,7 +38,7 @@ class TgtCompF(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
         partials['x3', 'x2'] = 1.0
 
@@ -54,7 +54,7 @@ class TgtCompC(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
         partials['x3', 'x2'] = 1.0
 
@@ -70,7 +70,7 @@ class TgtCompK(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
         partials['x3', 'x2'] = 1.0
 
@@ -90,7 +90,7 @@ class TgtCompFMulti(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_partials(self, inputs, outputs, resids, J):
+    def compute_partial_derivs(self, inputs, outputs, resids, J):
         """ Derivative is 1.0"""
         J['_x3', 'x2'] = np.array([1.0])
         J['_x3', '_x2'] = 0.0
