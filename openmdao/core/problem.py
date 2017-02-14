@@ -553,8 +553,8 @@ def _check_shape(shape, val):
 
     Parameters
     ----------
-    meta : dict
-        metadata for a variable.
+    shape : tuple
+        Expected shape of a variable.
     val : float or ndarray or list
         value to check.
     """

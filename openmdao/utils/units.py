@@ -595,6 +595,8 @@ def _new_unit(name, factor, powers):
 
     Parameters
     ----------
+    name : str
+        The name of the new unit
     factor : float
         conversion factor to base units
     powers : [int, ...]
@@ -610,8 +612,12 @@ def add_offset_unit(name, baseunit, factor, offset, comment=''):
 
     Parameters
     ----------
-    unit : str
-        newly defined unit
+    name : str
+        The name of the unit
+    baseunit : str or instance of PhysicalUnit
+        The unit upon which this offset unit is based.
+    factor : str
+        The scaling factor used to define the new unit w.r.t. baseunit
     offset : float
         zero offset for new unit
     comment : str
@@ -641,8 +647,10 @@ def add_unit(name, unit, comment=''):
 
     Parameters
     ----------
+    name : str
+        The name of the unit being added. For example: 'Hz'
     unit : str
-        newly defined unit
+        definition of the unit w.r.t. some other unit.  For example: '1/s'
     comment : str
         optional comment to describe unit
     """
@@ -751,7 +759,7 @@ def update_library(filename):
 
     Parameters
     ----------
-    filename: string or file
+    filename : string or file
         Source of units configuration data.
     """
     if isinstance(filename, basestring):
@@ -773,7 +781,7 @@ def _update_library(cfg):
 
     Parameters
     ----------
-    cfg: ConfigParser
+    cfg : ConfigParser
         ConfigParser loaded with unit_lib.ini data
     """
     retry1 = set()
@@ -832,7 +840,7 @@ def _find_unit(unit):
 
     Parameters
     ----------
-    unit: str
+    unit : str
         str representing the desired unit
 
     Returns
@@ -898,7 +906,7 @@ def valid_units(unit):
 
     Parameters
     ----------
-    units : str
+    unit : str
         String representation of the units.
 
     Returns
