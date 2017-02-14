@@ -59,12 +59,12 @@ class GlobalJacobian(Jacobian):
         int
             the ending index in the Jacobian.
         """
-        sizes_all = self._system._assembler._variable_sizes_all
+        sizes_all = self._system._assembler._variable_sizes_all['output']
         iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
         ivar_all0 = self._system._var_allprocs_range['output'][0]
 
-        ind1 = numpy.sum(sizes_all['output'][iproc, ivar_all0:ivar_all])
-        ind2 = numpy.sum(sizes_all['output'][iproc, ivar_all0:ivar_all + 1])
+        ind1 = numpy.sum(sizes_all[iproc, ivar_all0:ivar_all])
+        ind2 = numpy.sum(sizes_all[iproc, ivar_all0:ivar_all + 1])
 
         return ind1, ind2
 
@@ -78,11 +78,10 @@ class GlobalJacobian(Jacobian):
         var_indices = system._var_myproc_indices
         meta_in = system._var_myproc_metadata['input']
         meta_out = system._var_myproc_metadata['output']
-        out_names = system._var_allprocs_names['output']
         out_paths = system._var_allprocs_pathnames['output']
-        in_names = system._var_allprocs_names['input']
         in_paths = system._var_allprocs_pathnames['input']
-        ivar1, ivar2 = system._var_allprocs_range['output']
+        out_start, out_end = system._var_allprocs_range['output']
+        in_start, in_end = self._system._var_allprocs_range['input']
 
         self._int_mtx = self.options['matrix_class'](system.comm)
         self._ext_mtx = self.options['matrix_class'](system.comm)
@@ -104,12 +103,12 @@ class GlobalJacobian(Jacobian):
             sub_in_inds = s._var_myproc_indices['input']
 
             for re_idx_all in sub_out_inds:
-                re_path = out_paths[re_idx_all]
+                re_path = out_paths[re_idx_all - out_start]
                 re_unprom = re_path[start:]
                 re_offset = out_offsets[re_idx_all]
 
                 for out_idx_all in sub_out_inds:
-                    out_path = out_paths[out_idx_all]
+                    out_path = out_paths[out_idx_all - out_start]
                     key = (re_path, out_path)
                     if key in self._subjacs_info:
                         info, shape = self._subjacs_info[key]
@@ -124,7 +123,7 @@ class GlobalJacobian(Jacobian):
                                               None, shape)
 
                 for in_idx_all in sub_in_inds:
-                    in_path = in_paths[in_idx_all]
+                    in_path = in_paths[in_idx_all - in_start]
                     key = (re_path, in_path)
                     self._keymap[key] = key
                     if key in self._subjacs_info:
@@ -136,7 +135,7 @@ class GlobalJacobian(Jacobian):
                                  system._inputs._views_flat[iname].size)
 
                     out_idx_all = assembler._input_src_ids[in_idx_all]
-                    if ivar1 <= out_idx_all < ivar2:
+                    if out_start <= out_idx_all < out_end:
                         if src_indices[in_idx_all] is None:
                             self._int_mtx._add_submat(
                                 key, info, re_offset, out_offsets[out_idx_all],
@@ -146,7 +145,7 @@ class GlobalJacobian(Jacobian):
                             # instead of d(output)/d(input) when we have
                             # src_indices
                             src = assembler._input_src_ids[in_idx_all]
-                            in_path = out_paths[src]
+                            in_path = out_paths[src - out_start]
                             key2 = (key[0], in_path)
                             self._keymap[key] = key2
                             self._int_mtx._add_submat(key2, info, re_offset,
@@ -158,12 +157,12 @@ class GlobalJacobian(Jacobian):
                                                   in_offsets[in_idx_all],
                                                   None, shape)
 
+        iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
         out_size = numpy.sum(
-            assembler._variable_sizes_all['output'][ivar1:ivar2])
+            assembler._variable_sizes_all['output'][iproc, out_start:out_end])
 
-        ind1, ind2 = self._system._var_allprocs_range['input']
         in_size = numpy.sum(
-            assembler._variable_sizes_all['input'][ind1:ind2])
+            assembler._variable_sizes_all['input'][iproc, in_start:in_end])
 
         self._int_mtx._build(out_size, out_size)
         self._ext_mtx._build(out_size, in_size)
@@ -175,23 +174,24 @@ class GlobalJacobian(Jacobian):
         # var_var_indices are the *global* indices for variables on this proc
         var_indices = self._system._var_myproc_indices
         var_paths = self._system._var_allprocs_pathnames
-        ivar1, ivar2 = self._system._var_allprocs_range['output']
+        out_start, out_end = self._system._var_allprocs_range['output']
+        in_start, in_end = self._system._var_allprocs_range['output']
         assembler = self._system._assembler
 
         for re_idx_all in var_indices['output']:
-            re_path = var_paths['output'][re_idx_all]
+            re_path = var_paths['output'][re_idx_all - out_start]
             for out_idx_all in var_indices['output']:
-                out_path = var_paths['output'][out_idx_all]
+                out_path = var_paths['output'][out_idx_all - out_start]
                 key = (re_path, out_path)
                 if key in self._subjacs:
                     self._int_mtx._update_submat(key, self._subjacs[key])
 
             for in_idx_all in var_indices['input']:
-                in_path = var_paths['input'][in_idx_all]
+                in_path = var_paths['input'][in_idx_all - in_start]
                 key = (re_path, in_path)
                 if key in self._subjacs:
                     out_idx_all = assembler._input_src_ids[in_idx_all]
-                    if ivar1 <= out_idx_all < ivar2:
+                    if out_start <= out_idx_all < out_end:
                         self._int_mtx._update_submat(self._keymap[key],
                                                      self._subjacs[key])
                     elif out_idx_all != -1:  # skip unconnected inputs
