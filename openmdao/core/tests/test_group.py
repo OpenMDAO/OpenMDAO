@@ -71,7 +71,7 @@ class TestGroup(unittest.TestCase):
 
         p.setup()
 
-        self.assertEqual(p['comp1.a'], 3.0) # still use unpromoted name
+        self.assertEqual(p['comp1.a'], 3.0) # input, still use unpromoted name
         self.assertEqual(p['new_b'], 6.0)
 
     def test_group_simple_renamed_dict(self):

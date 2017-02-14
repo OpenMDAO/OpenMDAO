@@ -170,6 +170,8 @@ class System(object):
         transfer object; points to _vector_transfers['nonlinear'].
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
+    _jacobian_changed : bool
+        If True, the jacobian has changed since the last call to setup.
     _owns_global_jac : bool
         If True, we are owners of the GlobalJacobian in self._jacobian.
     _subjacs_info : OrderedDict of dict
@@ -251,6 +253,7 @@ class System(object):
 
         self._jacobian = DefaultJacobian()
         self._jacobian._system = self
+        self._jacobian_changed = True
         self._owns_global_jac = False
 
         self._subjacs_info = OrderedDict()
@@ -613,9 +616,7 @@ class System(object):
         """
         self._owns_global_jac = isinstance(jacobian, GlobalJacobian)
         self._jacobian = jacobian
-
-        # TODO: we need to set some sort of flag to tell us that setup
-        #  is now required since our jacobian has changed.
+        self._jacobian_changed = True
 
     def _setup_jacobians(self, jacobian=None):
         """
@@ -626,6 +627,8 @@ class System(object):
         jacobian : <GlobalJacobian> or None
             The global jacobian to populate for this system.
         """
+        self._jacobian_changed = False
+
         if self._owns_global_jac:
             jacobian = self._jacobian
         elif jacobian is not None:
@@ -752,6 +755,9 @@ class System(object):
         <Jacobian>
             The current system's jacobian with its _system set to self.
         """
+        if self._jacobian_changed:
+            raise RuntimeError("%s: jacobian has changed and setup was not "
+                               "called." % self.pathname)
         oldsys = self._jacobian._system
         self._jacobian._system = self
         self._jacobian._precompute_iter()
