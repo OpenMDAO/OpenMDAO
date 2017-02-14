@@ -30,7 +30,7 @@ class DirectSolver(LinearSolver):
 
         Parameters
         ----------
-        kwargs : {}
+        **kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
         super(DirectSolver, self).__init__(**kwargs)
