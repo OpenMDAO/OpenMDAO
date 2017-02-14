@@ -364,17 +364,17 @@ class TestProblem(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             prob.root = Group()
 
-        assert len(w) == 1
-        assert issubclass(w[0].category, DeprecationWarning)
-        assert str(w[0].message) == msg
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), msg)
 
         # check deprecation on getter
         with warnings.catch_warnings(record=True) as w:
             prob.root
 
-        assert len(w) == 1
-        assert issubclass(w[0].category, DeprecationWarning)
-        assert str(w[0].message) == msg
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), msg)
 
         # testing the root kwarg
         with self.assertRaises(ValueError) as cm:
@@ -386,9 +386,8 @@ class TestProblem(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             prob = Problem(root=Group)
 
-        assert str(w[0].message) == "The 'root' argument provides backwards compatibility " \
-                                    + "with OpenMDAO <= 1.x ; use 'model' instead."
-
+        self.assertEqual(str(w[0].message), "The 'root' argument provides backwards "
+                         "compatibility with OpenMDAO <= 1.x ; use 'model' instead.")
 
 
 if __name__ == "__main__":
