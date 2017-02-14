@@ -335,6 +335,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.suppress_solver_output = True
         prob.setup()
         prob.run_model()
+        assert_rel_error(self, prob['C3.ee'], 8.0, 0000.1)
 
     def test_jacobian_changed_group(self):
         prob = Problem()
