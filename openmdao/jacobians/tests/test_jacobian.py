@@ -301,11 +301,9 @@ class TestJacobian(unittest.TestCase):
         assert_rel_error(self, jac_out.squeeze(), expected, 1e-15)
 
     def test_component_global_jac(self):
-        # this was crashing during setup when reported by Justin.
-        # If it sets up and runs without crashing, consider it fixed.
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NewtonSolver() #NonlinearBlockGS()
+        prob.model.nl_solver = NewtonSolver()
 
         d1 = prob.model.get_subsystem('d1')
         d2 = prob.model.get_subsystem('d2')
@@ -314,6 +312,9 @@ class TestJacobian(unittest.TestCase):
 
         prob.setup()
         prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_jacobian_changed_group(self):
         prob = Problem()
