@@ -5,7 +5,8 @@ from openmdao.utils.general_utils import warn_deprecation
 
 
 class NewtonSolver(NonlinearSolver):
-    """Newton solver.
+    """
+    Newton solver.
 
     The default linear solver is the ln_solver in the containing system.
 
@@ -21,7 +22,8 @@ class NewtonSolver(NonlinearSolver):
     SOLVER = 'NL: Newton'
 
     def __init__(self, **kwargs):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
         Parameters
         ----------
@@ -37,7 +39,8 @@ class NewtonSolver(NonlinearSolver):
         self.linesearch = None
 
     def _setup_solvers(self, system, depth):
-        """Assign system instance, set depth, and optionally perform setup.
+        """
+        Assign system instance, set depth, and optionally perform setup.
 
         Parameters
         ----------
@@ -57,7 +60,9 @@ class NewtonSolver(NonlinearSolver):
             self.linesearch._setup_solvers(self._system, self._depth + 1)
 
     def _iter_execute(self):
-        """Perform the operations in the iteration loop."""
+        """
+        Perform the operations in the iteration loop.
+        """
         system = self._system
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0

@@ -8,8 +8,10 @@ from openmdao.components.exec_comp import ExecComp
 
 
 class FanOut(Group):
-    """Topology where one comp broadcasts an output to two target
-    components."""
+    """
+    Topology where one comp broadcasts an output to two target
+    components.
+    """
 
     def __init__(self):
         super(FanOut, self).__init__()
@@ -25,8 +27,10 @@ class FanOut(Group):
 
 
 class FanOutGrouped(Group):
-    """Topology where one component broadcasts an output to two target
-    components."""
+    """
+    Topology where one component broadcasts an output to two target
+    components.
+    """
 
     def __init__(self):
         super(FanOutGrouped, self).__init__()
@@ -51,7 +55,9 @@ class FanOutGrouped(Group):
 
 
 class FanIn(Group):
-    """Topology where two comps feed a single comp."""
+    """
+    Topology where two comps feed a single comp.
+    """
 
     def __init__(self):
         super(FanIn, self).__init__()
@@ -69,7 +75,8 @@ class FanIn(Group):
 
 
 class FanInGrouped(Group):
-    """Topology where two components in a Group feed a single component
+    """
+    Topology where two components in a Group feed a single component
     outside of that Group.
     """
 
@@ -94,7 +101,8 @@ class FanInGrouped(Group):
 
 
 class DiamondFlat(Group):
-    """Topology: one - two - one.
+    """
+    Topology: one - two - one.
 
     This one is flat."""
 
@@ -125,7 +133,9 @@ class DiamondFlat(Group):
 
 
 class Diamond(Group):
-    """Topology: one - two - one."""
+    """
+    Topology: one - two - one.
+    """
 
     def __init__(self):
         super(Diamond, self).__init__()
@@ -157,8 +167,10 @@ class Diamond(Group):
 
 
 class ConvergeDivergeFlat(Group):
-    """Topology one - two - one - two - one. This model was critical in
-    testing parallel reverse scatters. Thi version is perfectly flat."""
+    """
+    Topology one - two - one - two - one. This model was critical in
+    testing parallel reverse scatters. Thi version is perfectly flat.
+    """
 
     def __init__(self):
         super(ConvergeDivergeFlat, self).__init__()
@@ -199,7 +211,8 @@ class ConvergeDivergeFlat(Group):
 
 
 class ConvergeDiverge(Group):
-    """Topology: one - two - one - two - one.
+    """
+    Topology: one - two - one - two - one.
 
     Used for testing parallel reverse scatters.
     """
@@ -246,7 +259,8 @@ class ConvergeDiverge(Group):
 
 
 class ConvergeDivergeGroups(Group):
-    """Topology: one - two - one - two - one.
+    """
+    Topology: one - two - one - two - one.
 
     Used for testing parallel reverse scatters. This version contains some
     deeper nesting.

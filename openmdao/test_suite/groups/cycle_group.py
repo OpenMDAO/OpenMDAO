@@ -1,4 +1,5 @@
-"""Contains test groups for cycles with easily verified values/derivatives.
+"""
+Contains test groups for cycles with easily verified values/derivatives.
 
 The Group contains the following components:
     - 'first'
@@ -36,7 +37,9 @@ from openmdao.test_suite.components.cycle_comps import PSI, ExplicitCycleComp, E
 
 
 class CycleGroup(ParametericTestGroup):
-    """Group with a cycle. Derivatives and values are known."""
+    """
+    Group with a cycle. Derivatives and values are known.
+    """
 
     def __init__(self, **kwargs):
         super(CycleGroup, self).__init__(**kwargs)

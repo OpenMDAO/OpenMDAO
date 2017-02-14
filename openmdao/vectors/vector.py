@@ -6,7 +6,8 @@ from six.moves import range
 
 
 class Vector(object):
-    """Base Vector class.
+    """
+    Base Vector class.
 
     This class is instantiated for inputs, outputs, and residuals.
     It provides a dictionary interface and an arithmetic operations interface.
@@ -46,7 +47,8 @@ class Vector(object):
     """
 
     def __init__(self, name, typ, system, root_vector=None):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
         Parameters
         ----------
@@ -87,7 +89,8 @@ class Vector(object):
         self._initialize_views()
 
     def _create_subvector(self, system):
-        """Return a smaller vector for a subsystem.
+        """
+        Return a smaller vector for a subsystem.
 
         Parameters
         ----------
@@ -103,7 +106,8 @@ class Vector(object):
                               self._root_vector)
 
     def _clone(self, initialize_views=False):
-        """Return a copy that optionally provides view access to its data.
+        """
+        Return a copy that optionally provides view access to its data.
 
         Parameters
         ----------
@@ -123,7 +127,8 @@ class Vector(object):
         return vec
 
     def _compute_ivar_map(self):
-        """Compute the ivar_map.
+        """
+        Compute the ivar_map.
 
         The ivar_map index vector is the same length as data and indices,
         and it yields the index of the local variable.
@@ -168,7 +173,8 @@ class Vector(object):
         self._ivar_map = ivar_map
 
     def get_data(self, new_array=None):
-        """Get the array combining the data of all the varsets.
+        """
+        Get the array combining the data of all the varsets.
 
         Parameters
         ----------
@@ -192,7 +198,8 @@ class Vector(object):
         return new_array
 
     def set_data(self, array):
-        """Set the incoming array combining the data of all the varsets.
+        """
+        Set the incoming array combining the data of all the varsets.
 
         Parameters
         ----------
@@ -203,7 +210,8 @@ class Vector(object):
             data[:] = array[self._indices[ind]]
 
     def iadd_data(self, array):
-        """In-place add the incoming combined array.
+        """
+        In-place add the incoming combined array.
 
         Parameters
         ----------
@@ -214,7 +222,8 @@ class Vector(object):
             data[:] += array[self._indices[ind]]
 
     def __contains__(self, key):
-        """Check if the variable is involved in the current mat-vec product.
+        """
+        Check if the variable is involved in the current mat-vec product.
 
         Parameters
         ----------
@@ -229,7 +238,8 @@ class Vector(object):
         return key in self._names
 
     def __iter__(self):
-        """Iterator over variables involved in the current mat-vec product.
+        """
+        Iterator over variables involved in the current mat-vec product.
 
         Returns
         -------
@@ -239,7 +249,8 @@ class Vector(object):
         return iter(self._names)
 
     def __getitem__(self, key):
-        """Get the unscaled variable value in true units.
+        """
+        Get the unscaled variable value in true units.
 
         Parameters
         ----------
@@ -257,7 +268,8 @@ class Vector(object):
             raise KeyError("Variable '%s' not found." % key)
 
     def __setitem__(self, key, value):
-        """Set the unscaled variable value in true units.
+        """
+        Set the unscaled variable value in true units.
 
         Parameters
         ----------
@@ -276,7 +288,8 @@ class Vector(object):
             raise KeyError("Variable '%s' not found." % key)
 
     def _initialize_data(self, root_vector):
-        """Internally allocate vectors.
+        """
+        Internally allocate vectors.
 
         Must be implemented by the subclass.
 
@@ -292,7 +305,8 @@ class Vector(object):
         pass
 
     def _initialize_views(self):
-        """Internally assemble views onto the vectors.
+        """
+        Internally assemble views onto the vectors.
 
         Must be implemented by the subclass.
 
@@ -306,14 +320,16 @@ class Vector(object):
         pass
 
     def _clone_data(self):
-        """For each item in _data, replace it with a copy of the data.
+        """
+        For each item in _data, replace it with a copy of the data.
 
         Must be implemented by the subclass.
         """
         pass
 
     def __iadd__(self, vec):
-        """Perform in-place vector addition.
+        """
+        Perform in-place vector addition.
 
         Must be implemented by the subclass.
 
@@ -325,7 +341,8 @@ class Vector(object):
         pass
 
     def __isub__(self, vec):
-        """Perform in-place vector substraction.
+        """
+        Perform in-place vector substraction.
 
         Must be implemented by the subclass.
 
@@ -337,7 +354,8 @@ class Vector(object):
         pass
 
     def __imul__(self, val):
-        """Perform in-place scalar multiplication.
+        """
+        Perform in-place scalar multiplication.
 
         Must be implemented by the subclass.
 
@@ -349,7 +367,8 @@ class Vector(object):
         pass
 
     def add_scal_vec(self, val, vec):
-        """Perform in-place addition of a vector times a scalar.
+        """
+        Perform in-place addition of a vector times a scalar.
 
         Must be implemented by the subclass.
 
@@ -363,7 +382,8 @@ class Vector(object):
         pass
 
     def set_vec(self, vec):
-        """Set the value of this vector to that of the incoming vector.
+        """
+        Set the value of this vector to that of the incoming vector.
 
         Must be implemented by the subclass.
 
@@ -375,7 +395,8 @@ class Vector(object):
         pass
 
     def set_const(self, val):
-        """Set the value of this vector to a constant scalar value.
+        """
+        Set the value of this vector to a constant scalar value.
 
         Must be implemented by the subclass.
 
@@ -387,7 +408,8 @@ class Vector(object):
         pass
 
     def get_norm(self):
-        """Return the norm of this vector.
+        """
+        Return the norm of this vector.
 
         Must be implemented by the subclass.
 
@@ -399,7 +421,8 @@ class Vector(object):
         pass
 
     def change_scaling_state(self, c0, c1):
-        """Change the scaling state.
+        """
+        Change the scaling state.
 
         Parameters
         ----------
@@ -411,7 +434,8 @@ class Vector(object):
         pass
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
-        """Enforce lower/upper bounds, backtracking the entire vector together.
+        """
+        Enforce lower/upper bounds, backtracking the entire vector together.
 
         This method modifies both self (u) and step (du) in-place.
 
@@ -429,7 +453,8 @@ class Vector(object):
         pass
 
     def _enforce_bounds_scalar(self, du, alpha, lower_bounds, upper_bounds):
-        """Enforce lower/upper bounds on each scalar separately, then backtrack as a vector.
+        """
+        Enforce lower/upper bounds on each scalar separately, then backtrack as a vector.
 
         This method modifies both self (u) and step (du) in-place.
 
@@ -447,7 +472,8 @@ class Vector(object):
         pass
 
     def _enforce_bounds_wall(self, du, alpha, lower_bounds, upper_bounds):
-        """Enforce lower/upper bounds on each scalar separately, then backtrack along the wall.
+        """
+        Enforce lower/upper bounds on each scalar separately, then backtrack along the wall.
 
         This method modifies both self (u) and step (du) in-place.
 
@@ -466,7 +492,8 @@ class Vector(object):
 
 
 class Transfer(object):
-    """Base Transfer class.
+    """
+    Base Transfer class.
 
     Implementations:
 
@@ -488,7 +515,8 @@ class Transfer(object):
     """
 
     def __init__(self, in_vec, out_vec, in_inds, out_inds, comm):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
         Parameters
         ----------
@@ -512,14 +540,16 @@ class Transfer(object):
         self._initialize_transfer()
 
     def _initialize_transfer(self):
-        """Set up the transfer; do any necessary pre-computation.
+        """
+        Set up the transfer; do any necessary pre-computation.
 
         Optionally implemented by the subclass.
         """
         pass
 
     def __call__(self, in_vec, out_vec, mode='fwd'):
-        """Perform transfer.
+        """
+        Perform transfer.
 
         Must be implemented by the subclass.
 
