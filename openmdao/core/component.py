@@ -32,7 +32,7 @@ class Component(System):
 
         Parameters
         ----------
-        **kwargs: dict of keyword arguments
+        **kwargs : dict of keyword arguments
             available here and in all descendants of this system.
         """
         super(Component, self).__init__(**kwargs)

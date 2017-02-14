@@ -147,7 +147,7 @@ class System(object):
 
         Parameters
         ----------
-        **kwargs: dict of keyword arguments
+        **kwargs : dict of keyword arguments
             available here and in all descendants of this system.
         """
         self.name = ''
@@ -1253,7 +1253,7 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        kwargs : optional
+        **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
 
@@ -1358,7 +1358,7 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        kwargs : optional
+        **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
 
@@ -1515,7 +1515,7 @@ class System(object):
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
-        kwargs : optional
+        **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
 
@@ -1572,7 +1572,7 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        kwargs : optional
+        **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
 

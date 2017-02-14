@@ -31,8 +31,8 @@ def make_compatible(meta, value):
     """
     Make value compatible with the variable described in metadata.
 
-    Args
-    ----
+    Parameters
+    ----------
     meta : dict
         metadata for a variable.
     value : float or ndarray or list
@@ -66,11 +66,12 @@ def format_as_float_or_array(name, values, val_if_none=0.0):
 
     Parameters
     ----------
-    option_name : str
-        Name of the option being set
+    name : str
+        Name of the values being formatted
     values : float or numpy ndarray or Iterable
-        Values of the array option to be formatted to the expected form.
-    val_if_none : If values is None,
+        Values to be formatted to the expected form.
+    val_if_none : bool
+        Value to return if values is None
 
     Returns
     -------
