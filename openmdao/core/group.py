@@ -509,3 +509,6 @@ class Group(System):
             # Update jacobian
             if self._owns_global_jac:
                 J._update()
+
+        if self._ln_solver is not None:
+            self._ln_solver._linearize()
