@@ -118,6 +118,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(c1.pathname, 'Branch1.G1.G2.comp1')
 
     def test_group_nested_promoted1(self):
+        # promotes from bottom level up 1
         p = Problem(model=Group())
         g1 = p.model.add_subsystem('G1', Group())
         g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
@@ -136,6 +137,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['G1.comp2.a'], 4.0)
 
     def test_group_nested_promoted2(self):
+        # promotes up from G1 level
         p = Problem(model=Group())
         g1 = Group()
         g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0))
@@ -155,13 +157,17 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['G1.comp2.a'], 4.0)
 
     def test_group_nested_renamed(self):
-        raise unittest.SkipTest("The add_subsystem has not yet been updated for renames")
+        #raise unittest.SkipTest("The add_subsystem has not yet been updated for renames")
         p = Problem(model=Group())
         g1 = p.model.add_subsystem('G1', Group())
+        # g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
+        #                  promotes_inputs=[('a', 'new_a')], promotes_outputs=[('b', 'new_b')])
+        # g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0),
+        #                  promotes_inputs=[('a', 'new_a')])
         g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
-                         promotes_inputs=[('a', 'new_a')], promotes_outputs=[('b', 'new_b')])
+                         renames_inputs={'a': 'new_a'}, renames_outputs={'b': 'new_b'})
         g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0),
-                         promotes_inputs=[('a', 'new_a')])
+                         renames_inputs={'a': 'new_a'})
         p.setup()
 
         # output G1.comp1.b is promoted and renamed
@@ -305,7 +311,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['group2.comp2.b'], 40.0)
 
     def test_reused_output_promoted_names(self):
-        prob = Problem(Group())
+        prob = Problem(model=Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
         G1 = prob.model.add_subsystem('G1', Group())
         G1.add_subsystem("C1", ExecComp("y=2.0*x"), promotes=['y'])
@@ -314,6 +320,10 @@ class TestGroup(unittest.TestCase):
         with assertRaisesRegex(self, Exception, msg):
             prob.setup(check=False)
 
+    def test_basic_connect(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', numpy.ones(10)))
+        ???
 
 class TestConnect(unittest.TestCase):
 
