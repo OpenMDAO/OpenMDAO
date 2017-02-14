@@ -10,7 +10,7 @@ from unittest import SkipTest
 from openmdao.test_suite.groups.cycle_group import CycleGroup
 from openmdao.api import Problem
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
-from openmdao.api import GlobalJacobian, DenseMatrix, CooMatrix, CsrMatrix
+from openmdao.api import GlobalJacobian, DenseMatrix, COOmatrix, CSRmatrix
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -183,9 +183,9 @@ class ParameterizedInstance(object):
             if jacobian_type == 'dense':
                 prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
             elif jacobian_type == 'sparse-coo':
-                prob.model.jacobian = GlobalJacobian(matrix_class=CooMatrix)
+                prob.model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
             elif jacobian_type == 'sparse-csr':
-                prob.model.jacobian = GlobalJacobian(matrix_class=CsrMatrix)
+                prob.model.jacobian = GlobalJacobian(matrix_class=CSRmatrix)
 
         prob.model.ln_solver = self.linear_solver_class(**self.linear_solver_options)
 
