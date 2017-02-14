@@ -56,8 +56,8 @@ help:
 
 clean:
 	rm -rf $(BUILDDIR)/*
-	rm -rf srcdocs/usr
-	rm -rf srcdocs/dev
+	rm -rf _srcdocs/usr
+	rm -rf _srcdocs/dev
 	rm -rf tags
 	rm -rf tmp
 	rm feature_docs_unit_test_db.sqlite
@@ -73,29 +73,28 @@ redbaron:
 html: mock redbaron
 
 	# Running things before docbuild
-	python utils/preprocess_tags.py
-	python utils/create_feature_docs_unit_test_db.py
+	python _utils/preprocess_tags.py
+	python _utils/create_feature_docs_unit_test_db.py
 
 	# Cleaning up previously-generated files before docbuild
 	rm -rf $(BUILDDIR)/*
-	rm -rf srcdocs/usr
-	rm -rf srcdocs/dev
+	rm -rf _srcdocs/usr
+	rm -rf _srcdocs/dev
 
 	# Doing the first command in the background does two builds in parallel
 	#       dev docs get built into tmp/moved into _build later
 	#       to avoid race to create dirs.
-	$(SPHINXBUILD) -b html -d tmp/doctrees  . tmp/html -t "dev" &
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr"
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr" &
+	$(SPHINXBUILD) -b html -d tmp/doctrees  . tmp/html -t "dev"
 
 	# Making dirs in which to move things, moving things (parallel build prob)
-	mkdir $(BUILDDIR)/html/srcdocs/dev
-	mkdir $(BUILDDIR)/doctrees/srcdocs/dev
-	cp -R tmp/html/srcdocs/dev $(BUILDDIR)/html/srcdocs
-	cp -R tmp/doctrees/srcdocs/dev $(BUILDDIR)/doctrees/srcdocs
+	mkdir $(BUILDDIR)/html/_srcdocs/dev
+	mkdir $(BUILDDIR)/doctrees/_srcdocs/dev
+	cp -R tmp/html/_srcdocs/dev $(BUILDDIR)/html/_srcdocs
+	cp -R tmp/doctrees/_srcdocs/dev $(BUILDDIR)/doctrees/_srcdocs
 
 	# post-game clean-up
 	rm feature_docs_unit_test_db.sqlite
-	rm -rf tags
 	rm -rf tmp
 
 	@echo

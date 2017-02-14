@@ -261,9 +261,9 @@ class Problem(object):
 
         Parameters
         ----------
-        vector_class : type (DefaultVector)
+        vector_class : type
             reference to an actual <Vector> class; not an instance.
-        check : boolean (True)
+        check : boolean
             whether to run error check after setup is complete.
         logger : object
             Object for logging config checks if check is True.

@@ -1,8 +1,8 @@
 :orphan:
 
-.. `Basic component types: 1. IndepVarComp`
+.. _comp-type-1-indepvarcomp:
 
-Basic component types: 1. IndepVarComp
+Basic Component Types: 1. IndepVarComp
 ======================================
 
 Independent variables are those that are set externally to the model---therefore, they are called model inputs.
@@ -13,7 +13,7 @@ Independent variables are defined via the *IndepVarComp* class.
 The *IndepVarComp* class is instantiated directly (without defining a subclass).
 The name, initial value, and other options of the independent variable(s) to be declared can be either passed in during instantiation and declared via the :code:`add_output` method.
 
-Method signature
+Method Signature
 ----------------
 
 .. automethod:: openmdao.core.indepvarcomp.IndepVarComp.add_output
