@@ -38,7 +38,7 @@ class IndepVarComp(ExplicitComponent):
             in the case of declaring multiple variables at once.
         val : float or ndarray
             value of the variable if a single variable is being defined.
-        kwargs : dict
+        **kwargs : dict
             keyword arguments.
         """
         super(IndepVarComp, self).__init__(**kwargs)

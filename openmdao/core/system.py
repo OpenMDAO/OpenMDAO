@@ -52,7 +52,8 @@ def _format_driver_array_option(option_name, var_name, values,
         The path of the variable relative to the current system.
     values : float or numpy ndarray or Iterable
         Values of the array option to be formatted to the expected form.
-    val_if_none : If values is None,
+    val_if_none : float or numpy ndarray
+        The default value for the option if values is None.
 
     Returns
     -------
@@ -195,7 +196,7 @@ class System(object):
 
         Parameters
         ----------
-        **kwargs: dict of keyword arguments
+        **kwargs : dict of keyword arguments
             available here and in all descendants of this system.
         """
         self.name = ''
@@ -1276,7 +1277,7 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        kwargs : optional
+        **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
 
@@ -1381,7 +1382,7 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        kwargs : optional
+        **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
 
@@ -1538,7 +1539,7 @@ class System(object):
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
-        kwargs : optional
+        **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
 
@@ -1595,7 +1596,7 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        kwargs : optional
+        **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
 
