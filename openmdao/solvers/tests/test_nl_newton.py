@@ -231,26 +231,26 @@ class TestNewton(unittest.TestCase):
                 # States
                 self.add_output('z', 0.0)
 
-            def compute(self, params, unknowns):
+            def compute(self, inputs, outputs):
                 pass
 
-            def apply_nonlinear(self, params, unknowns, resids):
+            def apply_nonlinear(self, inputs, outputs, resids):
                 """ Don't solve; just calculate the residual."""
 
-                x = params['x']
-                z = unknowns['z']
+                x = inputs['x']
+                z = outputs['z']
 
                 resids['z'] = (z**3 + 3.0*z**2 - 6.0*z + x)*1e15
 
-            def linearize(self, params, unknowns, J):
+            def linearize(self, inputs, outputs, partials):
                 """Analytical derivatives."""
 
-                x = params['x']
-                z = unknowns['z']
+                x = inputs['x']
+                z = outputs['z']
 
                 # State equation
-                J[('z', 'z')] = (3.0*z**2 + 6.0*z - 6.0)*1e15
-                J[('z', 'x')] = 1.0*1e15
+                partials[('z', 'z')] = (3.0*z**2 + 6.0*z - 6.0)*1e15
+                partials[('z', 'x')] = 1.0*1e15
 
         prob = Problem()
         root = prob.model = Group()

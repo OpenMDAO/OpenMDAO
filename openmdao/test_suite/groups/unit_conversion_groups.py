@@ -18,13 +18,13 @@ class SrcComp(Component):
         self.add_input('x1', 100.0)
         self.add_output('x2', 100.0, units='degC')
 
-    def compute(self, params, unknowns):
+    def compute(self, inputs, outputs):
         """ Pass through."""
-        unknowns['x2'] = params['x1']
+        outputs['x2'] = inputs['x1']
 
-    def compute_jacobian(self, params, unknowns, resids, J):
+    def compute_partials(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
-        J['x2', 'x1'] = np.array([1.0])
+        partials['x2', 'x1'] = np.array([1.0])
 
 
 class TgtCompF(Component):
@@ -36,13 +36,13 @@ class TgtCompF(Component):
         self.add_input('x2', 100.0, units='degF')
         self.add_output('x3', 100.0)
 
-    def compute(self, params, unknowns):
+    def compute(self, inputs, outputs):
         """ Pass through."""
-        unknowns['x3'] = params['x2']
+        outputs['x3'] = inputs['x2']
 
-    def compute_jacobian(self, params, unknowns, resids, J):
+    def compute_partials(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
-        J['x3', 'x2'] = np.array([1.0])
+        partials['x3', 'x2'] = np.array([1.0])
 
 
 class TgtCompFMulti(Component):
@@ -58,21 +58,21 @@ class TgtCompFMulti(Component):
         self.add_output('x3', 100.0)
         self.add_output('x3_', 100.0)
 
-    def compute(self, params, unknowns):
+    def compute(self, inputs, outputs):
         """ Pass through."""
-        unknowns['x3'] = params['x2']
+        outputs['x3'] = inputs['x2']
 
-    def compute_jacobian(self, params, unknowns, resids, J):
+    def compute_partials(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
-        J['_x3', 'x2'] = np.array([1.0])
-        J['_x3', '_x2'] = 0.0
-        J['_x3', 'x2_'] = 0.0
-        J['x3', 'x2'] = np.array([1.0])
-        J['x3', '_x2'] = 0.0
-        J['x3', 'x2_'] = 0.0
-        J['x3_', 'x2'] = np.array([1.0])
-        J['x3_', '_x2'] = 0.0
-        J['x3_', 'x2_'] = 0.0
+        partials['_x3', 'x2'] = np.array([1.0])
+        partials['_x3', '_x2'] = 0.0
+        partials['_x3', 'x2_'] = 0.0
+        partials['x3', 'x2'] = np.array([1.0])
+        partials['x3', '_x2'] = 0.0
+        partials['x3', 'x2_'] = 0.0
+        partials['x3_', 'x2'] = np.array([1.0])
+        partials['x3_', '_x2'] = 0.0
+        partials['x3_', 'x2_'] = 0.0
 
 
 class TgtCompC(Component):
@@ -82,13 +82,13 @@ class TgtCompC(Component):
         self.add_input('x2', 100.0, units='degC')
         self.add_output('x3', 100.0)
 
-    def compute(self, params, unknowns):
+    def compute(self, inputs, outputs):
         """ Pass through."""
-        unknowns['x3'] = params['x2']
+        outputs['x3'] = inputs['x2']
 
-    def compute_jacobian(self, params, unknowns, resids, J):
+    def compute_partials(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
-        J['x3', 'x2'] = np.array([1.0])
+        partials['x3', 'x2'] = np.array([1.0])
 
 
 class TgtCompK(Component):
@@ -98,24 +98,23 @@ class TgtCompK(Component):
         self.add_input('x2', 100.0, units='degK')
         self.add_output('x3', 100.0)
 
-    def compute(self, params, unknowns):
+    def compute(self, inputs, outputs):
         """ Pass through."""
-        unknowns['x3'] = params['x2']
+        outputs['x3'] = inputs['x2']
 
-    def compute_jacobian(self, params, unknowns, resids, J):
+    def compute_partials(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
-        J['x3', 'x2'] = np.array([1.0])
+        partials['x3', 'x2'] = np.array([1.0])
 
 
 class UnitConvGroup(Group):
     """
     Group containing a defF source that feeds into three targets with
     units degF, degC, and degK respectively. Good for testing unit
-    conversion."""
+    conversion.
+    """
 
-    def __init__(self):
-        super(UnitConvGroup, self).__init__()
-
+    def initialize(self):
         self.add_subsystem('src', SrcComp())
         self.add_subsystem('tgtF', TgtCompF())
         self.add_subsystem('tgtC', TgtCompC())
@@ -138,9 +137,7 @@ class UnitConvGroupImplicitConns(Group):
     In this version, all connections are Implicit.
     """
 
-    def __init__(self):
-        super(UnitConvGroupImplicitConns, self).__init__()
-
+    def initialize(self):
         self.add_subsystem('src', SrcComp(), promotes=['x1', 'x2'])
         self.add_subsystem('tgtF', TgtCompF(), promotes=['x2'])
         self.add_subsystem('tgtC', TgtCompC(), promotes=['x2'])

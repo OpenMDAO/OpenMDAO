@@ -37,15 +37,15 @@ class MyExplicitComp(ExplicitComponent):
                            y[0]*17. - y[0]*y[1] + 2.*y[1]
         outputs['f'][1] = outputs['f'][0]*3.0
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partials(self, inputs, outputs, partials):
         x = inputs['x']
         y = inputs['y']
-        jacobian['f', 'x'] = self._jac_type(np.array([
+        partials['f', 'x'] = self._jac_type(np.array([
             [2.0*x[0] - 6.0 + x[1], 2.0*x[1] + 8.0 + x[0]],
             [(2.0*x[0] - 6.0 + x[1])*3., (2.0*x[1] + 8.0 + x[0])*3.]
         ]))
 
-        jacobian['f', 'y'] = self._jac_type(np.array([
+        partials['f', 'y'] = self._jac_type(np.array([
             [17.-y[1], 2.-y[0]],
             [(17.-y[1])*3., (2.-y[0])*3.]
         ]))
@@ -77,10 +77,10 @@ class MyExplicitComp2(ExplicitComponent):
         z = inputs['z']
         outputs['f'] = (w[0]-5.0)**2 + (w[1]+1.0)**2 + w[2]*6. + z*7.
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partials(self, inputs, outputs, partials):
         w = inputs['w']
         z = inputs['z']
-        jacobian['f', 'w'] = self._jac_type(np.array([[
+        partials['f', 'w'] = self._jac_type(np.array([[
             2.0*w[0] - 10.0,
             2.0*w[1] + 2.0,
             6.
@@ -115,8 +115,8 @@ class ExplicitSetItemComp(ExplicitComponent):
         self.add_input('in', val=in_val*scale)
         self.add_output('out', val=out_val*scale)
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
-        jacobian['out', 'in'] = self._constructor(self._value)
+    def compute_partials(self, inputs, outputs, partials):
+        partials['out', 'in'] = self._constructor(self._value)
 
 
 def arr2list(arr):

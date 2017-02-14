@@ -122,7 +122,7 @@ class ExplicitComponent(Component):
 
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                              scale_jac=True):
-                self.compute_jacobian(self._inputs, self._outputs, J)
+                self.compute_partials(self._inputs, self._outputs, J)
 
             # re-negate the jacobian
             self._negate_jac()
@@ -199,7 +199,7 @@ class ExplicitComponent(Component):
         """
         pass
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partials(self, inputs, outputs, partials):
         """
         Compute sub-jacobian parts / factorization.
 
@@ -209,8 +209,8 @@ class ExplicitComponent(Component):
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
-        jacobian : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
         """
         pass
 

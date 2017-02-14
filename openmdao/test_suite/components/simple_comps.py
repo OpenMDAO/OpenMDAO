@@ -36,11 +36,11 @@ class DoubleArrayComp(ExplicitComponent):
         outputs['y2'] = self.JJ[2:4, 0:2].dot(inputs['x1']) + \
                          self.JJ[2:4, 2:4].dot(inputs['x2'])
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partials(self, inputs, outputs, partials):
         """
         Analytical derivatives.
         """
-        jacobian[('y1', 'x1')] = self.JJ[0:2, 0:2]
-        jacobian[('y1', 'x2')] = self.JJ[0:2, 2:4]
-        jacobian[('y2', 'x1')] = self.JJ[2:4, 0:2]
-        jacobian[('y2', 'x2')] = self.JJ[2:4, 2:4]
+        partials[('y1', 'x1')] = self.JJ[0:2, 0:2]
+        partials[('y1', 'x2')] = self.JJ[0:2, 2:4]
+        partials[('y2', 'x1')] = self.JJ[2:4, 0:2]
+        partials[('y2', 'x2')] = self.JJ[2:4, 2:4]
