@@ -137,8 +137,8 @@ class Jacobian(object):
         """
         system = self._system
         start = len(system.pathname) + 1 if system.pathname else 0
-        outpaths = system._var_allprocs_pathnames['output']
-        inpaths = system._var_allprocs_pathnames['input']
+        out_names = system._var_allprocs_names['output']
+        in_names = system._var_allprocs_names['input']
         out_offset = system._var_allprocs_range['output'][0]
         in_offset = system._var_allprocs_range['input'][0]
         in_indices = system._var_myproc_indices['input']
@@ -146,20 +146,20 @@ class Jacobian(object):
 
         iter_list = []
         for re_ind in out_indices:
-            re_path = outpaths[re_ind - out_offset]
-            re_unprom = re_path[start:]
+            re_name = out_names[re_ind - out_offset]
+            re_unprom = re_name[start:]
 
             for out_ind in out_indices:
-                out_path = outpaths[out_ind - out_offset]
+                out_name = out_names[out_ind - out_offset]
 
-                if (re_path, out_path) in self._subjacs:
-                    iter_list.append((re_unprom, out_path[start:]))
+                if (re_name, out_name) in self._subjacs:
+                    iter_list.append((re_unprom, out_name[start:]))
 
             for in_ind in in_indices:
-                in_path = inpaths[in_ind - in_offset]
+                in_name = in_names[in_ind - in_offset]
 
-                if (re_path, in_path) in self._subjacs:
-                    iter_list.append((re_unprom, in_path[start:]))
+                if (re_name, in_name) in self._subjacs:
+                    iter_list.append((re_unprom, in_name[start:]))
 
         self._iter_list = iter_list
 
