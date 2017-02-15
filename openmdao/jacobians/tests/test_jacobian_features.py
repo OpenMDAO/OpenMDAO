@@ -7,7 +7,7 @@ from six import iteritems
 from nose_parameterized import parameterized
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
-     GlobalJacobian, CsrMatrix, CooMatrix, ScipyIterativeSolver
+     GlobalJacobian, CSRmatrix, COOmatrix, ScipyIterativeSolver
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.devtools.testutil import assert_rel_error
 
@@ -44,6 +44,39 @@ class SimpleComp(ExplicitComponent):
         partials['g', 'x'] = np.eye(2)
 
 
+class SimpleCompDependence(ExplicitComponent):
+    def initialize_variables(self):
+        self.add_input('x', shape=1)
+        self.add_input('y1', shape=2)
+        self.add_input('y2', shape=2)
+        self.add_input('z', shape=(2, 2))
+
+        self.add_output('f', shape=1)
+        self.add_output('g', shape=(2, 2))
+
+        self.declare_partials('f', 'y1', dependent=False)
+        self.declare_partials('f', 'y2', dependent=False)
+        self.declare_partials('g', 'z', dependent=False)
+
+
+class SimpleCompGlob(ExplicitComponent):
+    def initialize_variables(self):
+        self.add_input('x', shape=1)
+        self.add_input('y1', shape=2)
+        self.add_input('y2', shape=2)
+        self.add_input('y3', shape=2)
+        self.add_input('z', shape=(2, 2))
+
+        self.add_output('f', shape=1)
+        self.add_output('g', shape=(2, 2))
+
+        # This matches y1, y2, and y3.
+        self.declare_partials('f', 'y*', dependent=False)
+
+        # This matches y1 and y3.
+        self.declare_partials('g', 'y[13]', val=[[1, 0], [1, 0], [0, 1], [0, 1]])
+
+
 class SimpleCompConst(ExplicitComponent):
     def initialize_variables(self):
         self.add_input('x', shape=1)
@@ -55,13 +88,13 @@ class SimpleCompConst(ExplicitComponent):
         self.add_output('f', shape=1)
         self.add_output('g', shape=(2, 2))
 
-        self.declare_partials('f', 'y*', dependent=False)
+        self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
         self.declare_partials('g', 'z', dependent=False)
 
         self.declare_partials('f', 'x', val=1.)
         self.declare_partials('f', 'z', val=np.ones((1, 4)))
         self.declare_partials('g', 'y[13]', val=[[1, 0], [1, 0], [0, 1], [0, 1]])
-        self.declare_partials('g', 'y2', val=1., cols=[0, 0, 1, 1], rows=[0, 3, 0, 3])
+        self.declare_partials('g', 'y2', val=[1., 1., 1., 1.], cols=[0, 0, 1, 1], rows=[0, 2, 1, 3])
         self.declare_partials('g', 'x', val=sp.sparse.coo_matrix(((1., 1.), ((0, 3), (0, 0)))))
 
     def compute(self, inputs, outputs):
@@ -100,7 +133,7 @@ class TestJacobianFeatures(unittest.TestCase):
         self.problem = Problem(model=model)
         model.suppress_solver_output = True
         model.ln_solver = ScipyIterativeSolver()
-        model.jacobian = GlobalJacobian(matrix_class=CooMatrix)
+        model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
 
     def test_dependence(self):
         problem = self.problem
@@ -161,19 +194,37 @@ class TestJacobianFeatures(unittest.TestCase):
     def test_const_jacobian(self):
         model = Group()
         comp = IndepVarComp()
-        for name, val in (
-        ('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)), ('z', np.ones((2, 2)))):
+        for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),
+                          ('y3', np.ones(2)), ('z', np.ones((2, 2)))):
             comp.add_output(name, val)
-        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'z'])
+        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
 
         problem = Problem(model=model)
         model.suppress_solver_output = True
         model.ln_solver = ScipyIterativeSolver()
-        model.jacobian = GlobalJacobian(matrix_class=CooMatrix)
+        model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
         problem.run_model()
+        totals = problem.compute_total_derivs(['f', 'g'],
+                                              ['x', 'y1', 'y2', 'y3', 'z'])
+
+        jacobian = {}
+        jacobian['f', 'x'] = 1.
+        jacobian['f', 'z'] = np.ones((1, 4))
+        jacobian['f', 'y1'] = np.zeros((1, 2))
+        jacobian['f', 'y2'] = np.zeros((1, 2))
+        jacobian['f', 'y3'] = np.zeros((1, 2))
+
+        jacobian['g', 'y1'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+        jacobian['g', 'y2'] = [[1, 0], [0, 1], [1, 0], [0, 1]]
+        jacobian['g', 'y3'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+
+        jacobian['g', 'x'] = [[1], [0], [0], [1]]
+        jacobian['g', 'z'] = np.zeros((4, 4))
+
+        assert_rel_error(self, totals, jacobian)
 
 
 if __name__ == '__main__':

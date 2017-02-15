@@ -7,7 +7,7 @@ import unittest
 from six import iterkeys
 
 from openmdao.api import Problem, Group, ImplicitComponent, NewtonSolver, DirectSolver
-from openmdao.api import GlobalJacobian, CooMatrix, CsrMatrix, DenseMatrix
+from openmdao.api import GlobalJacobian, COOmatrix, CSRmatrix, DenseMatrix
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.devtools.testutil import assert_rel_error
@@ -51,9 +51,9 @@ class TestDirectSolver(unittest.TestCase):
             if jac == 'dict':
                 pass
             elif jac == 'coo':
-                prob.model.jacobian = GlobalJacobian(matrix_class=CooMatrix)
+                prob.model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
             elif jac == 'csr':
-                prob.model.jacobian = GlobalJacobian(matrix_class=CsrMatrix)
+                prob.model.jacobian = GlobalJacobian(matrix_class=CSRmatrix)
             elif jac == 'dense':
                 prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
 
