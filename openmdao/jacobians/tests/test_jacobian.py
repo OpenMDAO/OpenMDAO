@@ -5,7 +5,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, issparse
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
-     GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CsrMatrix, CooMatrix
+     GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CsrMatrix, CooMatrix, ExecComp
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.devtools.testutil import assert_rel_error
@@ -306,15 +306,36 @@ class TestJacobian(unittest.TestCase):
         prob.model.nl_solver = NewtonSolver()
 
         d1 = prob.model.get_subsystem('d1')
-        d2 = prob.model.get_subsystem('d2')
 
         d1.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        prob.model.suppress_solver_output = True
 
         prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_global_jac_bad_key(self):
+        # this test fails if GlobalJacobian._update sets in_start with 'output' instead of 'input'
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('indep', IndepVarComp('x', 1.0))
+        prob.model.add_subsystem('C1', ExecComp('c=a*2.0+b'))
+        c2 = prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c'))
+        c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0'))
+
+        prob.model.nl_solver = NewtonSolver()
+        c3.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+
+        prob.model.connect('indep.x', 'C1.a')
+        prob.model.connect('indep.x', 'C2.a')
+        prob.model.connect('C1.c', 'C2.b')
+        prob.model.connect('C2.d', 'C3.a')
+        prob.model.suppress_solver_output = True
+        prob.setup()
+        prob.run_model()
+        assert_rel_error(self, prob['C3.ee'], 8.0, 0000.1)
 
     def test_jacobian_changed_group(self):
         prob = Problem()
