@@ -1,4 +1,4 @@
-"""Define the CooMatrix class."""
+"""Define the COOmatrix class."""
 from __future__ import division
 
 import numpy
@@ -10,7 +10,7 @@ from six import iteritems
 from openmdao.matrices.matrix import Matrix, _compute_index_map
 
 
-class CooMatrix(Matrix):
+class COOmatrix(Matrix):
     """
     Sparse matrix in Coordinate list format.
     """

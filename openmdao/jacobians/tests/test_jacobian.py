@@ -5,7 +5,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, issparse
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
-     GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CsrMatrix, CooMatrix, ExecComp
+     GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CSRmatrix, COOmatrix, ExecComp
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.devtools.testutil import assert_rel_error
@@ -167,7 +167,7 @@ def _test_func_name(func, num, param):
 class TestJacobian(unittest.TestCase):
 
     @parameterized.expand(itertools.product(
-        [DenseMatrix, CsrMatrix, CooMatrix],
+        [DenseMatrix, CSRmatrix, COOmatrix],
         [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist],
         [False, True],  # not nested, nested
         [0, 1],  # extra calls to linearize

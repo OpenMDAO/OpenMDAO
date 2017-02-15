@@ -7,7 +7,7 @@ from six import iteritems
 from nose_parameterized import parameterized
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
-     GlobalJacobian, CsrMatrix, CooMatrix, ScipyIterativeSolver
+     GlobalJacobian, CSRmatrix, COOmatrix, ScipyIterativeSolver
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.devtools.testutil import assert_rel_error
 
@@ -100,7 +100,7 @@ class TestJacobianFeatures(unittest.TestCase):
         self.problem = Problem(model=model)
         model.suppress_solver_output = True
         model.ln_solver = ScipyIterativeSolver()
-        model.jacobian = GlobalJacobian(matrix_class=CooMatrix)
+        model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
 
     def test_dependence(self):
         problem = self.problem
@@ -169,7 +169,7 @@ class TestJacobianFeatures(unittest.TestCase):
         problem = Problem(model=model)
         model.suppress_solver_output = True
         model.ln_solver = ScipyIterativeSolver()
-        model.jacobian = GlobalJacobian(matrix_class=CooMatrix)
+        model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
