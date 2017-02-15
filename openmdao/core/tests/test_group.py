@@ -155,29 +155,6 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['G1.comp1.a'], 3.0)
         self.assertEqual(p['G1.comp2.a'], 4.0)
 
-    def test_group_nested_renamed(self):
-        #raise unittest.SkipTest("The add_subsystem has not yet been updated for renames")
-        p = Problem(model=Group())
-        g1 = p.model.add_subsystem('G1', Group())
-        # g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
-        #                  promotes_inputs=[('a', 'new_a')], promotes_outputs=[('b', 'new_b')])
-        # g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0),
-        #                  promotes_inputs=[('a', 'new_a')])
-        g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
-                         renames_inputs={'a': 'new_a'}, renames_outputs={'b': 'new_b'})
-        g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0),
-                         renames_inputs={'a': 'new_a'})
-        p.setup()
-
-        # output G1.comp1.b is promoted and renamed
-        self.assertEqual(p['G1.new_b'], 6.0)
-        # output G1.comp2.b is not promoted
-        self.assertEqual(p['G1.comp2.b'], 12.0)
-
-        # access both renamed inputs using unpromoted names.
-        self.assertEqual(p['G1.comp1.a'], 3.0)
-        self.assertEqual(p['G1.comp2.a'], 4.0)
-
     def test_group_promotes(self):
         """Promoting a single variable."""
         p = Problem(model=Group())
@@ -329,6 +306,7 @@ class TestGroup(unittest.TestCase):
         p.model.suppress_solver_output = True
         p.setup()
         p.run_model()
+        assert_rel_error(self, p['indep.x'], np.ones(5), 0.00001)
         assert_rel_error(self, p['C1.x'], np.ones(5)*12., 0.00001)
         assert_rel_error(self, p['C1.y'], 60., 0.00001)
 
@@ -351,8 +329,13 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)))
         p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros(3)))
         p.model.add_subsystem('C2', ExecComp('y=sum(x)*4.0', x=np.zeros(2)))
+
+        # connect C1.x to the first 3 entries of indep.x
         p.model.connect('indep.x', 'C1.x', src_indices=[0, 1, 2])
+
+        # connect C2.x to the last 2 entries of indep.x
         p.model.connect('indep.x', 'C2.x', src_indices=[3, 4])
+
         p.model.suppress_solver_output = True
         p.setup()
         p.run_model()
