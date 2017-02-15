@@ -44,6 +44,39 @@ class SimpleComp(ExplicitComponent):
         jacobian['g', 'x'] = np.eye(2)
 
 
+class SimpleCompDependence(ExplicitComponent):
+    def initialize_variables(self):
+        self.add_input('x', shape=1)
+        self.add_input('y1', shape=2)
+        self.add_input('y2', shape=2)
+        self.add_input('z', shape=(2, 2))
+
+        self.add_output('f', shape=1)
+        self.add_output('g', shape=(2, 2))
+
+        self.declare_partials('f', 'y1', dependent=False)
+        self.declare_partials('f', 'y2', dependent=False)
+        self.declare_partials('g', 'z', dependent=False)
+
+
+class SimpleCompGlob(ExplicitComponent):
+    def initialize_variables(self):
+        self.add_input('x', shape=1)
+        self.add_input('y1', shape=2)
+        self.add_input('y2', shape=2)
+        self.add_input('y3', shape=2)
+        self.add_input('z', shape=(2, 2))
+
+        self.add_output('f', shape=1)
+        self.add_output('g', shape=(2, 2))
+
+        # This matches y1, y2, and y3.
+        self.declare_partials('f', 'y*', dependent=False)
+
+        # This matches y1 and y3.
+        self.declare_partials('g', 'y[13]', val=[[1, 0], [1, 0], [0, 1], [0, 1]])
+
+
 class SimpleCompConst(ExplicitComponent):
     def initialize_variables(self):
         self.add_input('x', shape=1)
@@ -55,7 +88,7 @@ class SimpleCompConst(ExplicitComponent):
         self.add_output('f', shape=1)
         self.add_output('g', shape=(2, 2))
 
-        self.declare_partials('f', 'y*', dependent=False)
+        self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
         self.declare_partials('g', 'z', dependent=False)
 
         self.declare_partials('f', 'x', val=1.)
@@ -161,10 +194,10 @@ class TestJacobianFeatures(unittest.TestCase):
     def test_const_jacobian(self):
         model = Group()
         comp = IndepVarComp()
-        for name, val in (
-        ('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)), ('z', np.ones((2, 2)))):
+        for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),
+                          ('y3', np.ones(2)), ('z', np.ones((2, 2)))):
             comp.add_output(name, val)
-        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'z'])
+        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
 
         problem = Problem(model=model)
         model.suppress_solver_output = True
@@ -174,6 +207,24 @@ class TestJacobianFeatures(unittest.TestCase):
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
         problem.run_model()
+        totals = problem.compute_total_derivs(['f', 'g'],
+                                              ['x', 'y1', 'y2', 'y3', 'z'])
+
+        jacobian = {}
+        jacobian['f', 'x'] = 1.
+        jacobian['f', 'z'] = np.ones((1, 4))
+        jacobian['f', 'y1'] = np.zeros((1, 2))
+        jacobian['f', 'y2'] = np.zeros((1, 2))
+        jacobian['f', 'y3'] = np.zeros((1, 2))
+
+        jacobian['g', 'y1'] = [[1, 1], [0, 0], [0, 0], [1, 1]]
+        jacobian['g', 'y2'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+        jacobian['g', 'y3'] = [[1, 1], [0, 0], [0, 0], [1, 1]]
+
+        jacobian['g', 'x'] = [[1], [0], [0], [1]]
+        jacobian['g', 'z'] = np.zeros((4, 4))
+
+        assert_rel_error(self, totals, jacobian)
 
 
 if __name__ == '__main__':
