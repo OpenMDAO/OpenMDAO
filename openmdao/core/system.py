@@ -1,38 +1,26 @@
 """Define the base System class."""
 from __future__ import division
 
-from fnmatch import fnmatchcase
 from contextlib import contextmanager
 from collections import namedtuple, OrderedDict, Iterable
+from fnmatch import fnmatchcase
 import numbers
 import sys
-from six import iteritems
+
+from six import iteritems, string_types
+from six.moves import range
 
 import numpy
-
-from six import string_types
-from six.moves import range
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.jacobians.global_jacobian import GlobalJacobian
-from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.units import convert_units
 
 # This is for storing various data mapped to var pathname
 PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
-
-DesignVariable = namedtuple('DesignVariable', ['name', 'lower', 'upper',
-                                               'scaler', 'adder', 'ref',
-                                               'ref0', 'indices', 'metadata'])
-
-Constraint = namedtuple('Constraint', ['name', 'lower', 'upper', 'equals',
-                                       'scaler', 'adder', 'ref', 'ref0',
-                                       'indices', 'metadata'])
-
-Objective = namedtuple('Objective', ['name', 'scaler', 'adder', 'ref',
-                                     'ref0', 'indices', 'metadata'])
 
 
 def _format_driver_array_option(option_name, var_name, values,
@@ -1352,15 +1340,20 @@ class System(object):
         upper = (upper + adder) * scaler
 
         meta = kwargs if kwargs else None
-        self._design_vars[name] = DesignVariable(name=name, lower=lower,
-                                                 upper=upper, scaler=scaler,
-                                                 adder=adder, ref=ref,
-                                                 ref0=ref0, indices=indices,
-                                                 metadata=meta)
+        self._design_vars[name] = dvs = OrderedDict()
+        dvs['name'] = name
+        dvs['upper'] = upper
+        dvs['lower'] = lower
+        dvs['scaler'] = scaler
+        dvs['adder'] = adder
+        dvs['ref'] = ref
+        dvs['ref0'] = ref0
+        dvs['indices'] = indices
+        dvs['metadata'] = meta
 
     def add_response(self, name, type, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, adder=None, scaler=None,
-                     **kwargs):
+                     linear=False, **kwargs):
         r"""
         Add a response variable to this system.
 
@@ -1389,6 +1382,8 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
+        linear : bool
+            Set to True if constraint is linear. Default is False.
         **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
@@ -1503,23 +1498,31 @@ class System(object):
             equals = (equals + adder) * scaler
 
         meta = kwargs if kwargs else None
-        if type == 'obj':
-            self._responses[name] = Objective(name=name, scaler=scaler,
-                                              adder=adder, ref=ref, ref0=ref0,
-                                              indices=indices, metadata=meta)
-        elif type == 'con':
-            self._responses[name] = Constraint(name=name, lower=lower,
-                                               upper=upper, equals=equals,
-                                               scaler=scaler, adder=adder,
-                                               ref=ref, ref0=ref0,
-                                               indices=indices, metadata=meta)
+        self._responses[name] = resp = OrderedDict()
+        resp['name'] = name
+        resp['scaler'] = scaler
+        resp['adder'] = adder
+        resp['ref'] = ref
+        resp['ref0'] = ref0
+        resp['indices'] = indices
+        resp['metadata'] = meta
+        resp['type'] = type
+
+        if type == 'con':
+            resp['lower'] = lower
+            resp['upper'] = upper
+            resp['equals'] = equals
+            resp['linear'] = linear
+
+        elif type =='obj':
+            pass
         else:
             raise ValueError('Unrecognized type for response.  Expected'
                              ' one of [\'obj\', \'con\']:  ({0})'.format(type))
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
-                       indices=None, **kwargs):
+                       indices=None, linear=False, **kwargs):
         r"""
         Add a constraint variable to this system.
 
@@ -1529,13 +1532,13 @@ class System(object):
             Name of the response variable in the system.
         lower : float or ndarray, optional
             Lower boundary for the variable
-        upper : upper or ndarray, optional
+        upper : float or ndarray, optional
             Upper boundary for the variable
-        equals : equals or ndarray, optional
+        equals : float or ndarray, optional
             Equality constraint value for the variable
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
-        ref0 : upper or ndarray, optional
+        ref0 : float or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
@@ -1546,6 +1549,8 @@ class System(object):
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
+        linear : bool
+            Set to True if constraint is linear. Default is False.
         **kwargs : optional
             Keyword arguments that are saved as metadata for the
             design variable.
@@ -1579,7 +1584,7 @@ class System(object):
 
         self.add_response(name=name, type='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
-                          ref0=ref0, indices=indices, metadata=meta)
+                          ref0=ref0, indices=indices, linear=linear, metadata=meta)
 
     def add_objective(self, name, ref=None, ref0=None, indices=None,
                       adder=None, scaler=None, **kwargs):
@@ -1592,7 +1597,7 @@ class System(object):
             Name of the response variable in the system.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
-        ref0 : upper or ndarray, optional
+        ref0 : float or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
@@ -1670,7 +1675,14 @@ class System(object):
         # Size them all
         vec = self._outputs._names
         for name, data in iteritems(out):
-            out[name]['size'] = vec[name].shape[0]
+
+            # Depending on where the constraint was added, the name in the
+            # vectors might be relative instead of absolute. Lucky we have
+            # both.
+            if name in vec:
+                out[name]['size'] = vec[name].shape[0]
+            else:
+                out[name]['size'] = vec[out[name]['name']].shape[0]
 
         if recurse:
             for subsys in self._subsystems_allprocs:
@@ -1734,8 +1746,8 @@ class System(object):
             The constraints defined in the current system.
 
         """
-        return dict((key, response) for (key, response) in
-                    self.get_responses(recurse=recurse).items() if isinstance(response, Constraint))
+        return OrderedDict((key, response) for (key, response) in
+                           self.get_responses(recurse=recurse).items() if response['type']=='con')
 
     def get_objectives(self, recurse=True):
         """
@@ -1756,5 +1768,5 @@ class System(object):
             The objectives defined in the current system.
 
         """
-        return dict((key, response) for (key, response) in
-                    self.get_responses(recurse=recurse).items() if isinstance(response, Objective))
+        return OrderedDict((key, response) for (key, response) in
+                           self.get_responses(recurse=recurse).items() if response['type']=='obj')

@@ -186,25 +186,21 @@ class pyOptSparseDriver(Driver):
         opt_prob.finalizeDesignVariables()
 
         # Add all objectives
-        objs = self.get_objectives()
-        self.quantities = list(objs)
-        self.sparsity = OrderedDict()
-        self.sub_sparsity = OrderedDict()
+        objs = self.get_objective_values()
         for name in objs:
             opt_prob.addObj(name)
-            self.sparsity[name] = self.indep_list
 
-        # Calculate and save gradient for any linear constraints.
-        lcons = self.get_constraints(lintype='linear').keys()
-        self._problem = problem
-        if len(lcons) > 0:
-            self.lin_jacs = self.calc_gradient(indep_list, lcons,
-                                               return_format='dict')
-            #print("Linear Gradient")
-            #print(self.lin_jacs)
+        ## Calculate and save gradient for any linear constraints.
+        #lcons = self.get_constraints(lintype='linear').keys()
+        #self._problem = problem
+        #if len(lcons) > 0:
+            #self.lin_jacs = self.calc_gradient(indep_list, lcons,
+                                               #return_format='dict')
+            ##print("Linear Gradient")
+            ##print(self.lin_jacs)
 
         # Add all equality constraints
-        econs = self.get_constraints(ctype='eq', lintype='nonlinear')
+        econs = self.get_constraint_values(ctype='eq', lintype='nonlinear')
         con_meta = self.get_constraint_metadata()
         self.quantities += list(econs)
 
@@ -332,85 +328,6 @@ class pyOptSparseDriver(Driver):
                 self.exit_flag = 0
         except KeyError: #nothing is here, so something bad happened!
             self.exit_flag = 0
-
-    def _build_sparse(self, name, wrt, consize, param_vals, sub_param_conns,
-                      full_param_conns, rels):
-        """ Build up the data structures that define a sparse Jacobian
-        matrix. Called separately on each nonlinear constraint.
-
-        Args
-        ----
-        name : str
-            Constraint name.
-        wrt : list
-            List of relevant param names.
-        consize : int
-            Width of this constraint.
-        param_vals : dict
-            Dictionary of parameter values; used for sizing.
-        sub_param_conns : dict
-            Parameter subindex connection info.
-        full_param_conns : dict
-            Parameter full connection info.
-        rels : set
-            Set of relevant nodes for this connstraint.
-
-        Returns
-        -------
-        pyoptsparse coo matrix or None
-        """
-
-        jac = None
-
-        # Additional sparsity for index connections
-        for param in wrt:
-
-            sub_conns = sub_param_conns.get(param)
-            if not sub_conns:
-                continue
-
-            # If we have a simultaneous full connection, then we move on
-            full_conns = full_param_conns.get(param)
-            if full_conns.intersection(rels):
-                continue
-
-            rel_idx = set()
-            for target, idx in iteritems(sub_conns):
-
-                # If a target of the indexed desvar connection is
-                # in the relevant path for this constraint, then
-                # those indices are relevant.
-                if target in rels:
-                    rel_idx.update(idx)
-
-            nrel = len(rel_idx)
-            if nrel > 0:
-
-                if jac is None:
-                    jac = {}
-
-                if param not in jac:
-                    # A coo matrix for the Jacobian
-                    # mat = {'coo':[row, col, data],
-                    #        'shape':[nrow, ncols]}
-                    coo = {}
-                    coo['shape'] = [consize, len(param_vals[param])]
-                    jac[param] = coo
-
-                row = []
-                col = []
-                for i in range(consize):
-                    row.extend([i]*nrel)
-                    col.extend(rel_idx)
-                data = np.ones((len(row), ))
-
-                jac[param]['coo'] = [np.array(row), np.array(col), data]
-
-                if name not in self.sub_sparsity:
-                    self.sub_sparsity[name] = {}
-                self.sub_sparsity[name][param] = np.array(list(rel_idx))
-
-        return jac
 
     def _objfunc(self, dv_dict):
         """ Function that evaluates and returns the objective function and

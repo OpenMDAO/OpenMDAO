@@ -1,5 +1,7 @@
 """Define a base class for all Drivers in OpenMDAO."""
 
+from six import iteritems
+
 from openmdao.utils.generalized_dict import OptionsDictionary
 
 
@@ -118,8 +120,18 @@ class Driver(object):
             obj_dict[name] = vec[name]
         return obj_dict
 
-    def get_constraint_values(self):
+    def get_constraint_values(self, ctype='all', lintype='all'):
         """Return constraint values.
+
+        Args
+        ----
+        ctype : string
+            Default is 'all'. Optionally return just the inequality constraints
+            with 'ineq' or the equality constraints with 'eq'.
+
+        lintype : string
+            Default is 'all'. Optionally return just the linear constraints
+            with 'linear' or the nonlinear constraints with 'nonlinear'.
 
         Returns
         -------
@@ -129,12 +141,26 @@ class Driver(object):
         cons = self._cons
         vec = self.problem.model._outputs
         con_dict = {}
-        for name in cons:
 
-            # TODO: use constraint scaling
+        for key, meta in iteritems(self._cons):
 
+            if lintype == 'linear' and meta['linear'] is False:
+                continue
+
+            if lintype == 'nonlinear' and meta['linear']:
+                continue
+
+            if ctype == 'eq' and meta['equals'] is None:
+                continue
+
+            if ctype == 'ineq' and meta['equals'] is not None:
+                continue
+
+            # TODO: Need to get the allgathered values? Like:
+            # cons[key] = self._get_distrib_var(key, meta, 'constraint')
             con_dict[name] = vec[name]
-        return con_dict
+
+        return cons
 
     def get_total_derivatives(self, return_format='dict'):
         """Return the derivatives.
