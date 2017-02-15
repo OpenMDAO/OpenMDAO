@@ -177,13 +177,13 @@ class Problem(object):
         if pdata.typ == 'output':
             meta = self.model._var_myproc_metadata['output'][pdata.myproc_idx]
             if 'shape' in meta:
-                value = make_compatible(meta, value)
+                value, _ = make_compatible(pathname, value, meta['shape'])
             c0, c1 = self.model._scaling_to_norm['output'][pdata.myproc_idx, :]
             self.model._outputs[pathname] = c0 + c1 * np.array(value)
         else:
             meta = self.model._var_myproc_metadata['input'][pdata.myproc_idx]
             if 'shape' in meta:
-                value = make_compatible(meta, value)
+                value, _ = make_compatible(pathname, value, meta['shape'])
             c0, c1 = self.model._scaling_to_norm['input'][pdata.myproc_idx, :]
             self.model._inputs[pathname] = c0 + c1 * np.array(value)
 

@@ -133,7 +133,7 @@ class TestSystem(unittest.TestCase):
         p.model.suppress_solver_output = True
         p.run_model()
 
-        msg = "Incompatible shape for assignment. Expected .* but got .*"
+        msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"
 
         num_val = -10
         arr_val = -10*np.ones((5, 1))

@@ -14,7 +14,7 @@ from copy import deepcopy
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
-from openmdao.utils.general_utils import format_as_float_or_array
+from openmdao.utils.general_utils import format_as_float_or_array, make_compatible
 
 
 class Component(System):
@@ -81,39 +81,10 @@ class Component(System):
         if units is not None and not valid_units(units):
             raise ValueError("The units '%s' are invalid" % units)
 
-        if shape is not None:
-            if isinstance(shape, int):
-                shape = (shape,)
-            elif isinstance(shape, list):
-                shape = tuple(shape)
-        # Next check that shapes are consistent
-        if not numpy.isscalar(val):
-            val_shape = numpy.atleast_1d(val).shape
-            # 1. val and shape
-            if shape is not None and val_shape != shape:
-                raise ValueError('The val argument is an array, but val.shape != shape.')
-            # 2. val and indices
-            if indices is not None and val_shape != numpy.atleast_1d(indices).shape:
-                raise ValueError('The val and indices are arrays, but val.shape != indices.shape.')
-        if shape is not None:
-            # 3. shape and indices
-            if indices is not None and shape != numpy.atleast_1d(indices).shape:
-                raise ValueError('The val argument is an array, but val.shape != indices.shape.')
-
         metadata = {}
 
-        # val: taken as is
-        metadata['value'] = val
-
-        # shape: if not given, infer from val (if array) or indices, else assume scalar
-        if shape is not None:
-            metadata['shape'] = shape
-        elif not numpy.isscalar(val):
-            metadata['shape'] = numpy.atleast_1d(val).shape
-        elif indices is not None:
-            metadata['shape'] = numpy.atleast_1d(indices).shape
-        else:
-            metadata['shape'] = (1,)
+        # value, shape: based on args, making sure they are compatible
+        metadata['value'], metadata['shape'] = make_compatible(name, val, shape, indices)
 
         # indices: None or ndarray
         if indices is None:
@@ -208,28 +179,10 @@ class Component(System):
         if units is not None and not valid_units(units):
             raise ValueError("The units '%s' are invalid" % units)
 
-        if shape is not None:
-            if isinstance(shape, int):
-                shape = (shape,)
-            elif isinstance(shape, list):
-                shape = tuple(shape)
-        # Next check that shapes are consistent between val and shape, if necessary
-        if not numpy.isscalar(val):
-            if shape is not None and numpy.atleast_1d(val).shape != shape:
-                raise ValueError('The val argument is an array, but val.shape != shape.')
-
         metadata = {}
 
-        # val: taken as is
-        metadata['value'] = val
-
-        # shape: if not given, infer from val (if array) or indices, else assume scalar
-        if shape is not None:
-            metadata['shape'] = shape
-        elif not numpy.isscalar(val):
-            metadata['shape'] = numpy.atleast_1d(val).shape
-        else:
-            metadata['shape'] = (1,)
+        # value, shape: based on args, making sure they are compatible
+        metadata['value'], metadata['shape'] = make_compatible(name, val, shape)
 
         # units, res_units: taken as is
         metadata['units'] = units

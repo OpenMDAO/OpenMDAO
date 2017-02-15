@@ -44,7 +44,7 @@ class TestProblem(unittest.TestCase):
         prob = Problem(model)
         prob.setup()
 
-        msg = "Incompatible shape for assignment. Expected .* but got .*"
+        msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"
 
         # check valid scalar value
         new_val = -10.

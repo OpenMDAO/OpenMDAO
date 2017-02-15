@@ -27,32 +27,61 @@ def warn_deprecation(msg):
     warnings.simplefilter('ignore', DeprecationWarning)
 
 
-def make_compatible(meta, value):
+def make_compatible(name, value, shape=None, indices=None):
     """
-    Make value compatible with the variable described in metadata.
+    Make value compatible with the specified shape or the shape of indices.
 
     Parameters
     ----------
-    meta : dict
-        metadata for a variable.
-    value : float or ndarray or list
-        value.
+    value : str
+        The name of the value.
+    value : float or list or tuple or ndarray
+        The value of a variable.
+    shape : int or tuple or list or None
+        The expected or desired shape of the value.
+    indices : int or list of ints or tuple of ints or int ndarray or None
+        The indices of a source variable, used to determine shape if shape is None.
+        If shape is not None, the shape of the indices must match shape.
 
     Returns
     -------
     ndarray
-        value in a form compatible with the specified metadata.
+        The value in a shape compatible with the specified shape and/or indices.
+    tuple
+        The resulting shape of the value.
+
+    Raises
+    ------
+    ValueError
+        If value cannot be made to conform to shape or if shape and indices
+        are incompatible.
     """
-    tgt_shape = meta['shape']
-    if np.isscalar(value):
-        value = np.ones(tgt_shape) * value
-    else:
+    # if shape is not given, infer from indices
+    if shape:
+        if isinstance(shape, int):
+            shape = (shape,)
+        elif isinstance(shape, list):
+            shape = tuple(shape)
+    elif indices is not None:
+        shape = np.atleast_1d(indices).shape
+
+    if shape is None:
+        # shape is not determined, assume the shape of value was intended
         value = np.atleast_1d(value)
-    if value.shape != tgt_shape:
-        raise ValueError("Incompatible shape for assignment. "
-                         "Expected %s but got %s." %
-                         (tgt_shape, value.shape))
-    return value
+        shape = value.shape
+    else:
+        # shape is determined, if value is scalar assign it to array of shape
+        # otherwise make sure value is an array of the determined shape
+        if np.isscalar(value):
+            value = np.ones(shape) * value
+        else:
+            value = np.atleast_1d(value)
+            if value.shape != shape:
+                raise ValueError("Incompatible shape for '%s': "
+                                 "Expected %s but got %s." %
+                                 (name, shape, value.shape))
+
+    return value, shape
 
 
 def format_as_float_or_array(name, values, val_if_none=0.0):
