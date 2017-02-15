@@ -4,6 +4,7 @@ from six import assertRaisesRegex
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+from openmdao.devtools.testutil import assert_rel_error
 
 
 class SimpleGroup(Group):
@@ -318,10 +319,48 @@ class TestGroup(unittest.TestCase):
         with assertRaisesRegex(self, Exception, msg):
             prob.setup(check=False)
 
-    def test_basic_connect(self):
+    def test_basic_connect_units(self):
         p = Problem(model=Group())
-        p.model.add_subsystem('indep', IndepVarComp('x', numpy.ones(10)))
-        ???
+        indep = p.model.add_subsystem('indep', IndepVarComp())
+        indep.add_output('x', np.ones(5), units='ft')
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)', x=np.zeros(5),
+                                             units={'x': 'inch', 'y': 'inch'}))
+        p.model.connect('indep.x', 'C1.x')
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.x'], np.ones(5)*12., 0.00001)
+        assert_rel_error(self, p['C1.y'], 60., 0.00001)
+
+    def test_connect_1_to_many(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)))
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros(5)))
+        p.model.add_subsystem('C2', ExecComp('y=sum(x)*4.0', x=np.zeros(5)))
+        p.model.add_subsystem('C3', ExecComp('y=sum(x)*6.0', x=np.zeros(5)))
+        p.model.connect('indep.x', ['C1.x', 'C2.x', 'C3.x'])
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.y'], 10., 0.00001)
+        assert_rel_error(self, p['C2.y'], 20., 0.00001)
+        assert_rel_error(self, p['C3.y'], 30., 0.00001)
+
+    def test_connect_src_indices(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)))
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros(3)))
+        p.model.add_subsystem('C2', ExecComp('y=sum(x)*4.0', x=np.zeros(2)))
+        p.model.connect('indep.x', 'C1.x', src_indices=[0, 1, 2])
+        p.model.connect('indep.x', 'C2.x', src_indices=[3, 4])
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.x'], np.ones(3), 0.00001)
+        assert_rel_error(self, p['C1.y'], 6., 0.00001)
+        assert_rel_error(self, p['C2.x'], np.ones(2), 0.00001)
+        assert_rel_error(self, p['C2.y'], 8., 0.00001)
+
 
 class TestConnect(unittest.TestCase):
 
