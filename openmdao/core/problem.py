@@ -54,7 +54,7 @@ class Problem(object):
     """
 
     def __init__(self, model=None, comm=None, assembler_class=None,
-                 use_ref_vector=True):
+                 use_ref_vector=True, root=None):
         """
         Initialize attributes.
 
@@ -68,6 +68,8 @@ class Problem(object):
             pointer to the global <Assembler> object.
         use_ref_vector : bool
             if True, allocate vectors to store ref. values.
+        root : <System> or None
+            Deprecated kwarg for `model`.
         """
         if comm is None:
             try:
@@ -77,6 +79,16 @@ class Problem(object):
                 comm = FakeComm()
         if assembler_class is None:
             assembler_class = DefaultAssembler
+
+        if root is not None:
+            if model is not None:
+                raise ValueError("cannot specify both `root` and `model`. `root` has been "
+                                 "deprecated, please use model")
+
+            warn_deprecation("The 'root' argument provides backwards compatibility "
+                             "with OpenMDAO <= 1.x ; use 'model' instead.")
+
+            model = root
 
         self.model = model
         self.comm = comm
@@ -553,8 +565,8 @@ def _check_shape(shape, val):
 
     Parameters
     ----------
-    meta : dict
-        metadata for a variable.
+    shape : tuple
+        Expected shape of a variable.
     val : float or ndarray or list
         value to check.
     """

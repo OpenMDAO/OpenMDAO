@@ -209,19 +209,19 @@ class ExecComp(ExplicitComponent):
         for expr in self._codes:
             exec(expr, _expr_dict, _IODict(outputs, inputs, self._to_colons))
 
-    def compute_jacobian(self, params, unknowns, jacobian):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """
         Use complex step method to update the given Jacobian.
 
         Parameters
         ----------
-        params : `VecWrapper`
+        inputs : `VecWrapper`
             `VecWrapper` containing parameters. (p)
 
-        unknowns : `VecWrapper`
+        outputs : `VecWrapper`
             `VecWrapper` containing outputs and states. (u)
 
-        jacobians : `Jacobian`
+        partials : `Jacobian`
             Contains sub-jacobians.
         """
         # our complex step
@@ -229,11 +229,11 @@ class ExecComp(ExplicitComponent):
 
         non_pbo_outputs = self._non_pbo_outputs
 
-        for param in params._views:
+        for param in inputs._views:
 
-            pwrap = _TmpDict(params)
+            pwrap = _TmpDict(inputs)
 
-            pval = params[param]
+            pval = inputs[param]
             if isinstance(pval, ndarray):
                 # replace the param array with a complex copy
                 pwrap[param] = numpy.asarray(pval, npcomplex)
@@ -251,7 +251,7 @@ class ExecComp(ExplicitComponent):
                 else:
                     pwrap[param][idx] += step
 
-                uwrap = _TmpDict(unknowns, return_complex=True)
+                uwrap = _TmpDict(outputs, return_complex=True)
 
                 # solve with complex param value
                 self._residuals.set_const(0.0)
@@ -259,11 +259,11 @@ class ExecComp(ExplicitComponent):
 
                 for u in non_pbo_outputs:
                     jval = imag(uwrap[u] / self.complex_stepsize)
-                    if (u, param) not in jacobian:  # create the dict entry
-                        jacobian[(u, param)] = numpy.zeros((jval.size, psize))
+                    if (u, param) not in partials:  # create the dict entry
+                        partials[(u, param)] = numpy.zeros((jval.size, psize))
 
                     # set the column in the Jacobian entry
-                    jacobian[(u, param)][:, i] = jval.flat
+                    partials[(u, param)][:, i] = jval.flat
 
                 # restore old param value
                 if idx is None:
