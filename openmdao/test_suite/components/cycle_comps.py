@@ -44,21 +44,6 @@ def _compute_dA(system_size, theta):
     u, v, cross_terms, same_terms = _compute_vector_terms(system_size)
     return np.cos(theta) * cross_terms - np.sin(theta) * same_terms
 
-# def _inputs_to_vector(inputs, num_var, var_shape):
-#     size = np.prod(var_shape)
-#     x = np.zeros(num_var * size)
-#     for i in range(num_var):
-#         x_i = inputs['x_{}'.format(i)].flat
-#         x[size*i:size*(i+1)] = x_i
-#
-#     return x
-
-
-# def _vector_to_outputs(vec, outputs, num_var, var_shape):
-#     size = np.prod(var_shape)
-#     for i in range(num_var):
-#         y_i = vec[size * i:size * (i + 1)].reshape(var_shape)
-#         outputs['y_{}'.format(i)] = y_i
 
 def array_idx(i, var_size):
     return slice(i * var_size, (i + 1) * var_size)
