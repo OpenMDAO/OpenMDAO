@@ -323,9 +323,9 @@ class Component(System):
         multiple_items = len(oflist) > 1 or len(wrtlist) > 1
 
         for of in oflist:
-            of_copies = multiple_items or glob_patterns.intersection(set(of))
+            of_copies = multiple_items or glob_patterns.intersection(of)
             for wrt in wrtlist:
-                make_copies = of_copies or glob_patterns.intersection(set(wrt))
+                make_copies = of_copies or glob_patterns.intersection(wrt)
                 meta = {
                     'rows': rows,
                     'cols': cols,
