@@ -1676,7 +1676,7 @@ class System(object):
         vec = self._outputs._names
         for name, data in iteritems(out):
 
-            # Depending on where the constraint was added, the name in the
+            # Depending on where the designvar was added, the name in the
             # vectors might be relative instead of absolute. Lucky we have
             # both.
             if name in vec:
@@ -1719,6 +1719,18 @@ class System(object):
         except KeyError as err:
             msg = "Output not found for response {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
+
+        # Size them all
+        vec = self._outputs._names
+        for name, data in iteritems(out):
+
+            # Depending on where the response was added, the name in the
+            # vectors might be relative instead of absolute. Lucky we have
+            # both.
+            if name in vec:
+                out[name]['size'] = vec[name].shape[0]
+            else:
+                out[name]['size'] = vec[out[name]['name']].shape[0]
 
         if recurse:
             for subsys in self._subsystems_allprocs:

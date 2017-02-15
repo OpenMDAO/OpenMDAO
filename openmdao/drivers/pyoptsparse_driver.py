@@ -4,10 +4,10 @@ pyoptsparse is based on pyOpt, which is an object-oriented framework for
 formulating and solving nonlinear constrained optimization problems, with
 additional MPI capability.
 """
-
 from __future__ import print_function
-
+from collections import OrderedDict
 import traceback
+
 from six import iteritems
 from six.moves import range
 
@@ -103,11 +103,11 @@ class pyOptSparseDriver(Driver):
         self.supports['equality_constraints'] = True
         self.supports['multiple_objectives'] = True
         self.supports['two_sided_constraints'] = True
+        self.supports['active_set'] = True
 
         # TODO: Support these
-        #self.supports['active_set'] = True
-        #self.supports['linear_constraints'] = True
-        #self.supports['integer_design_vars'] = False
+        # self.supports['linear_constraints'] = True
+        # self.supports['integer_design_vars'] = False
 
         # User Options
         self.options.declare('optimizer', value='SLSQP', values=_check_imports(),
@@ -130,15 +130,20 @@ class pyOptSparseDriver(Driver):
         # with a history file
         self.hotstart_file = None
 
+        # We save the pyopt_solution so that it can be queried later on.
         self.pyopt_solution = None
 
-        #self.lin_jacs = OrderedDict()
-        #self.quantities = []
-        #self.metadata = None
-        #self.exit_flag = 0
-        #self.sparsity = OrderedDict()
-        #self.sub_sparsity = OrderedDict()
-        #self.active_tols = {}
+        # Cache the jacs of linear constraints
+        self.lin_jacs = OrderedDict()
+
+        # Support for active-set performance improvements.
+        self.active_tols = {}
+
+        # self.quantities = []
+        # self.metadata = None
+        # self.exit_flag = 0
+        # self.sparsity = OrderedDict()
+        # self.sub_sparsity = OrderedDict()
 
     def _setup_driver(self, problem):
         """Prepare the driver for execution.
@@ -163,8 +168,9 @@ class pyOptSparseDriver(Driver):
         """Excute pyOptsparse.
 
         Note that pyOpt controls the execution, and the individual optimizers
-        (i.e., SNOPT) control the iteration.
+        (e.g., SNOPT) control the iteration.
         """
+        problem = self.problem
         model = self.problem.model
         self.pyopt_solution = None
         self.iter_count = 0
@@ -174,7 +180,7 @@ class pyOptSparseDriver(Driver):
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
-        # Add all parameters
+        # Add all design variables
         param_meta = self._designvars
         param_vals = self.get_design_var_values()
 
@@ -190,73 +196,51 @@ class pyOptSparseDriver(Driver):
         for name in objs:
             opt_prob.addObj(name)
 
-        ## Calculate and save gradient for any linear constraints.
-        #lcons = self.get_constraints(lintype='linear').keys()
-        #self._problem = problem
-        #if len(lcons) > 0:
-            #self.lin_jacs = self.calc_gradient(indep_list, lcons,
-                                               #return_format='dict')
-            ##print("Linear Gradient")
-            ##print(self.lin_jacs)
+        # Calculate and save derivatives for any linear constraints.
+        con_meta = self._cons
+        lcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
+                            if con['linear']==True)
+        if len(lcons) > 0:
+            self.lin_jacs = problem.compute_total_derivs(of=lcons, wrt=indep_list,
+                                                         return_format='dict')
 
         # Add all equality constraints
-        econs = self.get_constraint_values(ctype='eq', lintype='nonlinear')
-        con_meta = self.get_constraint_metadata()
-        self.quantities += list(econs)
-
         self.active_tols = {}
-        for name in self.get_constraints(ctype='eq'):
-            meta = con_meta[name]
+        eqcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
+                            if con['equals'])
+        for name, meta in iteritems(eqcons):
             size = meta['size']
             lower = upper = meta['equals']
 
-            # Sparsify Jacobian via relevance
-            rels = rel.relevant[name]
-            wrt = rels.intersection(indep_list)
-            self.sparsity[name] = wrt
-
             if meta['linear']:
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper,
-                                     linear=True, wrt=wrt,
+                                     linear=True, #wrt=wrt,
                                      jac=self.lin_jacs[name])
             else:
 
-                jac = self._build_sparse(name, wrt, size, param_vals,
-                                         sub_param_conns, full_param_conns, rels)
-                opt_prob.addConGroup(name, size, lower=lower, upper=upper,
-                                     wrt=wrt, jac=jac)
+                opt_prob.addConGroup(name, size, lower=lower, upper=upper)
 
             active_tol = meta.get('active_tol')
             if active_tol:
                 self.active_tols[name] = active_tol
 
         # Add all inequality constraints
-        incons = self.get_constraints(ctype='ineq', lintype='nonlinear')
-        self.quantities += list(incons)
-
-        for name in self.get_constraints(ctype='ineq'):
-            meta = con_meta[name]
+        iqcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
+                            if not con['equals'])
+        for name, meta in iteritems(iqcons):
             size = meta['size']
 
             # Bounds - double sided is supported
             lower = meta['lower']
             upper = meta['upper']
 
-            # Sparsify Jacobian via relevance
-            rels = rel.relevant[name]
-            wrt = rels.intersection(indep_list)
-            self.sparsity[name] = wrt
-
             if meta['linear']:
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower,
-                                     linear=True, wrt=wrt,
+                                     linear=True, #wrt=wrt,
                                      jac=self.lin_jacs[name])
             else:
 
-                jac = self._build_sparse(name, wrt, size, param_vals,
-                                         sub_param_conns, full_param_conns, rels)
-                opt_prob.addConGroup(name, size, upper=upper, lower=lower,
-                                     wrt=wrt, jac=jac)
+                opt_prob.addConGroup(name, size, upper=upper, lower=lower)
 
             active_tol = meta.get('active_tol')
             if active_tol is not None:
@@ -303,8 +287,6 @@ class pyOptSparseDriver(Driver):
             sol = opt(opt_prob, sens=self._gradfunc, storeHistory=self.hist_file,
                       hotStart=self.hotstart_file)
 
-        self._problem = None
-
         # Print results
         if self.options['print_results']:
             print(sol)
@@ -350,8 +332,7 @@ class pyOptSparseDriver(Driver):
         """
 
         fail = 0
-        metadata = self.metadata
-        system = self.root
+        system = self.problem.model
 
         try:
             for name in self.indep_list:
@@ -362,15 +343,8 @@ class pyOptSparseDriver(Driver):
             #print(dv_dict)
 
             self.iter_count += 1
-            update_local_meta(metadata, (self.iter_count,))
 
-            try:
-                with self.root._dircontext:
-                    system.solve_nonlinear(metadata=metadata)
-
-            # Let the optimizer try to handle the error
-            except AnalysisError:
-                fail = 1
+            model._solve_nonlinear()
 
             func_dict = self.get_objectives() # this returns a new OrderedDict
             func_dict.update(self.get_constraints())

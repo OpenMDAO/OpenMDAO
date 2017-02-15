@@ -45,11 +45,11 @@ class Driver(object):
         self.supports.declare('multiple_objectives', type_=bool, value=True)
         self.supports.declare('two_sided_constraints', type_=bool, value=True)
         self.supports.declare('gradients', type_=bool, value=True)
+        self.supports.declare('active_set', type_=bool, value=True)
 
         # TODO, support these in Openmdao blue
         # self.supports.declare('linear_constraints', True)
         # self.supports.declare('integer_design_vars', True)
-        # self.supports.declare('active_set', True)
 
     def _setup_driver(self, problem):
         """Prepare the driver for execution.
