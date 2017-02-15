@@ -11,16 +11,21 @@ from openmdao.core.component import Component
 
 
 class ImplicitComponent(Component):
-    """Class to inherit from when all output variables are implicit."""
+    """
+    Class to inherit from when all output variables are implicit.
+    """
 
     def _apply_nonlinear(self):
-        """Compute residuals."""
+        """
+        Compute residuals.
+        """
         with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                          residuals=[self._residuals]):
             self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
     def _solve_nonlinear(self):
-        """Compute outputs.
+        """
+        Compute outputs.
 
         Returns
         -------
@@ -45,7 +50,8 @@ class ImplicitComponent(Component):
                 return result
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """Compute jac-vec product.
+        """
+        Compute jac-vec product.
 
         Parameters
         ----------
@@ -73,7 +79,8 @@ class ImplicitComponent(Component):
                                       d_inputs, d_outputs, d_residuals, mode)
 
     def _solve_linear(self, vec_names, mode):
-        """Apply inverse jac product.
+        """
+        Apply inverse jac product.
 
         Parameters
         ----------
@@ -92,7 +99,7 @@ class ImplicitComponent(Component):
             relative error.
         """
         if self._ln_solver is not None:
-            return self._ln_solver(vec_names, mode)
+            return self._ln_solver.solve(vec_names, mode)
         else:
             failed = False
             abs_errors = []
@@ -118,7 +125,9 @@ class ImplicitComponent(Component):
             return failed, numpy.linalg.norm(abs_errors), numpy.linalg.norm(rel_errors)
 
     def _linearize(self):
-        """Compute jacobian / factorization."""
+        """
+        Compute jacobian / factorization.
+        """
         with self._jacobian_context() as J:
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                              scale_jac=True):
@@ -127,8 +136,12 @@ class ImplicitComponent(Component):
             if self._owns_global_jac:
                 J._update()
 
+        if self._ln_solver is not None:
+            self._ln_solver._linearize()
+
     def apply_nonlinear(self, inputs, outputs, residuals):
-        """Compute residuals given inputs and outputs.
+        """
+        Compute residuals given inputs and outputs.
 
         Parameters
         ----------
@@ -142,7 +155,8 @@ class ImplicitComponent(Component):
         pass
 
     def solve_nonlinear(self, inputs, outputs):
-        """Compute outputs given inputs.
+        """
+        Compute outputs given inputs.
 
         Parameters
         ----------
@@ -160,7 +174,8 @@ class ImplicitComponent(Component):
 
     def apply_linear(self, inputs, outputs,
                      d_inputs, d_outputs, d_residuals, mode):
-        r"""Compute jac-vector product.
+        r"""
+        Compute jac-vector product.
 
         If mode is:
             'fwd': (d_inputs, d_outputs) \|-> d_residuals
@@ -185,7 +200,8 @@ class ImplicitComponent(Component):
         pass
 
     def solve_linear(self, d_outputs, d_residuals, mode):
-        r"""Apply inverse jac product.
+        r"""
+        Apply inverse jac product.
 
         If mode is:
             'fwd': d_residuals \|-> d_outputs
@@ -209,7 +225,8 @@ class ImplicitComponent(Component):
         pass
 
     def linearize(self, inputs, outputs, jacobian):
-        """Compute sub-jacobian parts / factorization.
+        """
+        Compute sub-jacobian parts / factorization.
 
         Parameters
         ----------

@@ -17,7 +17,8 @@ VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
 
 
 def array_idx_iter(shape):
-    """Return an iterator over the indices into a n-dimensional array.
+    """
+    Return an iterator over the indices into a n-dimensional array.
 
     Parameters
     ----------
@@ -34,7 +35,9 @@ def _parse_for_vars(s):
 
 
 def _valid_name(s, exprs):
-    """Generate a locally unique replacement for a dotted name."""
+    """
+    Generate a locally unique replacement for a dotted name.
+    """
     i = 0
     check = ' '.join(exprs)
     while True:
@@ -45,10 +48,13 @@ def _valid_name(s, exprs):
 
 
 class ExecComp(ExplicitComponent):
-    """A <Component> defined by an expression string."""
+    """
+    A component defined by an expression string.
+    """
 
     def __init__(self, exprs, inits=None, units=None, **kwargs):
-        r"""Create a <Component> using only an expression string.
+        r"""
+        Create a <Component> using only an expression string.
 
         Given a list of assignment statements, this component creates
         input and output variables at construction time.  All variables
@@ -174,18 +180,23 @@ class ExecComp(ExplicitComponent):
         return [compile(expr, expr, 'exec') for expr in exprs]
 
     def __getstate__(self):
-        """Return state as a dict."""
+        """
+        Return state as a dict.
+        """
         state = self.__dict__.copy()
         del state['_codes']
         return state
 
     def __setstate__(self, state):
-        """Restore state from `state`."""
+        """
+        Restore state from `state`.
+        """
         self.__dict__.update(state)
         self._codes = self._compile_exprs(self._exprs)
 
     def compute(self, inputs, outputs):
-        """Execute this component's assignment statemens.
+        """
+        Execute this component's assignment statemens.
 
         Parameters
         ----------
@@ -194,36 +205,35 @@ class ExecComp(ExplicitComponent):
 
         outputs : `Vector`
             `Vector` containing outputs.
-
         """
         for expr in self._codes:
             exec(expr, _expr_dict, _IODict(outputs, inputs, self._to_colons))
 
-    def compute_jacobian(self, params, unknowns, jacobian):
-        """Use complex step method to update the given Jacobian.
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        """
+        Use complex step method to update the given Jacobian.
 
         Parameters
         ----------
-        params : `VecWrapper`
+        inputs : `VecWrapper`
             `VecWrapper` containing parameters. (p)
 
-        unknowns : `VecWrapper`
+        outputs : `VecWrapper`
             `VecWrapper` containing outputs and states. (u)
 
-        jacobians : `Jacobian`
+        partials : `Jacobian`
             Contains sub-jacobians.
-
         """
         # our complex step
         step = self.complex_stepsize * 1j
 
         non_pbo_outputs = self._non_pbo_outputs
 
-        for param in params._views:
+        for param in inputs._views:
 
-            pwrap = _TmpDict(params)
+            pwrap = _TmpDict(inputs)
 
-            pval = params[param]
+            pval = inputs[param]
             if isinstance(pval, ndarray):
                 # replace the param array with a complex copy
                 pwrap[param] = numpy.asarray(pval, npcomplex)
@@ -241,7 +251,7 @@ class ExecComp(ExplicitComponent):
                 else:
                     pwrap[param][idx] += step
 
-                uwrap = _TmpDict(unknowns, return_complex=True)
+                uwrap = _TmpDict(outputs, return_complex=True)
 
                 # solve with complex param value
                 self._residuals.set_const(0.0)
@@ -249,11 +259,11 @@ class ExecComp(ExplicitComponent):
 
                 for u in non_pbo_outputs:
                     jval = imag(uwrap[u] / self.complex_stepsize)
-                    if (u, param) not in jacobian:  # create the dict entry
-                        jacobian[(u, param)] = numpy.zeros((jval.size, psize))
+                    if (u, param) not in partials:  # create the dict entry
+                        partials[(u, param)] = numpy.zeros((jval.size, psize))
 
                     # set the column in the Jacobian entry
-                    jacobian[(u, param)][:, i] = jval.flat
+                    partials[(u, param)][:, i] = jval.flat
 
                 # restore old param value
                 if idx is None:
@@ -263,7 +273,8 @@ class ExecComp(ExplicitComponent):
 
 
 class _TmpDict(object):
-    """Dict wrapper that allows modification without changing the wrapped dict.
+    """
+    Dict wrapper that allows modification without changing the wrapped dict.
 
     It will allow getting of values
     from its inner dict unless those values get modified via
@@ -273,7 +284,8 @@ class _TmpDict(object):
     """
 
     def __init__(self, inner, return_complex=False):
-        """Construct the dictionary object.
+        """
+        Construct the dictionary object.
 
         Parameters
         ----------
@@ -311,14 +323,16 @@ class _TmpDict(object):
 
 
 class _IODict(object):
-    """A dict wrapper that contains 2 different dicts.
+    """
+    A dict wrapper that contains 2 different dicts.
 
     Items are first looked for in the outputs
     and then the inputs.
     """
 
     def __init__(self, outputs, inputs, to_colons):
-        """Create the dict wrapper.
+        """
+        Create the dict wrapper.
 
         Parameters
         ----------
@@ -350,7 +364,8 @@ class _IODict(object):
 
 
 def _import_functs(mod, dct, names=None):
-    """Map attributes attrs from the given module into the given dict.
+    """
+    Map attributes attrs from the given module into the given dict.
 
     Parameters
     ----------

@@ -76,10 +76,10 @@ OpenMDAO User Source Documentation
    :maxdepth: 1
 """
 
-    # need to set up the srcdocs directory structure, relative to docs.
+    # need to set up the _srcdocs directory structure, relative to docs.
     docs_dir = os.path.dirname(__file__)
 
-    doc_dir = os.path.join(docs_dir, "srcdocs", doctype)
+    doc_dir = os.path.join(docs_dir, "_srcdocs", doctype)
     if os.path.isdir(doc_dir):
         import shutil
         shutil.rmtree(doc_dir)
@@ -93,7 +93,7 @@ OpenMDAO User Source Documentation
 
     # look for directories in the openmdao level, one up from docs
     # those directories will be the openmdao packages
-    # auto-generate the top-level index.rst file for srcdocs, based on
+    # auto-generate the top-level index.rst file for _srcdocs, based on
     # openmdao packages:
 
     # to improve the order that the user sees in the source docs, put
@@ -110,7 +110,7 @@ OpenMDAO User Source Documentation
             if listing not in IGNORE_LIST and listing not in packages:
                 packages.append(listing)
 
-    # begin writing the 'srcdocs/index.rst' file at mid  level.
+    # begin writing the '_srcdocs/index.rst' file at mid  level.
     index_filename = os.path.join(doc_dir, "index.rst")
     index = open(index_filename, "w")
     if doctype == "dev":
@@ -144,11 +144,11 @@ OpenMDAO User Source Documentation
             # stuff in the file to have fwd slashes.
             index.write("   packages/openmdao." + package + "\n")
 
-            # make subpkg directory (e.g. srcdocs/packages/core) for ref sheets
+            # make subpkg directory (e.g. _srcdocs/packages/core) for ref sheets
             package_dir = os.path.join(packages_dir, package)
             os.mkdir(package_dir)
 
-            # create/write a package index file: (e.g. "srcdocs/packages/openmdao.core.rst")
+            # create/write a package index file: (e.g. "_srcdocs/packages/openmdao.core.rst")
             package_file = open(package_filename, "w")
             package_file.write(package_name + "\n")
             package_file.write("-" * len(package_name) + "\n")
@@ -173,7 +173,7 @@ OpenMDAO User Source Documentation
                     ref_sheet.write(".. _" + doctype + "_" + package_name + "." +
                                     filename + ":\n\n")
                     ref_sheet.write(filename + "\n")
-                    ref_sheet.write("+" * len(filename) + "\n\n")
+                    ref_sheet.write("-" * len(filename) + "\n\n")
                     ref_sheet.write(".. automodule:: " + package_name + "." + sub_package)
 
                     # finish and close each reference sheet.
@@ -199,6 +199,137 @@ else:
 if doctype:
     generate_docs(doctype)
 
+# ------------------------begin monkeypatch-----------------------
+# monkeypatch to make our docstrings allow "Options"
+def _parse(self):
+    """
+    parse
+    """
+    self._doc.reset()
+    self._parse_summary()
+
+    sections = list(self._read_sections())
+    section_names = set([section for section, content in sections])
+
+    has_returns = 'Returns' in section_names
+    has_yields = 'Yields' in section_names
+    # We could do more tests, but we are not. Arbitrarily.
+    if has_returns and has_yields:
+        msg = 'Docstring contains both a Returns and Yields section.'
+        raise ValueError(msg)
+
+    for (section, content) in sections:
+        if not section.startswith('..'):
+            section = (s.capitalize() for s in section.split(' '))
+            section = ' '.join(section)
+            if self.get(section):
+                msg = ("The section %s appears twice in the docstring." %
+                       section)
+                raise ValueError(msg)
+
+        if section in ('Parameters', 'Options', 'Params', 'Returns', 'Yields', 'Raises',
+                       'Warns', 'Other Parameters', 'Attributes',
+                       'Methods'):
+            self[section] = self._parse_param_list(content)
+        elif section.startswith('.. index::'):
+            self['index'] = self._parse_index(section, content)
+        elif section == 'See Also':
+            self['See Also'] = self._parse_see_also(content)
+        else:
+            self[section] = content
+
+
+def __str__(self, indent=0, func_role="obj"):
+    """
+    our own __str__
+    """
+    out = []
+    out += self._str_signature()
+    out += self._str_index() + ['']
+    out += self._str_summary()
+    out += self._str_extended_summary()
+    out += self._str_param_list('Parameters')
+    out += self._str_options('Options')
+    out += self._str_returns()
+    for param_list in ('Other Parameters', 'Raises', 'Warns'):
+        out += self._str_param_list(param_list)
+    out += self._str_warnings()
+    out += self._str_see_also(func_role)
+    out += self._str_section('Notes')
+    out += self._str_references()
+    out += self._str_examples()
+    for param_list in ('Attributes', 'Methods'):
+        out += self._str_member_list(param_list)
+    out = self._str_indent(out, indent)
+    return '\n'.join(out)
+
+
+def __init__(self, docstring, config={}):
+    """
+    init
+    """
+    docstring = textwrap.dedent(docstring).split('\n')
+
+    self._doc = Reader(docstring)
+    self._parsed_data = {
+        'Signature': '',
+        'Summary': [''],
+        'Extended Summary': [],
+        'Parameters': [],
+        'Options': [],
+        'Returns': [],
+        'Raises': [],
+        'Warns': [],
+        'Other Parameters': [],
+        'Attributes': [],
+        'Methods': [],
+        'See Also': [],
+        'Notes': [],
+        'Warnings': [],
+        'References': '',
+        'Examples': '',
+        'index': {}
+    }
+
+    try:
+        self._parse()
+    except ParseError as e:
+        e.docstring = orig_docstring
+        raise
+
+    # In creation of usr docs, remove private Attributes (beginning with '_')
+    # with a crazy list comprehension
+    if tags.has("usr"):
+        self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"]
+                                              if not att[0].startswith('_')]
+
+
+def _str_options(self, name):
+    """
+    """
+    out = []
+    if self[name]:
+        out += self._str_field_list(name)
+        out += ['']
+        for param, param_type, desc in self[name]:
+            if param_type:
+                out += self._str_indent(['**%s** : %s' % (param.strip(),
+                                                          param_type)])
+            else:
+                out += self._str_indent(['**%s**' % param.strip()])
+            if desc:
+                out += ['']
+                out += self._str_indent(desc, 8)
+            out += ['']
+    return out
+
+
+# Do the actual patch switchover to these local versions
+NumpyDocString.__init__ = __init__
+SphinxDocString._str_options = _str_options
+SphinxDocString._parse = _parse
+SphinxDocString.__str__ = __str__
+# --------------end monkeypatch---------------------
 
 # --------------begin sphinx extension---------------------
 # a short sphinx extension to take care of hyperlinking in docs
@@ -285,13 +416,13 @@ def setup(app):
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('./exts'))
+sys.path.insert(0, os.path.abspath('./_exts'))
 
 if type == "usr":
-    absp = os.path.join('.', 'srcdocs', 'usr')
+    absp = os.path.join('.', '_srcdocs', 'usr')
     sys.path.insert(0, os.path.abspath(absp))
 elif type == "dev":
-    absp = os.path.join('.', 'srcdocs', 'dev')
+    absp = os.path.join('.', '_srcdocs', 'dev')
     sys.path.insert(0, os.path.abspath(absp))
 
 
@@ -358,10 +489,10 @@ language = None
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 if tags.has("usr"):
-    exclude_patterns = ['_build', 'srcdocs/dev']
+    exclude_patterns = ['_build', '_srcdocs/dev']
 
 if tags.has("dev"):
-    exclude_patterns = ['_build', 'srcdocs/usr']
+    exclude_patterns = ['_build', '_srcdocs/usr']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -373,7 +504,7 @@ todo_include_todos = False
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'theme'
+html_theme = '_theme'
 # html_theme = 'sphinxdoc'
 
 # Add any paths that contain custom themes here, relative to this directory.

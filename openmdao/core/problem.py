@@ -18,7 +18,8 @@ from openmdao.vectors.default_vector import DefaultVector
 
 
 class FakeComm(object):
-    """Fake MPI communicator class used if mpi4py is not installed.
+    """
+    Fake MPI communicator class used if mpi4py is not installed.
 
     Attributes
     ----------
@@ -29,13 +30,16 @@ class FakeComm(object):
     """
 
     def __init__(self):
-        """Initialize attributes."""
+        """
+        Initialize attributes.
+        """
         self.rank = 0
         self.size = 1
 
 
 class Problem(object):
-    """Top-level container for the systems and drivers.
+    """
+    Top-level container for the systems and drivers.
 
     Attributes
     ----------
@@ -53,8 +57,9 @@ class Problem(object):
     """
 
     def __init__(self, model=None, comm=None, assembler_class=None,
-                 use_ref_vector=True):
-        """Initialize attributes.
+                 use_ref_vector=True, root=None):
+        """
+        Initialize attributes.
 
         Parameters
         ----------
@@ -66,6 +71,8 @@ class Problem(object):
             pointer to the global <Assembler> object.
         use_ref_vector : bool
             if True, allocate vectors to store ref. values.
+        root : <System> or None
+            Deprecated kwarg for `model`.
         """
         if comm is None:
             try:
@@ -76,6 +83,16 @@ class Problem(object):
         if assembler_class is None:
             assembler_class = DefaultAssembler
 
+        if root is not None:
+            if model is not None:
+                raise ValueError("cannot specify both `root` and `model`. `root` has been "
+                                 "deprecated, please use model")
+
+            warn_deprecation("The 'root' argument provides backwards compatibility "
+                             "with OpenMDAO <= 1.x ; use 'model' instead.")
+
+            model = root
+
         self.model = model
         self.comm = comm
         self.driver = Driver()
@@ -84,7 +101,8 @@ class Problem(object):
         self._use_ref_vector = use_ref_vector
 
     def _get_path_data(self, name):
-        """Get absolute pathname and related data.
+        """
+        Get absolute pathname and related data.
 
         Parameters
         ----------
@@ -126,7 +144,8 @@ class Problem(object):
         return pathname, pdata
 
     def __getitem__(self, name):
-        """Get an output/input variable.
+        """
+        Get an output/input variable.
 
         Parameters
         ----------
@@ -148,7 +167,8 @@ class Problem(object):
             return c0 + c1 * self.model._inputs[pathname]
 
     def __setitem__(self, name, value):
-        """Set an output/input variable.
+        """
+        Set an output/input variable.
 
         Parameters
         ----------
@@ -180,7 +200,8 @@ class Problem(object):
 
     @property
     def root(self):
-        """Provide 'root' property for backwards compatibility.
+        """
+        Provide 'root' property for backwards compatibility.
 
         Returns
         -------
@@ -193,7 +214,8 @@ class Problem(object):
 
     @root.setter
     def root(self, model):
-        """Provide for setting the 'root' property for backwards compatibility.
+        """
+        Provide for setting the 'root' property for backwards compatibility.
 
         Parameters
         -------
@@ -205,7 +227,8 @@ class Problem(object):
         self.model = model
 
     def run_model(self):
-        """Run the model by calling the root system's solve_nonlinear.
+        """
+        Run the model by calling the root system's solve_nonlinear.
 
         Returns
         -------
@@ -233,7 +256,8 @@ class Problem(object):
         return self.driver.run()
 
     def run_once(self):
-        """Backward compatible call for run_model.
+        """
+        Backward compatible call for run_model.
 
         Returns
         -------
@@ -250,7 +274,8 @@ class Problem(object):
         return self.run_model()
 
     def run(self):
-        """Backward compatible call for run_driver.
+        """
+        Backward compatible call for run_driver.
 
         Returns
         -------
@@ -268,13 +293,14 @@ class Problem(object):
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None,
               mode='auto'):
-        """Set up everything (model, assembler, vector, solvers, drivers).
+        """
+        Set up everything (model, assembler, vector, solvers, drivers).
 
         Parameters
         ----------
-        vector_class : type (DefaultVector)
+        vector_class : type
             reference to an actual <Vector> class; not an instance.
-        check : boolean (True)
+        check : boolean
             whether to run error check after setup is complete.
         logger : object
             Object for logging config checks if check is True.
@@ -357,7 +383,8 @@ class Problem(object):
         return self
 
     def setup_vector(self, vec_name, vector_class, use_ref_vector):
-        """Set up the 'vec_name' <Vector>.
+        """
+        Set up the 'vec_name' <Vector>.
 
         Parameters
         ----------
@@ -387,7 +414,8 @@ class Problem(object):
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
-        """Compute derivatives of desired quantities with respect to desired inputs.
+        """
+        Compute derivatives of desired quantities with respect to desired inputs.
 
         Parameters
         ----------
@@ -554,12 +582,13 @@ class Problem(object):
 
 
 def _check_shape(shape, val):
-    """Check that the shape of a value matches the metadata for a variable.
+    """
+    Check that the shape of a value matches the metadata for a variable.
 
     Parameters
     ----------
-    meta : dict
-        metadata for a variable.
+    shape : tuple
+        Expected shape of a variable.
     val : float or ndarray or list
         value to check.
     """

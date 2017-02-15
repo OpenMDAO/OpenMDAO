@@ -5,7 +5,7 @@ import sphinx
 from sphinx.util.compat import Directive
 from sphinx.writers.html import HTMLTranslator
 
-from openmdao.docs.utils.docutil import get_unit_test_source_and_run_outputs
+from openmdao.docs._utils.docutil import get_unit_test_source_and_run_outputs
 
 if sys.version_info[0] == 2:
     import cgi as cgiesc
@@ -78,7 +78,6 @@ class EmbedTestDirective(Directive):
 
 def setup(app):
     """add custom directive into Sphinx so that it is found during document parsing"""
-
     app.add_directive('embed-test', EmbedTestDirective)
     app.add_node(skipped_or_failed_node, html=(visit_skipped_or_failed_node, depart_skipped_or_failed_node))
 

@@ -60,6 +60,7 @@ def _vector_to_outputs(vec, outputs, num_var, var_shape):
         outputs['y_{}'.format(i)] = y_i
 
 class ExplicitCycleComp(ExplicitComponent):
+
     def __str__(self):
         return 'Explicit Cycle Component'
 
@@ -190,7 +191,7 @@ class ExplicitCycleComp(ExplicitComponent):
 
             self.declare_partials('theta_out', 'theta', **self._array2kwargs(dtheta, pd_type))
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         if self.metadata['jacobian_type'] != 'matvec':
             angle_param = self.angle_param
             angle = inputs[angle_param]
@@ -216,10 +217,10 @@ class ExplicitCycleComp(ExplicitComponent):
                     J_y_x = self.make_jacobian_entry(A[array_idx(out_idx), array_idx(in_idx)], pd_type)
                     J_y_angle = self.make_jacobian_entry(dA_x[array_idx(out_idx)], pd_type)
 
-                    jacobian[out_var, in_var] = J_y_x
-                    jacobian[out_var, angle_param] = J_y_angle
+                    partials[out_var, in_var] = J_y_x
+                    partials[out_var, angle_param] = J_y_angle
 
-            jacobian['theta_out', 'theta'] = self.make_jacobian_entry(dtheta, pd_type)
+            partials['theta_out', 'theta'] = self.make_jacobian_entry(dtheta, pd_type)
 
 
 class ExplicitFirstComp(ExplicitCycleComp):
@@ -274,16 +275,16 @@ class ExplicitLastComp(ExplicitFirstComp):
             self.declare_partials('theta_out', 'psi',
                                   **self._array2kwargs(np.array([1.]), pd_type))
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         if self.metadata['jacobian_type'] != 'matvec':
             pd_type = self.metadata['partial_type']
             for i in range(self.metadata['num_var']):
                 in_var = 'x_{0}'.format(i)
-                jacobian['x_norm2', in_var] = self.make_jacobian_entry(inputs[in_var].flat[:], pd_type)
+                partials['x_norm2', in_var] = self.make_jacobian_entry(inputs[in_var].flat[:], pd_type)
 
             k = self.metadata['num_comp']
-            jacobian['theta_out', 'theta'] = self.make_jacobian_entry(np.array([.5]), pd_type)
-            jacobian['theta_out', 'psi'] = self.make_jacobian_entry(np.array([-1/(2*k-2)]), pd_type)
+            partials['theta_out', 'theta'] = self.make_jacobian_entry(np.array([.5]), pd_type)
+            partials['theta_out', 'psi'] = self.make_jacobian_entry(np.array([-1/(2*k-2)]), pd_type)
 
     def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
         if self.metadata['jacobian_type'] == 'matvec':

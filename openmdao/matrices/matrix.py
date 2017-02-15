@@ -4,7 +4,8 @@ import numpy
 
 
 class Matrix(object):
-    """Base matrix class.
+    """
+    Base matrix class.
 
     This class is used for global Jacobians.
 
@@ -21,7 +22,8 @@ class Matrix(object):
     """
 
     def __init__(self, comm):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
         Parameters
         ----------
@@ -34,7 +36,8 @@ class Matrix(object):
         self._metadata = {}
 
     def _add_submat(self, key, info, irow, icol, src_indices, shape):
-        """Declare a sub-jacobian.
+        """
+        Declare a sub-jacobian.
 
         Parameters
         ----------
@@ -55,7 +58,8 @@ class Matrix(object):
         self._submats[key] = (info, irow, icol, src_indices, shape)
 
     def _build(self, num_rows, num_cols):
-        """Allocate the matrix.
+        """
+        Allocate the matrix.
 
         Parameters
         ----------
@@ -67,7 +71,8 @@ class Matrix(object):
         pass
 
     def _update_submat(self, submats, metadata, key, jac, system):
-        """Update the values of a sub-jacobian.
+        """
+        Update the values of a sub-jacobian.
 
         Parameters
         ----------
@@ -85,7 +90,8 @@ class Matrix(object):
         pass
 
     def _prod(self, vec, mode):
-        """Perform a matrix vector product.
+        """
+        Perform a matrix vector product.
 
         Parameters
         ----------
@@ -103,7 +109,8 @@ class Matrix(object):
 
 
 def _compute_index_map(jrows, jcols, irow, icol, src_indices):
-    """Return row/column indices to map sub-jacobian to global jac.
+    """
+    Return row/column indices to map sub-jacobian to global jac.
 
     Parameters
     ----------
