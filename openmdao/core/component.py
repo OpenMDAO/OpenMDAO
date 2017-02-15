@@ -259,6 +259,30 @@ class Component(System):
         self._var_myproc_metadata['output'].append(metadata)
         self._var2meta[name] = metadata
 
+    def approx_partials(self, of, wrt, method='fd', **kwargs):
+        """
+        Inform the framework that the specified derivatives are to be approximated using the
+        specified method and options.
+
+        Parameters
+        ----------
+        of : str or list of str
+            The name of the residual(s) that derivatives are being computed for.
+            May also contain a glob pattern.
+        wrt : str or list of str
+            The name of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+        method : str
+            The type of approximation that should be used. Valid options include:
+                - 'fd': Finite Difference
+        **kwargs : dict
+            Keyword arguments for controlling the behavior of the approximation.
+        """
+        oflist = [of] if isinstance(of, string_types) else of
+        wrtlist = [wrt] if isinstance(wrt, string_types) else wrt
+
+
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):
         """
