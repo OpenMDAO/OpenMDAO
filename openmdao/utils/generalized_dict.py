@@ -200,7 +200,31 @@ class OptionsDictionary(GeneralizedDictionary):
 
     This class is instantiated for:
         1. the options attribute in solvers, drivers, and processor allocators
+        2. the supports attribute in drivers
+
+    Attributes
+    ----------
+    _dict : dict
+        Dictionary of entries set using via dictionary access.
+    _global_dict : dict
+        Dictionary of entries like _dict, but combined with dicts of parents.
+    _declared_entries : dict
+        Dictionary of entry declarations.
+    _read_only : bool
+        Flag that toggles read_only mode.
     """
+
+    def __init__(self, read_only=False):
+        """Initialize all attributes.
+
+        Parameters
+        ----------
+        read_only : bool
+            Set to True to create a read-only OptionsDictionary.
+        """
+        super(OptionsDictionary, self).__init__()
+
+        self._read_only = read_only
 
     def __setitem__(self, name, value):
         """Set an entry in the local dictionary.
@@ -212,6 +236,10 @@ class OptionsDictionary(GeneralizedDictionary):
         value : -
             value of the entry to be value- and type-checked if declared.
         """
+        if self._read_only:
+            msg = "Tried to set '{}' on a read-only OptionsDictionary."
+            raise KeyError(msg.format(name))
+
         if name not in self._declared_entries:
             raise KeyError("Entry '{}' is not declared".format(name))
 

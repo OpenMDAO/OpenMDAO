@@ -23,7 +23,13 @@ class TestDriver(unittest.TestCase):
         prob.run_driver()
 
         designvars = prob.driver.get_design_var_values()
-        self.assertEqual(designvars['x'], 2.0 )
+        self.assertEqual(designvars['pz.z'][0], 5.0 )
+
+        designvars = prob.driver.get_objective_values()
+        self.assertEqual(designvars['obj_cmp.obj'], prob['obj'] )
+
+        designvars = prob.driver.get_constraint_values()
+        self.assertEqual(designvars['con_cmp1.con1'], prob['con1']  )
 
 if __name__ == "__main__":
     unittest.main()

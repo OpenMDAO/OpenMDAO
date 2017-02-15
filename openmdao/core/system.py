@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from collections import namedtuple, OrderedDict, Iterable
 import numbers
 import sys
+from six import iteritems
 
 import numpy
 
@@ -1590,12 +1591,25 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        out = self._design_vars.copy()
+        pro2abs = self._var_name2path['output']
+
+        # Human readable error message during Driver setup.
+        try:
+            out = {pro2abs[name]: data for name, data in iteritems(self._design_vars)}
+        except KeyError as err:
+            msg = "Output not found for design variable {0} in system '{1}'."
+            raise RuntimeError(msg.format(str(err), self.pathname))
+
+        # Size them all
+        vec = self._outputs._names
+        for name, data in iteritems(out):
+            out[name]['size'] = vec[name].shape[0]
+
         if recurse:
             for subsys in self._subsystems_allprocs:
                 subsys_design_vars = subsys.get_design_vars(recurse=recurse)
                 for key in subsys_design_vars:
-                    out[subsys.name + '.' + key] = subsys_design_vars[key]
+                    out[key] = subsys_design_vars[key]
         return out
 
     def get_responses(self, recurse=True):
@@ -1617,12 +1631,20 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        out = self._responses.copy()
+        pro2abs = self._var_name2path['output']
+
+        # Human readable error message during Driver setup.
+        try:
+            out = {pro2abs[name]: data for name, data in iteritems(self._responses)}
+        except KeyError as err:
+            msg = "Output not found for response {0} in system '{1}'."
+            raise RuntimeError(msg.format(str(err), self.pathname))
+
         if recurse:
             for subsys in self._subsystems_allprocs:
                 subsys_design_vars = subsys.get_responses(recurse=recurse)
                 for key in subsys_design_vars:
-                    out[subsys.name + '.' + key] = subsys_design_vars[key]
+                    out[key] = subsys_design_vars[key]
         return out
 
     def get_constraints(self, recurse=True):
