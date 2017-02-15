@@ -133,13 +133,10 @@ class System(object):
     _var_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
         integer arrays of global indices of variables on this proc.
     _var_maps : {'input': dict, 'output': dict}
-        dictionary of variable names and their aliases (for promotes/renames).
+        dictionary of variable names and their promoted names.
     _var_promotes : { 'any': set(), 'input': set(), 'output': set() }
         dictionary of sets of variable names/wildcards specifying promotion
         (used to calculate _var_maps)
-    _var_renames : { 'input': {}, 'output': {} }
-        dictionary of mappings used to specify variables to be renamed in the
-        parent group. (used to calculate _var_maps)
     _var_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
     _var_connections_indices : [(int, int), ...]
@@ -230,7 +227,6 @@ class System(object):
 
         self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
-        self._var_renames = {'input': {}, 'output': {}}
 
         self._var_connections = {}
         self._var_connections_indices = []
@@ -693,7 +689,7 @@ class System(object):
 
     def _get_maps(self, typ):
         """
-        Define variable maps based on promotes and renames lists.
+        Define variable maps based on promotes lists.
 
         Parameters
         ----------
@@ -704,7 +700,7 @@ class System(object):
         -------
         dict of {str:str, ...}
             dictionary mapping input/output variable names
-            to promoted or renamed variable names.
+            to promoted variable names.
         """
         maps = {}
 
@@ -712,7 +708,6 @@ class System(object):
 
         promotes = self._var_promotes['any']
         promotes_typ = self._var_promotes[typ]
-        renames = self._var_renames[typ]
 
         if promotes:
             names = promotes
@@ -735,12 +730,8 @@ class System(object):
                     maps[name] = name
                     break
             else:
-                if name in renames:
-                    # Rename selected variables in the parent system
-                    maps[name] = renames[name]
-                else:
-                    # Default: prepend the parent system's name
-                    maps[name] = gname + name if gname else name
+                # Default: prepend the parent system's name
+                maps[name] = gname + name if gname else name
 
         return maps
 
