@@ -131,7 +131,7 @@ class Jacobian(object):
 
     def _precompute_iter(self):
         """
-        Cache two lists of (output, input) pairs found in the jacobian for the current System.
+        Cache lists of (output, input) pairs found in the jacobian for the current System.
 
         The two lists are:
         1. _iter_list_rel_unpromoted : list of unpromoted names viewed from this system

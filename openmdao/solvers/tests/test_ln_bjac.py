@@ -70,6 +70,5 @@ class TestLinearBlockJacSolver(unittest.TestCase):
                              "A block linear solver 'LN: LNBJ' is being used with a GlobalJacobian in system ''")
 
 
-
 if __name__ == "__main__":
     unittest.main()

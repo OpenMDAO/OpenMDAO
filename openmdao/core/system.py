@@ -915,7 +915,7 @@ class System(object):
 
         for sys in self.system_iter(include_self=True, recurse=True):
             if sys._owns_global_jac:
-                with sys._jacobian_context() as J:
+                with sys._jacobian_context():
                     sys._jacobian._precompute_iter()
                     sys._jacobian._scale(scaling)
 
