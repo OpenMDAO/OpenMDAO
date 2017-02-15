@@ -292,14 +292,14 @@ class Group(System):
                                       out_index + out_offset))
 
                     if src_indices is not None:
-                        # set the 'indices' metadata in the input variable
+                        # set the 'src_indices' metadata in the input variable
                         try:
                             in_myproc_index = myproc_in_names.index(in_name)
                         except ValueError:
                             pass
                         else:
                             meta = input_meta[in_myproc_index]
-                            meta['indices'] = np.array(src_indices, dtype=int)
+                            meta['src_indices'] = np.array(src_indices, dtype=int)
 
                         # set src_indices to None to avoid unnecessary repeat
                         # of setting indices and shape metadata when we have

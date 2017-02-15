@@ -40,11 +40,11 @@ class TestAddVarCompIndices(ExplicitComponent):
     """Component for tests for declaring only indices."""
 
     def initialize_variables(self):
-        self.add_input('x_a', indices=0)
-        self.add_input('x_b', indices=(0, 1))
-        self.add_input('x_c', indices=[0, 1])
-        self.add_input('x_d', indices=numpy.arange(6))
-        self.add_input('x_e', indices=numpy.arange(6).reshape((3, 2)))
+        self.add_input('x_a', src_indices=0)
+        self.add_input('x_b', src_indices=(0, 1))
+        self.add_input('x_c', src_indices=[0, 1])
+        self.add_input('x_d', src_indices=numpy.arange(6))
+        self.add_input('x_e', src_indices=numpy.arange(6).reshape((3, 2)))
         self.add_output('y')
 
 
@@ -54,8 +54,8 @@ class TestAddVarCompScalarArray(ExplicitComponent):
     def initialize_variables(self):
         self.add_input('x_a', 2.0, shape=(6))
         self.add_input('x_b', 2.0, shape=(3, 2))
-        self.add_input('x_c', 2.0, indices=numpy.arange(6))
-        self.add_input('x_d', 2.0, indices=numpy.arange(6).reshape((3,2)))
+        self.add_input('x_c', 2.0, src_indices=numpy.arange(6))
+        self.add_input('x_d', 2.0, src_indices=numpy.arange(6).reshape((3,2)))
         self.add_output('y_a', 3.0, shape=(6))
         self.add_output('y_b', 3.0, shape=(3, 2))
 
@@ -64,8 +64,8 @@ class TestAddVarCompArrayIndices(ExplicitComponent):
     """Component for tests for declaring with array val and array indices."""
 
     def initialize_variables(self):
-        self.add_input('x_a', 2.0 * numpy.ones(6), indices=numpy.arange(6))
-        self.add_input('x_b', 2.0 * numpy.ones((3, 2)), indices=numpy.arange(6).reshape((3, 2)))
+        self.add_input('x_a', 2.0 * numpy.ones(6), src_indices=numpy.arange(6))
+        self.add_input('x_b', 2.0 * numpy.ones((3, 2)), src_indices=numpy.arange(6).reshape((3, 2)))
         self.add_output('y')
 
 
