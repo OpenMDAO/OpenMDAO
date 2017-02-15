@@ -141,6 +141,9 @@ class TestGroup(unittest.TestCase):
         g1 = Group()
         g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0))
         g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
+
+        # use glob pattern 'comp?.a' to promote both comp1.a and comp2.a
+        # use glob pattern 'comp?.b' to promote both comp1.b and comp2.b
         p.model.add_subsystem('G1', g1,
                               promotes_inputs=['comp?.a'],
                               promotes_outputs=['comp?.b'])
