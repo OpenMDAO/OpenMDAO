@@ -7,6 +7,7 @@ import numpy
 from itertools import product
 from six import string_types, iteritems
 from scipy.sparse import issparse
+from copy import deepcopy
 
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
@@ -318,13 +319,19 @@ class Component(System):
                 raise ValueError('If rows and cols are specified, val must be a scalar or have the '
                                  'same shape, val: {}, rows/cols: {}'.format(val.shape, rows.shape))
 
+        glob_patterns = {'*', '?', '['}
+        multiple_items = len(oflist) > 1 or len(wrtlist) > 1
+
         for of in oflist:
+            of_copies = multiple_items or glob_patterns.intersection(set(of))
             for wrt in wrtlist:
+                make_copies = of_copies or glob_patterns.intersection(set(wrt))
                 meta = {
                     'rows': rows,
                     'cols': cols,
                     'value': val,
                     'dependent': dependent,
+                    'copy': make_copies
                 }
                 # matching names/glob patterns will be resolved later because
                 # we don't know if all variables have been declared at this
@@ -346,11 +353,18 @@ class Component(System):
         tvlists = (('output', outs), ('input', ins))
 
         for (of_pattern, wrt_pattern), meta in iteritems(self._subjacs_info):
+            copy = meta['copy']
+            val = meta['value']
             of_matches = [name for name in outs if fnmatchcase(name, of_pattern)]
             for typ, vnames in tvlists:
                 wrt_matches = [name for name in vnames if fnmatchcase(name, wrt_pattern)]
                 for (of, wrt) in product(of_matches, wrt_matches):
-                    yield (of, wrt), meta, typ
+                    if copy:
+                        mc = meta.copy()
+                        mc['value'] = deepcopy(val)
+                        yield (of, wrt), mc, typ
+                    else:
+                        yield (of, wrt), meta, typ
 
     def _check_partials_meta(self, key, meta):
         """
