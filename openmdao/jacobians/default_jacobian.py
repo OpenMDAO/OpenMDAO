@@ -27,7 +27,7 @@ class DefaultJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        for out_name, in_name in self:
+        for out_name, in_name in iter(self._iter_list_rel_unpromoted):
             ukey = self._key2unique((out_name, in_name))
             jac = self._subjacs[ukey]
 

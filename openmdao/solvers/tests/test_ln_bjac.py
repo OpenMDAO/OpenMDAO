@@ -11,6 +11,7 @@ from openmdao.api import Group, IndepVarComp, Problem, LinearBlockGS, LinearBloc
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 
+
 class TestLinearBlockGSSolver(unittest.TestCase):
 
     def test_globaljac_err(self):
@@ -26,7 +27,7 @@ class TestLinearBlockGSSolver(unittest.TestCase):
 
         prob.model.jacobian = GlobalJacobian()
         prob.setup(check=False, mode='fwd')
-        
+
         prob['width'] = 2.0
         prob.run_model()
 
@@ -38,7 +39,6 @@ class TestLinearBlockGSSolver(unittest.TestCase):
 
         self.assertEqual(str(context.exception),
                          "A block linear solver 'LN: LNBGS' is being used with a GlobalJacobian in system ''")
-        
 
 
 class TestLinearBlockJacSolver(unittest.TestCase):
@@ -56,7 +56,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
 
         prob.model.jacobian = GlobalJacobian()
         prob.setup(check=False, mode='fwd')
-        
+
         prob['width'] = 2.0
         prob.run_model()
 
@@ -68,7 +68,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
 
             self.assertEqual(str(context.exception),
                              "A block linear solver 'LN: LNBJ' is being used with a GlobalJacobian in system ''")
-        
+
 
 
 if __name__ == "__main__":
