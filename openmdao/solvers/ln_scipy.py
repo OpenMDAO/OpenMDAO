@@ -33,6 +33,7 @@ class ScipyIterativeSolver(LinearSolver):
 
         # initialize preconditioner to None
         self.precon = None
+        self._sub_solvers.append('precon')
 
     def _declare_options(self):
         """

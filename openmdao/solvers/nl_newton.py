@@ -34,9 +34,11 @@ class NewtonSolver(NonlinearSolver):
 
         # Slot for linear solver
         self.ln_solver = None
+        self._sub_solvers.append('ln_solver')
 
         # Slot for linesearch
         self.linesearch = None
+        self._sub_solvers.append('linesearch')
 
     def _setup_solvers(self, system, depth):
         """

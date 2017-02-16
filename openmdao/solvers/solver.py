@@ -26,6 +26,9 @@ class Solver(object):
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
         number of iterations for the current invocation of the solver.
+    _sub_solvers : [str, ...]
+        list of child solver attribute names that should be iterated over whenever
+        any recursion is needed
     options : <OptionsDictionary>
         options dictionary.
     """
@@ -46,6 +49,7 @@ class Solver(object):
         self._vec_names = None
         self._mode = 'fwd'
         self._iter_count = 0
+        self._sub_solvers = []
 
         self.options = OptionsDictionary()
         self.options.declare('maxiter', type_=int, value=10,
@@ -289,7 +293,10 @@ class LinearSolver(Solver):
         """
         Perform any required initialization operations such as matrix factorization.
         """
-        pass
+        for sub_solver_name in self._sub_solvers:
+            sub_solver = getattr(self, sub_solver_name)
+            if isinstance(sub_solver, Solver):
+                sub_solver._linearize()
 
     def _iter_initialize(self):
         """
