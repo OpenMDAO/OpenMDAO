@@ -33,7 +33,7 @@ def make_compatible(name, value, shape=None, indices=None):
 
     Parameters
     ----------
-    value : str
+    name : str
         The name of the value.
     value : float or list or tuple or ndarray
         The value of a variable.
