@@ -61,30 +61,6 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp1.a'], 3.0) # still use unpromoted name
         self.assertEqual(p['b'], 6.0)
 
-    def test_group_simple_renamed(self):
-        raise unittest.SkipTest("The add_subsystem has not yet been updated for renames")
-        p = Problem(model=Group())
-        p.model.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
-                              promotes_inputs=[('a','new_a')],
-                              promotes_outputs=[('b', 'new_b')])
-
-        p.setup()
-
-        self.assertEqual(p['comp1.a'], 3.0) # input, still use unpromoted name
-        self.assertEqual(p['new_b'], 6.0)
-
-    def test_group_simple_renamed_dict(self):
-        raise unittest.SkipTest("The add_subsystem has not yet been updated for renames")
-        p = Problem(model=Group())
-        p.model.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
-                              promotes_inputs=[{'a': 'new_a'}],
-                              promotes_outputs=[{'b': 'new_b'}])
-
-        p.setup()
-
-        self.assertEqual(p['comp1.a'], 3.0) # still use unpromoted name
-        self.assertEqual(p['new_b'], 6.0)
-
     def test_group_nested(self):
         p = Problem(model=Group())
         g1 = p.model.add_subsystem('G1', Group())
@@ -210,46 +186,6 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(p['a'], 2)
         self.assertEqual(p['x'], 5)
-        self.assertEqual(p['comp2.y'], 10)
-
-    def test_group_renames_conn(self):
-        """Renaming variables and using implicit connections."""
-        raise unittest.SkipTest("The add_subsystem has not yet been updated for renames")
-        p = Problem(model=Group())
-        p.model.add_subsystem('comp1', IndepVarComp([
-                ('a', 2.0),
-                ('x', 5.0),
-            ]),
-            promotes_outputs=['x', ('a', 'q')])
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
-        p.setup()
-
-        p.model.suppress_solver_output = True
-        p.run_model()
-
-        self.assertEqual(p['q'], 2)
-        self.assertEqual(p['x'], 5)
-        self.assertEqual(p['comp2.y'], 10)
-
-    def test_group_renames_and_connect(self):
-        """Renaming variables and issuing explicit connections."""
-        raise unittest.SkipTest("The add_subsystem has not yet been updated for renames")
-        p = Problem(model=Group())
-        p.model.add_subsystem('comp1', IndepVarComp([
-                ('a', 2.0),
-                ('x', 5.0),
-            ]),
-            promotes_outputs=[('x', 'x2'), ('a', 'q')])
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'))
-        p.model.connect('x2', 'comp2.x')
-        p.setup()
-
-        p.model.suppress_solver_output = True
-        p.run_model()
-
-        self.assertEqual(p['q'], 2)
-        self.assertEqual(p['x2'], 5)
-        self.assertEqual(p['comp2.x'], 5)
         self.assertEqual(p['comp2.y'], 10)
 
     def test_group_nested_conn(self):
@@ -478,19 +414,6 @@ class TestConnect(unittest.TestCase):
 
         msg = "Output and input are in the same System for connection " + \
               "in 'sub' from 'y' to 'tgt.x'."
-
-        with assertRaisesRegex(self, RuntimeError, msg):
-            prob.setup(check=False)
-
-    def test_connect_within_system_with_renames(self):
-        prob = Problem(Group())
-
-        sub = prob.model.add_subsystem('sub', Group())
-        sub.add_subsystem('tgt', ExecComp('y = x'), renames_outputs={'y': 'y2'})
-        sub.connect('y2', 'tgt.x', src_indices=[1])
-
-        msg = "Output and input are in the same System for connection " + \
-              "in 'sub' from 'y2' to 'tgt.x'."
 
         with assertRaisesRegex(self, RuntimeError, msg):
             prob.setup(check=False)
