@@ -42,18 +42,18 @@ class SellarDis1(ExplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0)
 
-    def compute(self, params, unknowns):
+    def compute(self, inputs, outputs):
         """
         Evaluates the equation
         y1 = z1**2 + z2 + x1 - 0.2*y2
         """
 
-        z1 = params['z'][0]
-        z2 = params['z'][1]
-        x1 = params['x']
-        y2 = params['y2']
+        z1 = inputs['z'][0]
+        z2 = inputs['z'][1]
+        x1 = inputs['x']
+        y2 = inputs['y2']
 
-        unknowns['y1'] = z1**2 + z2 + x1 - 0.2*y2
+        outputs['y1'] = z1**2 + z2 + x1 - 0.2*y2
 
         self.execution_count += 1
 
@@ -63,13 +63,13 @@ class SellarDis1withDerivatives(SellarDis1):
     Component containing Discipline 1 -- derivatives version.
     """
 
-    def compute_jacobian(self, params, unknowns, J):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """
         Jacobian for Sellar discipline 1.
         """
-        J['y1','y2'] = -0.2
-        J['y1','z'] = np.array([[2.0*params['z'][0], 1.0]])
-        J['y1','x'] = 1.0
+        partials['y1','y2'] = -0.2
+        partials['y1','z'] = np.array([[2.0 * inputs['z'][0], 1.0]])
+        partials['y1','x'] = 1.0
 
 
 class SellarDis2(ExplicitComponent):
@@ -91,15 +91,15 @@ class SellarDis2(ExplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0)
 
-    def compute(self, params, unknowns):
+    def compute(self, inputs, outputs):
         """
         Evaluates the equation
         y2 = y1**(.5) + z1 + z2
         """
 
-        z1 = params['z'][0]
-        z2 = params['z'][1]
-        y1 = params['y1']
+        z1 = inputs['z'][0]
+        z2 = inputs['z'][1]
+        y1 = inputs['y1']
 
         # Note: this may cause some issues. However, y1 is constrained to be
         # above 3.16, so lets just let it converge, and the optimizer will
@@ -107,7 +107,7 @@ class SellarDis2(ExplicitComponent):
         if y1.real < 0.0:
             y1 *= -1
 
-        unknowns['y2'] = y1**.5 + z1 + z2
+        outputs['y2'] = y1**.5 + z1 + z2
 
         self.execution_count += 1
 
@@ -117,12 +117,12 @@ class SellarDis2withDerivatives(SellarDis2):
     Component containing Discipline 2 -- derivatives version.
     """
 
-    def compute_jacobian(self, params, unknowns, J):
+    def compute_partial_derivs(self, inputs, outputs, J):
         """
         Jacobian for Sellar discipline 2.
         """
 
-        J['y2', 'y1'] = .5*params['y1']**-.5
+        J['y2', 'y1'] = .5*inputs['y1']**-.5
         J['y2', 'z'] = np.array([[1.0, 1.0]])
 
 
@@ -252,23 +252,23 @@ class StateConnection(ImplicitComponent):
         # States
         self.add_output('y2_command', val=1.0)
 
-    def apply_nonlinear(self, params, unknowns, resids):
+    def apply_nonlinear(self, inputs, outputs, residuals):
         """
         Don't solve; just calculate the residual.
         """
 
-        y2_actual = params['y2_actual']
-        y2_command = unknowns['y2_command']
+        y2_actual = inputs['y2_actual']
+        y2_command = outputs['y2_command']
 
-        resids['y2_command'] = y2_actual - y2_command
+        residuals['y2_command'] = y2_actual - y2_command
 
-    def compute(self, params, unknowns):
+    def compute(self, inputs, outputs):
         """
         This is a dummy comp that doesn't modify its state.
         """
         pass
 
-    def linearize(self, params, unknowns, J):
+    def linearize(self, inputs, outputs, J):
         """
         Analytical derivatives.
         """

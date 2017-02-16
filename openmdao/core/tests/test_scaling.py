@@ -120,10 +120,10 @@ class TestScaling(unittest.TestCase):
 
         prob['sys1.old_length'] = 3.e5
         assert_rel_error(self, prob['sys1.old_length'], 3.e5)
-        assert_rel_error(self, prob.model._outputs['sys1.old_length'], 3.)
+        assert_rel_error(self, prob.model._outputs['sys1.old_length'], 3.e5)
         prob.run_model()
         assert_rel_error(self, prob['sys2.new_length'], 3.e-1)
-        assert_rel_error(self, prob.model._outputs['sys2.new_length'], 3.)
+        assert_rel_error(self, prob.model._outputs['sys2.new_length'], 3.e-1)
 
     def test_speed(self):
         comp = IndepVarComp()

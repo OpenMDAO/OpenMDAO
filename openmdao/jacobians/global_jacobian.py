@@ -175,7 +175,7 @@ class GlobalJacobian(Jacobian):
         var_indices = self._system._var_myproc_indices
         var_paths = self._system._var_allprocs_pathnames
         out_start, out_end = self._system._var_allprocs_range['output']
-        in_start, in_end = self._system._var_allprocs_range['output']
+        in_start, in_end = self._system._var_allprocs_range['input']
         assembler = self._system._assembler
 
         for re_idx_all in var_indices['output']:

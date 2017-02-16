@@ -331,6 +331,7 @@ class System(object):
 
         Sets the following attributes:
             _var_allprocs_names
+            _var_allprocs_pathnames
             _var_myproc_names
             _var_myproc_metadata
 
@@ -603,22 +604,6 @@ class System(object):
             sub_upper_bounds = upper_bounds._create_subvector(subsys)
             subsys._setup_bounds_vectors(sub_lower_bounds, sub_upper_bounds, False)
 
-    @property
-    def jacobian(self):
-        """
-        A Jacobian object or None.
-        """
-        return self._jacobian
-
-    @jacobian.setter
-    def jacobian(self, jacobian):
-        """
-        Set the Jacobian.
-        """
-        self._owns_global_jac = isinstance(jacobian, GlobalJacobian)
-        self._jacobian = jacobian
-        self._jacobian_changed = True
-
     def _setup_jacobians(self, jacobian=None):
         """
         Set and populate jacobians down through the system tree.
@@ -743,6 +728,22 @@ class System(object):
                     maps[name] = gname + name if gname else name
 
         return maps
+
+    @property
+    def jacobian(self):
+        """
+        A Jacobian object or None.
+        """
+        return self._jacobian
+
+    @jacobian.setter
+    def jacobian(self, jacobian):
+        """
+        Set the Jacobian.
+        """
+        self._owns_global_jac = isinstance(jacobian, GlobalJacobian)
+        self._jacobian = jacobian
+        self._jacobian_changed = True
 
     @contextmanager
     def _jacobian_context(self):
@@ -884,6 +885,39 @@ class System(object):
         d_inputs._names = d_inputs._views
         d_outputs._names = d_outputs._views
         d_residuals._names = d_residuals._views
+
+    @contextmanager
+    def _scaled_context(self):
+        """
+        Context manager that temporarily puts all vectors and Jacobians in a scaled state.
+        """
+        self._scale_vectors_and_jacobians('to norm')
+        yield
+        self._scale_vectors_and_jacobians('to phys')
+
+    def _scale_vectors_and_jacobians(self, direction):
+        """
+        Scale all vectors and Jacobians to or from a scaled state.
+
+        Parameters
+        ----------
+        direction : str
+            'to norm' (to scaled) or 'to phys' (to unscaled).
+        """
+        if direction == 'to norm':
+            scaling = self._scaling_to_norm
+        elif direction == 'to phys':
+            scaling = self._scaling_to_phys
+
+        for vec_type in ['input', 'output', 'residual']:
+            for vec in self._vectors[vec_type].values():
+                vec._scale(scaling[vec_type])
+
+        for sys in self.system_iter(include_self=True, recurse=True):
+            if sys._owns_global_jac:
+                with sys._jacobian_context():
+                    sys._jacobian._precompute_iter()
+                    sys._jacobian._scale(scaling)
 
     @property
     def nl_solver(self):
@@ -1156,105 +1190,6 @@ class System(object):
             except KeyError:
                 raise KeyError("%s: residual '%s' not found." % (self.pathname,
                                                                  name))
-
-    def _apply_nonlinear(self):
-        """
-        Compute residuals.
-        """
-        pass
-
-    def _solve_nonlinear(self):
-        """
-        Compute outputs.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
-        """
-        pass
-
-    def _apply_linear(self, vec_names, mode, var_inds=None):
-        """
-        Compute jac-vec product.
-
-        Parameters
-        ----------
-        vec_names : [str, ...]
-            list of names of the right-hand-side vectors.
-        mode : str
-            'fwd' or 'rev'.
-        var_inds : [int, int, int, int] or None
-            ranges of variable IDs involved in this matrix-vector product.
-            The ordering is [lb1, ub1, lb2, ub2].
-        """
-        pass
-
-    def _solve_linear(self, vec_names, mode):
-        """
-        Apply inverse jac product.
-
-        Parameters
-        ----------
-        vec_names : [str, ...]
-            list of names of the right-hand-side vectors.
-        mode : str
-            'fwd' or 'rev'.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
-        """
-        pass
-
-    def _linearize(self):
-        """
-        Compute jacobian / factorization.
-        """
-        pass
-
-    def initialize(self):
-        """
-        Optional user-defined method run once during instantiation.
-
-        Available attributes:
-            name
-            metadata (only local)
-        """
-        pass
-
-    def initialize_processors(self):
-        """
-        Optional user-defined method run after repartitioning/rebalancing.
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-        """
-        pass
-
-    def initialize_variables(self):
-        """
-        Required method for components to declare inputs and outputs.
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-        """
-        pass
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
@@ -1736,3 +1671,176 @@ class System(object):
         """
         return dict((key, response) for (key, response) in
                     self.get_responses(recurse=recurse).items() if isinstance(response, Objective))
+
+    def run_apply_nonlinear(self):
+        """
+        Compute residuals.
+        """
+        with self._scaled_context():
+            self._apply_nonlinear()
+
+    def run_solve_nonlinear(self):
+        """
+        Compute outputs.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        with self._scaled_context():
+            result = self._solve_nonlinear()
+
+        return result
+
+    def run_apply_linear(self, vec_names, mode, var_inds=None):
+        """
+        Compute jac-vec product.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+        var_inds : [int, int, int, int] or None
+            ranges of variable IDs involved in this matrix-vector product.
+            The ordering is [lb1, ub1, lb2, ub2].
+        """
+        with self._scaled_context():
+            self._apply_linear(vec_names, mode, var_inds)
+
+    def run_solve_linear(self, vec_names, mode):
+        """
+        Apply inverse jac product.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        with self._scaled_context():
+            result = self._solve_linear(vec_names, mode)
+
+        return result
+
+    def run_linearize(self):
+        """
+        Compute jacobian / factorization.
+        """
+        with self._scaled_context():
+            self._linearize()
+
+    def _apply_nonlinear(self):
+        """
+        Compute residuals.
+        """
+        pass
+
+    def _solve_nonlinear(self):
+        """
+        Compute outputs.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        pass
+
+    def _apply_linear(self, vec_names, mode, var_inds=None):
+        """
+        Compute jac-vec product.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+        var_inds : [int, int, int, int] or None
+            ranges of variable IDs involved in this matrix-vector product.
+            The ordering is [lb1, ub1, lb2, ub2].
+        """
+        pass
+
+    def _solve_linear(self, vec_names, mode):
+        """
+        Apply inverse jac product.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        pass
+
+    def _linearize(self):
+        """
+        Compute jacobian / factorization.
+        """
+        pass
+
+    def initialize(self):
+        """
+        Optional user-defined method run once during instantiation.
+
+        Available attributes:
+            name
+            metadata (only local)
+        """
+        pass
+
+    def initialize_processors(self):
+        """
+        Optional user-defined method run after repartitioning/rebalancing.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+        """
+        pass
+
+    def initialize_variables(self):
+        """
+        Required method for components to declare inputs and outputs.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+        """
+        pass

@@ -5,8 +5,6 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 
-from openmdao.test_suite.groups.unit_conversion_groups import SrcComp
-
 
 class SimpleGroup(Group):
 
@@ -422,8 +420,8 @@ class TestConnect(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
-        prob.model.add_subsystem('src', SrcComp())
-        prob.model.add_subsystem('tgt', ExecComp('y = x'))
+        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', units={'x2': 'degC'}))
+        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x'))
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
@@ -438,8 +436,8 @@ class TestConnect(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
-        prob.model.add_subsystem('src', SrcComp())
-        prob.model.add_subsystem('tgt', ExecComp('y = x', units={'x': 'm'}))
+        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', units={'x2': 'degC'}))
+        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', units={'x': 'm'}))
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')

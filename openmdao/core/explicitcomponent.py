@@ -122,7 +122,7 @@ class ExplicitComponent(Component):
 
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                              scale_jac=True):
-                self.compute_jacobian(self._inputs, self._outputs, J)
+                self.compute_partial_derivs(self._inputs, self._outputs, J)
 
             # re-negate the jacobian
             self._negate_jac()
@@ -169,7 +169,8 @@ class ExplicitComponent(Component):
                 for out_name in self._var_myproc_names['output']:
                     key = (out_name, in_name)
                     if key in self._jacobian:
-                        self._jacobian._multiply_subjac(key, -1.0)
+                        ukey = self._jacobian._key2unique(key)
+                        self._jacobian._multiply_subjac(ukey, -1.0)
 
     def _set_partials_meta(self):
         """
@@ -199,7 +200,7 @@ class ExplicitComponent(Component):
         """
         pass
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """
         Compute sub-jacobian parts / factorization.
 
@@ -209,8 +210,8 @@ class ExplicitComponent(Component):
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
-        jacobian : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
         """
         pass
 
