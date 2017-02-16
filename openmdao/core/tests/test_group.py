@@ -3,7 +3,8 @@ from six import assertRaisesRegex
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
+from openmdao.devtools.testutil import assert_rel_error
 
 
 class SimpleGroup(Group):
@@ -116,6 +117,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(c1.pathname, 'Branch1.G1.G2.comp1')
 
     def test_group_nested_promoted1(self):
+        # promotes from bottom level up 1
         p = Problem(model=Group())
         g1 = p.model.add_subsystem('G1', Group())
         g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
@@ -134,10 +136,14 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['G1.comp2.a'], 4.0)
 
     def test_group_nested_promoted2(self):
+        # promotes up from G1 level
         p = Problem(model=Group())
         g1 = Group()
         g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0))
         g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
+
+        # use glob pattern 'comp?.a' to promote both comp1.a and comp2.a
+        # use glob pattern 'comp?.b' to promote both comp1.b and comp2.b
         p.model.add_subsystem('G1', g1,
                               promotes_inputs=['comp?.a'],
                               promotes_outputs=['comp?.b'])
@@ -149,25 +155,6 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp2.b'], 12.0)
 
         # access both promoted inputs using unpromoted names.
-        self.assertEqual(p['G1.comp1.a'], 3.0)
-        self.assertEqual(p['G1.comp2.a'], 4.0)
-
-    def test_group_nested_renamed(self):
-        raise unittest.SkipTest("The add_subsystem has not yet been updated for renames")
-        p = Problem(model=Group())
-        g1 = p.model.add_subsystem('G1', Group())
-        g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
-                         promotes_inputs=[('a', 'new_a')], promotes_outputs=[('b', 'new_b')])
-        g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0),
-                         promotes_inputs=[('a', 'new_a')])
-        p.setup()
-
-        # output G1.comp1.b is promoted and renamed
-        self.assertEqual(p['G1.new_b'], 6.0)
-        # output G1.comp2.b is not promoted
-        self.assertEqual(p['G1.comp2.b'], 12.0)
-
-        # access both renamed inputs using unpromoted names.
         self.assertEqual(p['G1.comp1.a'], 3.0)
         self.assertEqual(p['G1.comp2.a'], 4.0)
 
@@ -303,7 +290,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['group2.comp2.b'], 40.0)
 
     def test_reused_output_promoted_names(self):
-        prob = Problem(Group())
+        prob = Problem(model=Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
         G1 = prob.model.add_subsystem('G1', Group())
         G1.add_subsystem("C1", ExecComp("y=2.0*x"), promotes=['y'])
@@ -311,6 +298,90 @@ class TestGroup(unittest.TestCase):
         msg = "Output name 'y' refers to multiple outputs: \['G1.C2.y', 'G1.C1.y'\]."
         with assertRaisesRegex(self, Exception, msg):
             prob.setup(check=False)
+
+    def test_basic_connect_units(self):
+        p = Problem(model=Group())
+        indep = p.model.add_subsystem('indep', IndepVarComp())
+        indep.add_output('x', np.ones(5), units='ft')
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)', x=np.zeros(5),
+                                             units={'x': 'inch', 'y': 'inch'}))
+        p.model.connect('indep.x', 'C1.x')
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['indep.x'], np.ones(5), 0.00001)
+        assert_rel_error(self, p['C1.x'], np.ones(5)*12., 0.00001)
+        assert_rel_error(self, p['C1.y'], 60., 0.00001)
+
+    def test_connect_1_to_many(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)))
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros(5)))
+        p.model.add_subsystem('C2', ExecComp('y=sum(x)*4.0', x=np.zeros(5)))
+        p.model.add_subsystem('C3', ExecComp('y=sum(x)*6.0', x=np.zeros(5)))
+        p.model.connect('indep.x', ['C1.x', 'C2.x', 'C3.x'])
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.y'], 10., 0.00001)
+        assert_rel_error(self, p['C2.y'], 20., 0.00001)
+        assert_rel_error(self, p['C3.y'], 30., 0.00001)
+
+    def test_connect_src_indices(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)))
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros(3)))
+        p.model.add_subsystem('C2', ExecComp('y=sum(x)*4.0', x=np.zeros(2)))
+
+        # connect C1.x to the first 3 entries of indep.x
+        p.model.connect('indep.x', 'C1.x', src_indices=[0, 1, 2])
+
+        # connect C2.x to the last 2 entries of indep.x
+        p.model.connect('indep.x', 'C2.x', src_indices=[3, 4])
+
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.x'], np.ones(3), 0.00001)
+        assert_rel_error(self, p['C1.y'], 6., 0.00001)
+        assert_rel_error(self, p['C2.x'], np.ones(2), 0.00001)
+        assert_rel_error(self, p['C2.y'], 8., 0.00001)
+
+    def test_promote_src_indices(self):
+        class MyComp1(ExplicitComponent):
+            def initialize_variables(self):
+                # this input will connect to entries 0, 1, and 2 of its source
+                self.add_input('x', np.ones(3), src_indices=[0, 1, 2])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        class MyComp2(ExplicitComponent):
+            def initialize_variables(self):
+                # this input will connect to entries 3 and 4 of its source
+                self.add_input('x', np.ones(2), src_indices=[3, 4])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*4.0
+
+        p = Problem(model=Group())
+
+        # by promoting the following output and inputs to 'x', they will
+        # be automatically connected
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', MyComp1(), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', MyComp2(), promotes_inputs=['x'])
+
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.x'], np.ones(3), 0.00001)
+        assert_rel_error(self, p['C1.y'], 6., 0.00001)
+        assert_rel_error(self, p['C2.x'], np.ones(2), 0.00001)
+        assert_rel_error(self, p['C2.y'], 8., 0.00001)
 
 
 class TestConnect(unittest.TestCase):

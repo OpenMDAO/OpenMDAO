@@ -36,7 +36,8 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
         self._var2meta = {}
 
-    def add_input(self, name, val=1.0, shape=None, indices=None, units=None, desc='', var_set=0):
+    def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
+                  desc='', var_set=0):
         """
         Add an input variable to the component.
 
@@ -45,22 +46,24 @@ class Component(System):
         name : str
             name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
-            The initial value of the variable being added in user-defined units. Default is 1.0.
+            The initial value of the variable being added in user-defined units.
+            Default is 1.0.
         shape : int or tuple or list or None
-            Shape of this variable, only required if indices not provided and val is not an array.
-            Default is None.
-        indices : int or list of ints or tuple of ints or int ndarray or None
+            Shape of this variable, only required if src_indices not provided and
+            val is not an array. Default is None.
+        src_indices : int or list of ints or tuple of ints or int ndarray or None
             The indices of the source variable to transfer data from.
-            If val is given as an array_like object, the shapes of val and indices must match.
-            A value of None implies this input depends on all entries of source. Default is None.
+            If val is given as an array_like object, the shapes of val and
+            src_indices must match. A value of None implies this input depends
+            on all entries of source. Default is None.
         units : str or None
-            Units in which this input variable will be provided to the component during execution.
-            Default is None, which means it has no units.
+            Units in which this input variable will be provided to the component
+            during execution. Default is None, which means it has no units.
         desc : str
             description of the variable
         var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for reconfigurability.
-            Default is 0.
+            For advanced users only. ID or color for this variable, relevant for
+            reconfigurability. Default is 0.
         """
         # First, type check all arguments
         if not isinstance(name, str):
@@ -69,8 +72,10 @@ class Component(System):
             raise TypeError('The val argument should be a float, list, tuple, or ndarray')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
-        if indices is not None and not isinstance(indices, (int, list, tuple, numpy.ndarray)):
-            raise TypeError('The indices argument should be an int, list, tuple, or ndarray')
+        if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
+                                                                    numpy.ndarray)):
+            raise TypeError('The src_indices argument should be an int, list, '
+                            'tuple, or ndarray')
         if units is not None and not isinstance(units, str):
             raise TypeError('The units argument should be a str or None')
 
@@ -90,33 +95,35 @@ class Component(System):
             if shape is not None and val_shape != shape:
                 raise ValueError('The val argument is an array, but val.shape != shape.')
             # 2. val and indices
-            if indices is not None and val_shape != numpy.atleast_1d(indices).shape:
-                raise ValueError('The val and indices are arrays, but val.shape != indices.shape.')
+            if src_indices is not None and val_shape != numpy.atleast_1d(src_indices).shape:
+                raise ValueError('The val and src_indices are arrays, but val.shape '
+                                 '!= src_indices.shape.')
         if shape is not None:
             # 3. shape and indices
-            if indices is not None and shape != numpy.atleast_1d(indices).shape:
-                raise ValueError('The val argument is an array, but val.shape != indices.shape.')
+            if src_indices is not None and shape != numpy.atleast_1d(src_indices).shape:
+                raise ValueError('The val argument is an array, but val.shape != '
+                                 'src_indices.shape.')
 
         metadata = {}
 
         # val: taken as is
         metadata['value'] = val
 
-        # shape: if not given, infer from val (if array) or indices, else assume scalar
+        # shape: if not given, infer from val (if array) or src_indices, else assume scalar
         if shape is not None:
             metadata['shape'] = shape
         elif not numpy.isscalar(val):
             metadata['shape'] = numpy.atleast_1d(val).shape
-        elif indices is not None:
-            metadata['shape'] = numpy.atleast_1d(indices).shape
+        elif src_indices is not None:
+            metadata['shape'] = numpy.atleast_1d(src_indices).shape
         else:
             metadata['shape'] = (1,)
 
-        # indices: None or ndarray
-        if indices is None:
-            metadata['indices'] = None
+        # src_indices: None or ndarray
+        if src_indices is None:
+            metadata['src_indices'] = None
         else:
-            metadata['indices'] = numpy.atleast_1d(indices)
+            metadata['src_indices'] = numpy.atleast_1d(src_indices)
 
         # units: taken as is
         metadata['units'] = units
@@ -145,7 +152,7 @@ class Component(System):
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
         shape : int or tuple or list or None
-            Shape of this variable, only required if indices not provided and val is not an array.
+            Shape of this variable, only required if val is not an array.
             Default is None.
         units : str or None
             Units in which the output variables will be provided to the component during execution.
