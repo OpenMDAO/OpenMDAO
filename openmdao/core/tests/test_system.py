@@ -152,7 +152,7 @@ class TestSystem(unittest.TestCase):
                 inputs['C2.x'] = bad_val.tolist()
 
             #
-            # set_output
+            # set output
             #
 
             # assign array to scalar
@@ -180,7 +180,7 @@ class TestSystem(unittest.TestCase):
                 outputs['C2.y'] = bad_val.tolist()
 
             #
-            # set_residual
+            # set residual
             #
 
             # assign array to scalar
