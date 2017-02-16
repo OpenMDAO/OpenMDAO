@@ -3,7 +3,7 @@ from six import assertRaisesRegex
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -338,6 +338,42 @@ class TestGroup(unittest.TestCase):
 
         # connect C2.x to the last 2 entries of indep.x
         p.model.connect('indep.x', 'C2.x', src_indices=[3, 4])
+
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.x'], np.ones(3), 0.00001)
+        assert_rel_error(self, p['C1.y'], 6., 0.00001)
+        assert_rel_error(self, p['C2.x'], np.ones(2), 0.00001)
+        assert_rel_error(self, p['C2.y'], 8., 0.00001)
+
+    def test_promote_src_indices(self):
+        class MyComp1(ExplicitComponent):
+            def initialize_variables(self):
+                # this input will connect to entries 0, 1, and 2 of its source
+                self.add_input('x', np.ones(3), src_indices=[0, 1, 2])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        class MyComp2(ExplicitComponent):
+            def initialize_variables(self):
+                # this input will connect to entries 3 and 4 of its source
+                self.add_input('x', np.ones(2), src_indices=[3, 4])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*4.0
+
+        p = Problem(model=Group())
+
+        # by promoting the following output and inputs to 'x', they will
+        # be automatically connected
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', MyComp1(), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', MyComp2(), promotes_inputs=['x'])
 
         p.model.suppress_solver_output = True
         p.setup()
