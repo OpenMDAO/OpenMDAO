@@ -290,11 +290,7 @@ class Component(System):
         val : float or ndarray of float or scipy.sparse
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
-
         """
-        of_list = [of] if isinstance(of, string_types) else of
-        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
-
         # If only one of rows/cols is specified
         if (rows is None) ^ (cols is None):
             raise ValueError('If one of rows/cols is specified, then both must be specified')
@@ -319,25 +315,9 @@ class Component(System):
                 raise ValueError('If rows and cols are specified, val must be a scalar or have the '
                                  'same shape, val: {}, rows/cols: {}'.format(val.shape, rows.shape))
 
-        glob_patterns = {'*', '?', '['}
-        multiple_items = len(of_list) > 1 or len(wrt_list) > 1
+        multiple_items, pattern_matches = self._find_partial_matches(of, wrt)
 
-        outs = self._var_allprocs_names['output']
-        ins = self._var_allprocs_names['input']
-
-        def find_matches(pattern, var_list):
-            globs = glob_patterns.intersection(pattern)
-            if globs:
-                return [name for name in var_list if fnmatchcase(name, pattern)]
-            elif pattern in var_list:
-                return [pattern]
-            return []
-
-        of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
-        wrt_pattern_matches = [(pattern, find_matches(pattern, outs), find_matches(pattern, ins))
-                               for pattern in wrt_list]
-
-        for of_bundle, wrt_bundle in product(of_pattern_matches, wrt_pattern_matches):
+        for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
             wrt_pattern, wrt_out, wrt_in = wrt_bundle
             if not of_matches:
@@ -362,6 +342,44 @@ class Component(System):
                     meta.update(meta_changes)
                     self._check_partials_meta(key, meta)
                     self._subjacs_info[key] = meta
+
+    def _find_partial_matches(self, of, wrt):
+        """
+        Find all partial derivative matches from of and wrt.
+
+        Parameters
+        ----------
+        of : str or list of str
+            The name of the residual(s) that derivatives are being computed for.
+            May also contain a glob pattern.
+        wrt : str or list of str
+            The name of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+
+        Returns
+        -------
+        bool, tuple(list, list)
+            Bool for if there are multiple items in either of/wrt, tuple containing the of/wrt match
+        """
+        of_list = [of] if isinstance(of, string_types) else of
+        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
+        glob_patterns = {'*', '?', '['}
+        multiple_items = len(of_list) > 1 or len(wrt_list) > 1
+        outs = self._var_allprocs_names['output']
+        ins = self._var_allprocs_names['input']
+
+        def find_matches(pattern, var_list):
+            if glob_patterns.intersection(pattern):
+                return [name for name in var_list if fnmatchcase(name, pattern)]
+            elif pattern in var_list:
+                return [pattern]
+            return []
+
+        of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
+        wrt_pattern_matches = [(pattern, find_matches(pattern, outs), find_matches(pattern, ins))
+                               for pattern in wrt_list]
+        return multiple_items, (of_pattern_matches, wrt_pattern_matches)
 
     def _check_partials_meta(self, key, meta):
         """
