@@ -29,8 +29,10 @@ class Jacobian(object):
     _keymap : dict
         Mapping of original (output, input) key to (output, source) in cases
         where the input has src_indices.
-    _iter_list : [(out_name, in_name), ...]
-        list of output-input pairs to iterate over.
+    _iter_list_rel_unprom : [(out_name, in_name), ...]
+        list of output-input pairs to iterate over where the names are relative, unpromoted.
+    _iter_list_pathnames : [(out_name, in_name), ...]
+        list of output-input pairs to iterate over where the names are unique pathnames.
     options : <OptionsDictionary>
         options dictionary.
     """
@@ -51,7 +53,8 @@ class Jacobian(object):
         self._int_mtx = None
         self._ext_mtx = None
         self._keymap = {}
-        self._iter_list = None
+        self._iter_list_rel_unprom = None
+        self._iter_list_pathnames = None
 
         self.options = OptionsDictionary()
         self.options.update(kwargs)
@@ -90,7 +93,7 @@ class Jacobian(object):
         Parameters
         ----------
         key : (str, str)
-            output name, input name of sub-Jacobian.
+            output name, input name of sub-Jacobian. Names are local, promoted.
 
         Returns
         -------
@@ -106,19 +109,17 @@ class Jacobian(object):
             return (self._system._var_name2path['output'][key[0]],
                     self._system._var_name2path['output'][key[1]])
 
-    def _multiply_subjac(self, key, val):
+    def _multiply_subjac(self, ukey, val):
         """
         Multiply this sub-Jacobian by val.
 
         Parameters
         ----------
-        key : (str, str)
-            Output name, input name of sub-Jacobian.
-            The names are in the current system's namespace, unpromoted.
+        ukey : (str, str)
+            Output name, input name of sub-Jacobian. The names are the full global pathnames.
         val : float
             value to multiply by.
         """
-        ukey = self._key2unique(key)
         jac = self._subjacs[ukey]
 
         if isinstance(jac, numpy.ndarray):
@@ -130,38 +131,45 @@ class Jacobian(object):
 
     def _precompute_iter(self):
         """
-        Assemble list of output-input pairs by name.
+        Cache lists of (output, input) pairs found in the jacobian for the current System.
 
-        Sets self._iter_list to a list of (output, input) pairs found in the
-        jacobian for the current System. input and output are unpromoted names.
+        The two lists are:
+        1. _iter_list_rel_unprom : list of unpromoted names viewed from this system
+        2. _iter_list_pathnames : list of global, unique pathnames
         """
         system = self._system
         start = len(system.pathname) + 1 if system.pathname else 0
-        outpaths = system._var_allprocs_pathnames['output']
-        inpaths = system._var_allprocs_pathnames['input']
+        out_paths = system._var_allprocs_pathnames['output']
+        in_paths = system._var_allprocs_pathnames['input']
         out_offset = system._var_allprocs_range['output'][0]
         in_offset = system._var_allprocs_range['input'][0]
         in_indices = system._var_myproc_indices['input']
         out_indices = system._var_myproc_indices['output']
 
-        iter_list = []
+        iter_list_rel_unprom = []
+        iter_list_pathnames = []
         for re_ind in out_indices:
-            re_path = outpaths[re_ind - out_offset]
+            re_path = out_paths[re_ind - out_offset]
             re_unprom = re_path[start:]
 
             for out_ind in out_indices:
-                out_path = outpaths[out_ind - out_offset]
+                out_path = out_paths[out_ind - out_offset]
+                out_unprom = out_path[start:]
 
                 if (re_path, out_path) in self._subjacs:
-                    iter_list.append((re_unprom, out_path[start:]))
+                    iter_list_rel_unprom.append((re_unprom, out_unprom))
+                    iter_list_pathnames.append((re_path, out_path))
 
             for in_ind in in_indices:
-                in_path = inpaths[in_ind - in_offset]
+                in_path = in_paths[in_ind - in_offset]
+                in_unprom = in_path[start:]
 
                 if (re_path, in_path) in self._subjacs:
-                    iter_list.append((re_unprom, in_path[start:]))
+                    iter_list_rel_unprom.append((re_unprom, in_unprom))
+                    iter_list_pathnames.append((re_path, in_path))
 
-        self._iter_list = iter_list
+        self._iter_list_rel_unprom = iter_list_rel_unprom
+        self._iter_list_pathnames = iter_list_pathnames
 
     def __contains__(self, key):
         """
@@ -170,8 +178,7 @@ class Jacobian(object):
         Parameters
         ----------
         key : (str, str)
-            output name, input name of sub-Jacobian. Names are
-            promoted names.
+            output name, input name of sub-Jacobian. Names are promoted names.
 
         Returns
         -------
@@ -185,20 +192,8 @@ class Jacobian(object):
                 for ipath in self._system._var_name2path['input'][key[1]]:
                     return (out_path, ipath) in self._subjacs
             elif key[1] in outname2path:
-                return (outname2path[key[0]], outname2path[key[1]]
-                        ) in self._subjacs
+                return (outname2path[key[0]], outname2path[key[1]]) in self._subjacs
         return False
-
-    def __iter__(self):
-        """
-        Return iterator from pre-computed _iter_list.
-
-        Returns
-        -------
-        listiterator
-            iterator returning (out_name, in_name) pairs.
-        """
-        return iter(self._iter_list)
 
     def __setitem__(self, key, jac):
         """
@@ -207,7 +202,7 @@ class Jacobian(object):
         Parameters
         ----------
         key : (str, str)
-            output name, input name of sub-Jacobian.
+            output name, input name of sub-Jacobian. Names are promoted names.
         jac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
@@ -241,7 +236,7 @@ class Jacobian(object):
         Parameters
         ----------
         key : (str, str)
-            output name, input name of sub-Jacobian.
+            output name, input name of sub-Jacobian. Names are promoted names.
 
         Returns
         -------
@@ -251,25 +246,30 @@ class Jacobian(object):
         ukey = self._key2unique(key)
         return self._subjacs[ukey]
 
-    def _scale_subjac(self, key, coeffs):
+    def _iter_pathnames(self):
+        return iter(self._iter_list_pathnames)
+
+    def _iter_rel_unprom(self):
+        return iter(self._iter_list_rel_unprom)
+
+    def _scale_subjac(self, ukey, coeffs):
         """
         Change the scaling state of a single subjac.
 
         Parameters
         ----------
-        key : (str, str)
-            Jacobian key of promoted names.
+        ukey : (str, str)
+            Output name, input name of sub-Jacobian. The names are the full global pathnames.
         coeffs : dict of ndarray[nvar_myproc, 2]
             0th and 1st order coefficients for scaling/unscaling.
             The keys are 'input', 'output', and 'residual'
         """
-        ukey = self._key2unique(key)
         ind0 = self._system._var_pathdict[ukey[0]].myproc_idx
         ind1 = self._system._var_pathdict[ukey[1]].myproc_idx
         typ = self._system._var_pathdict[ukey[1]].typ
 
         val = coeffs['residual'][ind0, 1] / coeffs[typ][ind1, 1]
-        self._multiply_subjac(key, val)
+        self._multiply_subjac(ukey, val)
 
     def _scale(self, coeffs):
         """
@@ -281,8 +281,8 @@ class Jacobian(object):
             0th and 1st order coefficients for scaling/unscaling.
             The keys are 'input', 'output', and 'residual'.
         """
-        for key in self:
-            self._scale_subjac(key, coeffs)
+        for ukey in self._iter_pathnames():
+            self._scale_subjac(ukey, coeffs)
 
     def _initialize(self):
         """
@@ -320,7 +320,7 @@ class Jacobian(object):
         Parameters
         ----------
         key : (str, str)
-            output name, input name of sub-Jacobian.
+            output name, input name of sub-Jacobian. The names are promoted names.
         meta : dict
             Metadata dictionary for the subjacobian.
         negate : bool

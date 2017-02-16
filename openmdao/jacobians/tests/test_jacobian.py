@@ -5,7 +5,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, issparse
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
-     GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CsrMatrix, CooMatrix, ExecComp
+     GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CSRmatrix, COOmatrix, ExecComp
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.devtools.testutil import assert_rel_error
@@ -24,6 +24,7 @@ class MyExplicitComp(ExplicitComponent):
         self.add_input('y', val=np.zeros(2))
         self.add_output('f', val=np.zeros(2))
 
+    def initialize_partials(self):
         val = self._jac_type(np.array([[1., 1.], [1., 1.]]))
         if isinstance(val, list):
             self.declare_partials('f', ['x','y'], rows=val[1], cols=val[2], val=val[0])
@@ -60,13 +61,14 @@ class MyExplicitComp2(ExplicitComponent):
         self.add_input('z', val=0.0)
         self.add_output('f', val=0.0)
 
-        val=self._jac_type(np.array([[7.]]))
+    def initialize_partials(self):
+        val = self._jac_type(np.array([[7.]]))
         if isinstance(val, list):
             self.declare_partials('f', 'z', rows=val[1], cols=val[2], val=val[0])
         else:
             self.declare_partials('f', 'z', val=val)
 
-        val=self._jac_type(np.array([[1., 1., 1.]]))
+        val = self._jac_type(np.array([[1., 1., 1.]]))
         if isinstance(val, list):
             self.declare_partials('f', 'w', rows=val[1], cols=val[2], val=val[0])
         else:
@@ -167,7 +169,7 @@ def _test_func_name(func, num, param):
 class TestJacobian(unittest.TestCase):
 
     @parameterized.expand(itertools.product(
-        [DenseMatrix, CsrMatrix, CooMatrix],
+        [DenseMatrix, CSRmatrix, COOmatrix],
         [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist],
         [False, True],  # not nested, nested
         [0, 1],  # extra calls to linearize

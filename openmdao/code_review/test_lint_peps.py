@@ -24,6 +24,7 @@ file_excludes = [
 ignores = {
     'pep8': [
         'E131',  # continuation line unaligned for hanging indent
+        'W503',  # Line breaks should occur before a binary operator
     ],
     'pep257': [
         'D203',  # 1 blank required before class docstrings
