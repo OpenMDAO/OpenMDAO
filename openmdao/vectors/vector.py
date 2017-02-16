@@ -282,6 +282,8 @@ class Vector(object):
         """
         if key in self._names:
             value, shape = ensure_compatible(key, value, self._views[key].shape)
+            if isinstance(value, numpy.ndarray):
+                value = value.reshape(self._views[key].shape)
             self._views[key][:] = value
         else:
             raise KeyError("Variable '%s' not found." % key)
