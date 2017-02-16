@@ -349,7 +349,7 @@ class Component(System):
                            or len(of_matches) > 1
                            or (len(wrt_in) + len(wrt_out)) > 1)
 
-            for type_, wrt_matches in [('output', wrt_out), ('intput', wrt_in)]:
+            for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
                 for key in product(of_matches, wrt_matches):
                     meta_changes = {
                         'rows': rows,
