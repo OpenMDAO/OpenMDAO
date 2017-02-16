@@ -84,6 +84,78 @@ def ensure_compatible(name, value, shape=None, indices=None):
     return value, shape
 
 
+def determine_adder_scaler(ref0, ref, adder, scaler):
+    r"""
+    Determine proper values of adder and scaler based on user arguments.
+
+    Parameters
+    ----------
+    ref : float or ndarray, optional
+        Value of response variable that scales to 1.0 in the driver.
+    ref0 : upper or ndarray, optional
+        Value of response variable that scales to 0.0 in the driver.
+    adder : float or ndarray, optional
+        Value to add to the model value to get the scaled value. Adder
+        is first in precedence.
+    scaler : float or ndarray, optional
+        Value to multiply the model value to get the scaled value. Scaler
+        is second in precedence.
+
+    Returns
+    -------
+    tuple
+        adder and scaler, properly formatted and based on ref/ref0 if provided.
+
+    Raises
+    ------
+    ValueError
+        If both ref/ref0 and adder/scaler were provided.
+
+    Notes
+    -----
+    The response can be scaled using scaler and adder, where
+
+    .. math::
+
+        x_{scaled} = scaler(x + adder)
+
+    or through the use of ref/ref0, which map to scaler and adder through
+    the equations:
+
+    .. math::
+
+        0 = scaler(ref_0 + adder)
+
+        1 = scaler(ref + adder)
+
+    which results in:
+
+    .. math::
+
+        adder = -ref_0
+
+        scaler = \frac{1}{ref + adder}
+    """
+    # Affine scaling cannot be used with scalers/adders
+    if ref0 is not None or ref is not None:
+        if scaler is not None or adder is not None:
+            raise ValueError('Inputs ref/ref0 are mutually exclusive '
+                             'with scaler/adder')
+        # Convert ref/ref0 to scaler/adder so we can scale the bounds
+        adder = -ref0
+        scaler = 1.0 / (ref + adder)
+    else:
+        if scaler is None:
+            scaler = 1.0
+        if adder is None:
+            adder = 0.0
+
+    adder = format_as_float_or_array('adder', adder, val_if_none=0.0)
+    scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0)
+
+    return adder, scaler
+
+
 def format_as_float_or_array(name, values, val_if_none=0.0):
     """
     Format values as a numpy array.

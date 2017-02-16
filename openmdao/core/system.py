@@ -17,7 +17,8 @@ from openmdao.jacobians.global_jacobian import GlobalJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import convert_units
-from openmdao.utils.general_utils import ensure_compatible, format_as_float_or_array
+from openmdao.utils.general_utils import \
+    ensure_compatible, determine_adder_scaler, format_as_float_or_array
 
 
 # This is for storing various data mapped to var pathname
@@ -864,11 +865,11 @@ class System(object):
             for vec in self._vectors[vec_type].values():
                 vec._scale(scaling[vec_type])
 
-        for sys in self.system_iter(include_self=True, recurse=True):
-            if sys._owns_global_jac:
-                with sys._jacobian_context():
-                    sys._jacobian._precompute_iter()
-                    sys._jacobian._scale(scaling)
+        for system in self.system_iter(include_self=True, recurse=True):
+            if system._owns_global_jac:
+                with system._jacobian_context():
+                    system._jacobian._precompute_iter()
+                    system._jacobian._scale(scaling)
 
     @property
     def nl_solver(self):
@@ -1231,25 +1232,8 @@ class System(object):
         if not isinstance(name, string_types):
             raise TypeError('The name argument should be a string, got {0}'.format(name))
 
-        # Affine scaling cannot be used with scalers/adders
-        if ref0 is not None or ref is not None:
-            if scaler is not None or adder is not None:
-                raise ValueError('Inputs ref/ref0 are mutually exclusive '
-                                 'with scaler/adder')
-            # Convert ref/ref0 to scaler/adder so we can scale the bounds
-            adder = -ref0
-            scaler = 1.0 / (ref + adder)
-        else:
-            if scaler is None:
-                scaler = 1.0
-            if adder is None:
-                adder = 0.0
-
-        # Convert adder to ndarray/float as necessary
-        adder = format_as_float_or_array('adder', adder, val_if_none=0.0)
-
-        # Convert scaler to ndarray/float as necessary
-        scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0)
+        # determine adder and scaler based on args
+        adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
         # Convert lower to ndarray/float as necessary
         lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max)
@@ -1345,19 +1329,8 @@ class System(object):
             msg = '{0} \'{1}\' already exists.'.format(typemap[type], name)
             raise RuntimeError(msg.format(name))
 
-        # Affine scaling cannot be used with scalers/adders
-        if ref0 is not None or ref is not None:
-            if scaler is not None or adder is not None:
-                raise ValueError('Inputs ref/ref0 are mutually exclusive '
-                                 'with scaler/adder')
-            # Convert ref/ref0 to scaler/adder so we can scale the bounds
-            adder = -ref0
-            scaler = 1.0 / (ref + adder)
-        else:
-            if scaler is None:
-                scaler = 1.0
-            if adder is None:
-                adder = 0.0
+        # determine adder and scaler based on args
+        adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
         # A constraint cannot be an equality and inequality constraint
         if equals is not None and (lower is not None or upper is not None):
