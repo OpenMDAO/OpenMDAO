@@ -262,8 +262,7 @@ class Component(System):
 
     def approx_partials(self, of, wrt, method='fd', **kwargs):
         """
-        Inform the framework that the specified derivatives are to be approximated using the
-        specified method and options.
+        Inform the framework that the specified derivatives are to be approximated.
 
         Parameters
         ----------
@@ -282,7 +281,6 @@ class Component(System):
         """
         oflist = [of] if isinstance(of, string_types) else of
         wrtlist = [wrt] if isinstance(wrt, string_types) else wrt
-
 
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):
@@ -314,11 +312,7 @@ class Component(System):
         val : float or ndarray of float or scipy.sparse
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
-
         """
-        of_list = [of] if isinstance(of, string_types) else of
-        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
-
         # If only one of rows/cols is specified
         if (rows is None) ^ (cols is None):
             raise ValueError('If one of rows/cols is specified, then both must be specified')
@@ -343,9 +337,57 @@ class Component(System):
                 raise ValueError('If rows and cols are specified, val must be a scalar or have the '
                                  'same shape, val: {}, rows/cols: {}'.format(val.shape, rows.shape))
 
+        multiple_items, pattern_matches = self._find_partial_matches(of, wrt)
+
+        for of_bundle, wrt_bundle in product(*pattern_matches):
+            of_pattern, of_matches = of_bundle
+            wrt_pattern, wrt_out, wrt_in = wrt_bundle
+            if not of_matches:
+                raise ValueError('No matches were found for of="{}"'.format(of_pattern))
+            if not (wrt_out or wrt_in):
+                raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
+
+            make_copies = (multiple_items
+                           or len(of_matches) > 1
+                           or (len(wrt_in) + len(wrt_out)) > 1)
+
+            for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
+                for key in product(of_matches, wrt_matches):
+                    meta_changes = {
+                        'rows': rows,
+                        'cols': cols,
+                        'value': deepcopy(val) if make_copies else val,
+                        'dependent': dependent,
+                        'type': type_
+                    }
+                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    meta.update(meta_changes)
+                    self._check_partials_meta(key, meta)
+                    self._subjacs_info[key] = meta
+
+    def _find_partial_matches(self, of, wrt):
+        """
+        Find all partial derivative matches from of and wrt.
+
+        Parameters
+        ----------
+        of : str or list of str
+            The name of the residual(s) that derivatives are being computed for.
+            May also contain a glob pattern.
+        wrt : str or list of str
+            The name of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+
+        Returns
+        -------
+        bool, tuple(list, list)
+            Bool for if there are multiple items in either of/wrt, tuple containing the of/wrt match
+        """
+        of_list = [of] if isinstance(of, string_types) else of
+        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         glob_patterns = {'*', '?', '['}
         multiple_items = len(of_list) > 1 or len(wrt_list) > 1
-
         outs = self._var_allprocs_names['output']
         ins = self._var_allprocs_names['input']
 
@@ -360,32 +402,7 @@ class Component(System):
         of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, outs), find_matches(pattern, ins))
                                for pattern in wrt_list]
-
-        for of_bundle, wrt_bundle in product(of_pattern_matches, wrt_pattern_matches):
-            of_pattern, of_matches = of_bundle
-            wrt_pattern, wrt_out, wrt_in = wrt_bundle
-            if not of_matches:
-                raise ValueError('No matches were found for of="{}"'.format(of_pattern))
-            if not (wrt_out or wrt_in):
-                raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
-
-            make_copies = (multiple_items
-                           or len(of_matches) > 1
-                           or (len(wrt_in) + len(wrt_out)) > 1)
-
-            for type_, wrt_matches in [('output', wrt_out), ('intput', wrt_in)]:
-                for key in product(of_matches, wrt_matches):
-                    meta_changes = {
-                        'rows': rows,
-                        'cols': cols,
-                        'value': deepcopy(val) if make_copies else val,
-                        'dependent': dependent,
-                        'type': type_
-                    }
-                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
-                    meta.update(meta_changes)
-                    self._check_partials_meta(key, meta)
-                    self._subjacs_info[key] = meta
+        return multiple_items, (of_pattern_matches, wrt_pattern_matches)
 
     def _check_partials_meta(self, key, meta):
         """
