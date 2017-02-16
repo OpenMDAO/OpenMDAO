@@ -145,13 +145,14 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._setup_variables(False)
 
+        # Note: These declare calls are outside of initialize_partials so that users do not have to
+        # call the super version of initialize_partials. This is still post-initialize_variables.
         other_names = []
         for i, out_name in enumerate(self._var_myproc_names['output']):
             meta = self._var_myproc_metadata['output'][i]
             size = numpy.prod(meta['shape'])
             arange = numpy.arange(size)
-            self.declare_partials(out_name, out_name, rows=arange, cols=arange,
-                                  val=numpy.ones(size))
+            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
             for other_name in other_names:
                 self.declare_partials(out_name, other_name, dependent=False)
                 self.declare_partials(other_name, out_name, dependent=False)
@@ -175,7 +176,6 @@ class ExplicitComponent(Component):
         """
         with self._jacobian_context() as J:
             for key, meta in iteritems(self._subjacs_info):
-                self._check_partials_meta(key, meta)
                 J._set_partials_meta(key, meta, meta['type'] == 'input')
 
     def compute(self, inputs, outputs):

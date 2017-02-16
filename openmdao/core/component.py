@@ -371,6 +371,7 @@ class Component(System):
                 }
                 meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
                 meta.update(meta_changes)
+                self._check_partials_meta(key, meta)
                 self._subjacs_info[key] = meta
 
     def _check_partials_meta(self, key, meta):
@@ -462,6 +463,9 @@ class Component(System):
                     self._var_name2path[typ][name] = (path,)
                 else:
                     self._var_name2path[typ][name] = path
+
+        # Now that variables are available, we can setup partials
+        self.initialize_partials()
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
         r"""

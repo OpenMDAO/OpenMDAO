@@ -126,8 +126,6 @@ class ExplicitCycleComp(ExplicitComponent):
         self.add_input(self._cycle_names['theta'], val=1.)
         self.add_output(self._cycle_names['theta_out'], shape=(1,))
 
-        self.setup_jacobian()
-
     def compute(self, inputs, outputs):
         theta = inputs[self._cycle_names['theta']]
         A = _compute_A(self.size, theta)
@@ -221,7 +219,7 @@ class ExplicitCycleComp(ExplicitComponent):
         else:
             return {'val': jac}
 
-    def setup_jacobian(self):
+    def initialize_partials(self):
         pd_type = self.metadata['partial_type']
         if self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
             num_var = self.num_var
@@ -326,8 +324,8 @@ class ExplicitLastComp(ExplicitFirstComp):
         # theta_out has 1/2 the error as theta does to the correct angle.
         outputs[self._cycle_names['theta_out']] = theta / 2 + (self._n * 2 * np.pi - psi) / (2 * k - 2)
 
-    def setup_jacobian(self):
-        super(ExplicitLastComp, self).setup_jacobian()
+    def initialize_partials(self):
+        super(ExplicitLastComp, self).initialize_partials()
 
         pd_type = self.metadata['partial_type']
         if self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':

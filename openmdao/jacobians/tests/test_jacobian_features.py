@@ -17,59 +17,39 @@ class SimpleComp(ExplicitComponent):
         self.add_input('x', shape=1)
         self.add_input('y1', shape=2)
         self.add_input('y2', shape=2)
-        self.add_input('z', shape=(2, 2))
-
-        self.add_output('f', shape=1)
-        self.add_output('g', shape=(2, 2))
-
-        self.initialize_partials()
-
-    def initialize_partials(self):
-        pass
-
-    def compute(self, inputs, outputs):
-        outputs['f'] = np.sum(inputs['z']) + inputs['x']
-        outputs['g'] = np.outer(inputs['y1'], inputs['y2']) + inputs['x']*np.eye(2)
-
-    def compute_partial_derivs(self, inputs, outputs, partials):
-        partials['f', 'x'] = 1.
-        partials['f', 'z'] = np.ones((2, 2)).flat[:]
-
-        partials['g', 'y1'] = np.hstack((np.array([[1, 1], [0, 0]]).flat,
-                                         np.array([[0, 0], [1, 1]]).flat))
-
-        partials['g', 'y2'] = np.hstack((np.array([[1, 0], [1, 0]]).flat,
-                                         np.array([[0, 1], [0, 1]]).flat))
-
-        partials['g', 'x'] = np.eye(2)
-
-
-class SimpleCompDependence(ExplicitComponent):
-    def initialize_variables(self):
-        self.add_input('x', shape=1)
-        self.add_input('y1', shape=2)
-        self.add_input('y2', shape=2)
-        self.add_input('z', shape=(2, 2))
-
-        self.add_output('f', shape=1)
-        self.add_output('g', shape=(2, 2))
-
-        self.declare_partials('f', 'y1', dependent=False)
-        self.declare_partials('f', 'y2', dependent=False)
-        self.declare_partials('g', 'z', dependent=False)
-
-
-class SimpleCompGlob(ExplicitComponent):
-    def initialize_variables(self):
-        self.add_input('x', shape=1)
-        self.add_input('y1', shape=2)
-        self.add_input('y2', shape=2)
         self.add_input('y3', shape=2)
         self.add_input('z', shape=(2, 2))
 
         self.add_output('f', shape=1)
         self.add_output('g', shape=(2, 2))
 
+    def compute(self, inputs, outputs):
+        outputs['f'] = np.sum(inputs['z']) + inputs['x']
+        outputs['g'] = (np.outer(inputs['y1'] + inputs['y3'], np.ones(2))
+                        + np.outer(np.ones(2), inputs['y2'])
+                        + inputs['x']*np.eye(2))
+
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        partials['f', 'x'] = 1.
+        partials['f', 'z'] = np.ones((1, 4))
+
+        partials['g', 'y1'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+        partials['g', 'y2'] = [[1, 0], [0, 1], [1, 0], [0, 1]]
+        partials['g', 'y3'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+
+        partials['g', 'x'] = np.eye(2)
+
+
+class SimpleCompDependence(SimpleComp):
+    def initialize_partials(self):
+        self.declare_partials('f', 'y1', dependent=False)
+        self.declare_partials('f', 'y2', dependent=False)
+        self.declare_partials('f', 'y3', dependent=False)
+        self.declare_partials('g', 'z', dependent=False)
+
+
+class SimpleCompGlob(SimpleComp):
+    def initialize_partials(self):
         # This matches y1, y2, and y3.
         self.declare_partials('f', 'y*', dependent=False)
 
@@ -77,17 +57,8 @@ class SimpleCompGlob(ExplicitComponent):
         self.declare_partials('g', 'y[13]', val=[[1, 0], [1, 0], [0, 1], [0, 1]])
 
 
-class SimpleCompConst(ExplicitComponent):
-    def initialize_variables(self):
-        self.add_input('x', shape=1)
-        self.add_input('y1', shape=2)
-        self.add_input('y2', shape=2)
-        self.add_input('y3', shape=2)
-        self.add_input('z', shape=(2, 2))
-
-        self.add_output('f', shape=1)
-        self.add_output('g', shape=(2, 2))
-
+class SimpleCompConst(SimpleComp):
+    def initialize_partials(self):
         self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
         self.declare_partials('g', 'z', dependent=False)
 
@@ -100,6 +71,9 @@ class SimpleCompConst(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['f'] = np.sum(inputs['z']) + inputs['x']
         outputs['g'] = np.outer(inputs['y1'] + inputs['y3'], inputs['y2']) + inputs['x'] * np.eye(2)
+
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        pass
 
 
 class SimpleCompKwarg(SimpleComp):
