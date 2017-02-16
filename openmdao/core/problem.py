@@ -157,7 +157,6 @@ class Problem(object):
         if pdata.typ == 'output':
             return self.model._outputs[pathname]
         else:
-            c0, c1 = self.model._scaling_to_phys['input'][pdata.myproc_idx, :]
             return self.model._inputs[pathname]
 
     def __setitem__(self, name, value):

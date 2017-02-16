@@ -29,7 +29,7 @@ class Jacobian(object):
     _keymap : dict
         Mapping of original (output, input) key to (output, source) in cases
         where the input has src_indices.
-    _iter_list_rel_unpromoted : [(out_name, in_name), ...]
+    _iter_list_rel_unprom : [(out_name, in_name), ...]
         list of output-input pairs to iterate over where the names are relative, unpromoted.
     _iter_list_pathnames : [(out_name, in_name), ...]
         list of output-input pairs to iterate over where the names are unique pathnames.
@@ -53,7 +53,7 @@ class Jacobian(object):
         self._int_mtx = None
         self._ext_mtx = None
         self._keymap = {}
-        self._iter_list_rel_unpromoted = None
+        self._iter_list_rel_unprom = None
         self._iter_list_pathnames = None
 
         self.options = OptionsDictionary()
@@ -134,7 +134,7 @@ class Jacobian(object):
         Cache lists of (output, input) pairs found in the jacobian for the current System.
 
         The two lists are:
-        1. _iter_list_rel_unpromoted : list of unpromoted names viewed from this system
+        1. _iter_list_rel_unprom : list of unpromoted names viewed from this system
         2. _iter_list_pathnames : list of global, unique pathnames
         """
         system = self._system
@@ -168,7 +168,7 @@ class Jacobian(object):
                     iter_list_rel_unpromoted.append((re_unprom, in_unprom))
                     iter_list_pathnames.append((re_path, in_path))
 
-        self._iter_list_rel_unpromoted = iter_list_rel_unpromoted
+        self._iter_list_rel_unprom = iter_list_rel_unpromoted
         self._iter_list_pathnames = iter_list_pathnames
 
     def __contains__(self, key):
@@ -246,6 +246,12 @@ class Jacobian(object):
         ukey = self._key2unique(key)
         return self._subjacs[ukey]
 
+    def _iter_pathnames(self):
+        return iter(self._iter_list_pathnames)
+
+    def _iter_rel_unprom(self):
+        return iter(self._iter_list_rel_unprom)
+
     def _scale_subjac(self, ukey, coeffs):
         """
         Change the scaling state of a single subjac.
@@ -275,7 +281,7 @@ class Jacobian(object):
             0th and 1st order coefficients for scaling/unscaling.
             The keys are 'input', 'output', and 'residual'.
         """
-        for ukey in iter(self._iter_list_pathnames):
+        for ukey in self._iter_pathnames():
             self._scale_subjac(ukey, coeffs)
 
     def _initialize(self):
