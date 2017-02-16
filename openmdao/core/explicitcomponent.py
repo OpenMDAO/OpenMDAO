@@ -169,7 +169,8 @@ class ExplicitComponent(Component):
                 for out_name in self._var_myproc_names['output']:
                     key = (out_name, in_name)
                     if key in self._jacobian:
-                        self._jacobian._multiply_subjac(key, -1.0)
+                        ukey = self._jacobian._key2unique(key)
+                        self._jacobian._multiply_subjac(ukey, -1.0)
 
     def _set_partials_meta(self):
         """
