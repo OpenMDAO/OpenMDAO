@@ -101,7 +101,8 @@ class CycleGroup(ParametericTestGroup):
 
         self._generate_components(connection_type, first_class, middle_class, last_class, num_comp)
 
-        theta_name = 'last.theta_out' if connection_type == 'explicit' else 'theta_0'
+        theta_name = 'last.theta_out' if connection_type == 'explicit' else \
+            'theta_{}'.format(num_comp)
 
         self.total_of = ['last.x_norm2', theta_name]
         self.total_wrt = ['psi_comp.psi']
@@ -125,7 +126,8 @@ class CycleGroup(ParametericTestGroup):
             'var_shape': var_shape,
             'num_var': num_var,
             'jacobian_type': self.metadata['jacobian_type'],
-            'partial_type': self.metadata['partial_type']
+            'partial_type': self.metadata['partial_type'],
+            'connection_type': conn_type,
         }
 
         self.add_subsystem('psi_comp', IndepVarComp('psi', PSI))
@@ -133,9 +135,14 @@ class CycleGroup(ParametericTestGroup):
         for i in range(num_var):
             indep_var_comp.add_output('x_{0}'.format(i), np.ones(var_shape))
 
-        self._add_cycle_comp(conn_type, first_class, first_name, 0, comp_args)
-        prev_name = first_name
         idx = 0
+
+        first_comp = first_class(index=idx, **comp_args)
+        self.add_subsystem(first_name, first_comp,
+                           promotes_inputs=first_comp._cycle_promotes_in,
+                           promotes_outputs=first_comp._cycle_promotes_out)
+        prev_name = first_name
+
 
         connection_variables = [('y_{0}'.format(i), 'x_{0}'.format(i)) for i in range(num_var)]
         connection_variables.append(('theta_out', 'theta'))
@@ -143,7 +150,10 @@ class CycleGroup(ParametericTestGroup):
         # Middle Subsystems
         for idx in range(1, num_comp - 1):
             current_name = 'middle_{0}'.format(idx)
-            self._add_cycle_comp(conn_type, middle_class, current_name, idx, comp_args)
+            middle_comp = middle_class(index=idx, **comp_args)
+            self.add_subsystem(current_name, middle_comp,
+                               promotes_inputs=middle_comp._cycle_promotes_in,
+                               promotes_outputs=middle_comp._cycle_promotes_out)
 
             if conn_type == 'explicit':
                 self._explicit_connections(prev_name, current_name, connection_variables)
@@ -151,28 +161,27 @@ class CycleGroup(ParametericTestGroup):
             prev_name = current_name
 
         # Final Subsystem
-        if conn_type == 'explicit':
-            self.add_subsystem(last_name, last_class(**comp_args))
+        last_comp = last_class(index=idx+1, **comp_args)
+        self.add_subsystem(last_name, last_comp,
+                           promotes_inputs=last_comp._cycle_promotes_in,
+                           promotes_outputs=last_comp._cycle_promotes_out)
 
+        if conn_type == 'explicit':
             self._explicit_connections(prev_name, last_name, connection_variables)
             self._explicit_connections(last_name, first_name, [('theta_out', 'theta')])
-
-        elif conn_type == 'implicit':
-            renames_inputs = {'x_{0}'.format(i): 'x_{0}_{1}'.format(idx + 1, i) for i in range(self.num_var)}
-            renames_inputs['theta'] = 'theta_{0}'.format(idx + 1)
-            renames_outputs = {
-                'theta_out': 'theta_0'
-            }
-            self.add_subsystem(last_name, last_class(**comp_args),
-                               renames_inputs=renames_inputs,
-                               renames_outputs=renames_outputs)
+        else:
+            theta_out = last_comp._cycle_names['theta_out']
+            theta_in = first_comp._cycle_names['theta']
+            self.connect(theta_out, theta_in)
 
         self.connect('psi_comp.psi', first_name + '.psi')
         self.connect('psi_comp.psi', last_name + '.psi')
+
         if conn_type == 'explicit':
             var_name = first_name + '.x_{0}'
         else:
             var_name = 'x_0_{0}'
+
         for i in range(num_var):
             self.connect('x0_comp.x_{0}'.format(i), var_name.format(i))
 
@@ -182,18 +191,3 @@ class CycleGroup(ParametericTestGroup):
                 '{0}.{1}'.format(prev_name, out_var),
                 '{0}.{1}'.format(current_name, in_var)
             )
-
-    def _add_cycle_comp(self, connection_type, comp_class, comp_name, index, comp_args):
-        if connection_type == 'explicit':
-            self.add_subsystem(comp_name, comp_class(**comp_args))
-        elif connection_type == 'implicit':
-
-            renames_inputs = {'x_{0}'.format(i): 'x_{0}_{1}'.format(index, i) for i in range(self.num_var)}
-            renames_inputs['theta'] = 'theta_{0}'.format(index)
-
-            renames_outputs = {'y_{0}'.format(i): 'x_{0}_{1}'.format(index + 1, i) for i in range(self.num_var)}
-            renames_outputs['theta_out'] = 'theta_{0}'.format(index + 1)
-
-            self.add_subsystem(comp_name, comp_class(**comp_args),
-                               renames_inputs=renames_inputs,
-                               renames_outputs=renames_outputs)
