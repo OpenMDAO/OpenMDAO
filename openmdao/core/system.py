@@ -28,9 +28,9 @@ def _format_driver_array_option(option_name, var_name, values,
     """
     Format driver array option values.
 
-    Checks that the given array values are either None, float, or an
-    iterable of numeric values.  On output all interables of numeric values
-    are converted to numpy.ndarray.  If values is scalar, it is converted
+    Checks that the given array values are either None, float, or an iterable
+    of numeric values. On output all interables of numeric values are
+    converted to a flat numpy.ndarray. If values is scalar, it is converted
     to float.
 
     Parameters
@@ -58,12 +58,16 @@ def _format_driver_array_option(option_name, var_name, values,
     """
     # Convert adder to ndarray/float as necessary
     if isinstance(values, numpy.ndarray):
-        pass
+        values = values.flatten()
     elif not isinstance(values, string_types) \
             and isinstance(values, Iterable):
-        values = numpy.asarray(values, dtype=float)
+        values = numpy.asarray(values, dtype=float).flatten()
     elif values is None:
         values = val_if_none
+    elif values == float('inf'):
+        values = sys.float_info.max
+    elif values == -float('inf'):
+        values = -sys.float_info.max
     elif isinstance(values, numbers.Number):
         values = float(values)
     else:

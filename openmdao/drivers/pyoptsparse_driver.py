@@ -263,7 +263,9 @@ class pyOptSparseDriver(Driver):
         if self.options['gradient method'] == 'pyopt_fd':
 
             # Use pyOpt's internal finite difference
-            fd_step = problem.root.deriv_options['step_size']
+            # TODO: Need to get this from OpenMDAO
+            # fd_step = problem.root.deriv_options['step_size']
+            fd_step = 1e-6
             sol = opt(opt_prob, sens='FD', sensStep=fd_step, storeHistory=self.hist_file,
                       hotStart=self.hotstart_file)
 
@@ -271,7 +273,9 @@ class pyOptSparseDriver(Driver):
             if self.options['optimizer'] == 'SNOPT':
 
                 # Use SNOPT's internal finite difference
-                fd_step = problem.root.deriv_options['step_size']
+                # TODO: Need to get this from OpenMDAO
+                # fd_step = problem.root.deriv_options['step_size']
+                fd_step = 1e-6
                 sol = opt(opt_prob, sens=None, sensStep=fd_step, storeHistory=self.hist_file,
                           hotStart=self.hotstart_file)
 
