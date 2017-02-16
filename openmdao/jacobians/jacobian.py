@@ -146,7 +146,7 @@ class Jacobian(object):
         in_indices = system._var_myproc_indices['input']
         out_indices = system._var_myproc_indices['output']
 
-        iter_list_rel_unpromoted = []
+        iter_list_rel_unprom = []
         iter_list_pathnames = []
         for re_ind in out_indices:
             re_path = out_paths[re_ind - out_offset]
@@ -157,7 +157,7 @@ class Jacobian(object):
                 out_unprom = out_path[start:]
 
                 if (re_path, out_path) in self._subjacs:
-                    iter_list_rel_unpromoted.append((re_unprom, out_unprom))
+                    iter_list_rel_unprom.append((re_unprom, out_unprom))
                     iter_list_pathnames.append((re_path, out_path))
 
             for in_ind in in_indices:
@@ -165,10 +165,10 @@ class Jacobian(object):
                 in_unprom = in_path[start:]
 
                 if (re_path, in_path) in self._subjacs:
-                    iter_list_rel_unpromoted.append((re_unprom, in_unprom))
+                    iter_list_rel_unprom.append((re_unprom, in_unprom))
                     iter_list_pathnames.append((re_path, in_path))
 
-        self._iter_list_rel_unprom = iter_list_rel_unpromoted
+        self._iter_list_rel_unprom = iter_list_rel_unprom
         self._iter_list_pathnames = iter_list_pathnames
 
     def __contains__(self, key):
