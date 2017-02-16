@@ -493,6 +493,12 @@ class Problem(object):
 
                 totals = OrderedDict()
 
+                for okeys in of:
+                    for okey in okeys:
+                        for ikeys in wrt:
+                            for ikey in ikeys:
+                                totals[(okey, ikey)] = None
+
             elif return_format == 'dict':
 
                 totals = OrderedDict()
