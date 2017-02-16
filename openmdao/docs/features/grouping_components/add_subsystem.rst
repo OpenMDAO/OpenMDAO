@@ -29,22 +29,12 @@ that the unpromoted name and the full or absolute pathname are the same.
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_simple_promoted
 
-3. Rename the input and output of a component.
-
-.. embed-test::
-    openmdao.core.tests.test_group.TestGroup.test_group_simple_renamed
-
-4. Rename the input and output of a component using a dict.
-
-.. embed-test::
-    openmdao.core.tests.test_group.TestGroup.test_group_simple_renamed_dict
-
-5. Add 2 components to a Group nested within another Group.
+3. Add 2 components to a Group nested within another Group.
 
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_nested
 
-6. Promote the input and output of components to subgroup level.
+4. Promote the input and output of components to subgroup level.
 
 In this example, there are two inputs promoted to the same name, so the promoted
 name is not unique.
@@ -52,13 +42,8 @@ name is not unique.
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_nested_promoted1
 
-7. Promote the input and output of components from subgroup level up
+5. Promote the input and output of components from subgroup level up
 to top level.
 
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_nested_promoted2
-
-8. Rename the input and output of components nested within a subgroup.
-
-.. embed-test::
-    openmdao.core.tests.test_group.TestGroup.test_group_nested_renamed
