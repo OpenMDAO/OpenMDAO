@@ -7,8 +7,8 @@ import scipy.linalg
 import scipy.sparse.linalg
 
 from openmdao.solvers.solver import LinearSolver
-from openmdao.matrices.coo_matrix import CooMatrix
-from openmdao.matrices.csr_matrix import CsrMatrix
+from openmdao.matrices.coo_matrix import COOmatrix
+from openmdao.matrices.csr_matrix import CSRmatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
 
 
@@ -49,7 +49,7 @@ class DirectSolver(LinearSolver):
             if isinstance(mtx, DenseMatrix):
                 numpy.set_printoptions(precision=3)
                 self._lup = scipy.linalg.lu_factor(mtx._matrix)
-            elif isinstance(mtx, (CooMatrix, CsrMatrix)):
+            elif isinstance(mtx, (COOmatrix, CSRmatrix)):
                 numpy.set_printoptions(precision=3)
                 self._lu = scipy.sparse.linalg.splu(mtx._matrix)
             else:
@@ -147,7 +147,7 @@ class DirectSolver(LinearSolver):
 
             b_data = b_vec.get_data()
             if system._owns_global_jac and isinstance(system._jacobian._int_mtx,
-                                                      (CooMatrix, CsrMatrix)):
+                                                      (COOmatrix, CSRmatrix)):
                 x_data = self._lu.solve(b_data, trans_splu)
             else:
                 x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)

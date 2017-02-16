@@ -10,7 +10,7 @@ from unittest import SkipTest
 from openmdao.test_suite.groups.cycle_group import CycleGroup
 from openmdao.api import Problem
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
-from openmdao.api import GlobalJacobian, DenseMatrix, CooMatrix, CsrMatrix
+from openmdao.api import GlobalJacobian, DenseMatrix, COOmatrix, CSRmatrix
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -161,9 +161,14 @@ class ParameterizedInstance(object):
                                       'rtol': 1e-10,
                                       }
 
-    def setup(self):
+    def setup(self, check=False):
         """
         Creates the containing `Problem` and performs needed initializations.
+
+        Parameters
+        ----------
+        check : bool
+            If setup should run checks.
         """
         args = self.args
 
@@ -183,9 +188,9 @@ class ParameterizedInstance(object):
             if jacobian_type == 'dense':
                 prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
             elif jacobian_type == 'sparse-coo':
-                prob.model.jacobian = GlobalJacobian(matrix_class=CooMatrix)
+                prob.model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
             elif jacobian_type == 'sparse-csr':
-                prob.model.jacobian = GlobalJacobian(matrix_class=CsrMatrix)
+                prob.model.jacobian = GlobalJacobian(matrix_class=CSRmatrix)
 
         prob.model.ln_solver = self.linear_solver_class(**self.linear_solver_options)
 
@@ -193,7 +198,7 @@ class ParameterizedInstance(object):
 
         prob.model.suppress_solver_output = True
 
-        prob.setup(vec_class, check=False)
+        prob.setup(vec_class, check=check)
 
         fail, rele, abse = prob.run_model()
         if fail:
