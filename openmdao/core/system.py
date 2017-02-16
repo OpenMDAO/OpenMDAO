@@ -331,6 +331,7 @@ class System(object):
 
         Sets the following attributes:
             _var_allprocs_names
+            _var_allprocs_pathnames
             _var_myproc_names
             _var_myproc_metadata
 
@@ -603,22 +604,6 @@ class System(object):
             sub_upper_bounds = upper_bounds._create_subvector(subsys)
             subsys._setup_bounds_vectors(sub_lower_bounds, sub_upper_bounds, False)
 
-    @property
-    def jacobian(self):
-        """
-        A Jacobian object or None.
-        """
-        return self._jacobian
-
-    @jacobian.setter
-    def jacobian(self, jacobian):
-        """
-        Set the Jacobian.
-        """
-        self._owns_global_jac = isinstance(jacobian, GlobalJacobian)
-        self._jacobian = jacobian
-        self._jacobian_changed = True
-
     def _setup_jacobians(self, jacobian=None):
         """
         Set and populate jacobians down through the system tree.
@@ -744,6 +729,22 @@ class System(object):
 
         return maps
 
+    @property
+    def jacobian(self):
+        """
+        A Jacobian object or None.
+        """
+        return self._jacobian
+
+    @jacobian.setter
+    def jacobian(self, jacobian):
+        """
+        Set the Jacobian.
+        """
+        self._owns_global_jac = isinstance(jacobian, GlobalJacobian)
+        self._jacobian = jacobian
+        self._jacobian_changed = True
+
     @contextmanager
     def _jacobian_context(self):
         """
@@ -751,8 +752,8 @@ class System(object):
 
         Sets this system's _jacobian._system attribute to the current system.
 
-        Returns
-        -------
+        Yields
+        ------
         <Jacobian>
             The current system's jacobian with its _system set to self.
         """
@@ -830,8 +831,8 @@ class System(object):
             If True, zero out residuals (in fwd mode) or inputs and outputs
             (in rev mode).
 
-        Returns
-        -------
+        Yields
+        ------
         (d_inputs, d_outputs, d_residuals) : tuple of Vectors
             Yields the three Vectors configured internally to deal only
             with variables relevant to the current matrix vector product.
@@ -880,6 +881,79 @@ class System(object):
         d_inputs._names = d_inputs._views
         d_outputs._names = d_outputs._views
         d_residuals._names = d_residuals._views
+
+    @contextmanager
+    def nonlinear_vector_context(self):
+        """
+        Context manager that yields the inputs, outputs, and residuals vectors.
+
+        Yields
+        ------
+        (inputs, outputs, residuals) : tuple of <Vector> instances
+            Yields the inputs, outputs, and residuals nonlinear vectors.
+        """
+        if self._inputs is None:
+            raise RuntimeError("Cannot get vectors because setup has not yet been called.")
+
+        yield self._inputs, self._outputs, self._residuals
+
+    @contextmanager
+    def linear_vector_context(self, vec_name='linear'):
+        """
+        Context manager that yields linear inputs, outputs, and residuals vectors.
+
+        Parameters
+        ----------
+        vec_name : str
+            Name of the linear right-hand-side vector. The default is 'linear'.
+
+        Yields
+        ------
+        (inputs, outputs, residuals) : tuple of <Vector> instances
+            Yields the inputs, outputs, and residuals linear vectors for vec_name.
+        """
+        if self._inputs is None:
+            raise RuntimeError("Cannot get vectors because setup has not yet been called.")
+
+        if vec_name not in self._vectors['input']:
+            raise ValueError("There is no linear vector named %s" % vec_name)
+
+        yield (self._vectors['input'][vec_name],
+               self._vectors['output'][vec_name],
+               self._vectors['residual'][vec_name])
+
+    @contextmanager
+    def _scaled_context(self):
+        """
+        Context manager that temporarily puts all vectors and Jacobians in a scaled state.
+        """
+        self._scale_vectors_and_jacobians('to norm')
+        yield
+        self._scale_vectors_and_jacobians('to phys')
+
+    def _scale_vectors_and_jacobians(self, direction):
+        """
+        Scale all vectors and Jacobians to or from a scaled state.
+
+        Parameters
+        ----------
+        direction : str
+            'to norm' (to scaled) or 'to phys' (to unscaled).
+        """
+        if direction == 'to norm':
+            scaling = self._scaling_to_norm
+        elif direction == 'to phys':
+            scaling = self._scaling_to_phys
+
+        for vec_type in ['input', 'output', 'residual']:
+            for vec in self._vectors[vec_type].values():
+                vec._scale(scaling[vec_type])
+
+        for sys in self.system_iter(include_self=True, recurse=True):
+            if sys._owns_global_jac:
+                with sys._jacobian_context():
+                    sys._jacobian._precompute_iter()
+                    sys._jacobian._scale(scaling)
 
     @property
     def nl_solver(self):
@@ -980,276 +1054,6 @@ class System(object):
             if recurse:
                 for sub in s.system_iter(local=local, recurse=True, typ=typ):
                     yield sub
-
-    def get_input(self, name, units=None):
-        """
-        Return the named input value using the unpromoted name.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable.
-        units : str or None
-            if not None, return the value in the given units.
-
-        Returns
-        -------
-        float or ndarray
-            The value of the named variable.
-        """
-        if units is not None:
-            raise NotImplementedError("units arg not supported yet")
-        if self._inputs is None:
-            raise RuntimeError("%s: Cannot access input '%s'. Setup has not "
-                               "been called." % (self.name, name))
-        try:
-            return self._inputs[name]
-        except KeyError:
-            raise KeyError("%s: input '%s' not found." % (self.pathname,
-                                                          name))
-
-    def set_input(self, name, value):
-        """
-        Set the value of the named input using the unpromoted name.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable.
-        value : float or ndarray
-            value to be set.
-        """
-        if self._inputs is None:
-            raise RuntimeError("%s: Cannot access input '%s'. Setup has not "
-                               "been called." % (self.name, name))
-        try:
-            self._inputs[name] = value
-        except KeyError:
-            raise KeyError("%s: input '%s' not found." % (self.pathname,
-                                                          name))
-
-    def get_output(self, name, scaled=False, units=None):
-        """
-        Return the named output value using promoted or unpromoted name.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable.
-        scaled : bool
-            If True, return the scaled value.
-        units : str or None
-            If not None, return the value in the given units.
-
-        Returns
-        -------
-        float or ndarray
-            The value of the named variable.
-        """
-        if scaled or units is not None:
-            raise NotImplementedError("scaled and units args not supported yet")
-        if self._outputs is None:
-            raise RuntimeError("%s: Cannot access output '%s'. Setup has not "
-                               "been called." % (self.name, name))
-        try:
-            return self._outputs[name]
-        except KeyError:
-            # check for promoted name
-            start = len(self.pathname) + 1 if self.pathname else 0
-            try:
-                unprom = self._var_name2path['output'][name][start:]
-                return self._outputs[unprom]
-            except KeyError:
-                raise KeyError("%s: output '%s' not found." % (self.pathname,
-                                                               name))
-
-    def set_output(self, name, value):
-        """
-        Return the named output value using promoted or unpromoted name.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable.
-        value : float or ndarray
-            the value to be set.
-        """
-        if self._outputs is None:
-            raise RuntimeError("%s: Cannot access output '%s'. Setup has not "
-                               "been called." % (self.name, name))
-        try:
-            self._outputs[name] = value
-        except KeyError:
-            # check for promoted name
-            start = len(self.pathname) + 1 if self.pathname else 0
-            try:
-                unprom = self._var_name2path['output'][name][start:]
-                self._outputs[unprom] = value
-            except KeyError:
-                raise KeyError("%s: output '%s' not found." % (self.pathname,
-                                                               name))
-
-    def get_residual(self, name, scaled=False, units=None):
-        """
-        Return the named residual value using promoted or unpromoted name.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable.
-        scaled : bool
-            If True, return the scaled value.
-        units : str or None
-            If not None, return the value in the given units.
-
-        Returns
-        -------
-        float or ndarray
-            The value of the named residual.
-        """
-        if scaled or units is not None:
-            raise NotImplementedError("scaled and units args not supported yet")
-        if self._residuals is None:
-            raise RuntimeError("%s: Cannot access residual '%s'. Setup has not "
-                               "been called." % (self.name, name))
-
-        try:
-            return self._residuals[name]
-        except KeyError:
-            # check for promoted name
-            start = len(self.pathname) + 1 if self.pathname else 0
-            try:
-                unprom = self._var_name2path['output'][name][start:]
-                return self._residuals[unprom]
-            except KeyError:
-                raise KeyError("%s: residual '%s' not found." % (self.pathname,
-                                                                 name))
-
-    def set_residual(self, name, value):
-        """
-        Set value of named residual using promoted or unpromoted name.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable.
-        value : float or ndarray
-            the value to be set.
-        """
-        if self._residuals is None:
-            raise RuntimeError("%s: Cannot access residual '%s'. Setup has not "
-                               "been called." % (self.name, name))
-
-        try:
-            self._residuals[name] = value
-        except KeyError:
-            # check for promoted name
-            start = len(self.pathname) + 1 if self.pathname else 0
-            try:
-                unprom = self._var_name2path['output'][name][start:]
-                self._residuals[unprom] = value
-            except KeyError:
-                raise KeyError("%s: residual '%s' not found." % (self.pathname,
-                                                                 name))
-
-    def _apply_nonlinear(self):
-        """
-        Compute residuals.
-        """
-        pass
-
-    def _solve_nonlinear(self):
-        """
-        Compute outputs.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
-        """
-        pass
-
-    def _apply_linear(self, vec_names, mode, var_inds=None):
-        """
-        Compute jac-vec product.
-
-        Parameters
-        ----------
-        vec_names : [str, ...]
-            list of names of the right-hand-side vectors.
-        mode : str
-            'fwd' or 'rev'.
-        var_inds : [int, int, int, int] or None
-            ranges of variable IDs involved in this matrix-vector product.
-            The ordering is [lb1, ub1, lb2, ub2].
-        """
-        pass
-
-    def _solve_linear(self, vec_names, mode):
-        """
-        Apply inverse jac product.
-
-        Parameters
-        ----------
-        vec_names : [str, ...]
-            list of names of the right-hand-side vectors.
-        mode : str
-            'fwd' or 'rev'.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
-        """
-        pass
-
-    def _linearize(self):
-        """
-        Compute jacobian / factorization.
-        """
-        pass
-
-    def initialize(self):
-        """
-        Optional user-defined method run once during instantiation.
-
-        Available attributes:
-            name
-            metadata (only local)
-        """
-        pass
-
-    def initialize_processors(self):
-        """
-        Optional user-defined method run after repartitioning/rebalancing.
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-        """
-        pass
-
-    def initialize_variables(self):
-        """
-        Required method for components to declare inputs and outputs.
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-        """
-        pass
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
@@ -1731,3 +1535,176 @@ class System(object):
         """
         return dict((key, response) for (key, response) in
                     self.get_responses(recurse=recurse).items() if isinstance(response, Objective))
+
+    def run_apply_nonlinear(self):
+        """
+        Compute residuals.
+        """
+        with self._scaled_context():
+            self._apply_nonlinear()
+
+    def run_solve_nonlinear(self):
+        """
+        Compute outputs.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        with self._scaled_context():
+            result = self._solve_nonlinear()
+
+        return result
+
+    def run_apply_linear(self, vec_names, mode, var_inds=None):
+        """
+        Compute jac-vec product.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+        var_inds : [int, int, int, int] or None
+            ranges of variable IDs involved in this matrix-vector product.
+            The ordering is [lb1, ub1, lb2, ub2].
+        """
+        with self._scaled_context():
+            self._apply_linear(vec_names, mode, var_inds)
+
+    def run_solve_linear(self, vec_names, mode):
+        """
+        Apply inverse jac product.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        with self._scaled_context():
+            result = self._solve_linear(vec_names, mode)
+
+        return result
+
+    def run_linearize(self):
+        """
+        Compute jacobian / factorization.
+        """
+        with self._scaled_context():
+            self._linearize()
+
+    def _apply_nonlinear(self):
+        """
+        Compute residuals.
+        """
+        pass
+
+    def _solve_nonlinear(self):
+        """
+        Compute outputs.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        pass
+
+    def _apply_linear(self, vec_names, mode, var_inds=None):
+        """
+        Compute jac-vec product.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+        var_inds : [int, int, int, int] or None
+            ranges of variable IDs involved in this matrix-vector product.
+            The ordering is [lb1, ub1, lb2, ub2].
+        """
+        pass
+
+    def _solve_linear(self, vec_names, mode):
+        """
+        Apply inverse jac product.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
+        pass
+
+    def _linearize(self):
+        """
+        Compute jacobian / factorization.
+        """
+        pass
+
+    def initialize(self):
+        """
+        Optional user-defined method run once during instantiation.
+
+        Available attributes:
+            name
+            metadata (only local)
+        """
+        pass
+
+    def initialize_processors(self):
+        """
+        Optional user-defined method run after repartitioning/rebalancing.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+        """
+        pass
+
+    def initialize_variables(self):
+        """
+        Required method for components to declare inputs and outputs.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+        """
+        pass

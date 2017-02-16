@@ -161,9 +161,14 @@ class ParameterizedInstance(object):
                                       'rtol': 1e-10,
                                       }
 
-    def setup(self):
+    def setup(self, check=False):
         """
         Creates the containing `Problem` and performs needed initializations.
+
+        Parameters
+        ----------
+        check : bool
+            If setup should run checks.
         """
         args = self.args
 
@@ -193,7 +198,7 @@ class ParameterizedInstance(object):
 
         prob.model.suppress_solver_output = True
 
-        prob.setup(vec_class, check=False)
+        prob.setup(vec_class, check=check)
 
         fail, rele, abse = prob.run_model()
         if fail:
