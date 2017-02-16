@@ -17,7 +17,7 @@ from openmdao.jacobians.global_jacobian import GlobalJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import convert_units
-from openmdao.utils.general_utils import make_compatible, format_as_float_or_array
+from openmdao.utils.general_utils import ensure_compatible, format_as_float_or_array
 
 
 # This is for storing various data mapped to var pathname
@@ -1017,7 +1017,7 @@ class System(object):
             pdata = self._var_pathdict[path]
             meta = self._var_myproc_metadata['input'][pdata.myproc_idx]
             if 'shape' in meta:
-                value, _ = make_compatible(path, value, meta['shape'])
+                value, _ = ensure_compatible(path, value, meta['shape'])
             self._inputs[name] = value
         except KeyError:
             raise KeyError("%s: input '%s' not found." % (self.pathname,
@@ -1077,7 +1077,7 @@ class System(object):
             pdata = self._var_pathdict[path]
             meta = self._var_myproc_metadata['output'][pdata.myproc_idx]
             if 'shape' in meta:
-                value, _ = make_compatible(path, value, meta['shape'])
+                value, _ = ensure_compatible(path, value, meta['shape'])
             self._outputs[name] = value
         except KeyError:
             # check for promoted name
@@ -1088,7 +1088,7 @@ class System(object):
                 pdata = self._var_pathdict[path]
                 meta = self._var_myproc_metadata['output'][pdata.myproc_idx]
                 if 'shape' in meta:
-                    value, _ = make_compatible(path, value, meta['shape'])
+                    value, _ = ensure_compatible(path, value, meta['shape'])
                 self._outputs[unprom] = value
             except KeyError:
                 raise KeyError("%s: output '%s' not found." % (self.pathname,
@@ -1150,7 +1150,7 @@ class System(object):
             pdata = self._var_pathdict[path]
             meta = self._var_myproc_metadata['output'][pdata.myproc_idx]
             if 'shape' in meta:
-                value, _ = make_compatible(path, value, meta['shape'])
+                value, _ = ensure_compatible(path, value, meta['shape'])
             self._residuals[name] = value
         except KeyError:
             # check for promoted name
@@ -1161,7 +1161,7 @@ class System(object):
                 pdata = self._var_pathdict[path]
                 meta = self._var_myproc_metadata['output'][pdata.myproc_idx]
                 if 'shape' in meta:
-                    value, _ = make_compatible(path, value, meta['shape'])
+                    value, _ = ensure_compatible(path, value, meta['shape'])
                 self._residuals[unprom] = value
             except KeyError:
                 raise KeyError("%s: residual '%s' not found." % (self.pathname,

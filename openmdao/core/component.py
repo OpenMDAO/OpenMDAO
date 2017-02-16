@@ -14,7 +14,7 @@ from copy import deepcopy
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
-from openmdao.utils.general_utils import format_as_float_or_array, make_compatible
+from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible
 
 
 class Component(System):
@@ -84,7 +84,7 @@ class Component(System):
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'] = make_compatible(name, val, shape, indices)
+        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape, indices)
 
         # indices: None or ndarray
         if indices is None:
@@ -182,7 +182,7 @@ class Component(System):
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'] = make_compatible(name, val, shape)
+        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape)
 
         # units, res_units: taken as is
         metadata['units'] = units

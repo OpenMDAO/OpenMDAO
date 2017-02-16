@@ -14,7 +14,7 @@ from openmdao.error_checking.check_config import check_config
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.core.component import Component
-from openmdao.utils.general_utils import warn_deprecation, make_compatible
+from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
 
 
 class FakeComm(object):
@@ -175,12 +175,12 @@ class Problem(object):
         if pdata.typ == 'output':
             meta = self.model._var_myproc_metadata['output'][pdata.myproc_idx]
             if 'shape' in meta:
-                value, _ = make_compatible(pathname, value, meta['shape'])
+                value, _ = ensure_compatible(pathname, value, meta['shape'])
             self.model._outputs[pathname] = value
         else:
             meta = self.model._var_myproc_metadata['input'][pdata.myproc_idx]
             if 'shape' in meta:
-                value, _ = make_compatible(pathname, value, meta['shape'])
+                value, _ = ensure_compatible(pathname, value, meta['shape'])
             self.model._inputs[pathname] = value
 
     @property

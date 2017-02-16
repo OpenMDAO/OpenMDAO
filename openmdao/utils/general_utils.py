@@ -27,7 +27,7 @@ def warn_deprecation(msg):
     warnings.simplefilter('ignore', DeprecationWarning)
 
 
-def make_compatible(name, value, shape=None, indices=None):
+def ensure_compatible(name, value, shape=None, indices=None):
     """
     Make value compatible with the specified shape or the shape of indices.
 
