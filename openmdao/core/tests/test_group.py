@@ -387,9 +387,35 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C2.x'], np.ones(2), 0.00001)
         assert_rel_error(self, p['C2.y'], 8., 0.00001)
 
+    def test_promote_src_indices_nonflat(self):
+        class MyComp(ExplicitComponent):
+            def initialize_variables(self):
+                # this input will connect to even entries of the source
+                self.add_input('x', np.ones(3), src_indices=[0, 2, 4, 6, 8])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+        p = Problem(model=Group())
+
+        # by promoting the following output and inputs to 'x', they will
+        # be automatically connected
+        p.model.add_subsystem('indep',
+                              IndepVarComp('x', np.arange(9).reshape((3,3))),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.x'], np.array([0, 2, 4, 6, 8]), 0.00001)
+        assert_rel_error(self, p['C1.y'], 6., 0.00001)
+
 
 class TestGroupMPI(unittest.TestCase):
-    N_PROCS = 2
+    # FIXME: fix MPI stuff so this can run as an MPI test
+    #N_PROCS = 2
 
     def test_promote_distrib(self):
         class MyComp(ExplicitComponent):
@@ -400,7 +426,7 @@ class TestGroupMPI(unittest.TestCase):
                 else:
                     idxs = [3, 4]
 
-                self.add_input('x', np.ones(3), src_indices=idxs)
+                self.add_input('x', np.ones(len(idxs)), src_indices=idxs)
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
