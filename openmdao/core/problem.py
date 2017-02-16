@@ -160,11 +160,9 @@ class Problem(object):
         pathname, pdata = self._get_path_data(name)
 
         if pdata.typ == 'output':
-            c0, c1 = self.model._scaling_to_phys['output'][pdata.myproc_idx, :]
-            return c0 + c1 * self.model._outputs[pathname]
+            return self.model._outputs[pathname]
         else:
-            c0, c1 = self.model._scaling_to_phys['input'][pdata.myproc_idx, :]
-            return c0 + c1 * self.model._inputs[pathname]
+            return self.model._inputs[pathname]
 
     def __setitem__(self, name, value):
         """
@@ -186,8 +184,7 @@ class Problem(object):
                     value = np.ones(meta['shape']) * value
                 else:
                     _check_shape(meta['shape'], value)
-            c0, c1 = self.model._scaling_to_norm['output'][pdata.myproc_idx, :]
-            self.model._outputs[pathname] = c0 + c1 * np.array(value)
+            self.model._outputs[pathname] = value
         else:
             meta = self.model._var_myproc_metadata['input'][pdata.myproc_idx]
             if 'shape' in meta:
@@ -195,8 +192,7 @@ class Problem(object):
                     value = np.ones(meta['shape']) * value
                 else:
                     _check_shape(meta['shape'], value)
-            c0, c1 = self.model._scaling_to_norm['input'][pdata.myproc_idx, :]
-            self.model._inputs[pathname] = c0 + c1 * np.array(value)
+            self.model._inputs[pathname] = value
 
     @property
     def root(self):
@@ -239,7 +235,7 @@ class Problem(object):
         float
             absolute error.
         """
-        return self.model._solve_nonlinear()
+        return self.model.run_solve_nonlinear()
 
     def run_driver(self):
         """Run the driver on the model.
@@ -380,6 +376,8 @@ class Problem(object):
         if check:
             check_config(self, logger)
 
+        model._scale_vectors_and_jacobians('to phys')
+
         return self
 
     def setup_vector(self, vec_name, vector_class, use_ref_vector):
@@ -467,146 +465,143 @@ class Problem(object):
         # TODO: poi_indices and qoi_indices requires special support
         # -------------------------------------------------------------------
 
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        for subname in vec_dinput:
+        with model._scaled_context():
 
-            # TODO: Do all three deriv vectors have the same keys?
+            # Prepare model for calculation by cleaning out the derivatives
+            # vectors.
+            for subname in vec_dinput:
 
-            # Skip nonlinear because we don't need to mess with it?
-            if subname == 'nonlinear':
-                continue
+                # TODO: Do all three deriv vectors have the same keys?
 
-            vec_dinput[subname].set_const(0.0)
-            vec_doutput[subname].set_const(0.0)
-            vec_dresid[subname].set_const(0.0)
+                # Skip nonlinear because we don't need to mess with it?
+                if subname == 'nonlinear':
+                    continue
 
-        # Linearize Model
-        model._linearize()
+                vec_dinput[subname].set_const(0.0)
+                vec_doutput[subname].set_const(0.0)
+                vec_dresid[subname].set_const(0.0)
 
-        of = [(n,) if isinstance(n, string_types) else n for n in of]
-        wrt = [(n,) if isinstance(n, string_types) else n for n in wrt]
+            # Linearize Model
+            model._linearize()
 
-        # Create data structures (and possibly allocate space) for the total
-        # derivatives that we will return.
-        if return_format == 'flat_dict':
+            of = [(n,) if isinstance(n, string_types) else n for n in of]
+            wrt = [(n,) if isinstance(n, string_types) else n for n in wrt]
 
-            totals = OrderedDict()
+            # Create data structures (and possibly allocate space) for the total
+            # derivatives that we will return.
+            if return_format == 'flat_dict':
 
-            for okeys in of:
-                for okey in okeys:
-                    for ikeys in wrt:
-                        for ikey in ikeys:
-                            totals[(okey, ikey)] = None
+                totals = OrderedDict()
 
-        elif return_format == 'dict':
+            elif return_format == 'dict':
 
-            totals = OrderedDict()
+                totals = OrderedDict()
 
-            for okeys in of:
-                for okey in okeys:
-                    totals[okey] = OrderedDict()
-                    for ikeys in wrt:
-                        for ikey in ikeys:
-                            totals[okey][ikey] = None
+                for okeys in of:
+                    for okey in okeys:
+                        totals[okey] = OrderedDict()
+                        for ikeys in wrt:
+                            for ikey in ikeys:
+                                totals[okey][ikey] = None
 
-        else:
-            msg = "Unsupported return format '%s." % return_format
-            raise NotImplementedError(msg)
+            else:
+                msg = "Unsupported return format '%s." % return_format
+                raise NotImplementedError(msg)
 
-        # Convert of and wrt names from promoted to unpromoted
-        # (which is absolute path since we're at the top)
-        paths = model._var_allprocs_pathnames
-        indices = model._var_allprocs_indices
-        oldof = of
-        of = []
-        for names in oldof:
-            of.append(tuple(paths['output'][indices['output'][name]]
-                            for name in names))
+            # Convert of and wrt names from promoted to unpromoted
+            # (which is absolute path since we're at the top)
+            paths = model._var_allprocs_pathnames
+            indices = model._var_allprocs_indices
+            oldof = of
+            of = []
+            for names in oldof:
+                of.append(tuple(paths['output'][indices['output'][name]]
+                                for name in names))
 
-        oldwrt = wrt
-        wrt = []
-        for names in oldwrt:
-            wrt.append(tuple(paths['output'][indices['output'][name]]
-                             for name in names))
+            oldwrt = wrt
+            wrt = []
+            for names in oldwrt:
+                wrt.append(tuple(paths['output'][indices['output'][name]]
+                                 for name in names))
 
-        if mode == 'fwd':
-            input_list, output_list = wrt, of
-            old_input_list, old_output_list = oldwrt, oldof
-            input_vec, output_vec = vec_dresid, vec_doutput
-        else:
-            input_list, output_list = of, wrt
-            old_input_list, old_output_list = oldof, oldwrt
-            input_vec, output_vec = vec_doutput, vec_dresid
+            if mode == 'fwd':
+                input_list, output_list = wrt, of
+                old_input_list, old_output_list = oldwrt, oldof
+                input_vec, output_vec = vec_dresid, vec_doutput
+            else:
+                input_list, output_list = of, wrt
+                old_input_list, old_output_list = oldof, oldwrt
+                input_vec, output_vec = vec_doutput, vec_dresid
 
-        # TODO : Parallel adjoint setup loop goes here.
-        # NOTE : Until we support it, we will just limit ourselves to the
-        # 'linear' vector.
-        vecname = 'linear'
-        dinputs = input_vec[vecname]
-        doutputs = output_vec[vecname]
+            # TODO : Parallel adjoint setup loop goes here.
+            # NOTE : Until we support it, we will just limit ourselves to the
+            # 'linear' vector.
+            vecname = 'linear'
+            dinputs = input_vec[vecname]
+            doutputs = output_vec[vecname]
 
-        # If Forward mode, solve linear system for each 'wrt'
-        # If Adjoint mode, solve linear system for each 'of'
-        for icount, input_names in enumerate(input_list):
-            for iname_count, input_name in enumerate(input_names):
-                flat_view = dinputs._views_flat[input_name]
-                n_in = len(flat_view)
-                for idx in range(n_in):
-                    # Maybe we don't need to clean up so much at the beginning,
-                    # since we clean this every time.
-                    dinputs.set_const(0.0)
+            # If Forward mode, solve linear system for each 'wrt'
+            # If Adjoint mode, solve linear system for each 'of'
+            for icount, input_names in enumerate(input_list):
+                for iname_count, input_name in enumerate(input_names):
+                    flat_view = dinputs._views_flat[input_name]
+                    n_in = len(flat_view)
+                    for idx in range(n_in):
+                        # Maybe we don't need to clean up so much at the beginning,
+                        # since we clean this every time.
+                        dinputs.set_const(0.0)
 
-                    # Dictionary access returns a scaler for 1d input, and we
-                    # need a vector for clean code, so use _views_flat.
-                    flat_view[idx] = 1.0
+                        # Dictionary access returns a scaler for 1d input, and we
+                        # need a vector for clean code, so use _views_flat.
+                        flat_view[idx] = 1.0
 
-                    # The root system solves here.
-                    model._solve_linear([vecname], mode)
+                        # The root system solves here.
+                        model._solve_linear([vecname], mode)
 
-                    # Pull out the answers and pack into our data structure.
-                    for ocount, output_names in enumerate(output_list):
-                        for oname_count, output_name in enumerate(output_names):
-                            deriv_val = doutputs._views_flat[output_name]
-                            len_val = len(deriv_val)
+                        # Pull out the answers and pack into our data structure.
+                        for ocount, output_names in enumerate(output_list):
+                            for oname_count, output_name in enumerate(output_names):
+                                deriv_val = doutputs._views_flat[output_name]
+                                len_val = len(deriv_val)
 
-                            if return_format == 'flat_dict':
-                                if mode == 'fwd':
+                                if return_format == 'flat_dict':
+                                    if mode == 'fwd':
 
-                                    key = (old_output_list[ocount][oname_count],
-                                           old_input_list[icount][iname_count])
+                                        key = (old_output_list[ocount][oname_count],
+                                               old_input_list[icount][iname_count])
 
-                                    if totals[key] is None:
-                                        totals[key] = np.zeros((len_val, n_in))
-                                    totals[key][:, idx] = deriv_val
+                                        if totals[key] is None:
+                                            totals[key] = np.zeros((len_val, n_in))
+                                        totals[key][:, idx] = deriv_val
 
-                                else:
+                                    else:
 
-                                    key = (old_input_list[icount][iname_count],
-                                           old_output_list[ocount][oname_count])
+                                        key = (old_input_list[icount][iname_count],
+                                               old_output_list[ocount][oname_count])
 
-                                    if totals[key] is None:
-                                        totals[key] = np.zeros((n_in, len_val))
-                                    totals[key][idx, :] = deriv_val
+                                        if totals[key] is None:
+                                            totals[key] = np.zeros((n_in, len_val))
+                                        totals[key][idx, :] = deriv_val
 
-                            elif return_format == 'dict':
-                                if mode == 'fwd':
 
-                                    okey = old_output_list[ocount][oname_count]
-                                    ikey = old_input_list[icount][iname_count]
+                                elif return_format == 'dict':
+                                    if mode == 'fwd':
 
-                                    if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.zeros((len_val, n_in))
-                                    totals[okey][ikey][:, idx] = deriv_val
+                                        okey = old_output_list[ocount][oname_count]
+                                        ikey = old_input_list[icount][iname_count]
 
-                                else:
+                                        if totals[okey][ikey] is None:
+                                            totals[okey][ikey] = np.zeros((len_val, n_in))
+                                        totals[okey][ikey][:, idx] = deriv_val
 
-                                    okey = old_input_list[icount][iname_count]
-                                    ikey = old_output_list[ocount][oname_count]
+                                    else:
 
-                                    if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.zeros((n_in, len_val))
-                                    totals[okey][ikey][idx, :] = deriv_val
+                                        okey = old_input_list[icount][iname_count]
+                                        ikey = old_output_list[ocount][oname_count]
+
+                                        if totals[okey][ikey] is None:
+                                            totals[okey][ikey] = np.zeros((n_in, len_val))
+                                        totals[okey][ikey][idx, :] = deriv_val
 
         return totals
 
