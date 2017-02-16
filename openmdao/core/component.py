@@ -292,8 +292,8 @@ class Component(System):
             contain the values found at each (row, col) location in the subjac.
 
         """
-        oflist = [of] if isinstance(of, string_types) else of
-        wrtlist = [wrt] if isinstance(wrt, string_types) else wrt
+        of_list = [of] if isinstance(of, string_types) else of
+        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
 
         # If only one of rows/cols is specified
         if (rows is None) ^ (cols is None):
@@ -320,51 +320,58 @@ class Component(System):
                                  'same shape, val: {}, rows/cols: {}'.format(val.shape, rows.shape))
 
         glob_patterns = {'*', '?', '['}
-        multiple_items = len(oflist) > 1 or len(wrtlist) > 1
+        multiple_items = len(of_list) > 1 or len(wrt_list) > 1
 
-        for of in oflist:
-            of_copies = multiple_items or glob_patterns.intersection(of)
-            for wrt in wrtlist:
-                make_copies = of_copies or glob_patterns.intersection(wrt)
-                meta = {
-                    'rows': rows,
-                    'cols': cols,
-                    'value': val,
-                    'dependent': dependent,
-                    'copy': make_copies
-                }
-                # matching names/glob patterns will be resolved later because
-                # we don't know if all variables have been declared at this
-                # point.
-                key = (of, wrt)
-                if key in self._subjacs_info:
-                    meta2 = self._subjacs_info[key]
-                else:
-                    meta2 = SUBJAC_META_DEFAULTS.copy()
-                meta2.update(meta)
-                self._subjacs_info[key] = meta2
-
-    def _iter_partials_matches(self):
-        """
-        Generate all (of, wrt) name pairs to add to jacobian.
-        """
         outs = self._var_allprocs_names['output']
         ins = self._var_allprocs_names['input']
-        tvlists = (('output', outs), ('input', ins))
 
-        for (of_pattern, wrt_pattern), meta in iteritems(self._subjacs_info):
-            copy = meta['copy']
-            val = meta['value']
-            of_matches = [name for name in outs if fnmatchcase(name, of_pattern)]
-            for typ, vnames in tvlists:
-                wrt_matches = [name for name in vnames if fnmatchcase(name, wrt_pattern)]
-                for (of, wrt) in product(of_matches, wrt_matches):
-                    if copy:
-                        mc = meta.copy()
-                        mc['value'] = deepcopy(val)
-                        yield (of, wrt), mc, typ
-                    else:
-                        yield (of, wrt), meta, typ
+        def find_matches(pattern, var_list):
+            globs = glob_patterns.intersection(pattern)
+            if globs:
+                return [name for name in var_list if fnmatchcase(name, pattern)]
+            elif pattern in var_list:
+                return [pattern]
+            return []
+
+        of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
+        wrt_pattern_matches = [(pattern, find_matches(pattern, outs), find_matches(pattern, ins))
+                               for pattern in wrt_list]
+
+        for of_bundle, wrt_bundle in product(of_pattern_matches, wrt_pattern_matches):
+            of_pattern, of_matches = of_bundle
+            wrt_pattern, wrt_out, wrt_in = wrt_bundle
+            if not of_matches:
+                raise ValueError('No matches were found for of={}'.format(of_pattern))
+            if not (wrt_out or wrt_in):
+                raise ValueError('No matches were found for wrt={}'.format(wrt_pattern))
+
+            make_copies = (multiple_items
+                           or len(of_matches) > 1
+                           or (len(wrt_in) + len(wrt_out)) > 1)
+
+            for key in product(of_matches, wrt_out):
+                meta_changes = {
+                    'rows': rows,
+                    'cols': cols,
+                    'value': deepcopy(val) if make_copies else val,
+                    'dependent': dependent,
+                    'type': 'output'
+                }
+                meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                meta.update(meta_changes)
+                self._subjacs_info[key] = meta
+
+            for key in product(of_matches, wrt_in):
+                meta_changes = {
+                    'rows': rows,
+                    'cols': cols,
+                    'value': deepcopy(val) if make_copies else val,
+                    'dependent': dependent,
+                    'type': 'input'
+                }
+                meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                meta.update(meta_changes)
+                self._subjacs_info[key] = meta
 
     def _check_partials_meta(self, key, meta):
         """
@@ -415,7 +422,7 @@ class Component(System):
         Set subjacobian info into our jacobian.
         """
         with self._jacobian_context() as J:
-            for key, meta, typ in self._iter_partials_matches():
+            for key, meta in iteritems(self._subjacs_info):
                 self._check_partials_meta(key, meta)
                 J._set_partials_meta(key, meta)
 

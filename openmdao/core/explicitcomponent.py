@@ -2,11 +2,8 @@
 
 from __future__ import division
 
-import collections
-
 import numpy
-from scipy.sparse import coo_matrix, csr_matrix
-from six import string_types
+from six import iteritems
 
 from openmdao.core.component import Component
 
@@ -177,10 +174,9 @@ class ExplicitComponent(Component):
         Set subjacobian info into our jacobian.
         """
         with self._jacobian_context() as J:
-            for key, meta, typ in self._iter_partials_matches():
+            for key, meta in iteritems(self._subjacs_info):
                 self._check_partials_meta(key, meta)
-                # only negate d_output/d_input partials
-                J._set_partials_meta(key, meta, typ == 'input')
+                J._set_partials_meta(key, meta, meta['type'] == 'input')
 
     def compute(self, inputs, outputs):
         """
