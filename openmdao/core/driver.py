@@ -6,7 +6,8 @@ from openmdao.utils.generalized_dict import OptionsDictionary
 
 
 class Driver(object):
-    """Top-level container for the systems and drivers.
+    """
+    Top-level container for the systems and drivers.
 
     Attributes
     ----------
@@ -42,8 +43,10 @@ class Driver(object):
         self.supports = OptionsDictionary()#read_only=True)
         self.supports.declare('inequality_constraints', type_=bool, value=True)
         self.supports.declare('equality_constraints', type_=bool, value=True)
-        self.supports.declare('multiple_objectives', type_=bool, value=True)
+        self.supports.declare('linear_constraints', type_=bool, value=True)
         self.supports.declare('two_sided_constraints', type_=bool, value=True)
+        self.supports.declare('multiple_objectives', type_=bool, value=True)
+        self.supports.declare('integer_design_vars', type_=bool, value=True)
         self.supports.declare('gradients', type_=bool, value=True)
         self.supports.declare('active_set', type_=bool, value=True)
 
@@ -52,7 +55,8 @@ class Driver(object):
         # self.supports.declare('integer_design_vars', True)
 
     def _setup_driver(self, problem):
-        """Prepare the driver for execution.
+        """
+        Prepare the driver for execution.
 
         This is the final thing to run during setup.
 
@@ -72,7 +76,8 @@ class Driver(object):
         self._cons = model.get_constraints(recurse=True)
 
     def get_design_var_values(self):
-        """Return the design variable values.
+        """
+        Return the design variable values.
 
         This is called to gather the initial design variable state.
 
@@ -91,8 +96,22 @@ class Driver(object):
             dv_dict[name] = vec[name]
         return dv_dict
 
+    def set_design_var(self, name, value):
+        """
+        Sets the value of a design variable.
+
+        Parameters
+        ----------
+        name : str
+            Global pathname of the design variable.
+        value : float or ndarray
+            Value for the design variable.
+        """
+        self.problem.model._outputs[name] = value
+
     def get_response_values(self):
-        """Return response values.
+        """
+        Return response values.
 
         Returns
         -------
@@ -103,7 +122,8 @@ class Driver(object):
         pass
 
     def get_objective_values(self):
-        """Return objective values.
+        """
+        Return objective values.
 
         Returns
         -------
@@ -114,14 +134,13 @@ class Driver(object):
         vec = self.problem.model._outputs
         obj_dict = {}
         for name in objs:
-
-            # TODO: use objective scaling
-
             obj_dict[name] = vec[name]
+
         return obj_dict
 
     def get_constraint_values(self, ctype='all', lintype='all'):
-        """Return constraint values.
+        """
+        Return constraint values.
 
         Args
         ----
@@ -142,7 +161,7 @@ class Driver(object):
         vec = self.problem.model._outputs
         con_dict = {}
 
-        for key, meta in iteritems(self._cons):
+        for name, meta in iteritems(self._cons):
 
             if lintype == 'linear' and meta['linear'] is False:
                 continue
@@ -157,13 +176,14 @@ class Driver(object):
                 continue
 
             # TODO: Need to get the allgathered values? Like:
-            # cons[key] = self._get_distrib_var(key, meta, 'constraint')
+            # cons[name] = self._get_distrib_var(name, meta, 'constraint')
             con_dict[name] = vec[name]
 
-        return cons
+        return con_dict
 
     def get_total_derivatives(self, return_format='dict'):
-        """Return the derivatives.
+        """
+        Return the derivatives.
 
         These derivatives are of the responses with respect to the design vars.
 
@@ -175,7 +195,8 @@ class Driver(object):
         pass
 
     def run(self):
-        """Execute this driver.
+        """
+        Execute this driver.
 
         The base `Driver` just runs the model. All other drivers overload
         this method.

@@ -38,12 +38,12 @@ class TestPyoptSparse(unittest.TestCase):
         prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
             prob.driver.opt_settings['ACC'] = 1e-9
-        prob.driver.options['print_results'] = False
-        prob.driver.add_desvar('x', lower=-50.0, upper=50.0)
-        prob.driver.add_desvar('y', lower=-50.0, upper=50.0)
+        root.options['print_results'] = False
 
-        prob.driver.add_objective('f_xy')
-        prob.driver.add_constraint('c', upper=-15.0)
+        root.add_design_var('x', lower=-50.0, upper=50.0)
+        root.add_design_var('y', lower=-50.0, upper=50.0)
+        root.add_objective('f_xy')
+        root.add_constraint('c', upper=-15.0)
 
         prob.setup(check=False)
         prob.run()

@@ -112,6 +112,36 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'x'], -6.0, 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], 8.0, 1e-6)
 
+    def test_compute_total_derivs_basic_return_dict(self):
+        # Make sure 'dict' return_format works.
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        prob.setup(check=False, mode='fwd')
+        prob.model.suppress_solver_output = True
+        prob.run_model()
+
+        of = ['f_xy']
+        wrt = ['x', 'y']
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+
+        assert_rel_error(self, derivs['f_xy']['x'], -6.0, 1e-6)
+        assert_rel_error(self, derivs['f_xy']['y'], 8.0, 1e-6)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+
+        of = ['f_xy']
+        wrt = ['x', 'y']
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+
+        assert_rel_error(self, derivs['f_xy']['x'], -6.0, 1e-6)
+        assert_rel_error(self, derivs['f_xy']['y'], 8.0, 1e-6)
+
     def test_feature_set_indeps(self):
         prob = Problem()
 
