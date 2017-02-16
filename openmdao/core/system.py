@@ -741,8 +741,8 @@ class System(object):
 
         Sets this system's _jacobian._system attribute to the current system.
 
-        Returns
-        -------
+        Yields
+        ------
         <Jacobian>
             The current system's jacobian with its _system set to self.
         """
@@ -820,8 +820,8 @@ class System(object):
             If True, zero out residuals (in fwd mode) or inputs and outputs
             (in rev mode).
 
-        Returns
-        -------
+        Yields
+        ------
         (d_inputs, d_outputs, d_residuals) : tuple of Vectors
             Yields the three Vectors configured internally to deal only
             with variables relevant to the current matrix vector product.
@@ -870,6 +870,46 @@ class System(object):
         d_inputs._names = d_inputs._views
         d_outputs._names = d_outputs._views
         d_residuals._names = d_residuals._views
+
+    @contextmanager
+    def nonlinear_vector_context(self):
+        """
+        Context manager that yields the inputs, outputs, and residuals vectors.
+
+        Yields
+        ------
+        (inputs, outputs, residuals) : tuple of <Vector> instances
+            Yields the inputs, outputs, and residuals nonlinear vectors.
+        """
+        if self._inputs is None:
+            raise RuntimeError("Cannot get vectors because setup has not yet been called.")
+
+        yield self._inputs, self._outputs, self._residuals
+
+    @contextmanager
+    def linear_vector_context(self, vec_name='linear'):
+        """
+        Context manager that yields linear inputs, outputs, and residuals vectors.
+
+        Parameters
+        ----------
+        vec_name : str
+            Name of the linear right-hand-side vector. The default is 'linear'.
+
+        Yields
+        ------
+        (inputs, outputs, residuals) : tuple of <Vector> instances
+            Yields the inputs, outputs, and residuals linear vectors for vec_name.
+        """
+        if self._inputs is None:
+            raise RuntimeError("Cannot get vectors because setup has not yet been called.")
+
+        if vec_name not in self._vectors['input']:
+            raise ValueError("There is no linear vector named %s" % vec_name)
+
+        yield (self._vectors['input'][vec_name],
+               self._vectors['output'][vec_name],
+               self._vectors['residual'][vec_name])
 
     @contextmanager
     def _scaled_context(self):
@@ -1003,177 +1043,6 @@ class System(object):
             if recurse:
                 for sub in s.system_iter(local=local, recurse=True, typ=typ):
                     yield sub
-
-    def get_input(self, name, units=None):
-        """
-        Return the named input value using the unpromoted name.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable.
-        units : str or None
-            if not None, return the value in the given units.
-
-        Returns
-        -------
-        float or ndarray
-            The value of the named variable.
-        """
-        if units is not None:
-            raise NotImplementedError("units arg not supported yet")
-        if self._inputs is None:
-            raise RuntimeError("%s: Cannot access input '%s'. Setup has not "
-                               "been called." % (self.name, name))
-        try:
-            return self._inputs[name]
-        except KeyError:
-            raise KeyError("%s: input '%s' not found." % (self.pathname,
-                                                          name))
-
-    def set_input(self, name, value):
-        """
-        Set the value of the named input using the unpromoted name.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable.
-        value : float or ndarray
-            value to be set.
-        """
-        if self._inputs is None:
-            raise RuntimeError("%s: Cannot access input '%s'. Setup has not "
-                               "been called." % (self.name, name))
-        try:
-            self._inputs[name] = value
-        except KeyError:
-            raise KeyError("%s: input '%s' not found." % (self.pathname,
-                                                          name))
-
-    def get_output(self, name, scaled=False, units=None):
-        """
-        Return the named output value using promoted or unpromoted name.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable.
-        scaled : bool
-            If True, return the scaled value.
-        units : str or None
-            If not None, return the value in the given units.
-
-        Returns
-        -------
-        float or ndarray
-            The value of the named variable.
-        """
-        if scaled or units is not None:
-            raise NotImplementedError("scaled and units args not supported yet")
-        if self._outputs is None:
-            raise RuntimeError("%s: Cannot access output '%s'. Setup has not "
-                               "been called." % (self.name, name))
-        try:
-            return self._outputs[name]
-        except KeyError:
-            # check for promoted name
-            start = len(self.pathname) + 1 if self.pathname else 0
-            try:
-                unprom = self._var_name2path['output'][name][start:]
-                return self._outputs[unprom]
-            except KeyError:
-                raise KeyError("%s: output '%s' not found." % (self.pathname,
-                                                               name))
-
-    def set_output(self, name, value):
-        """
-        Return the named output value using promoted or unpromoted name.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable.
-        value : float or ndarray
-            the value to be set.
-        """
-        if self._outputs is None:
-            raise RuntimeError("%s: Cannot access output '%s'. Setup has not "
-                               "been called." % (self.name, name))
-        try:
-            self._outputs[name] = value
-        except KeyError:
-            # check for promoted name
-            start = len(self.pathname) + 1 if self.pathname else 0
-            try:
-                unprom = self._var_name2path['output'][name][start:]
-                self._outputs[unprom] = value
-            except KeyError:
-                raise KeyError("%s: output '%s' not found." % (self.pathname,
-                                                               name))
-
-    def get_residual(self, name, scaled=False, units=None):
-        """
-        Return the named residual value using promoted or unpromoted name.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable.
-        scaled : bool
-            If True, return the scaled value.
-        units : str or None
-            If not None, return the value in the given units.
-
-        Returns
-        -------
-        float or ndarray
-            The value of the named residual.
-        """
-        if scaled or units is not None:
-            raise NotImplementedError("scaled and units args not supported yet")
-        if self._residuals is None:
-            raise RuntimeError("%s: Cannot access residual '%s'. Setup has not "
-                               "been called." % (self.name, name))
-
-        try:
-            return self._residuals[name]
-        except KeyError:
-            # check for promoted name
-            start = len(self.pathname) + 1 if self.pathname else 0
-            try:
-                unprom = self._var_name2path['output'][name][start:]
-                return self._residuals[unprom]
-            except KeyError:
-                raise KeyError("%s: residual '%s' not found." % (self.pathname,
-                                                                 name))
-
-    def set_residual(self, name, value):
-        """
-        Set value of named residual using promoted or unpromoted name.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable.
-        value : float or ndarray
-            the value to be set.
-        """
-        if self._residuals is None:
-            raise RuntimeError("%s: Cannot access residual '%s'. Setup has not "
-                               "been called." % (self.name, name))
-
-        try:
-            self._residuals[name] = value
-        except KeyError:
-            # check for promoted name
-            start = len(self.pathname) + 1 if self.pathname else 0
-            try:
-                unprom = self._var_name2path['output'][name][start:]
-                self._residuals[unprom] = value
-            except KeyError:
-                raise KeyError("%s: residual '%s' not found." % (self.pathname,
-                                                                 name))
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
@@ -1885,5 +1754,18 @@ class System(object):
             pathname
             comm
             metadata (local and global)
+        """
+        pass
+
+    def initialize_partials(self):
+        """
+        Optional method for components to declare Jacobian structure/approximations.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+            variable names
         """
         pass
