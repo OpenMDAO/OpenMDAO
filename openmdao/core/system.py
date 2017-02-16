@@ -1603,7 +1603,7 @@ class System(object):
             raise RuntimeError(msg.format(str(err), self.pathname))
 
         # Size them all
-        vec = self._outputs._names
+        vec = self._outputs._views_flat
         for name, data in iteritems(out):
 
             # Depending on where the designvar was added, the name in the
@@ -1651,7 +1651,7 @@ class System(object):
             raise RuntimeError(msg.format(str(err), self.pathname))
 
         # Size them all
-        vec = self._outputs._names
+        vec = self._outputs._views_flat
         for name, data in iteritems(out):
 
             # Depending on where the response was added, the name in the

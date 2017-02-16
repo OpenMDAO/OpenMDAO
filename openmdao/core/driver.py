@@ -11,6 +11,8 @@ class Driver(object):
 
     Attributes
     ----------
+    fail : bool
+        Reports whether the driver ran successfully.
     options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.
     problem : <Problem>
@@ -56,6 +58,8 @@ class Driver(object):
         # self.supports.declare('linear_constraints', True)
         # self.supports.declare('integer_design_vars', True)
 
+        self.fail = False
+
     def _setup_driver(self, problem):
         """
         Prepare the driver for execution.
@@ -89,13 +93,11 @@ class Driver(object):
            Dictionary containing values of each design variable.
         """
         dvs = self._designvars
-        vec = self.problem.model._outputs
+        vec = self.problem.model._outputs._views_flat
         dv_dict = {}
         for name in dvs:
-
-            # TODO: use dv scaling
-
             dv_dict[name] = vec[name]
+
         return dv_dict
 
     def set_design_var(self, name, value):
@@ -133,7 +135,7 @@ class Driver(object):
            Dictionary containing values of each objective.
         """
         objs = self._objs
-        vec = self.problem.model._outputs
+        vec = self.problem.model._outputs._views_flat
         obj_dict = {}
         for name in objs:
             obj_dict[name] = vec[name]
@@ -160,7 +162,7 @@ class Driver(object):
            Dictionary containing values of each constraint.
         """
         cons = self._cons
-        vec = self.problem.model._outputs
+        vec = self.problem.model._outputs._views_flat
         con_dict = {}
 
         for name, meta in iteritems(self._cons):

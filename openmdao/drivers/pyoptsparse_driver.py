@@ -145,7 +145,6 @@ class pyOptSparseDriver(Driver):
 
         self._indep_list = []
         self._quantities = []
-        self.exit_flag = 0
 
     def _setup_driver(self, problem):
         """
@@ -207,13 +206,13 @@ class pyOptSparseDriver(Driver):
         lcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
                             if con['linear'] is True)
         if len(lcons) > 0:
-            _lin_jacs = problem.compute_total_derivs(of=lcons, wrt=indep_list,
-                                                     return_format='dict')
+            _lin_jacs = problem._compute_total_derivs(of=lcons, wrt=indep_list,
+                                                      return_format='dict')
 
         # Add all equality constraints
         self.active_tols = {}
         eqcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
-                             if con['equals'])
+                             if con['equals'] is not None)
         for name, meta in iteritems(eqcons):
             size = meta['size']
             lower = upper = meta['equals']
@@ -228,7 +227,7 @@ class pyOptSparseDriver(Driver):
 
         # Add all inequality constraints
         iqcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
-                             if not con['equals'])
+                             if con['equals'] is None)
         for name, meta in iteritems(iqcons):
             size = meta['size']
 
@@ -302,15 +301,15 @@ class pyOptSparseDriver(Driver):
         self.pyopt_solution = sol
         try:
             exit_status = sol.optInform['value']
-            self.exit_flag = 1
+            self.fail = False
 
             # These are various failed statuses.
             if exit_status > 2:
-                self.exit_flag = 0
+                self.fail = True
 
         except KeyError:
             # Nothing is here, so something bad happened!
-            self.exit_flag = 0
+            self.fail = True
 
     def _objfunc(self, dv_dict):
         """
