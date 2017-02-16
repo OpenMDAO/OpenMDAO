@@ -28,7 +28,9 @@ class Driver(object):
     """
 
     def __init__(self):
-        """Initialize the driver."""
+        """
+        Initialize the driver.
+        """
         self.problem = None
         self._designvars = None
         self._cons = None
@@ -40,7 +42,7 @@ class Driver(object):
         # Note Driver based class supports setting up problems that use every
         # feature, but it doesn't do anything except run the model. This is
         # primarilly for generic testing.
-        self.supports = OptionsDictionary()#read_only=True)
+        self.supports = OptionsDictionary()
         self.supports.declare('inequality_constraints', type_=bool, value=True)
         self.supports.declare('equality_constraints', type_=bool, value=True)
         self.supports.declare('linear_constraints', type_=bool, value=True)
@@ -98,7 +100,7 @@ class Driver(object):
 
     def set_design_var(self, name, value):
         """
-        Sets the value of a design variable.
+        Set the value of a design variable.
 
         Parameters
         ----------
@@ -142,8 +144,8 @@ class Driver(object):
         """
         Return constraint values.
 
-        Args
-        ----
+        Parameters
+        ----------
         ctype : string
             Default is 'all'. Optionally return just the inequality constraints
             with 'ineq' or the equality constraints with 'eq'.
@@ -180,19 +182,6 @@ class Driver(object):
             con_dict[name] = vec[name]
 
         return con_dict
-
-    def get_total_derivatives(self, return_format='dict'):
-        """
-        Return the derivatives.
-
-        These derivatives are of the responses with respect to the design vars.
-
-        Parameters
-        ----------
-        return_format : string
-            Format for the derivatives. Default is 'string'.
-        """
-        pass
 
     def run(self):
         """

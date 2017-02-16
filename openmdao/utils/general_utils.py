@@ -22,9 +22,11 @@ def warn_deprecation(msg):
 
 
 def set_pyoptsparse_opt(optname):
-    """For testing, sets the pyoptsparse optimizer using the given optimizer
-    name.  This may be modified based on the value of
-    OPENMDAO_FORCE_PYOPTSPARSE_OPT.  This can be used on systems that have
+    """
+    For testing, sets the pyoptsparse optimizer using the given optimizer name.
+
+    This may be modified based on the value of
+    OPENMDAO_FORCE_PYOPTSPARSE_OPT. This can be used on systems that have
     SNOPT installed to force them to use SLSQP in order to mimic our test
     machines on travis and appveyor.
 
@@ -40,7 +42,6 @@ def set_pyoptsparse_opt(optname):
     str
         Pyoptsparse optimizer string
     """
-
     OPT = None
     OPTIMIZER = None
     force = os.environ.get('OPENMDAO_FORCE_PYOPTSPARSE_OPT')

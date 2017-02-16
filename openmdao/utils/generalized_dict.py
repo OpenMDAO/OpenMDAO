@@ -226,7 +226,8 @@ class OptionsDictionary(GeneralizedDictionary):
     """
 
     def __init__(self, read_only=False):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
         Parameters
         ----------

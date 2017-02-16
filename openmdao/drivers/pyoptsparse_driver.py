@@ -1,9 +1,11 @@
 """
 OpenMDAO Wrapper for pyoptsparse.
+
 pyoptsparse is based on pyOpt, which is an object-oriented framework for
 formulating and solving nonlinear constrained optimization problems, with
 additional MPI capability.
 """
+
 from __future__ import print_function
 from collections import OrderedDict
 import traceback
@@ -30,7 +32,6 @@ def _check_imports():
     """
     Dynamically remove optimizers we don't have.
     """
-
     optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
                'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']
 
@@ -76,15 +77,19 @@ class pyOptSparseDriver(Driver):
 
     Attributes
     ----------
-    hist_file : string or None
+    hist_file : str or None
         File location for saving pyopt_sparse optimization history.
         Default is None for no output.
+    hotstart_file : str
+        Optional file to hot start the optimization.
     opt_settings : dict
         Dictionary for setting optimizer-specific options.
     problem : <Problem>
         Pointer to the containing problem.
     supports : <OptionsDictionary>
         Provides a consistant way for drivers to declare what features they support.
+    pyopt_solution : <Solution>
+        Pyopt_sparse solution object.
     _cons : dict
         Contains all constraint info.
     _designvars : dict
@@ -93,8 +98,6 @@ class pyOptSparseDriver(Driver):
         List of design variables.
     _objs : dict
         Contains all objective info.
-    _indep_list : list
-        List of design variables.
     _responses : dict
         Contains all response info.
     """
@@ -103,7 +106,6 @@ class pyOptSparseDriver(Driver):
         """
         Initialize pyopt.
         """
-
         super(pyOptSparseDriver, self).__init__()
 
         # What we support
@@ -141,15 +143,9 @@ class pyOptSparseDriver(Driver):
         # We save the pyopt_solution so that it can be queried later on.
         self.pyopt_solution = None
 
-        # Cache the jacs of linear constraints
-        self.lin_jacs = OrderedDict()
-
-        # Support for active-set performance improvements.
-        self.active_tols = {}
-
         self._indep_list = []
         self._quantities = []
-        # self.exit_flag = 0
+        self.exit_flag = 0
 
     def _setup_driver(self, problem):
         """
@@ -182,7 +178,6 @@ class pyOptSparseDriver(Driver):
         model = self.problem.model
         self.pyopt_solution = None
         self.iter_count = 0
-        self._quantities = []
 
         # Initial Run
         model._solve_nonlinear()
@@ -205,14 +200,15 @@ class pyOptSparseDriver(Driver):
         objs = self.get_objective_values()
         for name in objs:
             opt_prob.addObj(name)
+            self._quantities.append(name)
 
         # Calculate and save derivatives for any linear constraints.
         con_meta = self._cons
         lcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
-                            if con['linear']==True)
+                            if con['linear'] is True)
         if len(lcons) > 0:
-            self.lin_jacs = problem.compute_total_derivs(of=lcons, wrt=_indep_list,
-                                                         return_format='dict')
+            _lin_jacs = problem.compute_total_derivs(of=lcons, wrt=indep_list,
+                                                     return_format='dict')
 
         # Add all equality constraints
         self.active_tols = {}
@@ -224,15 +220,15 @@ class pyOptSparseDriver(Driver):
 
             if meta['linear']:
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper,
-                                     linear=True, #wrt=wrt,
-                                     jac=self.lin_jacs[name])
+                                     linear=True,
+                                     jac=_lin_jacs[name])
             else:
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper)
                 self._quantities.append(name)
 
         # Add all inequality constraints
         iqcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
-                            if not con['equals'])
+                             if not con['equals'])
         for name, meta in iteritems(iqcons):
             size = meta['size']
 
@@ -242,8 +238,8 @@ class pyOptSparseDriver(Driver):
 
             if meta['linear']:
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower,
-                                     linear=True, #wrt=wrt,
-                                     jac=self.lin_jacs[name])
+                                     linear=True,
+                                     jac=_lin_jacs[name])
             else:
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower)
                 self._quantities.append(name)
@@ -255,8 +251,7 @@ class pyOptSparseDriver(Driver):
             opt = getattr(_tmp, optimizer)()
 
         except ImportError:
-            msg = "Optimizer %s is not available in this installation." % \
-                   optimizer
+            msg = "Optimizer %s is not available in this installation." % optimizer
             raise ImportError(msg)
 
         # Set optimization options
@@ -274,7 +269,7 @@ class pyOptSparseDriver(Driver):
                       hotStart=self.hotstart_file)
 
         elif self.options['gradient method'] == 'snopt_fd':
-            if self.options['optimizer']=='SNOPT':
+            if self.options['optimizer'] == 'SNOPT':
 
                 # Use SNOPT's internal finite difference
                 fd_step = problem.root.deriv_options['step_size']
@@ -297,28 +292,32 @@ class pyOptSparseDriver(Driver):
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state
         dv_dict = sol.getDVs()
-        for name in _indep_list:
+        for name in indep_list:
             val = dv_dict[name]
-            self.set_desvar(name, val)
+            self.set_design_var(name, val)
 
-        with self.root._dircontext:
-            self.root.solve_nonlinear(metadata=self.metadata)
+        model._solve_nonlinear()
 
         # Save the most recent solution.
         self.pyopt_solution = sol
         try:
             exit_status = sol.optInform['value']
             self.exit_flag = 1
-            if exit_status > 2: # bad
+
+            # These are various failed statuses.
+            if exit_status > 2:
                 self.exit_flag = 0
-        except KeyError: #nothing is here, so something bad happened!
+
+        except KeyError:
+            # Nothing is here, so something bad happened!
             self.exit_flag = 0
 
     def _objfunc(self, dv_dict):
         """
-        Function that evaluates and returns the objective function and
-        constraints. This function is passed to pyOpt's Optimization object
-        and is called from its optimizers.
+        Function that evaluates and returns the objective function and constraints.
+
+        This function is passed to pyOpt's Optimization object and is called
+        from its optimizers.
 
         Parameters
         ----------
@@ -348,8 +347,8 @@ class pyOptSparseDriver(Driver):
             self.iter_count += 1
             model._solve_nonlinear()
 
-            func_dict = self.get_objective_values() # this returns a new OrderedDict
-            func_dict.update(self.get_constraint_values())
+            func_dict = self.get_objective_values()
+            func_dict.update(self.get_constraint_values(lintype='nonlinear'))
 
         except Exception as msg:
             tb = traceback.format_exc()
@@ -367,9 +366,10 @@ class pyOptSparseDriver(Driver):
 
     def _gradfunc(self, dv_dict, func_dict):
         """
-        Function that evaluates and returns the gradient of the objective
-        function and constraints. This function is passed to pyOpt's
-        Optimization object and is called from its optimizers.
+        Function that evaluates and returns the gradient of the objective function and constraints.
+
+        This function is passed to pyOpt's Optimization object and is called
+        from its optimizers.
 
         Parameters
         ----------
@@ -393,9 +393,9 @@ class pyOptSparseDriver(Driver):
 
         try:
 
-            sens_dict = prob.compute_total_derivs(of=self._quantities,
-                                                  wrt=self._indep_list,
-                                                  return_format='dict')
+            sens_dict = prob._compute_total_derivs(of=self._quantities,
+                                                   wrt=self._indep_list,
+                                                   return_format='dict')
 
         except Exception as msg:
             tb = traceback.format_exc()

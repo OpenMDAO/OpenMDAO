@@ -1449,7 +1449,7 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
 
-        elif type =='obj':
+        elif type == 'obj':
             pass
         else:
             raise ValueError('Unrecognized type for response.  Expected'
@@ -1694,7 +1694,8 @@ class System(object):
 
         """
         return OrderedDict((key, response) for (key, response) in
-                           self.get_responses(recurse=recurse).items() if response['type']=='con')
+                           self.get_responses(recurse=recurse).items()
+                           if response['type'] == 'con')
 
     def get_objectives(self, recurse=True):
         """
@@ -1716,7 +1717,8 @@ class System(object):
 
         """
         return OrderedDict((key, response) for (key, response) in
-                           self.get_responses(recurse=recurse).items() if response['type']=='obj')
+                           self.get_responses(recurse=recurse).items()
+                           if response['type'] == 'obj')
 
     def run_apply_nonlinear(self):
         """

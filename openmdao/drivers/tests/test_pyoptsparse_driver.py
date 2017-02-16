@@ -4,6 +4,7 @@ import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 
@@ -27,26 +28,28 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_upper(self):
 
         prob = Problem()
-        root = prob.root = Group()
+        model = prob.model = Group()
 
-        root.add('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        root.add('p2', IndepVarComp('y', 50.0), promotes=['*'])
-        root.add('comp', Paraboloid(), promotes=['*'])
-        root.add('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        model.suppress_solver_output = True
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
             prob.driver.opt_settings['ACC'] = 1e-9
-        root.options['print_results'] = False
+        prob.driver.options['print_results'] = False
 
-        root.add_design_var('x', lower=-50.0, upper=50.0)
-        root.add_design_var('y', lower=-50.0, upper=50.0)
-        root.add_objective('f_xy')
-        root.add_constraint('c', upper=-15.0)
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
 
         prob.setup(check=False)
-        prob.run()
+        prob.run_driver()
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -55,12 +58,14 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_lower(self):
 
         prob = Problem()
-        root = prob.root = Group()
+        model = prob.model = Group()
 
-        root.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        root.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
-        root.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        root.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+
+        model.suppress_solver_output = True
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -68,14 +73,14 @@ class TestPyoptSparse(unittest.TestCase):
             prob.driver.opt_settings['ACC'] = 1e-9
         prob.driver.options['print_results'] = False
 
-        root.add_design_var('x', lower=-50.0, upper=50.0)
-        root.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
 
-        root.add_objective('f_xy')
-        root.add_constraint('c', lower=15.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=15.0)
 
         prob.setup(check=False)
-        prob.run()
+        prob.run_driver()
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
