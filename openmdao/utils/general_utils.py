@@ -56,12 +56,14 @@ def ensure_compatible(name, value, shape=None, indices=None):
         If value cannot be made to conform to shape or if shape and indices
         are incompatible.
     """
-    # if shape is not given, infer from indices
-    if shape:
+    # if shape is not given, infer from value (if not scalar) or indices
+    if shape is not None:
         if isinstance(shape, int):
             shape = (shape,)
         elif isinstance(shape, list):
             shape = tuple(shape)
+    elif not np.isscalar(value):
+        shape = value.shape
     elif indices is not None:
         shape = np.atleast_1d(indices).shape
 
@@ -80,6 +82,12 @@ def ensure_compatible(name, value, shape=None, indices=None):
                 raise ValueError("Incompatible shape for '%s': "
                                  "Expected %s but got %s." %
                                  (name, shape, value.shape))
+
+    # finally make sure shape of indices is compatible
+    if indices is not None and np.atleast_1d(indices).shape != shape:
+        raise ValueError("Shape of indices does not match shape for '%s': "
+                         "Expected %s but got %s." %
+                         (name, shape, np.atleast_1d(indices).shape))
 
     return value, shape
 
