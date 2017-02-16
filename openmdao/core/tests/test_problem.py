@@ -1,5 +1,4 @@
 """ Unit tests for the problem interface."""
-from __future__ import print_function
 
 import unittest
 import warnings
@@ -45,7 +44,7 @@ class TestProblem(unittest.TestCase):
         prob = Problem(model)
         prob.setup()
 
-        msg = "Incorrect size during assignment. Expected .* but got .*"
+        msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"
 
         # check valid scalar value
         new_val = -10.

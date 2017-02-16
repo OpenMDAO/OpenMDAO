@@ -4,6 +4,8 @@ import numpy
 
 from six.moves import range
 
+from openmdao.utils.general_utils import ensure_compatible
+
 
 class Vector(object):
     """
@@ -279,8 +281,7 @@ class Vector(object):
             variable value to set (not scaled, not dimensionless)
         """
         if key in self._names:
-            if isinstance(value, tuple) or isinstance(value, list):
-                value = numpy.atleast_1d(value)
+            value, shape = ensure_compatible(key, value, self._views[key].shape)
             if isinstance(value, numpy.ndarray):
                 value = value.reshape(self._views[key].shape)
             self._views[key][:] = value

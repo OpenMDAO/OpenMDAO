@@ -13,8 +13,8 @@ import traceback
 from six import iteritems
 from six.moves import range
 
-import scipy as sp
 import numpy as np
+import scipy as sp
 
 from pyoptsparse import Optimization
 

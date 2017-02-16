@@ -13,7 +13,7 @@ from openmdao.assemblers.default_assembler import DefaultAssembler
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
 from openmdao.error_checking.check_config import check_config
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
 from openmdao.vectors.default_vector import DefaultVector
 
 
@@ -180,18 +180,12 @@ class Problem(object):
         if pdata.typ == 'output':
             meta = self.model._var_myproc_metadata['output'][pdata.myproc_idx]
             if 'shape' in meta:
-                if np.isscalar(value):
-                    value = np.ones(meta['shape']) * value
-                else:
-                    _check_shape(meta['shape'], value)
+                value, _ = ensure_compatible(pathname, value, meta['shape'])
             self.model._outputs[pathname] = value
         else:
             meta = self.model._var_myproc_metadata['input'][pdata.myproc_idx]
             if 'shape' in meta:
-                if np.isscalar(value):
-                    value = np.ones(meta['shape']) * value
-                else:
-                    _check_shape(meta['shape'], value)
+                value, _ = ensure_compatible(pathname, value, meta['shape'])
             self.model._inputs[pathname] = value
 
     @property
@@ -641,20 +635,3 @@ class Problem(object):
                                     totals[okey][ikey][idx, :] = deriv_val
 
         return totals
-
-
-def _check_shape(shape, val):
-    """
-    Check that the shape of a value matches the metadata for a variable.
-
-    Parameters
-    ----------
-    shape : tuple
-        Expected shape of a variable.
-    val : float or ndarray or list
-        value to check.
-    """
-    val_shape = np.atleast_1d(val).shape
-    if val_shape != shape:
-        raise ValueError("Incorrect size during assignment. Expected "
-                         "%s but got %s." % (shape, val_shape))

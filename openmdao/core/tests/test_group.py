@@ -168,6 +168,8 @@ class TestGroup(unittest.TestCase):
             promotes_outputs='x')
         p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs='x')
         p.setup()
+
+        p.model.suppress_solver_output = True
         p.run_model()
 
         self.assertEqual(p['comp1.a'], 2)
@@ -184,6 +186,8 @@ class TestGroup(unittest.TestCase):
             promotes_outputs=['a', 'x'])
         p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs='x')
         p.setup()
+
+        p.model.suppress_solver_output = True
         p.run_model()
 
         self.assertEqual(p['a'], 2)
@@ -200,6 +204,8 @@ class TestGroup(unittest.TestCase):
             promotes_outputs='*')
         p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
+
+        p.model.suppress_solver_output = True
         p.run_model()
 
         self.assertEqual(p['a'], 2)
@@ -217,6 +223,8 @@ class TestGroup(unittest.TestCase):
             promotes_outputs=['x', ('a', 'q')])
         p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
+
+        p.model.suppress_solver_output = True
         p.run_model()
 
         self.assertEqual(p['q'], 2)
@@ -235,6 +243,8 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('comp2', ExecComp('y=2*x'))
         p.model.connect('x2', 'comp2.x')
         p.setup()
+
+        p.model.suppress_solver_output = True
         p.run_model()
 
         self.assertEqual(p['q'], 2)
@@ -282,6 +292,7 @@ class TestGroup(unittest.TestCase):
         s = p.model.get_subsystem('')
         self.assertEqual(s, None)
 
+        p.model.suppress_solver_output = True
         p.run_model()
 
         self.assertEqual(p['group1.comp1.x'],  5.0)
