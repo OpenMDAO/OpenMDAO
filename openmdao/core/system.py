@@ -1708,3 +1708,16 @@ class System(object):
             metadata (local and global)
         """
         pass
+
+    def initialize_partials(self):
+        """
+        Optional method for components to declare Jacobian structure/approximations.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+            variable names
+        """
+        pass
