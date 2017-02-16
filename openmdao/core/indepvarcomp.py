@@ -106,7 +106,7 @@ class IndepVarComp(ExplicitComponent):
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
         shape : int or tuple or list or None
-            Shape of this variable, only required if indices not provided and val is not an array.
+            Shape of this variable, only required if val is not an array.
             Default is None.
         units : str or None
             Units in which the output variables will be provided to the component during execution.
