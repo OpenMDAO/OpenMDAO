@@ -1,7 +1,7 @@
 """ Definition of the Paraboloid component, which evaluates the equation
 (x-3)^2 + xy + (y+4)^2 = 3
 """
-
+from __future__ import division, print_function
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 
@@ -36,3 +36,29 @@ class Paraboloid(ExplicitComponent):
 
         partials['f_xy', 'x'] = 2.0*x - 6.0 + y
         partials['f_xy', 'y'] = 2.0*y + 8.0 + x
+
+
+if __name__ == "__main__":
+    from openmdao.core.problem import Problem
+    from openmdao.core.group import Group
+    from openmdao.core.indepvarcomp import IndepVarComp
+
+    model = Group()
+    model.add_subsystem('des_vars', IndepVarComp((
+        ('x', 3.0),
+        ('y', -4.0),
+    )))
+    model.add_subsystem('parab_comp', Paraboloid())
+
+    model.connect('des_vars.x', 'parab_comp.x')
+    model.connect('des_vars.y', 'parab_comp.y')
+
+    prob = Problem(model)
+    prob.setup()
+    prob.run()
+    print(prob['parab_comp.f'])
+
+    prob['des_vars.x'] = 5.0
+    prob['des_vars.y'] = -2.0
+    prob.run()
+    print(prob['parab_comp.f'])

@@ -20,11 +20,13 @@ Usage
 
 2. Promote the input and output of a component.
 
-Note that inputs are always accessed using unpromoted names even when they are
-promoted, because promoted input names may not be unique.  The unpromoted name
-is the full system path to the variable from the point of view of the calling
-system.  Accessing the variables through the Problem as in this example means
-that the unpromoted name and the full or absolute pathname are the same.
+.. note::
+
+    Inputs are always accessed using unpromoted names even when they are
+    promoted, because promoted input names may not be unique.  The unpromoted name
+    is the full system path to the variable from the point of view of the calling
+    system.  Accessing the variables through the Problem as in this example means
+    that the unpromoted name and the full or absolute pathname are the same.
 
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_simple_promoted
@@ -36,8 +38,8 @@ that the unpromoted name and the full or absolute pathname are the same.
 
 4. Promote the input and output of components to subgroup level.
 
-In this example, there are two inputs promoted to the same name, so the promoted
-name is not unique.
+In this example, there are two inputs promoted to the same name, so
+the promoted name *G1.a* is not unique.
 
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_nested_promoted1
