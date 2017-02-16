@@ -341,38 +341,27 @@ class Component(System):
             of_pattern, of_matches = of_bundle
             wrt_pattern, wrt_out, wrt_in = wrt_bundle
             if not of_matches:
-                raise ValueError('No matches were found for of={}'.format(of_pattern))
+                raise ValueError('No matches were found for of="{}"'.format(of_pattern))
             if not (wrt_out or wrt_in):
-                raise ValueError('No matches were found for wrt={}'.format(wrt_pattern))
+                raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
 
             make_copies = (multiple_items
                            or len(of_matches) > 1
                            or (len(wrt_in) + len(wrt_out)) > 1)
 
-            for key in product(of_matches, wrt_out):
-                meta_changes = {
-                    'rows': rows,
-                    'cols': cols,
-                    'value': deepcopy(val) if make_copies else val,
-                    'dependent': dependent,
-                    'type': 'output'
-                }
-                meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
-                meta.update(meta_changes)
-                self._subjacs_info[key] = meta
-
-            for key in product(of_matches, wrt_in):
-                meta_changes = {
-                    'rows': rows,
-                    'cols': cols,
-                    'value': deepcopy(val) if make_copies else val,
-                    'dependent': dependent,
-                    'type': 'input'
-                }
-                meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
-                meta.update(meta_changes)
-                self._check_partials_meta(key, meta)
-                self._subjacs_info[key] = meta
+            for type_, wrt_matches in [('output', wrt_out), ('intput', wrt_in)]:
+                for key in product(of_matches, wrt_matches):
+                    meta_changes = {
+                        'rows': rows,
+                        'cols': cols,
+                        'value': deepcopy(val) if make_copies else val,
+                        'dependent': dependent,
+                        'type': type_
+                    }
+                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    meta.update(meta_changes)
+                    self._check_partials_meta(key, meta)
+                    self._subjacs_info[key] = meta
 
     def _check_partials_meta(self, key, meta):
         """

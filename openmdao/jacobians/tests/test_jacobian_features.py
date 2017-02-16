@@ -152,7 +152,7 @@ class TestJacobianFeatures(unittest.TestCase):
          'If one of rows/cols is specified, then both must be specified'),
         ({'of': 'f', 'wrt': 'z', 'rows': [0], 'cols': [0, 3]},
          'rows and cols must have the same shape, rows: \(1L?,\), cols: \(2L?,\)'),
-        ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, 1, 3], 'val':[0, 1]},
+        ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, 1, 3], 'val': [0, 1]},
          'If rows and cols are specified, val must be a scalar or have the same shape, '
          'val: \(2L?,\), rows/cols: \(3L?,\)'),
     ])
@@ -164,6 +164,21 @@ class TestJacobianFeatures(unittest.TestCase):
         with self.assertRaises(ValueError) as ex:
             problem.setup(check=False)
         self.assertRegexpMatches(str(ex.exception), error_msg)
+
+    @parameterized.expand([
+        ({'of': 'q', 'wrt': 'z'}, 'No matches were found for of="q"'),
+        ({'of': 'f?', 'wrt': 'x'}, 'No matches were found for of="f?"'),
+        ({'of': 'f', 'wrt': 'q'}, 'No matches were found for wrt="q"'),
+        ({'of': 'f', 'wrt': 'x?'}, 'No matches were found for wrt="x?"'),
+    ])
+    def test_bad_names(self, partials_kwargs, error_msg):
+        comp = SimpleCompKwarg(partials_kwargs)
+        problem = self.problem
+        model = problem.model
+        model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
+        with self.assertRaises(ValueError) as ex:
+            problem.setup(check=False)
+        self.assertEquals(str(ex.exception), error_msg)
 
     def test_const_jacobian(self):
         model = Group()
