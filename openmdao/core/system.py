@@ -790,10 +790,6 @@ class System(object):
             with variables relevant to the current matrix vector product.
 
         """
-        # TODO: The 'Returns' in the docstring above should be 'Yields', but
-        #  our linter currently isn't smart enough to know that, so for now we
-        #  put 'Returns' in there.
-
         d_inputs = self._vectors['input'][vec_name]
         d_outputs = self._vectors['output'][vec_name]
         d_residuals = self._vectors['residual'][vec_name]
@@ -961,9 +957,8 @@ class System(object):
         else:
             sysiter = self._subsystems_allprocs
 
-        if include_self:
-            if typ is None or isinstance(self, typ):
-                yield self
+        if include_self and (typ is None or isinstance(self, typ)):
+            yield self
 
         for s in sysiter:
             if typ is None or isinstance(s, typ):
