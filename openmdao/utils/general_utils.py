@@ -63,7 +63,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
         elif isinstance(shape, list):
             shape = tuple(shape)
     elif not np.isscalar(value):
-        shape = value.shape
+        shape = np.atleast_1d(value).shape
     elif indices is not None:
         shape = np.atleast_1d(indices).shape
 
