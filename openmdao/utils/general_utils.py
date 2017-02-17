@@ -205,13 +205,13 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
         if adder is None:
             adder = 0.0
 
-    adder = format_as_float_or_array('adder', adder, val_if_none=0.0)
-    scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0)
+    adder = format_as_float_or_array('adder', adder, val_if_none=0.0, flatten=True)
+    scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0, flatten=True)
 
     return adder, scaler
 
 
-def format_as_float_or_array(name, values, val_if_none=0.0):
+def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     """
     Format driver array option values.
 
@@ -228,6 +228,8 @@ def format_as_float_or_array(name, values, val_if_none=0.0):
         Values of the array option to be formatted to the expected form.
     val_if_none : float or numpy ndarray
         The default value for the option if values is None.
+    flatten : bool
+        Set to True to flatten any ndarray return.
 
     Returns
     -------
@@ -244,9 +246,13 @@ def format_as_float_or_array(name, values, val_if_none=0.0):
     # Convert adder to ndarray/float as necessary
     if isinstance(values, np.ndarray):
         values = values
+        if flatten:
+            values = values.flatten()
     elif not isinstance(values, string_types) \
             and isinstance(values, Iterable):
         values = np.asarray(values, dtype=float)
+        if flatten:
+            values = values.flatten()
     elif values is None:
         values = val_if_none
     elif values == float('inf'):

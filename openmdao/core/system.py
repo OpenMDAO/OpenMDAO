@@ -1055,10 +1055,12 @@ class System(object):
         adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
         # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max)
+        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max,
+                                         flatten=True)
 
         # Convert upper to ndarray/float as necessary
-        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max)
+        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max,
+                                         flatten=True)
 
         # Apply scaler/adder to lower and upper
         lower = (lower + adder) * scaler
@@ -1185,21 +1187,17 @@ class System(object):
         if ref0 is not None:
             ref0 = float(ref0)
 
-        # Convert adder to ndarray/float as necessary
-        adder = format_as_float_or_array('adder', adder, val_if_none=0.0)
-
-        # Convert scaler to ndarray/float as necessary
-        scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0)
-
         # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max)
+        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max,
+                                         flatten=True)
 
         # Convert upper to ndarray/float as necessary
-        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max)
+        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max,
+                                         flatten=True)
 
         # Convert equals to ndarray/float as necessary
         if equals is not None:
-            equals = format_as_float_or_array('equals', equals)
+            equals = format_as_float_or_array('equals', equals, flatten=True)
 
         # Scale the bounds
         if lower is not None:
