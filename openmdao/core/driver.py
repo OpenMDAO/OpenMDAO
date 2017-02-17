@@ -111,7 +111,7 @@ class Driver(object):
         value : float or ndarray
             Value for the design variable.
         """
-        self.problem.model._outputs[name] = value
+        self.problem.model._outputs._views_flat[name] = value
 
     def get_response_values(self):
         """
