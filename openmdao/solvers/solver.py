@@ -180,6 +180,12 @@ class Solver(object):
         """
         pass
 
+    def _linearize(self):
+        """
+        Perform any required linearization operations such as matrix factorization.
+        """
+        pass
+
     def solve(self):
         """
         Run the solver.
@@ -284,12 +290,6 @@ class LinearSolver(Solver):
         self._vec_names = vec_names
         self._mode = mode
         return self._run_iterator()
-
-    def _linearize(self):
-        """
-        Perform any required initialization operations such as matrix factorization.
-        """
-        pass
 
     def _iter_initialize(self):
         """
