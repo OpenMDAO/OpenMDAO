@@ -4,7 +4,9 @@ from __future__ import division
 import numpy
 import unittest
 
-from openmdao.api import Problem, IndepVarComp
+from six import assertRaisesRegex
+
+from openmdao.api import Problem, ExplicitComponent, IndepVarComp
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
@@ -41,6 +43,23 @@ class TestExplicitComponent(unittest.TestCase):
         prob['widths'] = 2.
         prob.run_model()
         assert_rel_error(self, prob['total_volume'], 24.)
+
+    def test_error_handling(self):
+        """Test error handling when adding inputs/outputs."""
+        comp = ExplicitComponent()
+
+        msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"
+
+        with assertRaisesRegex(self, ValueError, msg):
+            comp.add_output('arr', val=numpy.ones((2,2)), shape=([2]))
+
+        with assertRaisesRegex(self, ValueError, msg):
+            comp.add_input('arr', val=numpy.ones((2,2)), shape=([2]))
+
+        msg = "Shape of indices does not match shape for '.*': Expected (.*) but got (.*)"
+
+        with assertRaisesRegex(self, ValueError, msg):
+            comp.add_input('arr', val=numpy.ones((2,2)), src_indices=[0,1])
 
 
 class TestImplicitComponent(unittest.TestCase):
