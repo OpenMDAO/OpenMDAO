@@ -59,6 +59,16 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system, self._depth + 1)
 
+    def _linearize(self):
+        """
+        Perform any required linearization operations such as matrix factorization.
+        """
+        if self.precon is not None:
+            self.precon._linearize()
+
+        if self.linesearch is not None:
+            self.linesearch._linearize()
+
     def _iter_execute(self):
         """
         Perform the operations in the iteration loop.

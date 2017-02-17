@@ -4,7 +4,6 @@ from __future__ import division
 from fnmatch import fnmatchcase
 from contextlib import contextmanager
 from collections import namedtuple, OrderedDict, Iterable
-import numbers
 import sys
 
 import numpy
@@ -18,6 +17,9 @@ from openmdao.jacobians.global_jacobian import GlobalJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import convert_units
+from openmdao.utils.general_utils import \
+    determine_adder_scaler, format_as_float_or_array
+
 
 # This is for storing various data mapped to var pathname
 PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
@@ -32,56 +34,6 @@ Constraint = namedtuple('Constraint', ['name', 'lower', 'upper', 'equals',
 
 Objective = namedtuple('Objective', ['name', 'scaler', 'adder', 'ref',
                                      'ref0', 'indices', 'metadata'])
-
-
-def _format_driver_array_option(option_name, var_name, values,
-                                val_if_none=0.0):
-    """
-    Format driver array option values.
-
-    Checks that the given array values are either None, float, or an
-    iterable of numeric values.  On output all interables of numeric values
-    are converted to numpy.ndarray.  If values is scalar, it is converted
-    to float.
-
-    Parameters
-    ----------
-    option_name : str
-        Name of the option being set
-    var_name : str
-        The path of the variable relative to the current system.
-    values : float or numpy ndarray or Iterable
-        Values of the array option to be formatted to the expected form.
-    val_if_none : float or numpy ndarray
-        The default value for the option if values is None.
-
-    Returns
-    -------
-    float or numpy.ndarray
-        Values transformed to the expected form.
-
-    Raises
-    ------
-    ValueError
-        If values is Iterable but cannot be converted to a numpy ndarray
-    TypeError
-        If values is scalar, not None, and not a Number.
-    """
-    # Convert adder to ndarray/float as necessary
-    if isinstance(values, numpy.ndarray):
-        pass
-    elif not isinstance(values, string_types) \
-            and isinstance(values, Iterable):
-        values = numpy.asarray(values, dtype=float)
-    elif values is None:
-        values = val_if_none
-    elif isinstance(values, numbers.Number):
-        values = float(values)
-    else:
-        raise TypeError('Expected values of {0} to be an Iterable of '
-                        'numeric values, or a scalar numeric value. '
-                        'Got {1} instead.'.format(option_name, values))
-    return values
 
 
 class System(object):
@@ -133,13 +85,10 @@ class System(object):
     _var_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
         integer arrays of global indices of variables on this proc.
     _var_maps : {'input': dict, 'output': dict}
-        dictionary of variable names and their aliases (for promotes/renames).
+        dictionary of variable names and their promoted names.
     _var_promotes : { 'any': set(), 'input': set(), 'output': set() }
         dictionary of sets of variable names/wildcards specifying promotion
         (used to calculate _var_maps)
-    _var_renames : { 'input': {}, 'output': {} }
-        dictionary of mappings used to specify variables to be renamed in the
-        parent group. (used to calculate _var_maps)
     _var_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
     _var_connections_indices : [(int, int), ...]
@@ -230,7 +179,6 @@ class System(object):
 
         self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
-        self._var_renames = {'input': {}, 'output': {}}
 
         self._var_connections = {}
         self._var_connections_indices = []
@@ -678,7 +626,7 @@ class System(object):
 
     def _get_maps(self, typ):
         """
-        Define variable maps based on promotes and renames lists.
+        Define variable maps based on promotes lists.
 
         Parameters
         ----------
@@ -689,7 +637,7 @@ class System(object):
         -------
         dict of {str:str, ...}
             dictionary mapping input/output variable names
-            to promoted or renamed variable names.
+            to promoted variable names.
         """
         maps = {}
 
@@ -697,7 +645,6 @@ class System(object):
 
         promotes = self._var_promotes['any']
         promotes_typ = self._var_promotes[typ]
-        renames = self._var_renames[typ]
 
         if promotes:
             names = promotes
@@ -720,12 +667,8 @@ class System(object):
                     maps[name] = name
                     break
             else:
-                if name in renames:
-                    # Rename selected variables in the parent system
-                    maps[name] = renames[name]
-                else:
-                    # Default: prepend the parent system's name
-                    maps[name] = gname + name if gname else name
+                # Default: prepend the parent system's name
+                maps[name] = gname + name if gname else name
 
         return maps
 
@@ -949,11 +892,11 @@ class System(object):
             for vec in self._vectors[vec_type].values():
                 vec._scale(scaling[vec_type])
 
-        for sys in self.system_iter(include_self=True, recurse=True):
-            if sys._owns_global_jac:
-                with sys._jacobian_context():
-                    sys._jacobian._precompute_iter()
-                    sys._jacobian._scale(scaling)
+        for system in self.system_iter(include_self=True, recurse=True):
+            if system._owns_global_jac:
+                with system._jacobian_context():
+                    system._jacobian._precompute_iter()
+                    system._jacobian._scale(scaling)
 
     @property
     def nl_solver(self):
@@ -1119,31 +1062,14 @@ class System(object):
         if not isinstance(name, string_types):
             raise TypeError('The name argument should be a string, got {0}'.format(name))
 
-        # Affine scaling cannot be used with scalers/adders
-        if ref0 is not None or ref is not None:
-            if scaler is not None or adder is not None:
-                raise ValueError('Inputs ref/ref0 are mutually exclusive '
-                                 'with scaler/adder')
-            # Convert ref/ref0 to scaler/adder so we can scale the bounds
-            adder = -ref0
-            scaler = 1.0 / (ref + adder)
-        else:
-            if scaler is None:
-                scaler = 1.0
-            if adder is None:
-                adder = 0.0
-
-        # Convert adder to ndarray/float as necessary
-        adder = _format_driver_array_option('adder', name, adder, val_if_none=0.0)
-
-        # Convert scaler to ndarray/float as necessary
-        scaler = _format_driver_array_option('scaler', name, scaler, val_if_none=1.0)
+        # determine adder and scaler based on args
+        adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
         # Convert lower to ndarray/float as necessary
-        lower = _format_driver_array_option('lower', name, lower, val_if_none=-sys.float_info.max)
+        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max)
 
         # Convert upper to ndarray/float as necessary
-        upper = _format_driver_array_option('upper', name, upper, val_if_none=sys.float_info.max)
+        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max)
 
         # Apply scaler/adder to lower and upper
         lower = (lower + adder) * scaler
@@ -1233,19 +1159,8 @@ class System(object):
             msg = '{0} \'{1}\' already exists.'.format(typemap[type], name)
             raise RuntimeError(msg.format(name))
 
-        # Affine scaling cannot be used with scalers/adders
-        if ref0 is not None or ref is not None:
-            if scaler is not None or adder is not None:
-                raise ValueError('Inputs ref/ref0 are mutually exclusive '
-                                 'with scaler/adder')
-            # Convert ref/ref0 to scaler/adder so we can scale the bounds
-            adder = -ref0
-            scaler = 1.0 / (ref + adder)
-        else:
-            if scaler is None:
-                scaler = 1.0
-            if adder is None:
-                adder = 0.0
+        # determine adder and scaler based on args
+        adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
         # A constraint cannot be an equality and inequality constraint
         if equals is not None and (lower is not None or upper is not None):
@@ -1275,20 +1190,20 @@ class System(object):
             ref0 = float(ref0)
 
         # Convert adder to ndarray/float as necessary
-        adder = _format_driver_array_option('adder', name, adder, val_if_none=0.0)
+        adder = format_as_float_or_array('adder', adder, val_if_none=0.0)
 
         # Convert scaler to ndarray/float as necessary
-        scaler = _format_driver_array_option('scaler', name, scaler, val_if_none=1.0)
+        scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0)
 
         # Convert lower to ndarray/float as necessary
-        lower = _format_driver_array_option('lower', name, lower, val_if_none=-sys.float_info.max)
+        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max)
 
         # Convert upper to ndarray/float as necessary
-        upper = _format_driver_array_option('upper', name, upper, val_if_none=sys.float_info.max)
+        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max)
 
         # Convert equals to ndarray/float as necessary
         if equals is not None:
-            equals = _format_driver_array_option('equals', name, equals)
+            equals = format_as_float_or_array('equals', equals)
 
         # Scale the bounds
         if lower is not None:
@@ -1706,5 +1621,18 @@ class System(object):
             pathname
             comm
             metadata (local and global)
+        """
+        pass
+
+    def initialize_partials(self):
+        """
+        Optional method for components to declare Jacobian structure/approximations.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+            variable names
         """
         pass
