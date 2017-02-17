@@ -46,3 +46,12 @@ Usage
 
 .. embed-test::
     openmdao.core.tests.test_component.TestIndepVarComp.test_add_output
+
+checking out the new embed test
+
+.. embed-test::
+    openmdao.core.tests.test_problem.TestProblem.test_compute_total_derivs_basic
+
+.. embed-test::
+    openmdao.core.tests.test_problem.TestProblem.test_compute_total_derivs_basic
+    :no-split:

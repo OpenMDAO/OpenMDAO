@@ -388,3 +388,203 @@ def get_unit_test_source_and_run_outputs(method_path):
     if PY3:
         run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
     return source_minus_docstrings_with_prints_cleaned, run_outputs, skipped, failed
+
+
+def split_source_into_input_blocks(src):
+    '''
+    '''
+    rb = RedBaron(src)
+    in_code_blocks = []
+    in_code_block = ""
+    # group code until the first print, then repeat
+    for r in rb:
+        line = r.dumps()
+        if not line.endswith('\n'):
+            line += '\n'
+        in_code_block += line
+        if r.type == 'print':
+            # stop and make an input code block
+            in_code_blocks.append(in_code_block)
+            in_code_block = ""
+            
+    if in_code_block: # If anything left over
+        in_code_blocks.append(in_code_block)
+
+    return in_code_blocks
+
+
+def insert_output_start_stop_indicators(src):
+    '''
+    '''
+    rb = RedBaron(src)
+
+    src_with_out_start_stop_indicators = ''
+    input_block_number = 0
+    for r in rb:
+        line = r.dumps()
+        # not sure why some lines from RedBaron do not have newlines
+        if not line.endswith('\n'):
+            line += '\n'
+        if r.type == 'print':
+            # src_with_out_start_stop_indicators += 'print("<<<<<{}")'.format(input_block_number) + '\n'
+            src_with_out_start_stop_indicators += line
+            src_with_out_start_stop_indicators += 'print(">>>>>{}")'.format(input_block_number) + '\n'
+        else:
+            src_with_out_start_stop_indicators += line
+        input_block_number += 1
+    return src_with_out_start_stop_indicators
+
+def extract_output_blocks(run_output):
+    '''
+    '''
+
+    output_blocks = []
+    # Look for start and end lines that look like this:
+    #  <<<<<4
+    #  >>>>>4
+    output_block = ''
+    for line in run_output.splitlines():
+        if line.startswith('>>>>>'):
+            output_blocks.append(output_block)
+            output_block = ''
+        else:            
+            output_block += line
+
+    return output_blocks
+
+def get_unit_test_source_and_run_outputs_in_out(method_path):
+    '''
+    1. Get the source code for a unit test method
+    2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned
+    3. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks
+    4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned 
+            to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators
+    5. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    6. Extract from run_outputs, the Out blocks -> output_blocks
+    7. Return source_minus_docstrings_with_prints_cleaned, input_blocks, output_blocks, skipped, failed
+    '''
+
+    #####################
+    ### 1. Get the source code for a unit test method ###
+    #####################
+    module_path = '.'.join(method_path.split('.')[:-2])
+    class_name = method_path.split('.')[-2]
+    method_name = method_path.split('.')[-1]
+    test_module = importlib.import_module(module_path)
+    cls = getattr(test_module, class_name)
+    meth = getattr(cls, method_name)
+    class_source_code = inspect.getsource(cls)
+
+    rb = RedBaron(class_source_code)
+    def_nodes = rb.findAll("DefNode", name=method_name)
+    def_nodes[0].value.decrease_indentation(8)
+    method_source = def_nodes[0].value.dumps()
+
+    # Remove docstring from source code
+    source_minus_docstrings = remove_docstrings(method_source)
+
+    # We are using the RedBaron module in the next two function calls
+    #    to get the code in the way we want it.
+
+    # Only want the method body. Do not want the 'def' line
+    # method_body_source = get_method_body(source_minus_docstrings)
+    # method_body_source = source_minus_docstrings
+
+    #####################
+    ### 2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned ###
+    #####################
+    # Replace some of the asserts with prints of the actual values
+    source_minus_docstrings_with_prints = replace_asserts_with_prints(source_minus_docstrings)
+
+    # remove raise SkipTest lines
+    # We decided to leave them in for now
+    # source_minus_docstrings_with_prints = remove_raise_skip_tests(source_minus_docstrings_with_prints)
+
+    # Remove the initial empty lines
+    source_minus_docstrings_with_prints_cleaned = remove_initial_empty_lines_from_source(
+        source_minus_docstrings_with_prints)
+
+    #####################
+    ### 4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned ###
+    ###        to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators ###
+    #####################
+    source_with_output_start_stop_indicators = insert_output_start_stop_indicators( source_minus_docstrings_with_prints_cleaned )
+
+    #####################
+    ### 5. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    #####################
+    # Get all the pieces of code needed to run the unit test method
+    module_source_code = inspect.getsource(test_module)
+    lines_before_test_cases = get_lines_before_test_cases(module_source_code)
+    setup_source_code = get_method_body(inspect.getsource(getattr(cls, 'setUp')))
+    teardown_source_code = get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
+
+    # If the test method has a skipUnless or skip decorator, we need to convert it to a
+    #   raise call
+    skip_predicate_and_message = get_skip_predicate_and_message(class_source_code, method_name)
+    if skip_predicate_and_message:
+        # predicate, message = skip_unless_predicate_and_message
+        predicate, message = skip_predicate_and_message
+        if predicate:
+            raise_skip_test_source_code = 'import unittest\nif not {}: raise unittest.SkipTest("{}")'.format(predicate, message)
+        else:
+            raise_skip_test_source_code = 'import unittest\nraise unittest.SkipTest("{}")'.format(message)
+    else:
+        raise_skip_test_source_code = ""
+
+    code_to_run = '\n'.join([lines_before_test_cases,
+                            setup_source_code,
+                            raise_skip_test_source_code,
+                            source_with_output_start_stop_indicators,
+                            teardown_source_code])
+
+    # Write it to a file so we can run it. Tried using exec but ran into problems with that
+    fd, code_to_run_path = tempfile.mkstemp()
+    skipped = False
+    failed = False
+    try:
+        with os.fdopen(fd, 'w') as tmp:
+            tmp.write(code_to_run)
+            tmp.close()
+        run_outputs = subprocess.check_output(['python', code_to_run_path], stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        # Get a traceback like this:
+        # Traceback (most recent call last):
+        #     File "/Applications/PyCharm CE.app/Contents/helpers/pydev/pydevd.py", line 1556, in <module>
+        #         globals = debugger.run(setup['file'], None, None, is_module)
+        #     File "/Applications/PyCharm CE.app/Contents/helpers/pydev/pydevd.py", line 940, in run
+        #         pydev_imports.execfile(file, globals, locals)  # execute the script
+        #     File "/var/folders/l3/9j86k5gn6cx0_p25kdplxgpw1l9vkk/T/tmp215aM1", line 23, in <module>
+        #         raise unittest.SkipTest("check_total_derivatives not implemented yet")
+        # unittest.case.SkipTest: check_total_derivatives not implemented yet
+        if 'raise unittest.SkipTest' in e.output.decode('utf-8'):
+            reason_for_skip = e.output.splitlines()[-1][len('unittest.case.SkipTest: '):]
+            run_outputs = reason_for_skip
+            skipped = True
+        else:
+            run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(method_path, e.output.decode('utf-8'))
+            failed = True
+            # print("Running of embedded test " + method_path + " in docs failed due to: " + e.output.decode('utf-8'))
+            # raise
+    finally:
+        os.remove(code_to_run_path)
+
+    if PY3:
+        run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
+
+    if not skipped and not failed:
+        #####################
+        ### 3. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks ###
+        #####################
+        input_blocks = split_source_into_input_blocks(source_minus_docstrings_with_prints_cleaned)
+
+        #####################
+        ### 6. Extract from run_outputs, the Out blocks -> output_blocks ###
+        #####################
+        output_blocks = extract_output_blocks(run_outputs)
+        skipped_failed_output = None
+    else:
+        input_blocks = output_blocks = None
+        skipped_failed_output = run_outputs
+
+    return source_minus_docstrings_with_prints_cleaned, skipped_failed_output, input_blocks, output_blocks, skipped, failed
