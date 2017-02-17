@@ -83,9 +83,10 @@ class FanInGrouped(Group):
     def __init__(self):
         super(FanInGrouped, self).__init__()
 
-        self.add_subsystem('iv', IndepVarComp([
-            ('x1', 1.0), ('x2', 1.0)
-        ]))
+        iv = self.add_subsystem('iv', IndepVarComp())
+        iv.add_output('x1', 1.0)
+        iv.add_output('x2', 1.0)
+
 
         self.sub = self.add_subsystem('sub', Group())  # ParallelGroup
         self.sub.add_subsystem('c1', ExecComp(['y=-2.0*x']))
