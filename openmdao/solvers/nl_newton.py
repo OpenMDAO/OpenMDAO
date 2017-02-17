@@ -34,11 +34,9 @@ class NewtonSolver(NonlinearSolver):
 
         # Slot for linear solver
         self.ln_solver = None
-        self._sub_solvers.append('ln_solver')
 
         # Slot for linesearch
         self.linesearch = None
-        self._sub_solvers.append('linesearch')
 
     def _setup_solvers(self, system, depth):
         """
@@ -60,6 +58,16 @@ class NewtonSolver(NonlinearSolver):
 
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system, self._depth + 1)
+
+    def _linearize(self):
+        """
+        Perform any required linearization operations such as matrix factorization.
+        """
+        if self.precon is not None:
+            self.precon._linearize()
+
+        if self.linesearch is not None:
+            self.linesearch._linearize()
 
     def _iter_execute(self):
         """
