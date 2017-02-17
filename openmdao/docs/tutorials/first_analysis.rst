@@ -12,7 +12,7 @@ Consider a paraboloid function, defined by the explicit function
 
   f(x,y) = (x-3.0)^2 + x \times y + (y+4.0)^2 - 3.0 ,
 
-where :math:`x` and :math`y` are the inputs to the function.
+where :math:`x` and :math:`y` are the inputs to the function.
 The minimum of this function is located at
 
 .. math::
@@ -68,7 +68,7 @@ The minimum of this function is located at
         prob.run()
         print(prob['parab_comp.f'])
 
-Lets break this script down an understand each section
+Lets break this script down and understand each section
 
 Preamble
 ---------
@@ -91,7 +91,7 @@ The component is the basic building block of a model. You will always define com
 
 .. note::
 
-    What about implicit functions? Check out this tutorial about using an `ImplicitComponent`
+    What about implicit functions? Check out this tutorial [TODO: LINK ME!] about using an `ImplicitComponent`
 
 
 ::

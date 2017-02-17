@@ -29,6 +29,20 @@ def depart_skipped_or_failed_node(self, node):
     html = '<div class="{}"><pre>{}</pre></div>'.format(node["kind"], cgiesc.escape(node["text"]))
     self.body.append(html)
 
+class in_or_out_node(nodes.Element):
+    pass
+
+def visit_in_or_out_node(self, node):
+    pass
+
+def depart_in_or_out_node(self, node):
+    if not isinstance(self, HTMLTranslator):
+        self.body.append("output only available for HTML\n")
+        return
+
+    html = '<div class="container"><div id="notebook"><div id="notebook-container"><div class="cell border-box-sizing code_cell rendered"><div class="input"><div class="prompt input_prompt">{}&nbsp;[{}]:</div><div class="inner_cell"><div class="input_area"><div class=" highlight hl-ipython3"><pre>{}</pre></div></div></div></div></div></div></div></div>'.format(node["kind"], node["number"], node["text"])
+    self.body.append(html)
+
 
 class EmbedTestDirective(Directive):
     """EmbedTestDirective is a custom directive to allow a unit test and the result
@@ -58,8 +72,10 @@ class EmbedTestDirective(Directive):
         (src, output, skipped, failed) = get_unit_test_source_and_run_outputs(method_path)
 
         # we want the body of test code to be formatted and code highlighted
-        body = nodes.literal_block(src, src)
-        body['language'] = 'python'
+        #body = nodes.literal_block(src, src)
+        body = in_or_out_node(code=src, text=output, kind="In", number=1)
+        #body['language'] = 'python'
+
         doc_nodes.append(body)
 
         # we want the output block to also be formatted similarly unless test was skipped
@@ -80,5 +96,6 @@ def setup(app):
     """add custom directive into Sphinx so that it is found during document parsing"""
     app.add_directive('embed-test', EmbedTestDirective)
     app.add_node(skipped_or_failed_node, html=(visit_skipped_or_failed_node, depart_skipped_or_failed_node))
+    app.add_node(in_or_out_node, html=(visit_in_or_out_node, depart_in_or_out_node))
 
     return {'version': sphinx.__display_version__, 'parallel_read_safe': True}
