@@ -12,6 +12,7 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.problem import Problem
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.ln_bgs import LinearBlockGS
+from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver, gmres
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec, \
      TestExplCompSimpleDense
@@ -519,6 +520,31 @@ class TestScipyIterativeSolver(unittest.TestCase):
         assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
 
         self.assertTrue(precon._iter_count > 0)
+
+        # test direct solver precon and make sure the _linearize recurses correctly
+        precon = group.ln_solver.precon = DirectSolver()
+        p.setup()
+
+        # forward
+        group._vectors['residual']['linear'].set_const(1.0)
+        group._vectors['output']['linear'].set_const(0.0)
+        group.ln_solver._linearize()
+        group._solve_linear(['linear'], 'fwd')
+
+        output = group._vectors['output']['linear']._data
+        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
+        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+
+        # reverse
+        group._vectors['output']['linear'].set_const(1.0)
+        group._vectors['residual']['linear'].set_const(0.0)
+        group.ln_solver._linearize()
+        group._solve_linear(['linear'], 'rev')
+
+        output = group._vectors['residual']['linear']._data
+        assert_rel_error(self, output[0], group.expected_solution[0], 3e-15)
+        assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -266,6 +266,13 @@ class PetscKSP(LinearSolver):
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
 
+    def _linearize(self):
+        """
+        Perform any required linearization operations such as matrix factorization.
+        """
+        if self.precon is not None:
+            self.precon._linearize()
+
     def solve(self, vec_names, mode):
         """
         Solve the linear system for the problem in self._system.
