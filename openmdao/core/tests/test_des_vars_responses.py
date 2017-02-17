@@ -9,6 +9,7 @@ from openmdao.devtools.testutil import assert_rel_error
 
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
 
+
 class TestDesVarsResponses(unittest.TestCase):
 
     def test_api_backwards_compatible(self):
@@ -203,7 +204,7 @@ class TestDesvarOnModel(unittest.TestCase):
                                       scaler=0.5)
 
         self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
-                                                 ' exclusive with' \
+                                                 ' exclusive with'
                                                  ' scaler/adder')
 
     def test_desvar_affine_mapping(self):
@@ -223,7 +224,6 @@ class TestDesvarOnModel(unittest.TestCase):
         prob.setup()
 
         des_vars = prob.model.get_design_vars()
-
 
         x_ref0 = des_vars['x'].ref0
         x_ref = des_vars['x'].ref
@@ -305,7 +305,7 @@ class TestConstraintOnModel(unittest.TestCase):
                                       scaler=0.5)
 
         self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
-                                                 ' exclusive with' \
+                                                 ' exclusive with'
                                                  ' scaler/adder')
 
     def test_constraint_affine_mapping(self):
@@ -474,7 +474,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             prob.model.add_objective('con1', ref0=0.0, scaler=0.5)
 
         self.assertEqual(str(context.exception), 'Inputs ref/ref0 are mutually'
-                                                 ' exclusive with' \
+                                                 ' exclusive with'
                                                  ' scaler/adder')
 
     def test_objective_affine_mapping(self):

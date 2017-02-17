@@ -21,6 +21,12 @@ class Group(System):
     def __init__(self, **kwargs):
         """
         Set the solvers to nonlinear and linear block Gauss--Seidel by default.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            dict of arguments available here and in all descendants of this
+            Group.
         """
         super(Group, self).__init__(**kwargs)
 
@@ -53,8 +59,7 @@ class Group(System):
         self.add_subsystem(name, subsys, promotes=promotes)
 
     def add_subsystem(self, name, subsys, promotes=None,
-                      promotes_inputs=None, promotes_outputs=None,
-                      renames_inputs=None, renames_outputs=None):
+                      promotes_inputs=None, promotes_outputs=None):
         """
         Add a subsystem.
 
@@ -74,12 +79,6 @@ class Group(System):
         promotes_outputs : str, iter of str, optional
             One or a list of output variable names specifying which subsystem output
             variables to 'promote' up to this group.
-        renames_inputs : list of (str, str) or dict, optional
-            A dict mapping old name to new name for any subsystem
-            input variables that should be renamed in this group.
-        renames_outputs : list of (str, str) or dict, optional
-            A dict mapping old name to new name for any subsystem
-            output variables that should be renamed in this group.
 
         Returns
         -------
@@ -110,10 +109,6 @@ class Group(System):
             subsys._var_promotes['input'] = set(promotes_inputs)
         if promotes_outputs:
             subsys._var_promotes['output'] = set(promotes_outputs)
-        if renames_inputs:
-            subsys._var_renames['input'] = dict(renames_inputs)
-        if renames_outputs:
-            subsys._var_renames['output'] = dict(renames_outputs)
 
         return subsys
 
@@ -286,14 +281,14 @@ class Group(System):
                                       out_index + out_offset))
 
                     if src_indices is not None:
-                        # set the 'indices' metadata in the input variable
+                        # set the 'src_indices' metadata in the input variable
                         try:
                             in_myproc_index = myproc_in_names.index(in_name)
                         except ValueError:
                             pass
                         else:
                             meta = input_meta[in_myproc_index]
-                            meta['indices'] = np.array(src_indices, dtype=int)
+                            meta['src_indices'] = np.array(src_indices, dtype=int)
 
                         # set src_indices to None to avoid unnecessary repeat
                         # of setting indices and shape metadata when we have
@@ -509,3 +504,6 @@ class Group(System):
             # Update jacobian
             if self._owns_global_jac:
                 J._update()
+
+        if self._ln_solver is not None:
+            self._ln_solver._linearize()

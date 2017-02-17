@@ -2,11 +2,8 @@
 
 from __future__ import division
 
-import collections
-
 import numpy
-from scipy.sparse import coo_matrix, csr_matrix
-from six import string_types
+from six import iteritems
 
 from openmdao.core.component import Component
 
@@ -122,7 +119,7 @@ class ExplicitComponent(Component):
 
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                              scale_jac=True):
-                self.compute_jacobian(self._inputs, self._outputs, J)
+                self.compute_partial_derivs(self._inputs, self._outputs, J)
 
             # re-negate the jacobian
             self._negate_jac()
@@ -148,13 +145,14 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._setup_variables(False)
 
+        # Note: These declare calls are outside of initialize_partials so that users do not have to
+        # call the super version of initialize_partials. This is still post-initialize_variables.
         other_names = []
         for i, out_name in enumerate(self._var_myproc_names['output']):
             meta = self._var_myproc_metadata['output'][i]
             size = numpy.prod(meta['shape'])
             arange = numpy.arange(size)
-            self.declare_partials(out_name, out_name, rows=arange, cols=arange,
-                                  val=numpy.ones(size))
+            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
             for other_name in other_names:
                 self.declare_partials(out_name, other_name, dependent=False)
                 self.declare_partials(other_name, out_name, dependent=False)
@@ -169,17 +167,16 @@ class ExplicitComponent(Component):
                 for out_name in self._var_myproc_names['output']:
                     key = (out_name, in_name)
                     if key in self._jacobian:
-                        self._jacobian._multiply_subjac(key, -1.0)
+                        ukey = self._jacobian._key2unique(key)
+                        self._jacobian._multiply_subjac(ukey, -1.0)
 
     def _set_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
         """
         with self._jacobian_context() as J:
-            for key, meta, typ in self._iter_partials_matches():
-                self._check_partials_meta(key, meta)
-                # only negate d_output/d_input partials
-                J._set_partials_meta(key, meta, typ == 'input')
+            for key, meta in iteritems(self._subjacs_info):
+                J._set_partials_meta(key, meta, meta['type'] == 'input')
 
     def compute(self, inputs, outputs):
         """
@@ -199,7 +196,7 @@ class ExplicitComponent(Component):
         """
         pass
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """
         Compute sub-jacobian parts / factorization.
 
@@ -209,8 +206,8 @@ class ExplicitComponent(Component):
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
-        jacobian : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
         """
         pass
 

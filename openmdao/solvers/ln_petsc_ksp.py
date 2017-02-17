@@ -58,6 +58,16 @@ KSP_TYPES = [
 def _get_petsc_vec_array_new(vec):
     """
     Helper function to handle a petsc backwards incompatibility.
+
+    Parameters
+    ----------
+    vec : petsc vector
+        Vector whose data is being requested.
+
+    Returns
+    -------
+    ndarray
+        A readonly copy of the array of values from vec.
     """
     return vec.getArray(readonly=True)
 
@@ -65,6 +75,16 @@ def _get_petsc_vec_array_new(vec):
 def _get_petsc_vec_array_old(vec):
     """
     Helper function to handle a petsc backwards incompatibility.
+
+    Parameters
+    ----------
+    vec : petsc vector
+        Vector whose data is being requested.
+
+    Returns
+    -------
+    ndarray
+        An array of values from vec.
     """
     return vec.getArray()
 
@@ -159,7 +179,7 @@ class PetscKSP(LinearSolver):
 
         Parameters
         ----------
-        kwargs : {}
+        **kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
         if PETSc is None:
@@ -245,6 +265,13 @@ class PetscKSP(LinearSolver):
 
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
+
+    def _linearize(self):
+        """
+        Perform any required linearization operations such as matrix factorization.
+        """
+        if self.precon is not None:
+            self.precon._linearize()
 
     def solve(self, vec_names, mode):
         """

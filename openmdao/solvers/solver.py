@@ -180,6 +180,12 @@ class Solver(object):
         """
         pass
 
+    def _linearize(self):
+        """
+        Perform any required linearization operations such as matrix factorization.
+        """
+        pass
+
     def solve(self):
         """
         Run the solver.
