@@ -363,9 +363,9 @@ class pyOptSparseDriver(Driver):
             fail = 1
             func_dict = {}
 
-        print("Functions calculated")
-        print(dv_dict)
-        print(func_dict)
+        # print("Functions calculated")
+        # print(dv_dict)
+        # print(func_dict)
         return func_dict, fail
 
     def _gradfunc(self, dv_dict, func_dict):
@@ -410,7 +410,7 @@ class pyOptSparseDriver(Driver):
             print(70 * "=", tb, 70 * "=")
             sens_dict = {}
 
-        print("Derivatives calculated")
-        print(dv_dict)
-        print(sens_dict)
+        # print("Derivatives calculated")
+        # print(dv_dict)
+        # print(sens_dict)
         return sens_dict, fail

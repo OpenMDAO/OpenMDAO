@@ -577,5 +577,237 @@ class TestPyoptSparse(unittest.TestCase):
 
         self.assertEqual(str(cm.exception), expected)
 
+    def test_simple_paraboloid_scaled_desvars_fwd(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add('comp', Paraboloid(), promotes=['*'])
+        model.add('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['print_results'] = False
+        prob.driver.add_desvar('x', lower=-50.0, upper=50.0, scaler=1/50.0)
+        prob.driver.add_desvar('y', lower=-50.0, upper=50.0, scaler=1/50.0)
+
+        prob.driver.add_objective('f_xy')
+        prob.driver.add_constraint('c', lower=10.0, upper=11.0)
+
+        model.ln_solver.options['mode'] = 'fwd'
+
+        prob.setup(check=False)
+        prob.run()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
+    def test_simple_paraboloid_scaled_desvars_fd(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add('comp', Paraboloid(), promotes=['*'])
+        model.add('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['print_results'] = False
+        prob.driver.add_desvar('x', lower=-50.0, upper=50.0, scaler=1/50.0)
+        prob.driver.add_desvar('y', lower=-50.0, upper=50.0, scaler=1/50.0)
+
+        prob.driver.add_objective('f_xy')
+        prob.driver.add_constraint('c', lower=10.0, upper=11.0)
+
+        model.deriv_options['type'] = 'fd'
+
+        prob.setup(check=False)
+        prob.run()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
+    def test_simple_paraboloid_scaled_desvars_rev(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add('comp', Paraboloid(), promotes=['*'])
+        model.add('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['print_results'] = False
+        prob.driver.add_desvar('x', lower=-50.0, upper=50.0, scaler=1/50.0)
+        prob.driver.add_desvar('y', lower=-50.0, upper=50.0, scaler=1/50.0)
+
+        prob.driver.add_objective('f_xy')
+        prob.driver.add_constraint('c', lower=10.0, upper=11.0)
+
+        model.ln_solver.options['mode'] = 'rev'
+
+        prob.setup(check=False)
+        prob.run()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
+    def test_simple_paraboloid_scaled_constraint_fwd(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add('comp', Paraboloid(), promotes=['*'])
+        model.add('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['print_results'] = False
+        prob.driver.add_desvar('x', lower=-50.0, upper=50.0)
+        prob.driver.add_desvar('y', lower=-50.0, upper=50.0)
+
+        prob.driver.add_objective('f_xy')
+        prob.driver.add_constraint('c', lower=10.0, upper=11.0, scaler=1/10.)
+
+        prob.setup(check=False, mode='fwd')
+        prob.run()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
+    def test_simple_paraboloid_scaled_constraint_fd(self):
+        # Finite difference not supported yet.
+        raise unittest.SkipTest("Full model FD not supported yet.")
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add('comp', Paraboloid(), promotes=['*'])
+        model.add('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['print_results'] = False
+        prob.driver.add_desvar('x', lower=-50.0, upper=50.0)
+        prob.driver.add_desvar('y', lower=-50.0, upper=50.0)
+
+        prob.driver.add_objective('f_xy')
+        prob.driver.add_constraint('c', lower=10.0, upper=11.0, scaler=1/10.)
+
+        model.deriv_options['type'] = 'fd'
+
+        prob.setup(check=False)
+        prob.run()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
+    def test_simple_paraboloid_scaled_constraint_rev(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add('comp', Paraboloid(), promotes=['*'])
+        model.add('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['print_results'] = False
+        prob.driver.add_desvar('x', lower=-50.0, upper=50.0)
+        prob.driver.add_desvar('y', lower=-50.0, upper=50.0)
+
+        prob.driver.add_objective('f_xy')
+        prob.driver.add_constraint('c', lower=10.0, upper=11.0, scaler=1/10.)
+
+        model.ln_solver.options['mode'] = 'rev'
+
+        prob.setup(check=False)
+        prob.run()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
+    def test_simple_paraboloid_scaled_objective_fwd(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add('comp', Paraboloid(), promotes=['*'])
+        model.add('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['print_results'] = False
+        prob.driver.add_desvar('x', lower=-50.0, upper=50.0)
+        prob.driver.add_desvar('y', lower=-50.0, upper=50.0)
+
+        prob.driver.add_objective('f_xy', scaler=1/10.)
+        prob.driver.add_constraint('c', lower=10.0, upper=11.0)
+
+        model.ln_solver.options['mode'] = 'fwd'
+
+        prob.setup(check=False)
+        prob.run()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
+    def test_simple_paraboloid_scaled_objective_rev(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add('comp', Paraboloid(), promotes=['*'])
+        model.add('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['print_results'] = False
+        prob.driver.add_desvar('x', lower=-50.0, upper=50.0)
+        prob.driver.add_desvar('y', lower=-50.0, upper=50.0)
+
+        prob.driver.add_objective('f_xy', scaler=1/10.)
+        prob.driver.add_constraint('c', lower=10.0, upper=11.0)
+
+        model.ln_solver.options['mode'] = 'rev'
+
+        prob.setup(check=False)
+        prob.run()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
 if __name__ == "__main__":
     unittest.main()
