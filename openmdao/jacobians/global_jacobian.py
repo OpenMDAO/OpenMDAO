@@ -90,7 +90,7 @@ class GlobalJacobian(Jacobian):
                        for i in var_indices['output']}
         in_offsets = {i: self._get_var_range(i, 'input')[0]
                       for i in var_indices['input']}
-        src_indices = {i: meta_in[j]['indices']
+        src_indices = {i: meta_in[j]['src_indices']
                        for j, i in enumerate(var_indices['input'])}
 
         start = len(system.pathname) + 1 if system.pathname else 0
@@ -175,7 +175,7 @@ class GlobalJacobian(Jacobian):
         var_indices = self._system._var_myproc_indices
         var_paths = self._system._var_allprocs_pathnames
         out_start, out_end = self._system._var_allprocs_range['output']
-        in_start, in_end = self._system._var_allprocs_range['output']
+        in_start, in_end = self._system._var_allprocs_range['input']
         assembler = self._system._assembler
 
         for re_idx_all in var_indices['output']:

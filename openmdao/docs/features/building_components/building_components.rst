@@ -50,22 +50,22 @@ There are three types of components in OpenMDAO:
 
 For our example, one way to implement the numerical model would be to assign each variable its own component, as below.
 
-===  =================  =======  =======
-No.  Component type     Inputs   Outputs
-===  =================  =======  =======
- 1   IndepVarComp                   x
- 2   ImplicitComponent    x, z      y
- 3   ExplicitComponent     y        z
-===  =================  =======  =======
+  ===  =================  =======  =======
+  No.  Component type     Inputs   Outputs
+  ===  =================  =======  =======
+   1   IndepVarComp                   x
+   2   ImplicitComponent    x, z      y
+   3   ExplicitComponent     y        z
+  ===  =================  =======  =======
 
 Another way that is also valid would be to have one component compute both y and z explicitly, which would mean that this component solves the implicit equation for y internally.
 
-===  =================  =======  =======
-No.  Component type     Inputs   Outputs
-===  =================  =======  =======
- 1   IndepVarComp                   x
- 2   ExplicitComponent     x       y, z
-===  =================  =======  =======
+  ===  =================  =======  =======
+  No.  Component type     Inputs   Outputs
+  ===  =================  =======  =======
+   1   IndepVarComp                   x
+   2   ExplicitComponent     x       y, z
+  ===  =================  =======  =======
 
 Both ways would be valid, but the first way is recommended.
 The second way requires the user to solve y and z together, and computing the derivatives of y and z with respect to x is non-trivial.

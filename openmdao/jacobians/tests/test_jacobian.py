@@ -5,7 +5,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, issparse
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
-     GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CSRmatrix, COOmatrix
+     GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CSRmatrix, COOmatrix, ExecComp
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.devtools.testutil import assert_rel_error
@@ -24,6 +24,7 @@ class MyExplicitComp(ExplicitComponent):
         self.add_input('y', val=np.zeros(2))
         self.add_output('f', val=np.zeros(2))
 
+    def initialize_partials(self):
         val = self._jac_type(np.array([[1., 1.], [1., 1.]]))
         if isinstance(val, list):
             self.declare_partials('f', ['x','y'], rows=val[1], cols=val[2], val=val[0])
@@ -60,13 +61,14 @@ class MyExplicitComp2(ExplicitComponent):
         self.add_input('z', val=0.0)
         self.add_output('f', val=0.0)
 
-        val=self._jac_type(np.array([[7.]]))
+    def initialize_partials(self):
+        val = self._jac_type(np.array([[7.]]))
         if isinstance(val, list):
             self.declare_partials('f', 'z', rows=val[1], cols=val[2], val=val[0])
         else:
             self.declare_partials('f', 'z', val=val)
 
-        val=self._jac_type(np.array([[1., 1., 1.]]))
+        val = self._jac_type(np.array([[1., 1., 1.]]))
         if isinstance(val, list):
             self.declare_partials('f', 'w', rows=val[1], cols=val[2], val=val[0])
         else:
@@ -301,19 +303,41 @@ class TestJacobian(unittest.TestCase):
         assert_rel_error(self, jac_out.squeeze(), expected, 1e-15)
 
     def test_component_global_jac(self):
-        # this was crashing during setup when reported by Justin.
-        # If it sets up and runs without crashing, consider it fixed.
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NewtonSolver() #NonlinearBlockGS()
+        prob.model.nl_solver = NewtonSolver()
 
         d1 = prob.model.get_subsystem('d1')
-        d2 = prob.model.get_subsystem('d2')
 
         d1.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        prob.model.suppress_solver_output = True
 
         prob.setup()
         prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_global_jac_bad_key(self):
+        # this test fails if GlobalJacobian._update sets in_start with 'output' instead of 'input'
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('indep', IndepVarComp('x', 1.0))
+        prob.model.add_subsystem('C1', ExecComp('c=a*2.0+b'))
+        c2 = prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c'))
+        c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0'))
+
+        prob.model.nl_solver = NewtonSolver()
+        c3.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+
+        prob.model.connect('indep.x', 'C1.a')
+        prob.model.connect('indep.x', 'C2.a')
+        prob.model.connect('C1.c', 'C2.b')
+        prob.model.connect('C2.d', 'C3.a')
+        prob.model.suppress_solver_output = True
+        prob.setup()
+        prob.run_model()
+        assert_rel_error(self, prob['C3.ee'], 8.0, 0000.1)
 
     def test_jacobian_changed_group(self):
         prob = Problem()
