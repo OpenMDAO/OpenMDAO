@@ -14,7 +14,7 @@ init:
   #Uncomment the following line to gain RDP access to an appveyor machine.
   #Login info will appear in the console
   #- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
-  - set CONDA=Miniconda
+  - set CONDA=Miniconda2
   - if "%PYTHON%" == "3.4" (set CONDA=%CONDA%3)
   - if "%PLATFORM%" == "x64" (set CONDA=%CONDA%-x64)
   - echo %CONDA%
