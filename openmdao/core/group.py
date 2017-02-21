@@ -336,12 +336,14 @@ class Group(System):
         """
         self._var_pathdict = {}
         self._var_name2path = {'input': {}, 'output': {}}
+        self._var_name2unprom = {'input': {}, 'output': {}}
 
         start = len(self.pathname) + 1 if self.pathname else 0
         for typ in ['input', 'output']:
             my_idx_dict = {}  # maps absolute path to myproc idx
             myproc_names = self._var_myproc_names[typ]
             name2path = self._var_name2path[typ]
+            name2unprom = self._var_name2unprom[typ]
 
             for subsys in self._subsystems_myproc:
                 # Assemble the names list from subsystems
@@ -354,6 +356,7 @@ class Group(System):
                     self._var_allprocs_pathnames[typ].append(paths[idx])
                     my_idx_dict[paths[idx]] = len(myproc_names)
                     myproc_names.append(paths[idx][start:])
+                    name2unprom[name] = paths[idx][start:]
 
                 # Assemble the metadata list from the subsystems
                 metadata = subsys._var_myproc_metadata[typ]
