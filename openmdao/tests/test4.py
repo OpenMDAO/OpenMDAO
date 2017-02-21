@@ -95,35 +95,37 @@ class Test(unittest.TestCase):
         root = self.p.model
 
         root.suppress_solver_output = True
-        #root._solve_nonlinear()
+        #root.run_solve_nonlinear()
 
-        root._vectors['output']['linear'].set_const(1.0)
-        root._apply_linear(['linear'], 'fwd')
-        output = root._vectors['residual']['linear']._data[0]
-        self.assertEqualArrays(output, [7, 3])
+        with root.linear_vector_context() as (inputs, outputs, residuals):
+            outputs.set_const(1.0)
+            root.run_apply_linear(['linear'], 'fwd')
+            output = residuals._data[0]
+            self.assertEqualArrays(output, [7, 3])
 
-        root._vectors['residual']['linear'].set_const(1.0)
-        root._apply_linear(['linear'], 'rev')
-        output = root._vectors['output']['linear']._data[0]
-        self.assertEqualArrays(output, [7, 3])
+            residuals.set_const(1.0)
+            root.run_apply_linear(['linear'], 'rev')
+            output = outputs._data[0]
+            self.assertEqualArrays(output, [7, 3])
 
     def test_solve_linear(self):
         root = self.p.model
 
         root.suppress_solver_output = True
-        #root._solve_nonlinear()
+        #root.run_solve_nonlinear()
 
-        root._vectors['residual']['linear'].set_const(11.0)
-        root._vectors['output']['linear'].set_const(0.0)
-        root._solve_linear(['linear'], 'fwd')
-        output = root._vectors['output']['linear']._data[0]
-        self.assertEqualArrays(output, [1, 5])
+        with root.linear_vector_context() as (inputs, outputs, residuals):
+            residuals.set_const(11.0)
+            outputs.set_const(0.0)
+            root.run_solve_linear(['linear'], 'fwd')
+            output = outputs._data[0]
+            self.assertEqualArrays(output, [1, 5])
 
-        root._vectors['output']['linear'].set_const(11.0)
-        root._vectors['residual']['linear'].set_const(0.0)
-        root._solve_linear(['linear'], 'rev')
-        output = root._vectors['residual']['linear']._data[0]
-        self.assertEqualArrays(output, [1, 5])
+            outputs.set_const(11.0)
+            residuals.set_const(0.0)
+            root.run_solve_linear(['linear'], 'rev')
+            output = residuals._data[0]
+            self.assertEqualArrays(output, [1, 5])
 
 
 if __name__ == '__main__':

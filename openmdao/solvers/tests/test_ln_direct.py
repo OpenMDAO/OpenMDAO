@@ -47,6 +47,7 @@ class TestDirectSolver(unittest.TestCase):
             prob = Problem(model=TestImplComp())
             prob.model.nl_solver = NewtonSolver()
             prob.model.ln_solver = DirectSolver()
+            prob.model.suppress_solver_output = True
 
             if jac == 'dict':
                 pass
@@ -62,17 +63,18 @@ class TestDirectSolver(unittest.TestCase):
             prob.run_model()
             assert_rel_error(self, prob['y'], [-1., 1.])
 
-            prob.model._vectors['residual']['linear'].set_const(2.0)
-            prob.model._vectors['output']['linear'].set_const(0.0)
-            prob.model._solve_linear(['linear'], 'fwd')
-            result = prob.model._vectors['output']['linear'].get_data()
-            assert_rel_error(self, result, [-2., 2.])
+            with prob.model.linear_vector_context() as (inputs, outputs, residuals):
+                residuals.set_const(2.0)
+                outputs.set_const(0.0)
+                prob.model.run_solve_linear(['linear'], 'fwd')
+                result = outputs.get_data()
+                assert_rel_error(self, result, [-2., 2.])
 
-            prob.model._vectors['output']['linear'].set_const(2.0)
-            prob.model._vectors['residual']['linear'].set_const(0.0)
-            prob.model._solve_linear(['linear'], 'rev')
-            result = prob.model._vectors['residual']['linear'].get_data()
-            assert_rel_error(self, result, [2., -2.])
+                outputs.set_const(2.0)
+                residuals.set_const(0.0)
+                prob.model.run_solve_linear(['linear'], 'rev')
+                result = residuals.get_data()
+                assert_rel_error(self, result, [2., -2.])
 
     def test_direct_solver_group(self):
         """
@@ -81,21 +83,22 @@ class TestDirectSolver(unittest.TestCase):
         prob = Problem(model=TestImplicitGroup(lnSolverClass=DirectSolver))
 
         prob.setup(check=False)
-        prob.model._linearize()
+        prob.model.run_linearize()
 
-        prob.model._vectors['residual']['linear'].set_const(1.0)
-        prob.model._vectors['output']['linear'].set_const(0.0)
-        prob.model._solve_linear(['linear'], 'fwd')
-        result = prob.model._vectors['output']['linear']._data
-        assert_rel_error(self, result[0], prob.model.expected_solution[0], 1e-15)
-        assert_rel_error(self, result[1], prob.model.expected_solution[1], 1e-15)
+        with prob.model.linear_vector_context() as (inputs, outputs, residuals):
+            residuals.set_const(1.0)
+            outputs.set_const(0.0)
+            prob.model.run_solve_linear(['linear'], 'fwd')
+            result = outputs._data
+            assert_rel_error(self, result[0], prob.model.expected_solution[0], 1e-15)
+            assert_rel_error(self, result[1], prob.model.expected_solution[1], 1e-15)
 
-        prob.model._vectors['output']['linear'].set_const(1.0)
-        prob.model._vectors['residual']['linear'].set_const(0.0)
-        prob.model._solve_linear(['linear'], 'rev')
-        result = prob.model._vectors['residual']['linear']._data
-        assert_rel_error(self, result[0], prob.model.expected_solution[0], 1e-15)
-        assert_rel_error(self, result[1], prob.model.expected_solution[1], 1e-15)
+            outputs.set_const(1.0)
+            residuals.set_const(0.0)
+            prob.model.run_solve_linear(['linear'], 'rev')
+            result = residuals._data
+            assert_rel_error(self, result[0], prob.model.expected_solution[0], 1e-15)
+            assert_rel_error(self, result[1], prob.model.expected_solution[1], 1e-15)
 
     @parametric_suite(
         vector_class=['default'],

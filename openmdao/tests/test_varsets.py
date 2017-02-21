@@ -34,75 +34,79 @@ class TestVarSets(unittest.TestCase):
 
     def test_apply_linear(self):
         root = self.p.model
-        root._vectors['output']['linear'].set_const(1.0)
-        root._apply_linear(['linear'], 'fwd')
-        output = root._vectors['residual']['linear']._data
-        assert_rel_error(self, output[0], [4, 5, 4, 5], 1e-15)
-        assert_rel_error(self, output[1], [3, 6, 3, 6], 1e-15)
 
-        # for no varsets, number should be the same, but reordered
-        root = self.p_no_varsets.model
+        with root.linear_vector_context() as (inputs, outputs, residuals):
+            outputs.set_const(1.0)
+            root.run_apply_linear(['linear'], 'fwd')
+            output = residuals._data
+            assert_rel_error(self, output[0], [4, 5, 4, 5], 1e-15)
+            assert_rel_error(self, output[1], [3, 6, 3, 6], 1e-15)
 
-        root._vectors['output']['linear'].set_const(1.0)
-        root._apply_linear(['linear'], 'fwd')
-        output_novs = root._vectors['residual']['linear']._data
+            # for no varsets, number should be the same, but reordered
+            root = self.p_no_varsets.model
 
-        expected = np.array([output[i][j]
-                                 for i,j in self.p._assembler._variable_set_indices['output']])
-        assert_rel_error(self, output_novs, expected, 1e-15)
+            outputs.set_const(1.0)
+            root.run_apply_linear(['linear'], 'fwd')
+            output_novs = residuals._data
 
-        root = self.p.model
-        root._vectors['residual']['linear'].set_const(1.0)
-        root._apply_linear(['linear'], 'rev')
-        output = root._vectors['output']['linear']._data
-        assert_rel_error(self, output[0], [4, 5, 4, 5], 1e-15)
-        assert_rel_error(self, output[1], [3, 6, 3, 6], 1e-15)
+            expected = np.array([output[i][j]
+                                     for i,j in self.p._assembler._variable_set_indices['output']])
+            assert_rel_error(self, output_novs, expected, 1e-15)
 
-        # for no varsets, number should be the same, but reordered
-        root = self.p_no_varsets.model
-        root._vectors['residual']['linear'].set_const(1.0)
-        root._apply_linear(['linear'], 'rev')
-        output_novs = root._vectors['output']['linear']._data
-        expected = np.array([output[i][j]
-                                 for i,j in self.p._assembler._variable_set_indices['output']])
-        assert_rel_error(self, output_novs, expected, 1e-15)
+            root = self.p.model
+            residuals.set_const(1.0)
+            root.run_apply_linear(['linear'], 'rev')
+            output = outputs._data
+            assert_rel_error(self, output[0], [4, 5, 4, 5], 1e-15)
+            assert_rel_error(self, output[1], [3, 6, 3, 6], 1e-15)
+
+            # for no varsets, number should be the same, but reordered
+            root = self.p_no_varsets.model
+            residuals.set_const(1.0)
+            root.run_apply_linear(['linear'], 'rev')
+            output_novs = outputs._data
+            expected = np.array([output[i][j]
+                                     for i,j in self.p._assembler._variable_set_indices['output']])
+            assert_rel_error(self, output_novs, expected, 1e-15)
 
     def test_solve_linear(self):
         root = self.p.model
-        root._vectors['residual']['linear'].set_const(1.0)
-        root._vectors['output']['linear'].set_const(0.0)
-        root._solve_linear(['linear'], 'fwd')
-        output = root._vectors['output']['linear']._data
-        assert_rel_error(self, output[0], root.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], root.expected_solution[1], 1e-15)
 
-        # now try without varsets for comparison
-        root = self.p_no_varsets.model
-        root._vectors['residual']['linear'].set_const(1.0)
-        root._vectors['output']['linear'].set_const(0.0)
-        root._solve_linear(['linear'], 'fwd')
-        output_novs = root._vectors['output']['linear']._data
-        expected = np.array([output[i][j]
-                                 for i,j in self.p._assembler._variable_set_indices['output']])
-        assert_rel_error(self, output_novs, expected, 1e-15)
+        with root.linear_vector_context() as (inputs, outputs, residuals):
+            residuals.set_const(1.0)
+            outputs.set_const(0.0)
+            root.run_solve_linear(['linear'], 'fwd')
+            output = outputs._data
+            assert_rel_error(self, output[0], root.expected_solution[0], 1e-15)
+            assert_rel_error(self, output[1], root.expected_solution[1], 1e-15)
 
-        root = self.p.model
-        root._vectors['output']['linear'].set_const(1.0)
-        root._vectors['residual']['linear'].set_const(0.0)
-        root._solve_linear(['linear'], 'rev')
-        output = root._vectors['residual']['linear']._data
-        assert_rel_error(self, output[0], root.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], root.expected_solution[1], 1e-15)
+            # now try without varsets for comparison
+            root = self.p_no_varsets.model
+            residuals.set_const(1.0)
+            outputs.set_const(0.0)
+            root.run_solve_linear(['linear'], 'fwd')
+            output_novs = outputs._data
+            expected = np.array([output[i][j]
+                                     for i,j in self.p._assembler._variable_set_indices['output']])
+            assert_rel_error(self, output_novs, expected, 1e-15)
 
-        # now try without varsets for comparison
-        root = self.p_no_varsets.model
-        root._vectors['output']['linear'].set_const(1.0)
-        root._vectors['residual']['linear'].set_const(0.0)
-        root._solve_linear(['linear'], 'rev')
-        output_novs = root._vectors['residual']['linear']._data
-        expected = np.array([output[i][j]
-                                 for i,j in self.p._assembler._variable_set_indices['output']])
-        assert_rel_error(self, output_novs, expected, 1e-15)
+            root = self.p.model
+            outputs.set_const(1.0)
+            residuals.set_const(0.0)
+            root.run_solve_linear(['linear'], 'rev')
+            output = residuals._data
+            assert_rel_error(self, output[0], root.expected_solution[0], 1e-15)
+            assert_rel_error(self, output[1], root.expected_solution[1], 1e-15)
+
+            # now try without varsets for comparison
+            root = self.p_no_varsets.model
+            outputs.set_const(1.0)
+            residuals.set_const(0.0)
+            root.run_solve_linear(['linear'], 'rev')
+            output_novs = residuals._data
+            expected = np.array([output[i][j]
+                                     for i,j in self.p._assembler._variable_set_indices['output']])
+            assert_rel_error(self, output_novs, expected, 1e-15)
 
 
 if __name__ == "__main__":
