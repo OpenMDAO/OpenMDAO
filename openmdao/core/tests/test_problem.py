@@ -330,7 +330,6 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         with prob.model.nonlinear_vector_context() as (inputs, outputs, residuals):
-            print "foo", residuals._names
             self.assertLess(residuals['y1'], 1e-6)
             self.assertLess(residuals['y2'], 1e-6)
 
