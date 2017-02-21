@@ -34,7 +34,7 @@ The list of known units and valid prefixes can be found in the units library (`o
 Any entry in the :code:`[base_units]` or :code:`[units]` sections of the library is a known unit.
 Valid prefixes are given in the :code:`[prefixes]` section of the library.
 
-For illustration, each of the following is a valid unit strings representing the same quantity include:
+For illustration, each of the following is a valid unit string representing the same quantity:
 
 - :code:`N`
 - :code:`0.224809 * lbf`

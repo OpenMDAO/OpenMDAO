@@ -9,6 +9,10 @@ As we saw in <Section declaring_variables>, we can specify scaling parameters fo
 Scaling can be important for the efficiency of some linear solvers.
 Knowing when and how to use scaling can be tricky, but in general, it is a good idea to scale outputs and residuals so that both have values that are :math:`\mathcal{O}(1)`.
 
+Note: residual scaling is separate and independent of output scaling in implicit components.
+In explicit components, the requested output scaling is applied to the residuals as well, by default.
+However, the user has the option to override this behavior and specify their own residual scaling in their explicit component.
+
 Basics
 ------
 
@@ -28,6 +32,9 @@ As the examples below show, scaling can be useful when the output value is very 
   ============  ==============  ================
 
 For residuals, scaling works the same way, except that the argument to :code:`add_output` is :code:`res_ref`.
+Note: :code:`ref` scales only the outputs and :code:`res_ref` scales only the residuals.
+As mentioned previously, residual scaling defaults to the output scaling in explicit components.
+In other words, :code:`res_ref` is set to :code:`ref` by default.
 
 Scaling with an offset
 ----------------------
@@ -47,6 +54,7 @@ On the other hand, :code:`ref` represents the physical value when the scaled val
   ============  ============  ==============  ================
 
 Residual scaling works the same way with :code:`res_ref` and :code:`res_ref0`.
+In explicit components, both :code:`res_ref` and :code:`res_ref0` default to :code:`ref` and :code:`ref0`, respectively.
 
 Using scaling with units
 ------------------------
