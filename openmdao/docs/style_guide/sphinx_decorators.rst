@@ -29,18 +29,18 @@ and a method that looks like this and has the decorator applied to it:
    ::
 
     @mydecorator
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """
         Compute sub-jacobian parts / factorization.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
-        jacobian : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
         """
 
         pass
@@ -57,19 +57,18 @@ But if we add the call signature of the method to the docstring as the first lin
    ::
 
     @mydecorator
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """
-        compute_jacobian(self, inputs, outputs, jacobian)
         Compute sub-jacobian parts / factorization.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
-        jacobian : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
         """
 
         pass

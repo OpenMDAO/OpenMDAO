@@ -9,10 +9,13 @@ from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
 
 
 class PETScTransfer(DefaultTransfer):
-    """PETSc Transfer implementation for running in parallel."""
+    """
+    PETSc Transfer implementation for running in parallel.
+    """
 
     def _initialize_transfer(self):
-        """Set up the transfer; do any necessary pre-computation.
+        """
+        Set up the transfer; do any necessary pre-computation.
 
         Optionally implemented by the subclass.
         """
@@ -33,10 +36,11 @@ class PETScTransfer(DefaultTransfer):
                 self._transfers[key] = transfer
 
     def __call__(self, in_vec, out_vec, mode='fwd'):
-        """Perform transfer.
+        """
+        Perform transfer.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : <Vector>
             pointer to the input vector.
         out_vec : <Vector>
@@ -63,7 +67,8 @@ class PETScTransfer(DefaultTransfer):
 
 
 class PETScVector(DefaultVector):
-    """PETSc Vector implementation for running in parallel.
+    """
+    PETSc Vector implementation for running in parallel.
 
     Most methods use the DefaultVector's implementation.
     """
@@ -71,14 +76,15 @@ class PETScVector(DefaultVector):
     TRANSFER = PETScTransfer
 
     def _initialize_data(self, root_vector):
-        """Internally allocate vectors.
+        """
+        Internally allocate vectors.
 
         Sets the following attributes:
 
         - _data
 
-        Args
-        ----
+        Parameters
+        ----------
         root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
@@ -94,7 +100,8 @@ class PETScVector(DefaultVector):
             self._petsc.append(petsc)
 
     def get_norm(self):
-        """Return the norm of this vector.
+        """
+        Return the norm of this vector.
 
         Returns
         -------

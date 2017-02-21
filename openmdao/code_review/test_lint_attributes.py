@@ -19,12 +19,13 @@ directories = [
 
 
 class LintAttributesTestCase(unittest.TestCase):
-
-    """ Check that for each class, all attributes are documented in the class docstring.
+    """
+    Check that for each class, all attributes are documented in the class docstring.
 
     Parses the source code for the __init__ methods, searching for attribute declarations in every self.* =
     and ensure these attributes are in the 'Attributes' class docstring.
     """
+
     def test_attributes(self):
         topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         print_info = False

@@ -14,6 +14,16 @@ you will be able to construct models by linking multiple analyses together and t
    tutorials/first_optimization
    tutorials/first_mdao
 
+
+===============================
+`Sample Problems`_
+===============================
+
+.. toctree::
+   :maxdepth: 1
+
+   features/problems/sellar
+
 ============================
 `Features`_
 ============================
@@ -22,23 +32,46 @@ you will be able to construct models by linking multiple analyses together and t
 OpenMDAOs fully supported features are documented here.
 Anything documented here has been thoroughly tested an should be considered fully functional.
 
+
+
 Building components
 ====================
 
 .. toctree::
    :maxdepth: 1
 
+   features/building_components/building_components
+   features/building_components/declaring_variables
    features/building_components/indepvarcomp
    features/building_components/explicitcomp
+   features/building_components/implicitcomp
+   features/building_components/units
+   features/building_components/scaling
+
+Grouping components for more complex models
+===========================================
+
+.. toctree::
+    :maxdepth: 1
+
+    features/grouping_components/grouping_components
+    features/grouping_components/add_subsystem
+    features/grouping_components/get_subsystem
+    features/grouping_components/connect
+
 
 Defining partial derivatives
 ================================
 
-Grouping components for more complex models
-================================================================
-
 Solvers (nonlinear and linear)
 ================================
+
+.. toctree::
+   :maxdepth: 1
+
+   features/solvers/set_solvers
+   features/solvers/solver_options
+
 
 Running your models
 ================================
@@ -46,8 +79,8 @@ Running your models
 .. toctree::
    :maxdepth: 1
 
-   features/running/setup_and_run
    features/running/set_get
+   features/running/setup_and_run
    features/running/check_total_derivatives
 
 Drivers (optimizers and DOE)
@@ -59,21 +92,19 @@ Saving your data
 Visualization
 ================================
 
-
-
 ============================
 `Source Documentation`_
 ============================
 
-.. _OpenMDAO Reference Sheets: srcdocs/index.html
+.. _OpenMDAO Reference Sheets: _srcdocs/index.html
 
 `OpenMDAO Developer Source Documentation`__
 
-.. __: srcdocs/dev/index.html
+.. __: _srcdocs/dev/index.html
 
 `OpenMDAO User Source Documentation`__
 
-.. __: srcdocs/usr/index.html
+.. __: _srcdocs/usr/index.html
 
 .. toctree::
    :maxdepth: 1

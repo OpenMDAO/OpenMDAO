@@ -1,33 +1,49 @@
 """Define the Group class."""
 from __future__ import division
 
-import numpy
-from six import iteritems
-import warnings
+from six import iteritems, string_types
+from collections import Iterable
 
-import numpy
+import numpy as np
 
-from openmdao.core.system import System
+from openmdao.core.system import System, PathData
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
 from openmdao.solvers.ln_bgs import LinearBlockGS
+from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.units import is_compatible
 
 
 class Group(System):
-    """Class used to group systems together; instantiate or inherit."""
+    """
+    Class used to group systems together; instantiate or inherit.
+    """
 
-    def initialize(self):
-        """Add subsystems from kwargs."""
-        self.metadata.declare('subsystems', type_=list, value=[],
-                              desc='list of subsystems')
-        self._subsystems_allprocs.extend(self.metadata['subsystems'])
-        self.nl_solver = NonlinearBlockGS()
-        self.ln_solver = LinearBlockGS()
+    def __init__(self, **kwargs):
+        """
+        Set the solvers to nonlinear and linear block Gauss--Seidel by default.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            dict of arguments available here and in all descendants of this
+            Group.
+        """
+        super(Group, self).__init__(**kwargs)
+
+        # TODO: we cannot set the solvers with property setters at the moment
+        # because our lint check thinks that we are defining new attributes
+        # called nl_solver and ln_solver without documenting them.
+        if not self._nl_solver:
+            self._nl_solver = NonlinearBlockGS()
+        if not self._ln_solver:
+            self._ln_solver = LinearBlockGS()
 
     def add(self, name, subsys, promotes=None):
-        """Deprecated version of <Group.add_subsystem>.
+        """
+        Deprecated version of <Group.add_subsystem>.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             Name of the subsystem being added
         subsys : System
@@ -37,41 +53,32 @@ class Group(System):
             to 'promote' up to this group. This is for backwards compatibility
             with older versions of OpenMDAO.
         """
-        warnings.simplefilter('always', DeprecationWarning)
-        warnings.warn('This method provides backwards compabitibility with '
-                      'OpenMDAO <= 1.x ; use add_subsystem instead.',
-                      DeprecationWarning, stacklevel=2)
-        warnings.simplefilter('ignore', DeprecationWarning)
+        warn_deprecation('This method provides backwards compatibility with '
+                         'OpenMDAO <= 1.x ; use add_subsystem instead.')
 
         self.add_subsystem(name, subsys, promotes=promotes)
 
     def add_subsystem(self, name, subsys, promotes=None,
-                      promotes_inputs=None, promotes_outputs=None,
-                      renames_inputs=None, renames_outputs=None):
-        """Add a subsystem.
+                      promotes_inputs=None, promotes_outputs=None):
+        """
+        Add a subsystem.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             Name of the subsystem being added
         subsys : <System>
             An instantiated, but not-yet-set up system object.
-        promotes : iter of str, optional
-            A list of variable names specifying which subsystem variables
+        promotes : str, iter of str, optional
+            One or a list of variable names specifying which subsystem variables
             to 'promote' up to this group. This is for backwards compatibility
             with older versions of OpenMDAO.
-        promotes_inputs : iter of str, optional
-            A list of input variable names specifying which subsystem input
+        promotes_inputs : str, iter of str, optional
+            One or a list of input variable names specifying which subsystem input
             variables to 'promote' up to this group.
-        promotes_outputs : iter of str, optional
-            A list of output variable names specifying which subsystem output
+        promotes_outputs : str, iter of str, optional
+            One or a list of output variable names specifying which subsystem output
             variables to 'promote' up to this group.
-        renames_inputs : list of (str, str) or dict, optional
-            A dict mapping old name to new name for any subsystem
-            input variables that should be renamed in this group.
-        renames_outputs : list of (str, str) or dict, optional
-            A dict mapping old name to new name for any subsystem
-            output variables that should be renamed in this group.
 
         Returns
         -------
@@ -79,7 +86,6 @@ class Group(System):
             the subsystem that was passed in. This is returned to
             enable users to instantiate and add a subsystem at the
             same time, and get the pointer back.
-
         """
         for sub in self._subsystems_allprocs:
             if name == sub.name:
@@ -89,24 +95,29 @@ class Group(System):
         self._subsystems_allprocs.append(subsys)
         subsys.name = name
 
+        # If we're given a string, turn into a list
+        if isinstance(promotes, string_types):
+            promotes = [promotes]
+        if isinstance(promotes_inputs, string_types):
+            promotes_inputs = [promotes_inputs]
+        if isinstance(promotes_outputs, string_types):
+            promotes_outputs = [promotes_outputs]
+
         if promotes:
             subsys._var_promotes['any'] = set(promotes)
         if promotes_inputs:
             subsys._var_promotes['input'] = set(promotes_inputs)
         if promotes_outputs:
             subsys._var_promotes['output'] = set(promotes_outputs)
-        if renames_inputs:
-            subsys._var_renames['input'] = dict(renames_inputs)
-        if renames_outputs:
-            subsys._var_renames['output'] = dict(renames_outputs)
 
         return subsys
 
     def connect(self, out_name, in_name, src_indices=None):
-        """Connect output out_name to input in_name in this namespace.
+        """
+        Connect output out_name to input in_name in this namespace.
 
-        Args
-        ----
+        Parameters
+        ----------
         out_name : str
             name of the output (source) variable to connect
         in_name : str or [str, ... ] or (str, ...)
@@ -116,20 +127,49 @@ class Group(System):
             variable, you can specify which indices of the source to be
             transferred to the input here.
         """
+        # if src_indices argument is given, it should be valid
+        if isinstance(src_indices, string_types):
+            if isinstance(in_name, string_types):
+                in_name = [in_name]
+            in_name.append(src_indices)
+            raise TypeError("src_indices must be an index array, did you mean"
+                            " connect('%s', %s)?" % (out_name, in_name))
+
+        if isinstance(src_indices, np.ndarray):
+            if not np.issubdtype(src_indices.dtype, np.integer):
+                raise TypeError("src_indices must contain integers, but src_indices for "
+                                "connection from '%s' to '%s' is %s." %
+                                (out_name, in_name, src_indices.dtype.type))
+        elif isinstance(src_indices, Iterable):
+            types_in_src_idxs = set(type(idx) for idx in src_indices)
+            for t in types_in_src_idxs:
+                if not np.issubdtype(t, np.integer):
+                    raise TypeError("src_indices must contain integers, but src_indices for "
+                                    "connection from '%s' to '%s' contains non-integers." %
+                                    (out_name, in_name))
+
+        # if multiple targets are given, recursively connect to each
         if isinstance(in_name, (list, tuple)):
             for name in in_name:
                 self.connect(out_name, name, src_indices)
             return
 
+        # target should not already be connected
         if in_name in self._var_connections:
             srcname = self._var_connections[in_name][0]
-            raise RuntimeError("Input '%s' is already connected to '%s'" %
+            raise RuntimeError("Input '%s' is already connected to '%s'." %
                                (in_name, srcname))
+
+        # source and target should not be in the same system
+        if out_name.rsplit('.', 1)[0] == in_name.rsplit('.', 1)[0]:
+            raise RuntimeError("Output and input are in the same System for " +
+                               "connection from '%s' to '%s'." % (out_name, in_name))
 
         self._var_connections[in_name] = (out_name, src_indices)
 
     def _setup_connections(self):
-        """Recursively assemble a list of input-output connections.
+        """
+        Recursively assemble a list of input-output connections.
 
         Sets the following attributes:
             _var_connections_indices
@@ -150,8 +190,10 @@ class Group(System):
 
         allprocs_in_names = self._var_allprocs_names['input']
         myproc_in_names = self._var_myproc_names['input']
+        myproc_out_names = self._var_myproc_names['output']
         allprocs_out_names = self._var_allprocs_names['output']
         input_meta = self._var_myproc_metadata['input']
+        output_meta = self._var_myproc_metadata['output']
 
         in_offset = self._var_allprocs_range['input'][0]
         out_offset = self._var_allprocs_range['output'][0]
@@ -159,6 +201,74 @@ class Group(System):
         # Loop through user-defined connections
         for in_name, (out_name, src_indices) \
                 in iteritems(self._var_connections):
+
+            # throw an exception if either output or input doesn't exist
+            # (not traceable to a connect statement, so provide context)
+            if out_name not in allprocs_out_names:
+                raise NameError("Output '%s' does not exist for connection "
+                                "in '%s' from '%s' to '%s'." %
+                                (out_name, self.name, out_name, in_name))
+
+            if in_name not in allprocs_in_names:
+                raise NameError("Input '%s' does not exist for connection "
+                                "in '%s' from '%s' to '%s'." %
+                                (in_name, self.name, out_name, in_name))
+
+            # throw an exception if output and input are in the same system
+            # (not traceable to a connect statement, so provide context)
+            out_subsys = out_name.rsplit('.', 1)[0] if '.' in out_name \
+                else self._find_subsys_with_promoted_name(out_name, 'output')
+
+            in_subsys = in_name.rsplit('.', 1)[0] if '.' in in_name \
+                else self._find_subsys_with_promoted_name(in_name, 'input')
+
+            if out_subsys == in_subsys:
+                raise RuntimeError("Output and input are in the same System " +
+                                   "for connection in '%s' from '%s' to '%s'." %
+                                   (self.name, out_name, in_name))
+
+            out_path = self._var_name2path['output'][out_name]
+            pdata = self._var_pathdict[out_path]
+            # TODO: we need to allgather unit information. Otherwise we can't
+            # error check units for any connections that cross processes
+            # because the metadata isn't available.
+            if pdata.myproc_idx is not None:
+                out_units = output_meta[pdata.myproc_idx]['units']
+                in_paths = self._var_name2path['input'][in_name]
+
+                for in_path in in_paths:
+                    pdata = self._var_pathdict[in_path]
+                    if pdata.myproc_idx is None:
+                        continue
+                    in_units = input_meta[pdata.myproc_idx]['units']
+
+                    # throw an error if one of input and output is unitless,
+                    # but the other isn't
+                    if (out_units and not in_units or
+                            in_units and not out_units):
+                        if out_units:
+                            out_units = "has units '%s'" % out_units
+                        else:
+                            out_units = "is unitless"
+                        if in_units:
+                            in_units = "has units '%s'" % in_units
+                        else:
+                            in_units = "is unitless"
+                        raise RuntimeError("Units must be specified for both or"
+                                           " neither side of connection in "
+                                           "'%s': '%s' %s but '%s' %s." %
+                                           (self.name, out_name, out_units,
+                                            in_name, in_units))
+
+                    # throw an error if the input and output units are not
+                    # compatible
+                    if not is_compatible(in_units, out_units):
+                        raise RuntimeError("Output and input units are not "
+                                           "compatible for connection in '%s':"
+                                           " '%s' has units '%s' but '%s' has "
+                                           "units '%s'." %
+                                           (self.name, out_name, out_units,
+                                            in_name, in_units))
 
             for in_index, name in enumerate(allprocs_in_names):
                 if name == in_name:
@@ -171,34 +281,68 @@ class Group(System):
                                       out_index + out_offset))
 
                     if src_indices is not None:
-                        # set the 'indices' metadata in the input variable
+                        # set the 'src_indices' metadata in the input variable
                         try:
                             in_myproc_index = myproc_in_names.index(in_name)
                         except ValueError:
                             pass
                         else:
                             meta = input_meta[in_myproc_index]
-                            meta['indices'] = numpy.array(src_indices,
-                                                          dtype=int)
+                            meta['src_indices'] = np.array(src_indices, dtype=int)
 
-                        # set src_indices to None to avoid unnecessary
-                        # repeat of setting indices and shape metadata
-                        # when we have multiple inputs promoted to the same
-                        # name.
+                        # set src_indices to None to avoid unnecessary repeat
+                        # of setting indices and shape metadata when we have
+                        # multiple inputs promoted to the same name.
                         src_indices = None
 
         self._var_connections_indices = pairs
 
+    def _find_subsys_with_promoted_name(self, var_name, io_type='output'):
+        """
+        Find subsystem that contains promoted variable.
+
+        Parameters
+        ----------
+        var_name : str
+            variable name
+        io_type : str
+            'output' or 'input'.
+
+        Returns
+        -------
+        str
+            name of subsystem, None if not found.
+        """
+        for subsys in self._subsystems_allprocs:
+            for name, prom_name in iteritems(subsys._var_maps[io_type]):
+                if var_name == prom_name:
+                    return subsys.name
+        return None
+
     def initialize_variables(self):
-        """Set up variable name and metadata lists."""
+        """
+        Set up variable name and metadata lists.
+        """
+        self._var_pathdict = {}
+        self._var_name2path = {'input': {}, 'output': {}}
+
+        start = len(self.pathname) + 1 if self.pathname else 0
         for typ in ['input', 'output']:
+            my_idx_dict = {}  # maps absolute path to myproc idx
+            myproc_names = self._var_myproc_names[typ]
+            name2path = self._var_name2path[typ]
+
             for subsys in self._subsystems_myproc:
                 # Assemble the names list from subsystems
                 subsys._var_maps[typ] = subsys._get_maps(typ)
-                for sub_name in subsys._var_allprocs_names[typ]:
-                    name = subsys._var_maps[typ][sub_name]
+                paths = subsys._var_allprocs_pathnames[typ]
+
+                for idx, subname in enumerate(subsys._var_allprocs_names[typ]):
+                    name = subsys._var_maps[typ][subname]
                     self._var_allprocs_names[typ].append(name)
-                    self._var_myproc_names[typ].append(name)
+                    self._var_allprocs_pathnames[typ].append(paths[idx])
+                    my_idx_dict[paths[idx]] = len(myproc_names)
+                    myproc_names.append(paths[idx][start:])
 
                 # Assemble the metadata list from the subsystems
                 metadata = subsys._var_myproc_metadata[typ]
@@ -210,25 +354,71 @@ class Group(System):
                 # One representative proc from each sub_comm adds names
                 sub_comm = self._subsystems_myproc[0].comm
                 if sub_comm.rank == 0:
-                    names = self._var_allprocs_names[typ]
+                    names = (self._var_allprocs_names[typ],
+                             self._var_allprocs_pathnames[typ])
                 else:
-                    names = []
+                    names = ([], [])
 
                 # Every proc on this comm now has global variable names
-                raw = self.comm.allgather(names)
                 self._var_allprocs_names[typ] = []
-                for names in raw:
+                self._var_allprocs_pathnames[typ] = []
+                for names, pathnames in self.comm.allgather(names):
                     self._var_allprocs_names[typ].extend(names)
+                    self._var_allprocs_pathnames[typ].extend(pathnames)
+
+            for idx, name in enumerate(self._var_allprocs_names[typ]):
+                path = self._var_allprocs_pathnames[typ][idx]
+                self._var_pathdict[path] = PathData(name, idx,
+                                                    my_idx_dict.get(path), typ)
+                if name in name2path:
+                    if typ is 'input':
+                        name2path[name].append(path)
+                    else:
+                        raise RuntimeError("Output name '%s' refers to "
+                                           "multiple outputs: %s." %
+                                           (name, [path, name2path[name]]))
+                else:
+                    if typ is 'input':
+                        name2path[name] = [path]
+                    else:
+                        name2path[name] = path
+
+    def get_subsystem(self, name):
+        """
+        Return the system called 'name' in the current namespace.
+
+        Parameters
+        ----------
+        name : str
+            name of the desired system in the current namespace.
+
+        Returns
+        -------
+        System or None
+            System if found else None.
+        """
+        system = self
+        for subname in name.split('.'):
+            for sub in system._subsystems_allprocs:
+                if sub.name == subname:
+                    system = sub
+                    break
+            else:
+                return None
+        return system
 
     def _apply_nonlinear(self):
-        """Compute residuals."""
+        """
+        Compute residuals.
+        """
         self._transfers[None](self._inputs, self._outputs, 'fwd')
         # Apply recursion
         for subsys in self._subsystems_myproc:
             subsys._apply_nonlinear()
 
     def _solve_nonlinear(self):
-        """Compute outputs.
+        """
+        Compute outputs.
 
         Returns
         -------
@@ -242,10 +432,11 @@ class Group(System):
         return self._nl_solver.solve()
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """Compute jac-vec product.
+        """
+        Compute jac-vec product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -254,38 +445,38 @@ class Group(System):
             ranges of variable IDs involved in this matrix-vector product.
             The ordering is [lb1, ub1, lb2, ub2].
         """
-        # Use global Jacobian
-        if self._jacobian._top_name == self.pathname:
-            for vec_name in vec_names:
-                with self._matvec_context(vec_name, var_inds, mode) as vecs:
-                    d_inputs, d_outputs, d_residuals = vecs
-                    self._jacobian._system = self
-                    self._jacobian._apply(d_inputs, d_outputs, d_residuals,
-                                          mode)
-        # Apply recursion
-        else:
-            if mode == 'fwd':
+        with self._jacobian_context() as J:
+            # Use global Jacobian
+            if self._owns_global_jac:
                 for vec_name in vec_names:
-                    d_inputs = self._vectors['input'][vec_name]
-                    d_outputs = self._vectors['output'][vec_name]
-                    self._vector_transfers[vec_name][None](
-                        d_inputs, d_outputs, mode)
+                    with self._matvec_context(vec_name, var_inds, mode) as vecs:
+                        d_inputs, d_outputs, d_residuals = vecs
+                        J._apply(d_inputs, d_outputs, d_residuals, mode)
+            # Apply recursion
+            else:
+                if mode == 'fwd':
+                    for vec_name in vec_names:
+                        d_inputs = self._vectors['input'][vec_name]
+                        d_outputs = self._vectors['output'][vec_name]
+                        self._vector_transfers[vec_name][None](
+                            d_inputs, d_outputs, mode)
 
-            for subsys in self._subsystems_myproc:
-                subsys._apply_linear(vec_names, mode, var_inds)
+                for subsys in self._subsystems_myproc:
+                    subsys._apply_linear(vec_names, mode, var_inds)
 
-            if mode == 'rev':
-                for vec_name in vec_names:
-                    d_inputs = self._vectors['input'][vec_name]
-                    d_outputs = self._vectors['output'][vec_name]
-                    self._vector_transfers[vec_name][None](
-                        d_inputs, d_outputs, mode)
+                if mode == 'rev':
+                    for vec_name in vec_names:
+                        d_inputs = self._vectors['input'][vec_name]
+                        d_outputs = self._vectors['output'][vec_name]
+                        self._vector_transfers[vec_name][None](
+                            d_inputs, d_outputs, mode)
 
     def _solve_linear(self, vec_names, mode):
-        """Apply inverse jac product.
+        """
+        Apply inverse jac product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -302,19 +493,17 @@ class Group(System):
         """
         return self._ln_solver.solve(vec_names, mode)
 
-    def _linearize(self, initial=False):
-        """Compute jacobian / factorization.
-
-        Args
-        ----
-        initial : boolean
-            whether this is the initial call to assemble the Jacobian.
+    def _linearize(self):
         """
-        for subsys in self._subsystems_myproc:
-            subsys._linearize()
+        Compute jacobian / factorization.
+        """
+        with self._jacobian_context() as J:
+            for subsys in self._subsystems_myproc:
+                subsys._linearize()
 
-        # Update jacobian
-        if not initial and self._jacobian._top_name == self.pathname:
-            self._jacobian._system = self
-            self._jacobian._update()
-            self._jacobian._precompute_iter()
+            # Update jacobian
+            if self._owns_global_jac:
+                J._update()
+
+        if self._ln_solver is not None:
+            self._ln_solver._linearize()

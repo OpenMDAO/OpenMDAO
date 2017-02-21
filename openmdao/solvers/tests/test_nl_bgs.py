@@ -1,4 +1,4 @@
-""" Unit test for the Nonlinear Block Gauss Seidel solver. """
+"""Test the Nonlinear Block Gauss Seidel solver. """
 
 import sys
 import unittest
@@ -13,6 +13,23 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, \
 
 
 class TestNLBGaussSeidel(unittest.TestCase):
+
+    def test_feature_set_options(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+
+        nlgbs.options['maxiter'] = 20
+        nlgbs.options['atol'] = 1e-6
+        nlgbs.options['rtol'] = 1e-6
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_sellar(self):
         # Basic sellar test.

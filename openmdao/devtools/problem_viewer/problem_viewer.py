@@ -15,6 +15,7 @@ except ImportError:
     h5py = None
 
 from openmdao.api import ImplicitComponent, Problem, Group
+from openmdao.utils.general_utils import warn_deprecation
 #from openmdao.util.record_util import is_valid_sqlite3_db
 import base64
 
@@ -69,7 +70,7 @@ def _get_tree_dict(system):
 def _get_viewer_data(problem_or_rootgroup):
     """Get the data needed by the N2 viewer as a dictionary."""
     if isinstance(problem_or_rootgroup, Problem):
-        root_group = problem_or_rootgroup.root
+        root_group = problem_or_rootgroup.model
     elif isinstance(problem_or_rootgroup, Group):
         if not problem_or_rootgroup.pathname: # root group
             root_group = problem_or_rootgroup
@@ -99,10 +100,7 @@ def view_tree(*args, **kwargs):
     """
     view_tree was renamed to view_model, but left here for backwards compatibility
     """
-    import warnings
-    warnings.simplefilter('always', DeprecationWarning)
-    warnings.warn("view_tree is deprecated. Please switch to view_model.", DeprecationWarning, stacklevel=2)
-    warnings.simplefilter('ignore', DeprecationWarning)
+    warn_deprecation("view_tree is deprecated. Please switch to view_model.")
     view_model(*args, **kwargs)
 
 def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_browser=True, offline=True, embed=False):
@@ -111,8 +109,8 @@ def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_brows
     of the specified type.  Optionally pops up a web browser to
     view the file.
 
-    Args
-    ----
+    Parameters
+    ----------
     problem_or_filename : Either a Problem() or a string
         Problem() : The Problem (after problem.setup()) for the desired tree.
         string : The filename of the case recorder file containing the data required to build the tree.

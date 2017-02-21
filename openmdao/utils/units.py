@@ -1,4 +1,5 @@
-"""Classes and functions to support unit conversion.
+"""
+Classes and functions to support unit conversion.
 
 The module provides a basic set of predefined physical quantities
 in its built-in library; however, it also supports generation of
@@ -27,7 +28,8 @@ from math import sin, cos, tan, floor, pi
 
 
 class NumberDict(OrderedDict):
-    """Dictionary storing numerical values.
+    """
+    Dictionary storing numerical values.
 
     An instance of this class acts like an array of numbers with
     generalized (non-integer) indices. A value of zero is assumed
@@ -37,10 +39,11 @@ class NumberDict(OrderedDict):
     """
 
     def __getitem__(self, item):
-        """Get the item, or 0.
+        """
+        Get the item, or 0.
 
-        Args
-        ----
+        Parameters
+        ----------
         item : key
             key to get the item
 
@@ -55,10 +58,11 @@ class NumberDict(OrderedDict):
             return 0
 
     def __coerce__(self, other):
-        """Change other dict to NumberDicts.
+        """
+        Change other dict to NumberDicts.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : Dict
             the dict instance to be coerced
 
@@ -72,10 +76,11 @@ class NumberDict(OrderedDict):
         return self, other
 
     def __add__(self, other):
-        """Add another NumberDict to myself.
+        """
+        Add another NumberDict to myself.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : NumberDict
             the other NumberDict Instance
 
@@ -92,10 +97,11 @@ class NumberDict(OrderedDict):
         return sum_dict
 
     def __sub__(self, other):
-        """Add another NumberDict from myself.
+        """
+        Add another NumberDict from myself.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : NumberDict
             the other NumberDict Instance
 
@@ -112,10 +118,11 @@ class NumberDict(OrderedDict):
         return sum_dict
 
     def __rsub__(self, other):
-        """Add subtract myself from another NumberDict.
+        """
+        Add subtract myself from another NumberDict.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : NumberDict
             the other NumberDict Instance
 
@@ -132,10 +139,11 @@ class NumberDict(OrderedDict):
         return sum_dict
 
     def __mul__(self, other):
-        """Multiply myself by another NumberDict.
+        """
+        Multiply myself by another NumberDict.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : NumberDict
             the other NumberDict Instance
 
@@ -152,10 +160,11 @@ class NumberDict(OrderedDict):
     __rmul__ = __mul__
 
     def __div__(self, other):
-        """Divide myself by another NumberDict.
+        """
+        Divide myself by another NumberDict.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : int
             value to divide by
 
@@ -172,10 +181,11 @@ class NumberDict(OrderedDict):
     __truediv__ = __div__  # for python 3
 
     def __repr__(self):
-        """Return a string deceleration of myself.
+        """
+        Return a string deceleration of myself.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : NumberDict
             the other NumberDict Instance
 
@@ -188,7 +198,8 @@ class NumberDict(OrderedDict):
 
 
 class PhysicalUnit(object):
-    """Physical unit.
+    """
+    Physical unit.
 
     A physical unit is defined by a name (possibly composite), a scaling
     factor, and the exponentials of each of the SI base units that enter into
@@ -210,10 +221,11 @@ class PhysicalUnit(object):
     """
 
     def __init__(self, names, factor, powers, offset=0):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         names : dict or str
             A dictionary mapping each name component to its
             associated integer power (e.g., C{{'m': 1, 's': -1}})
@@ -236,7 +248,8 @@ class PhysicalUnit(object):
         self._powers = powers
 
     def __repr__(self):
-        """String representation of myself.
+        """
+        String representation of myself.
 
         Returns
         -------
@@ -247,7 +260,8 @@ class PhysicalUnit(object):
                                               self._powers, self._offset)
 
     def __str__(self):
-        """Convert myself to string.
+        """
+        Convert myself to string.
 
         Returns
         -------
@@ -257,10 +271,11 @@ class PhysicalUnit(object):
         return '<PhysicalUnit ' + self.name() + '>'
 
     def __lt__(self, other):
-        """Compare myself to other.
+        """
+        Compare myself to other.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             The other physical unit to be compared to
 
@@ -275,10 +290,11 @@ class PhysicalUnit(object):
         return self._factor < other._factor
 
     def __gt__(self, other):
-        """Compare myself to other.
+        """
+        Compare myself to other.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             The other physical unit to be compared to
 
@@ -292,10 +308,11 @@ class PhysicalUnit(object):
         return self._factor > other._factor
 
     def __eq__(self, other):
-        """Test for equality.
+        """
+        Test for equality.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             The other physical unit to be compared to
 
@@ -309,10 +326,11 @@ class PhysicalUnit(object):
                 self._powers == other._powers)
 
     def __mul__(self, other):
-        """Multiply myself by other.
+        """
+        Multiply myself by other.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             The other physical unit to be compared to
 
@@ -338,10 +356,11 @@ class PhysicalUnit(object):
     __rmul__ = __mul__
 
     def __div__(self, other):
-        """Divide myself by other.
+        """
+        Divide myself by other.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             The other physical unit to be operated on
 
@@ -365,10 +384,11 @@ class PhysicalUnit(object):
     __truediv__ = __div__   # for python 3
 
     def __rdiv__(self, other):
-        """Divide other by myself.
+        """
+        Divide other by myself.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             The other physical unit to be operated on
 
@@ -384,10 +404,11 @@ class PhysicalUnit(object):
     __rtruediv__ = __rdiv__
 
     def __pow__(self, other):
-        """Raise myself to a power.
+        """
+        Raise myself to a power.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : float or int
             power to raise self by
 
@@ -422,7 +443,8 @@ class PhysicalUnit(object):
         raise TypeError('Only integer and inverse integer exponents allowed')
 
     def in_base_units(self):
-        """Return the base unit equivalent of this unit.
+        """
+        Return the base unit equivalent of this unit.
 
         Returns
         -------
@@ -449,10 +471,11 @@ class PhysicalUnit(object):
         return _find_unit(num + denom)
 
     def conversion_tuple_to(self, other):
-        """Compute the tuple of (factor, offset) for conversion.
+        """
+        Compute the tuple of (factor, offset) for conversion.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             Another unit.
 
@@ -485,10 +508,11 @@ class PhysicalUnit(object):
         return (factor, offset)
 
     def is_compatible(self, other):
-        """Check for compatibility with another unit.
+        """
+        Check for compatibility with another unit.
 
-        Args
-        ----
+        Parameters
+        ----------
         other : PhysicalUnit
             Another unit.
 
@@ -500,7 +524,8 @@ class PhysicalUnit(object):
         return self._powers == other._powers
 
     def is_dimensionless(self):
-        """Dimensionless PQ.
+        """
+        Dimensionless PQ.
 
         Returns
         -------
@@ -510,7 +535,8 @@ class PhysicalUnit(object):
         return not any(self._powers)
 
     def is_angle(self):
-        """Check if this PQ is an Angle.
+        """
+        Check if this PQ is an Angle.
 
         Returns
         -------
@@ -521,10 +547,11 @@ class PhysicalUnit(object):
                 sum(self._powers) == 1)
 
     def set_name(self, name):
-        """Set the name.
+        """
+        Set the name.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             the name
         """
@@ -532,7 +559,8 @@ class PhysicalUnit(object):
         self._names[name] = 1
 
     def name(self):
-        """Compute the name of this unit.
+        """
+        Compute the name of this unit.
 
         Returns
         -------
@@ -562,10 +590,13 @@ class PhysicalUnit(object):
 ####################################
 
 def _new_unit(name, factor, powers):
-    """Create new Unit.
+    """
+    Create new Unit.
 
-    Args
-    ----
+    Parameters
+    ----------
+    name : str
+        The name of the new unit
     factor : float
         conversion factor to base units
     powers : [int, ...]
@@ -576,12 +607,17 @@ def _new_unit(name, factor, powers):
 
 
 def add_offset_unit(name, baseunit, factor, offset, comment=''):
-    """Adding Offset Unit.
+    """
+    Adding Offset Unit.
 
-    Args
-    ----
-    unit : str
-        newly defined unit
+    Parameters
+    ----------
+    name : str
+        The name of the unit
+    baseunit : str or instance of PhysicalUnit
+        The unit upon which this offset unit is based.
+    factor : str
+        The scaling factor used to define the new unit w.r.t. baseunit
     offset : float
         zero offset for new unit
     comment : str
@@ -606,12 +642,15 @@ def add_offset_unit(name, baseunit, factor, offset, comment=''):
 
 
 def add_unit(name, unit, comment=''):
-    """Adding Unit.
+    """
+    Adding Unit.
 
-    Args
-    ----
+    Parameters
+    ----------
+    name : str
+        The name of the unit being added. For example: 'Hz'
     unit : str
-        newly defined unit
+        definition of the unit w.r.t. some other unit.  For example: '1/s'
     comment : str
         optional comment to describe unit
     """
@@ -635,7 +674,22 @@ _UNIT_LIB = ConfigParser()
 
 
 def _do_nothing(string):
-    """Make the ConfigParser case sensitive."""
+    """
+    Make the ConfigParser case sensitive.
+
+    Defines an optionxform for the units configparser that
+    does nothing, resulting in a case-sensitive parser.
+
+    Parameters
+    ----------
+    string : str
+        The string to be transformed for the ConfigParser
+
+    Returns
+    -------
+    str
+        The same string that was given as a parameter.
+    """
     return string
 
 
@@ -643,10 +697,11 @@ _UNIT_LIB.optionxform = _do_nothing
 
 
 def import_library(libfilepointer):
-    """Import a units library, replacing any existing definitions.
+    """
+    Import a units library, replacing any existing definitions.
 
-    Args
-    ----
+    Parameters
+    ----------
     libfilepointer : file
         new library file to work with
 
@@ -699,11 +754,12 @@ def import_library(libfilepointer):
 
 
 def update_library(filename):
-    """Update units in current library from `filename`.
+    """
+    Update units in current library from `filename`.
 
-    Args
-    ----
-    filename: string or file
+    Parameters
+    ----------
+    filename : string or file
         Source of units configuration data.
     """
     if isinstance(filename, basestring):
@@ -720,11 +776,12 @@ def update_library(filename):
 
 
 def _update_library(cfg):
-    """Update library from :class:`ConfigParser` `cfg`.
+    """
+    Update library from :class:`ConfigParser` `cfg`.
 
-    Args
-    ----
-    cfg: ConfigParser
+    Parameters
+    ----------
+    cfg : ConfigParser
         ConfigParser loaded with unit_lib.ini data
     """
     retry1 = set()
@@ -778,11 +835,12 @@ _UNIT_CACHE = {}
 
 
 def _find_unit(unit):
-    """Find unit helper function.
+    """
+    Find unit helper function.
 
-    Args
-    ----
-    unit: str
+    Parameters
+    ----------
+    unit : str
         str representing the desired unit
 
     Returns
@@ -828,23 +886,43 @@ def _find_unit(unit):
 
                         # no prefixes found, unknown unit
                         else:
-                            raise ValueError("no unit named '%s' is defined"
-                                             % item)
+                            return None
+                            # raise ValueError("no unit named '%s' is defined"
+                            #                  % item)
 
                 unit = eval(name, {'__builtins__': None}, _UNIT_LIB.unit_table)
 
             _UNIT_CACHE[name] = unit
 
     if not isinstance(unit, PhysicalUnit):
-        raise TypeError(str(unit) + ' is not a unit')
+        return None
+
     return unit
 
 
-def conversion_to_base_units(units):
-    """Get the offset and scaler to convert from given units to base units.
+def valid_units(unit):
+    """
+    Return whether the given units are vaild.
 
-    Args
-    ----
+    Parameters
+    ----------
+    unit : str
+        String representation of the units.
+
+    Returns
+    -------
+    bool
+        True for valid, False for invalid.
+    """
+    return _find_unit(unit) is not None
+
+
+def conversion_to_base_units(units):
+    """
+    Get the offset and scaler to convert from given units to base units.
+
+    Parameters
+    ----------
     units : str
         String representation of the units.
 
@@ -863,12 +941,13 @@ def conversion_to_base_units(units):
 
 
 def is_compatible(old_units, new_units):
-    """Check whether units are compatible in terms of base units.
+    """
+    Check whether units are compatible in terms of base units.
 
     e.g., m/s is compatible with ft/hr
 
-    Args
-    ----
+    Parameters
+    ----------
     old_units : str
         original units as a string.
     new_units : str or None
@@ -888,18 +967,18 @@ def is_compatible(old_units, new_units):
     return old_unit.is_compatible(new_unit)
 
 
-def convert_units(val, old_units, new_units=''):
-    """Take a given quantity and return in different units.
+def convert_units(val, old_units, new_units=None):
+    """
+    Take a given quantity and return in different units.
 
-    Args
-    ----
+    Parameters
+    ----------
     val : float
         value in original units.
-    old_units : str
-        original units as a string.
-    new_units : str
-        new units to return the value in; if empty str,
-        return in standard units.
+    old_units : str or None
+        original units as a string or None.
+    new_units : str or None
+        new units to return the value in or None.
 
     Returns
     -------
@@ -908,6 +987,11 @@ def convert_units(val, old_units, new_units=''):
     """
     if not old_units and not new_units:  # dimensionless
         return val
+    elif not old_units or not new_units:
+        # A descriptive exception should have been thrown when checking the connection.
+        raise RuntimeError("Units are inconsistent between an input and an output. "
+                           "A descriptive error should have been given earlier. "
+                           "Please contact the developers.")
 
     old_unit = _find_unit(old_units)
     if new_units:
@@ -932,5 +1016,6 @@ if __name__ == '__main__':
         (conversion_to_base_units('km'), (0., 1.0e3)),
         (convert_units(3.0, 'mm'), (3.0e-3)),
         (convert_units(3.0, 'mm', 'cm'), (3.0e-1))
+        (convert_units(100, 'degC', 'degF'), (212.))
     ]:
         print(returned, 'should be', expected)

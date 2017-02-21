@@ -3,7 +3,6 @@
 from __future__ import division
 from collections import OrderedDict
 import sys
-import warnings
 
 from six import string_types
 from six.moves import range
@@ -11,12 +10,16 @@ from six.moves import range
 import numpy as np
 
 from openmdao.assemblers.default_assembler import DefaultAssembler
-from openmdao.vectors.default_vector import DefaultVector
 from openmdao.error_checking.check_config import check_config
+from openmdao.utils.general_utils import warn_deprecation
+from openmdao.vectors.default_vector import DefaultVector
+from openmdao.core.component import Component
+from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
 
 
 class FakeComm(object):
-    """Fake MPI communicator class used if mpi4py is not installed.
+    """
+    Fake MPI communicator class used if mpi4py is not installed.
 
     Attributes
     ----------
@@ -27,13 +30,16 @@ class FakeComm(object):
     """
 
     def __init__(self):
-        """Initialize attributes."""
+        """
+        Initialize attributes.
+        """
         self.rank = 0
         self.size = 1
 
 
 class Problem(object):
-    """Top-level container for the systems and drivers.
+    """
+    Top-level container for the systems and drivers.
 
     Attributes
     ----------
@@ -48,11 +54,12 @@ class Problem(object):
     """
 
     def __init__(self, model=None, comm=None, assembler_class=None,
-                 use_ref_vector=True):
-        """Initialize attributes.
+                 use_ref_vector=True, root=None):
+        """
+        Initialize attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         model : <System> or None
             pointer to the top-level <System> object (root node in the tree).
         comm : MPI.Comm or <FakeComm> or None
@@ -61,6 +68,8 @@ class Problem(object):
             pointer to the global <Assembler> object.
         use_ref_vector : bool
             if True, allocate vectors to store ref. values.
+        root : <System> or None
+            Deprecated kwarg for `model`.
         """
         if comm is None:
             try:
@@ -71,17 +80,70 @@ class Problem(object):
         if assembler_class is None:
             assembler_class = DefaultAssembler
 
+        if root is not None:
+            if model is not None:
+                raise ValueError("cannot specify both `root` and `model`. `root` has been "
+                                 "deprecated, please use model")
+
+            warn_deprecation("The 'root' argument provides backwards compatibility "
+                             "with OpenMDAO <= 1.x ; use 'model' instead.")
+
+            model = root
+
         self.model = model
         self.comm = comm
         self._assembler = assembler_class(comm)
         self._use_ref_vector = use_ref_vector
 
-    # TODO: getitem/setitem need to properly handle scaling/units
-    def __getitem__(self, name):
-        """Get an output/input variable.
+    def _get_path_data(self, name):
+        """
+        Get absolute pathname and related data.
 
-        Args
-        ----
+        Parameters
+        ----------
+        name : str
+            name of the variable in the root system's namespace. May be
+            a promoted name or an unpromoted name.
+
+        Returns
+        -------
+        str, PathData
+            absolute pathname and PathData namedtuple
+        """
+        try:
+            pdata = self.model._var_pathdict[name]
+            pathname = name
+        except KeyError:
+            # name is not an absolute path
+            try:
+                pathname = self.model._var_name2path['output'][name]
+            except KeyError:
+                try:
+                    paths = self.model._var_name2path['input'][name]
+                except KeyError:
+                    raise KeyError("Variable '%s' not found." % name)
+
+                if len(paths) > 1:
+                    raise RuntimeError("Variable name '%s' is not unique and "
+                                       "matches the following: %s. "
+                                       "Use the absolute pathname instead." %
+                                       (name, paths))
+                pathname = paths[0]
+
+            pdata = self.model._var_pathdict[pathname]
+
+        if pdata.myproc_idx is None:
+            raise RuntimeError("Variable '%s' is not found in this process" %
+                               name)
+
+        return pathname, pdata
+
+    def __getitem__(self, name):
+        """
+        Get an output/input variable.
+
+        Parameters
+        ----------
         name : str
             name of the variable in the root system's namespace.
 
@@ -90,38 +152,68 @@ class Problem(object):
         float or ndarray
             the requested output/input variable.
         """
-        try:
-            self.model._outputs[name]
-            ind = self.model._var_myproc_names['output'].index(name)
-            c0, c1 = self.model._scaling_to_phys['output'][ind, :]
-            return c0 + c1 * self.model._outputs[name]
-        except KeyError:
-            ind = self.model._var_myproc_names['input'].index(name)
-            c0, c1 = self.model._scaling_to_phys['input'][ind, :]
-            return c0 + c1 * self.model._inputs[name]
+        pathname, pdata = self._get_path_data(name)
+
+        if pdata.typ == 'output':
+            return self.model._outputs[pathname]
+        else:
+            return self.model._inputs[pathname]
 
     def __setitem__(self, name, value):
-        """Set an output/input variable.
+        """
+        Set an output/input variable.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : str
             name of the output/input variable in the root system's namespace.
         value : float or ndarray or list
             value to set this variable to.
         """
-        try:
-            self.model._outputs[name]
-            ind = self.model._var_myproc_names['output'].index(name)
-            c0, c1 = self.model._scaling_to_norm['output'][ind, :]
-            self.model._outputs[name] = c0 + c1 * np.array(value)
-        except KeyError:
-            ind = self.model._var_myproc_names['input'].index(name)
-            c0, c1 = self.model._scaling_to_norm['input'][ind, :]
-            self.model._inputs[name] = c0 + c1 * np.array(value)
+        pathname, pdata = self._get_path_data(name)
+
+        if pdata.typ == 'output':
+            meta = self.model._var_myproc_metadata['output'][pdata.myproc_idx]
+            if 'shape' in meta:
+                value, _ = ensure_compatible(pathname, value, meta['shape'])
+            self.model._outputs[pathname] = value
+        else:
+            meta = self.model._var_myproc_metadata['input'][pdata.myproc_idx]
+            if 'shape' in meta:
+                value, _ = ensure_compatible(pathname, value, meta['shape'])
+            self.model._inputs[pathname] = value
+
+    @property
+    def root(self):
+        """
+        Provide 'root' property for backwards compatibility.
+
+        Returns
+        -------
+        <Group>
+            reference to the 'model' property.
+        """
+        warn_deprecation("The 'root' property provides backwards compatibility "
+                         "with OpenMDAO <= 1.x ; use 'model' instead.")
+        return self.model
+
+    @root.setter
+    def root(self, model):
+        """
+        Provide for setting the 'root' property for backwards compatibility.
+
+        Parameters
+        -------
+        model : <Group>
+            reference to a <Group> to be assigned to the 'model' property.
+        """
+        warn_deprecation("The 'root' property provides backwards compatibility "
+                         "with OpenMDAO <= 1.x ; use 'model' instead.")
+        self.model = model
 
     def run_model(self):
-        """Run the model by calling the root system's solve_nonlinear.
+        """
+        Run the model by calling the root system's solve_nonlinear.
 
         Returns
         -------
@@ -132,10 +224,11 @@ class Problem(object):
         float
             absolute error.
         """
-        return self.model._solve_nonlinear()
+        return self.model.run_solve_nonlinear()
 
     def run_once(self):
-        """Backward compatible call for run_model.
+        """
+        Backward compatible call for run_model.
 
         Returns
         -------
@@ -146,16 +239,14 @@ class Problem(object):
         float
             absolute error.
         """
-        warnings.simplefilter('always', DeprecationWarning)
-        warnings.warn('This method provides backwards compabitibility with '
-                      'OpenMDAO <= 1.x ; use run_driver instead.',
-                      DeprecationWarning, stacklevel=2)
-        warnings.simplefilter('ignore', DeprecationWarning)
+        warn_deprecation('This method provides backwards compatibility with '
+                         'OpenMDAO <= 1.x ; use run_driver instead.')
 
         return self.run_model()
 
     def run(self):
-        """Backward compatible call for run_driver.
+        """
+        Backward compatible call for run_driver.
 
         Returns
         -------
@@ -166,23 +257,21 @@ class Problem(object):
         float
             absolute error.
         """
-        warnings.simplefilter('always', DeprecationWarning)
-        warnings.warn('This method provides backwards compabitibility with '
-                      'OpenMDAO <= 1.x ; use run_driver instead.',
-                      DeprecationWarning, stacklevel=2)
-        warnings.simplefilter('ignore', DeprecationWarning)
+        warn_deprecation('This method provides backwards compatibility with '
+                         'OpenMDAO <= 1.x ; use run_driver instead.')
 
         return self.run_driver()
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None,
               mode='auto'):
-        """Set up everything (model, assembler, vector, solvers, drivers).
+        """
+        Set up everything (model, assembler, vector, solvers, drivers).
 
-        Args
-        ----
-        vector_class : type (DefaultVector)
+        Parameters
+        ----------
+        vector_class : type
             reference to an actual <Vector> class; not an instance.
-        check : boolean (True)
+        check : boolean
             whether to run error check after setup is complete.
         logger : object
             Object for logging config checks if check is True.
@@ -247,16 +336,28 @@ class Problem(object):
         # Vector setup for the linear vector
         self.setup_vector('linear', vector_class, self._use_ref_vector)
 
+        model._setup_jacobians()
+
+        for system in model.system_iter(include_self=True, recurse=True):
+            # set up all the solvers.
+            if system._nl_solver is not None:
+                system._nl_solver._setup_solvers(system, 0)
+            if system._ln_solver is not None:
+                system._ln_solver._setup_solvers(system, 0)
+
         if check:
             check_config(self, logger)
+
+        model._scale_vectors_and_jacobians('to phys')
 
         return self
 
     def setup_vector(self, vec_name, vector_class, use_ref_vector):
-        """Set up the 'vec_name' <Vector>.
+        """
+        Set up the 'vec_name' <Vector>.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_name : str
             name of the vector.
         vector_class : type
@@ -278,16 +379,16 @@ class Problem(object):
 
         # TODO: implement this properly
         ind1, ind2 = self.model._var_allprocs_range['output']
-        import numpy
-        vector_var_ids = numpy.arange(ind1, ind2)
+        vector_var_ids = np.arange(ind1, ind2)
 
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
-        """Compute derivatives of desired quantities with respect to desired inputs.
+        """
+        Compute derivatives of desired quantities with respect to desired inputs.
 
-        Args
-        ----
+        Parameters
+        ----------
         of : list of variable name strings or None
             Variables whose derivatives will be computed. Default is None, which
             uses the driver's objectives and constraints.
@@ -336,95 +437,117 @@ class Problem(object):
         # TODO: poi_indices and qoi_indices requires special support
         # -------------------------------------------------------------------
 
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        for subname in vec_dinput:
+        with model._scaled_context():
 
-            # TODO: Do all three deriv vectors have the same keys?
+            # Prepare model for calculation by cleaning out the derivatives
+            # vectors.
+            for subname in vec_dinput:
 
-            # Skip nonlinear because we don't need to mess with it?
-            if subname == 'nonlinear':
-                continue
+                # TODO: Do all three deriv vectors have the same keys?
 
-            vec_dinput[subname].set_const(0.0)
-            vec_doutput[subname].set_const(0.0)
-            vec_dresid[subname].set_const(0.0)
+                # Skip nonlinear because we don't need to mess with it?
+                if subname == 'nonlinear':
+                    continue
 
-        # Linearize Model
-        model._linearize()
+                vec_dinput[subname].set_const(0.0)
+                vec_doutput[subname].set_const(0.0)
+                vec_dresid[subname].set_const(0.0)
 
-        # Create data structures (and possibly allocate space) for the total
-        # derivatives that we will return.
-        if return_format == 'flat_dict':
+            # Linearize Model
+            model._linearize()
 
-            totals = OrderedDict()
+            of = [(n,) if isinstance(n, string_types) else n for n in of]
+            wrt = [(n,) if isinstance(n, string_types) else n for n in wrt]
 
-            for okeys in of:
-                if isinstance(okeys, string_types):
-                    okeys = (okeys,)
-                for okey in okeys:
-                    for ikeys in wrt:
-                        if isinstance(ikeys, string_types):
-                            ikeys = (ikeys,)
-                        for ikey in ikeys:
-                            totals[(okey, ikey)] = None
+            # Create data structures (and possibly allocate space) for the total
+            # derivatives that we will return.
+            if return_format == 'flat_dict':
 
-        else:
-            msg = "Unsupported return format '%s." % return_format
-            raise NotImplementedError(msg)
+                totals = OrderedDict()
 
-        if mode == 'fwd':
-            input_list, output_list = wrt, of
-            input_vec, output_vec = vec_dresid, vec_doutput
-        else:
-            input_list, output_list = of, wrt
-            input_vec, output_vec = vec_doutput, vec_dresid
+                for okeys in of:
+                    for okey in okeys:
+                        for ikeys in wrt:
+                            for ikey in ikeys:
+                                totals[(okey, ikey)] = None
 
-        # TODO : Parallel adjoint setup loop goes here.
-        # NOTE : Until we support it, we will just limit ourselves to the
-        # 'linear' vector.
-        vecname = 'linear'
-        dinputs = input_vec[vecname]
-        doutputs = output_vec[vecname]
+            else:
+                msg = "Unsupported return format '%s." % return_format
+                raise NotImplementedError(msg)
 
-        # If Forward mode, solve linear system for each 'wrt'
-        # If Adjoint mode, solve linear system for each 'of'
-        for input_name in input_list:
-            flat_view = dinputs._views_flat[input_name]
-            n_in = len(flat_view)
-            for idx in range(n_in):
-                # Maybe we don't need to clean up so much at the beginning,
-                # since we clean this every time.
-                dinputs.set_const(0.0)
+            # convert of and wrt names from promoted to unpromoted
+            # (which is absolute path since we're at the top)
+            paths = model._var_allprocs_pathnames
+            indices = model._var_allprocs_indices
+            oldof = of
+            of = []
+            for names in oldof:
+                of.append(tuple(paths['output'][indices['output'][name]]
+                                for name in names))
 
-                # Dictionary access returns a scaler for 1d input, and we
-                # need a vector for clean code, so use _views_flat.
-                flat_view[idx] = 1.0
+            oldwrt = wrt
+            wrt = []
+            for names in oldwrt:
+                wrt.append(tuple(paths['output'][indices['output'][name]]
+                                 for name in names))
 
-                # The root system solves here.
-                model._solve_linear([vecname], mode)
+            if mode == 'fwd':
+                input_list, output_list = wrt, of
+                old_input_list, old_output_list = oldwrt, oldof
+                input_vec, output_vec = vec_dresid, vec_doutput
+            else:
+                input_list, output_list = of, wrt
+                old_input_list, old_output_list = oldof, oldwrt
+                input_vec, output_vec = vec_doutput, vec_dresid
 
-                # Pull out the answers and pack them into our data structure.
-                for output_name in output_list:
+            # TODO : Parallel adjoint setup loop goes here.
+            # NOTE : Until we support it, we will just limit ourselves to the
+            # 'linear' vector.
+            vecname = 'linear'
+            dinputs = input_vec[vecname]
+            doutputs = output_vec[vecname]
 
-                    deriv_val = doutputs._views_flat[output_name]
-                    len_val = len(deriv_val)
+            # If Forward mode, solve linear system for each 'wrt'
+            # If Adjoint mode, solve linear system for each 'of'
+            for icount, input_names in enumerate(input_list):
+                for iname_count, input_name in enumerate(input_names):
+                    flat_view = dinputs._views_flat[input_name]
+                    n_in = len(flat_view)
+                    for idx in range(n_in):
+                        # Maybe we don't need to clean up so much at the beginning,
+                        # since we clean this every time.
+                        dinputs.set_const(0.0)
 
-                    if return_format == 'flat_dict':
-                        if mode == 'fwd':
+                        # Dictionary access returns a scaler for 1d input, and we
+                        # need a vector for clean code, so use _views_flat.
+                        flat_view[idx] = 1.0
 
-                            key = (output_name, input_name)
+                        # The root system solves here.
+                        model._solve_linear([vecname], mode)
 
-                            if totals[key] is None:
-                                totals[key] = np.zeros((len_val, n_in))
-                            totals[key][:, idx] = deriv_val
+                        # Pull out the answers and pack into our data structure.
+                        for ocount, output_names in enumerate(output_list):
+                            for oname_count, output_name in enumerate(output_names):
+                                deriv_val = doutputs._views_flat[output_name]
+                                len_val = len(deriv_val)
 
-                        else:
+                                if return_format == 'flat_dict':
+                                    if mode == 'fwd':
 
-                            key = (input_name, output_name)
+                                        key = (old_output_list[ocount][oname_count],
+                                               old_input_list[icount][iname_count])
 
-                            if totals[key] is None:
-                                totals[key] = np.zeros((n_in, len_val))
-                            totals[key][idx, :] = deriv_val
+                                        if totals[key] is None:
+                                            totals[key] = np.zeros((len_val, n_in))
+                                        totals[key][:, idx] = deriv_val
+
+                                    else:
+
+                                        key = (old_input_list[icount][iname_count],
+                                               old_output_list[ocount][oname_count])
+
+                                        if totals[key] is None:
+                                            totals[key] = np.zeros((n_in, len_val))
+                                        totals[key][idx, :] = deriv_val
 
         return totals

@@ -27,41 +27,40 @@ class TestExplCompArray(ExplicitComponent):
 
 class TestExplCompArrayDense(TestExplCompArray):
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         thk = self.metadata['thickness']
 
-        inds = numpy.arange(4)
-        jacobian['areas', 'lengths'] = numpy.diag(inputs['widths'].flatten())
-        jacobian['areas', 'widths'] = numpy.diag(inputs['lengths'].flatten())
-        jacobian['total_volume', 'lengths'] = inputs['widths'].flatten() * thk
-        jacobian['total_volume', 'widths'] = inputs['lengths'].flatten() * thk
+        partials['areas', 'lengths'] = numpy.diag(inputs['widths'].flatten())
+        partials['areas', 'widths'] = numpy.diag(inputs['lengths'].flatten())
+        partials['total_volume', 'lengths'] = inputs['widths'].flatten() * thk
+        partials['total_volume', 'widths'] = inputs['lengths'].flatten() * thk
 
 
 class TestExplCompArraySpmtx(TestExplCompArray):
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         thk = self.metadata['thickness']
 
         inds = numpy.arange(4)
-        jacobian['areas', 'lengths'] = scipy.sparse.csr_matrix(
+        partials['areas', 'lengths'] = scipy.sparse.csr_matrix(
             (inputs['widths'].flatten(), (inds, inds)))
-        jacobian['areas', 'widths'] = scipy.sparse.csr_matrix(
+        partials['areas', 'widths'] = scipy.sparse.csr_matrix(
             (inputs['lengths'].flatten(), (inds, inds)))
-        jacobian['total_volume', 'lengths'] = scipy.sparse.csr_matrix(
+        partials['total_volume', 'lengths'] = scipy.sparse.csr_matrix(
             (inputs['widths'].flatten() * thk, ([0], inds)))
-        jacobian['total_volume', 'widths'] = scipy.sparse.csr_matrix(
+        partials['total_volume', 'widths'] = scipy.sparse.csr_matrix(
             (inputs['lengths'].flatten() * thk, ([0], inds)))
 
 
 class TestExplCompArraySparse(TestExplCompArray):
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         thk = self.metadata['thickness']
 
         inds = numpy.arange(4)
-        jacobian['areas', 'lengths'] = (inputs['widths'].flatten(), inds, inds)
-        jacobian['areas', 'widths'] = (inputs['lengths'].flatten(), inds, inds)
-        jacobian['total_volume', 'lengths'] = (
+        partials['areas', 'lengths'] = (inputs['widths'].flatten(), inds, inds)
+        partials['areas', 'widths'] = (inputs['lengths'].flatten(), inds, inds)
+        partials['total_volume', 'lengths'] = (
             inputs['widths'].flatten() * thk, [0], inds)
-        jacobian['total_volume', 'widths'] = (
+        partials['total_volume', 'widths'] = (
             inputs['lengths'].flatten() * thk, [0], inds)

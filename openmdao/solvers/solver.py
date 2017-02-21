@@ -4,10 +4,12 @@ from __future__ import division, print_function
 import numpy
 
 from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.jacobians.global_jacobian import GlobalJacobian
 
 
 class Solver(object):
-    """Base solver class.
+    """
+    Base solver class.
 
     This class is subclassed by NonlinearSolver and LinearSolver,
     which are in turn subclassed by actual solver implementations.
@@ -31,10 +33,11 @@ class Solver(object):
     SOLVER = 'base_solver'
 
     def __init__(self, **kwargs):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs : dict
             options dictionary.
         """
@@ -53,24 +56,24 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', type_=int, value=1,
                              desc='whether to print output')
-        self.options.declare('subsolvers', type_=dict, value={},
-                             desc='dictionary of solvers called by this one')
 
         self._declare_options()
         self.options.update(kwargs)
 
     def _declare_options(self):
-        """Declare options before kwargs are processed in the init method.
+        """
+        Declare options before kwargs are processed in the init method.
 
         This is optionally implemented by subclasses of Solver.
         """
         pass
 
     def _setup_solvers(self, system, depth):
-        """Assign system instance, set depth, and optionally perform setup.
+        """
+        Assign system instance, set depth, and optionally perform setup.
 
-        Args
-        ----
+        Parameters
+        ----------
         system : <System>
             pointer to the owning system.
         depth : int
@@ -79,14 +82,12 @@ class Solver(object):
         self._system = system
         self._depth = depth
 
-        for solver in self.options['subsolvers'].values():
-            solver._setup_solvers(system, depth + 1)
-
     def _mpi_print(self, iteration, res, res0):
-        """Print residuals from an iteration.
+        """
+        Print residuals from an iteration.
 
-        Args
-        ----
+        Parameters
+        ----------
         iteration : int
             iteration counter, 0-based.
         res : float
@@ -120,16 +121,17 @@ class Solver(object):
             print(print_str)
 
     def _run_iterator(self):
-        """Run the iterative solver.
+        """
+        Run the iterative solver.
 
         Returns
         -------
         boolean
-            True is unconverged or diverged; False is successful.
+            Failure flag; True if failed to converge, False is successful.
         float
-            relative error at termination.
+            absolute error.
         float
-            absolute error at termination.
+            relative error.
         """
         maxiter = self.options['maxiter']
         atol = self.options['atol']
@@ -146,10 +148,11 @@ class Solver(object):
             self._mpi_print(self._iter_count, norm / norm0, norm)
         fail = (numpy.isinf(norm) or numpy.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
-        return fail, norm / norm0, norm
+        return fail, norm, norm / norm0
 
     def _iter_initialize(self):
-        """Perform any necessary pre-processing operations.
+        """
+        Perform any necessary pre-processing operations.
 
         Returns
         -------
@@ -161,11 +164,14 @@ class Solver(object):
         pass
 
     def _iter_execute(self):
-        """Perform the operations in the iteration loop."""
+        """
+        Perform the operations in the iteration loop.
+        """
         pass
 
     def _iter_get_norm(self):
-        """Return the norm of the residual.
+        """
+        Return the norm of the residual.
 
         Returns
         -------
@@ -174,55 +180,30 @@ class Solver(object):
         """
         pass
 
-    def solve(self):
-        """Run the solver.
-
-        Returns
-        -------
-        float
-            initial error.
-        float
-            error at the first iteration.
+    def _linearize(self):
+        """
+        Perform any required linearization operations such as matrix factorization.
         """
         pass
 
-    def set_subsolver(self, name, solver):
-        """Add a subsolver to this solver.
-
-        Args
-        ----
-        name : str
-            name of the subsolver.
-        solver : <Solver>
-            the subsolver instance.
+    def solve(self):
+        """
+        Run the solver.
 
         Returns
         -------
-        <Solver>
-            the subsolver instance.
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            absolute error.
+        float
+            relative error.
         """
-        self.options['subsolvers'][name] = solver
-        self.options['subsolvers'][name]._setup_solvers(self._system,
-                                                        self._depth + 1)
-        return solver
-
-    def get_subsolver(self, name):
-        """Get a subsolver.
-
-        Args
-        ----
-        name : str
-            name of the subsolver.
-
-        Returns
-        -------
-        <Solver>
-            the instance of the requested subsolver.
-        """
-        return self.options['subsolvers'][name]
+        pass
 
     def __str__(self):
-        """Return a string representation of the solver.
+        """
+        Return a string representation of the solver.
 
         Returns
         -------
@@ -233,22 +214,28 @@ class Solver(object):
 
 
 class NonlinearSolver(Solver):
-    """Base class for nonlinear solvers."""
+    """
+    Base class for nonlinear solvers.
+    """
 
     def solve(self):
-        """Run the solver.
+        """
+        Run the solver.
 
         Returns
         -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
         float
-            initial error.
+            absolute error.
         float
-            error at the first iteration.
+            relative error.
         """
         return self._run_iterator()
 
     def _iter_initialize(self):
-        """Perform any necessary pre-processing operations.
+        """
+        Perform any necessary pre-processing operations.
 
         Returns
         -------
@@ -265,7 +252,8 @@ class NonlinearSolver(Solver):
         return norm0, norm
 
     def _iter_get_norm(self):
-        """Return the norm of the residual.
+        """
+        Return the norm of the residual.
 
         Returns
         -------
@@ -277,13 +265,16 @@ class NonlinearSolver(Solver):
 
 
 class LinearSolver(Solver):
-    """Base class for linear solvers."""
+    """
+    Base class for linear solvers.
+    """
 
     def solve(self, vec_names, mode):
-        """Run the solver.
+        """
+        Run the solver.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -301,7 +292,8 @@ class LinearSolver(Solver):
         return self._run_iterator()
 
     def _iter_initialize(self):
-        """Perform any necessary pre-processing operations.
+        """
+        Perform any necessary pre-processing operations.
 
         Returns
         -------
@@ -329,7 +321,8 @@ class LinearSolver(Solver):
         return norm0, norm
 
     def _iter_get_norm(self):
-        """Return the norm of the residual.
+        """
+        Return the norm of the residual.
 
         Returns
         -------
@@ -357,3 +350,26 @@ class LinearSolver(Solver):
             norm += b_vec.get_norm()**2
 
         return norm ** 0.5
+
+
+class BlockLinearSolver(LinearSolver):
+    """
+    A base class for LinearBlockGS and LinearBlockJac.
+    """
+
+    def _iter_initialize(self):
+        """
+        Perform any necessary pre-processing operations.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
+        if isinstance(self._system._jacobian, GlobalJacobian):
+            raise RuntimeError("A block linear solver '%s' is being used with "
+                               "a GlobalJacobian in system '%s'" %
+                               (self.SOLVER, self._system.pathname))
+        return super(BlockLinearSolver, self)._iter_initialize()

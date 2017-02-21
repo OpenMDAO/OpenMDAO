@@ -8,14 +8,17 @@ from openmdao.assemblers.assembler import Assembler
 
 
 class DefaultAssembler(Assembler):
-    """Default <Assembler> implementation."""
+    """
+    Default <Assembler> implementation.
+    """
 
     def _compute_transfers(self, nsub_allprocs, var_range,
                            subsystems_myproc, subsystems_inds):
-        """Compute the transfer indices.
+        """
+        Compute the transfer indices.
 
-        Args
-        ----
+        Parameters
+        ----------
         nsub_allprocs : int
             number of subsystems on all procs.
         var_range : [int, int]

@@ -4,14 +4,14 @@ import numpy as np
 from math import isnan
 
 
-def assert_rel_error(test_case, actual, desired, tolerance):
+def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
     """Check relative error.
 
     Determine that the relative error between `actual` and `desired`
     is within `tolerance`. If `desired` is zero, then use absolute error.
 
-    Args
-    ----
+    Parameters
+    ----------
     test_case : :class:`unittest.TestCase`
         TestCase instance used for assertions.
 
@@ -88,8 +88,8 @@ class TestLogger(object):
     def error(self, msg):
         """Collect an error message.
 
-        Args
-        ----
+        Parameters
+        ----------
         msg : str
             An error message.
         """
@@ -98,8 +98,8 @@ class TestLogger(object):
     def warning(self, msg):
         """Collect a warning message.
 
-        Args
-        ----
+        Parameters
+        ----------
         msg : str
             A warning message.
         """
@@ -108,8 +108,8 @@ class TestLogger(object):
     def info(self, msg):
         """Collect an informational message.
 
-        Args
-        ----
+        Parameters
+        ----------
         msg : str
             An informational message.
         """
@@ -118,8 +118,8 @@ class TestLogger(object):
     def debug(self, msg):
         """Collect a debug message.
 
-        Args
-        ----
+        Parameters
+        ----------
         msg : str
             A debugging message.
         """

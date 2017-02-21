@@ -1,14 +1,18 @@
 """Define the LinearBlockJac class."""
-from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.solver import BlockLinearSolver
 
 
-class LinearBlockJac(LinearSolver):
-    """Linear block Jacobi solver."""
+class LinearBlockJac(BlockLinearSolver):
+    """
+    Linear block Jacobi solver.
+    """
 
     SOLVER = 'LN: LNBJ'
 
     def _iter_execute(self):
-        """Perform the operations in the iteration loop."""
+        """
+        Perform the operations in the iteration loop.
+        """
         system = self._system
         mode = self._mode
         vec_names = self._vec_names

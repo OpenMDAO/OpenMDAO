@@ -1,10 +1,11 @@
 """Define the base Matrix class."""
-from __future__ import division, print_function
+from __future__ import division
 import numpy
 
 
 class Matrix(object):
-    """Base matrix class.
+    """
+    Base matrix class.
 
     This class is used for global Jacobians.
 
@@ -14,99 +15,36 @@ class Matrix(object):
         communicator of the top-level system that owns the <Jacobian>.
     _matrix : object
         implementation-specific representation of the actual matrix.
-    _out_submats : dict
+    _submats : dict
         dictionary of sub-jacobian data keyed by (out_ind, in_ind).
-    _in_submats : dict
-        dictionary of sub-jacobian data keyed by (out_ind, in_ind).
-    _out_metadata : dict
-        implementation-specific data for the sub-jacobians.
-    _in_metadata : dict
+    _metadata : dict
         implementation-specific data for the sub-jacobians.
     """
 
     def __init__(self, comm):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         comm : MPI.Comm or <FakeComm>
             communicator of the top-level system that owns the <Jacobian>.
         """
         self._comm = comm
         self._matrix = None
-        self._out_submats = {}
-        self._in_submats = {}
-        self._out_metadata = {}
-        self._in_metadata = {}
+        self._submats = {}
+        self._metadata = {}
 
-    def prod_fwd(self, in_vec, row_range=None):
-        """Perform a forward product.
-
-        Args
-        ----
-        in_vec : ndarray[:]
-            incoming vector to multiply.
-        row_range : [int, int] or None
-            the row index range for which to compute the product.
-
-        Returns
-        -------
-        out_vec : ndarray[:]
-            vector resulting from the product.
+    def _add_submat(self, key, info, irow, icol, src_indices, shape):
         """
-        out_vec = self._prod(in_vec, 'fwd')
-        if row_range is None:
-            return out_vec
-        else:
-            return out_vec[row_range[0]:row_range[1]]
+        Declare a sub-jacobian.
 
-    def prod_rev(self, in_vec, row_range=None):
-        """Perform a reverse product.
-
-        Args
-        ----
-        in_vec : ndarray[:]
-            incoming vector to multiply.
-        row_range : [int, int] or None
-            the row index range with which to compute the product.
-
-        Returns
-        -------
-        out_vec : ndarray[:]
-            vector resulting from the product.
-        """
-        if row_range is not None:
-            in_vec = numpy.array(in_vec)
-            in_vec[:row_range[0]] = 0.
-            in_vec[row_range[1]:] = 0.
-
-        return self._prod(in_vec, 'rev')
-
-    def _out_add_submat(self, key, jac, irow, icol):
-        """Declare a sub-jacobian.
-
-        Args
-        ----
+        Parameters
+        ----------
         key : (int, int)
             the global output and input variable indices.
-        jac : ndarray or scipy.sparse or tuple
-            the sub-jacobian.
-        irow : int
-            the starting row index (offset) for this sub-jacobian.
-        icol : int
-            the starting col index (offset) for this sub-jacobian.
-        """
-        self._out_submats[key] = (jac, irow, icol, None)
-
-    def _in_add_submat(self, key, jac, irow, icol, src_indices):
-        """Declare a sub-jacobian.
-
-        Args
-        ----
-        key : (int, int)
-            the global output and input variable indices.
-        jac : ndarray or scipy.sparse or tuple
-            the sub-jacobian.
+        info : dict
+            sub-jacobian metadata.
         irow : int
             the starting row index (offset) for this sub-jacobian.
         icol : int
@@ -114,38 +52,17 @@ class Matrix(object):
         src_indices : ndarray
             indices from the source variable that an input variable
             connects to.
+        shape : tuple
+            Shape of the specified submatrix.
         """
-        self._in_submats[key] = (jac, irow, icol, src_indices)
-
-    def _out_update_submat(self, key, jac):
-        """Update the values of a sub-jacobian.
-
-        Args
-        ----
-        key : (int, int)
-            the global output and input variable indices.
-        jac : ndarray or scipy.sparse or tuple
-            the sub-jacobian, the same format with which it was declared.
-        """
-        self._update_submat(self._out_submats, self._out_metadata, key, jac)
-
-    def _in_update_submat(self, key, jac):
-        """Update the values of a sub-jacobian.
-
-        Args
-        ----
-        key : (int, int)
-            the global output and input variable indices.
-        jac : ndarray or scipy.sparse or tuple
-            the sub-jacobian, the same format with which it was declared.
-        """
-        self._update_submat(self._in_submats, self._in_metadata, key, jac)
+        self._submats[key] = (info, irow, icol, src_indices, shape)
 
     def _build(self, num_rows, num_cols):
-        """Allocate the matrix.
+        """
+        Allocate the matrix.
 
-        Args
-        ----
+        Parameters
+        ----------
         num_rows : int
             number of rows in the matrix.
         num_cols : int
@@ -153,11 +70,12 @@ class Matrix(object):
         """
         pass
 
-    def _update_submat(self, submats, metadata, key, jac):
-        """Update the values of a sub-jacobian.
+    def _update_submat(self, submats, metadata, key, jac, system):
+        """
+        Update the values of a sub-jacobian.
 
-        Args
-        ----
+        Parameters
+        ----------
         submats : dict
             dictionary of sub-jacobian data keyed by (out_ind, in_ind).
         metadata : dict
@@ -166,14 +84,17 @@ class Matrix(object):
             the global output and input variable indices.
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
+        system : <System>
+            The System that owns the jacobian.
         """
         pass
 
     def _prod(self, vec, mode):
-        """Perform a matrix vector product.
+        """
+        Perform a matrix vector product.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec : ndarray[:]
             incoming vector to multiply.
         mode : str
@@ -188,10 +109,11 @@ class Matrix(object):
 
 
 def _compute_index_map(jrows, jcols, irow, icol, src_indices):
-    """Return row/column indices to map sub-jacobian to global jac.
+    """
+    Return row/column indices to map sub-jacobian to global jac.
 
-    Args
-    ----
+    Parameters
+    ----------
     jrows : index array
         Array of row indices.
     jcols : index array
