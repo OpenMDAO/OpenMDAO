@@ -55,7 +55,6 @@ class Driver(object):
         self.supports.declare('active_set', type_=bool, value=True)
 
         # TODO, support these in Openmdao blue
-        # self.supports.declare('linear_constraints', True)
         # self.supports.declare('integer_design_vars', True)
 
         self.fail = False
@@ -277,10 +276,7 @@ class Driver(object):
             for okey, oval in iteritems(derivs):
                 for ikey, val in iteritems(oval):
                     imeta = self._designvars[ikey]
-                    if okey in self._cons:
-                        ometa = self._cons[okey]
-                    else:
-                        ometa = self._objs[okey]
+                    ometa = self._responses[okey]
 
                     iscaler = imeta['scaler']
                     iadder = imeta['adder']
