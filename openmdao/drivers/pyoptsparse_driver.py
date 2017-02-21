@@ -98,6 +98,8 @@ class pyOptSparseDriver(Driver):
         List of design variables.
     _objs : dict
         Contains all objective info.
+    _quantities : list
+        Contains the objectives plus nonlinear constraints.
     _responses : dict
         Contains all response info.
     """
