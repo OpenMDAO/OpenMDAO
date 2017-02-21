@@ -95,8 +95,18 @@ class Driver(object):
         dvs = self._designvars
         vec = self.problem.model._outputs._views_flat
         dv_dict = {}
-        for name in dvs:
-            dv_dict[name] = vec[name]
+        for name, meta in iteritems(dvs):
+            scaler = meta['scaler']
+            adder = meta['adder']
+            val = vec[name].copy()
+
+            # Scale design variable values
+            if adder is not None:
+                val += adder
+            if scaler is not None:
+                val *= scaler
+
+            dv_dict[name] = val
 
         return dv_dict
 
@@ -111,6 +121,16 @@ class Driver(object):
         value : float or ndarray
             Value for the design variable.
         """
+        meta = self._designvars[name]
+        scaler = meta['scaler']
+        adder = meta['adder']
+
+        # Scale design variable values
+        if scaler is not None:
+            value *= 1.0 / scaler
+        if adder is not None:
+            value -= adder
+
         self.problem.model._outputs._views_flat[name][:] = value
 
     def get_response_values(self):
@@ -137,8 +157,18 @@ class Driver(object):
         objs = self._objs
         vec = self.problem.model._outputs._views_flat
         obj_dict = {}
-        for name in objs:
-            obj_dict[name] = vec[name]
+        for name, meta in iteritems(objs):
+            scaler = meta['scaler']
+            adder = meta['adder']
+            val = vec[name].copy()
+
+            # Scale objectives
+            if adder is not None:
+                val += adder
+            if scaler is not None:
+                val *= scaler
+
+            obj_dict[name] = val
 
         return obj_dict
 
@@ -179,9 +209,19 @@ class Driver(object):
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
 
+            scaler = meta['scaler']
+            adder = meta['adder']
+            val = vec[name].copy()
+
+            # Scale objectives
+            if adder is not None:
+                val += adder
+            if scaler is not None:
+                val *= scaler
+
             # TODO: Need to get the allgathered values? Like:
             # cons[name] = self._get_distrib_var(name, meta, 'constraint')
-            con_dict[name] = vec[name]
+            con_dict[name] = val
 
         return con_dict
 
@@ -202,3 +242,65 @@ class Driver(object):
             relative error.
         """
         return self.problem.model._solve_nonlinear()
+
+    def _compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict',
+                              global_names=True):
+        """
+        Compute derivatives of desired quantities with respect to desired inputs.
+
+        All derivatives are returned using driver scaling.
+
+        Parameters
+        ----------
+        of : list of variable name strings or None
+            Variables whose derivatives will be computed. Default is None, which
+            uses the driver's objectives and constraints.
+        wrt : list of variable name strings or None
+            Variables with respect to which the derivatives will be computed.
+            Default is None, which uses the driver's desvars.
+        return_format : string
+            Format to return the derivatives. Default is a 'flat_dict', which
+            returns them in a dictionary whose keys are tuples of form (of, wrt).
+        global_names : bool
+            Set to True when passing in global names to skip some translation steps.
+
+        Returns
+        -------
+        derivs : object
+            Derivatives in form requested by 'return_format'.
+        """
+        derivs = self.problem._compute_total_derivs(of=of, wrt=wrt, return_format=return_format,
+                                                    global_names=global_names)
+
+        if return_format == 'dict':
+
+            for okey, oval in iteritems(derivs):
+                for ikey, val in iteritems(oval):
+                    imeta = self._designvars[ikey]
+                    if okey in self._cons:
+                        ometa = self._cons[okey]
+                    else:
+                        ometa = self._objs[okey]
+
+                    iscaler = imeta['scaler']
+                    iadder = imeta['adder']
+                    oscaler = ometa['scaler']
+                    oadder = ometa['adder']
+
+                    # Scale response side
+                    if oadder is not None:
+                        val += oadder
+                    if oscaler is not None:
+                        val *= oscaler
+
+                    # Scale design var side
+                    if iscaler is not None:
+                        val *= 1.0 / iscaler
+                    if iadder is not None:
+                        val -= iadder
+
+        else:
+            msg = "Derivative scaling by the driver only supports the 'dict' format at present."
+            raise RuntimeError(msg)
+
+        return derivs

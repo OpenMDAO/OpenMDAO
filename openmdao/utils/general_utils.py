@@ -143,6 +143,9 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
     r"""
     Determine proper values of adder and scaler based on user arguments.
 
+    Adder and Scaler are used internally because the transformation is
+    slightly more efficient.
+
     Parameters
     ----------
     ref : float or ndarray, optional
@@ -168,37 +171,24 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
 
     Notes
     -----
-    The response can be scaled using scaler and adder, where
-
-    .. math::
-
-        x_{scaled} = scaler(x + adder)
-
-    or through the use of ref/ref0, which map to scaler and adder through
-    the equations:
-
-    .. math::
-
-        0 = scaler(ref_0 + adder)
-
-        1 = scaler(ref + adder)
-
-    which results in:
-
-    .. math::
-
-        adder = -ref_0
-
-        scaler = \frac{1}{ref + adder}
+    The response can be scaled using ref and ref0.
+    The argument :code:`ref0` represents the physical value when the scaled value is 0.
+    The argument :code:`ref` represents the physical value when the scaled value is 1.
     """
     # Affine scaling cannot be used with scalers/adders
     if ref0 is not None or ref is not None:
         if scaler is not None or adder is not None:
             raise ValueError('Inputs ref/ref0 are mutually exclusive '
                              'with scaler/adder')
+        if ref is None:
+            ref = 1.0
+        if ref0 is None:
+            ref0 = 0.0
+
         # Convert ref/ref0 to scaler/adder so we can scale the bounds
         adder = -ref0
         scaler = 1.0 / (ref + adder)
+
     else:
         if scaler is None:
             scaler = 1.0

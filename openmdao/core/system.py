@@ -1020,28 +1020,9 @@ class System(object):
 
         Notes
         -----
-        The design variable can be scaled using scaler and adder, where
-
-        .. math::
-
-            x_{scaled} = scaler(x + adder)
-
-        or through the use of ref/ref0, which map to scaler and adder through
-        the equations:
-
-        .. math::
-
-            0 = scaler(ref_0 + adder)
-
-            1 = scaler(ref + adder)
-
-        which results in:
-
-        .. math::
-
-            adder = -ref_0
-
-            scaler = \frac{1}{ref + adder}
+        The response can be scaled using ref and ref0.
+        The argument :code:`ref0` represents the physical value when the scaled value is 0.
+        The argument :code:`ref` represents the physical value when the scaled value is 1.
         """
         if name in self._design_vars:
             msg = "Design Variable '{}' already exists."
@@ -1071,8 +1052,8 @@ class System(object):
         dvs['name'] = name
         dvs['upper'] = upper
         dvs['lower'] = lower
-        dvs['scaler'] = scaler
-        dvs['adder'] = adder
+        dvs['scaler'] = None if scaler == 1.0 else scaler
+        dvs['adder'] = None if adder == 0.0 else adder
         dvs['ref'] = ref
         dvs['ref0'] = ref0
         dvs['indices'] = indices
@@ -1117,28 +1098,10 @@ class System(object):
 
         Notes
         -----
-        The response can be scaled using scaler and adder, where
+        The response can be scaled using ref and ref0.
+        The argument :code:`ref0` represents the physical value when the scaled value is 0.
+        The argument :code:`ref` represents the physical value when the scaled value is 1.
 
-        .. math::
-
-            x_{scaled} = scaler(x + adder)
-
-        or through the use of ref/ref0, which map to scaler and adder through
-        the equations:
-
-        .. math::
-
-            0 = scaler(ref_0 + adder)
-
-            1 = scaler(ref + adder)
-
-        which results in:
-
-        .. math::
-
-            adder = -ref_0
-
-            scaler = \frac{1}{ref + adder}
         """
         # Name must be a string
         if not isinstance(name, string_types):
@@ -1212,8 +1175,8 @@ class System(object):
         meta = kwargs if kwargs else None
         self._responses[name] = resp = OrderedDict()
         resp['name'] = name
-        resp['scaler'] = scaler
-        resp['adder'] = adder
+        resp['scaler'] = None if scaler == 1.0 else scaler
+        resp['adder'] = None if adder == 0.0 else adder
         resp['ref'] = ref
         resp['ref0'] = ref0
         resp['indices'] = indices
@@ -1269,28 +1232,9 @@ class System(object):
 
         Notes
         -----
-        The constraint can be scaled using scaler and adder, where
-
-        .. math::
-
-            x_{scaled} = scaler(x + adder)
-
-        or through the use of ref/ref0, which map to scaler and adder through
-        the equations:
-
-        .. math::
-
-            0 = scaler(ref_0 + adder)
-
-            1 = scaler(ref + adder)
-
-        which results in:
-
-        .. math::
-
-            adder = -ref_0
-
-            scaler = \frac{1}{ref + adder}
+        The response can be scaled using ref and ref0.
+        The argument :code:`ref0` represents the physical value when the scaled value is 0.
+        The argument :code:`ref` represents the physical value when the scaled value is 1.
         """
         meta = kwargs if kwargs else None
 

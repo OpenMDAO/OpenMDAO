@@ -397,7 +397,7 @@ class pyOptSparseDriver(Driver):
 
         try:
 
-            sens_dict = prob._compute_total_derivs(of=self._quantities,
+            sens_dict = self._compute_total_derivs(of=self._quantities,
                                                    wrt=self._indep_list,
                                                    return_format='dict')
 
