@@ -56,7 +56,7 @@ class EmbedTestDirective(Directive):
     An example usage would look like this:
 
     .. embed-test::
-        openmdao.core.tests.test_component.TestIndepVarComp.test___init___1var
+        openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test___init___1var
 
     What the above will do is replace the directive and its args with the blocks of code
     from the unit test, run the test with the asserts replaced with prints, and show the

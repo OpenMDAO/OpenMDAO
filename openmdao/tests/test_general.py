@@ -36,7 +36,7 @@ class ParameterizedTestCases(unittest.TestCase):
 
 class ParameterizedTestCasesSubset(unittest.TestCase):
     """Duplicating some testing to demonstrate filters and default running."""
-    
+
     @parametric_suite(jacobian_type='*',
                       num_comp=[2, 5, 10],
                       partial_type='aij',

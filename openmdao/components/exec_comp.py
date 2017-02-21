@@ -29,11 +29,6 @@ def array_idx_iter(shape):
         yield p
 
 
-def _parse_for_vars(s):
-    return set([x.strip() for x in re.findall(VAR_RGX, s)
-                if not x.endswith('(') and x.strip() not in _expr_dict])
-
-
 def _valid_name(s, exprs):
     """
     Generate a locally unique replacement for a dotted name.
@@ -113,15 +108,26 @@ class ExecComp(ExplicitComponent):
         self._to_colons = None
         self._from_colons = None
         self._colon_names = None
+        self._inits = inits
+        self._units = units
+        self._kwargs = kwargs
 
+    def initialize_variables(self):
+        """
+        Set up variable name and metadata lists.
+        """
         outs = set()
         allvars = set()
+        exprs = self._exprs
+        inits = self._inits
+        units = self._units
+        kwargs = self._kwargs
 
         # find all of the variables and which ones are outputs
         for expr in exprs:
             lhs, _ = expr.split('=', 1)
-            outs.update(_parse_for_vars(lhs))
-            allvars.update(_parse_for_vars(expr))
+            outs.update(self._parse_for_out_vars(lhs))
+            allvars.update(self._parse_for_vars(expr))
 
         if inits is not None:
             kwargs.update(inits)
@@ -129,20 +135,19 @@ class ExecComp(ExplicitComponent):
         # make sure all kwargs are legit
         for kwarg in kwargs:
             if kwarg not in allvars:
-                raise RuntimeError("Arg '%s' in call to ExecComp() "
+                raise RuntimeError("%s: arg '%s' in call to ExecComp() "
                                    "does not refer to any variable in the "
-                                   "expressions %s" % (kwarg, exprs))
+                                   "expressions %s" % (self.pathname,
+                                                       kwarg, exprs))
 
         # make sure units are legit
         units_dict = units if units is not None else {}
         for unit_var in units_dict:
             if unit_var not in allvars:
-                raise RuntimeError("Units specific for variable {0} "
+                raise RuntimeError("{2}: Units specific for variable {0} "
                                    "in call to ExecComp() but {0} does "
                                    "not appear in the expression "
-                                   "{1}".format(unit_var, exprs))
-
-        exprs = self._exprs
+                                   "{1}".format(unit_var, exprs, self.pathname))
 
         for var in sorted(allvars):
             # if user supplied an initial value, use it, otherwise set to 0.0
@@ -178,6 +183,30 @@ class ExecComp(ExplicitComponent):
                      for expr in exprs]
 
         return [compile(expr, expr, 'exec') for expr in exprs]
+
+    def _parse_for_out_vars(self, s):
+        vnames = set([x.strip() for x in re.findall(VAR_RGX, s)
+                      if not x.endswith('(')])
+        for v in vnames:
+            if v in _expr_dict:
+                raise NameError("%s: cannot assign to variable '%s' "
+                                "because it's already defined as an internal "
+                                "function or constant." % (self.pathname, v))
+        return vnames
+
+    def _parse_for_vars(self, s):
+        vnames = set([x.strip() for x in re.findall(VAR_RGX, s) if not x.endswith('(')])
+        to_remove = []
+        for v in vnames:
+            if v in _expr_dict:
+                expvar = _expr_dict[v]
+                if callable(expvar):
+                    raise NameError("%s: cannot use '%s' as a variable because "
+                                    "it's already defined as an internal "
+                                    "function." % (self.pathname, v))
+                else:
+                    to_remove.append(v)
+        return vnames.difference(to_remove)
 
     def __getstate__(self):
         """
