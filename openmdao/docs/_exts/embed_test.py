@@ -43,9 +43,9 @@ def depart_in_or_out_node(self, node):
         self.body.append("output only available for HTML\n")
         return
     if node["kind"] == "In":
-        html = '<div class="container"><div id="notebook"><div id="notebook-container"><div class="cell border-box-sizing code_cell rendered"><div class="input"><div class="prompt input_prompt">{}&nbsp;[{}]:</div><div class="inner_cell"><div class="input_area"><div class=" highlight hl-ipython3"><pre>{}</pre></div></div></div></div></div></div></div></div>'.format(node["kind"], node["number"], node["text"])
+        html = '<div class="container"><div class="cell border-box-sizing code_cell rendered"><div class="input"><div class="prompt input_prompt">{}&nbsp;[{}]:</div><div class="inner_cell"><div class="input_area"><div class=" highlight hl-ipython3"><pre>{}</pre></div></div></div></div></div></div>'.format(node["kind"], node["number"], node["text"])
     elif node["kind"] == "Out":
-        html = '<div class="container"><div id="notebook"><div id="notebook-container"><div class="cell border-box-sizing code_cell rendered"><div class="output"><div class="prompt output_prompt">{}&nbsp;[{}]:</div><div class="inner_cell"><div class="output_area"><div class=" highlight hl-ipython3"><pre>{}</pre></div></div></div></div></div></div></div></div>'.format(node["kind"], node["number"], node["text"])
+        html = '<div class="container"><div class="cell border-box-sizing code_cell rendered"><div class="output"><div class="prompt output_prompt">{}&nbsp;[{}]:</div><div class="inner_cell"><div class="output_area"><div class=" highlight hl-ipython3"><pre>{}</pre><br></div></div></div></div></div></div>'.format(node["kind"], node["number"], node["text"])
 
     self.body.append(html)
 

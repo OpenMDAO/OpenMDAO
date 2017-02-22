@@ -389,6 +389,17 @@ def get_unit_test_source_and_run_outputs(method_path):
         run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
     return source_minus_docstrings_with_prints_cleaned, run_outputs, skipped, failed
 
+def remove_leading_trailing_whitespace_lines(src):
+    lines = src.splitlines()
+
+    non_whitespace_lines = []
+    for i, l in enumerate( lines ):
+        if l and not l.isspace():
+            non_whitespace_lines.append(i)
+    imin = min(non_whitespace_lines)
+    imax = max(non_whitespace_lines)
+
+    return '\n'.join(lines[imin: imax+1])
 
 def split_source_into_input_blocks(src):
     '''
@@ -402,11 +413,16 @@ def split_source_into_input_blocks(src):
         if not line.endswith('\n'):
             line += '\n'
         in_code_block += line
-        if r.type == 'print':
+        if r.type == 'print' or \
+            ( len(r.value) == 3 and \
+            (r.type, r.value[0].type, r.value[1].type, r.value[2].type) == \
+                ('atomtrailers', 'name', 'name', 'call') and \
+                r.value[1].value in ['run_model', 'run_driver', 'setup'] ):
             # stop and make an input code block
+            in_code_block = remove_leading_trailing_whitespace_lines(in_code_block)
             in_code_blocks.append(in_code_block)
             in_code_block = ""
-            
+
     if in_code_block: # If anything left over
         in_code_blocks.append(in_code_block)
 
@@ -429,6 +445,12 @@ def insert_output_start_stop_indicators(src):
             # src_with_out_start_stop_indicators += 'print("<<<<<{}")'.format(input_block_number) + '\n'
             src_with_out_start_stop_indicators += line
             src_with_out_start_stop_indicators += 'print(">>>>>{}")'.format(input_block_number) + '\n'
+        elif len(r.value) == 3 and \
+            (r.type, r.value[0].type, r.value[1].type, r.value[2].type) == \
+                ('atomtrailers', 'name', 'name', 'call') and \
+                r.value[1].value in ['run_model', 'run_driver', 'setup']:
+            src_with_out_start_stop_indicators += line
+            src_with_out_start_stop_indicators += 'print(">>>>>{}")'.format(input_block_number) + '\n'
         else:
             src_with_out_start_stop_indicators += line
         input_block_number += 1
@@ -447,8 +469,8 @@ def extract_output_blocks(run_output):
         if line.startswith('>>>>>'):
             output_blocks.append(output_block)
             output_block = ''
-        else:            
-            output_block += line
+        else:
+            output_block += line + '\n'
 
     return output_blocks
 
@@ -457,7 +479,7 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     1. Get the source code for a unit test method
     2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned
     3. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks
-    4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned 
+    4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
             to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators
     5. Run the test using source_with_out_start_stop_indicators -> run_outputs
     6. Extract from run_outputs, the Out blocks -> output_blocks
@@ -470,6 +492,8 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     module_path = '.'.join(method_path.split('.')[:-2])
     class_name = method_path.split('.')[-2]
     method_name = method_path.split('.')[-1]
+    if method_name == 'test_feature_promoted_sellar_set_get_inputs':
+        pass
     test_module = importlib.import_module(module_path)
     cls = getattr(test_module, class_name)
     meth = getattr(cls, method_name)

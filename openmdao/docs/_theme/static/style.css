@@ -116,49 +116,32 @@ div.failed pre {
 
 
 /* The following sets up the In/Out blocks for embedded tests */
-div.inner_cell {
-    moz-box-align: stretch;
-    box-orient: vertical;
-    box-align: right;
-    webkit-box-orient: vertical;
-    webkit-box-direction: normal;
-    flex-direction: column;
-    webkit-box-align: right;
-    align-items: right;
-    webkit-box-flex: 1;
-    box-flex: 1;
-    flex: 1;
-    text-align: left;
-}
-
 div.input_prompt {
     color: #303F9F;
-    border-top: 1px solid transparent;
+    float: left;
+}
+
+div.input_area {
+    border-radius: 2px;
+}
+
+div.output_prompt {
+    color: #D84315;
+    float: left;
+}
+
+div.output_area pre {
+    border: 0;
+    /*vertical-align: baseline;*/
+    /*color: #000;*/
+    background-color: transparent;
+    border-radius: 0;
 }
 
 div.highlight{
   margin:.4em;
   border:none;padding:0;
-  background-color:transparent;}
-
-div.input_area {
-    border: 1px solid #cfcfcf;
-    border-radius: 2px;
-    background: #f7f7f7;
-}
-
-div.output_prompt {
-    color: #D84315;
-}
-
-div.output_area pre {
-    margin: 0;
-    padding: 0;
-    border: 0;
-    vertical-align: baseline;
-    color: #000;
-    background-color: transparent;
-    border-radius: 0;
+  background-color:transparent;
 }
 
 .prompt {
@@ -169,27 +152,5 @@ div.output_area pre {
     text-align: left;
     user-select: none;
     cursor: default;
-}
-
-.CodeMirror, .prompt, div.input_area, div.output_text {
-    line-height: 1.21429em;
-}
-
-
-div.cell {
-    -webkit-box-orient: vertical;
-    -webkit-box-direction: normal;
-    flex-direction: column;
-    -webkit-box-align: stretch;
-    align-items: stretch;
-    -webkit-box-sizing: border-box;
-    border-width: 1px;
-    border-style: solid;
-    border-color: transparent;
-    width: 100%;
-    padding: 5px;
-    margin: 0;
-    outline: 0;
-    background: linear-gradient(to right,transparent -40px,transparent 1px,transparent 1px,transparent 100%);
 }
 /* End of In/Out block markup */
