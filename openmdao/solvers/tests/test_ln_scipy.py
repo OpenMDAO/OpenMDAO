@@ -20,7 +20,7 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
-     FanOut, FanOutGrouped, ConvergeDiverge, ConvergeDivergeFlat, \
+     FanOut, FanOutGrouped, ConvergeDivergeFlat, \
      ConvergeDivergeGroups, Diamond, DiamondFlat
 
 class TestScipyIterativeSolver(unittest.TestCase):
@@ -371,7 +371,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
         try:
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
         except AnalysisError as err:
             self.assertEqual(str(err), "Solve in '': ScipyGMRES failed to converge after 2 iterations")
         else:
@@ -524,14 +524,15 @@ class TestScipyIterativeSolver(unittest.TestCase):
 
             self.assertTrue(precon._iter_count > 0)
 
-            # test direct solver precon and make sure the _linearize recurses correctly
-            precon = group.ln_solver.precon = DirectSolver()
-            p.setup()
+        # test direct solver precon and make sure the _linearize recurses correctly
+        precon = group.ln_solver.precon = DirectSolver()
+        p.setup(check=False)
 
+        with group.linear_vector_context() as (inputs, outputs, residuals):
             # forward
             residuals.set_const(1.0)
             outputs.set_const(0.0)
-            group.run_linearize()
+            group.ln_solver._linearize()
             group.run_solve_linear(['linear'], 'fwd')
 
             output = outputs._data
