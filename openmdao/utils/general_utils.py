@@ -61,14 +61,14 @@ def set_pyoptsparse_opt(optname):
         try:
             OPT(optname)
             OPTIMIZER = optname
-        except:
+        except Exception as exc:
             if optname != 'SLSQP':
                 try:
                     OPT('SLSQP')
                     OPTIMIZER = 'SLSQP'
-                except:
+                except Exception as exc:
                     pass
-    except:
+    except Exception as exc:
         pass
 
     return OPT, OPTIMIZER
