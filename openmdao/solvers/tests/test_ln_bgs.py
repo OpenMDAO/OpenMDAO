@@ -35,16 +35,16 @@ class TestBGSSolver(unittest.TestCase):
         p.model.suppress_solver_output = True
 
         # forward
-        with group.linear_vector_context() as (inputs, outputs, residuals):
-            residuals.set_const(1.0)
-            outputs.set_const(0.0)
+        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
             group.run_solve_linear(['linear'], 'fwd')
 
             self.assertTrue(group.ln_solver._iter_count == 2)
 
             # reverse
-            outputs.set_const(1.0)
-            residuals.set_const(0.0)
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
             group.run_solve_linear(['linear'], 'rev')
 
             self.assertTrue(group.ln_solver._iter_count == 2)

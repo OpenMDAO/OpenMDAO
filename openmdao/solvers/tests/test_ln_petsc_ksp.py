@@ -42,22 +42,22 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.model.suppress_solver_output = True
 
-        with group.linear_vector_context() as (inputs, outputs, residuals):
+        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
             # forward
-            residuals.set_const(1.0)
-            outputs.set_const(0.0)
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
             group.run_solve_linear(['linear'], 'fwd')
 
-            output = outputs._data
+            output = d_outputs._data
             assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
             assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
 
             # reverse
-            outputs.set_const(1.0)
-            residuals.set_const(0.0)
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
             group.run_solve_linear(['linear'], 'rev')
 
-            output = residuals._data
+            output = d_residuals._data
             assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
             assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
 
@@ -71,21 +71,21 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.model.suppress_solver_output = True
 
-        with group.linear_vector_context() as (inputs, outputs, residuals):
+        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
             # forward
-            residuals.set_const(1.0)
-            outputs.set_const(0.0)
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
             group.run_solve_linear(['linear'], 'fwd')
 
-            output = outputs._data
+            output = d_outputs._data
             assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
 
             # reverse
-            outputs.set_const(1.0)
-            residuals.set_const(0.0)
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
             group.run_solve_linear(['linear'], 'rev')
 
-            output = residuals._data
+            output = d_residuals._data
             assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
 
     def test_solve_linear_ksp_maxiter(self):
@@ -98,17 +98,17 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.model.suppress_solver_output = True
 
-        with group.linear_vector_context() as (inputs, outputs, residuals):
+        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
             # forward
-            residuals.set_const(1.0)
-            outputs.set_const(0.0)
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
             group.run_solve_linear(['linear'], 'fwd')
 
             self.assertTrue(group.ln_solver._iter_count == 3)
 
             # reverse
-            outputs.set_const(1.0)
-            residuals.set_const(0.0)
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
             group.run_solve_linear(['linear'], 'rev')
 
             self.assertTrue(group.ln_solver._iter_count == 3)
@@ -123,24 +123,24 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.model.suppress_solver_output = True
 
-        with group.linear_vector_context() as (inputs, outputs, residuals):
+        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
             # forward
-            residuals.set_const(1.0)
-            outputs.set_const(0.0)
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
             group.run_solve_linear(['linear'], 'fwd')
 
-            output = outputs._data
+            output = d_outputs._data
             assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
             assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
 
             self.assertTrue(precon._iter_count > 0)
 
             # reverse
-            outputs.set_const(1.0)
-            residuals.set_const(0.0)
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
             group.run_solve_linear(['linear'], 'rev')
 
-            output = residuals._data
+            output = d_residuals._data
             assert_rel_error(self, output[0], group.expected_solution[0], 3e-15)
             assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
 
@@ -150,24 +150,24 @@ class TestPetscKSP(unittest.TestCase):
         precon = group.ln_solver.precon = DirectSolver()
         p.setup(vector_class=PETScVector, check=False)
 
-        with group.linear_vector_context() as (inputs, outputs, residuals):
+        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
             # forward
-            residuals.set_const(1.0)
-            outputs.set_const(0.0)
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
             group.ln_solver._linearize()
             group.run_solve_linear(['linear'], 'fwd')
 
-            output = outputs._data
+            output = d_outputs._data
             assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
             assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
 
             # reverse
-            outputs.set_const(1.0)
-            residuals.set_const(0.0)
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
             group.ln_solver._linearize()
             group.run_solve_linear(['linear'], 'rev')
 
-            output = residuals._data
+            output = d_residuals._data
             assert_rel_error(self, output[0], group.expected_solution[0], 3e-15)
             assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
 

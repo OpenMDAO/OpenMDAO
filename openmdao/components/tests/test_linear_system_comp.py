@@ -60,17 +60,17 @@ class TestLinearSystem(unittest.TestCase):
         prob.model.suppress_solver_output = True
         prob.run_model()
 
-        with lingrp.linear_vector_context() as (inputs, outputs, residuals):
+        with lingrp.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
             # Forward mode with RHS of self.b
-            residuals['lin.x'] = self.b
+            d_residuals['lin.x'] = self.b
             lingrp.run_solve_linear(['linear'], 'fwd')
-            sol = outputs['lin.x']
+            sol = d_outputs['lin.x']
             assert_rel_error(self, sol, self.x, .0001)
 
             # Reverse mode with RHS of self.b_T
-            outputs['lin.x'] = self.b_T
+            d_outputs['lin.x'] = self.b_T
             lingrp.run_solve_linear(['linear'], 'rev')
-            sol = residuals['lin.x']
+            sol = d_residuals['lin.x']
             assert_rel_error(self, sol, self.x, .0001)
 
             # Compare against calculated derivs

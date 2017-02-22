@@ -95,32 +95,32 @@ class Test(unittest.TestCase):
         root = self.p.model
         root.suppress_solver_output = True
 
-        with root.linear_vector_context() as (inputs, outputs, residuals):
-            outputs.set_const(1.0)
+        with root.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            d_outputs.set_const(1.0)
             root.run_apply_linear(['linear'], 'fwd')
-            output = residuals._data[0]
+            output = d_residuals._data[0]
             self.assertEqualArrays(output, [7, 3])
 
-            residuals.set_const(1.0)
+            d_residuals.set_const(1.0)
             root.run_apply_linear(['linear'], 'rev')
-            output = outputs._data[0]
+            output = d_outputs._data[0]
             self.assertEqualArrays(output, [7, 3])
 
     def test_solve_linear(self):
         root = self.p.model
         root.suppress_solver_output = True
 
-        with root.linear_vector_context() as (inputs, outputs, residuals):
-            residuals.set_const(11.0)
-            outputs.set_const(0.0)
+        with root.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            d_residuals.set_const(11.0)
+            d_outputs.set_const(0.0)
             root.run_solve_linear(['linear'], 'fwd')
-            output = outputs._data[0]
+            output = d_outputs._data[0]
             self.assertEqualArrays(output, [1, 5])
 
-            outputs.set_const(11.0)
-            residuals.set_const(0.0)
+            d_outputs.set_const(11.0)
+            d_residuals.set_const(0.0)
             root.run_solve_linear(['linear'], 'rev')
-            output = residuals._data[0]
+            output = d_residuals._data[0]
             self.assertEqualArrays(output, [1, 5])
 
 

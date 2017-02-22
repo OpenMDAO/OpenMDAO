@@ -63,17 +63,17 @@ class TestDirectSolver(unittest.TestCase):
             prob.run_model()
             assert_rel_error(self, prob['y'], [-1., 1.])
 
-            with prob.model.linear_vector_context() as (inputs, outputs, residuals):
-                residuals.set_const(2.0)
-                outputs.set_const(0.0)
+            with prob.model.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+                d_residuals.set_const(2.0)
+                d_outputs.set_const(0.0)
                 prob.model.run_solve_linear(['linear'], 'fwd')
-                result = outputs.get_data()
+                result = d_outputs.get_data()
                 assert_rel_error(self, result, [-2., 2.])
 
-                outputs.set_const(2.0)
-                residuals.set_const(0.0)
+                d_outputs.set_const(2.0)
+                d_residuals.set_const(0.0)
                 prob.model.run_solve_linear(['linear'], 'rev')
-                result = residuals.get_data()
+                result = d_residuals.get_data()
                 assert_rel_error(self, result, [2., -2.])
 
     def test_direct_solver_group(self):
@@ -85,18 +85,18 @@ class TestDirectSolver(unittest.TestCase):
         prob.setup(check=False)
         prob.model.run_linearize()
 
-        with prob.model.linear_vector_context() as (inputs, outputs, residuals):
-            residuals.set_const(1.0)
-            outputs.set_const(0.0)
+        with prob.model.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
             prob.model.run_solve_linear(['linear'], 'fwd')
-            result = outputs._data
+            result = d_outputs._data
             assert_rel_error(self, result[0], prob.model.expected_solution[0], 1e-15)
             assert_rel_error(self, result[1], prob.model.expected_solution[1], 1e-15)
 
-            outputs.set_const(1.0)
-            residuals.set_const(0.0)
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
             prob.model.run_solve_linear(['linear'], 'rev')
-            result = residuals._data
+            result = d_residuals._data
             assert_rel_error(self, result[0], prob.model.expected_solution[0], 1e-15)
             assert_rel_error(self, result[1], prob.model.expected_solution[1], 1e-15)
 

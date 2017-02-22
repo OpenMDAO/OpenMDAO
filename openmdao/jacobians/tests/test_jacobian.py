@@ -222,42 +222,42 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
     def _check_fwd(self, prob, check_vec):
-        with prob.model.linear_vector_context() as (inputs, outputs, residuals):
-            work = outputs._clone()
+        with prob.model.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            work = d_outputs._clone()
             work.set_const(1.0)
 
             # fwd apply_linear test
-            outputs.set_const(1.0)
+            d_outputs.set_const(1.0)
             prob.model.run_apply_linear(['linear'], 'fwd')
-            residuals.set_data(residuals.get_data() - check_vec)
-            self.assertAlmostEqual(residuals.get_norm(), 0)
+            d_residuals.set_data(d_residuals.get_data() - check_vec)
+            self.assertAlmostEqual(d_residuals.get_norm(), 0)
 
             # fwd solve_linear test
-            outputs.set_const(0.0)
-            residuals.set_data(check_vec)
+            d_outputs.set_const(0.0)
+            d_residuals.set_data(check_vec)
 
             prob.model.run_solve_linear(['linear'], 'fwd')
 
-            outputs -= work
-            self.assertAlmostEqual(outputs.get_norm(), 0, delta=1e-6)
+            d_outputs -= work
+            self.assertAlmostEqual(d_outputs.get_norm(), 0, delta=1e-6)
 
     def _check_rev(self, prob, check_vec):
-        with prob.model.linear_vector_context() as (inputs, outputs, residuals):
-            work = outputs._clone()
+        with prob.model.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            work = d_outputs._clone()
             work.set_const(1.0)
 
             # rev apply_linear test
-            residuals.set_const(1.0)
+            d_residuals.set_const(1.0)
             prob.model.run_apply_linear(['linear'], 'rev')
-            outputs.set_data(outputs.get_data() - check_vec)
-            self.assertAlmostEqual(outputs.get_norm(), 0)
+            d_outputs.set_data(d_outputs.get_data() - check_vec)
+            self.assertAlmostEqual(d_outputs.get_norm(), 0)
 
             # rev solve_linear test
-            residuals.set_const(0.0)
-            outputs.set_data(check_vec)
+            d_residuals.set_const(0.0)
+            d_outputs.set_data(check_vec)
             prob.model.run_solve_linear(['linear'], 'rev')
-            residuals -= work
-            self.assertAlmostEqual(residuals.get_norm(), 0, delta=1e-6)
+            d_residuals -= work
+            self.assertAlmostEqual(d_residuals.get_norm(), 0, delta=1e-6)
 
     dtypes = [
         ('int', 1),
