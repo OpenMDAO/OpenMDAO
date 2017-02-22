@@ -54,12 +54,12 @@ install:
     if [ "$PY" = "2.7" ]; then
         pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
     elif [ "$PY" = "3.4" ]; then
-        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-cp34m-linux_x86_64.whl;
+        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py3-none-linux.whl;
     fi
   fi
 - if [ "$OS" = "MacOSX" ]; then
     if [ "$PY" = "2.7" ]; then
-        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-macosx_10_5_x86_64.whl;
+        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py2-none-mac.whl;
     elif [ "$PY" = "3.4" ]; then
         pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-none-macosx_10_5_x86_64.whl;
     fi
