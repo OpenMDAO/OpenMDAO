@@ -562,25 +562,27 @@ class TestScipyIterativeSolver(unittest.TestCase):
         p.model.suppress_solver_output = True
 
         # forward
-        g1._vectors['residual']['linear'].set_const(1.0)
-        g1._vectors['output']['linear'].set_const(0.0)
-        g1._solve_linear(['linear'], 'fwd')
+        with g1.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
+            g1._solve_linear(['linear'], 'fwd')
 
-        output = g1._vectors['output']['linear']._data
-        # The empty first entry in _data is due to the dummy
-        #     variable being in a different variable set not owned by g1
-        assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[2], g1.expected_solution[1], 1e-15)
+            output = d_outputs._data
+            # The empty first entry in _data is due to the dummy
+            #     variable being in a different variable set not owned by g1
+            assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
+            assert_rel_error(self, output[2], g1.expected_solution[1], 1e-15)
 
         # reverse
-        g1._vectors['output']['linear'].set_const(1.0)
-        g1._vectors['residual']['linear'].set_const(0.0)
-        g1.ln_solver._linearize()
-        g1._solve_linear(['linear'], 'rev')
+        with g1.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
+            g1.ln_solver._linearize()
+            g1._solve_linear(['linear'], 'rev')
 
-        output = g1._vectors['residual']['linear']._data
-        assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
-        assert_rel_error(self, output[2], g1.expected_solution[1], 3e-15)
+            output = d_residuals._data
+            assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
+            assert_rel_error(self, output[2], g1.expected_solution[1], 3e-15)
 
 
 if __name__ == "__main__":
