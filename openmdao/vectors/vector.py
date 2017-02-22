@@ -189,13 +189,16 @@ class Vector(object):
             Array combining the data of all the varsets.
         """
         if new_array is None:
-            inds = self._system._var_myproc_indices[self._typ]
-            sizes = self._assembler._variable_sizes_all[self._typ][self._iproc,
-                                                                   inds]
-            new_array = numpy.zeros(numpy.sum(sizes))
+            size = 0
+            for data in self._data:
+                size += data.shape[0]
+            new_array = numpy.empty(size)
 
+        start = 0
         for ind, data in enumerate(self._data):
-            new_array[self._indices[ind]] = data
+            stop = start + data.shape[0]
+            new_array[start:stop] = data
+            start += data.shape[0]
 
         return new_array
 
@@ -208,8 +211,11 @@ class Vector(object):
         array : ndarray
             Array to set to the data for all the varsets.
         """
+        start = 0
         for ind, data in enumerate(self._data):
-            data[:] = array[self._indices[ind]]
+            stop = start + data.shape[0]
+            data[:] = array[start:stop]
+            start += data.shape[0]
 
     def iadd_data(self, array):
         """
@@ -220,8 +226,11 @@ class Vector(object):
         array : ndarray
             Array to set to the data for all the varsets.
         """
+        start = 0
         for ind, data in enumerate(self._data):
-            data[:] += array[self._indices[ind]]
+            stop = start + data.shape[0]
+            data[:] += array[start:stop]
+            start += data.shape[0]
 
     def __contains__(self, key):
         """
