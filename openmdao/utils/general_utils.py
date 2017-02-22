@@ -203,7 +203,7 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
 
 def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     """
-    Format driver array option values.
+    Format array option values.
 
     Checks that the given array values are either None, float, or an iterable
     of numeric values. On output all interables of numeric values are

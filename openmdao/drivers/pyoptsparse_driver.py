@@ -175,8 +175,8 @@ class pyOptSparseDriver(Driver):
         Note that pyOpt controls the execution, and the individual optimizers
         (e.g., SNOPT) control the iteration.
         """
-        problem = self.problem
-        model = self.problem.model
+        problem = self._problem
+        model = self._problem.model
         self.pyopt_solution = None
         self.iter_count = 0
 
@@ -338,7 +338,7 @@ class pyOptSparseDriver(Driver):
             0 for successful function evaluation
             1 for unsuccessful function evaluation
         """
-        model = self.problem.model
+        model = self._problem.model
         fail = 0
 
         try:
@@ -394,7 +394,7 @@ class pyOptSparseDriver(Driver):
             0 for successful function evaluation
             1 for unsuccessful function evaluation
         """
-        prob = self.problem
+        prob = self._problem
         fail = 0
 
         try:

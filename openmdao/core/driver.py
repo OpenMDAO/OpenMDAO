@@ -15,7 +15,7 @@ class Driver(object):
         Reports whether the driver ran successfully.
     options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.
-    problem : <Problem>
+    _problem : <Problem>
         Pointer to the containing problem.
     supports : <OptionsDictionary>
         Provides a consistant way for drivers to declare what features they support.
@@ -33,7 +33,7 @@ class Driver(object):
         """
         Initialize the driver.
         """
-        self.problem = None
+        self._problem = None
         self._designvars = None
         self._cons = None
         self._objs = None
@@ -70,7 +70,7 @@ class Driver(object):
         problem : <`Problem`>
             Pointer to the containing problem.
         """
-        self.problem = problem
+        self._problem = problem
         model = problem.model
 
         # Gather up the information for design vars.
@@ -92,7 +92,7 @@ class Driver(object):
            Dictionary containing values of each design variable.
         """
         dvs = self._designvars
-        vec = self.problem.model._outputs._views_flat
+        vec = self._problem.model._outputs._views_flat
         dv_dict = {}
         for name, meta in iteritems(dvs):
             scaler = meta['scaler']
@@ -130,7 +130,7 @@ class Driver(object):
         if adder is not None:
             value -= adder
 
-        self.problem.model._outputs._views_flat[name][:] = value
+        self._problem.model._outputs._views_flat[name][:] = value
 
     def get_response_values(self):
         """
@@ -154,7 +154,7 @@ class Driver(object):
            Dictionary containing values of each objective.
         """
         objs = self._objs
-        vec = self.problem.model._outputs._views_flat
+        vec = self._problem.model._outputs._views_flat
         obj_dict = {}
         for name, meta in iteritems(objs):
             scaler = meta['scaler']
@@ -191,7 +191,7 @@ class Driver(object):
            Dictionary containing values of each constraint.
         """
         cons = self._cons
-        vec = self.problem.model._outputs._views_flat
+        vec = self._problem.model._outputs._views_flat
         con_dict = {}
 
         for name, meta in iteritems(self._cons):
@@ -240,7 +240,7 @@ class Driver(object):
         float
             relative error.
         """
-        return self.problem.model._solve_nonlinear()
+        return self._problem.model._solve_nonlinear()
 
     def _compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict',
                               global_names=True):
@@ -268,8 +268,8 @@ class Driver(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        derivs = self.problem._compute_total_derivs(of=of, wrt=wrt, return_format=return_format,
-                                                    global_names=global_names)
+        derivs = self._problem._compute_total_derivs(of=of, wrt=wrt, return_format=return_format,
+                                                     global_names=global_names)
 
         if return_format == 'dict':
 
