@@ -4,7 +4,7 @@ import unittest
 import scipy.sparse.linalg
 
 from openmdao.api import Problem, ImplicitComponent, Group
-from openmdao.api import ScipyIterativeSolver, LinearBlockJac, LinearBlockGS
+from openmdao.api import LinearBlockGS
 from openmdao.api import view_model
 
 class CompA(ImplicitComponent):
@@ -93,9 +93,7 @@ class Test(unittest.TestCase):
 
     def test_apply_linear(self):
         root = self.p.model
-
         root.suppress_solver_output = True
-        #root.run_solve_nonlinear()
 
         with root.linear_vector_context() as (inputs, outputs, residuals):
             outputs.set_const(1.0)
@@ -110,9 +108,7 @@ class Test(unittest.TestCase):
 
     def test_solve_linear(self):
         root = self.p.model
-
         root.suppress_solver_output = True
-        #root.run_solve_nonlinear()
 
         with root.linear_vector_context() as (inputs, outputs, residuals):
             residuals.set_const(11.0)
