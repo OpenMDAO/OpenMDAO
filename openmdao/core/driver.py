@@ -235,10 +235,6 @@ class Driver(object):
         -------
         boolean
             Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         return self._problem.model._solve_nonlinear()
 

@@ -174,6 +174,11 @@ class pyOptSparseDriver(Driver):
 
         Note that pyOpt controls the execution, and the individual optimizers
         (e.g., SNOPT) control the iteration.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
         """
         problem = self._problem
         model = self._problem.model
@@ -316,6 +321,8 @@ class pyOptSparseDriver(Driver):
         except KeyError:
             # Nothing is here, so something bad happened!
             self.fail = True
+
+        return self.fail
 
     def _objfunc(self, dv_dict):
         """

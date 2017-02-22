@@ -239,10 +239,6 @@ class Problem(object):
         -------
         boolean
             Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         with self.model._scaled_context():
             return self.driver.run()
@@ -273,10 +269,6 @@ class Problem(object):
         -------
         boolean
             Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         warn_deprecation('This method provides backwards compatibility with '
                          'OpenMDAO <= 1.x ; use run_driver instead.')
