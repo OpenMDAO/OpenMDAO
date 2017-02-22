@@ -82,8 +82,6 @@ class System(object):
         maps full variable pathname to local name, index and I/O type
     _var_name2path : dict
         maps local var name to full pathname.
-    _var_name2unprom : dict
-        maps local var name (promoted) to unpromoted name.
     _var_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
         integer arrays of global indices of variables on this proc.
     _var_maps : {'input': dict, 'output': dict}

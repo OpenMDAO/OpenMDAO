@@ -415,7 +415,6 @@ class Component(System):
         # set up absolute path info
         self._var_pathdict = {}
         self._var_name2path = {'input': {}, 'output': {}}
-        self._var_name2unprom = {'input': {}, 'output': {}}
         for typ in ['input', 'output']:
             names = self._var_allprocs_names[typ]
             if self.pathname:
@@ -431,7 +430,6 @@ class Component(System):
                     self._var_name2path[typ][name] = (path,)
                 else:
                     self._var_name2path[typ][name] = path
-                self._var_name2unprom[typ][name] = name
 
         # Now that variables are available, we can setup partials
         self.initialize_partials()

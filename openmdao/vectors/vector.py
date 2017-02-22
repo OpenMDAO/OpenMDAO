@@ -258,19 +258,12 @@ class Vector(object):
         ----------
         key : str
             Variable name in the owning system's namespace.
-            For outputs/residuals, the promoted name must be given.
-            For inputs, the unpromoted name must be given.
 
         Returns
         -------
         float or ndarray
             variable value (not scaled, not dimensionless).
         """
-        # If output/residual, map the promoted name to the unpromoted name.
-        # If input, key must already be the unpromoted name.
-        if self._typ == 'output':
-            key = self._system._var_name2unprom[key]
-
         if key in self._names:
             return self._views[key][self._idxs[key]]
         else:
@@ -284,16 +277,9 @@ class Vector(object):
         ----------
         key : str
             Variable name in the owning system's namespace.
-            For outputs/residuals, the promoted name must be given.
-            For inputs, the unpromoted name must be given.
         value : float or list or tuple or ndarray
             variable value to set (not scaled, not dimensionless)
         """
-        # If output/residual, map the promoted name to the unpromoted name.
-        # If input, key must already be the unpromoted name.
-        if self._typ == 'output':
-            key = self._system._var_name2unprom[key]
-
         if key in self._names:
             value, shape = ensure_compatible(key, value, self._views[key].shape)
             self._views[key][:] = value
