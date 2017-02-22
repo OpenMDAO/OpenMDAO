@@ -244,7 +244,8 @@ class Problem(object):
         float
             absolute error.
         """
-        return self.driver.run()
+        with self.model._scaled_context():
+            return self.driver.run()
 
     def run_once(self):
         """
