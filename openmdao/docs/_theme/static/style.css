@@ -131,11 +131,8 @@ div.output_prompt {
 }
 
 div.output_area pre {
-    border: 0;
-    /*vertical-align: baseline;*/
-    /*color: #000;*/
     background-color: transparent;
-    border-radius: 0;
+    border-radius: 2px;
 }
 
 div.highlight{
