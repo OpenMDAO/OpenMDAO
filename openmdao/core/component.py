@@ -2,15 +2,19 @@
 
 from __future__ import division
 
+import sys
+
 from fnmatch import fnmatchcase
 import numpy
 from itertools import product
 from six import string_types, iteritems
 from scipy.sparse import issparse
+from copy import deepcopy
 
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
+from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible
 
 
 class Component(System):
@@ -35,7 +39,8 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
         self._var2meta = {}
 
-    def add_input(self, name, val=1.0, shape=None, indices=None, units=None, desc='', var_set=0):
+    def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
+                  desc='', var_set=0):
         """
         Add an input variable to the component.
 
@@ -44,22 +49,24 @@ class Component(System):
         name : str
             name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
-            The initial value of the variable being added in user-defined units. Default is 1.0.
+            The initial value of the variable being added in user-defined units.
+            Default is 1.0.
         shape : int or tuple or list or None
-            Shape of this variable, only required if indices not provided and val is not an array.
-            Default is None.
-        indices : int or list of ints or tuple of ints or int ndarray or None
+            Shape of this variable, only required if src_indices not provided and
+            val is not an array. Default is None.
+        src_indices : int or list of ints or tuple of ints or int ndarray or None
             The indices of the source variable to transfer data from.
-            If val is given as an array_like object, the shapes of val and indices must match.
-            A value of None implies this input depends on all entries of source. Default is None.
+            If val is given as an array_like object, the shapes of val and
+            src_indices must match. A value of None implies this input depends
+            on all entries of source. Default is None.
         units : str or None
-            Units in which this input variable will be provided to the component during execution.
-            Default is None, which means it has no units.
+            Units in which this input variable will be provided to the component
+            during execution. Default is None, which means it has no units.
         desc : str
             description of the variable
         var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for reconfigurability.
-            Default is 0.
+            For advanced users only. ID or color for this variable, relevant for
+            reconfigurability. Default is 0.
         """
         # First, type check all arguments
         if not isinstance(name, str):
@@ -68,8 +75,10 @@ class Component(System):
             raise TypeError('The val argument should be a float, list, tuple, or ndarray')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
-        if indices is not None and not isinstance(indices, (int, list, tuple, numpy.ndarray)):
-            raise TypeError('The indices argument should be an int, list, tuple, or ndarray')
+        if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
+                                                                    numpy.ndarray)):
+            raise TypeError('The src_indices argument should be an int, list, '
+                            'tuple, or ndarray')
         if units is not None and not isinstance(units, str):
             raise TypeError('The units argument should be a str or None')
 
@@ -77,45 +86,16 @@ class Component(System):
         if units is not None and not valid_units(units):
             raise ValueError("The units '%s' are invalid" % units)
 
-        if shape is not None:
-            if isinstance(shape, int):
-                shape = (shape,)
-            elif isinstance(shape, list):
-                shape = tuple(shape)
-        # Next check that shapes are consistent
-        if not numpy.isscalar(val):
-            val_shape = numpy.atleast_1d(val).shape
-            # 1. val and shape
-            if shape is not None and val_shape != shape:
-                raise ValueError('The val argument is an array, but val.shape != shape.')
-            # 2. val and indices
-            if indices is not None and val_shape != numpy.atleast_1d(indices).shape:
-                raise ValueError('The val and indices are arrays, but val.shape != indices.shape.')
-        if shape is not None:
-            # 3. shape and indices
-            if indices is not None and shape != numpy.atleast_1d(indices).shape:
-                raise ValueError('The val argument is an array, but val.shape != indices.shape.')
-
         metadata = {}
 
-        # val: taken as is
-        metadata['value'] = val
+        # value, shape: based on args, making sure they are compatible
+        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape, src_indices)
 
-        # shape: if not given, infer from val (if array) or indices, else assume scalar
-        if shape is not None:
-            metadata['shape'] = shape
-        elif not numpy.isscalar(val):
-            metadata['shape'] = numpy.atleast_1d(val).shape
-        elif indices is not None:
-            metadata['shape'] = numpy.atleast_1d(indices).shape
+        # src_indices: None or ndarray
+        if src_indices is None:
+            metadata['src_indices'] = None
         else:
-            metadata['shape'] = (1,)
-
-        # indices: None or ndarray
-        if indices is None:
-            metadata['indices'] = None
-        else:
-            metadata['indices'] = numpy.atleast_1d(indices)
+            metadata['src_indices'] = numpy.atleast_1d(src_indices)
 
         # units: taken as is
         metadata['units'] = units
@@ -144,7 +124,7 @@ class Component(System):
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
         shape : int or tuple or list or None
-            Shape of this variable, only required if indices not provided and val is not an array.
+            Shape of this variable, only required if val is not an array.
             Default is None.
         units : str or None
             Units in which the output variables will be provided to the component during execution.
@@ -191,12 +171,11 @@ class Component(System):
             raise TypeError('The units argument should be a str or None')
         if res_units is not None and not isinstance(res_units, str):
             raise TypeError('The res_units argument should be a str or None')
-        if lower is not None and not numpy.isscalar(lower) and \
-                not isinstance(lower, (list, tuple, numpy.ndarray)):
-            raise TypeError('The lower argument should be a float, list, tuple, or ndarray')
-        if upper is not None and not numpy.isscalar(upper) and \
-                not isinstance(upper, (list, tuple, numpy.ndarray)):
-            raise TypeError('The upper argument should be a float, list, tuple, or ndarray')
+        if lower is not None:
+            lower = format_as_float_or_array('lower', lower)
+        if upper is not None:
+            upper = format_as_float_or_array('upper', upper)
+
         for item in [ref, ref0, res_ref, res_ref]:
             if not numpy.isscalar(item):
                 raise TypeError('The %s argument should be a float' % (item.__name__))
@@ -205,28 +184,10 @@ class Component(System):
         if units is not None and not valid_units(units):
             raise ValueError("The units '%s' are invalid" % units)
 
-        if shape is not None:
-            if isinstance(shape, int):
-                shape = (shape,)
-            elif isinstance(shape, list):
-                shape = tuple(shape)
-        # Next check that shapes are consistent between val and shape, if necessary
-        if not numpy.isscalar(val):
-            if shape is not None and numpy.atleast_1d(val).shape != shape:
-                raise ValueError('The val argument is an array, but val.shape != shape.')
-
         metadata = {}
 
-        # val: taken as is
-        metadata['value'] = val
-
-        # shape: if not given, infer from val (if array) or indices, else assume scalar
-        if shape is not None:
-            metadata['shape'] = shape
-        elif not numpy.isscalar(val):
-            metadata['shape'] = numpy.atleast_1d(val).shape
-        else:
-            metadata['shape'] = (1,)
+        # value, shape: based on args, making sure they are compatible
+        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape)
 
         # units, res_units: taken as is
         metadata['units'] = units
@@ -289,11 +250,7 @@ class Component(System):
         val : float or ndarray of float or scipy.sparse
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
-
         """
-        oflist = [of] if isinstance(of, string_types) else of
-        wrtlist = [wrt] if isinstance(wrt, string_types) else wrt
-
         # If only one of rows/cols is specified
         if (rows is None) ^ (cols is None):
             raise ValueError('If one of rows/cols is specified, then both must be specified')
@@ -318,39 +275,71 @@ class Component(System):
                 raise ValueError('If rows and cols are specified, val must be a scalar or have the '
                                  'same shape, val: {}, rows/cols: {}'.format(val.shape, rows.shape))
 
-        for of in oflist:
-            for wrt in wrtlist:
-                meta = {
-                    'rows': rows,
-                    'cols': cols,
-                    'value': val,
-                    'dependent': dependent,
-                }
-                # matching names/glob patterns will be resolved later because
-                # we don't know if all variables have been declared at this
-                # point.
-                key = (of, wrt)
-                if key in self._subjacs_info:
-                    meta2 = self._subjacs_info[key]
-                else:
-                    meta2 = SUBJAC_META_DEFAULTS.copy()
-                meta2.update(meta)
-                self._subjacs_info[key] = meta2
+        multiple_items, pattern_matches = self._find_partial_matches(of, wrt)
 
-    def _iter_partials_matches(self):
+        for of_bundle, wrt_bundle in product(*pattern_matches):
+            of_pattern, of_matches = of_bundle
+            wrt_pattern, wrt_out, wrt_in = wrt_bundle
+            if not of_matches:
+                raise ValueError('No matches were found for of="{}"'.format(of_pattern))
+            if not (wrt_out or wrt_in):
+                raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
+
+            make_copies = (multiple_items
+                           or len(of_matches) > 1
+                           or (len(wrt_in) + len(wrt_out)) > 1)
+
+            for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
+                for key in product(of_matches, wrt_matches):
+                    meta_changes = {
+                        'rows': rows,
+                        'cols': cols,
+                        'value': deepcopy(val) if make_copies else val,
+                        'dependent': dependent,
+                        'type': type_
+                    }
+                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    meta.update(meta_changes)
+                    self._check_partials_meta(key, meta)
+                    self._subjacs_info[key] = meta
+
+    def _find_partial_matches(self, of, wrt):
         """
-        Generate all (of, wrt) name pairs to add to jacobian.
+        Find all partial derivative matches from of and wrt.
+
+        Parameters
+        ----------
+        of : str or list of str
+            The name of the residual(s) that derivatives are being computed for.
+            May also contain a glob pattern.
+        wrt : str or list of str
+            The name of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+
+        Returns
+        -------
+        bool, tuple(list, list)
+            Bool for if there are multiple items in either of/wrt, tuple containing the of/wrt match
         """
+        of_list = [of] if isinstance(of, string_types) else of
+        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
+        glob_patterns = {'*', '?', '['}
+        multiple_items = len(of_list) > 1 or len(wrt_list) > 1
         outs = self._var_allprocs_names['output']
         ins = self._var_allprocs_names['input']
-        tvlists = (('output', outs), ('input', ins))
 
-        for (of_pattern, wrt_pattern), meta in iteritems(self._subjacs_info):
-            of_matches = [name for name in outs if fnmatchcase(name, of_pattern)]
-            for typ, vnames in tvlists:
-                wrt_matches = [name for name in vnames if fnmatchcase(name, wrt_pattern)]
-                for (of, wrt) in product(of_matches, wrt_matches):
-                    yield (of, wrt), meta, typ
+        def find_matches(pattern, var_list):
+            if glob_patterns.intersection(pattern):
+                return [name for name in var_list if fnmatchcase(name, pattern)]
+            elif pattern in var_list:
+                return [pattern]
+            return []
+
+        of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
+        wrt_pattern_matches = [(pattern, find_matches(pattern, outs), find_matches(pattern, ins))
+                               for pattern in wrt_list]
+        return multiple_items, (of_pattern_matches, wrt_pattern_matches)
 
     def _check_partials_meta(self, key, meta):
         """
@@ -401,7 +390,7 @@ class Component(System):
         Set subjacobian info into our jacobian.
         """
         with self._jacobian_context() as J:
-            for key, meta, typ in self._iter_partials_matches():
+            for key, meta in iteritems(self._subjacs_info):
                 self._check_partials_meta(key, meta)
                 J._set_partials_meta(key, meta)
 
@@ -441,6 +430,9 @@ class Component(System):
                     self._var_name2path[typ][name] = (path,)
                 else:
                     self._var_name2path[typ][name] = path
+
+        # Now that variables are available, we can setup partials
+        self.initialize_partials()
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
         r"""

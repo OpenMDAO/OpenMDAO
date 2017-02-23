@@ -64,6 +64,13 @@ class ScipyIterativeSolver(LinearSolver):
         if self.precon is not None:
             self.precon._setup_solvers(self._system, self._depth + 1)
 
+    def _linearize(self):
+        """
+        Perform any required linearization operations such as matrix factorization.
+        """
+        if self.precon is not None:
+            self.precon._linearize()
+
     def _mat_vec(self, in_vec):
         """
         Compute matrix-vector product.

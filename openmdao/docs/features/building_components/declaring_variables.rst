@@ -28,48 +28,48 @@ Usage
 
 1. Declaring with only the default value.
 
-.. embed-code::
-    openmdao.core.tests.test_add_var.TestAddVarCompVal
+  .. embed-code::
+      openmdao.core.tests.test_add_var.CompAddWithDefault
 
-.. embed-test::
-    openmdao.core.tests.test_add_var.TestAddVar.test_val
+  .. embed-test::
+      openmdao.core.tests.test_add_var.TestAddVar.test_val
 
 2. Declaring with only the shape argument.
 
-.. embed-code::
-    openmdao.core.tests.test_add_var.TestAddVarCompShape
+  .. embed-code::
+      openmdao.core.tests.test_add_var.CompAddWithShape
 
-.. embed-test::
-    openmdao.core.tests.test_add_var.TestAddVar.test_shape
+  .. embed-test::
+      openmdao.core.tests.test_add_var.TestAddVar.test_shape
 
 3. Declaring with only the indices argument.
 
-.. embed-code::
-    openmdao.core.tests.test_add_var.TestAddVarCompIndices
+  .. embed-code::
+      openmdao.core.tests.test_add_var.CompAddWithIndices
 
-.. embed-test::
-    openmdao.core.tests.test_add_var.TestAddVar.test_indices
+  .. embed-test::
+      openmdao.core.tests.test_add_var.TestAddVar.test_indices
 
 4. Declaring an array variable with a scalar default value.
 
-.. embed-code::
-    openmdao.core.tests.test_add_var.TestAddVarCompScalarArray
+  .. embed-code::
+      openmdao.core.tests.test_add_var.CompAddArrayWithScalar
 
-.. embed-test::
-    openmdao.core.tests.test_add_var.TestAddVar.test_scalar_array
+  .. embed-test::
+      openmdao.core.tests.test_add_var.TestAddVar.test_scalar_array
 
 5. Declaring with an array val and indices (their shapes must match).
 
-.. embed-code::
-    openmdao.core.tests.test_add_var.TestAddVarCompArrayIndices
+  .. embed-code::
+      openmdao.core.tests.test_add_var.CompAddWithArrayIndices
 
-.. embed-test::
-    openmdao.core.tests.test_add_var.TestAddVar.test_array_indices
+  .. embed-test::
+      openmdao.core.tests.test_add_var.TestAddVar.test_array_indices
 
 6. Declaring an output with bounds.
 
-.. embed-code::
-    openmdao.core.tests.test_add_var.TestAddVarCompBounds
+  .. embed-code::
+      openmdao.core.tests.test_add_var.CompAddWithBounds
 
-.. embed-test::
-    openmdao.core.tests.test_add_var.TestAddVar.test_bounds
+  .. embed-test::
+      openmdao.core.tests.test_add_var.TestAddVar.test_bounds
