@@ -73,7 +73,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
             raise RuntimeError("src_indices for '%s' is not flat, so its input "
                                "shape must be provided. src_indices may contain "
                                "an extra dimension if the connected source is "
-                               "non-flat, making the input shape ambiguous." %
+                               "not flat, making the input shape ambiguous." %
                                name)
         shape = ind_shape
 

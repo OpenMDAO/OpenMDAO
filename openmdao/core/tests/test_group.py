@@ -375,8 +375,7 @@ class TestGroup(unittest.TestCase):
     def test_promote_src_indices_nonflat_to_scalars(self):
         class MyComp(ExplicitComponent):
             def initialize_variables(self):
-                self.add_input('x', 1.0,
-                               src_indices=[(3,1)], shape=(1,))
+                self.add_input('x', 1.0, src_indices=[(3,1)], shape=(1,))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -396,6 +395,32 @@ class TestGroup(unittest.TestCase):
         p.run_model()
         assert_rel_error(self, p['C1.x'], 10., 0.00001)
         assert_rel_error(self, p['C1.y'], 10., 0.00001)
+
+    def test_promote_src_indices_nonflat_error(self):
+        class MyComp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x', 1.0, src_indices=[(3,1)])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+        p = Problem(model=Group())
+
+        # by promoting the following output and inputs to 'x', they will
+        # be automatically connected
+        p.model.add_subsystem('indep',
+                              IndepVarComp('x', np.arange(12).reshape((4,3))),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+
+        with self.assertRaises(Exception) as context:
+            p.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "src_indices for 'x' is not flat, so its input shape "
+                         "must be provided. src_indices may contain an extra "
+                         "dimension if the connected source is not flat, making "
+                         "the input shape ambiguous.")
 
     @parameterized.expand(itertools.product(
         [(4,3), (1,12), (12,), (12,1)],
