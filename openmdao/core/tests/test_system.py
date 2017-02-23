@@ -79,13 +79,13 @@ class TestSystem(unittest.TestCase):
             self.assertEqual(residuals['G1.G2.C1.b'], 99.0)
 
         # Test linear
-        with model.linear_vector_context('linear') as (inputs, outputs, residuals):
-            outputs['G1.G2.C1.b'] = 10.
-            self.assertEqual(outputs['G1.G2.C1.b'], 10.)
+        with model.linear_vector_context('linear') as (d_inputs, d_outputs, d_residuals):
+            d_outputs['G1.G2.C1.b'] = 10.
+            self.assertEqual(d_outputs['G1.G2.C1.b'], 10.)
 
         # Test linear with invalid vec_name
         with self.assertRaises(Exception) as cm:
-            with model.linear_vector_context('bad_name') as (inputs, outputs, residuals):
+            with model.linear_vector_context('bad_name') as (d_inputs, d_outputs, d_residuals):
                 pass
         self.assertEqual(str(cm.exception),
                          "There is no linear vector named %s" % 'bad_name')
