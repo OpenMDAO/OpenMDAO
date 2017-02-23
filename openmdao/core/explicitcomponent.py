@@ -129,8 +129,6 @@ class ExplicitComponent(Component):
                 # re-negate the jacobian
                 self._negate_jac()
 
-
-
             if self._owns_global_jac:
                 J._update()
 

@@ -1,3 +1,4 @@
+"""Finite difference derivative approximations."""
 from __future__ import division, print_function
 
 import numpy as np
@@ -12,10 +13,13 @@ DEFAULT_FD_OPTIONS = {
     'form': 'forward',
 }
 
+
 class FiniteDifference(ApproximationScheme):
     r"""
-    Approximation scheme using finite differences to estimate derivatives. For example, using the
-    'forward' form with a step size of 'h' will approximate the derivative in the following way:
+    Approximation scheme using finite differences to estimate derivatives.
+
+    For example, using the 'forward' form with a step size of 'h' will approximate the derivative in
+    the following way:
         f'(x) = \frac{f(x+h) - f(x)}{h} + O(h).
 
     Attributes
@@ -23,11 +27,25 @@ class FiniteDifference(ApproximationScheme):
     _exec_list : list
         A list of which derivatives (in execution order) to compute.
     """
+
     def __init__(self):
+        """
+        Initialize the ApproximationScheme.
+        """
         super(FiniteDifference, self).__init__()
         self._exec_list = []
 
     def add_approximation(self, key, kwargs):
+        """
+        Use this approximation scheme to approximate the derivative d(of)/d(wrt).
+
+        Parameters
+        ----------
+        key : tuple(str,str)
+            Pairing of (of, wrt) for the derivative.
+        kwargs : dict
+            Additional keyword arguments, to be interpreted by sub-classes.
+        """
         of, wrt = key
         fd_options = DEFAULT_FD_OPTIONS.copy()
         fd_options.update(kwargs)
@@ -36,6 +54,7 @@ class FiniteDifference(ApproximationScheme):
     @staticmethod
     def _key_fun(approx_tuple):
         """
+        Compute the sorting key for an approximation tuple.
 
         Parameters
         ----------
@@ -61,6 +80,23 @@ class FiniteDifference(ApproximationScheme):
         # TODO: Automatic sparse FD by constructing a graph of variable dependence?
 
     def compute_approximation(self, system, jac=None, deriv_type='partial'):
+        """
+        Execute the system to compute the approximate (sub)-Jacobians.
+
+        Parameters
+        ----------
+        system : System
+            System on which the execution is run.
+
+        jac : None or Jacobian
+            If None, update system with the approximated sub-Jacobians. Otherwise, store the
+            approximations in the given object.
+
+        deriv_type : str
+            One of 'total' or 'partial', indicating if total or partial derivatives are
+            being
+            approximated.
+        """
         if jac is None:
             jac = system._jacobian
 
@@ -78,12 +114,12 @@ class FiniteDifference(ApproximationScheme):
             # TODO: Higher orders?
             if form == 'forward':
                 deltas = [step]
-                coeffs = [1/step]
-                current_coeff = -1/step
+                coeffs = [1 / step]
+                current_coeff = -1 / step
 
             elif form == 'central':
-                deltas = [step/2, -step/2]
-                coeffs = [1/step, 1/step]
+                deltas = [step / 2, -step / 2]
+                coeffs = [1 / step, -1 / step]
                 current_coeff = 0
 
             else:

@@ -10,6 +10,7 @@ from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseM
      GlobalJacobian, CSRmatrix, COOmatrix, ScipyIterativeSolver
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.test_suite.parametric_suite import _cartesian_dict_product
 
 
 class SimpleComp(ExplicitComponent):
@@ -76,11 +77,15 @@ class SimpleCompConst(SimpleComp):
         pass
 
 class SimpleCompFD(SimpleComp):
+    def __init__(self, **kwargs):
+        super(SimpleCompFD, self).__init__()
+        self.kwargs = kwargs
+
     def initialize_partials(self):
         self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
         self.declare_partials('g', 'z', dependent=False)
 
-        self.approx_partials('*', '*')
+        self.approx_partials('*', '*', **self.kwargs)
 
     def compute_partial_derivs(self, inputs, outputs, partials):
         pass
@@ -225,8 +230,11 @@ class TestJacobianFeatures(unittest.TestCase):
 
         assert_rel_error(self, totals, jacobian)
 
-    def test_fd(self):
-        comp = SimpleCompFD()
+    @parameterized.expand(
+        itertools.product([1e-6, 1e-8], ['forward', 'central'])
+    )
+    def test_fd(self, step, form):
+        comp = SimpleCompFD(step=step, form=form)
         problem = self.problem
         model = problem.model
         model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
@@ -249,7 +257,7 @@ class TestJacobianFeatures(unittest.TestCase):
         jacobian['g', 'x'] = [[1], [0], [0], [1]]
         jacobian['g', 'z'] = np.zeros((4, 4))
 
-        assert_rel_error(self, totals, jacobian, 1e-8)
+        assert_rel_error(self, totals, jacobian, 1e-6)
 
 
 if __name__ == '__main__':

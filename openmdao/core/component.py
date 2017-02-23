@@ -274,7 +274,6 @@ class Component(System):
                     meta.update(kwargs)
                     self._subjacs_info[key] = meta
 
-
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):
         """

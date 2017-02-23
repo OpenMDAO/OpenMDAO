@@ -1,3 +1,4 @@
+"""Base class used to define the interface for derivative approximation schemes."""
 from __future__ import print_function, division
 
 from openmdao.utils.generalized_dict import OptionsDictionary
@@ -7,6 +8,7 @@ class ApproximationScheme(object):
     """
     Base class used to define the interface for derivative approximation schemes.
     """
+
     def add_approximation(self, key, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
@@ -47,7 +49,7 @@ class ApproximationScheme(object):
 
     def _run_point(self, system, input_deltas, deriv_type='partial'):
         """
-        Alters the specified inputs by the given deltas, runs the system, and returns the results.
+        Alter the specified inputs by the given deltas, runs the system, and returns the results.
 
         Parameters
         ----------
@@ -83,9 +85,9 @@ class ApproximationScheme(object):
                 inputs._views_flat[in_name][idxs] += delta
 
         # TODO: Grab only results of interest
-        cache = results_vec._clone(True)
+        cache = results_vec._clone()
         run_model()
-        results = results_vec._clone(True)
+        results = results_vec._clone()
         results_vec.set_vec(cache)
 
         for in_name, idxs, delta in input_deltas:
