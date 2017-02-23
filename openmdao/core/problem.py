@@ -596,7 +596,7 @@ class Problem(object):
                                            old_input_list[icount][iname_count])
 
                                     if totals[key] is None:
-                                        totals[key] = np.zeros((len_val, n_in))
+                                        totals[key] = np.empty((len_val, n_in))
                                     totals[key][:, idx] = deriv_val
 
                                 else:
@@ -605,7 +605,7 @@ class Problem(object):
                                            old_output_list[ocount][oname_count])
 
                                     if totals[key] is None:
-                                        totals[key] = np.zeros((n_in, len_val))
+                                        totals[key] = np.empty((n_in, len_val))
                                     totals[key][idx, :] = deriv_val
 
                             elif return_format == 'dict':
@@ -615,7 +615,7 @@ class Problem(object):
                                     ikey = old_input_list[icount][iname_count]
 
                                     if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.zeros((len_val, n_in))
+                                        totals[okey][ikey] = np.empty((len_val, n_in))
                                     totals[okey][ikey][:, idx] = deriv_val
 
                                 else:
@@ -624,7 +624,7 @@ class Problem(object):
                                     ikey = old_output_list[ocount][oname_count]
 
                                     if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.zeros((n_in, len_val))
+                                        totals[okey][ikey] = np.empty((n_in, len_val))
                                     totals[okey][ikey][idx, :] = deriv_val
 
         return totals

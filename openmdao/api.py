@@ -24,6 +24,7 @@ from openmdao.jacobians.global_jacobian import GlobalJacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOmatrix
 from openmdao.matrices.csr_matrix import CSRmatrix
+from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.generalized_dict import OptionsDictionary

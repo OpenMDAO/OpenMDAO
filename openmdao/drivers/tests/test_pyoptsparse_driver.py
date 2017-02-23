@@ -6,9 +6,9 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.drivers.pyoptsparse_driver import set_pyoptsparse_opt
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
-from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 
 # check that pyoptsparse is installed

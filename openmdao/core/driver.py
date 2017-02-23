@@ -91,10 +91,9 @@ class Driver(object):
         dict
            Dictionary containing values of each design variable.
         """
-        dvs = self._designvars
         vec = self._problem.model._outputs._views_flat
         dv_dict = {}
-        for name, meta in iteritems(dvs):
+        for name, meta in iteritems(self._designvars):
             scaler = meta['scaler']
             adder = meta['adder']
             val = vec[name].copy()
@@ -153,10 +152,9 @@ class Driver(object):
         dict
            Dictionary containing values of each objective.
         """
-        objs = self._objs
         vec = self._problem.model._outputs._views_flat
         obj_dict = {}
-        for name, meta in iteritems(objs):
+        for name, meta in iteritems(self._objs):
             scaler = meta['scaler']
             adder = meta['adder']
             val = vec[name].copy()
@@ -190,7 +188,6 @@ class Driver(object):
         dict
            Dictionary containing values of each constraint.
         """
-        cons = self._cons
         vec = self._problem.model._outputs._views_flat
         con_dict = {}
 
