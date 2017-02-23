@@ -1,6 +1,8 @@
 """Some miscellaneous utility functions."""
 from __future__ import division
 
+import os
+import sys
 import warnings
 from six import string_types
 
@@ -96,6 +98,9 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
     r"""
     Determine proper values of adder and scaler based on user arguments.
 
+    Adder and Scaler are used internally because the transformation is
+    slightly more efficient.
+
     Parameters
     ----------
     ref : float or ndarray, optional
@@ -121,66 +126,100 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
 
     Notes
     -----
-    The response can be scaled using scaler and adder, where
-
-    .. math::
-
-        x_{scaled} = scaler(x + adder)
-
-    or through the use of ref/ref0, which map to scaler and adder through
-    the equations:
-
-    .. math::
-
-        0 = scaler(ref_0 + adder)
-
-        1 = scaler(ref + adder)
-
-    which results in:
-
-    .. math::
-
-        adder = -ref_0
-
-        scaler = \frac{1}{ref + adder}
+    The response can be scaled using ref and ref0.
+    The argument :code:`ref0` represents the physical value when the scaled value is 0.
+    The argument :code:`ref` represents the physical value when the scaled value is 1.
     """
     # Affine scaling cannot be used with scalers/adders
     if ref0 is not None or ref is not None:
         if scaler is not None or adder is not None:
             raise ValueError('Inputs ref/ref0 are mutually exclusive '
                              'with scaler/adder')
+        if ref is None:
+            ref = 1.0
+        if ref0 is None:
+            ref0 = 0.0
+
         # Convert ref/ref0 to scaler/adder so we can scale the bounds
         adder = -ref0
         scaler = 1.0 / (ref + adder)
+
     else:
         if scaler is None:
             scaler = 1.0
         if adder is None:
             adder = 0.0
 
-    adder = format_as_float_or_array('adder', adder, val_if_none=0.0)
-    scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0)
+    adder = format_as_float_or_array('adder', adder, val_if_none=0.0, flatten=True)
+    scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0, flatten=True)
 
     return adder, scaler
 
 
-def format_as_float_or_array(name, values, val_if_none=0.0):
+def set_pyoptsparse_opt(optname):
     """
-    Format values as a numpy array.
+    For testing, sets the pyoptsparse optimizer using the given optimizer name.
 
-    Checks that the given array values are either None, float, or an
-    iterable of numeric values.  On output all iterables of numeric values
-    are converted to numpy.ndarray.  If values is scalar, it is converted
+    This may be modified based on the value of
+    OPENMDAO_FORCE_PYOPTSPARSE_OPT. This can be used on systems that have
+    SNOPT installed to force them to use SLSQP in order to mimic our test
+    machines on travis and appveyor.
+
+    Parameters
+    ----------
+    optname : str
+        Name of pyoptsparse optimizer that is requested by the test.
+
+    Returns
+    -------
+    object
+        Pyoptsparse optimizer instance.
+    str
+        Pyoptsparse optimizer string
+    """
+    OPT = None
+    OPTIMIZER = None
+    force = os.environ.get('OPENMDAO_FORCE_PYOPTSPARSE_OPT')
+    if force:
+        optname = force
+
+    try:
+        from pyoptsparse import OPT
+        try:
+            OPT(optname)
+            OPTIMIZER = optname
+        except Exception as exc:
+            if optname != 'SLSQP':
+                try:
+                    OPT('SLSQP')
+                    OPTIMIZER = 'SLSQP'
+                except Exception as exc:
+                    pass
+    except Exception as exc:
+        pass
+
+    return OPT, OPTIMIZER
+
+
+def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
+    """
+    Format array option values.
+
+    Checks that the given array values are either None, float, or an iterable
+    of numeric values. On output all interables of numeric values are
+    converted to a flat numpy.ndarray. If values is scalar, it is converted
     to float.
 
     Parameters
     ----------
     name : str
-        Name of the values being formatted
+        The path of the variable relative to the current system.
     values : float or numpy ndarray or Iterable
-        Values to be formatted to the expected form.
-    val_if_none : bool
-        Value to return if values is None
+        Values of the array option to be formatted to the expected form.
+    val_if_none : float or numpy ndarray
+        The default value for the option if values is None.
+    flatten : bool
+        Set to True to flatten any ndarray return.
 
     Returns
     -------
@@ -194,14 +233,22 @@ def format_as_float_or_array(name, values, val_if_none=0.0):
     TypeError
         If values is scalar, not None, and not a Number.
     """
-    # Convert to ndarray/float as necessary
+    # Convert adder to ndarray/float as necessary
     if isinstance(values, np.ndarray):
-        pass
+        values = values
+        if flatten:
+            values = values.flatten()
     elif not isinstance(values, string_types) \
             and isinstance(values, Iterable):
         values = np.asarray(values, dtype=float)
+        if flatten:
+            values = values.flatten()
     elif values is None:
         values = val_if_none
+    elif values == float('inf'):
+        values = sys.float_info.max
+    elif values == -float('inf'):
+        values = -sys.float_info.max
     elif isinstance(values, numbers.Number):
         values = float(values)
     else:
