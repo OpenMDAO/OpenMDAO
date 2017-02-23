@@ -6,7 +6,7 @@ from itertools import groupby
 from six.moves import range
 
 
-from openmdao.approximation_schemes.ApproximationScheme import ApproximationScheme
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 
 DEFAULT_FD_OPTIONS = {
     'step': 1e-6,

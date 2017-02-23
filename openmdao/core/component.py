@@ -12,7 +12,7 @@ from scipy.sparse import issparse
 from copy import deepcopy
 from collections import OrderedDict
 
-from openmdao.approximation_schemes.FiniteDifference import FiniteDifference
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
