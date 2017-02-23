@@ -261,7 +261,7 @@ class ExplicitCycleComp(ExplicitComponent):
                                   **self._array2kwargs(dtheta, pd_type))
 
     def compute_partial_derivs(self, inputs, outputs, partials):
-        if self.metadata['jacobian_type'] != 'matvec':
+        if self.metadata['jacobian_type'] != 'matvec' and not self.metadata['finite_difference']:
             angle_param = self._cycle_names[self.angle_param]
             angle = inputs[angle_param]
             num_var = self.num_var
@@ -350,7 +350,7 @@ class ExplicitLastComp(ExplicitFirstComp):
                                   **self._array2kwargs(np.array([1.]), pd_type))
 
     def compute_partial_derivs(self, inputs, outputs, partials):
-        if self.metadata['jacobian_type'] != 'matvec':
+        if self.metadata['jacobian_type'] != 'matvec' and not self.metadata['finite_difference']:
             pd_type = self.metadata['partial_type']
             for i in range(self.metadata['num_var']):
                 in_var = self._cycle_names['x'].format(i)
