@@ -348,8 +348,7 @@ class TestGroup(unittest.TestCase):
                 # as our input.
                 self.add_input('x', np.ones((2,2)),
                                src_indices=[[(0,0), (3,1)],
-                                            [(2,1), (1,1)]],
-                               shape=(2,2))
+                                            [(2,1), (1,1)]])
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -449,8 +448,12 @@ class TestGroup(unittest.TestCase):
                             sidxs[-1].append(idxvals[i])
                             i += 1
 
+                if len(tgt_shape) == 1:
+                    tshape = None  # don't need to set shape if input is flat
+                else:
+                    tshape = tgt_shape
                 self.add_input('x', np.ones(4).reshape(tgt_shape),
-                               src_indices=sidxs, shape=tgt_shape)
+                               src_indices=sidxs, shape=tshape)
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
