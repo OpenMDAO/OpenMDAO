@@ -409,7 +409,7 @@ class Group(System):
 
     def _apply_nonlinear(self):
         """
-        Compute residuals.
+        Compute residuals. The model is assumed to be in a scaled state.
         """
         self._transfers[None](self._inputs, self._outputs, 'fwd')
         # Apply recursion
@@ -418,7 +418,7 @@ class Group(System):
 
     def _solve_nonlinear(self):
         """
-        Compute outputs.
+        Compute outputs. The model is assumed to be in a scaled state.
 
         Returns
         -------
@@ -433,7 +433,7 @@ class Group(System):
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """
-        Compute jac-vec product.
+        Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
@@ -473,7 +473,7 @@ class Group(System):
 
     def _solve_linear(self, vec_names, mode):
         """
-        Apply inverse jac product.
+        Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
@@ -495,7 +495,7 @@ class Group(System):
 
     def _linearize(self):
         """
-        Compute jacobian / factorization.
+        Compute jacobian / factorization. The model is assumed to be in a scaled state.
         """
         with self._jacobian_context() as J:
             for subsys in self._subsystems_myproc:
