@@ -74,7 +74,7 @@ body {
   line-height: 150%;
   text-align: center;
   /*in the main page, background-color is the color of the bars down the sides*/
-  /*background-color: #BFD1D4; /*blue*/*/
+  /*background-color: #BFD1D4; /*blue*/ */
   background-color: #66C2FF; /*blue*/
 
 
@@ -114,3 +114,40 @@ div.failed pre {
   background-color: rgba(255, 0, 0, 0.35);
 }
 
+
+/* The following sets up the In/Out blocks for embedded tests */
+div.input_prompt {
+    color: #303F9F;
+    float: left;
+}
+
+div.input_area {
+    border-radius: 2px;
+}
+
+div.output_prompt {
+    color: #D84315;
+    float: left;
+}
+
+div.output_area pre {
+    background-color: transparent;
+    border-radius: 2px;
+}
+
+div.highlight{
+  margin:.4em;
+  border:none;padding:0;
+  background-color:transparent;
+}
+
+.prompt {
+    min-width: 14ex;
+    padding: .4em;
+    margin: 0;
+    font-family: monospace;
+    text-align: left;
+    user-select: none;
+    cursor: default;
+}
+/* End of In/Out block markup */
