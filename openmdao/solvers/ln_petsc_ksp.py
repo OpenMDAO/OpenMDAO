@@ -1,8 +1,8 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
 from __future__ import division, print_function
-from six import iteritems
 import numpy
+from six import itervalues
 
 try:
     import petsc4py
