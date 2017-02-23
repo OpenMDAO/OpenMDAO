@@ -190,8 +190,7 @@ class Vector(object):
         """
         if new_array is None:
             inds = self._system._var_myproc_indices[self._typ]
-            sizes = self._assembler._variable_sizes_all[self._typ][self._iproc,
-                                                                   inds]
+            sizes = self._assembler._variable_sizes_all[self._typ][self._iproc, inds]
             new_array = numpy.zeros(numpy.sum(sizes))
 
         for ind, data in enumerate(self._data):
