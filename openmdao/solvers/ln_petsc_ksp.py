@@ -408,7 +408,7 @@ class PetscKSP(LinearSolver):
 
         size = 0
         global_var_sizes = system._assembler._variable_sizes_all['output']
-        for v_name, idx in iteritems(system._var_allprocs_indices['output']):
+        for idx in itervalues(system._var_allprocs_indices['output']):
             size += sum(global_var_sizes[:, idx])
 
         jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
