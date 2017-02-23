@@ -4,7 +4,7 @@ import unittest
 import scipy.sparse.linalg
 
 from openmdao.api import Problem, ImplicitComponent, Group
-from openmdao.api import ScipyIterativeSolver, LinearBlockJac, LinearBlockGS
+from openmdao.api import LinearBlockGS
 from openmdao.api import view_model
 
 class CompA(ImplicitComponent):
@@ -93,37 +93,35 @@ class Test(unittest.TestCase):
 
     def test_apply_linear(self):
         root = self.p.model
-
         root.suppress_solver_output = True
-        #root._solve_nonlinear()
 
-        root._vectors['output']['linear'].set_const(1.0)
-        root._apply_linear(['linear'], 'fwd')
-        output = root._vectors['residual']['linear']._data[0]
-        self.assertEqualArrays(output, [7, 3])
+        with root.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            d_outputs.set_const(1.0)
+            root.run_apply_linear(['linear'], 'fwd')
+            output = d_residuals._data[0]
+            self.assertEqualArrays(output, [7, 3])
 
-        root._vectors['residual']['linear'].set_const(1.0)
-        root._apply_linear(['linear'], 'rev')
-        output = root._vectors['output']['linear']._data[0]
-        self.assertEqualArrays(output, [7, 3])
+            d_residuals.set_const(1.0)
+            root.run_apply_linear(['linear'], 'rev')
+            output = d_outputs._data[0]
+            self.assertEqualArrays(output, [7, 3])
 
     def test_solve_linear(self):
         root = self.p.model
-
         root.suppress_solver_output = True
-        #root._solve_nonlinear()
 
-        root._vectors['residual']['linear'].set_const(11.0)
-        root._vectors['output']['linear'].set_const(0.0)
-        root._solve_linear(['linear'], 'fwd')
-        output = root._vectors['output']['linear']._data[0]
-        self.assertEqualArrays(output, [1, 5])
+        with root.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            d_residuals.set_const(11.0)
+            d_outputs.set_const(0.0)
+            root.run_solve_linear(['linear'], 'fwd')
+            output = d_outputs._data[0]
+            self.assertEqualArrays(output, [1, 5])
 
-        root._vectors['output']['linear'].set_const(11.0)
-        root._vectors['residual']['linear'].set_const(0.0)
-        root._solve_linear(['linear'], 'rev')
-        output = root._vectors['residual']['linear']._data[0]
-        self.assertEqualArrays(output, [1, 5])
+            d_outputs.set_const(11.0)
+            d_residuals.set_const(0.0)
+            root.run_solve_linear(['linear'], 'rev')
+            output = d_residuals._data[0]
+            self.assertEqualArrays(output, [1, 5])
 
 
 if __name__ == '__main__':

@@ -15,7 +15,6 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDeriv
 
 class TestProblem(unittest.TestCase):
 
-    @unittest.skip('correct behavior not implemented yet')
     def test_set_2d_array(self):
 
         prob = Problem(model=Group())
@@ -111,6 +110,36 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'x'], -6.0, 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], 8.0, 1e-6)
 
+    def test_compute_total_derivs_basic_return_dict(self):
+        # Make sure 'dict' return_format works.
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        prob.setup(check=False, mode='fwd')
+        prob.model.suppress_solver_output = True
+        prob.run_model()
+
+        of = ['f_xy']
+        wrt = ['x', 'y']
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+
+        assert_rel_error(self, derivs['f_xy']['x'], -6.0, 1e-6)
+        assert_rel_error(self, derivs['f_xy']['y'], 8.0, 1e-6)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+
+        of = ['f_xy']
+        wrt = ['x', 'y']
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+
+        assert_rel_error(self, derivs['f_xy']['x'], -6.0, 1e-6)
+        assert_rel_error(self, derivs['f_xy']['y'], 8.0, 1e-6)
+
     def test_feature_set_indeps(self):
         prob = Problem()
 
@@ -171,7 +200,6 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
 
-    # @unittest.skip("check_total_derivatives not implemented yet")
     def test_feature_check_total_derivatives_manual(self):
         raise unittest.SkipTest("check_total_derivatives not implemented yet")
 
@@ -189,7 +217,6 @@ class TestProblem(unittest.TestCase):
         # TODO: Need to devlop the group FD/CS api, so user can control how this
         #       happens by chaninging settings on the root node
 
-    # @unittest.skip("check_total_derivatives not implemented yet")
     def test_feature_check_total_derivatives_from_driver(self):
         raise unittest.SkipTest("check_total_derivatives not implemented yet")
 
@@ -217,7 +244,6 @@ class TestProblem(unittest.TestCase):
         # TODO: need a decorator to capture this output and put it into the doc,
         #       or maybe just a new kind of assert?
 
-    # @unittest.skip("drivers not implemented yet")
     def test_feature_run_driver(self):
         raise unittest.SkipTest("drivers not implemented yet")
 
@@ -272,9 +298,7 @@ class TestProblem(unittest.TestCase):
 
         assert_rel_error(self, prob['d1.y1'], 27.3049178437, 1e-6)
 
-    # @unittest.skip("set/get inputs via full path name not supported yet")
     def test_feature_promoted_sellar_set_get_inputs(self):
-        raise unittest.SkipTest("set/get inputs via full path name not supported yet")
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -321,9 +345,8 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 9.87161739688, 1e-6)
         assert_rel_error(self, prob['y2'], 8.14191301549, 1e-6)
 
-    # @unittest.skip('residualss accessor on Problem not implemented yet')
+    @unittest.skip('access via promoted names is not working yet')
     def test_feature_residuals(self):
-        raise unittest.SkipTest('residuals accessors on Problem not implemented yet')
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -336,8 +359,9 @@ class TestProblem(unittest.TestCase):
         prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
         prob.run_model()
 
-        self.assertLess(prob.residuals['y1'], 1e-6)
-        self.assertLess(prob.residuals['y2'], 1e-6)
+        with prob.model.nonlinear_vector_context() as (inputs, outputs, residuals):
+            self.assertLess(residuals['y1'], 1e-6)
+            self.assertLess(residuals['y2'], 1e-6)
 
     def test_setup_bad_mode(self):
         # Test error message when passing bad mode to setup.

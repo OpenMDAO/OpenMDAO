@@ -278,6 +278,7 @@ def __init__(self, docstring, config={}):
         'Parameters': [],
         'Options': [],
         'Returns': [],
+        'Yields': [],
         'Raises': [],
         'Warns': [],
         'Other Parameters': [],

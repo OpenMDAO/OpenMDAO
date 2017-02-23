@@ -11,6 +11,18 @@ from openmdao.api import ExecComp
 from openmdao.devtools.testutil import assert_rel_error
 
 
+class SpeedComp(ExplicitComponent):
+    """Simple speed computation from distance and time with unit conversations."""
+
+    def initialize_variables(self):
+        self.add_input('distance', val=1.0, units='km')
+        self.add_input('time', val=1.0, units='h')
+        self.add_output('speed', val=1.0, units='km/h')
+
+    def compute(self, inputs, outputs):
+        outputs['speed'] = inputs['distance'] / inputs['time']
+
+
 class SrcComp(ExplicitComponent):
     """Source provides degrees Celsius."""
 
@@ -139,6 +151,31 @@ class UnitConvGroupImplicitConns(Group):
 
 class TestUnitConversion(unittest.TestCase):
     """ Testing automatic unit conversion."""
+
+    def test_speed(self):
+        comp = IndepVarComp()
+        comp.add_output('distance', val=1., units='m')
+        comp.add_output('time', val=1., units='s')
+
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('c1', comp)
+        prob.model.add_subsystem('c2', SpeedComp())
+        prob.model.add_subsystem('c3', ExecComp('f=speed', units={'speed': 'm/s'}))
+        prob.model.connect('c1.distance', 'c2.distance')
+        prob.model.connect('c1.time', 'c2.time')
+        prob.model.connect('c2.speed', 'c3.speed')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['c1.distance'], 1.)  # units: m
+        assert_rel_error(self, prob['c2.distance'], 1.e-3)  # units: km
+
+        assert_rel_error(self, prob['c1.time'], 1.)  # units: s
+        assert_rel_error(self, prob['c2.time'], 1./3600.)  # units: h
+
+        assert_rel_error(self, prob['c2.speed'], 3.6)  # units: km/h
+        assert_rel_error(self, prob['c3.f'], 1.0)  # units: km/h
 
     def test_basic(self):
         """Test that output values and total derivatives are correct."""

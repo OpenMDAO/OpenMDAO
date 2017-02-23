@@ -116,7 +116,7 @@ class Test(unittest.TestCase):
                     [compB._outputs['f'],  0],
                 ])
 
-            root._solve_nonlinear()
+            root.run_solve_nonlinear()
 
             if root.comm.rank == 0:
                 self.assertList([
