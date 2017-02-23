@@ -315,8 +315,10 @@ class Problem(object):
                                      model._var_allprocs_names)
 
         # Assembler setup: global transfer indices vector
-        assembler._setup_src_indices(model._var_myproc_metadata['input'],
-                                     model._var_myproc_indices['input'])
+        assembler._setup_src_indices(model._var_myproc_metadata,
+                                     model._var_myproc_indices['input'],
+                                     model._var_pathdict,
+                                     model._var_allprocs_pathnames)
 
         # Assembler setup: compute data required for units/scaling
         assembler._setup_src_data(model._var_myproc_metadata['output'],

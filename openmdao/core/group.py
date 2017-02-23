@@ -288,7 +288,7 @@ class Group(System):
                             pass
                         else:
                             meta = input_meta[in_myproc_index]
-                            meta['src_indices'] = np.array(src_indices, dtype=int)
+                            meta['src_indices'] = np.atleast_1d(src_indices)
 
                         # set src_indices to None to avoid unnecessary repeat
                         # of setting indices and shape metadata when we have

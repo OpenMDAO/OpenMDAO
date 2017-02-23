@@ -1,6 +1,8 @@
 """Define the base Assembler class."""
 
 from __future__ import division
+
+from itertools import product
 import numpy
 
 from six.moves import range
@@ -186,7 +188,8 @@ class Assembler(object):
 
         self._input_src_ids = _input_src_ids
 
-    def _setup_src_indices(self, input_metadata, myproc_var_global_indices):
+    def _setup_src_indices(self, metadata, myproc_var_global_indices,
+                           var_pathdict, var_allprocs_pathnames):
         """
         Assemble global list of src_indices.
 
@@ -196,17 +199,24 @@ class Assembler(object):
 
         Parameters
         ----------
-        input_metadata : [{}, ...]
-            list of metadata dictionaries of inputs that exist on this proc.
+        metadata : {'input': [{}, ...], 'output': [{}, ...]}
+            list of metadata dictionaries of variables that exist on this proc.
         myproc_var_global_indices : ndarray[:]
             integer arrays of global indices of variables on this proc.
+        var_pathdict : dict
+            dict that maps absolute pathname to promoted name, global and local index.
+        var_allprocs_pathnames : {'input': [], 'output': []}
+            absolute pathnames for each input and output var.
         """
+        input_metadata = metadata['input']
+        output_metadata = metadata['output']
+
         # Compute total size of indices vector
         total_idx_size = 0
         sizes = numpy.zeros(len(input_metadata), dtype=int)
 
-        for ind, metadata in enumerate(input_metadata):
-            sizes[ind] = numpy.prod(metadata['shape'])
+        for ind, meta in enumerate(input_metadata):
+            sizes[ind] = numpy.prod(meta['shape'])
 
         total_idx_size = numpy.sum(sizes)
 
@@ -217,14 +227,36 @@ class Assembler(object):
 
         # Populate arrays
         ind1, ind2 = 0, 0
-        for ind, metadata in enumerate(input_metadata):
+        for ind, meta in enumerate(input_metadata):
             isize = sizes[ind]
             ind2 += isize
-            src_indices = metadata['src_indices']
+            src_indices = meta['src_indices']
             if src_indices is None:
                 self._src_indices[ind1:ind2] = numpy.arange(isize, dtype=int)
+            elif src_indices.ndim == 1:
+                self._src_indices[ind1:ind2] = src_indices
             else:
-                self._src_indices[ind1:ind2] = src_indices.flat
+                src_id = self._input_src_ids[myproc_var_global_indices[ind]]
+                if src_id == -1:  # input is not connected
+                    self._src_indices[ind1:ind2] = numpy.arange(isize, dtype=int)
+                else:
+                    pdata = var_pathdict[var_allprocs_pathnames['output'][src_id]]
+                    # TODO: the src may not be in this processes and we need its shape
+                    if pdata.myproc_idx is None:
+                        raise NotImplementedError("accessing source metadata from "
+                                                  "another process isn't supported "
+                                                  "yet.")
+                    src_shape = output_metadata[pdata.myproc_idx]['shape']
+                    if len(src_shape) == 1:
+                        self._src_indices[ind1:ind2] = src_indices.flat
+                    else:
+                        tgt_shape = meta['shape']
+                        # loop over src_indices tuples to get indices into the source
+                        entries = [list(range(x)) for x in tgt_shape]
+                        cols = numpy.vstack(src_indices[i] for i in product(*entries))
+                        dimidxs = [cols[:, i] for i in range(cols.shape[1])]
+                        self._src_indices[ind1:ind2] = numpy.ravel_multi_index(dimidxs, src_shape)
+
             self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
                                                                           ind2]
             ind1 += isize
