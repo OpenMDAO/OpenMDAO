@@ -8,7 +8,6 @@ additional MPI capability.
 
 from __future__ import print_function
 from collections import OrderedDict
-import os
 import traceback
 
 from six import iteritems
@@ -424,48 +423,3 @@ class pyOptSparseDriver(Driver):
         # print(dv_dict)
         # print(sens_dict)
         return sens_dict, fail
-
-
-def set_pyoptsparse_opt(optname):
-    """
-    For testing, sets the pyoptsparse optimizer using the given optimizer name.
-
-    This may be modified based on the value of
-    OPENMDAO_FORCE_PYOPTSPARSE_OPT. This can be used on systems that have
-    SNOPT installed to force them to use SLSQP in order to mimic our test
-    machines on travis and appveyor.
-
-    Parameters
-    ----------
-    optname : str
-        Name of pyoptsparse optimizer that is requested by the test.
-
-    Returns
-    -------
-    object
-        Pyoptsparse optimizer instance.
-    str
-        Pyoptsparse optimizer string
-    """
-    OPT = None
-    OPTIMIZER = None
-    force = os.environ.get('OPENMDAO_FORCE_PYOPTSPARSE_OPT')
-    if force:
-        optname = force
-
-    try:
-        from pyoptsparse import OPT
-        try:
-            OPT(optname)
-            OPTIMIZER = optname
-        except Exception as exc:
-            if optname != 'SLSQP':
-                try:
-                    OPT('SLSQP')
-                    OPTIMIZER = 'SLSQP'
-                except Exception as exc:
-                    pass
-    except Exception as exc:
-        pass
-
-    return OPT, OPTIMIZER
