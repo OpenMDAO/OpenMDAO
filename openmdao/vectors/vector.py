@@ -21,31 +21,31 @@ class Vector(object):
     Attributes
     ----------
     _name : str
-        right-hand-side (RHS) name.
+        The name of the vector: 'nonlinear', 'linear', or right-hand side name.
     _typ : str
-        'input' or 'output'.
+        Type: 'input' for input vectors; 'output' for output/residual vectors.
     _assembler : Assembler
-        pointer to the assembler.
+        Pointer to the assembler.
     _system : System
-        pointer to the owning system.
+        Pointer to the owning system.
     _iproc : int
-        global processor index.
+        Global processor index.
     _views : dict
-        dictionary mapping variable names to the ndarray views.
+        Dictionary mapping variable names to the ndarray views.
     _views_flat : dict
-        dictionary mapping variable names to the flattened ndarray views.
+        Dictionary mapping variable names to the flattened ndarray views.
     _idxs : dict
-        0 or slice(None), used so that 1-sized vectors are made floats.
+        Either 0 or slice(None), used so that 1-sized vectors are made floats.
     _names : set([str, ...])
-        set of variables that are relevant in the current context.
+        Set of variables that are relevant in the current context.
     _root_vector : Vector
-        pointer to the vector owned by the root system.
+        Pointer to the vector owned by the root system.
     _data : list
-        list of the actual allocated data (depends on implementation).
+        List of the actual allocated data (depends on implementation).
     _indices : list
-        list of indices mapping the varset-grouped data to the global vector.
+        List of indices mapping the varset-grouped data to the global vector.
     _ivar_map : list[nvar_set] of int ndarray[size]
-        list of index arrays mapping each entry to its variable index.
+        List of index arrays mapping each entry to its variable index.
     """
 
     def __init__(self, name, typ, system, root_vector=None):
@@ -55,13 +55,13 @@ class Vector(object):
         Parameters
         ----------
         name : str
-            right-hand-side (RHS) name.
+            The name of the vector: 'nonlinear', 'linear', or right-hand side name.
         typ : str
-            'input' for input vectors; 'output' for output/residual vectors.
+            Type: 'input' for input vectors; 'output' for output/residual vectors.
         system : <System>
-            pointer to the owning system.
+            Pointer to the owning system.
         root_vector : <Vector>
-            pointer to the vector owned by the root system.
+            Pointer to the vector owned by the root system.
         """
         self._name = name
         self._typ = typ
@@ -190,8 +190,7 @@ class Vector(object):
         """
         if new_array is None:
             inds = self._system._var_myproc_indices[self._typ]
-            sizes = self._assembler._variable_sizes_all[self._typ][self._iproc,
-                                                                   inds]
+            sizes = self._assembler._variable_sizes_all[self._typ][self._iproc, inds]
             new_array = numpy.zeros(numpy.sum(sizes))
 
         for ind, data in enumerate(self._data):
@@ -257,7 +256,7 @@ class Vector(object):
         Parameters
         ----------
         key : str
-            variable name in the owning system's namespace.
+            Variable name in the owning system's namespace.
 
         Returns
         -------
@@ -276,7 +275,7 @@ class Vector(object):
         Parameters
         ----------
         key : str
-            variable name in the owning system's namespace.
+            Variable name in the owning system's namespace.
         value : float or list or tuple or ndarray
             variable value to set (not scaled, not dimensionless)
         """

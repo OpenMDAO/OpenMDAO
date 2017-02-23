@@ -1,6 +1,8 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
 from __future__ import division, print_function
+import numpy
+from six import itervalues
 
 try:
     import petsc4py
@@ -400,13 +402,14 @@ class PetscKSP(LinearSolver):
         if vec_name in self._ksp:
             return self._ksp[vec_name]
 
-        rank = system.comm.rank + system._mpi_proc_range[0]
+        lsize = 0
+        for metadata in system._var_myproc_metadata['output']:
+            lsize += numpy.prod(metadata['shape'])
 
-        lsizes = system._assembler._variable_sizes_all['output'][rank]
-        sizes = sum(system._assembler._variable_sizes_all['output'])
-
-        lsize = sum(lsizes)
-        size = sum(sizes)
+        size = 0
+        global_var_sizes = system._assembler._variable_sizes_all['output']
+        for idx in itervalues(system._var_allprocs_indices['output']):
+            size += sum(global_var_sizes[:, idx])
 
         jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
                                            comm=system.comm)
