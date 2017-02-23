@@ -40,7 +40,7 @@ class Component(System):
         self._var2meta = {}
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
-                  desc='', var_set=0, src_shape=None):
+                  desc='', var_set=0):
         """
         Add an input variable to the component.
 
@@ -67,10 +67,6 @@ class Component(System):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for
             reconfigurability. Default is 0.
-        src_shape : int or tuple or list or None
-            Shape of the source variable connected to this input.  This is only needed if
-            src_indices is also specified and either shape is not given or val is not
-            given or is a scalar.
         """
         # First, type check all arguments
         if not isinstance(name, str):
@@ -95,8 +91,7 @@ class Component(System):
         # value, shape: based on args, making sure they are compatible
         metadata['value'], metadata['shape'] = ensure_compatible(name, val,
                                                                  shape,
-                                                                 src_indices,
-                                                                 src_shape)
+                                                                 src_indices)
 
         # src_indices: None or ndarray
         if src_indices is None:

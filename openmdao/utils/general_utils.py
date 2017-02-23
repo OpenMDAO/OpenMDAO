@@ -27,7 +27,7 @@ def warn_deprecation(msg):
     warnings.simplefilter('ignore', DeprecationWarning)
 
 
-def ensure_compatible(name, value, shape=None, indices=None, src_shape=None):
+def ensure_compatible(name, value, shape=None, indices=None):
     """
     Make value compatible with the specified shape or the shape of indices.
 
@@ -42,9 +42,6 @@ def ensure_compatible(name, value, shape=None, indices=None, src_shape=None):
     indices : int or list of ints or tuple of ints or int ndarray or None
         The indices of a source variable, used to determine shape if shape is None.
         If shape is not None, the shape of the indices must match shape.
-    src_shape : int or tuple or list or None
-        Only valid if named variable is an input and indices are defined, shape is not,
-        and val is either not defined or is a scalar.
 
     Returns
     -------
@@ -62,8 +59,6 @@ def ensure_compatible(name, value, shape=None, indices=None, src_shape=None):
     if indices is not None:
         indices = np.atleast_1d(indices)
         ind_shape = indices.shape
-        if src_shape is not None and len(src_shape) > 1:
-            ind_shape = ind_shape[:-1]
 
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
@@ -74,6 +69,12 @@ def ensure_compatible(name, value, shape=None, indices=None, src_shape=None):
     elif not np.isscalar(value):
         shape = np.atleast_1d(value).shape
     elif indices is not None:
+        if len(ind_shape) > 1:
+            raise RuntimeError("src_indices for '%s' is not flat, so its input "
+                               "shape must be provided. src_indices may contain "
+                               "an extra dimension if the connected source is "
+                               "non-flat, making the input shape ambiguous." %
+                               name)
         shape = ind_shape
 
     if shape is None:
@@ -93,10 +94,10 @@ def ensure_compatible(name, value, shape=None, indices=None, src_shape=None):
                                  (name, shape, value.shape))
 
     # finally make sure shape of indices is compatible
-    if indices is not None and ind_shape != shape:
+    if indices is not None and shape != ind_shape[:len(shape)]:
         raise ValueError("Shape of indices does not match shape for '%s': "
                          "Expected %s but got %s." %
-                         (name, shape, ind_shape))
+                         (name, shape, ind_shape[:len(shape)]))
 
     return value, shape
 

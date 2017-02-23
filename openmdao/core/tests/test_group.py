@@ -349,7 +349,7 @@ class TestGroup(unittest.TestCase):
                 self.add_input('x', np.ones((2,2)),
                                src_indices=[[(0,0), (3,1)],
                                             [(2,1), (1,1)]],
-                               src_shape=(4,3))
+                               shape=(2,2))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -371,6 +371,31 @@ class TestGroup(unittest.TestCase):
                          np.array([[0., 10.],
                                    [7., 4.]]), 0.00001)
         assert_rel_error(self, p['C1.y'], 21., 0.00001)
+
+    def test_promote_src_indices_nonflat_to_scalars(self):
+        class MyComp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x', 1.0,
+                               src_indices=[(3,1)], shape=(1,))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+        p = Problem(model=Group())
+
+        # by promoting the following output and inputs to 'x', they will
+        # be automatically connected
+        p.model.add_subsystem('indep',
+                              IndepVarComp('x', np.arange(12).reshape((4,3))),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.x'], 10., 0.00001)
+        assert_rel_error(self, p['C1.y'], 10., 0.00001)
 
     @parameterized.expand(itertools.product(
         [(4,3), (1,12), (12,), (12,1)],
@@ -400,7 +425,7 @@ class TestGroup(unittest.TestCase):
                             i += 1
 
                 self.add_input('x', np.ones(4).reshape(tgt_shape),
-                               src_indices=sidxs, src_shape=src_shape)
+                               src_indices=sidxs, shape=tgt_shape)
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
