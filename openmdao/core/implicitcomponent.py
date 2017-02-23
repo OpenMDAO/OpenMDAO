@@ -5,7 +5,7 @@ from __future__ import division
 import collections
 
 import numpy
-from six import string_types
+from six import string_types, itervalues
 
 from openmdao.core.component import Component
 
@@ -131,6 +131,8 @@ class ImplicitComponent(Component):
         with self._jacobian_context() as J:
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                              scale_jac=True):
+                for approximation in itervalues(self._approx_schemes):
+                    approximation.compute_approximation(self)
                 self.linearize(self._inputs, self._outputs, J)
 
             if self._owns_global_jac:

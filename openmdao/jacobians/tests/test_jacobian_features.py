@@ -75,6 +75,16 @@ class SimpleCompConst(SimpleComp):
     def compute_partial_derivs(self, inputs, outputs, partials):
         pass
 
+class SimpleCompFD(SimpleComp):
+    def initialize_partials(self):
+        self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
+        self.declare_partials('g', 'z', dependent=False)
+
+        self.approx_partials('*', '*')
+
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        pass
+
 
 class SimpleCompKwarg(SimpleComp):
     def __init__(self, partial_kwargs):
@@ -214,6 +224,32 @@ class TestJacobianFeatures(unittest.TestCase):
         jacobian['g', 'z'] = np.zeros((4, 4))
 
         assert_rel_error(self, totals, jacobian)
+
+    def test_fd(self):
+        comp = SimpleCompFD()
+        problem = self.problem
+        model = problem.model
+        model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
+
+        problem.setup(check=True)
+        problem.run_model()
+        totals = problem.compute_total_derivs(['f', 'g'],
+                                              ['x', 'y1', 'y2', 'y3', 'z'])
+        jacobian = {}
+        jacobian['f', 'x'] = 1.
+        jacobian['f', 'z'] = np.ones((1, 4))
+        jacobian['f', 'y1'] = np.zeros((1, 2))
+        jacobian['f', 'y2'] = np.zeros((1, 2))
+        jacobian['f', 'y3'] = np.zeros((1, 2))
+
+        jacobian['g', 'y1'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+        jacobian['g', 'y2'] = [[1, 0], [0, 1], [1, 0], [0, 1]]
+        jacobian['g', 'y3'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+
+        jacobian['g', 'x'] = [[1], [0], [0], [1]]
+        jacobian['g', 'z'] = np.zeros((4, 4))
+
+        assert_rel_error(self, totals, jacobian, 1e-8)
 
 
 if __name__ == '__main__':
