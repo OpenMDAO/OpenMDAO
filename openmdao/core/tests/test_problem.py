@@ -329,9 +329,9 @@ class TestProblem(unittest.TestCase):
         prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
         prob.run_model()
 
-        with prob.model.nonlinear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            self.assertLess(d_residuals['y1'], 1e-6)
-            self.assertLess(d_residuals['y2'], 1e-6)
+        with prob.model.nonlinear_vector_context() as (inputs, outputs, residuals):
+            self.assertLess(residuals['y1'], 1e-6)
+            self.assertLess(residuals['y2'], 1e-6)
 
     def test_setup_bad_mode(self):
         # Test error message when passing bad mode to setup.
