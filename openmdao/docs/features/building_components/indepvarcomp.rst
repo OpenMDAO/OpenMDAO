@@ -44,14 +44,5 @@ Usage
 
 5. Define two independent variables using the :code:`add_output` method with additional options.
 
-.. embed-test::
-    openmdao.core.tests.test_component.TestIndepVarComp.test_add_output
-
-checking out the new embed test
-
-.. embed-test::
-    openmdao.core.tests.test_problem.TestProblem.test_compute_total_derivs_basic
-
-.. embed-test::
-    openmdao.core.tests.test_problem.TestProblem.test_compute_total_derivs_basic
-    :no-split:
+  .. embed-test::
+      openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_add_output

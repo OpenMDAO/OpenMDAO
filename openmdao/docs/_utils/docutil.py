@@ -488,7 +488,7 @@ def extract_output_blocks(run_output):
         if line.startswith('>>>>>'):
             output_blocks.append(output_block)
             output_block = ''
-        else:            
+        else:
             output_block += line + '\n'
 
     return output_blocks
@@ -498,7 +498,7 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     1. Get the source code for a unit test method
     2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned
     3. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks
-    4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned 
+    4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
             to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators
     5. Run the test using source_with_out_start_stop_indicators -> run_outputs
     6. Extract from run_outputs, the Out blocks -> output_blocks
