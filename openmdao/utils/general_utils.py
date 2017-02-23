@@ -1,7 +1,6 @@
 """Some miscellaneous utility functions."""
 from __future__ import division
 
-import os
 import sys
 import warnings
 from six import string_types
@@ -154,51 +153,6 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
     scaler = format_as_float_or_array('scaler', scaler, val_if_none=1.0, flatten=True)
 
     return adder, scaler
-
-
-def set_pyoptsparse_opt(optname):
-    """
-    For testing, sets the pyoptsparse optimizer using the given optimizer name.
-
-    This may be modified based on the value of
-    OPENMDAO_FORCE_PYOPTSPARSE_OPT. This can be used on systems that have
-    SNOPT installed to force them to use SLSQP in order to mimic our test
-    machines on travis and appveyor.
-
-    Parameters
-    ----------
-    optname : str
-        Name of pyoptsparse optimizer that is requested by the test.
-
-    Returns
-    -------
-    object
-        Pyoptsparse optimizer instance.
-    str
-        Pyoptsparse optimizer string
-    """
-    OPT = None
-    OPTIMIZER = None
-    force = os.environ.get('OPENMDAO_FORCE_PYOPTSPARSE_OPT')
-    if force:
-        optname = force
-
-    try:
-        from pyoptsparse import OPT
-        try:
-            OPT(optname)
-            OPTIMIZER = optname
-        except Exception as exc:
-            if optname != 'SLSQP':
-                try:
-                    OPT('SLSQP')
-                    OPTIMIZER = 'SLSQP'
-                except Exception as exc:
-                    pass
-    except Exception as exc:
-        pass
-
-    return OPT, OPTIMIZER
 
 
 def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
