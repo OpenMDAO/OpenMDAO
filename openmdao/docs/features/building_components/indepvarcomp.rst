@@ -24,23 +24,23 @@ Usage
 
 1. Define one independent variable and set its value.
 
-  .. embed-test::
-      openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_simple
+.. embed-test::
+    openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_simple
 
 2. Define one independent variable with a default value.
 
-  .. embed-test::
-      openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_simple_default
+.. embed-test::
+    openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_simple_default
 
 3. Define one independent variable with a default value and additional options.
 
-  .. embed-test::
-      openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_simple_kwargs
+.. embed-test::
+    openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_simple_kwargs
 
 4. Define one independent array variable.
 
-  .. embed-test::
-      openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_simple_array
+.. embed-test::
+    openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_simple_array
 
 5. Define two independent variables using the :code:`add_output` method with additional options.
 
