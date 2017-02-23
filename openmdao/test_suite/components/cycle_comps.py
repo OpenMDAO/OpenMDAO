@@ -232,7 +232,7 @@ class ExplicitCycleComp(ExplicitComponent):
                 raise unittest.SkipTest('only dense FD supported')
             self.approx_partials('*', '*')
 
-        if self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
+        elif self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
             num_var = self.num_var
             var_shape = self.var_shape
             var_size = np.prod(var_shape)

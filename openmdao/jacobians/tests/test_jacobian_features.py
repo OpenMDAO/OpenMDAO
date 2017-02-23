@@ -10,7 +10,6 @@ from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseM
      GlobalJacobian, CSRmatrix, COOmatrix, ScipyIterativeSolver
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.test_suite.parametric_suite import _cartesian_dict_product
 
 
 class SimpleComp(ExplicitComponent):
