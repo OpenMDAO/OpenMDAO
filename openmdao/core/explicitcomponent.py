@@ -15,7 +15,7 @@ class ExplicitComponent(Component):
 
     def _apply_nonlinear(self):
         """
-        Compute residuals.
+        Compute residuals. The model is assumed to be in a scaled state.
         """
         with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                          residuals=[self._residuals]):
@@ -26,7 +26,7 @@ class ExplicitComponent(Component):
 
     def _solve_nonlinear(self):
         """
-        Compute outputs.
+        Compute outputs. The model is assumed to be in a scaled state.
 
         Returns
         -------
@@ -46,7 +46,7 @@ class ExplicitComponent(Component):
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """
-        Compute jac-vec product.
+        Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
@@ -78,7 +78,7 @@ class ExplicitComponent(Component):
 
     def _solve_linear(self, vec_names, mode):
         """
-        Apply inverse jac product.
+        Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
@@ -110,7 +110,7 @@ class ExplicitComponent(Component):
 
     def _linearize(self):
         """
-        Compute jacobian / factorization.
+        Compute jacobian / factorization. The model is assumed to be in a scaled state.
         """
         with self._jacobian_context() as J:
             # negate constant subjacs (and others that will get overwritten)
@@ -180,7 +180,7 @@ class ExplicitComponent(Component):
 
     def compute(self, inputs, outputs):
         """
-        Compute outputs given inputs.
+        Compute outputs given inputs. The model is assumed to be in an unscaled state.
 
         Parameters
         ----------
@@ -198,7 +198,7 @@ class ExplicitComponent(Component):
 
     def compute_partial_derivs(self, inputs, outputs, partials):
         """
-        Compute sub-jacobian parts / factorization.
+        Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
 
         Parameters
         ----------
@@ -214,7 +214,7 @@ class ExplicitComponent(Component):
     def compute_jacvec_product(self, inputs, outputs,
                                d_inputs, d_outputs, mode):
         r"""
-        Compute jac-vector product.
+        Compute jac-vector product. The model is assumed to be in an unscaled state.
 
         If mode is:
             'fwd': d_inputs \|-> d_outputs

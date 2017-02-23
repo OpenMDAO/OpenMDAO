@@ -99,10 +99,13 @@ class DefaultVector(Vector):
             list of zeros arrays of correct size, one for each var_set.
         """
         variable_sizes = self._assembler._variable_sizes[self._typ]
+        variable_sizes_all = self._assembler._variable_sizes_all[self._typ]
         variable_set_indices = self._assembler._variable_set_indices[self._typ]
 
         ind1, ind2 = self._system._var_allprocs_range[self._typ]
         sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
+
+        ind_offset = numpy.sum(variable_sizes_all[self._iproc, :ind1])
 
         data = []
         indices = []
@@ -114,8 +117,7 @@ class DefaultVector(Vector):
                 ind1 = numpy.sum(sizes_array[self._iproc, :data_inds[0]])
                 ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
                 data.append(self._root_vector._data[iset][ind1:ind2])
-                indices.append(self._root_vector._indices[iset][ind1:ind2] -
-                               ind1)
+                indices.append(self._root_vector._indices[iset][ind1:ind2] - ind_offset)
             else:
                 data.append(numpy.zeros(0))
                 indices.append(numpy.zeros(0, int))

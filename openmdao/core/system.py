@@ -80,8 +80,8 @@ class System(object):
         list of metadata dictionaries of variables that exist on this proc.
     _var_pathdict : dict
         maps full variable pathname to local name, index and I/O type
-    _var_name2path = dict
-        maps local var name to full pathname
+    _var_name2path : dict
+        maps local var name to full pathname.
     _var_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
         integer arrays of global indices of variables on this proc.
     _var_maps : {'input': dict, 'output': dict}
@@ -1454,6 +1454,8 @@ class System(object):
     def run_apply_nonlinear(self):
         """
         Compute residuals.
+
+        This calls _apply_nonlinear, but with the model assumed to be in an unscaled state.
         """
         with self._scaled_context():
             self._apply_nonlinear()
@@ -1461,6 +1463,8 @@ class System(object):
     def run_solve_nonlinear(self):
         """
         Compute outputs.
+
+        This calls _solve_nonlinear, but with the model assumed to be in an unscaled state.
 
         Returns
         -------
@@ -1480,6 +1484,8 @@ class System(object):
         """
         Compute jac-vec product.
 
+        This calls _apply_linear, but with the model assumed to be in an unscaled state.
+
         Parameters
         ----------
         vec_names : [str, ...]
@@ -1496,6 +1502,8 @@ class System(object):
     def run_solve_linear(self, vec_names, mode):
         """
         Apply inverse jac product.
+
+        This calls _solve_linear, but with the model assumed to be in an unscaled state.
 
         Parameters
         ----------
@@ -1521,19 +1529,21 @@ class System(object):
     def run_linearize(self):
         """
         Compute jacobian / factorization.
+
+        This calls _linearize, but with the model assumed to be in an unscaled state.
         """
         with self._scaled_context():
             self._linearize()
 
     def _apply_nonlinear(self):
         """
-        Compute residuals.
+        Compute residuals. The model is assumed to be in a scaled state.
         """
         pass
 
     def _solve_nonlinear(self):
         """
-        Compute outputs.
+        Compute outputs. The model is assumed to be in a scaled state.
 
         Returns
         -------
@@ -1548,7 +1558,7 @@ class System(object):
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """
-        Compute jac-vec product.
+        Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
@@ -1564,7 +1574,7 @@ class System(object):
 
     def _solve_linear(self, vec_names, mode):
         """
-        Apply inverse jac product.
+        Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
@@ -1586,7 +1596,7 @@ class System(object):
 
     def _linearize(self):
         """
-        Compute jacobian / factorization.
+        Compute jacobian / factorization. The model is assumed to be in a scaled state.
         """
         pass
 
