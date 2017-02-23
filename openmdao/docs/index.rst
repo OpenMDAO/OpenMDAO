@@ -45,6 +45,8 @@ Building components
    features/building_components/indepvarcomp
    features/building_components/explicitcomp
    features/building_components/implicitcomp
+   features/building_components/units
+   features/building_components/scaling
 
 Grouping components for more complex models
 ===========================================
