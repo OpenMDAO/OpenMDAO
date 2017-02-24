@@ -301,6 +301,23 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C2.x'], np.ones(2), 0.00001)
         assert_rel_error(self, p['C2.y'], 8., 0.00001)
 
+    def test_connect_src_indices_noflat(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.arange(12).reshape((4,3))))
+        p.model.add_subsystem('C1', ExecComp('y=numpy.sum(x)*2.0', x=np.zeros((2,2))))
+
+        # connect C1.x to entries (0,0), (3,1), (2,1), (1,1) of indep.x
+        p.model.connect('indep.x', 'C1.x',
+                        src_indices=[[(0,0), (3,1)],
+                                     [(2,1), (1,1)]])
+
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.x'], np.array([[0., 10.],
+                                                    [7., 4.]]), 0.00001)
+        assert_rel_error(self, p['C1.y'], 42., 0.00001)
+
     def test_promote_src_indices(self):
         class MyComp1(ExplicitComponent):
             def initialize_variables(self):
@@ -526,7 +543,7 @@ class TestConnect(unittest.TestCase):
 
     def test_src_indices_as_float_list(self):
         msg = "src_indices must contain integers, but src_indices for " + \
-              "connection from 'src.x' to 'tgt.x' contains non-integers."
+              "connection from 'src.x' to 'tgt.x' is <.* 'numpy.float64'>."
 
         with assertRaisesRegex(self, TypeError, msg):
             self.sub.connect('src.x', 'tgt.x', src_indices=[1.0])

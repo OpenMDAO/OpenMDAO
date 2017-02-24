@@ -36,3 +36,9 @@ unit conversion.
 
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_connect_src_indices
+
+4. Connect only part of a non-flat array output to a non-flat array
+input.
+
+.. embed-test::
+    openmdao.core.tests.test_group.TestGroup.test_connect_src_indices_noflat
