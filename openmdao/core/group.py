@@ -135,18 +135,14 @@ class Group(System):
             raise TypeError("src_indices must be an index array, did you mean"
                             " connect('%s', %s)?" % (out_name, in_name))
 
+        if isinstance(src_indices, Iterable):
+            src_indices = np.atleast_1d(src_indices)
+
         if isinstance(src_indices, np.ndarray):
             if not np.issubdtype(src_indices.dtype, np.integer):
                 raise TypeError("src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
                                 (out_name, in_name, src_indices.dtype.type))
-        elif isinstance(src_indices, Iterable):
-            types_in_src_idxs = set(type(idx) for idx in src_indices)
-            for t in types_in_src_idxs:
-                if not np.issubdtype(t, np.integer):
-                    raise TypeError("src_indices must contain integers, but src_indices for "
-                                    "connection from '%s' to '%s' contains non-integers." %
-                                    (out_name, in_name))
 
         # if multiple targets are given, recursively connect to each
         if isinstance(in_name, (list, tuple)):
@@ -288,7 +284,7 @@ class Group(System):
                             pass
                         else:
                             meta = input_meta[in_myproc_index]
-                            meta['src_indices'] = np.array(src_indices, dtype=int)
+                            meta['src_indices'] = np.atleast_1d(src_indices)
 
                         # set src_indices to None to avoid unnecessary repeat
                         # of setting indices and shape metadata when we have

@@ -132,7 +132,6 @@ language = None
 
 # exclude_patterns is a list of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-print ("TAGS: ", tags)
 if tags.has("usr") or tags.has("dev"):
     from openmdao.docs._utils.generate_sourcedocs import generate_docs
     if tags.has("usr"):

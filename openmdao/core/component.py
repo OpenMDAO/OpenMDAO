@@ -3,6 +3,7 @@
 from __future__ import division
 
 import sys
+import inspect
 
 from fnmatch import fnmatchcase
 import numpy
@@ -14,7 +15,8 @@ from copy import deepcopy
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
-from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible
+from openmdao.utils.general_utils import \
+    format_as_float_or_array, ensure_compatible, warn_deprecation
 
 
 class Component(System):
@@ -68,6 +70,11 @@ class Component(System):
             For advanced users only. ID or color for this variable, relevant for
             reconfigurability. Default is 0.
         """
+        if inspect.stack()[1][3] == '__init__':
+            warn_deprecation("In the future, the 'add_input' method must be "
+                             "called from 'initialize_variables' rather than "
+                             "in the '__init__' function.")
+
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
@@ -89,7 +96,9 @@ class Component(System):
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape, src_indices)
+        metadata['value'], metadata['shape'] = ensure_compatible(name, val,
+                                                                 shape,
+                                                                 src_indices)
 
         # src_indices: None or ndarray
         if src_indices is None:
@@ -160,6 +169,11 @@ class Component(System):
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
         """
+        if inspect.stack()[1][3] == '__init__':
+            warn_deprecation("In the future, the 'add_output' method must be "
+                             "called from 'initialize_variables' rather than "
+                             "in the '__init__' function.")
+
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
