@@ -434,24 +434,22 @@ class TestGroup(unittest.TestCase):
                          "the input shape ambiguous.")
 
     @parameterized.expand(itertools.product(
-        [(4,3), (1,12), (12,), (12,1)],
+        [((4,3),  [(0,0), (3,1), (2,1), (1,1)]),
+         ((1,12), [(0,0), (0,10), (0,7), (0,4)]),
+         ((12,),  [0, 10, 7, 4]),
+         ((12,1), [(0,0), (10,0), (7,0), (4,0)])],
         [(2,2), (4,), (4,1), (1,4)],
         ), testcase_func_name=lambda f, n, p: 'test_promote_src_indices_'+'_'.join(str(a) for a in p.args)
     )
-    def test_promote_src_indices_param(self, src_shape, tgt_shape):
+    def test_promote_src_indices_param(self, src_info, tgt_shape):
+        src_shape, idxvals = src_info
         class MyComp(ExplicitComponent):
             def initialize_variables(self):
-                if len(src_shape) == 1:
-                    idxvals = [0, 10, 7, 4]
-                elif src_shape[0] == 1:
-                    idxvals = [(0,0), (0,10), (0,7), (0,4)]
-                elif src_shape[1] == 1:
-                    idxvals = [(0,0), (10,0), (7,0), (4,0)]
-                else:
-                    idxvals = [(0,0), (3,1), (2,1), (1,1)]
                 if len(tgt_shape) == 1:
+                    tshape = None  # don't need to set shape if input is flat
                     sidxs = idxvals
                 else:
+                    tshape = tgt_shape
                     sidxs = []
                     i = 0
                     for r in range(tgt_shape[0]):
@@ -460,10 +458,6 @@ class TestGroup(unittest.TestCase):
                             sidxs[-1].append(idxvals[i])
                             i += 1
 
-                if len(tgt_shape) == 1:
-                    tshape = None  # don't need to set shape if input is flat
-                else:
-                    tshape = tgt_shape
                 self.add_input('x', np.ones(4).reshape(tgt_shape),
                                src_indices=sidxs, shape=tshape)
                 self.add_output('y', 1.0)
