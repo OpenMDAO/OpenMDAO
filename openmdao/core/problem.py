@@ -9,12 +9,15 @@ from six.moves import range
 
 import numpy as np
 
+from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.assemblers.default_assembler import DefaultAssembler
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
 from openmdao.error_checking.check_config import check_config
+from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
 from openmdao.vectors.default_vector import DefaultVector
+
 
 
 class FakeComm(object):
@@ -398,6 +401,91 @@ class Problem(object):
         vector_var_ids = np.arange(ind1, ind2)
 
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
+
+    def check_partial_derivatives(self, out_stream=sys.stdout, comps=None,
+                                 compact_print=False, abs_err_tol=1e-6,
+                                 rel_err_tol=1e-6, global_options=None):
+        """
+        Checks partial derivatives comprehensively for all components in your model.
+        Args
+        ----
+        out_stream : file_like
+            Where to send human readable output. Default is sys.stdout. Set to None to suppress.
+        comps : None or list_like
+            List of component names to check the partials of (all others will be skipped). Set to
+             None (default) to run all components.
+        compact_print : bool
+            Set to True to just print the essentials, one line per unknown-param pair.
+        abs_err_tol : float
+            Threshold value for absolute error.  Errors about this value will have a '*' displayed
+            next to them in output, making them easy to search for. Default is 1.0E-6.
+        rel_err_tol : float
+            Threshold value for relative error.  Errors about this value will have a '*' displayed
+            next to them in output, making them easy to search for. Note at times there may be a
+            significant relative error due to a minor absolute error.  Default is 1.0E-6.
+        global_options : dict
+            Dictionary of options that override options specified in ALL components. Only
+            'form', 'step', 'step_calc', and 'method' can be specified in
+             this way.
+        Returns
+        -------
+        Dict of Dicts of Dicts
+        First key is the component name;
+        2nd key is the (output, input) tuple of strings;
+        third key is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev'];
+        For 'rel error', 'abs error', 'magnitude' the value is:
+            A tuple containing norms for forward - fd, adjoint - fd, forward - adjoint using the
+            best case fdstep.
+        For 'J_fd', 'J_fwd', 'J_rev' the value is:
+            A numpy array representing the computed Jacobian for the three different methods
+            of computation.
+        """
+
+        class FakeStream(object):
+            def write(self, s):
+                pass
+
+        if out_stream is None:
+            out_stream = FakeStream
+
+        if not global_options:
+            global_options = DEFAULT_FD_OPTIONS.copy()
+            global_options['method'] = 'fd'
+
+        if global_options['method'] == 'fd':
+            scheme = FiniteDifference()
+        else:
+            raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
+
+        model = self.model
+
+        # Make sure we're in a valid state
+        model.run_apply_nonlinear()
+        model._linearize()
+
+        all_comps = model.system_iter(typ=Component)
+        if comps is None:
+            comps = all_comps
+        else:
+            all_comp_names = {c.pathname for c in all_comps}
+            requested = set(comps)
+            extra = requested.difference(all_comp_names)
+            if extra:
+                msg = 'The following are not valid comp names: {}'.format(sorted(list(extra)))
+                raise ValueError(msg)
+            comps = (model.get_subsystem(c_name) for c_name in comps)
+
+        for comp in comps:
+            # Skip IndepVarComps
+            if isinstance(comp, IndepVarComp):
+                continue
+
+            c_name = comp.pathname
+
+            # TODO: Check deprecated deriv_options
+            
+
+
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
         """

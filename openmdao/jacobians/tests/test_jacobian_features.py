@@ -251,10 +251,13 @@ class TestJacobianFeatures(unittest.TestCase):
         assert_rel_error(self, totals, jacobian)
 
     @parameterized.expand(
-        itertools.product([1e-6, 1e-8], ['forward', 'central'])
+        itertools.product([1e-6, 1e-8],  # Step size
+                          ['forward', 'central', 'backward'],  # FD Form
+                          ['rel', 'abs'],  # Step calc
+                          )
     )
-    def test_fd(self, step, form):
-        comp = SimpleCompFD(step=step, form=form)
+    def test_fd(self, step, form, step_calc):
+        comp = SimpleCompFD(step=step, form=form, step_calc=step_calc)
         problem = self.problem
         model = problem.model
         model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])

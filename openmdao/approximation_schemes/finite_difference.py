@@ -15,10 +15,12 @@ DEFAULT_FD_OPTIONS = {
     'step': 1e-6,
     'form': 'forward',
     'order': None,
+    'step_calc': 'abs',
 }
 
 DEFAULT_ORDER = {
     'forward': 1,
+    'backward': 1,
     'central': 2,
 }
 
@@ -26,6 +28,9 @@ FD_COEFFS = {
     ('forward', 1): FDForm(deltas=np.array([1]),
                            coeffs=np.array([1]),
                            current_coeff=-1.),
+    ('backward', 1): FDForm(deltas=np.array([-1]),
+                           coeffs=np.array([-1]),
+                           current_coeff=1.),
     ('central', 2): FDForm(deltas=np.array([1, -1]),
                            coeffs=np.array([1 / 2, -1 / 2]),
                            current_coeff=0.),
@@ -39,7 +44,7 @@ def _generate_fd_coeff(form, order):
     Parameters
     ----------
     form : str
-        Requested form of FD (e.g. 'forward', 'central').
+        Requested form of FD (e.g. 'forward', 'central', 'backward').
     order : int
         The order of accuracy of the requested FD scheme.
 
@@ -108,11 +113,12 @@ class FiniteDifference(ApproximationScheme):
 
         Returns
         -------
-        tuple(str, str, float, int)
-            Sorting key (wrt, form, step_size, order)
+        tuple(str, str, float, int, str)
+            Sorting key (wrt, form, step_size, order, step_calc)
         """
         fd_options = approx_tuple[2]
-        return approx_tuple[1], fd_options['form'], fd_options['step'], fd_options['order']
+        return (approx_tuple[1], fd_options['form'], fd_options['order'],
+                fd_options['step'],  fd_options['step_calc'])
 
     def _init_approximations(self):
         """
@@ -154,7 +160,7 @@ class FiniteDifference(ApproximationScheme):
         for key, approximations in groupby(self._exec_list, self._key_fun):
             # groupby (along with this key function) will group all 'of's that have the same wrt and
             # step size.
-            wrt, form, step, order = key
+            wrt, form, order, step, step_calc = key
 
             # FD forms are written as a collection of changes to inputs (deltas) and the associated
             # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its
@@ -165,6 +171,13 @@ class FiniteDifference(ApproximationScheme):
             # as deltas = [-2, -1, 1, 2] * h, coeffs = [1/12, -2/3, 2/3 , -1/12] * 1/h,
             # current_coeff = 0.
             fd_form = _generate_fd_coeff(form, order)
+
+            if step_calc == 'rel':
+                if wrt in system._outputs:
+                    scale = np.linalg.norm(system._outputs._views_flat[wrt])
+                else:
+                    scale = np.linalg.norm(system._inputs._views_flat[wrt])
+                step *= scale
 
             deltas = fd_form.deltas * step
             coeffs = fd_form.coeffs / step
