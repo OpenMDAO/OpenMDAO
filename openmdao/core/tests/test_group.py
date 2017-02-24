@@ -485,6 +485,9 @@ class TestGroupMPI(unittest.TestCase):
     #N_PROCS = 2
 
     def test_promote_distrib(self):
+        if PETScVector is None:
+            raise unittest.SkipTest("PETSc is not installed")
+
         class MyComp(ExplicitComponent):
             def initialize_variables(self):
                 # decide what parts of the array we want based on our rank
