@@ -3,14 +3,16 @@ from __future__ import division
 
 import numpy
 import unittest
+import warnings
 
 from six import assertRaisesRegex
 
-from openmdao.api import Problem, ExplicitComponent, IndepVarComp
+from openmdao.api import Problem, ExplicitComponent
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
+from openmdao.test_suite.components.simple_comps import TestExplCompDeprecated
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -60,6 +62,23 @@ class TestExplicitComponent(unittest.TestCase):
 
         with assertRaisesRegex(self, ValueError, msg):
             comp.add_input('arr', val=numpy.ones((2,2)), src_indices=[0,1])
+
+    def test_deprecated_vars_in_init(self):
+        """test that deprecation warning is issued if vars are declared in __init__."""
+        with warnings.catch_warnings(record=True) as w:
+            TestExplCompDeprecated()
+
+        self.assertEqual(len(w), 2)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertTrue(issubclass(w[1].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message),
+                "In the future, the 'add_input' method must be "
+                "called from 'initialize_variables' rather than "
+                "in the '__init__' function.")
+        self.assertEqual(str(w[1].message),
+                "In the future, the 'add_output' method must be "
+                "called from 'initialize_variables' rather than "
+                "in the '__init__' function.")
 
 
 class TestImplicitComponent(unittest.TestCase):
