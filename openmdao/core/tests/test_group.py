@@ -1,10 +1,16 @@
 import unittest
 from six import assertRaisesRegex
+import itertools
 
 import numpy as np
+from nose_parameterized import parameterized
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
+try:
+    from openmdao.parallel_api import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class SimpleGroup(Group):
@@ -26,6 +32,7 @@ class BranchGroup(Group):
         b2 = self.add_subsystem('Branch2', Group())
         g3 = b2.add_subsystem('G3', Group())
         g3.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
+
 
 class TestGroup(unittest.TestCase):
 
@@ -256,9 +263,9 @@ class TestGroup(unittest.TestCase):
         p.model.suppress_solver_output = True
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['indep.x'], np.ones(5), 0.00001)
-        assert_rel_error(self, p['C1.x'], np.ones(5)*12., 0.00001)
-        assert_rel_error(self, p['C1.y'], 60., 0.00001)
+        assert_rel_error(self, p['indep.x'], np.ones(5))
+        assert_rel_error(self, p['C1.x'], np.ones(5)*12.)
+        assert_rel_error(self, p['C1.y'], 60.)
 
     def test_connect_1_to_many(self):
         p = Problem(model=Group())
@@ -270,9 +277,9 @@ class TestGroup(unittest.TestCase):
         p.model.suppress_solver_output = True
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.y'], 10., 0.00001)
-        assert_rel_error(self, p['C2.y'], 20., 0.00001)
-        assert_rel_error(self, p['C3.y'], 30., 0.00001)
+        assert_rel_error(self, p['C1.y'], 10.)
+        assert_rel_error(self, p['C2.y'], 20.)
+        assert_rel_error(self, p['C3.y'], 30.)
 
     def test_connect_src_indices(self):
         p = Problem(model=Group())
@@ -289,10 +296,27 @@ class TestGroup(unittest.TestCase):
         p.model.suppress_solver_output = True
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.x'], np.ones(3), 0.00001)
-        assert_rel_error(self, p['C1.y'], 6., 0.00001)
-        assert_rel_error(self, p['C2.x'], np.ones(2), 0.00001)
-        assert_rel_error(self, p['C2.y'], 8., 0.00001)
+        assert_rel_error(self, p['C1.x'], np.ones(3))
+        assert_rel_error(self, p['C1.y'], 6.)
+        assert_rel_error(self, p['C2.x'], np.ones(2))
+        assert_rel_error(self, p['C2.y'], 8.)
+
+    def test_connect_src_indices_noflat(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.arange(12).reshape((4,3))))
+        p.model.add_subsystem('C1', ExecComp('y=numpy.sum(x)*2.0', x=np.zeros((2,2))))
+
+        # connect C1.x to entries (0,0), (3,1), (2,1), (1,1) of indep.x
+        p.model.connect('indep.x', 'C1.x',
+                        src_indices=[[(0,0), (3,1)],
+                                     [(2,1), (1,1)]])
+
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.x'], np.array([[0., 10.],
+                                                    [7., 4.]]))
+        assert_rel_error(self, p['C1.y'], 42.)
 
     def test_promote_src_indices(self):
         class MyComp1(ExplicitComponent):
@@ -325,10 +349,174 @@ class TestGroup(unittest.TestCase):
         p.model.suppress_solver_output = True
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.x'], np.ones(3), 0.00001)
-        assert_rel_error(self, p['C1.y'], 6., 0.00001)
-        assert_rel_error(self, p['C2.x'], np.ones(2), 0.00001)
-        assert_rel_error(self, p['C2.y'], 8., 0.00001)
+        assert_rel_error(self, p['C1.x'], np.ones(3))
+        assert_rel_error(self, p['C1.y'], 6.)
+        assert_rel_error(self, p['C2.x'], np.ones(2))
+        assert_rel_error(self, p['C2.y'], 8.)
+
+    def test_promote_src_indices_nonflat(self):
+        class MyComp(ExplicitComponent):
+            def initialize_variables(self):
+                # We want to pull the following 4 values out of the source:
+                # [(0,0), (3,1), (2,1), (1,1)].
+                # Because our input is also non-flat we must arrange the
+                # source index tuples into an array having the same shape
+                # as our input.
+                self.add_input('x', np.ones((2,2)),
+                               src_indices=[[(0,0), (3,1)],
+                                            [(2,1), (1,1)]])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+        p = Problem(model=Group())
+
+        # by promoting the following output and inputs to 'x', they will
+        # be automatically connected
+        p.model.add_subsystem('indep',
+                              IndepVarComp('x', np.arange(12).reshape((4,3))),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.x'],
+                         np.array([[0., 10.],
+                                   [7., 4.]]))
+        assert_rel_error(self, p['C1.y'], 21.)
+
+    def test_promote_src_indices_nonflat_to_scalars(self):
+        class MyComp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x', 1.0, src_indices=[(3,1)], shape=(1,))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x']*2.0
+
+        p = Problem(model=Group())
+
+        p.model.add_subsystem('indep',
+                              IndepVarComp('x', np.arange(12).reshape((4,3))),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+
+        p.model.suppress_solver_output = True
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.x'], 10.)
+        assert_rel_error(self, p['C1.y'], 20.)
+
+    def test_promote_src_indices_nonflat_error(self):
+        class MyComp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x', 1.0, src_indices=[(3,1)])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+        p = Problem(model=Group())
+
+        p.model.add_subsystem('indep',
+                              IndepVarComp('x', np.arange(12).reshape((4,3))),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+
+        with self.assertRaises(Exception) as context:
+            p.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "src_indices for 'x' is not flat, so its input shape "
+                         "must be provided. src_indices may contain an extra "
+                         "dimension if the connected source is not flat, making "
+                         "the input shape ambiguous.")
+
+    @parameterized.expand(itertools.product(
+        [((4,3),  [(0,0), (3,1), (2,1), (1,1)]),
+         ((1,12), [(0,0), (0,10), (0,7), (0,4)]),
+         ((12,),  [0, 10, 7, 4]),
+         ((12,1), [(0,0), (10,0), (7,0), (4,0)])],
+        [(2,2), (4,), (4,1), (1,4)],
+        ), testcase_func_name=lambda f, n, p: 'test_promote_src_indices_'+'_'.join(str(a) for a in p.args)
+    )
+    def test_promote_src_indices_param(self, src_info, tgt_shape):
+        src_shape, idxvals = src_info
+        class MyComp(ExplicitComponent):
+            def initialize_variables(self):
+                if len(tgt_shape) == 1:
+                    tshape = None  # don't need to set shape if input is flat
+                    sidxs = idxvals
+                else:
+                    tshape = tgt_shape
+                    sidxs = []
+                    i = 0
+                    for r in range(tgt_shape[0]):
+                        sidxs.append([])
+                        for c in range(tgt_shape[1]):
+                            sidxs[-1].append(idxvals[i])
+                            i += 1
+
+                self.add_input('x', np.ones(4).reshape(tgt_shape),
+                               src_indices=sidxs, shape=tshape)
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+        p = Problem(model=Group())
+
+        p.model.add_subsystem('indep',
+                              IndepVarComp('x', np.arange(12).reshape(src_shape)),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+
+        p.model.suppress_solver_output = True
+        p.setup(check=False)
+        p.run_model()
+        assert_rel_error(self, p['C1.x'],
+                         np.array([0., 10., 7., 4.]).reshape(tgt_shape))
+        assert_rel_error(self, p['C1.y'], 21.)
+
+
+class TestGroupMPI(unittest.TestCase):
+    # FIXME: fix MPI stuff so this can run as an MPI test
+    #N_PROCS = 2
+
+    def test_promote_distrib(self):
+        if PETScVector is None:
+            raise unittest.SkipTest("PETSc is not installed")
+
+        class MyComp(ExplicitComponent):
+            def initialize_variables(self):
+                # decide what parts of the array we want based on our rank
+                if self.comm.rank == 0:
+                    idxs = [0, 1, 2]
+                else:
+                    idxs = [3, 4]
+
+                self.add_input('x', np.ones(len(idxs)), src_indices=idxs)
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        p = Problem(model=Group())
+
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+
+        p.model.suppress_solver_output = True
+        p.setup(PETScVector)
+        p.run_model()
+        if p.model.comm.rank == 0:
+            assert_rel_error(self, p['C1.x'], np.ones(3))
+            assert_rel_error(self, p['C1.y'], 6.)
+        else:
+            assert_rel_error(self, p['C1.x'], np.ones(2))
+            assert_rel_error(self, p['C1.y'], 4.)
 
 
 class TestConnect(unittest.TestCase):
@@ -352,7 +540,7 @@ class TestConnect(unittest.TestCase):
 
     def test_src_indices_as_float_list(self):
         msg = "src_indices must contain integers, but src_indices for " + \
-              "connection from 'src.x' to 'tgt.x' contains non-integers."
+              "connection from 'src.x' to 'tgt.x' is <.* 'numpy.float64'>."
 
         with assertRaisesRegex(self, TypeError, msg):
             self.sub.connect('src.x', 'tgt.x', src_indices=[1.0])

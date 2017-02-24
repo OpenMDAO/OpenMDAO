@@ -5,8 +5,6 @@ version: 2.0.{build}
 platform:
   - x64
 
-os: Previous Visual Studio 2015
-
 environment:
   matrix:
     - PYTHON: 2.7
