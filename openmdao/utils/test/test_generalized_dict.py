@@ -21,6 +21,12 @@ class TestOptionsDict(unittest.TestCase):
         expected_msg = "Entry 'test' has the wrong type (<{} 'int'>)".format(class_or_type)
         self.assertEqual(expected_msg, str(context.exception))
 
+        # make sure bools work
+        self.dict.declare('flag', value=False, type_=bool)
+        self.assertEqual(self.dict['flag'], False)
+        self.dict['flag'] = True
+        self.assertEqual(self.dict['flag'], True)
+
     def test_unnamed_args(self):
         with self.assertRaises(KeyError) as context:
             self.dict['test'] = 1
@@ -110,6 +116,16 @@ class TestOptionsDict(unittest.TestCase):
 
         expected_msg = ("Entry 'test''s value is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
                         " <object object at 0x[0-9A-Fa-f]+>\]")
+        assertRegex(self, str(context.exception), expected_msg)
+
+    def test_read_only(self):
+        opt = OptionsDictionary(read_only=True)
+        opt.declare('permanent', 3.0)
+
+        with self.assertRaises(KeyError) as context:
+            opt['permanent'] = 4.0
+
+        expected_msg = ("Tried to set 'permanent' on a read-only OptionsDictionary")
         assertRegex(self, str(context.exception), expected_msg)
 
 

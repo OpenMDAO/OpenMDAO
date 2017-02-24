@@ -2,10 +2,7 @@
 
 from __future__ import division
 
-import collections
-
 import numpy
-from six import string_types
 
 from openmdao.core.component import Component
 
@@ -17,7 +14,7 @@ class ImplicitComponent(Component):
 
     def _apply_nonlinear(self):
         """
-        Compute residuals.
+        Compute residuals. The model is assumed to be in a scaled state.
         """
         with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                          residuals=[self._residuals]):
@@ -25,7 +22,7 @@ class ImplicitComponent(Component):
 
     def _solve_nonlinear(self):
         """
-        Compute outputs.
+        Compute outputs. The model is assumed to be in a scaled state.
 
         Returns
         -------
@@ -51,7 +48,7 @@ class ImplicitComponent(Component):
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """
-        Compute jac-vec product.
+        Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
@@ -80,7 +77,7 @@ class ImplicitComponent(Component):
 
     def _solve_linear(self, vec_names, mode):
         """
-        Apply inverse jac product.
+        Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
@@ -126,7 +123,7 @@ class ImplicitComponent(Component):
 
     def _linearize(self):
         """
-        Compute jacobian / factorization.
+        Compute jacobian / factorization. The model is assumed to be in a scaled state.
         """
         with self._jacobian_context() as J:
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
@@ -143,6 +140,8 @@ class ImplicitComponent(Component):
         """
         Compute residuals given inputs and outputs.
 
+        The model is assumed to be in an unscaled state.
+
         Parameters
         ----------
         inputs : Vector
@@ -156,7 +155,7 @@ class ImplicitComponent(Component):
 
     def solve_nonlinear(self, inputs, outputs):
         """
-        Compute outputs given inputs.
+        Compute outputs given inputs. The model is assumed to be in an unscaled state.
 
         Parameters
         ----------
@@ -175,7 +174,7 @@ class ImplicitComponent(Component):
     def apply_linear(self, inputs, outputs,
                      d_inputs, d_outputs, d_residuals, mode):
         r"""
-        Compute jac-vector product.
+        Compute jac-vector product. The model is assumed to be in an unscaled state.
 
         If mode is:
             'fwd': (d_inputs, d_outputs) \|-> d_residuals
@@ -201,7 +200,7 @@ class ImplicitComponent(Component):
 
     def solve_linear(self, d_outputs, d_residuals, mode):
         r"""
-        Apply inverse jac product.
+        Apply inverse jac product. The model is assumed to be in an unscaled state.
 
         If mode is:
             'fwd': d_residuals \|-> d_outputs
@@ -226,7 +225,9 @@ class ImplicitComponent(Component):
 
     def linearize(self, inputs, outputs, jacobian):
         """
-        Compute sub-jacobian parts / factorization.
+        Compute sub-jacobian parts and any applicable matrix factorizations.
+
+        The model is assumed to be in an unscaled state.
 
         Parameters
         ----------

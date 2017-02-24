@@ -2,16 +2,14 @@
 import unittest
 import itertools
 import numpy as np
-from scipy.sparse import coo_matrix, csr_matrix, issparse
+from scipy.sparse import coo_matrix, csr_matrix
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
      GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CSRmatrix, COOmatrix, ExecComp
 from openmdao.test_suite.components.sellar import SellarDerivatives
-from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from nose_parameterized import parameterized
 from six import assertRaisesRegex
-
 
 
 class MyExplicitComp(ExplicitComponent):
@@ -190,7 +188,7 @@ class TestJacobian(unittest.TestCase):
         self._check_fwd(self.prob, fwd_check)
         # to catch issues with constant subjacobians, repeatedly call linearize
         for i in range(lincalls):
-            self.prob.model._linearize()
+            self.prob.model.run_linearize()
         self._check_fwd(self.prob, fwd_check)
         self._check_rev(self.prob, rev_check)
 
@@ -201,13 +199,12 @@ class TestJacobian(unittest.TestCase):
         else:
             top = prob.model
 
-        top.add_subsystem('indep',
-                          IndepVarComp((
-                              ('a', np.ones(3)),
-                              ('b', np.ones(2)),
-                          )))
-        C1 = top.add_subsystem('C1', MyExplicitComp(comp_jac_class))
-        C2 = top.add_subsystem('C2', MyExplicitComp2(comp_jac_class))
+        indep = top.add_subsystem('indep', IndepVarComp())
+        indep.add_output('a', val=np.ones(3))
+        indep.add_output('b', val=np.ones(2))
+
+        top.add_subsystem('C1', MyExplicitComp(comp_jac_class))
+        top.add_subsystem('C2', MyExplicitComp2(comp_jac_class))
         top.connect('indep.a', 'C1.x', src_indices=[2,0])
         top.connect('indep.b', 'C1.y')
         top.connect('indep.a', 'C2.w', src_indices=[0,2,1])
@@ -225,44 +222,42 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
     def _check_fwd(self, prob, check_vec):
-        work = prob.model._vectors['output']['linear']._clone()
-        work.set_const(1.0)
+        with prob.model.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            work = d_outputs._clone()
+            work.set_const(1.0)
 
-        # fwd apply_linear test
-        prob.model._vectors['output']['linear'].set_const(1.0)
-        prob.model._apply_linear(['linear'], 'fwd')
-        res = prob.model._vectors['residual']['linear']
-        res.set_data(res.get_data() - check_vec)
-        self.assertAlmostEqual(
-            prob.model._vectors['residual']['linear'].get_norm(), 0)
+            # fwd apply_linear test
+            d_outputs.set_const(1.0)
+            prob.model.run_apply_linear(['linear'], 'fwd')
+            d_residuals.set_data(d_residuals.get_data() - check_vec)
+            self.assertAlmostEqual(d_residuals.get_norm(), 0)
 
-        # fwd solve_linear test
-        prob.model._vectors['output']['linear'].set_const(0.0)
-        prob.model._vectors['residual']['linear'].set_data(check_vec)
-        prob.model._solve_linear(['linear'], 'fwd')
-        prob.model._vectors['output']['linear'] -= work
-        self.assertAlmostEqual(
-            prob.model._vectors['output']['linear'].get_norm(), 0, delta=1e-6)
+            # fwd solve_linear test
+            d_outputs.set_const(0.0)
+            d_residuals.set_data(check_vec)
+
+            prob.model.run_solve_linear(['linear'], 'fwd')
+
+            d_outputs -= work
+            self.assertAlmostEqual(d_outputs.get_norm(), 0, delta=1e-6)
 
     def _check_rev(self, prob, check_vec):
-        work = prob.model._vectors['output']['linear']._clone()
-        work.set_const(1.0)
+        with prob.model.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            work = d_outputs._clone()
+            work.set_const(1.0)
 
-        # rev apply_linear test
-        prob.model._vectors['residual']['linear'].set_const(1.0)
-        prob.model._apply_linear(['linear'], 'rev')
-        outs = prob.model._vectors['output']['linear']
-        outs.set_data(outs.get_data() - check_vec)
-        self.assertAlmostEqual(
-            prob.model._vectors['output']['linear'].get_norm(), 0)
+            # rev apply_linear test
+            d_residuals.set_const(1.0)
+            prob.model.run_apply_linear(['linear'], 'rev')
+            d_outputs.set_data(d_outputs.get_data() - check_vec)
+            self.assertAlmostEqual(d_outputs.get_norm(), 0)
 
-        # rev solve_linear test
-        prob.model._vectors['residual']['linear'].set_const(0.0)
-        prob.model._vectors['output']['linear'].set_data(check_vec)
-        prob.model._solve_linear(['linear'], 'rev')
-        prob.model._vectors['residual']['linear'] -= work
-        self.assertAlmostEqual(
-            prob.model._vectors['residual']['linear'].get_norm(), 0, delta=1e-6)
+            # rev solve_linear test
+            d_residuals.set_const(0.0)
+            d_outputs.set_data(check_vec)
+            prob.model.run_solve_linear(['linear'], 'rev')
+            d_residuals -= work
+            self.assertAlmostEqual(d_residuals.get_norm(), 0, delta=1e-6)
 
     dtypes = [
         ('int', 1),
@@ -290,8 +285,8 @@ class TestJacobian(unittest.TestCase):
 
         prob.model.suppress_solver_output = True
         prob.run_model()
-        prob.model._apply_nonlinear()
-        prob.model._linearize()
+        prob.model.run_apply_nonlinear()
+        prob.model.run_linearize()
 
         expected = constructor(value)
         with prob.model._subsystems_allprocs[0]._jacobian_context() as J:
@@ -312,7 +307,7 @@ class TestJacobian(unittest.TestCase):
         d1.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
         prob.model.suppress_solver_output = True
 
-        prob.setup()
+        prob.setup(check=False)
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -335,7 +330,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.connect('C1.c', 'C2.b')
         prob.model.connect('C2.d', 'C3.a')
         prob.model.suppress_solver_output = True
-        prob.setup()
+        prob.setup(check=False)
         prob.run_model()
         assert_rel_error(self, prob['C3.ee'], 8.0, 0000.1)
 
@@ -346,7 +341,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
 
-        prob.setup()
+        prob.setup(check=False)
 
         prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
 
@@ -359,7 +354,7 @@ class TestJacobian(unittest.TestCase):
         prob.model = SellarDerivatives()
         prob.model.nl_solver = NewtonSolver()
 
-        prob.setup()
+        prob.setup(check=False)
 
         d1 = prob.model.get_subsystem('d1')
         d1.jacobian = GlobalJacobian(matrix_class=DenseMatrix)

@@ -44,3 +44,21 @@ class DoubleArrayComp(ExplicitComponent):
         partials[('y1', 'x2')] = self.JJ[0:2, 2:4]
         partials[('y2', 'x1')] = self.JJ[2:4, 0:2]
         partials[('y2', 'x2')] = self.JJ[2:4, 2:4]
+
+
+class TestExplCompDeprecated(ExplicitComponent):
+    """
+    A component that adds variables in the __init__ function.
+    """
+
+    def __init__(self):
+        super(TestExplCompDeprecated, self).__init__()
+
+        self.add_input('x1', np.zeros([2]))
+        self.add_output('y1', np.zeros([2]))
+
+    def compute(self, inputs, outputs):
+        """
+        Execution.
+        """
+        outputs['y1'] = 2.*inputs['x1']
