@@ -456,6 +456,25 @@ def insert_output_start_stop_indicators(src):
         input_block_number += 1
     return src_with_out_start_stop_indicators
 
+def clean_up_empty_output_blocks(input_blocks, output_blocks):
+    '''Some of the blocks do not generate output. We only want to have
+            input blocks that have outputs
+    '''
+
+    new_input_blocks = []
+    new_output_blocks = []
+    current_in_block = ''
+    for in_block, out_block in zip(input_blocks, output_blocks):
+        if current_in_block and not current_in_block.endswith('\n'):
+            current_in_block += '\n'
+        current_in_block += in_block
+        if out_block:
+            new_input_blocks.append(current_in_block)
+            new_output_blocks.append(out_block)
+            current_in_block = ''
+
+    return new_input_blocks, new_output_blocks
+
 def extract_output_blocks(run_output):
     '''
     '''
@@ -606,6 +625,10 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
         ### 6. Extract from run_outputs, the Out blocks -> output_blocks ###
         #####################
         output_blocks = extract_output_blocks(run_outputs)
+
+        # Need to deal with the cases when there is no outputblock for a given input block
+        # Merge an input block with the previous block and throw away the output block
+        input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks, output_blocks)
         skipped_failed_output = None
     else:
         input_blocks = output_blocks = None
