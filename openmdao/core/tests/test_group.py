@@ -340,9 +340,8 @@ class TestGroup(unittest.TestCase):
     def test_promote_src_indices_nonflat(self):
         class MyComp(ExplicitComponent):
             def initialize_variables(self):
-                # the source we want to connect to has shape (4, 3), and
-                # our input shape is (2, 2).  We want to pull the following
-                # 4 values out of the source: [(0,0), (3,1), (2,1), (1,1)].
+                # We want to pull the following 4 values out of the source:
+                # [(0,0), (3,1), (2,1), (1,1)].
                 # Because our input is also non-flat we must arrange the
                 # source index tuples into an array having the same shape
                 # as our input.
@@ -378,7 +377,7 @@ class TestGroup(unittest.TestCase):
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])
+                outputs['y'] = inputs['x']*2.0
 
         p = Problem(model=Group())
 
@@ -393,7 +392,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
         assert_rel_error(self, p['C1.x'], 10., 0.00001)
-        assert_rel_error(self, p['C1.y'], 10., 0.00001)
+        assert_rel_error(self, p['C1.y'], 20., 0.00001)
 
     def test_promote_src_indices_nonflat_error(self):
         class MyComp(ExplicitComponent):
