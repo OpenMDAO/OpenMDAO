@@ -4,8 +4,8 @@ Using src_indices with promoted variables
 
 Inputs and outputs can be connected by promoting them to the same name, but what
 if your output is an array and you only want to connect part of it to your
-input?  If you connect variables via promotion, your must
-set *src_indices* when you add your input variable to its component.
+input?  If you connect variables via promotion, you must set *src_indices* when
+you call *add_input* to add your input variable to its component.
 
 Usage
 +++++
