@@ -7,7 +7,7 @@ from itertools import groupby
 from six.moves import range
 
 
-from openmdao.approximation_schemes.ApproximationScheme import ApproximationScheme
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 
