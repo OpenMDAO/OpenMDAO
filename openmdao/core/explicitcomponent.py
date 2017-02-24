@@ -2,10 +2,13 @@
 
 from __future__ import division
 
+import inspect
+
 import numpy
 from six import iteritems
 
 from openmdao.core.component import Component
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class ExplicitComponent(Component):
@@ -71,6 +74,11 @@ class ExplicitComponent(Component):
             res_ref = ref
         if res_ref0 is None:
             res_ref0 = ref0
+
+        if inspect.stack()[1][3] == '__init__':
+            warn_deprecation("In the future, the 'add_output' method must be "
+                             "called from 'initialize_variables' rather than "
+                             "in the '__init__' function.")
 
         super(ExplicitComponent, self).add_output(name, val=val, shape=shape, units=units,
                                                   res_units=res_units, desc=desc, lower=lower,
