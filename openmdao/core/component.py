@@ -96,7 +96,9 @@ class Component(System):
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape, src_indices)
+        metadata['value'], metadata['shape'] = ensure_compatible(name, val,
+                                                                 shape,
+                                                                 src_indices)
 
         # src_indices: None or ndarray
         if src_indices is None:

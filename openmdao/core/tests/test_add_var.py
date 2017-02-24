@@ -44,7 +44,7 @@ class CompAddWithIndices(ExplicitComponent):
         self.add_input('x_b', src_indices=(0, 1))
         self.add_input('x_c', src_indices=[0, 1])
         self.add_input('x_d', src_indices=numpy.arange(6))
-        self.add_input('x_e', src_indices=numpy.arange(6).reshape((3, 2)))
+        self.add_input('x_e', src_indices=numpy.arange(6).reshape((3, 2)), shape=(3,2))
         self.add_output('y')
 
 
@@ -55,7 +55,7 @@ class CompAddArrayWithScalar(ExplicitComponent):
         self.add_input('x_a', val=2.0, shape=(6))
         self.add_input('x_b', val=2.0, shape=(3, 2))
         self.add_input('x_c', val=2.0, src_indices=numpy.arange(6))
-        self.add_input('x_d', val=2.0, src_indices=numpy.arange(6).reshape((3,2)))
+        self.add_input('x_d', val=2.0, src_indices=numpy.arange(6).reshape((3,2)), shape=(3,2))
         self.add_output('y_a', val=3.0, shape=(6))
         self.add_output('y_b', val=3.0, shape=(3, 2))
 
