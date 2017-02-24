@@ -33,10 +33,9 @@ class SimpleComp(ExplicitComponent):
         partials['f', 'x'] = 1.
         partials['f', 'z'] = np.ones((1, 4))
 
-        partials['g', 'y1'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
-        partials['g', 'y2'] = [[1, 0], [0, 1], [1, 0], [0, 1]]
-        partials['g', 'y3'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
-
+        partials['g', 'y1'] = np.array([[1, 0], [1, 0], [0, 1], [0, 1]])
+        partials['g', 'y2'] = np.array([[1, 0], [0, 1], [1, 0], [0, 1]])
+        partials['g', 'y3'] = np.array([[1, 0], [1, 0], [0, 1], [0, 1]])
         partials['g', 'x'] = np.eye(2)
 
 
@@ -88,6 +87,28 @@ class SimpleCompFD(SimpleComp):
 
     def compute_partial_derivs(self, inputs, outputs, partials):
         pass
+
+
+class SimpleCompMixedFD(SimpleComp):
+    def __init__(self, **kwargs):
+        super(SimpleCompMixedFD, self).__init__()
+        self.kwargs = kwargs
+
+    def initialize_partials(self):
+        self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
+        self.declare_partials('g', 'z', dependent=False)
+
+        self.approx_partials('g', 'x', **self.kwargs)
+        self.approx_partials('g', 'y2', **self.kwargs)
+
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        partials['f', 'x'] = 1.
+        partials['f', 'z'] = np.ones((1, 4))
+
+        partials['g', 'y1'] = np.array([[1, 0], [1, 0], [0, 1], [0, 1]])
+        partials['g', 'y3'] = np.array([[1, 0], [1, 0], [0, 1], [0, 1]])
+
+        # dg/dx and dg/dy2 are FD'd
 
 
 class SimpleCompKwarg(SimpleComp):
@@ -258,6 +279,31 @@ class TestJacobianFeatures(unittest.TestCase):
 
         assert_rel_error(self, totals, jacobian, 1e-6)
 
+    def test_mixed_fd(self):
+        comp = SimpleCompMixedFD()
+        problem = self.problem
+        model = problem.model
+        model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
+
+        problem.setup(check=True)
+        problem.run_model()
+        totals = problem.compute_total_derivs(['f', 'g'],
+                                              ['x', 'y1', 'y2', 'y3', 'z'])
+        jacobian = {}
+        jacobian['f', 'x'] = 1.
+        jacobian['f', 'z'] = np.ones((1, 4))
+        jacobian['f', 'y1'] = np.zeros((1, 2))
+        jacobian['f', 'y2'] = np.zeros((1, 2))
+        jacobian['f', 'y3'] = np.zeros((1, 2))
+
+        jacobian['g', 'y1'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+        jacobian['g', 'y2'] = [[1, 0], [0, 1], [1, 0], [0, 1]]
+        jacobian['g', 'y3'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+
+        jacobian['g', 'x'] = [[1], [0], [0], [1]]
+        jacobian['g', 'z'] = np.zeros((4, 4))
+
+        assert_rel_error(self, totals, jacobian, 1e-6)
 
 if __name__ == '__main__':
     unittest.main()
