@@ -39,6 +39,12 @@ def visit_in_or_out_node(self, node):
     pass
 
 def depart_in_or_out_node(self, node):
+    """
+    This function creates the formatting that sets up the look of
+    In[1]: print(x)
+    Out[1]: 5
+    The look of the formatting is controlled by _theme/static/style.css
+    """
     if not isinstance(self, HTMLTranslator):
         self.body.append("output only available for HTML\n")
         return
@@ -74,10 +80,10 @@ class EmbedTestDirective(Directive):
 
     """
 
-    # must have at least one directive for this to work
+    # must have at least one arg (embedded test) for this to work
     required_arguments = 1
     optional_arguments = 1
-    has_content = True
+    has_content = False
 
     option_spec = {
         'no-split': unchanged

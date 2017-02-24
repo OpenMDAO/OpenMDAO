@@ -70,6 +70,10 @@ redbaron:
 	@(python -c "import redbaron" >/dev/null 2>&1) || (echo "The 'redbaron' package \
 	is required to build the docs. Install with:\n pip install redbaron"; exit 1)
 
+
+single:
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+
 html: mock redbaron
 
 	# Running things before docbuild
@@ -77,7 +81,7 @@ html: mock redbaron
 	python _utils/create_feature_docs_unit_test_db.py
 
 	# Cleaning up previously-generated files before docbuild
-	rm -rf $(BUILDDIR)/*
+	# rm -rf $(BUILDDIR)/*
 	rm -rf _srcdocs/usr
 	rm -rf _srcdocs/dev
 
