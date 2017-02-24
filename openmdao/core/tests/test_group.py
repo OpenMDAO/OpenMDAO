@@ -381,8 +381,6 @@ class TestGroup(unittest.TestCase):
 
         p = Problem(model=Group())
 
-        # by promoting the following output and inputs to 'x', they will
-        # be automatically connected
         p.model.add_subsystem('indep',
                               IndepVarComp('x', np.arange(12).reshape((4,3))),
                               promotes_outputs=['x'])
@@ -405,8 +403,6 @@ class TestGroup(unittest.TestCase):
 
         p = Problem(model=Group())
 
-        # by promoting the following output and inputs to 'x', they will
-        # be automatically connected
         p.model.add_subsystem('indep',
                               IndepVarComp('x', np.arange(12).reshape((4,3))),
                               promotes_outputs=['x'])
@@ -460,8 +456,6 @@ class TestGroup(unittest.TestCase):
 
         p = Problem(model=Group())
 
-        # by promoting the following output and inputs to 'x', they will
-        # be automatically connected
         p.model.add_subsystem('indep',
                               IndepVarComp('x', np.arange(12).reshape(src_shape)),
                               promotes_outputs=['x'])
@@ -496,8 +490,6 @@ class TestGroupMPI(unittest.TestCase):
 
         p = Problem(model=Group())
 
-        # by promoting the following output and input to 'x', they will
-        # be automatically connected
         p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
