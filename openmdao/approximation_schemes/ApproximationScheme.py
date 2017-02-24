@@ -22,7 +22,7 @@ class ApproximationScheme(object):
         """
         raise NotImplementedError()
 
-    def compute_approximation(self, system, jac=None, deriv_type='partial'):
+    def compute_approximations(self, system, jac=None, deriv_type='partial'):
         """
         Execute the system to compute the approximate (sub)-Jacobians.
 
@@ -41,7 +41,7 @@ class ApproximationScheme(object):
         """
         raise NotImplementedError()
 
-    def init_approximations(self):
+    def _init_approximations(self):
         """
         Perform any necessary setup for the approximation scheme.
         """

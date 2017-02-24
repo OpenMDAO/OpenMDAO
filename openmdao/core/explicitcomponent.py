@@ -119,7 +119,7 @@ class ExplicitComponent(Component):
                 # Additionally, computing the approximation before the call to compute_partials
                 # allows users to override FD'd values.
                 for approximation in itervalues(self._approx_schemes):
-                    approximation.compute_approximation(self, jac=J)
+                    approximation.compute_approximations(self, jac=J)
 
                 # negate constant subjacs (and others that will get overwritten)
                 # back to normal
@@ -193,7 +193,7 @@ class ExplicitComponent(Component):
                     self._approx_schemes[method].add_approximation(key, meta)
 
         for approx in itervalues(self._approx_schemes):
-            approx.init_approximations()
+            approx._init_approximations()
 
     def compute(self, inputs, outputs):
         """

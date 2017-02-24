@@ -459,7 +459,7 @@ class Component(System):
                     self._approx_schemes[method].add_approximation(key, meta)
 
         for approx in self._approx_schemes:
-            approx.init_approximations()
+            approx._init_approximations()
 
     def _setup_variables(self, recurse=False):
         """

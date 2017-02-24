@@ -132,7 +132,7 @@ class ImplicitComponent(Component):
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                              scale_jac=True):
                 for approximation in itervalues(self._approx_schemes):
-                    approximation.compute_approximation(self)
+                    approximation.compute_approximations(self)
                 self.linearize(self._inputs, self._outputs, J)
 
             if self._owns_global_jac:
