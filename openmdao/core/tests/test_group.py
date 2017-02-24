@@ -263,9 +263,9 @@ class TestGroup(unittest.TestCase):
         p.model.suppress_solver_output = True
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['indep.x'], np.ones(5), 0.00001)
-        assert_rel_error(self, p['C1.x'], np.ones(5)*12., 0.00001)
-        assert_rel_error(self, p['C1.y'], 60., 0.00001)
+        assert_rel_error(self, p['indep.x'], np.ones(5))
+        assert_rel_error(self, p['C1.x'], np.ones(5)*12.)
+        assert_rel_error(self, p['C1.y'], 60.)
 
     def test_connect_1_to_many(self):
         p = Problem(model=Group())
@@ -277,9 +277,9 @@ class TestGroup(unittest.TestCase):
         p.model.suppress_solver_output = True
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.y'], 10., 0.00001)
-        assert_rel_error(self, p['C2.y'], 20., 0.00001)
-        assert_rel_error(self, p['C3.y'], 30., 0.00001)
+        assert_rel_error(self, p['C1.y'], 10.)
+        assert_rel_error(self, p['C2.y'], 20.)
+        assert_rel_error(self, p['C3.y'], 30.)
 
     def test_connect_src_indices(self):
         p = Problem(model=Group())
@@ -296,10 +296,10 @@ class TestGroup(unittest.TestCase):
         p.model.suppress_solver_output = True
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.x'], np.ones(3), 0.00001)
-        assert_rel_error(self, p['C1.y'], 6., 0.00001)
-        assert_rel_error(self, p['C2.x'], np.ones(2), 0.00001)
-        assert_rel_error(self, p['C2.y'], 8., 0.00001)
+        assert_rel_error(self, p['C1.x'], np.ones(3))
+        assert_rel_error(self, p['C1.y'], 6.)
+        assert_rel_error(self, p['C2.x'], np.ones(2))
+        assert_rel_error(self, p['C2.y'], 8.)
 
     def test_connect_src_indices_noflat(self):
         p = Problem(model=Group())
@@ -315,8 +315,8 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
         assert_rel_error(self, p['C1.x'], np.array([[0., 10.],
-                                                    [7., 4.]]), 0.00001)
-        assert_rel_error(self, p['C1.y'], 42., 0.00001)
+                                                    [7., 4.]]))
+        assert_rel_error(self, p['C1.y'], 42.)
 
     def test_promote_src_indices(self):
         class MyComp1(ExplicitComponent):
@@ -349,10 +349,10 @@ class TestGroup(unittest.TestCase):
         p.model.suppress_solver_output = True
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.x'], np.ones(3), 0.00001)
-        assert_rel_error(self, p['C1.y'], 6., 0.00001)
-        assert_rel_error(self, p['C2.x'], np.ones(2), 0.00001)
-        assert_rel_error(self, p['C2.y'], 8., 0.00001)
+        assert_rel_error(self, p['C1.x'], np.ones(3))
+        assert_rel_error(self, p['C1.y'], 6.)
+        assert_rel_error(self, p['C2.x'], np.ones(2))
+        assert_rel_error(self, p['C2.y'], 8.)
 
     def test_promote_src_indices_nonflat(self):
         class MyComp(ExplicitComponent):
@@ -384,8 +384,8 @@ class TestGroup(unittest.TestCase):
         p.run_model()
         assert_rel_error(self, p['C1.x'],
                          np.array([[0., 10.],
-                                   [7., 4.]]), 0.00001)
-        assert_rel_error(self, p['C1.y'], 21., 0.00001)
+                                   [7., 4.]]))
+        assert_rel_error(self, p['C1.y'], 21.)
 
     def test_promote_src_indices_nonflat_to_scalars(self):
         class MyComp(ExplicitComponent):
@@ -406,8 +406,8 @@ class TestGroup(unittest.TestCase):
         p.model.suppress_solver_output = True
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.x'], 10., 0.00001)
-        assert_rel_error(self, p['C1.y'], 20., 0.00001)
+        assert_rel_error(self, p['C1.x'], 10.)
+        assert_rel_error(self, p['C1.y'], 20.)
 
     def test_promote_src_indices_nonflat_error(self):
         class MyComp(ExplicitComponent):
@@ -476,8 +476,8 @@ class TestGroup(unittest.TestCase):
         p.setup(check=False)
         p.run_model()
         assert_rel_error(self, p['C1.x'],
-                         np.array([0., 10., 7., 4.]).reshape(tgt_shape), 0.00001)
-        assert_rel_error(self, p['C1.y'], 21., 0.00001)
+                         np.array([0., 10., 7., 4.]).reshape(tgt_shape))
+        assert_rel_error(self, p['C1.y'], 21.)
 
 
 class TestGroupMPI(unittest.TestCase):
@@ -509,11 +509,11 @@ class TestGroupMPI(unittest.TestCase):
         p.setup(PETScVector)
         p.run_model()
         if p.model.comm.rank == 0:
-            assert_rel_error(self, p['C1.x'], np.ones(3), 0.00001)
-            assert_rel_error(self, p['C1.y'], 6., 0.00001)
+            assert_rel_error(self, p['C1.x'], np.ones(3))
+            assert_rel_error(self, p['C1.y'], 6.)
         else:
-            assert_rel_error(self, p['C1.x'], np.ones(2), 0.00001)
-            assert_rel_error(self, p['C1.y'], 4., 0.00001)
+            assert_rel_error(self, p['C1.x'], np.ones(2))
+            assert_rel_error(self, p['C1.y'], 4.)
 
 
 class TestConnect(unittest.TestCase):
