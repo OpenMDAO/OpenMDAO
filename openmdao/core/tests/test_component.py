@@ -12,7 +12,7 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
-from openmdao.test_suite.components.deprecated_comps import DeprecatedComp
+from openmdao.test_suite.components.deprecated_comps import TestExplCompDeprecated
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -66,7 +66,7 @@ class TestExplicitComponent(unittest.TestCase):
     def test_deprecated_vars_in_init(self):
         """test that deprecation warning is issued if vars are declared in __init__."""
         with warnings.catch_warnings(record=True) as w:
-            DeprecatedComp()
+            TestExplCompDeprecated()
 
         self.assertEqual(len(w), 2)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
