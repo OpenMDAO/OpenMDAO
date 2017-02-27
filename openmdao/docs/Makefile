@@ -76,14 +76,14 @@ single:
 
 html: mock redbaron
 
-	# Running things before docbuild
-	python _utils/preprocess_tags.py
-	python _utils/create_feature_docs_unit_test_db.py
-
 	# Cleaning up previously-generated files before docbuild
 	# rm -rf $(BUILDDIR)/*
 	rm -rf _srcdocs/usr
 	rm -rf _srcdocs/dev
+
+	# Running things before docbuild
+	python _utils/preprocess_tags.py
+	python _utils/create_feature_docs_unit_test_db.py
 
 	# Doing the first command in the background does two builds in parallel
 	#       dev docs get built into tmp/moved into _build later
