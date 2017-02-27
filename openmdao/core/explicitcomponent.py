@@ -114,7 +114,7 @@ class ExplicitComponent(Component):
         """
         with self._jacobian_context() as J:
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
-                                             scale_jac=True):
+                                             residuals=[self._residuals], scale_jac=True):
                 # Since the residuals are already negated, this call should come before negate_jac
                 # Additionally, computing the approximation before the call to compute_partials
                 # allows users to override FD'd values.
