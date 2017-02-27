@@ -3,6 +3,7 @@
 from __future__ import division
 
 import numpy
+from six import itervalues
 
 from openmdao.core.component import Component
 

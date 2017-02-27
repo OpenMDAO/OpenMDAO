@@ -1,17 +1,20 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
 from __future__ import division
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import sys
 
-from six import string_types
+from six import string_types, iteritems
 from six.moves import range
+from itertools import product, chain
 
 import numpy as np
+import scipy.sparse as sparse
 
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.assemblers.default_assembler import DefaultAssembler
 from openmdao.core.component import Component
+from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.driver import Driver
 from openmdao.error_checking.check_config import check_config
 from openmdao.core.indepvarcomp import IndepVarComp
@@ -405,8 +408,9 @@ class Problem(object):
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
 
     def check_partial_derivatives(self, out_stream=sys.stdout, comps=None,
-                                 compact_print=False, abs_err_tol=1e-6,
-                                 rel_err_tol=1e-6, global_options=None):
+                                  compact_print=False, abs_err_tol=1e-6,
+                                  rel_err_tol=1e-6, global_options=None,
+                                  force_dense=True):
         """
         Checks partial derivatives comprehensively for all components in your model.
         Args
@@ -427,8 +431,9 @@ class Problem(object):
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
         global_options : dict
             Dictionary of options that override options specified in ALL components. Only
-            'form', 'step', 'step_calc', and 'method' can be specified in
-             this way.
+            'form', 'step', 'step_calc', and 'method' can be specified in this way.
+        force_dense : bool
+            If True, analytic derivatives will be coerced into arrays.
         Returns
         -------
         Dict of Dicts of Dicts
@@ -448,7 +453,7 @@ class Problem(object):
                 pass
 
         if out_stream is None:
-            out_stream = FakeStream
+            out_stream = FakeStream()
 
         if not global_options:
             global_options = DEFAULT_FD_OPTIONS.copy()
@@ -457,20 +462,18 @@ class Problem(object):
         method = global_options['method']
 
         if global_options['method'] == 'fd':
-            scheme = FiniteDifference()
+            scheme = FiniteDifference
             form = global_options['form']
         else:
             raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
 
         model = self.model
 
-        # Make sure we're in a valid state
-        model.run_apply_nonlinear()
-        model._linearize()
+
 
         all_comps = model.system_iter(typ=Component)
         if comps is None:
-            comps = all_comps
+            comps = [comp for comp in all_comps]
         else:
             all_comp_names = {c.pathname for c in all_comps}
             requested = set(comps)
@@ -478,25 +481,112 @@ class Problem(object):
             if extra:
                 msg = 'The following are not valid comp names: {}'.format(sorted(list(extra)))
                 raise ValueError(msg)
-            comps = (model.get_subsystem(c_name) for c_name in comps)
+            comps = [model.get_subsystem(c_name) for c_name in comps]
 
+        current_mode = self._mode
+        current_suppresion = model.suppress_solver_output
+
+        # This is a defaultdict of (defaultdict of dicts).
+        partials_data = defaultdict(lambda: defaultdict(dict))
+
+        # Analytic Jacobians
+        for mode in ('fwd', 'rev'):
+            self.setup(mode=mode, check=False)
+            model.suppress_solver_output = True
+            # Make sure we're in a valid state
+            self.run_model()
+            model.run_linearize()
+
+            jac_key = 'J_' + mode
+
+            for comp in comps:
+                # Skip IndepVarComps
+                if isinstance(comp, IndepVarComp):
+                    continue
+
+                explicit_comp = isinstance(comp, ExplicitComponent)
+
+                c_name = comp.pathname
+
+                # TODO: Check deprecated deriv_options
+
+                with comp._units_scaling_context(scale_jac=True):
+                    subjacs = comp._jacobian._subjacs
+                    if explicit_comp:
+                        comp._negate_jac()
+
+                    pattern_matches = comp._find_partial_matches('*', '*')
+                    for of_bundle, wrt_bundle in product(*pattern_matches):
+                        of_pattern, of_matches = of_bundle
+                        wrt_pattern, wrt_out, wrt_in = wrt_bundle
+
+                        wrt_matches = chain(wrt_out, wrt_in)
+                        for (of, wrt) in product(of_matches, wrt_matches):
+                            deriv_value = subjacs.get((c_name + '.' + of, c_name + '.' + wrt))
+                            if deriv_value is None:
+                                in_size = np.prod(comp._var2meta[wrt]['shape'])
+                                out_size = np.prod(comp._var2meta[of]['shape'])
+                                deriv_value = np.zeros((out_size, in_size))
+
+                            if force_dense:
+                                if isinstance(deriv_value, list):
+                                    in_size = np.prod(comp._var2meta[wrt]['shape'])
+                                    out_size = np.prod(comp._var2meta[of]['shape'])
+                                    tmp_value = np.zeros((out_size, in_size))
+                                    jac_val, jac_i, jac_j = deriv_value
+                                    for i, j, val in zip(jac_i, jac_j, jac_val):
+                                        tmp_value[i,j] += val
+                                    deriv_value = tmp_value
+
+                                elif sparse.issparse(deriv_value):
+                                    deriv_value = deriv_value.todense()
+
+                            partials_data[c_name][of, wrt][jac_key] = deriv_value
+
+                    if explicit_comp:
+                        comp._negate_jac()
+
+        self.setup(mode=current_mode)
+        self.run_model()
+
+        # FD Jacobian
+        jac_key = 'J_' + method
         for comp in comps:
             # Skip IndepVarComps
             if isinstance(comp, IndepVarComp):
                 continue
 
-            c_name = comp.pathname
+            subjac_info = comp._subjacs_info
+            explicit_comp = isinstance(comp, ExplicitComponent)
+            approximation = scheme()
 
-            # TODO: Check deprecated deriv_options
+            pattern_matches = comp._find_partial_matches('*', '*')
+            for of_bundle, wrt_bundle in product(*pattern_matches):
+                of_pattern, of_matches = of_bundle
+                wrt_pattern, wrt_out, wrt_in = wrt_bundle
 
-            if compact_print:
-                check_description = "    (Check Type: {}:{})".format(method, form)
-            else:
-                check_description = ""
+                wrt_matches = chain(wrt_out, wrt_in)
+                for (of, wrt) in product(of_matches, wrt_matches):
+                    approximation.add_approximation((of, wrt), global_options)
 
-            out_stream.write('-' * (len(c_name) + 15) + '\n')
-            out_stream.write("Component: '%s'%s\n" % (c_name, check_description))
-            out_stream.write('-' * (len(c_name) + 15) + '\n')
+            approx_jac = {}
+            approximation.compute_approximations(comp, approx_jac)
+            for d_key, partial in iteritems(approx_jac):
+                # Since all partials for outputs for explicit comps are declared, assume anything
+                # missing is an input deriv.
+                if (explicit_comp
+                        and (d_key not in subjac_info or subjac_info[d_key]['type'] == 'input')):
+                    partials_data[c_name][d_key][jac_key] = -partial
+                else:
+                    partials_data[c_name][d_key][jac_key] = partial
+
+
+
+        # Conversion of defaultdict to dicts
+        partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
+        model.suppress_solver_output = current_suppresion
+        return partials_data
+
 
 
 
