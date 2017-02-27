@@ -281,6 +281,27 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C2.y'], 20.)
         assert_rel_error(self, p['C3.y'], 30.)
 
+    def test_double_src_indices(self):
+        class MyComp1(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x', np.ones(3), src_indices=[0, 1, 2])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        p = Problem(model=Group())
+
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x', src_indices=[1, 0, 2])
+
+        with self.assertRaises(Exception) as context:
+            p.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         ": src_indices has been defined in both "
+                         "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
+
     def test_connect_src_indices(self):
         p = Problem(model=Group())
         p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)))

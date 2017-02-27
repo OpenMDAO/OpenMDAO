@@ -284,6 +284,12 @@ class Group(System):
                             pass
                         else:
                             meta = input_meta[in_myproc_index]
+                            if meta['src_indices'] is not None:
+                                raise RuntimeError("%s: src_indices has been defined "
+                                                   "in both connect('%s', '%s') "
+                                                   "and add_input('%s', ...)." %
+                                                   (self.pathname, out_name,
+                                                    in_name, in_name))
                             meta['src_indices'] = np.atleast_1d(src_indices)
 
                         # set src_indices to None to avoid unnecessary repeat
