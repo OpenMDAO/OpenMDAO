@@ -129,10 +129,10 @@ class ImplicitComponent(Component):
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
         """
         with self._jacobian_context() as J:
+            for approximation in itervalues(self._approx_schemes):
+                approximation.compute_approximations(self)
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                              scale_jac=True):
-                for approximation in itervalues(self._approx_schemes):
-                    approximation.compute_approximations(self)
                 self.linearize(self._inputs, self._outputs, J)
 
             if self._owns_global_jac:

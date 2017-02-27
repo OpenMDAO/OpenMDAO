@@ -113,14 +113,13 @@ class ExplicitComponent(Component):
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
         """
         with self._jacobian_context() as J:
+            # Since the residuals are already negated, this call should come before negate_jac
+            # Additionally, computing the approximation before the call to compute_partials
+            # allows users to override FD'd values.
+            for approximation in itervalues(self._approx_schemes):
+                    approximation.compute_approximations(self, jac=J)
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                              scale_jac=True):
-                # Since the residuals are already negated, this call should come before negate_jac
-                # Additionally, computing the approximation before the call to compute_partials
-                # allows users to override FD'd values.
-                for approximation in itervalues(self._approx_schemes):
-                    approximation.compute_approximations(self, jac=J)
-
                 # negate constant subjacs (and others that will get overwritten)
                 # back to normal
                 self._negate_jac()

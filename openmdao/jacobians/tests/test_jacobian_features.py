@@ -305,5 +305,42 @@ class TestJacobianFeatures(unittest.TestCase):
 
         assert_rel_error(self, totals, jacobian, 1e-6)
 
+    def test_units_fd(self):
+        class UnitCompBase(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('T', val=284., units="degR", desc="Temperature")
+                self.add_input('P', val=1., units='lbf/inch**2', desc="Pressure")
+
+                self.add_output('flow:T', val=284., units="degR", desc="Temperature")
+                self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
+
+            def initialize_partials(self):
+                self.approx_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                outputs['flow:T'] = inputs['T']
+                outputs['flow:P'] = inputs['P']
+
+        p = Problem()
+        model = p.model = Group()
+        indep = model.add_subsystem('indep', IndepVarComp(), promotes=['*'])
+
+        indep.add_output('T', val=100., units='degK')
+        indep.add_output('P', val=1., units='bar')
+
+        model.add_subsystem('units', UnitCompBase(), promotes=['*'])
+
+        p.setup()
+        p.run_model()
+        totals = p.compute_total_derivs(['flow:T', 'flow:P'], ['T', 'P'])
+        expected_totals = {
+            ('flow:T', 'T'): 1.,
+            ('flow:P', 'T'): 0.,
+            ('flow:T', 'P'): 0.,
+            ('flow:P', 'P'): 1.,
+        }
+
+        assert_rel_error(self, totals, expected_totals, 1e-6)
+
 if __name__ == '__main__':
     unittest.main()
