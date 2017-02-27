@@ -1,3 +1,5 @@
+from __future__ import print_function, division
+
 import unittest
 import numpy as np
 import scipy as sp
@@ -328,19 +330,30 @@ class TestJacobianFeatures(unittest.TestCase):
         indep.add_output('T', val=100., units='degK')
         indep.add_output('P', val=1., units='bar')
 
-        model.add_subsystem('units', UnitCompBase(), promotes=['*'])
+        units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
         p.setup()
         p.run_model()
         totals = p.compute_total_derivs(['flow:T', 'flow:P'], ['T', 'P'])
         expected_totals = {
-            ('flow:T', 'T'): 1.,
+            ('flow:T', 'T'): 9/5,
             ('flow:P', 'T'): 0.,
             ('flow:T', 'P'): 0.,
-            ('flow:P', 'P'): 1.,
+            ('flow:P', 'P'): 14.50377,
+        }
+        assert_rel_error(self, totals, expected_totals, 1e-6)
+
+        expected_subjacs = {
+            ('units.flow:T', 'units.T'): -1.,
+            ('units.flow:P', 'units.T'): 0.,
+            ('units.flow:T', 'units.P'): 0.,
+            ('units.flow:P', 'units.P'): -1.,
         }
 
-        assert_rel_error(self, totals, expected_totals, 1e-6)
+        with units._units_scaling_context(scale_jac=True):
+            jac = units._jacobian._subjacs
+            for deriv, val in iteritems(expected_subjacs):
+                assert_rel_error(self, jac[deriv], val, 1e-6)
 
 if __name__ == '__main__':
     unittest.main()

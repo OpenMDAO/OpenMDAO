@@ -101,10 +101,10 @@ class ApproximationScheme(object):
         # TODO: MPI
 
         if deriv_type == 'total':
-            run_model = system._solve_nonlinear
+            run_model = system.run_solve_nonlinear
             results_vec = system._outputs
         elif deriv_type == 'partial':
-            run_model = system._apply_nonlinear
+            run_model = system.run_apply_nonlinear
             results_vec = system._residuals
         else:
             raise ValueError('deriv_type must be one of "total" or "partial"')
@@ -114,14 +114,8 @@ class ApproximationScheme(object):
 
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs:
-                scaling_idx = system._var_allprocs_indices['output'][in_name]
-                scaling_to_norm = system._scaling_to_norm['output'][scaling_idx, :]
-                delta *= scaling_to_norm[1]
                 outputs._views_flat[in_name][idxs] += delta
             else:
-                scaling_idx = system._var_allprocs_indices['input'][in_name]
-                scaling_to_norm = system._scaling_to_norm['input'][scaling_idx, :]
-                delta *= scaling_to_norm[1]
                 inputs._views_flat[in_name][idxs] += delta
 
         # TODO: Grab only results of interest
@@ -132,10 +126,8 @@ class ApproximationScheme(object):
 
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs:
-                delta *= self._get_scale_factor(system, in_name, 'output')
                 outputs._views_flat[in_name][idxs] -= delta
             else:
-                delta *= self._get_scale_factor(system, in_name, 'input')
                 inputs._views_flat[in_name][idxs] -= delta
 
         return results
