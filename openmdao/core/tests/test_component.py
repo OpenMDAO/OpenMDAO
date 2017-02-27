@@ -72,13 +72,13 @@ class TestExplicitComponent(unittest.TestCase):
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
         self.assertTrue(issubclass(w[1].category, DeprecationWarning))
         self.assertEqual(str(w[0].message),
-                "In the future, the 'add_input' method must be "
-                "called from 'initialize_variables' rather than "
-                "in the '__init__' function.")
+                         "In the future, the 'add_input' method must be "
+                         "called from 'initialize_variables' rather than "
+                         "in the '__init__' function.")
         self.assertEqual(str(w[1].message),
-                "In the future, the 'add_output' method must be "
-                "called from 'initialize_variables' rather than "
-                "in the '__init__' function.")
+                         "In the future, the 'add_output' method must be "
+                         "called from 'initialize_variables' rather than "
+                         "in the '__init__' function.")
 
 
 class TestImplicitComponent(unittest.TestCase):

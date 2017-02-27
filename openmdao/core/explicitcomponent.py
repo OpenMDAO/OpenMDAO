@@ -2,16 +2,88 @@
 
 from __future__ import division
 
+import inspect
+
 import numpy
 from six import iteritems
 
 from openmdao.core.component import Component
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class ExplicitComponent(Component):
     """
     Class to inherit from when all output variables are explicit.
     """
+
+    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
+                   lower=None, upper=None, ref=1.0, ref0=0.0,
+                   res_ref=None, res_ref0=None, var_set=0):
+        """
+        Add an output variable to the component.
+
+        For ExplicitComponent, res_ref and res_ref0 default to the values in res and res0 unless
+        otherwise specified.
+
+        Parameters
+        ----------
+        name : str
+            name of the variable in this component's namespace.
+        val : float or list or tuple or ndarray
+            The initial value of the variable being added in user-defined units. Default is 1.0.
+        shape : int or tuple or list or None
+            Shape of this variable, only required if val is not an array.
+            Default is None.
+        units : str or None
+            Units in which the output variables will be provided to the component during execution.
+            Default is None, which means it has no units.
+        res_units : str or None
+            Units in which the residuals of this output will be given to the user when requested.
+            Default is None, which means it has no units.
+        desc : str
+            description of the variable.
+        lower : float or list or tuple or ndarray or None
+            lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            consistent with the shape arg (if given), or (3) an array_like matching the shape of
+            val, if val is array_like. A value of None means this output has no lower bound.
+            Default is None.
+        upper : float or list or tuple or ndarray or None
+            upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            consistent with the shape arg (if given), or (3) an array_like matching the shape of
+            val, if val is array_like. A value of None means this output has no upper bound.
+            Default is None.
+        ref : float
+            Scaling parameter. The value in the user-defined units of this output variable when
+            the scaled value is 1. Default is 1.
+        ref0 : float
+            Scaling parameter. The value in the user-defined units of this output variable when
+            the scaled value is 0. Default is 0.
+        res_ref : float
+            Scaling parameter. The value in the user-defined res_units of this output's residual
+            when the scaled value is 1. Default is None, which means residual scaling matches
+            output scaling.
+        res_ref0 : float
+            Scaling parameter. The value in the user-defined res_units of this output's residual
+            when the scaled value is 0. Default is None, which means residual scaling matches
+            output scaling.
+        var_set : hashable object
+            For advanced users only. ID or color for this variable, relevant for reconfigurability.
+            Default is 0.
+        """
+        if res_ref is None:
+            res_ref = ref
+        if res_ref0 is None:
+            res_ref0 = ref0
+
+        if inspect.stack()[1][3] == '__init__':
+            warn_deprecation("In the future, the 'add_output' method must be "
+                             "called from 'initialize_variables' rather than "
+                             "in the '__init__' function.")
+
+        super(ExplicitComponent, self).add_output(name, val=val, shape=shape, units=units,
+                                                  res_units=res_units, desc=desc, lower=lower,
+                                                  upper=upper, ref=ref, ref0=ref0, res_ref=res_ref,
+                                                  res_ref0=res_ref0, var_set=var_set)
 
     def _apply_nonlinear(self):
         """
