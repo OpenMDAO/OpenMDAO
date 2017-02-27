@@ -14,27 +14,8 @@ from openmdao.core.component import Component
 from openmdao.core.driver import Driver
 from openmdao.error_checking.check_config import check_config
 from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
+from openmdao.utils.mpi import FakeComm
 from openmdao.vectors.default_vector import DefaultVector
-
-
-class FakeComm(object):
-    """
-    Fake MPI communicator class used if mpi4py is not installed.
-
-    Attributes
-    ----------
-    rank : int
-        index of current proc; value is 0 because there is only 1 proc.
-    size : int
-        number of procs in the comm; value is 1 since MPI is not available.
-    """
-
-    def __init__(self):
-        """
-        Initialize attributes.
-        """
-        self.rank = 0
-        self.size = 1
 
 
 class Problem(object):
