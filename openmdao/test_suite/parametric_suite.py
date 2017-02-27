@@ -4,6 +4,7 @@ import itertools
 from six.moves import zip
 from six import iteritems, iterkeys, itervalues, string_types
 import collections
+
 from nose_parameterized import parameterized
 from unittest import SkipTest
 
@@ -116,6 +117,7 @@ def parametric_suite(*args, **kwargs):
 
 # Needed for Nose
 parametric_suite.__test__ = False
+
 
 class ParameterizedInstance(object):
     """

@@ -4,7 +4,7 @@ from __future__ import division, print_function
 import numpy as np
 import scipy.sparse as sparse
 
-from openmdao.api import ExplicitComponent
+from openmdao.components.deprecated_component import Component as DeprecatedComponent
 
 
 PSI = 1.
@@ -12,7 +12,7 @@ PSI = 1.
 _vec_terms = {}
 
 
-def _compute_vector_terms(system_size):
+def _solve_nonlinear_vector_terms(system_size):
     # Try/Except pattern is much faster than if key in ... if the key is present (which it will be
     # outside of the first invocation).
     try:
@@ -32,47 +32,48 @@ def _compute_vector_terms(system_size):
         return u, v, cross_terms, same_terms
 
 
-def _compute_A(system_size, theta):
-    u, v, cross_terms, same_terms = _compute_vector_terms(system_size)
+def _solve_nonlinear_A(system_size, theta):
+    u, v, cross_terms, same_terms = _solve_nonlinear_vector_terms(system_size)
     return (np.eye(system_size)
             + np.sin(theta) * cross_terms
             + (np.cos(theta) - 1) * same_terms)
 
 
-def _compute_dA(system_size, theta):
-    u, v, cross_terms, same_terms = _compute_vector_terms(system_size)
+def _solve_nonlinear_dA(system_size, theta):
+    u, v, cross_terms, same_terms = _solve_nonlinear_vector_terms(system_size)
     return np.cos(theta) * cross_terms - np.sin(theta) * same_terms
 
 
 def array_idx(i, var_size):
     return slice(i * var_size, (i + 1) * var_size)
 
-class ExplicitCycleComp(ExplicitComponent):
 
-    def _inputs_to_vector(self, inputs):
+class DeprecatedCycleComp(DeprecatedComponent):
+
+    def _params_to_vector(self, params):
         var_shape = self.metadata['var_shape']
         num_var = self.metadata['num_var']
         size = np.prod(var_shape)
         x = np.zeros(num_var * size)
         for i in range(num_var):
-            x_i = inputs[self._cycle_names['x'].format(i)].flat
+            x_i = params[self._cycle_names['x'].format(i)].flat
             x[size * i:size * (i + 1)] = x_i
 
         return x
 
-    def _vector_to_outputs(self, vec, outputs):
+    def _vector_to_unknowns(self, vec, unknowns):
         var_shape = self.metadata['var_shape']
         num_var = self.metadata['num_var']
         size = np.prod(var_shape)
         for i in range(num_var):
             y_i = vec[size * i:size * (i + 1)].reshape(var_shape)
-            outputs[self._cycle_names['y'].format(i)] = y_i
+            unknowns[self._cycle_names['y'].format(i)] = y_i
 
     def __str__(self):
         return 'Explicit Cycle Component'
 
     def __init__(self, **kwargs):
-        super(ExplicitCycleComp, self).__init__(**kwargs)
+        super(DeprecatedCycleComp, self).__init__(**kwargs)
         self._cycle_names = {}
 
         if self.metadata['connection_type'] == 'implicit':
@@ -93,7 +94,7 @@ class ExplicitCycleComp(ExplicitComponent):
             self._cycle_names['theta_out'] = 'theta_out'
             self._cycle_promotes_in = self._cycle_promotes_out = []
 
-    def initialize(self):
+        # def initialize(self):
         self.metadata.declare('jacobian_type', value='matvec',
                               values=['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
                               desc='method of assembling derivatives')
@@ -112,7 +113,7 @@ class ExplicitCycleComp(ExplicitComponent):
 
         self.angle_param = 'theta'
 
-    def initialize_variables(self):
+        # def initialize_variables(self):
         self.num_var = self.metadata['num_var']
         self.var_shape = self.metadata['var_shape']
         self.size = self.num_var * np.prod(self.var_shape)
@@ -124,21 +125,21 @@ class ExplicitCycleComp(ExplicitComponent):
         self.add_input(self._cycle_names['theta'], val=1.)
         self.add_output(self._cycle_names['theta_out'], shape=(1,))
 
-    def compute(self, inputs, outputs):
-        theta = inputs[self._cycle_names['theta']]
-        A = _compute_A(self.size, theta)
-        x = self._inputs_to_vector(inputs)
+    def solve_nonlinear(self, params, unknowns, residuals):
+        theta = params[self._cycle_names['theta']]
+        A = _solve_nonlinear_A(self.size, theta)
+        x = self._params_to_vector(params)
         y = A.dot(x)
-        self._vector_to_outputs(y, outputs)
-        outputs[self._cycle_names['theta_out']] = theta
+        self._vector_to_unknowns(y, unknowns)
+        unknowns[self._cycle_names['theta_out']] = theta
 
-    def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+    def apply_linear(self, params, unknowns, d_params, d_unknowns, d_residuals, mode):
         if self.metadata['jacobian_type'] == 'matvec':
             angle_param = self._cycle_names[self.angle_param]
-            x = self._inputs_to_vector(inputs)
-            angle = inputs[angle_param]
-            A = _compute_A(self.size, angle)
-            dA = _compute_dA(self.size, angle)
+            x = self._params_to_vector(params)
+            angle = params[angle_param]
+            A = _solve_nonlinear_A(self.size, angle)
+            dA = _solve_nonlinear_dA(self.size, angle)
 
             var_shape = self.metadata['var_shape']
             var_size = np.prod(var_shape)
@@ -151,44 +152,44 @@ class ExplicitCycleComp(ExplicitComponent):
             if mode == 'fwd':
                 for j in range(num_var):
                     x_j = x_name.format(j)
-                    if x_j in d_inputs:
-                        dx = d_inputs[x_j].flat[:]
+                    if x_j in d_params:
+                        dx = d_params[x_j].flat[:]
                         for i in range(num_var):
                             y_i = y_name.format(i)
-                            if y_i in d_outputs:
+                            if y_i in d_unknowns:
                                 Aij = A[array_idx(i, var_size), array_idx(j, var_size)]
-                                d_outputs[y_i] += Aij.dot(dx).reshape(var_shape)
+                                d_unknowns[y_i] += Aij.dot(dx).reshape(var_shape)
 
-                if theta_name in d_inputs and theta_out_name in d_outputs:
-                    dtheta = d_inputs[theta_name]
-                    d_outputs[theta_out_name] += dtheta
+                if theta_name in d_params and theta_out_name in d_unknowns:
+                    dtheta = d_params[theta_name]
+                    d_unknowns[theta_out_name] += dtheta
 
-                if angle_param in d_inputs:
-                    dangle = d_inputs[angle_param]
+                if angle_param in d_params:
+                    dangle = d_params[angle_param]
                     dy_dangle = (dA.dot(x)) * dangle
                     for i in range(num_var):
                         y_i = y_name.format(i)
-                        if y_i in d_outputs:
-                            d_outputs[y_i] += dy_dangle[array_idx(i, var_size)].reshape(var_shape)
+                        if y_i in d_unknowns:
+                            d_unknowns[y_i] += dy_dangle[array_idx(i, var_size)].reshape(var_shape)
 
             elif mode == 'rev':
                 for i in range(num_var):
                     y_i = y_name.format(i)
-                    if y_i in d_outputs:
-                        dy_i = d_outputs[y_i].flat[:]
+                    if y_i in d_unknowns:
+                        dy_i = d_unknowns[y_i].flat[:]
                         for j in range(num_var):
                             x_j = x_name.format(j)
-                            if x_j in d_inputs:
+                            if x_j in d_params:
                                 Aij = A[array_idx(i, var_size), array_idx(j, var_size)]
-                                d_inputs[x_j] += Aij.T.dot(dy_i).reshape(var_shape)
-                            if angle_param in d_inputs:
+                                d_params[x_j] += Aij.T.dot(dy_i).reshape(var_shape)
+                            if angle_param in d_params:
                                 dAij = dA[array_idx(i, var_size), array_idx(j, var_size)]
-                                x_j_vec = inputs[x_j].flat[:]
-                                d_inputs[angle_param] += x_j_vec.T.dot(dAij.T.dot(dy_i))
+                                x_j_vec = params[x_j].flat[:]
+                                d_params[angle_param] += x_j_vec.T.dot(dAij.T.dot(dy_i))
 
-                if theta_out_name in d_outputs and theta_name in d_inputs:
-                    dtheta_out = d_outputs[theta_out_name]
-                    d_inputs[theta_name] += dtheta_out
+                if theta_out_name in d_unknowns and theta_name in d_params:
+                    dtheta_out = d_unknowns[theta_out_name]
+                    d_params[theta_name] += dtheta_out
 
     def make_jacobian_entry(self, A, pd_type):
         if pd_type == 'array':
@@ -247,17 +248,17 @@ class ExplicitCycleComp(ExplicitComponent):
             self.declare_partials(self._cycle_names['theta_out'], self._cycle_names['theta'],
                                   **self._array2kwargs(dtheta, pd_type))
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def solve_nonlinear_partial_derivs(self, params, unknowns, partials):
         if self.metadata['jacobian_type'] != 'matvec':
             angle_param = self._cycle_names[self.angle_param]
-            angle = inputs[angle_param]
+            angle = params[angle_param]
             num_var = self.num_var
             var_shape = self.var_shape
             var_size = np.prod(var_shape)
-            x = self._inputs_to_vector(inputs)
+            x = self._params_to_vector(params)
             size = self.size
-            A = _compute_A(size, angle)
-            dA = _compute_dA(size, angle)
+            A = _solve_nonlinear_A(size, angle)
+            dA = _solve_nonlinear_dA(size, angle)
             dA_x = np.atleast_2d(dA.dot(x)).T
             pd_type = self.metadata['partial_type']
             dtheta = np.array([[1.]])
@@ -282,47 +283,47 @@ class ExplicitCycleComp(ExplicitComponent):
             partials[theta_out, theta] = self.make_jacobian_entry(dtheta, pd_type)
 
 
-class ExplicitFirstComp(ExplicitCycleComp):
+class DeprecatedFirstComp(DeprecatedCycleComp):
     def __str__(self):
         return 'Explicit Cycle Component - First'
 
-    def initialize_variables(self):
+    def __init__(self):
         self.add_input('psi', val=1.)
         self.angle_param = 'psi'
         self._cycle_names['psi'] = 'psi'
-        super(ExplicitFirstComp, self).initialize_variables()
+        super(DeprecatedFirstComp, self).initialize_variables()
 
-    def compute(self, inputs, outputs):
-        theta = inputs[self._cycle_names['theta']]
-        psi = inputs[self._cycle_names['psi']]
-        A = _compute_A(self.size, psi)
+    def solve_nonlinear(self, params, unknowns, residuals):
+        theta = params[self._cycle_names['theta']]
+        psi = params[self._cycle_names['psi']]
+        A = _solve_nonlinear_A(self.size, psi)
         y = A.dot(np.ones(self.size))
-        self._vector_to_outputs(y, outputs)
-        outputs[self._cycle_names['theta_out']] = theta
+        self._vector_to_unknowns(y, unknowns)
+        unknowns[self._cycle_names['theta_out']] = theta
 
 
-class ExplicitLastComp(ExplicitFirstComp):
+class DeprecatedLastComp(DeprecatedFirstComp):
     def __str__(self):
         return 'Explicit Cycle Component - Last'
 
-    def initialize_variables(self):
+    def __init__(self):
         self.add_output('x_norm2', shape=(1,))
         self._n = 1
-        super(ExplicitLastComp, self).initialize_variables()
+        super(DeprecatedLastComp, self).initialize_variables()
 
-    def compute(self, inputs, outputs):
-        theta = inputs[self._cycle_names['theta']]
-        psi = inputs[self._cycle_names['psi']]
+    def solve_nonlinear(self, params, unknowns, residuals):
+        theta = params[self._cycle_names['theta']]
+        psi = params[self._cycle_names['psi']]
         k = self.metadata['num_comp']
-        x = self._inputs_to_vector(inputs)
+        x = self._params_to_vector(params)
 
-        outputs['x_norm2'] = 0.5*np.dot(x,x)
+        unknowns['x_norm2'] = 0.5*np.dot(x,x)
 
         # theta_out has 1/2 the error as theta does to the correct angle.
-        outputs[self._cycle_names['theta_out']] = theta / 2 + (self._n * 2 * np.pi - psi) / (2 * k - 2)
+        unknowns[self._cycle_names['theta_out']] = theta / 2 + (self._n * 2 * np.pi - psi) / (2 * k - 2)
 
     def initialize_partials(self):
-        super(ExplicitLastComp, self).initialize_partials()
+        super(DeprecatedLastComp, self).initialize_partials()
 
         pd_type = self.metadata['partial_type']
         if self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
@@ -335,12 +336,12 @@ class ExplicitLastComp(ExplicitFirstComp):
             self.declare_partials(self._cycle_names['theta_out'], self._cycle_names['psi'],
                                   **self._array2kwargs(np.array([1.]), pd_type))
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def solve_nonlinear_partial_derivs(self, params, unknowns, partials):
         if self.metadata['jacobian_type'] != 'matvec':
             pd_type = self.metadata['partial_type']
             for i in range(self.metadata['num_var']):
                 in_var = self._cycle_names['x'].format(i)
-                partials['x_norm2', in_var] = self.make_jacobian_entry(inputs[in_var].flat[:],
+                partials['x_norm2', in_var] = self.make_jacobian_entry(params[in_var].flat[:],
                                                                        pd_type)
 
             k = self.metadata['num_comp']
@@ -350,7 +351,7 @@ class ExplicitLastComp(ExplicitFirstComp):
             partials[theta_out, self._cycle_names['psi']] = \
                 self.make_jacobian_entry(np.array([-1/(2*k-2)]), pd_type)
 
-    def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+    def apply_linear(self, params, unknowns, d_params, d_unknowns, d_residuals, mode):
         if self.metadata['jacobian_type'] == 'matvec':
             k = self.metadata['num_comp']
             num_var = self.metadata['num_var']
@@ -359,27 +360,27 @@ class ExplicitLastComp(ExplicitFirstComp):
             psi = self._cycle_names['psi']
 
             if mode == 'fwd':
-                if theta_out in d_outputs:
-                    if theta in d_inputs:
-                        d_outputs[theta_out] += 0.5 * d_inputs[theta]
-                    if psi in d_inputs:
-                        d_outputs[theta_out] += -d_inputs[psi] / (2 * k - 2)
+                if theta_out in d_unknowns:
+                    if theta in d_params:
+                        d_unknowns[theta_out] += 0.5 * d_params[theta]
+                    if psi in d_params:
+                        d_unknowns[theta_out] += -d_params[psi] / (2 * k - 2)
                 for i in range(num_var):
                     in_var = self._cycle_names['x'].format(i)
-                    if in_var in d_inputs and 'x_norm2' in d_outputs:
-                        d_outputs['x_norm2'] += np.dot(inputs[in_var].flat, d_inputs[in_var].flat)
+                    if in_var in d_params and 'x_norm2' in d_unknowns:
+                        d_unknowns['x_norm2'] += np.dot(params[in_var].flat, d_params[in_var].flat)
 
             elif mode == 'rev':
-                if 'x_norm2' in d_outputs:
-                    dxnorm = d_outputs['x_norm2']
+                if 'x_norm2' in d_unknowns:
+                    dxnorm = d_unknowns['x_norm2']
                     for i in range(num_var):
                         x_i_name = self._cycle_names['x'].format(i)
-                        if x_i_name in d_inputs:
-                            d_inputs[x_i_name] += inputs[x_i_name] * dxnorm
+                        if x_i_name in d_params:
+                            d_params[x_i_name] += params[x_i_name] * dxnorm
 
-                if theta_out in d_outputs:
-                    dtheta_out = d_outputs[theta_out]
-                    if theta in d_inputs:
-                        d_inputs[theta] += .5*dtheta_out
-                    if psi in d_inputs:
-                        d_inputs[psi] += -dtheta_out/(2*k-2)
+                if theta_out in d_unknowns:
+                    dtheta_out = d_unknowns[theta_out]
+                    if theta in d_params:
+                        d_params[theta] += .5*dtheta_out
+                    if psi in d_params:
+                        d_params[psi] += -dtheta_out/(2*k-2)

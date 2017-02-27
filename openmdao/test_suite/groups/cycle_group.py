@@ -34,6 +34,8 @@ from openmdao.api import IndepVarComp
 from openmdao.test_suite.groups.parametric_group import ParametericTestGroup
 from openmdao.test_suite.components.cycle_comps import PSI, ExplicitCycleComp, ExplicitFirstComp,\
     ExplicitLastComp
+from openmdao.test_suite.components.deprecated_cycle_comps import DeprecatedCycleComp, DeprecatedFirstComp,\
+    DeprecatedLastComp
 
 
 class CycleGroup(ParametericTestGroup):
@@ -45,7 +47,7 @@ class CycleGroup(ParametericTestGroup):
         super(CycleGroup, self).__init__(**kwargs)
 
         self.default_params.update({
-            'component_class': ['explicit'],
+            'component_class': ['explicit', 'deprecated'],
             'connection_type': ['implicit', 'explicit'],
             'partial_type': ['array', 'sparse', 'aij'],
             'num_comp': [3, 2],
@@ -64,7 +66,7 @@ class CycleGroup(ParametericTestGroup):
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
         self.metadata.declare('component_class', type_=str, value='explicit',
-                              values=['explicit'],
+                              values=['explicit', 'deprecated'],
                               desc='Component class to instantiate')
         self.metadata.declare('jacobian_type', value='matvec',
                               values=['matvec', 'dense', 'sparse-coo',
@@ -96,6 +98,10 @@ class CycleGroup(ParametericTestGroup):
             first_class = ExplicitFirstComp
             middle_class = ExplicitCycleComp
             last_class = ExplicitLastComp
+        elif comp_class == 'deprecated':
+            first_class = DeprecatedFirstComp
+            middle_class = DeprecatedCycleComp
+            last_class = DeprecatedLastComp
         else:
             raise ValueError('Should not happen or else metadata dict is broken.')
 
@@ -142,7 +148,6 @@ class CycleGroup(ParametericTestGroup):
                            promotes_inputs=first_comp._cycle_promotes_in,
                            promotes_outputs=first_comp._cycle_promotes_out)
         prev_name = first_name
-
 
         connection_variables = [('y_{0}'.format(i), 'x_{0}'.format(i)) for i in range(num_var)]
         connection_variables.append(('theta_out', 'theta'))
