@@ -19,7 +19,7 @@ class EmbedCodeDirective(Directive):
     # must have at least one directive for this to work
     required_arguments = 1
     optional_arguments = 10
-    has_content = True
+    has_content = False
 
     def run(self):
         # create a list of document nodes to return

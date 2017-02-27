@@ -156,7 +156,7 @@ class pyOptSparseDriver(Driver):
 
         Parameters
         ----------
-        problem : <`Problem`>
+        problem : <Problem>
             Pointer to the containing problem.
         """
         super(pyOptSparseDriver, self)._setup_driver(problem)

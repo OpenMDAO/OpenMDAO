@@ -1,5 +1,5 @@
 
-Adding subsystems to a Group
+Adding Subsystems to a Group
 ----------------------------
 
 To add a Component or another Group to a Group, use the add_subsystem method.
