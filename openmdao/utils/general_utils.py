@@ -58,6 +58,10 @@ def ensure_compatible(name, value, shape=None, indices=None):
         If value cannot be made to conform to shape or if shape and indices
         are incompatible.
     """
+    if indices is not None:
+        indices = np.atleast_1d(indices)
+        ind_shape = indices.shape
+
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
         if isinstance(shape, int):
@@ -67,7 +71,13 @@ def ensure_compatible(name, value, shape=None, indices=None):
     elif not np.isscalar(value):
         shape = np.atleast_1d(value).shape
     elif indices is not None:
-        shape = np.atleast_1d(indices).shape
+        if len(ind_shape) > 1:
+            raise RuntimeError("src_indices for '%s' is not flat, so its input "
+                               "shape must be provided. src_indices may contain "
+                               "an extra dimension if the connected source is "
+                               "not flat, making the input shape ambiguous." %
+                               name)
+        shape = ind_shape
 
     if shape is None:
         # shape is not determined, assume the shape of value was intended
@@ -86,10 +96,10 @@ def ensure_compatible(name, value, shape=None, indices=None):
                                  (name, shape, value.shape))
 
     # finally make sure shape of indices is compatible
-    if indices is not None and np.atleast_1d(indices).shape != shape:
+    if indices is not None and shape != ind_shape[:len(shape)]:
         raise ValueError("Shape of indices does not match shape for '%s': "
                          "Expected %s but got %s." %
-                         (name, shape, np.atleast_1d(indices).shape))
+                         (name, shape, ind_shape[:len(shape)]))
 
     return value, shape
 

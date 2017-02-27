@@ -2,10 +2,7 @@
 
 from __future__ import division
 
-import collections
-
 import numpy
-from six import string_types, itervalues
 
 from openmdao.core.component import Component
 
