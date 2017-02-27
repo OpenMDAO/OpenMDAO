@@ -162,13 +162,13 @@ def MultiProcFailCheck(comm):
 
 def any_proc_is_true(comm, val):
     """
-    Return True if val is truthy in any proc in the given comm.
+    Return True if val is True in any proc in the given comm.
 
     Parameters
     ----------
     comm : MPI communicator
         expr will be evaluated in all processes in the communicator.
-    val : truthy or falsey value
+    val : bool 
         Value being tested.
 
     Returns
