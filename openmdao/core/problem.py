@@ -452,8 +452,11 @@ class Problem(object):
             global_options = DEFAULT_FD_OPTIONS.copy()
             global_options['method'] = 'fd'
 
+        method = global_options['method']
+
         if global_options['method'] == 'fd':
             scheme = FiniteDifference()
+            form = global_options['form']
         else:
             raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
 
@@ -483,7 +486,17 @@ class Problem(object):
             c_name = comp.pathname
 
             # TODO: Check deprecated deriv_options
-            
+
+            if compact_print:
+                check_description = "    (Check Type: {}:{})".format(method, form)
+            else:
+                check_description = ""
+
+            out_stream.write('-' * (len(c_name) + 15) + '\n')
+            out_stream.write("Component: '%s'%s\n" % (c_name, check_description))
+            out_stream.write('-' * (len(c_name) + 15) + '\n')
+
+
 
 
 
