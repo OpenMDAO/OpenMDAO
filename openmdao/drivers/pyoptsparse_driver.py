@@ -88,7 +88,7 @@ class pyOptSparseDriver(Driver):
         Pointer to the containing problem.
     supports : <OptionsDictionary>
         Provides a consistant way for drivers to declare what features they support.
-    pyopt_solution : <Solution>
+    pyopt_solution : Solution
         Pyopt_sparse solution object.
     _cons : dict
         Contains all constraint info.
@@ -156,7 +156,7 @@ class pyOptSparseDriver(Driver):
 
         Parameters
         ----------
-        problem : <`Problem`>
+        problem : <Problem>
             Pointer to the containing problem.
         """
         super(pyOptSparseDriver, self)._setup_driver(problem)

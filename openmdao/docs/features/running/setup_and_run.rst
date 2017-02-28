@@ -43,7 +43,6 @@ Set up a simple optimization problem and run it, call :code:`run_driver`.
     openmdao.core.tests.test_problem.TestProblem.test_feature_run_driver
 
 
-
 Related Features
 -------------------
 :ref:`Set/Get Variables<set-and-get-variables>`, drivers

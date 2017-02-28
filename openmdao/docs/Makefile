@@ -27,6 +27,57 @@ I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 
 .PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext
 
+#first item in makefile is default action of "make"
+html-update:
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS)  $(BUILDDIR)/html
+
+clean:
+	rm -rf $(BUILDDIR)/*
+	rm -rf _srcdocs/usr
+	rm -rf _srcdocs/dev
+	rm -rf tags
+	rm -rf tmp
+	rm feature_docs_unit_test_db.sqlite
+
+mock:
+	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
+	is required to build the docs. Install with:\n pip install mock"; exit 1)
+
+redbaron:
+	@(python -c "import redbaron" >/dev/null 2>&1) || (echo "The 'redbaron' package \
+	is required to build the docs. Install with:\n pip install redbaron"; exit 1)
+
+all: mock redbaron
+	# Cleaning up previously-generated files before docbuild
+	# rm -rf $(BUILDDIR)/*
+	rm -rf _srcdocs/usr
+	rm -rf _srcdocs/dev
+
+	# Running things before docbuild
+	python _utils/preprocess_tags.py
+	python _utils/create_feature_docs_unit_test_db.py
+
+	# Doing the first command in the background does two builds in parallel
+	#       dev docs get built into tmp/moved into _build later
+	#       to avoid race to create dirs.
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr" &
+	$(SPHINXBUILD) -b html -d tmp/doctrees  . tmp/html -t "dev"
+
+	# Making dirs in which to move things, moving things (parallel build prob)
+	mkdir $(BUILDDIR)/html/_srcdocs/dev
+	mkdir $(BUILDDIR)/doctrees/_srcdocs/dev
+	cp -R tmp/html/_srcdocs/dev $(BUILDDIR)/html/_srcdocs
+	cp -R tmp/doctrees/_srcdocs/dev $(BUILDDIR)/doctrees/_srcdocs
+
+	# post-game clean-up
+	rm feature_docs_unit_test_db.sqlite
+	rm -rf tmp
+
+	@echo
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+
+html: all
+
 help:
 	@echo "Please use 'make <target>' where <target> is one of"
 	@echo "  html       to make standalone HTML files"
@@ -53,52 +104,6 @@ help:
 	@echo "  linkcheck  to check all external links for integrity"
 	@echo "  doctest    to run all doctests embedded in the documentation (if enabled)"
 	@echo "  coverage   to run coverage check of the documentation (if enabled)"
-
-clean:
-	rm -rf $(BUILDDIR)/*
-	rm -rf _srcdocs/usr
-	rm -rf _srcdocs/dev
-	rm -rf tags
-	rm -rf tmp
-	rm feature_docs_unit_test_db.sqlite
-
-mock:
-	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
-	is required to build the docs. Install with:\n pip install mock"; exit 1)
-
-redbaron:
-	@(python -c "import redbaron" >/dev/null 2>&1) || (echo "The 'redbaron' package \
-	is required to build the docs. Install with:\n pip install redbaron"; exit 1)
-
-html: mock redbaron
-
-	# Running things before docbuild
-	python _utils/preprocess_tags.py
-	python _utils/create_feature_docs_unit_test_db.py
-
-	# Cleaning up previously-generated files before docbuild
-	rm -rf $(BUILDDIR)/*
-	rm -rf _srcdocs/usr
-	rm -rf _srcdocs/dev
-
-	# Doing the first command in the background does two builds in parallel
-	#       dev docs get built into tmp/moved into _build later
-	#       to avoid race to create dirs.
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr" &
-	$(SPHINXBUILD) -b html -d tmp/doctrees  . tmp/html -t "dev"
-
-	# Making dirs in which to move things, moving things (parallel build prob)
-	mkdir $(BUILDDIR)/html/_srcdocs/dev
-	mkdir $(BUILDDIR)/doctrees/_srcdocs/dev
-	cp -R tmp/html/_srcdocs/dev $(BUILDDIR)/html/_srcdocs
-	cp -R tmp/doctrees/_srcdocs/dev $(BUILDDIR)/doctrees/_srcdocs
-
-	# post-game clean-up
-	rm feature_docs_unit_test_db.sqlite
-	rm -rf tmp
-
-	@echo
-	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
 dirhtml:
 	$(SPHINXBUILD) -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml

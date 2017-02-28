@@ -67,7 +67,7 @@ class Driver(object):
 
         Parameters
         ----------
-        problem : <`Problem`>
+        problem : <Problem>
             Pointer to the containing problem.
         """
         self._problem = problem
