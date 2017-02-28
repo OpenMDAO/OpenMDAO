@@ -329,13 +329,24 @@ class TestUnitConversion(unittest.TestCase):
         prob = Problem(model=Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs='x1')
         prob.model.add_subsystem('src', SrcComp(), promotes_inputs='x1')
-        prob.model.add_subsystem('tgt', ExecComp('yy=xx', xx=0.0))
+        prob.model.add_subsystem('tgt', ExecComp('yy=xx', xx=0.0, units={'xx': 'unitless'}))
         prob.model.connect('src.x2', 'tgt.xx')
 
         with self.assertRaises(Exception) as cm:
             prob.setup()
-        expected_msg = "Units must be specified for both or neither side of connection " + \
-                       "in '': 'src.x2' has units 'degC' but 'tgt.xx' is unitless."
+        expected_msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'unitless' for 'src.x1'."
+        self.assertTrue(expected_msg in str(cm.exception))
+
+    def test_nounit_src_w_inputs_diff_units(self):
+        """Test error handling when a nounit src connects to multiple inputs with different units."""
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('indep', IndepVarComp('x', 100.0), promotes_outputs='x')
+        prob.model.add_subsystem('C1', ExecComp('y=x', x=0.0, units={'x': 'm'}), promotes_inputs='x')
+        prob.model.add_subsystem('C2', ExecComp('y=x', x=0.0, units={'x': 'ft'}), promotes_inputs='x')
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup()
+        expected_msg = "Output 'indep.x' has no units but connects to multiple inputs ['C1.x', 'C2.x'] having different units ['m', 'ft']"
         self.assertTrue(expected_msg in str(cm.exception))
 
     def test_basic_implicit_conn(self):

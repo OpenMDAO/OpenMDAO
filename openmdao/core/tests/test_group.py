@@ -339,6 +339,42 @@ class TestGroup(unittest.TestCase):
                                                     [7., 4.]]))
         assert_rel_error(self, p['C1.y'], 42.)
 
+    def test_promote_not_found1(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', ExecComp('y=x'), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', ExecComp('y=x'), promotes_outputs=['x*'])
+
+        with self.assertRaises(Exception) as context:
+            p.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "C2: no variables were promoted based on promotes_outputs=['x*']")
+        
+    def test_promote_not_found2(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', ExecComp('y=x'), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', ExecComp('y=x'), promotes_inputs=['xx'])
+
+        with self.assertRaises(Exception) as context:
+            p.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "C2: no variables were promoted based on promotes_inputs=['xx']")
+
+    def test_promote_not_found3(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', ExecComp('y=x'), promotes=['x'])
+        p.model.add_subsystem('C2', ExecComp('y=x'), promotes=['xx'])
+
+        with self.assertRaises(Exception) as context:
+            p.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "C2: no variables were promoted based on promotes=['xx']")
+
     def test_promote_src_indices(self):
         class MyComp1(ExplicitComponent):
             def initialize_variables(self):
@@ -628,14 +664,12 @@ class TestConnect(unittest.TestCase):
             prob.setup(check=False)
 
     def test_connect_units_with_unitless(self):
-        msg = "Units must be specified for both or neither side of " + \
-              "connection in '': " + \
-              "'src.x2' has units 'degC' but 'tgt.x' is unitless."
+        msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'unitless' for 'src.x1'."
 
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
         prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', units={'x2': 'degC'}))
-        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x'))
+        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', units={'x': 'unitless'}))
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
@@ -644,9 +678,7 @@ class TestConnect(unittest.TestCase):
             prob.setup(check=False)
 
     def test_connect_incompatible_units(self):
-        msg = "Output and input units are not compatible for " + \
-              "connection in '': " + \
-              "'src.x2' has units 'degC' but 'tgt.x' has units 'm'."
+        msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'src.x1'."
 
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
@@ -658,6 +690,21 @@ class TestConnect(unittest.TestCase):
 
         with assertRaisesRegex(self, RuntimeError, msg):
             prob.setup(check=False)
+
+    def test_connect_units_with_nounits(self):
+        prob = Problem(Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', units={'x2': 'degC'}))
+        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x'))
+
+        prob.model.connect('px1.x1', 'src.x1')
+        prob.model.connect('src.x2', 'tgt.x')
+        prob.model.suppress_solver_output = True
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['tgt.y'], 600.)
 
 
 if __name__ == "__main__":
