@@ -664,7 +664,7 @@ class TestConnect(unittest.TestCase):
             prob.setup(check=False)
 
     def test_connect_units_with_unitless(self):
-        msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'unitless' for 'src.x1'."
+        msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'unitless' for 'tgt.x'."
 
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
@@ -678,7 +678,7 @@ class TestConnect(unittest.TestCase):
             prob.setup(check=False)
 
     def test_connect_incompatible_units(self):
-        msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'src.x1'."
+        msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'tgt.x'."
 
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))

@@ -217,10 +217,10 @@ class Assembler(object):
                     if idata.myproc_idx is None:
                         in_unit_list = []
                         break
-                    in_unit_list.append(in_meta[idata.myproc_idx]['units'])
+                    in_unit_list.append((in_meta[idata.myproc_idx]['units'], in_ID))
 
                 if out_units:
-                    for in_ID, in_units in enumerate(in_unit_list):
+                    for in_units, in_ID in in_unit_list:
                         if in_units and not is_compatible(in_units, out_units):
                             raise RuntimeError("Output units of '%s' for '%s' are"
                                                " incompatible with input units of "
@@ -228,13 +228,13 @@ class Assembler(object):
                                                (out_units, out_paths[out_ID],
                                                 in_units, in_paths[in_ID]))
                 else:
-                    unitset = set(in_unit_list)
-                    if len(unitset) > 1:
+                    ulist = [u[0] for u in in_unit_list]
+                    if len(set(ulist)) > 1:
                         raise RuntimeError("Output '%s' has no units but connects "
                                            "to multiple inputs %s having different "
                                            "units %s" % (out_paths[out_ID],
                                                          [in_paths[i] for i in in_IDs],
-                                                         in_unit_list))
+                                                         ulist))
 
         self._input_src_ids = input_src_ids
 

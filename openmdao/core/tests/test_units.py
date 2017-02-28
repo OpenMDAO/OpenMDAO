@@ -334,8 +334,8 @@ class TestUnitConversion(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             prob.setup()
-        expected_msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'unitless' for 'src.x1'."
-        self.assertTrue(expected_msg in str(cm.exception))
+        expected_msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'unitless' for 'tgt.xx'."
+        self.assertEqual(expected_msg, str(cm.exception))
 
     def test_nounit_src_w_inputs_diff_units(self):
         """Test error handling when a nounit src connects to multiple inputs with different units."""
@@ -347,7 +347,7 @@ class TestUnitConversion(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
         expected_msg = "Output 'indep.x' has no units but connects to multiple inputs ['C1.x', 'C2.x'] having different units ['m', 'ft']"
-        self.assertTrue(expected_msg in str(cm.exception))
+        self.assertEqual(expected_msg, str(cm.exception))
 
     def test_basic_implicit_conn(self):
         """Test units with all implicit connections."""
@@ -664,39 +664,37 @@ class TestUnitConversion(unittest.TestCase):
                 #diff = abs(Jf[key][key2] - Jr[key][key2])
                 #assert_rel_error(self, diff, 0.0, 1e-10)
 
-    #def test_incompatible_connections(self):
+    def test_incompatible_connections(self):
 
-        #class BadComp(Component):
-            #def __init__(self):
-                #super(BadComp, self).__init__()
+        class BadComp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x2', 100.0, units='m')
+                self.add_output('x3', 100.0)
 
-                #self.add_param('x2', 100.0, units='m')
-                #self.add_output('x3', 100.0)
+        # Explicit Connection
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('src', SrcComp())
+        prob.model.add_subsystem('dest', BadComp())
+        prob.model.connect('src.x2', 'dest.x2')
+        with self.assertRaises(Exception) as cm:
+            prob.setup(check=False)
 
-        ## Explicit Connection
-        #prob = Problem()
-        #prob.root = Group()
-        #prob.root.add('src', SrcComp())
-        #prob.root.add('dest', BadComp())
-        #prob.root.connect('src.x2', 'dest.x2')
-        #with self.assertRaises(Exception) as cm:
-            #prob.setup(check=False)
+        expected_msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
 
-        #expected_msg = "Unit 'degC' in source 'src.x2' is incompatible with unit 'm' in target 'dest.x2'."
+        self.assertEqual(expected_msg, str(cm.exception))
 
-        #self.assertTrue(expected_msg in str(cm.exception))
+        # Implicit Connection
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('src', SrcComp(), promotes=['x2'])
+        prob.model.add_subsystem('dest', BadComp(),promotes=['x2'])
+        with self.assertRaises(Exception) as cm:
+            prob.setup(check=False)
 
-        ## Implicit Connection
-        #prob = Problem()
-        #prob.root = Group()
-        #prob.root.add('src', SrcComp(), promotes=['x2'])
-        #prob.root.add('dest', BadComp(),promotes=['x2'])
-        #with self.assertRaises(Exception) as cm:
-            #prob.setup(check=False)
+        expected_msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
 
-        #expected_msg = "Unit 'degC' in source 'src.x2' (x2) is incompatible with unit 'm' in target 'dest.x2' (x2)."
-
-        #self.assertTrue(expected_msg in str(cm.exception))
+        self.assertEqual(expected_msg, str(cm.exception))
 
     #def test_nested_relevancy_base(self):
 
