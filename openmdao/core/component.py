@@ -129,6 +129,7 @@ class Component(System):
                                             'my_idx': len(self._varx_abs_names['input']),
                                             'type_': 'input', 'metadata': metadata}
         self._varx_abs_names['input'].append(abs_name)
+        self._varx_allprocs_prom2abs_set['input'][name] = set([abs_name])
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
@@ -253,6 +254,7 @@ class Component(System):
                                             'my_idx': len(self._varx_abs_names['output']),
                                             'type_': 'output', 'metadata': metadata}
         self._varx_abs_names['output'].append(abs_name)
+        self._varx_allprocs_prom2abs_set['output'][name] = set([abs_name])
 
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):

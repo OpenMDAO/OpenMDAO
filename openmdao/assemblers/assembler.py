@@ -88,6 +88,25 @@ class Assembler(object):
         self._src_units = []
         self._src_scaling = None
 
+    def _setupx_variables(self, allprocs_abs_names):
+        """
+        Compute absolute name to/from idx maps for variables on all procs.
+
+        Sets the following attributes:
+            _varx_allprocs_abs_names
+            _varx_allprocs_abs2idx_io
+
+        Parameters
+        ----------
+        allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
+            List of absolute names of all owned variables, on all procs (maps idx to abs_name).
+        """
+        self._varx_allprocs_abs_names = allprocs_abs_names
+        self._varx_allprocs_abs2idx_io = {}
+        for type_ in ['input', 'output']:
+            for idx, abs_name in enumerate(allprocs_abs_names[type_]):
+                self._varx_allprocs_abs2idx_io[abs_name] = idx
+
     def _setup_variables(self, nvars, variable_metadata, variable_indices):
         """
         Compute the variable sets and sizes.

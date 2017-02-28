@@ -289,7 +289,7 @@ class System(object):
 
     def _setupx_variables_myproc(self):
         """
-        Assemble metadata and names lists / dictionaries for variables on the current proc.
+        Compute variable dict/list for variables on the current processor.
 
         Sets the following attributes:
             _varx_abs2data_io
@@ -331,12 +331,15 @@ class System(object):
         """
         Get the names for variables on all processors.
 
+        Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
+
         Returns
         -------
         {'input': [str, ...], 'output': [str, ...]}
             List of absolute names of owned variables existing on current proc.
         """
         allprocs_abs_names = {'input': [], 'output': []}
+        self._varx_allprocs_prom2abs_set = {'input': {}, 'output': {}}
 
         # If this is a group, we concatenate names from children and allgather.
         if len(self._subsystems_myproc) > 0:
@@ -347,18 +350,33 @@ class System(object):
                 for type_ in ['input', 'output']:
                     allprocs_abs_names[type_].extend(subsys_allprocs_abs_names[type_])
 
+            # For _varx_allprocs_prom2abs_set, essentially invert the abs2prom map in
+            # _varx_abs2data_io capturing at least the local maps.
+            for abs_name, data in iteritems(self._varx_abs2data_io):
+                type_ = data['type_']
+                prom_name = data['prom']
+                self._varx_allprocs_prom2abs_set[type_][prom_name] = [abs_name]
+
             # If we're running in parallel, gather contributions from other procs.
             if self.comm.size > 1:
                 for type_ in ['input', 'output']:
                     sub_comm = self._subsystems_myproc[0].comm
                     if sub_comm.rank == 0:
-                        names = allprocs_abs_names[type_]
+                        raw = (allprocs_abs_names[type_], self._varx_allprocs_prom2abs_set[type_])
                     else:
-                        names = []
+                        raw = ([], {})
 
                     allprocs_abs_names[type_] = []
-                    for names in self.comm.allgather(names):
-                        allprocs_abs_names[type_].extend(names)
+                    allprocs_prom2abs_set = {}
+                    for abs_names, prom2abs_set in self.comm.allgather(raw):
+                        allprocs_abs_names[type_].extend(abs_names)
+                        for prom_name, abs_name in iteritems(prom2abs_set):
+                            if prom_name not in allprocs_prom2abs_set:
+                                allprocs_prom2abs_set[prom_name] = [abs_name]
+                            else:
+                                allprocs_prom2abs_set[prom_name].append(abs_name)
+
+                    self._varx_allprocs_prom2abs_set[type_] = set(allprocs_prom2abs_set)
 
         # If this is a component, myproc names = allprocs names
         else:
@@ -374,9 +392,9 @@ class System(object):
 
     def _setupx_variable_allprocs_indices(self, global_index):
         """
-        Assemble variable index information for variables on all processors.
+        Compute the global index range for variables on all processors.
 
-        Sets the following attributes:
+        Computes the following attributes:
             _varx_allprocs_idx_range
 
         Parameters
@@ -460,6 +478,7 @@ class System(object):
             self._varx_abs2data_io = {}
             for type_ in ['input', 'output']:
                 self._varx_abs_names[type_] = []
+                self._varx_allprocs_prom2abs_set[type_] = {}
 
             self.initialize_variables()
 
