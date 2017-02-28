@@ -208,10 +208,17 @@ class Assembler(object):
                     # check units for connections that cross proc boundaries.
                     continue
                 out_units = out_meta[odata.myproc_idx]['units']
-                in_unit_list = [
-                    in_meta[pathdict[in_paths[in_ID]].myproc_idx]['units']
-                        for in_ID in in_IDs
-                ]
+                in_unit_list = []
+                for in_ID in in_IDs:
+                    idata = pathdict[in_paths[in_ID]]
+                    # TODO: fix this after we have allgathered metadata for units,
+                    # but for now, if any input is out-of-process, skip all of
+                    # the units checks
+                    if idata.myproc_idx is None:
+                        in_unit_list = []
+                        break
+                    in_unit_list.append(in_meta[idata.myproc_idx]['units'])
+
                 if out_units:
                     for in_ID, in_units in enumerate(in_unit_list):
                         if in_units and not is_compatible(in_units, out_units):
