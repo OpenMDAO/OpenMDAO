@@ -99,7 +99,7 @@ class System(object):
     _varx_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of owned variables existing on current proc.
     _varx_abs2data_io : dict
-        Dictionary mapping absolute names to dictionaries with (prom_name, rel_name, my_idx, type).
+        Dictionary mapping absolute names to dicts with keys (prom, rel, my_idx, type_, metadata).
         The my_idx entry is the index among variables in this system, on this processor.
         The type entry is either 'input' or 'output'.
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
@@ -287,6 +287,143 @@ class System(object):
                                          sub_global_dict, assembler,
                                          sub_proc_range)
 
+    def _setupx_variables_myproc(self):
+        """
+        Assemble metadata and names lists / dictionaries for variables on the current proc.
+
+        Sets the following attributes:
+            _varx_abs2data_io
+            _varx_abs_names
+        """
+        # If this is a component, we don't want to wipe the following two attributes.
+        # They contain valuable data from add_input/add_output in initialize_variables/__init__.
+        if len(self._subsystems_myproc) > 0:
+            self._varx_abs2data_io = {}
+            for type_ in ['input', 'output']:
+                self._varx_abs_names[type_] = []
+
+        # Perform recursion to populate the dict and list bottom-up
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_variables_myproc()
+
+            var_maps = {'input': subsys._get_maps('input'), 'output': subsys._get_maps('output')}
+
+            for type_ in ['input', 'output']:
+
+                # Assemble _varx_abs2data_io and _varx_abs_names by concatenating from subsys.
+                for abs_name in subsys._varx_abs_names[type_]:
+                    sub_data = subsys._varx_abs2data_io[abs_name]
+
+                    sub_prom_name = sub_data['prom']
+                    metadata = sub_data['metadata']
+
+                    prom_name = var_maps[type_][sub_prom_name]
+                    if self.pathname == '':
+                        rel_name = abs_name
+                    else:
+                        rel_name = abs_name[len(self.pathname) + 1:]
+                    self._varx_abs2data_io[abs_name] = {'prom': prom_name, 'rel': rel_name,
+                                                        'my_idx': len(self._varx_abs_names[type_]),
+                                                        'type_': type_, 'metadata': metadata}
+                    self._varx_abs_names[type_].append(abs_name)
+
+    def _setupx_variable_allprocs_names(self):
+        """
+        Get the names for variables on all processors.
+
+        Returns
+        -------
+        {'input': [str, ...], 'output': [str, ...]}
+            List of absolute names of owned variables existing on current proc.
+        """
+        allprocs_abs_names = {'input': [], 'output': []}
+
+        # If this is a group, we concatenate names from children and allgather.
+        if len(self._subsystems_myproc) > 0:
+            # First, concatenate the allprocs variable names from subsystems on my proc.
+            for subsys in self._subsystems_myproc:
+                subsys_allprocs_abs_names = subsys._setupx_variable_allprocs_names()
+
+                for type_ in ['input', 'output']:
+                    allprocs_abs_names[type_].extend(subsys_allprocs_abs_names[type_])
+
+            # If we're running in parallel, gather contributions from other procs.
+            if self.comm.size > 1:
+                for type_ in ['input', 'output']:
+                    sub_comm = self._subsystems_myproc[0].comm
+                    if sub_comm.rank == 0:
+                        names = allprocs_abs_names[type_]
+                    else:
+                        names = []
+
+                    allprocs_abs_names[type_] = []
+                    for names in self.comm.allgather(names):
+                        allprocs_abs_names[type_].extend(names)
+
+        # If this is a component, myproc names = allprocs names
+        else:
+            for type_ in ['input', 'output']:
+                allprocs_abs_names[type_].extend(self._varx_abs_names[type_])
+
+        # Now allprocs_abs_names is ready, so we get use it to
+        # count the total number of allprocs variables and put it in _varx_allprocs_idx_range.
+        for type_ in ['input', 'output']:
+            self._varx_allprocs_idx_range[type_] = [0, len(allprocs_abs_names[type_])]
+
+        return allprocs_abs_names
+
+    def _setupx_variable_allprocs_indices(self, global_index):
+        """
+        Assemble variable index information for variables on all processors.
+
+        Sets the following attributes:
+            _varx_allprocs_idx_range
+
+        Parameters
+        ----------
+        global_index : {'input': int, 'output': int}
+            current global variable counter.
+        """
+        # First, apply the global_index offset to make _varx_allprocs_idx_range correct.
+        for type_ in ['input', 'output']:
+            for ind in range(2):
+                self._varx_allprocs_idx_range[type_][ind] += global_index[type_]
+
+        if len(self._subsystems_myproc) > 0:
+            # Pre-recursion: compute index to pass to subsystems.
+            # This index is the number of variables on procs before current proc
+            # Necessary because of multiple global counters on different procs
+            if self.comm.size > 1:
+                subsys0 = self._subsystems_myproc[0]
+                for type_ in ['input', 'output']:
+                    # Note: the following is valid because _varx_allprocs_idx_range
+                    # contains [0, # allprocs vars] at this point because
+                    # _setupx_variable_allprocs_names has been run but the recursion
+                    # for the current method has not been performed yet.
+                    local_var_size = subsys0._varx_allprocs_idx_range[type_][1]
+
+                    # Compute the variable count list; 0 on rank > 0 procs
+                    sub_comm = subsys0.comm
+                    if sub_comm.rank == 0:
+                        nvar_myproc = local_var_size
+                    else:
+                        nvar_myproc = 0
+                    nvar_allprocs = self.comm.allgather(nvar_myproc)
+
+                    # Compute the offset
+                    iproc = self.comm.rank
+                    nvar_myproc = local_var_size
+                    global_index[type_] += numpy.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
+
+            # Perform recursion
+            for subsys in self._subsystems_myproc:
+                subsys_allprocs_abs_names = subsys._setupx_variable_allprocs_indices(global_index)
+
+        # Reset index dict to the global variable counter on all procs.
+        # Necessary for younger siblings to have proper index values.
+        for type_ in ['input', 'output']:
+            global_index[type_] = self._varx_allprocs_idx_range[type_][1]
+
     def _setup_variables(self, recurse=True):
         """
         Assemble variable metadata and names lists.
@@ -318,6 +455,11 @@ class System(object):
                 self._var_allprocs_pathnames[typ] = []
                 self._var_myproc_names[typ] = []
                 self._var_myproc_metadata[typ] = []
+
+            # [REFACTOR]
+            self._varx_abs2data_io = {}
+            for type_ in ['input', 'output']:
+                self._varx_abs_names[type_] = []
 
             self.initialize_variables()
 

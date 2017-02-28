@@ -120,6 +120,16 @@ class Component(System):
         self._var_myproc_metadata['input'].append(metadata)
         self._var2meta[name] = metadata
 
+        # [REFACTOR]
+        if self.pathname == '':
+            abs_name = name
+        else:
+            abs_name = self.pathname + '.' + name
+        self._varx_abs2data_io[abs_name] = {'prom': name, 'rel': name,
+                                            'my_idx': len(self._varx_abs_names['input']),
+                                            'type_': 'input', 'metadata': metadata}
+        self._varx_abs_names['input'].append(abs_name)
+
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
                    res_ref=1.0, res_ref0=0.0, var_set=0):
@@ -233,6 +243,16 @@ class Component(System):
         self._var_myproc_names['output'].append(name)
         self._var_myproc_metadata['output'].append(metadata)
         self._var2meta[name] = metadata
+
+        # [REFACTOR]
+        if self.pathname == '':
+            abs_name = name
+        else:
+            abs_name = self.pathname + '.' + name
+        self._varx_abs2data_io[abs_name] = {'prom': name, 'rel': name,
+                                            'my_idx': len(self._varx_abs_names['output']),
+                                            'type_': 'output', 'metadata': metadata}
+        self._varx_abs_names['output'].append(abs_name)
 
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):

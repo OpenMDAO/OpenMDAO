@@ -315,7 +315,15 @@ class Problem(object):
         model._setup_processors('', comm, {}, assembler, [0, comm.size])
         model._setup_variables()
         model._setup_variable_indices({'input': 0, 'output': 0})
+        model._setupx_variables_myproc()
+        allprocs_abs_names = model._setupx_variable_allprocs_names()
+        model._setupx_variable_allprocs_indices({'input': 0, 'output': 0})
         model._setup_connections()
+
+        for type_ in ['input', 'output']:
+            for ind in range(2):
+                assert model._var_allprocs_range[type_][ind] == \
+                    model._varx_allprocs_idx_range[type_][ind]
 
         # Assembler setup: variable metadata and indices
         nvars = {typ: len(model._var_allprocs_names[typ])
