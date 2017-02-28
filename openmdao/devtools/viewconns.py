@@ -9,7 +9,7 @@ from six import iteritems
 
 import numpy
 
-from openmdao.api import Problem
+from openmdao.core.problem import Problem
 from openmdao.devtools.compat import abs_conn_iter, abs_varname_iter, \
                                      abs_meta_iter, abs2prom_map
 from openmdao.utils.units import convert_units

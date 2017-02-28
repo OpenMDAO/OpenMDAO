@@ -282,6 +282,8 @@ class LinearSolver(Solver):
 
         Returns
         -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
         float
             initial error.
         float
