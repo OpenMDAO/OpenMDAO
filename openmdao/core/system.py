@@ -191,6 +191,12 @@ class System(object):
         self._var_connections = {}
         self._var_connections_indices = []
 
+        # [REFACTOR]
+        self._varx_allprocs_prom2abs_set = {'input': {}, 'output': {}}
+        self._varx_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
+        self._varx_abs_names = {'input': [], 'output': []}
+        self._varx_abs2data_io = {}
+
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._vector_transfers = {}
         self._vector_var_ids = {}

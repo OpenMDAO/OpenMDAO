@@ -46,7 +46,7 @@ class Assembler(object):
         Dictionary mapping absolute names to metadata dictionaries.
         Both inputs and outputs are contained in one combined dictionary.
     _varx_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
-        List of absolute names of all owned variables, on all procs.
+        List of absolute names of all owned variables, on all procs (maps idx to abs_name).
     _input_src_ids : int ndarray[num_input_var]
         the output variable ID for each input variable ID.
     _src_indices : int ndarray[:]
@@ -75,6 +75,11 @@ class Assembler(object):
         self._variable_sizes = {'input': [], 'output': []}
         self._variable_set_IDs = {'input': {}, 'output': {}}
         self._variable_set_indices = {'input': None, 'output': None}
+
+        # [REFACTOR]
+        self._varx_allprocs_abs2idx_io = {}
+        self._varx_allprocs_abs2meta_io = {}
+        self._varx_allprocs_abs_names = {'input': [], 'output': []}
 
         self._input_src_ids = None
         self._src_indices = None
