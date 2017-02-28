@@ -12,9 +12,15 @@ from openmdao.utils.units import conversion_to_base_units, convert_units
 
 class Assembler(object):
     """
-    Base Assembler class.
+    Base Assembler class. The primary purpose of the Assembler class is to set up transfers.
 
-    The primary purpose of the Assembler class is to set up transfers.
+    In attribute names:
+        abs / abs_name : absolute, unpromoted variable name, seen from root (unique).
+        rel / rel_name : relative, unpromoted variable name, seen from current system (unique).
+        prom / prom_name : relative, promoted variable name, seen from current system (non-unique).
+        idx : global variable index among variables on all procs (input/output indices separate).
+        my_idx : index among variables in this system, on this processor (I/O indices separate).
+        io : indicates explicitly that input and output variables are combined in the same dict.
 
     Attributes
     ----------
@@ -32,6 +38,15 @@ class Assembler(object):
                              'output': ndarray[nvar_all, 2]}
         the first column is the var_set ID and
         the second column is the variable index within the var_set.
+    _varx_allprocs_abs2idx_io : dict
+        Dictionary mapping absolute names to global indices.
+        Both inputs and outputs are contained in one combined dictionary.
+        For the global indices, input and output variable indices are tracked separately.
+    _varx_allprocs_abs2meta_io : dict
+        Dictionary mapping absolute names to metadata dictionaries.
+        Both inputs and outputs are contained in one combined dictionary.
+    _varx_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
+        List of absolute names of all owned variables, on all procs.
     _input_src_ids : int ndarray[num_input_var]
         the output variable ID for each input variable ID.
     _src_indices : int ndarray[:]

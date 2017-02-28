@@ -32,6 +32,14 @@ class System(object):
     Never instantiated; subclassed by <Group> or <Component>.
     All subclasses have their attributes defined here.
 
+    In attribute names:
+        abs / abs_name : absolute, unpromoted variable name, seen from root (unique).
+        rel / rel_name : relative, unpromoted variable name, seen from current system (unique).
+        prom / prom_name : relative, promoted variable name, seen from current system (non-unique).
+        idx : global variable index among variables on all procs (I/O indices separate).
+        my_idx : index among variables in this system, on this processor (I/O indices separate).
+        io : indicates explicitly that input and output variables are combined in the same dict.
+
     Attributes
     ----------
     name : str
@@ -83,6 +91,17 @@ class System(object):
     _var_connections_indices : [(int, int), ...]
         _var_connections with variable indices instead of names.  Entries
         have the form (input_index, output_index).
+    _varx_allprocs_prom2abs_set : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to set of all absolute names.
+        For outputs, the set will have length one since promoted output names are unique.
+    _varx_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
+        Global index range of owned variables with respect to all model variables.
+    _varx_abs_names : {'input': [str, ...], 'output': [str, ...]}
+        List of absolute names of owned variables existing on current proc.
+    _varx_abs2data_io : dict
+        Dictionary mapping absolute names to dictionaries with (prom_name, rel_name, my_idx, type).
+        The my_idx entry is the index among variables in this system, on this processor.
+        The type entry is either 'input' or 'output'.
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         dict of vector objects. These are the derivatives vectors.
     _vector_transfers : dict
