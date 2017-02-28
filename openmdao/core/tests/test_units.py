@@ -152,6 +152,13 @@ class UnitConvGroupImplicitConns(Group):
 class TestUnitConversion(unittest.TestCase):
     """ Testing automatic unit conversion."""
 
+    def test_dangling_input_w_units(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('C1', ExecComp('y=x', units={'x': 'ft', 'y': 'm'}))
+        prob.setup()
+        prob.run_model()
+        # this test passes as long as it doesn't raise an exception
+
     def test_speed(self):
         comp = IndepVarComp()
         comp.add_output('distance', val=1., units='m')
