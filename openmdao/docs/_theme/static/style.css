@@ -121,31 +121,37 @@ div.failed pre {
 div.input_prompt {
     color: #303F9F;
     float: left;
+    padding: 0px;
 }
 
 div.input_area {
-    border-radius: 2px;
+    border-radius: 1px;
+    padding: 0px;
 }
 
 div.output_prompt {
     color: #D84315;
     float: left;
+    padding: 0px;
 }
 
 div.output_area pre {
     background-color: transparent;
-    border-radius: 2px;
+    border-radius: 1px;
+    padding: 0px;
 }
 
 div.highlight{
   margin:.4em;
-  border:none;padding:0;
+  border: none;
+  padding: 0px;
   background-color:transparent;
 }
 
 .prompt {
     min-width: 14ex;
-    padding: .4em;
+    /*padding: .4em;*/
+    padding: 0px;
     margin: 0;
     font-family: monospace;
     text-align: left;
