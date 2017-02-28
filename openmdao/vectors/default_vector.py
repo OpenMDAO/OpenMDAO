@@ -321,8 +321,8 @@ class DefaultVector(Vector):
             0th and 1st order coefficients for scaling/unscaling.
         """
         for iset, data in enumerate(self._data):
-            data[:] = coeffs[self._ivar_map[iset], 0] + \
-                coeffs[self._ivar_map[iset], 1] * data
+            idx = self._ivar_map[iset]
+            data[:] = coeffs[idx, 0] + coeffs[idx, 1] * data
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """

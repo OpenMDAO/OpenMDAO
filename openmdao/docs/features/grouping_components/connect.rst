@@ -42,3 +42,4 @@ input.
 
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_connect_src_indices_noflat
+    
