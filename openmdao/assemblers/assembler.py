@@ -205,7 +205,7 @@ class Assembler(object):
                 odata = pathdict[out_paths[out_ID]]
                 if odata.myproc_idx is None:
                     # TODO: we need to allgather unit info. Otherwise we can't
-                    # checks units for connections that cross proc boundaries.
+                    # check units for connections that cross proc boundaries.
                     continue
                 out_units = out_meta[odata.myproc_idx]['units']
                 in_unit_list = [
