@@ -640,10 +640,8 @@ class System(object):
             names = promotes_typ
             patterns = [n for n in names if '*' in n or '?' in n]
         else:
-            if gname:
-                return {name: gname + name for name in self._var_allprocs_names[typ]}, False
-            else:
-                return {name: name for name in self._var_allprocs_names[typ]}, False
+            names = ()
+            patterns = ()
 
         maps = {}
         for name in self._var_allprocs_names[typ]:
