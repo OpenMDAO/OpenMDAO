@@ -149,7 +149,7 @@ def MultiProcFailCheck(comm):
     else:
         try:
             yield
-        except:
+        except Exception:
             fails = comm.allgather(traceback.format_exc())
         else:
             fails = comm.allgather('')
@@ -168,7 +168,7 @@ def any_proc_is_true(comm, val):
     ----------
     comm : MPI communicator
         expr will be evaluated in all processes in the communicator.
-    val : bool 
+    val : bool
         Value being tested.
 
     Returns

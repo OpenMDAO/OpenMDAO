@@ -40,7 +40,7 @@ def _is_context_manager(func):
 
     """
     src = inspect.getsource(func)
-    return 'return GeneratorContextManager' in src
+    return 'return GeneratorContextManager' in src or src.startswith('@contextmanager')
 
 
 class ReturnFinder(ast.NodeVisitor):
