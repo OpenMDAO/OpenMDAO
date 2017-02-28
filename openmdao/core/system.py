@@ -339,7 +339,6 @@ class System(object):
             List of absolute names of owned variables existing on current proc.
         """
         allprocs_abs_names = {'input': [], 'output': []}
-        self._varx_allprocs_prom2abs_set = {'input': {}, 'output': {}}
 
         # If this is a group, we concatenate names from children and allgather.
         if len(self._subsystems_myproc) > 0:
@@ -352,6 +351,7 @@ class System(object):
 
             # For _varx_allprocs_prom2abs_set, essentially invert the abs2prom map in
             # _varx_abs2data_io capturing at least the local maps.
+            self._varx_allprocs_prom2abs_set = {'input': {}, 'output': {}}
             for abs_name, data in iteritems(self._varx_abs2data_io):
                 type_ = data['type_']
                 prom_name = data['prom']
@@ -379,6 +379,7 @@ class System(object):
                     self._varx_allprocs_prom2abs_set[type_] = set(allprocs_prom2abs_set)
 
         # If this is a component, myproc names = allprocs names
+        # and _varx_allprocs_prom2abs_set was already computed in add_input / add_output.
         else:
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_].extend(self._varx_abs_names[type_])
