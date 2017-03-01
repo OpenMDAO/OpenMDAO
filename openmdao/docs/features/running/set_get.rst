@@ -16,8 +16,7 @@ To set or get the output variable, you reference it by its promoted name.
 In the regular <openmdao.test_suite.components.sellar.py> problem all the variables have been promoted to the top of the model.
 So to get the value of the "y1" output defined in <openmdao.test_suite.components.sellar.SellarDis1withDerivatives> component you would do the following:
 
-.. embed-test::
-    openmdao.core.tests.test_problem.TestProblem.test_feature_promoted_sellar_set_get_outputs
+.. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_feature_promoted_sellar_set_get_outputs
 
 
 You use the same syntax when working with the independent variables of your problem.
@@ -29,8 +28,7 @@ For example, consider our paraboloid tutorial problem problem which has two inde
 
 These would be defined and set as follows:
 
-.. embed-test::
-    openmdao.core.tests.test_problem.TestProblem.test_feature_set_indeps
+.. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_feature_set_indeps
 
 
 
@@ -39,8 +37,7 @@ So if you built the Sellar problem using connections (see <openmdao.test_suite.c
 instead of promoting everything, then you would access the variables like this:
 
 
-.. embed-test::
-    openmdao.core.tests.test_problem.TestProblem.test_feature_not_promoted_sellar_set_get_outputs
+.. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_feature_not_promoted_sellar_set_get_outputs
 
 
 Working with Array Variables
@@ -50,11 +47,9 @@ When you have an array variables, for convenience we allow you to set the value 
 In other words, the shape of the list has to match the shape of the actual data.
 
 
-.. embed-test::
-    openmdao.core.tests.test_problem.TestProblem.test_feature_set_get_array
+.. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_feature_set_get_array
 
-.. embed-test::
-    openmdao.core.tests.test_problem.TestProblem.test_set_2d_array
+.. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_set_2d_array
 
 
 
@@ -78,8 +73,7 @@ Inputs
 To set or get the and input variable, you reference it by its absolute path name. The full path name is necessary, because you could have an output (source) variable in units of meters, and then two connected inputs (targets) in units of millimeters and centimeters, respectively. Hence you need a specific path to reference each of the two different inputs separately to get the value in that input's units.
 
 
-.. embed-test::
-    openmdao.core.tests.test_problem.TestProblem.test_feature_promoted_sellar_set_get_inputs
+.. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_feature_promoted_sellar_set_get_inputs
 
 Related Features
 -----------------

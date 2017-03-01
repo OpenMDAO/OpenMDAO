@@ -198,6 +198,148 @@ class TestScaling(unittest.TestCase):
         use_scal = True
         self.assertTrue(runs_successfully(use_scal, coeffs))
 
+    def test_resid_scale_default(self):
+        # This model checks the contents of the residual in both scaled and unscaled states.
+        # The model is a cycle that iterates once, so the first component in the cycle carries
+        # a residual.
+
+        class Simple(ExplicitComponent):
+
+            def __init__(self, ref=1.0, res_ref=None, ref0=0.0, res_ref0=None, **kwargs):
+
+                kwargs['ref'] = ref
+                kwargs['ref0'] = ref0
+                kwargs['res_ref'] = res_ref
+                kwargs['res_ref0'] = res_ref0
+
+                super(Simple, self).__init__(**kwargs)
+
+            def initialize_variables(self):
+
+                ref = self.metadata['ref']
+                ref0 = self.metadata['ref0']
+                res_ref = self.metadata['res_ref']
+                res_ref0 = self.metadata['res_ref0']
+
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0, ref=ref, ref0=ref0, res_ref=res_ref, res_ref0=res_ref0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2.0*(inputs['x'] + 1.0)
+
+        # Baseline - all should be equal.
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', Simple())
+        model.add_subsystem('p2', Simple())
+        model.connect('p1.y', 'p2.x')
+        model.connect('p2.y', 'p1.x')
+
+        model._suppress_solver_output = True
+        model.nl_solver.options['maxiter'] = 1
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        res1 = model.get_subsystem('p1')._residuals.get_data()[0]
+        out1 = model.get_subsystem('p1')._outputs.get_data()[0]
+        out2 = model.get_subsystem('p2')._outputs.get_data()[0]
+
+        self.assertEqual(res1, out1 - 2.0*(out2 + 1.0))
+        with model._scaled_context():
+            res1 = model.get_subsystem('p1')._residuals.get_data()[0]
+            out1 = model.get_subsystem('p1')._outputs.get_data()[0]
+            out2 = model.get_subsystem('p2')._outputs.get_data()[0]
+
+            self.assertEqual(res1, out1 - 2.0*(out2 + 1.0))
+
+        # Scale the outputs only.
+        # Residual scaling uses output scaling by default.
+
+        ref = 1.0
+        ref0 = 1.5
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', Simple(ref=ref, ref0=ref0))
+        model.add_subsystem('p2', Simple(ref=ref, ref0=ref0))
+        model.connect('p1.y', 'p2.x')
+        model.connect('p2.y', 'p1.x')
+
+        model._suppress_solver_output = True
+        model.nl_solver.options['maxiter'] = 1
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        res1 = model.get_subsystem('p1')._residuals.get_data()[0]
+        out1 = model.get_subsystem('p1')._outputs.get_data()[0]
+        out2 = model.get_subsystem('p2')._outputs.get_data()[0]
+
+        self.assertEqual(res1, (out1 - 2.0*(out2 + 1.0)))
+        with model._scaled_context():
+            res1a = model.get_subsystem('p1')._residuals.get_data()[0]
+
+            self.assertEqual(res1a, (res1-ref0)/(ref-ref0))
+
+        # Scale the residual
+
+        res_ref = 4.0
+        res_ref0 = 3.5
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', Simple(res_ref=res_ref, res_ref0=res_ref0))
+        model.add_subsystem('p2', Simple(res_ref=res_ref, res_ref0=res_ref0))
+        model.connect('p1.y', 'p2.x')
+        model.connect('p2.y', 'p1.x')
+
+        model._suppress_solver_output = True
+        model.nl_solver.options['maxiter'] = 1
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        res1 = model.get_subsystem('p1')._residuals.get_data()[0]
+        out1 = model.get_subsystem('p1')._outputs.get_data()[0]
+        out2 = model.get_subsystem('p2')._outputs.get_data()[0]
+
+        self.assertEqual(res1, out1 - 2.0*(out2+1.0))
+        with model._scaled_context():
+            res1a = model.get_subsystem('p1')._residuals.get_data()[0]
+
+            self.assertEqual(res1a, (res1-res_ref0)/(res_ref-res_ref0))
+
+        # Simultaneously scale the residual and output with different values
+
+        ref = 3.0
+        ref0 = 2.75
+        res_ref = 4.0
+        res_ref0 = 3.5
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', Simple(ref=ref, ref0=ref0, res_ref=res_ref, res_ref0=res_ref0))
+        model.add_subsystem('p2', Simple(ref=ref, ref0=ref0, res_ref=res_ref, res_ref0=res_ref0))
+        model.connect('p1.y', 'p2.x')
+        model.connect('p2.y', 'p1.x')
+
+        model._suppress_solver_output = True
+        model.nl_solver.options['maxiter'] = 1
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        res1 = model.get_subsystem('p1')._residuals.get_data()[0]
+        out1 = model.get_subsystem('p1')._outputs.get_data()[0]
+        out2 = model.get_subsystem('p2')._outputs.get_data()[0]
+
+        self.assertEqual(res1, out1 - 2.0*(out2+1.0))
+        with model._scaled_context():
+            res1a = model.get_subsystem('p1')._residuals.get_data()[0]
+
+            self.assertEqual(res1a, (res1-res_ref0)/(res_ref-res_ref0))
 
 if __name__ == '__main__':
     unittest.main()
