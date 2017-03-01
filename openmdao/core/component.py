@@ -644,10 +644,10 @@ class Component(System):
         # and _varx_allprocs_prom2abs_set was already computed in add_input / add_output.
         allprocs_abs_names = {'input': [], 'output': []}
         for type_ in ['input', 'output']:
-            allprocs_abs_names[type_] = self._varx_abs_names[type_])
+            allprocs_abs_names[type_] = self._varx_abs_names[type_]
 
-        # Now allprocs_abs_names is ready, so we get use it to
-        # count the total number of allprocs variables and put it in _varx_allprocs_idx_range.
+        # We use allprocs_abs_names to count the total number of allprocs variables
+        # and put it in _varx_allprocs_idx_range.
         for type_ in ['input', 'output']:
             self._varx_allprocs_idx_range[type_] = [0, len(allprocs_abs_names[type_])]
 
@@ -665,7 +665,8 @@ class Component(System):
         global_index : {'input': int, 'output': int}
             current global variable counter.
         """
-        # First, apply the global_index offset to make _varx_allprocs_idx_range correct.
+        # At this point, _varx_allprocs_idx_range is correct except for an offset.
+        # We apply the global_index offset to make _varx_allprocs_idx_range correct.
         for type_ in ['input', 'output']:
             for ind in range(2):
                 self._varx_allprocs_idx_range[type_][ind] += global_index[type_]

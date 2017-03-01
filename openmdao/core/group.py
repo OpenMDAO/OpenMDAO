@@ -405,7 +405,7 @@ class Group(System):
 
             for type_ in ['input', 'output']:
 
-                # Assemble _varx_abs2data_io and _varx_abs_names by concatenating from subsys.
+                # Assemble _varx_abs2data_io and _varx_abs_names by concatenating from subsystems.
                 for abs_name in subsys._varx_abs_names[type_]:
                     sub_data = subsys._varx_abs2data_io[abs_name]
 
@@ -417,6 +417,7 @@ class Group(System):
                         rel_name = abs_name
                     else:
                         rel_name = abs_name[len(self.pathname) + 1:]
+
                     self._varx_abs2data_io[abs_name] = {'prom': prom_name, 'rel': rel_name,
                                                         'my_idx': len(self._varx_abs_names[type_]),
                                                         'type_': type_, 'metadata': metadata}
@@ -446,7 +447,7 @@ class Group(System):
                 allprocs_abs_names[type_].extend(subsys_allprocs_abs_names[type_])
 
         # For _varx_allprocs_prom2abs_set, essentially invert the abs2prom map in
-        # _varx_abs2data_io capturing at least the local maps.
+        # _varx_abs2data_io to capture at least the local maps.
         self._varx_allprocs_prom2abs_set = {'input': {}, 'output': {}}
         for abs_name, data in iteritems(self._varx_abs2data_io):
             type_ = data['type_']
@@ -479,8 +480,8 @@ class Group(System):
                     allprocs_prom2abs_set[prom_name] = set(abs_names_set)
                 self._varx_allprocs_prom2abs_set[type_] = allprocs_prom2abs_set
 
-        # Now allprocs_abs_names is ready, so we get use it to
-        # count the total number of allprocs variables and put it in _varx_allprocs_idx_range.
+        # We use allprocs_abs_names to count the total number of allprocs variables
+        # and put it in _varx_allprocs_idx_range.
         for type_ in ['input', 'output']:
             self._varx_allprocs_idx_range[type_] = [0, len(allprocs_abs_names[type_])]
 
@@ -498,7 +499,8 @@ class Group(System):
         global_index : {'input': int, 'output': int}
             current global variable counter.
         """
-        # First, apply the global_index offset to make _varx_allprocs_idx_range correct.
+        # At this point, _varx_allprocs_idx_range is correct except for an offset.
+        # We apply the global_index offset to make _varx_allprocs_idx_range correct.
         for type_ in ['input', 'output']:
             for ind in range(2):
                 self._varx_allprocs_idx_range[type_][ind] += global_index[type_]
