@@ -7,41 +7,7 @@ from openmdao.utils.generalized_dict import OptionsDictionary
 class ApproximationScheme(object):
     """
     Base class used to define the interface for derivative approximation schemes.
-
-    Attributes
-    ----------
-    _scale_cache : dict
-        Cache for scaling factors.
     """
-
-    def __init__(self):
-        self._scale_cache = {}
-
-    def _get_scale_factor(self, system, var_name, io_type):
-        """
-        Retreive cached scale factor or find if missing.
-
-        Parameters
-        ----------
-        system : System
-            System in which the variable lives.
-        var_name : str
-            Name of the variable.
-        io_type : str
-            'input' or 'output'
-
-        Returns
-        -------
-
-        """
-        scale_factor = self._scale_cache.get((system, var_name, io_type))
-        if scale_factor is None:
-            scaling_idx = system._var_allprocs_indices[io_type][var_name]
-            scaling_to_norm = system._scaling_to_norm[io_type][scaling_idx, :]
-            scale_factor = scaling_to_norm[1]
-            self._scale_cache[system, var_name, io_type] = scale_factor
-        return scale_factor
-
 
     def add_approximation(self, key, kwargs):
         """

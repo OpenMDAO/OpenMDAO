@@ -90,17 +90,23 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         data = prob.check_partial_derivatives(out_stream=stream)
 
-        self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x1']['J_fwd'] - 3.), 0.)
-        self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x1']['J_rev'] - 3.), 0.)
+        abs_error = data['comp']['y', 'x1']['abs error']
+        rel_error = data['comp']['y', 'x1']['rel error']
+        self.assertAlmostEqual(abs_error.forward, 0.)
+        self.assertAlmostEqual(abs_error.reverse, 0.)
+        self.assertAlmostEqual(rel_error.forward, 0.)
+        self.assertAlmostEqual(rel_error.reverse, 0.)
         self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x1']['J_fd'] - 3.), 0.,
                                delta=1e-6)
 
-        self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x2']['J_fwd']), 0.)
-        self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x2']['J_rev']), 0.)
+        abs_error = data['comp']['y', 'x2']['abs error']
+        rel_error = data['comp']['y', 'x2']['rel error']
+        self.assertAlmostEqual(abs_error.forward, 4.)
+        self.assertAlmostEqual(abs_error.reverse, 4.)
+        self.assertAlmostEqual(rel_error.forward, 1.)
+        self.assertAlmostEqual(rel_error.reverse, 1.)
         self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x2']['J_fd'] - 4.), 0.,
                                delta=1e-6)
-
-        self.fail('Finish implementing')
 
     def test_nested_fd_units(self):
         class UnitCompBase(ExplicitComponent):
@@ -169,11 +175,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
-                forward = partial['J_fwd']
-                reverse = partial['J_rev']
-                fd = partial['J_fd']
-                self.assertAlmostEqual(np.linalg.norm(forward - reverse), 0.)
-                self.assertAlmostEqual(np.linalg.norm(forward - fd), 0., delta=1e-6)
+                abs_error = partial['abs error']
+                self.assertAlmostEqual(abs_error.forward, 0.)
+                self.assertAlmostEqual(abs_error.reverse, 0.)
+                self.assertAlmostEqual(abs_error.forward_reverse, 0.)
 
 if __name__ == "__main__":
     unittest.main()

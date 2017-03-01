@@ -29,8 +29,8 @@ FD_COEFFS = {
                            coeffs=np.array([1]),
                            current_coeff=-1.),
     ('backward', 1): FDForm(deltas=np.array([-1]),
-                           coeffs=np.array([-1]),
-                           current_coeff=1.),
+                            coeffs=np.array([-1]),
+                            current_coeff=1.),
     ('central', 2): FDForm(deltas=np.array([1, -1]),
                            coeffs=np.array([1 / 2, -1 / 2]),
                            current_coeff=0.),
@@ -118,7 +118,7 @@ class FiniteDifference(ApproximationScheme):
         """
         fd_options = approx_tuple[2]
         return (approx_tuple[1], fd_options['form'], fd_options['order'],
-                fd_options['step'],  fd_options['step_calc'])
+                fd_options['step'], fd_options['step_calc'])
 
     def _init_approximations(self):
         """
