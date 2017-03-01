@@ -596,7 +596,7 @@ class Component(System):
                 abs_name = self.pathname + '.' + name
             return abs_name
 
-        # Now that we know pathnames, convert _varx_abs_names from names to abs_names.
+        # Now that we know the pathname, convert _varx_abs_names from names to abs_names.
         for type_ in ['input', 'output']:
             abs_names = []
             for name in self._varx_abs_names[type_]:
@@ -604,7 +604,7 @@ class Component(System):
                 abs_names.append(abs_name)
             self._varx_abs_names[type_] = abs_names
 
-        # Now that we know pathnames, convert _varx_abs2data_io from names to abs_names.
+        # Now that we know the pathname, convert _varx_abs2data_io from names to abs_names.
         abs2data_io = {}
         for name, data in iteritems(self._varx_abs2data_io):
             abs_name = get_abs_name(name)
@@ -629,7 +629,7 @@ class Component(System):
                 abs_name = self.pathname + '.' + name
             return abs_name
 
-        # Now that we know pathnames, convert _varx_abs_names from names to abs_names.
+        # Now that we know the pathname, convert _varx_abs_names from names to abs_names.
         for type_ in ['input', 'output']:
             allprocs_prom2abs_set = {}
             for name in self._varx_abs_names[type_]:
