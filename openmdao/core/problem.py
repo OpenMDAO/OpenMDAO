@@ -418,8 +418,8 @@ class Problem(object):
         """
         Check partial derivatives comprehensively for all components in your model.
 
-        Args
-        ----
+        Parameters
+        ----------
         out_stream : file_like
             Where to send human readable output. Default is sys.stdout. Set to None to suppress.
         comps : None or list_like
@@ -966,7 +966,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     out_stream.write(str(reverse))
                     out_stream.write('\n\n')
 
-                    out_stream.write('    Raw FD Derivative (Jfor)\n\n')
+                    out_stream.write('    Raw FD Derivative (Jfd)\n\n')
                     out_stream.write(str(fd))
                     out_stream.write('\n\n')
 
