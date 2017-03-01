@@ -126,11 +126,6 @@ class DeprecatedCycleComp(DeprecatedComponent):
         self.add_param(self._cycle_names['theta'], val=1.)
         self.add_output(self._cycle_names['theta_out'], shape=(1,))
 
-    # def apply_nonlinear(self, inputs, outputs, resids):
-    #     print(self.pathname, "apply_nonlinear()  FIXME")
-    #     theta = inputs[self._cycle_names['theta']]
-    #     resids['theta_out'] = theta - outputs['theta_out']
-
     def solve_nonlinear(self, inputs, outputs, residuals):
         theta = inputs[self._cycle_names['theta']]
         A = _compute_A(self.size, theta)
@@ -254,7 +249,8 @@ class DeprecatedCycleComp(DeprecatedComponent):
             self.declare_partials(self._cycle_names['theta_out'], self._cycle_names['theta'],
                                   **self._array2kwargs(dtheta, pd_type))
 
-    def linearize(self, inputs, outputs, partials):
+    def linearize(self, inputs, outputs, resids):
+        partials = {}
         if self.metadata['jacobian_type'] != 'matvec':
             angle_param = self._cycle_names[self.angle_param]
             angle = inputs[angle_param]
@@ -281,13 +277,18 @@ class DeprecatedCycleComp(DeprecatedComponent):
                     J_y_angle = self.make_jacobian_entry(dA_x[array_idx(out_idx, var_size)],
                                                          pd_type)
 
+                    print(out_var, 'wrt', in_var, '=', J_y_x)
                     partials[out_var, in_var] = J_y_x
+                    print(out_var, 'wrt', angle_param, '=', J_y_angle)
                     partials[out_var, angle_param] = J_y_angle
 
             theta_out = self._cycle_names['theta_out']
             theta = self._cycle_names['theta']
             partials[theta_out, theta] = self.make_jacobian_entry(dtheta, pd_type)
 
+        print(self.pathname, 'linearize() J:\n')
+        from pprint import pprint
+        pprint(partials)
         return partials
 
 
@@ -352,7 +353,8 @@ class DeprecatedLastComp(DeprecatedFirstComp):
             self.declare_partials(self._cycle_names['theta_out'], self._cycle_names['psi'],
                                   **self._array2kwargs(np.array([1.]), pd_type))
 
-    def linearize(self, inputs, outputs, partials):
+    def linearize(self, inputs, outputs, resids):
+        partials = {}
         if self.metadata['jacobian_type'] != 'matvec':
             pd_type = self.metadata['partial_type']
             for i in range(self.metadata['num_var']):
@@ -367,7 +369,9 @@ class DeprecatedLastComp(DeprecatedFirstComp):
             partials[theta_out, self._cycle_names['psi']] = \
                 self.make_jacobian_entry(np.array([-1/(2*k-2)]), pd_type)
 
-        return partials
+        print(self.pathname, 'linearize() J:\n')
+        from pprint import pprint
+        pprint(partials)
 
     def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
         if self.metadata['jacobian_type'] == 'matvec':

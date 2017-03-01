@@ -240,14 +240,23 @@ class Component(BaseComponent):
                     arange = numpy.arange(size)
                     self._jacobian[out_name, out_name] = (ones, arange, arange)
 
-            for out_name in self._var_myproc_names['output']:
-                if out_name in self._output_names:
-                    for in_name in self._var_myproc_names['input']:
-                        if (out_name, in_name) in self._jacobian:
-                            self._jacobian._negate((out_name, in_name))
+            # re-negate the jacobian
+            self._negate_jac()
 
             if self._owns_global_jac:
                 self._jacobian._update()
+
+    def _negate_jac(self):
+        """
+        Negate this component's part of the jacobian.
+        """
+        if self._jacobian._subjacs:
+            for in_name in self._var_myproc_names['input']:
+                for out_name in self._var_myproc_names['output']:
+                    key = (out_name, in_name)
+                    if key in self._jacobian:
+                        ukey = self._jacobian._key2unique(key)
+                        self._jacobian._multiply_subjac(ukey, -1.0)
 
     def apply_nonlinear(self, params, unknowns, residuals):
         """
@@ -262,7 +271,10 @@ class Component(BaseComponent):
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
-        pass
+        residuals.set_vec(unknowns)
+        self.solve_nonlinear(params, unknowns, residuals)
+        residuals -= unknowns
+        unknowns += residuals
 
     def solve_nonlinear(self, params, unknowns, residuals):
         """
@@ -328,9 +340,9 @@ class Component(BaseComponent):
         """
         pass
 
-    def linearize(self, params, unknowns, jacobian):
+    def linearize(self, params, unknowns, residuals):
         """
-        Compute sub-jacobian parts / factorization.
+        Compute jacobian.
 
         Parameters
         ----------
@@ -338,7 +350,13 @@ class Component(BaseComponent):
             unscaled, dimensional param variables read via params[key]
         unknowns : Vector
             unscaled, dimensional unknown variables read via unknowns[key]
-        jacobian : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+        residuals : Vector
+            unscaled, dimensional residuals written to via residuals[key]
+
+        Returns
+        -------
+        jacobian : dict
+            Dictionary whose keys are tuples of the form ('unknown', 'param')
+            and whose values are ndarrays
         """
-        pass
+        return None
