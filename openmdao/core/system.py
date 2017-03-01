@@ -303,6 +303,9 @@ class System(object):
 
         Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
 
+        Sets the following attributes:
+            _varx_allprocs_prom2abs_set
+
         Returns
         -------
         {'input': [str, ...], 'output': [str, ...]}
