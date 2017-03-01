@@ -1,6 +1,7 @@
 """ Tests the ins and outs of automatic unit conversion in OpenMDAO."""
 
 import unittest
+import warnings
 from six import iteritems
 from six.moves import cStringIO
 
@@ -331,6 +332,32 @@ class TestUnitConversion(unittest.TestCase):
         expected_msg = "The units 'junk' are invalid"
         self.assertTrue(expected_msg in str(cm.exception))
 
+    def test_add_unitless_output(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('indep', IndepVarComp('x', 0.0, units='unitless'))
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            prob.setup(check=False)
+            self.assertEqual(str(w[-1].message),
+                             "Output 'x' has units='unitless' but 'unitless' has "
+                             "been deprecated. Use units=None "
+                             "instead.  Note that connecting a unitless variable to "
+                             "one with units is no longer an error, but will issue "
+                             "a warning instead.")
+
+    def test_add_unitless_input(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('C1', ExecComp('y=x', units={'x': 'unitless'}))
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            prob.setup(check=False)
+        self.assertEqual(str(w[-1].message),
+                         "Input 'x' has units='unitless' but 'unitless' has "
+                         "been deprecated. Use units=None "
+                         "instead.  Note that connecting a unitless variable to "
+                         "one with units is no longer an error, but will issue "
+                         "a warning instead.")
+
     def test_incompatible_units(self):
         """Test error handling when only one of src and tgt have units."""
         prob = Problem(model=Group())
@@ -339,22 +366,11 @@ class TestUnitConversion(unittest.TestCase):
         prob.model.add_subsystem('tgt', ExecComp('yy=xx', xx=0.0, units={'xx': 'unitless'}))
         prob.model.connect('src.x2', 'tgt.xx')
 
-        with self.assertRaises(Exception) as cm:
+        msg = "Output 'src.x2' with units of 'degC' is connected to input 'tgt.xx' which has no units."
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             prob.setup()
-        expected_msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'unitless' for 'tgt.xx'."
-        self.assertEqual(expected_msg, str(cm.exception))
-
-    def test_nounit_src_w_inputs_diff_units(self):
-        """Test error handling when a nounit src connects to multiple inputs with different units."""
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('indep', IndepVarComp('x', 100.0), promotes_outputs='x')
-        prob.model.add_subsystem('C1', ExecComp('y=x', x=0.0, units={'x': 'm'}), promotes_inputs='x')
-        prob.model.add_subsystem('C2', ExecComp('y=x', x=0.0, units={'x': 'ft'}), promotes_inputs='x')
-
-        with self.assertRaises(Exception) as cm:
-            prob.setup()
-        expected_msg = "Output 'indep.x' has no units but connects to multiple inputs ['C1.x', 'C2.x'] having different units ['m', 'ft']"
-        self.assertEqual(expected_msg, str(cm.exception))
+        self.assertEqual(str(w[-1].message), msg)
 
     def test_basic_implicit_conn(self):
         """Test units with all implicit connections."""

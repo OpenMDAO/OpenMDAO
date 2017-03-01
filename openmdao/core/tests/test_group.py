@@ -1,6 +1,7 @@
 import unittest
 from six import assertRaisesRegex
 import itertools
+import warnings
 
 import numpy as np
 from nose_parameterized import parameterized
@@ -350,7 +351,7 @@ class TestGroup(unittest.TestCase):
             p.setup(check=False)
         self.assertEqual(str(context.exception),
                          "C2: no variables were promoted based on promotes_outputs=['x*']")
-        
+
     def test_promote_not_found2(self):
         p = Problem(model=Group())
         p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
@@ -664,8 +665,6 @@ class TestConnect(unittest.TestCase):
             prob.setup(check=False)
 
     def test_connect_units_with_unitless(self):
-        msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'unitless' for 'tgt.x'."
-
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
         prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', units={'x2': 'degC'}))
@@ -674,8 +673,11 @@ class TestConnect(unittest.TestCase):
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
 
-        with assertRaisesRegex(self, RuntimeError, msg):
+        msg = "Output 'src.x2' with units of 'degC' is connected to input 'tgt.x' which has no units."
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             prob.setup(check=False)
+            self.assertEqual(str(w[-1].message), msg)
 
     def test_connect_incompatible_units(self):
         msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'tgt.x'."
@@ -694,18 +696,44 @@ class TestConnect(unittest.TestCase):
     def test_connect_units_with_nounits(self):
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
-        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', units={'x2': 'degC'}))
-        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x'))
+        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1'))
+        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', units={'x': 'degC'}))
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
         prob.model.suppress_solver_output = True
 
-        prob.setup(check=False)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            prob.setup(check=False)
+
+            self.assertEqual(str(w[-1].message),
+                             "Input 'tgt.x' with units of 'degC' is "
+                             "connected to output 'src.x2' which has no units.")
+
         prob.run_model()
 
         assert_rel_error(self, prob['tgt.y'], 600.)
 
+    def test_connect_units_with_nounits_prom(self):
+        prob = Problem(Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x', 100.0), promotes_outputs=['x'])
+        prob.model.add_subsystem('src', ExecComp('y = 2 * x'), promotes=['x', 'y'])
+        prob.model.add_subsystem('tgt', ExecComp('z = 3 * y', units={'y': 'degC'}), promotes=['y'])
+
+        prob.model.suppress_solver_output = True
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            prob.setup(check=False)
+
+            self.assertEqual(str(w[-1].message),
+                             "Input 'tgt.y' with units of 'degC' is "
+                             "connected to output 'src.y' which has no units.")
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['tgt.z'], 600.)
 
 if __name__ == "__main__":
     unittest.main()

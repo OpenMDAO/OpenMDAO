@@ -3,11 +3,13 @@
 from __future__ import division
 
 from itertools import product
+import warnings
 import numpy
 
 from six.moves import range
 
 from openmdao.utils.units import conversion_to_base_units, convert_units, is_compatible
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class Assembler(object):
@@ -221,20 +223,25 @@ class Assembler(object):
 
                 if out_units:
                     for in_units, in_ID in in_unit_list:
-                        if in_units and not is_compatible(in_units, out_units):
+                        if not in_units:
+                            warnings.warn("Output '%s' with units of '%s' is "
+                                          "connected to input '%s' which has no"
+                                          " units." % (out_paths[out_ID],
+                                                       out_units,
+                                                       in_paths[in_ID]))
+                        elif not is_compatible(in_units, out_units):
                             raise RuntimeError("Output units of '%s' for '%s' are"
                                                " incompatible with input units of "
                                                "'%s' for '%s'." %
                                                (out_units, out_paths[out_ID],
                                                 in_units, in_paths[in_ID]))
                 else:
-                    ulist = [u[0] for u in in_unit_list]
-                    if len(set(ulist)) > 1:
-                        raise RuntimeError("Output '%s' has no units but connects "
-                                           "to multiple inputs %s having different "
-                                           "units %s" % (out_paths[out_ID],
-                                                         [in_paths[i] for i in in_IDs],
-                                                         ulist))
+                    for u, in_ID in in_unit_list:
+                        if u is not None:
+                            warnings.warn("Input '%s' with units of '%s' is "
+                                          "connected to output '%s' which has "
+                                          "no units." % (in_paths[in_ID], u,
+                                                         out_paths[out_ID]))
 
         self._input_src_ids = input_src_ids
 
