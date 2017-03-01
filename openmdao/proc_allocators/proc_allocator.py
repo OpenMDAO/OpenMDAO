@@ -1,6 +1,6 @@
 """Define the base ProcAllocator class."""
 from __future__ import division
-import numpy
+import numpy as np
 from six.moves import range
 
 from openmdao.utils.generalized_dict import OptionsDictionary

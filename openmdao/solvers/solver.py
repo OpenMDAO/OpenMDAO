@@ -1,7 +1,7 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 
 from __future__ import division, print_function
-import numpy
+import numpy as np
 
 from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.jacobians.global_jacobian import GlobalJacobian
@@ -146,7 +146,7 @@ class Solver(object):
             norm = self._iter_get_norm()
             self._iter_count += 1
             self._mpi_print(self._iter_count, norm / norm0, norm)
-        fail = (numpy.isinf(norm) or numpy.isnan(norm) or
+        fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
         return fail, norm, norm / norm0
 

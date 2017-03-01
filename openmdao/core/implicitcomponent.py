@@ -2,7 +2,7 @@
 
 from __future__ import division
 
-import numpy
+import numpy as np
 from six import itervalues
 
 from openmdao.core.component import Component
@@ -120,7 +120,7 @@ class ImplicitComponent(Component):
                 abs_errors.append(result[1])
                 rel_errors.append(result[2])
 
-            return failed, numpy.linalg.norm(abs_errors), numpy.linalg.norm(rel_errors)
+            return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
     def _linearize(self):
         """

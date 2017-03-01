@@ -4,7 +4,7 @@ from __future__ import division
 from six import iteritems, string_types
 from collections import Iterable
 
-import numpy
+import numpy as np
 
 from openmdao.core.system import System, PathData
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
@@ -136,10 +136,10 @@ class Group(System):
                             " connect('%s', %s)?" % (out_name, in_name))
 
         if isinstance(src_indices, Iterable):
-            src_indices = numpy.atleast_1d(src_indices)
+            src_indices = np.atleast_1d(src_indices)
 
-        if isinstance(src_indices, numpy.ndarray):
-            if not numpy.issubdtype(src_indices.dtype, numpy.integer):
+        if isinstance(src_indices, np.ndarray):
+            if not np.issubdtype(src_indices.dtype, np.integer):
                 raise TypeError("src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
                                 (out_name, in_name, src_indices.dtype.type))
@@ -290,7 +290,7 @@ class Group(System):
                                                    "and add_input('%s', ...)." %
                                                    (self.pathname, out_name,
                                                     in_name, in_name))
-                            meta['src_indices'] = numpy.atleast_1d(src_indices)
+                            meta['src_indices'] = np.atleast_1d(src_indices)
 
                         # set src_indices to None to avoid unnecessary repeat
                         # of setting indices and shape metadata when we have
@@ -528,7 +528,7 @@ class Group(System):
                 # Compute the offset
                 iproc = self.comm.rank
                 nvar_myproc = local_var_size
-                global_index[type_] += numpy.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
+                global_index[type_] += np.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
 
         # Perform recursion
         for subsys in self._subsystems_myproc:

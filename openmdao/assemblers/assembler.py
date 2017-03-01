@@ -3,7 +3,7 @@
 from __future__ import division
 
 from itertools import product
-import numpy
+import numpy as np
 
 from six.moves import range
 
@@ -151,8 +151,8 @@ class Assembler(object):
                 self._variable_set_IDs[typ][set_name] = iset
 
             # Compute _variable_set_indices and var_count
-            var_count = numpy.zeros(len(self._variable_set_IDs[typ]), int)
-            self._variable_set_indices[typ] = -numpy.ones((nvar_all, 2), int)
+            var_count = np.zeros(len(self._variable_set_IDs[typ]), int)
+            self._variable_set_indices[typ] = -np.ones((nvar_all, 2), int)
             for ivar_all in global_set_dict:
                 set_name = global_set_dict[ivar_all]
 
@@ -167,16 +167,16 @@ class Assembler(object):
             self._variable_sizes[typ] = []
             for iset in range(len(self._variable_set_IDs[typ])):
                 self._variable_sizes[typ].append(
-                    numpy.zeros((nproc, var_count[iset]), int))
+                    np.zeros((nproc, var_count[iset]), int))
 
-            self._variable_sizes_all[typ] = numpy.zeros(
-                (nproc, numpy.sum(var_count)), int)
+            self._variable_sizes_all[typ] = np.zeros(
+                (nproc, np.sum(var_count)), int)
 
         # Populate the sizes arrays
         iproc = self._comm.rank
         for typ in ['input', 'output']:
             for ivar, meta in enumerate(variable_metadata[typ]):
-                size = numpy.prod(meta['shape'])
+                size = np.prod(meta['shape'])
                 ivar_all = variable_indices[typ][ivar]
                 iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
                 self._variable_sizes[typ][iset][iproc, ivar_set] = size
@@ -209,7 +209,7 @@ class Assembler(object):
         """
         out_names = variable_allprocs_names['output']
         nvar_input = len(variable_allprocs_names['input'])
-        _input_src_ids = -numpy.ones(nvar_input, int)
+        _input_src_ids = -np.ones(nvar_input, int)
 
         # Add user defined connections to the _input_src_ids vector
         # and inconns
@@ -252,16 +252,16 @@ class Assembler(object):
 
         # Compute total size of indices vector
         total_idx_size = 0
-        sizes = numpy.zeros(len(input_metadata), dtype=int)
+        sizes = np.zeros(len(input_metadata), dtype=int)
 
         for ind, meta in enumerate(input_metadata):
-            sizes[ind] = numpy.prod(meta['shape'])
+            sizes[ind] = np.prod(meta['shape'])
 
-        total_idx_size = numpy.sum(sizes)
+        total_idx_size = np.sum(sizes)
 
         # Allocate arrays
-        self._src_indices = numpy.zeros(total_idx_size, int)
-        self._src_indices_range = numpy.zeros(
+        self._src_indices = np.zeros(total_idx_size, int)
+        self._src_indices_range = np.zeros(
             (myproc_var_global_indices.shape[0], 2), int)
 
         # Populate arrays
@@ -271,13 +271,13 @@ class Assembler(object):
             ind2 += isize
             src_indices = meta['src_indices']
             if src_indices is None:
-                self._src_indices[ind1:ind2] = numpy.arange(isize, dtype=int)
+                self._src_indices[ind1:ind2] = np.arange(isize, dtype=int)
             elif src_indices.ndim == 1:
                 self._src_indices[ind1:ind2] = src_indices
             else:
                 src_id = self._input_src_ids[myproc_var_global_indices[ind]]
                 if src_id == -1:  # input is not connected
-                    self._src_indices[ind1:ind2] = numpy.arange(isize, dtype=int)
+                    self._src_indices[ind1:ind2] = np.arange(isize, dtype=int)
                 else:
                     pdata = var_pathdict[var_allprocs_pathnames['output'][src_id]]
                     # TODO: the src may not be in this processes and we need its shape
@@ -292,9 +292,9 @@ class Assembler(object):
                         tgt_shape = meta['shape']
                         # loop over src_indices tuples to get indices into the source
                         entries = [list(range(x)) for x in tgt_shape]
-                        cols = numpy.vstack(src_indices[i] for i in product(*entries))
+                        cols = np.vstack(src_indices[i] for i in product(*entries))
                         dimidxs = [cols[:, i] for i in range(cols.shape[1])]
-                        self._src_indices[ind1:ind2] = numpy.ravel_multi_index(dimidxs, src_shape)
+                        self._src_indices[ind1:ind2] = np.ravel_multi_index(dimidxs, src_shape)
 
             self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
                                                                           ind2]
@@ -330,7 +330,7 @@ class Assembler(object):
         # where c0 and c1 are the two columns of out_scaling.
         # Below, ref0 and ref are the values of the variable in the specified
         # units at which the scaled values are 0 and 1, respectively.
-        out_scaling = numpy.empty((nvar_out, 2))
+        out_scaling = np.empty((nvar_out, 2))
         for ivar_out, meta in enumerate(variable_metadata):
             out_scaling[ivar_out, 0] = meta['ref0']
             out_scaling[ivar_out, 1] = meta['ref'] - meta['ref0']
@@ -344,18 +344,18 @@ class Assembler(object):
             out_units = []
             for str_list in out_units_raw:
                 out_units.extend(str_list)
-            out_inds = numpy.vstack(out_inds_raw)
-            out_scaling = numpy.vstack(out_scaling_raw)
+            out_inds = np.vstack(out_inds_raw)
+            out_scaling = np.vstack(out_scaling_raw)
 
         # Now, we can store the units and scaling coefficients by input
         # by referring to the out_* variables via the input-to-src mapping
         # which is called _input_src_ids.
         nvar_in = len(self._input_src_ids)
         self._src_units = [None for ind in range(nvar_in)]
-        self._src_scaling = numpy.empty((nvar_in, 2))
+        self._src_scaling = np.empty((nvar_in, 2))
         for ivar_in, ivar_out in enumerate(self._input_src_ids):
             if ivar_out != -1:
-                ind = numpy.where(out_inds == ivar_out)[0][0]
+                ind = np.where(out_inds == ivar_out)[0][0]
                 self._src_units[ivar_in] = out_units[ind]
                 self._src_scaling[ivar_in, :] = out_scaling[ind, :]
             else:

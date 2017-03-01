@@ -6,7 +6,7 @@ import sys
 import inspect
 
 from fnmatch import fnmatchcase
-import numpy
+import numpy as np
 from itertools import product, chain
 from six import string_types, iteritems
 from scipy.sparse import issparse
@@ -83,12 +83,12 @@ class Component(System):
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
-        if not numpy.isscalar(val) and not isinstance(val, (list, tuple, numpy.ndarray)):
+        if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray)):
             raise TypeError('The val argument should be a float, list, tuple, or ndarray')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
         if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
-                                                                    numpy.ndarray)):
+                                                                    np.ndarray)):
             raise TypeError('The src_indices argument should be an int, list, '
                             'tuple, or ndarray')
         if units is not None and not isinstance(units, str):
@@ -109,7 +109,7 @@ class Component(System):
         if src_indices is None:
             metadata['src_indices'] = None
         else:
-            metadata['src_indices'] = numpy.atleast_1d(src_indices)
+            metadata['src_indices'] = np.atleast_1d(src_indices)
 
         # units: taken as is
         metadata['units'] = units
@@ -191,7 +191,7 @@ class Component(System):
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
-        if not numpy.isscalar(val) and not isinstance(val, (list, tuple, numpy.ndarray)):
+        if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray)):
             raise TypeError('The val argument should be a float, list, tuple, or ndarray')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
@@ -205,7 +205,7 @@ class Component(System):
             upper = format_as_float_or_array('upper', upper)
 
         for item in [ref, ref0, res_ref, res_ref]:
-            if not numpy.isscalar(item):
+            if not np.isscalar(item):
                 raise TypeError('The %s argument should be a float' % (item.__name__))
 
         # Check that units are valid
@@ -225,11 +225,11 @@ class Component(System):
         metadata['desc'] = desc
 
         # lower, upper: check the shape if necessary
-        if lower is not None and not numpy.isscalar(lower) and \
-                numpy.atleast_1d(lower).shape != metadata['shape']:
+        if lower is not None and not np.isscalar(lower) and \
+                np.atleast_1d(lower).shape != metadata['shape']:
             raise ValueError('The lower argument has the wrong shape')
-        if upper is not None and not numpy.isscalar(upper) and \
-                numpy.atleast_1d(upper).shape != metadata['shape']:
+        if upper is not None and not np.isscalar(upper) and \
+                np.atleast_1d(upper).shape != metadata['shape']:
             raise ValueError('The upper argument has the wrong shape')
         metadata['lower'] = lower
         metadata['upper'] = upper
@@ -342,16 +342,16 @@ class Component(System):
             raise ValueError('If one of rows/cols is specified, then both must be specified')
 
         if val is not None and not issparse(val):
-            val = numpy.atleast_1d(val)
-            # numpy.promote_types  will choose the smallest dtype that can contain both arguments
-            safe_dtype = numpy.promote_types(val.dtype, float)
+            val = np.atleast_1d(val)
+            # np.promote_types  will choose the smallest dtype that can contain both arguments
+            safe_dtype = np.promote_types(val.dtype, float)
             val = val.astype(safe_dtype, copy=False)
 
         if rows is not None:
             if isinstance(rows, (list, tuple)):
-                rows = numpy.array(rows, dtype=int)
+                rows = np.array(rows, dtype=int)
             if isinstance(cols, (list, tuple)):
-                cols = numpy.array(cols, dtype=int)
+                cols = np.array(cols, dtype=int)
 
             if rows.shape != cols.shape:
                 raise ValueError('rows and cols must have the same shape,'
@@ -446,8 +446,8 @@ class Component(System):
         """
         of, wrt = key
         if meta['dependent']:
-            out_size = numpy.prod(self._var2meta[of]['shape'])
-            in_size = numpy.prod(self._var2meta[wrt]['shape'])
+            out_size = np.prod(self._var2meta[of]['shape'])
+            in_size = np.prod(self._var2meta[wrt]['shape'])
             rows = meta['rows']
             cols = meta['cols']
             if rows is not None:

@@ -1,7 +1,7 @@
 """Define the units/scaling tests."""
 from __future__ import division, print_function
 
-import numpy
+import numpy as np
 import scipy.sparse
 import unittest
 

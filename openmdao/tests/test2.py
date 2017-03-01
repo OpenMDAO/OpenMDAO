@@ -1,5 +1,5 @@
 from __future__ import division
-import numpy
+import numpy as np
 import unittest
 
 from openmdao.api import Problem, ExplicitComponent, Group, DefaultVector
@@ -66,7 +66,7 @@ class TestNumpyVec(unittest.TestCase):
         self.p.model._mpi_proc_allocator.parallel = True
 
     def assertEqualArrays(self, a, b):
-        self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
+        self.assertTrue(np.linalg.norm(a-b) < 1e-15)
 
     def assertList(self, ab_list):
         for a, b in ab_list:
@@ -86,7 +86,7 @@ class TestNumpyVec(unittest.TestCase):
 
     def test__variable_set_indices(self):
         set_indices = self.p._assembler._variable_set_indices['output']
-        array = numpy.array([[0,0],[1,0],[2,0],[3,0]])
+        array = np.array([[0,0],[1,0],[2,0],[3,0]])
         self.assertEqualArrays(set_indices, array)
 
     def test_transfer(self):

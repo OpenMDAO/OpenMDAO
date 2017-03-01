@@ -9,7 +9,7 @@ import sys
 from six import iteritems, string_types
 from six.moves import range
 
-import numpy
+import numpy as np
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
@@ -412,7 +412,7 @@ class System(object):
                     iproc = self.comm.rank
                     nvar_myproc = local_var_size
                     global_index[typ] += \
-                        numpy.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
+                        np.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
 
             # Perform the recursion
             if recurse:
@@ -424,13 +424,13 @@ class System(object):
                 raw = []
                 for subsys in self._subsystems_myproc:
                     raw.append(subsys._var_myproc_indices[typ])
-                self._var_myproc_indices[typ] = numpy.concatenate(raw)
+                self._var_myproc_indices[typ] = np.concatenate(raw)
 
         # If component, _var_myproc_indices is simply an arange
         else:
             for typ in ['input', 'output']:
                 ind1, ind2 = self._var_allprocs_range[typ]
-                self._var_myproc_indices[typ] = numpy.arange(ind1, ind2)
+                self._var_myproc_indices[typ] = np.arange(ind1, ind2)
 
         # Reset index dict to the global variable count on all procs
         # Necessary for younger siblings to have proper index values
@@ -517,9 +517,9 @@ class System(object):
 
         # Initialize scaling arrays
         for scaling in (self._scaling_to_norm, self._scaling_to_phys):
-            scaling['input'] = numpy.empty((nvar_in, 2))
-            scaling['output'] = numpy.empty((nvar_out, 2))
-            scaling['residual'] = numpy.empty((nvar_out, 2))
+            scaling['input'] = np.empty((nvar_in, 2))
+            scaling['output'] = np.empty((nvar_out, 2))
+            scaling['residual'] = np.empty((nvar_out, 2))
 
         # ref0 and ref are the values of the variable in the specified
         # units at which the scaled values are 0 and 1, respectively
@@ -596,12 +596,12 @@ class System(object):
                 # We set into the bounds vector first and then apply a and b because
                 # meta['lower'] and meta['upper'] could be lists or tuples.
                 if meta['lower'] is None:
-                    self._lower_bounds[name] = -numpy.inf
+                    self._lower_bounds[name] = -np.inf
                 else:
                     self._lower_bounds[name] = meta['lower']
                     self._lower_bounds[name] = a + b * self._lower_bounds[name]
                 if meta['upper'] is None:
-                    self._upper_bounds[name] = numpy.inf
+                    self._upper_bounds[name] = np.inf
                 else:
                     self._upper_bounds[name] = meta['upper']
                     self._upper_bounds[name] = a + b * self._upper_bounds[name]

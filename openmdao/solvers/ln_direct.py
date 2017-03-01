@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function
 
-import numpy
+import numpy as np
 import scipy.linalg
 import scipy.sparse.linalg
 
@@ -47,10 +47,10 @@ class DirectSolver(LinearSolver):
             mtx = system._jacobian._int_mtx
             # Perform dense or sparse lu factorization
             if isinstance(mtx, DenseMatrix):
-                numpy.set_printoptions(precision=3)
+                np.set_printoptions(precision=3)
                 self._lup = scipy.linalg.lu_factor(mtx._matrix)
             elif isinstance(mtx, (COOmatrix, CSRmatrix)):
-                numpy.set_printoptions(precision=3)
+                np.set_printoptions(precision=3)
                 self._lu = scipy.sparse.linalg.splu(mtx._matrix)
             else:
                 raise RuntimeError('Direct solver not implemented for mtx type %s in system %s'
@@ -62,8 +62,8 @@ class DirectSolver(LinearSolver):
 
             # Assemble the Jacobian by running the identity matrix through apply_linear
             nmtx = system._vectors['output']['linear'].get_data().size
-            eye = numpy.eye(nmtx)
-            mtx = numpy.empty((nmtx, nmtx))
+            eye = np.eye(nmtx)
+            mtx = np.empty((nmtx, nmtx))
             for i in range(nmtx):
                 mtx[:, i] = self._mat_vec(eye[:, i])
 
