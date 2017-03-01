@@ -7,11 +7,13 @@ import inspect
 
 from fnmatch import fnmatchcase
 import numpy
-from itertools import product
+from itertools import product, chain
 from six import string_types, iteritems
 from scipy.sparse import issparse
 from copy import deepcopy
+from collections import OrderedDict
 
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
@@ -27,6 +29,8 @@ class Component(System):
     ----------
     _var2meta : dict
         A mapping of local variable name to its metadata.
+    _approx_schemes : OrderedDict
+        A mapping of approximation types to the associated ApproximationScheme.
     """
 
     def __init__(self, **kwargs):
@@ -40,6 +44,7 @@ class Component(System):
         """
         super(Component, self).__init__(**kwargs)
         self._var2meta = {}
+        self._approx_schemes = OrderedDict()
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
                   desc='', var_set=0):
@@ -234,6 +239,55 @@ class Component(System):
         self._var_myproc_metadata['output'].append(metadata)
         self._var2meta[name] = metadata
 
+    def approx_partials(self, of, wrt, method='fd', **kwargs):
+        """
+        Inform the framework that the specified derivatives are to be approximated.
+
+        Parameters
+        ----------
+        of : str or list of str
+            The name of the residual(s) that derivatives are being computed for.
+            May also contain a glob pattern.
+        wrt : str or list of str
+            The name of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+        method : str
+            The type of approximation that should be used. Valid options include:
+                - 'fd': Finite Difference
+        **kwargs : dict
+            Keyword arguments for controlling the behavior of the approximation.
+        """
+        supported_methods = {'fd': FiniteDifference}
+
+        if method not in supported_methods:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method, supported_methods.keys()))
+
+        if method not in self._approx_schemes:
+            self._approx_schemes[method] = supported_methods[method]()
+
+        pattern_matches = self._find_partial_matches(of, wrt)
+
+        for of_bundle, wrt_bundle in product(*pattern_matches):
+            of_pattern, of_matches = of_bundle
+            wrt_pattern, wrt_out, wrt_in = wrt_bundle
+            if not of_matches:
+                raise ValueError('No matches were found for of="{}"'.format(of_pattern))
+            if not (wrt_out or wrt_in):
+                raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
+
+            for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
+                for key in product(of_matches, wrt_matches):
+                    meta_changes = {
+                        'method': method,
+                        'type': type_
+                    }
+                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    meta.update(meta_changes)
+                    meta.update(kwargs)
+                    self._subjacs_info[key] = meta
+
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):
         """
@@ -289,7 +343,9 @@ class Component(System):
                 raise ValueError('If rows and cols are specified, val must be a scalar or have the '
                                  'same shape, val: {}, rows/cols: {}'.format(val.shape, rows.shape))
 
-        multiple_items, pattern_matches = self._find_partial_matches(of, wrt)
+        pattern_matches = self._find_partial_matches(of, wrt)
+
+        multiple_items = False
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
@@ -302,6 +358,9 @@ class Component(System):
             make_copies = (multiple_items
                            or len(of_matches) > 1
                            or (len(wrt_in) + len(wrt_out)) > 1)
+            # Setting this to true means that future loop iterations (i.e. if there are multiple
+            # items in either of or wrt) will make copies.
+            multiple_items = True
 
             for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
                 for key in product(of_matches, wrt_matches):
@@ -333,13 +392,14 @@ class Component(System):
 
         Returns
         -------
-        bool, tuple(list, list)
-            Bool for if there are multiple items in either of/wrt, tuple containing the of/wrt match
+        tuple(list, list)
+            Pair of lists containing pattern matches (if any). Returns (of_matches, wrt_matches)
+            where of_matches is a list of tuples (pattern, matches) and wrt_matches is a list of
+            tuples (pattern, output_matches, input_matches).
         """
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         glob_patterns = {'*', '?', '['}
-        multiple_items = len(of_list) > 1 or len(wrt_list) > 1
         outs = self._var_allprocs_names['output']
         ins = self._var_allprocs_names['input']
 
@@ -353,7 +413,7 @@ class Component(System):
         of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, outs), find_matches(pattern, ins))
                                for pattern in wrt_list]
-        return multiple_items, (of_pattern_matches, wrt_pattern_matches)
+        return of_pattern_matches, wrt_pattern_matches
 
     def _check_partials_meta(self, key, meta):
         """
@@ -407,6 +467,13 @@ class Component(System):
             for key, meta in iteritems(self._subjacs_info):
                 self._check_partials_meta(key, meta)
                 J._set_partials_meta(key, meta)
+
+                method = meta.get('method', False)
+                if method and meta['dependent']:
+                    self._approx_schemes[method].add_approximation(key, meta)
+
+        for approx in self._approx_schemes:
+            approx._init_approximations()
 
     def _setup_variables(self, recurse=False):
         """
