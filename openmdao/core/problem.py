@@ -439,28 +439,25 @@ class Problem(object):
             'form', 'step', 'step_calc', and 'method' can be specified in this way.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays.
+
         Returns
         -------
-        Dict of Dicts of Dicts
-        First key is the component name;
-        2nd key is the (output, input) tuple of strings;
-        third key is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev'];
-        For 'rel error', 'abs error', 'magnitude' the value is:
-            A tuple containing norms for forward - fd, adjoint - fd, forward - adjoint using the
-            best case fdstep.
-        For 'J_fd', 'J_fwd', 'J_rev' the value is:
-            A numpy array representing the computed Jacobian for the three different methods
-            of computation.
+        dict of dicts of dicts
+            First key is the component name;
+            Second key is the (output, input) tuple of strings;
+            Third key is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev'];
+            For 'rel error', 'abs error', 'magnitude' the value is:
+                A tuple containing norms for forward - fd, adjoint - fd, forward - adjoint.
+            For 'J_fd', 'J_fwd', 'J_rev' the value is:
+                A numpy array representing the computed Jacobian for the three different methods
+                of computation.
         """
         if not global_options:
             global_options = DEFAULT_FD_OPTIONS.copy()
             global_options['method'] = 'fd'
 
-        method = global_options['method']
-
         if global_options['method'] == 'fd':
             scheme = FiniteDifference
-            form = global_options['form']
         else:
             raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
 
