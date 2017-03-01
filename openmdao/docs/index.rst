@@ -72,6 +72,7 @@ Solvers (nonlinear and linear)
 
    features/solvers/set_solvers
    features/solvers/solver_options
+   features/solvers/nlrunonce
 
 
 Running your models
