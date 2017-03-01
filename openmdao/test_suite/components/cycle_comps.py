@@ -4,6 +4,7 @@ from __future__ import division, print_function
 import numpy as np
 import scipy.sparse as sparse
 import itertools
+import unittest
 
 from openmdao.api import ExplicitComponent
 
@@ -94,7 +95,6 @@ class ExplicitCycleComp(ExplicitComponent):
             self._cycle_names['theta_out'] = 'theta_out'
             self._cycle_promotes_in = self._cycle_promotes_out = []
 
-
     def initialize(self):
         self.metadata.declare('jacobian_type', value='matvec',
                               values=['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
@@ -111,6 +111,9 @@ class ExplicitCycleComp(ExplicitComponent):
         self.metadata.declare('connection_type', type_=str, value='explicit',
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
+        self.metadata.declare('finite_difference', value=False,
+                              type_=bool,
+                              desc='If the derivatives should be finite differenced.')
 
         self.angle_param = 'theta'
 
@@ -221,7 +224,15 @@ class ExplicitCycleComp(ExplicitComponent):
 
     def initialize_partials(self):
         pd_type = self.metadata['partial_type']
-        if self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
+
+        if self.metadata['finite_difference']:
+            if self.metadata['jacobian_type'] == 'matvec':
+                raise unittest.SkipTest('not testing FD and matvec')
+            if pd_type != 'array':
+                raise unittest.SkipTest('only dense FD supported')
+            self.approx_partials('*', '*')
+
+        elif self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
             num_var = self.num_var
             var_shape = self.var_shape
             var_size = np.prod(var_shape)
@@ -250,7 +261,7 @@ class ExplicitCycleComp(ExplicitComponent):
                                   **self._array2kwargs(dtheta, pd_type))
 
     def compute_partial_derivs(self, inputs, outputs, partials):
-        if self.metadata['jacobian_type'] != 'matvec':
+        if self.metadata['jacobian_type'] != 'matvec' and not self.metadata['finite_difference']:
             angle_param = self._cycle_names[self.angle_param]
             angle = inputs[angle_param]
             num_var = self.num_var
@@ -339,7 +350,7 @@ class ExplicitLastComp(ExplicitFirstComp):
                                   **self._array2kwargs(np.array([1.]), pd_type))
 
     def compute_partial_derivs(self, inputs, outputs, partials):
-        if self.metadata['jacobian_type'] != 'matvec':
+        if self.metadata['jacobian_type'] != 'matvec' and not self.metadata['finite_difference']:
             pd_type = self.metadata['partial_type']
             for i in range(self.metadata['num_var']):
                 in_var = self._cycle_names['x'].format(i)

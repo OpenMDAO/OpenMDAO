@@ -48,6 +48,7 @@ class CycleGroup(ParametericTestGroup):
             'component_class': ['explicit'],
             'connection_type': ['implicit', 'explicit'],
             'partial_type': ['array', 'sparse', 'aij'],
+            'finite_difference': [False, True],
             'num_comp': [3, 2],
             'num_var': [3, 1],
             'var_shape': [(2, 3), (3,)],
@@ -73,6 +74,9 @@ class CycleGroup(ParametericTestGroup):
         self.metadata.declare('partial_type', value='array',
                               values=['array', 'sparse', 'aij'],
                               desc='type of partial derivatives')
+        self.metadata.declare('finite_difference', value=False,
+                              type_=bool,
+                              desc='If the derivatives should be finite differenced.')
 
     def initialize(self):
         self._initialize_metadata()
@@ -128,6 +132,7 @@ class CycleGroup(ParametericTestGroup):
             'jacobian_type': self.metadata['jacobian_type'],
             'partial_type': self.metadata['partial_type'],
             'connection_type': conn_type,
+            'finite_difference': self.metadata['finite_difference']
         }
 
         self.add_subsystem('psi_comp', IndepVarComp('psi', PSI))
