@@ -9,7 +9,8 @@ from openmdao.utils.general_utils import warn_deprecation
 
 
 class Component(BaseComponent):
-    """Component Class for backwards compatibility.
+    """
+    Component Class for backwards compatibility.
 
     Attributes
     ----------
@@ -20,7 +21,9 @@ class Component(BaseComponent):
     """
 
     def __init__(self, **kwargs):
-        """Add a few more attributes."""
+        """
+        Add a few more attributes.
+        """
         super(Component, self).__init__(**kwargs)
         self._state_names = []
         self._output_names = []
@@ -31,7 +34,8 @@ class Component(BaseComponent):
                          'this Component class is deprecated')
 
     def add_param(self, name, val=1.0, **kwargs):
-        """Add an param variable to the component.
+        """
+        Add an param variable to the component.
 
         Parameters
         ----------
@@ -45,7 +49,8 @@ class Component(BaseComponent):
         self.add_input(name, val, **kwargs)
 
     def add_state(self, name, val=1.0, **kwargs):
-        """Add a state variable to the component.
+        """
+        Add a state variable to the component.
 
         Parameters
         ----------
@@ -63,7 +68,8 @@ class Component(BaseComponent):
         self._state_names.append(name)
 
     def add_output(self, name, val=1.0, **kwargs):
-        """Add an output variable to the component.
+        """
+        Add an output variable to the component.
 
         Parameters
         ----------
@@ -81,7 +87,9 @@ class Component(BaseComponent):
         self._output_names.append(name)
 
     def _apply_nonlinear(self):
-        """See System._apply_nonlinear."""
+        """
+        Compute residuals.
+        """
         self._inputs._scale(self._scaling_to_phys['input'])
         self._outputs._scale(self._scaling_to_phys['output'])
         self._residuals._scale(self._scaling_to_phys['residual'])
@@ -93,7 +101,18 @@ class Component(BaseComponent):
         self._residuals._scale(self._scaling_to_norm['residual'])
 
     def _solve_nonlinear(self):
-        """See System._solve_nonlinear."""
+        """
+        Compute outputs.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
         if self._nl_solver is not None:
             self._nl_solver.solve()
         else:
@@ -108,7 +127,19 @@ class Component(BaseComponent):
             self._residuals._scale(self._scaling_to_norm['residual'])
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """See System._apply_linear."""
+        """
+        Compute jac-vec product.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+        var_inds : [int, int, int, int] or None
+            ranges of variable IDs involved in this matrix-vector product.
+            The ordering is [lb1, ub1, lb2, ub2].
+        """
         for vec_name in vec_names:
             with self._matvec_context(vec_name, var_inds, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
@@ -140,7 +171,25 @@ class Component(BaseComponent):
                 d_residuals._scale(self._scaling_to_norm['residual'])
 
     def _solve_linear(self, vec_names, mode):
-        """See System._solve_linear."""
+        """
+        Apply inverse jac product.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            relative error.
+        float
+            absolute error.
+        """
         if self._ln_solver is not None:
             return self._ln_solver(vec_names, mode)
         else:
@@ -169,7 +218,9 @@ class Component(BaseComponent):
             return success
 
     def _linearize(self):
-        """See System._linearize."""
+        """
+        Compute jacobian / factorization.
+        """
         with self._jacobian_context():
             self._inputs._scale(self._scaling_to_phys['input'])
             self._outputs._scale(self._scaling_to_phys['output'])
@@ -199,7 +250,8 @@ class Component(BaseComponent):
                 self._jacobian._update()
 
     def apply_nonlinear(self, params, unknowns, residuals):
-        """Compute residuals given params and unknowns.
+        """
+        Compute residuals given params and unknowns.
 
         Parameters
         ----------
@@ -213,7 +265,8 @@ class Component(BaseComponent):
         pass
 
     def solve_nonlinear(self, params, unknowns, residuals):
-        """Compute unknowns given params.
+        """
+        Compute unknowns given params.
 
         Parameters
         ----------
@@ -228,7 +281,8 @@ class Component(BaseComponent):
 
     def apply_linear(self, params, unknowns,
                      d_params, d_unknowns, d_residuals, mode):
-        r"""Compute jac-vector product.
+        r"""
+        Compute jac-vector product.
 
         If mode is:
             'fwd': (d_params, unknowns) \|-> d_residuals
@@ -253,7 +307,8 @@ class Component(BaseComponent):
         pass
 
     def solve_linear(self, d_unknowns_dict, d_residuals_dict, vec_names, mode):
-        r"""Apply inverse jac product.
+        r"""
+        Apply inverse jac product.
 
         If mode is:
             'fwd': d_residuals \|-> d_unknowns
@@ -274,7 +329,8 @@ class Component(BaseComponent):
         pass
 
     def linearize(self, params, unknowns, jacobian):
-        """Compute sub-jacobian parts / factorization.
+        """
+        Compute sub-jacobian parts / factorization.
 
         Parameters
         ----------

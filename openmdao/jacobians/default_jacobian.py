@@ -8,10 +8,13 @@ from openmdao.jacobians.jacobian import Jacobian
 
 
 class DefaultJacobian(Jacobian):
-    """No global <Jacobian>; use dictionary of user-supplied sub-Jacobians."""
+    """
+    No global <Jacobian>; use dictionary of user-supplied sub-Jacobians.
+    """
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
-        """Compute matrix-vector product.
+        """
+        Compute matrix-vector product.
 
         Parameters
         ----------
@@ -24,7 +27,7 @@ class DefaultJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        for out_name, in_name in self:
+        for out_name, in_name in self._iter_rel_unprom():
             ukey = self._key2unique((out_name, in_name))
             jac = self._subjacs[ukey]
 

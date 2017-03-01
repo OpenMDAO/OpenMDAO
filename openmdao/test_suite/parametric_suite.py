@@ -10,7 +10,7 @@ from unittest import SkipTest
 from openmdao.test_suite.groups.cycle_group import CycleGroup
 from openmdao.api import Problem
 from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
-from openmdao.api import GlobalJacobian, DenseMatrix, CooMatrix, CsrMatrix
+from openmdao.api import GlobalJacobian, DenseMatrix, COOmatrix, CSRmatrix
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -31,7 +31,8 @@ def _nice_name(obj):
 
 
 def _test_suite(*args, **kwargs):
-    """Generator for the parametric tests. If args is present, must only be the value '*',
+    """
+    Generator for the parametric tests. If args is present, must only be the value '*',
     indicating running all available groups/parameters. Otherwise, use kwargs to set the options
     like so:
         arg=value will specify that option,
@@ -100,7 +101,8 @@ def _test_name(run_by_default):
 
 
 def parametric_suite(*args, **kwargs):
-    """Decorator used for testing a range of different options for a particular
+    """
+    Decorator used for testing a range of different options for a particular
     ParametericTestGroup. If args is present, must only be the value '*',
     indicating running all available groups/parameters. Otherwise, use kwargs to set the options
     like so:
@@ -116,7 +118,8 @@ def parametric_suite(*args, **kwargs):
 parametric_suite.__test__ = False
 
 class ParameterizedInstance(object):
-    """Parameterized Instance for a particular ParametricTestGroup. Typically not instantiated
+    """
+    Parameterized Instance for a particular ParametricTestGroup. Typically not instantiated
     directly, but rather through the @parametric_suite decorator.
 
     Attributes
@@ -158,8 +161,15 @@ class ParameterizedInstance(object):
                                       'rtol': 1e-10,
                                       }
 
-    def setup(self):
-        """Creates the containing `Problem` and performs needed initializations."""
+    def setup(self, check=False):
+        """
+        Creates the containing `Problem` and performs needed initializations.
+
+        Parameters
+        ----------
+        check : bool
+            If setup should run checks.
+        """
         args = self.args
 
         group = MODELS[self._group_type](**args)
@@ -178,9 +188,9 @@ class ParameterizedInstance(object):
             if jacobian_type == 'dense':
                 prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
             elif jacobian_type == 'sparse-coo':
-                prob.model.jacobian = GlobalJacobian(matrix_class=CooMatrix)
+                prob.model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
             elif jacobian_type == 'sparse-csr':
-                prob.model.jacobian = GlobalJacobian(matrix_class=CsrMatrix)
+                prob.model.jacobian = GlobalJacobian(matrix_class=CSRmatrix)
 
         prob.model.ln_solver = self.linear_solver_class(**self.linear_solver_options)
 
@@ -188,14 +198,15 @@ class ParameterizedInstance(object):
 
         prob.model.suppress_solver_output = True
 
-        prob.setup(vec_class, check=False)
+        prob.setup(vec_class, check=check)
 
         fail, rele, abse = prob.run_model()
         if fail:
             raise RuntimeError('Problem run failed: re %f ; ae %f' % (rele, abse))
 
     def compute_totals(self, mode='fwd'):
-        """Computes the total derivatives across the model.
+        """
+        Computes the total derivatives across the model.
 
         Parameters
         ----------

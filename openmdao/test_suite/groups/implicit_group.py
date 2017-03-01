@@ -90,7 +90,9 @@ class Comp(ImplicitComponent):
 
 
 class TestImplicitGroup(Group):
-    """A `Group` with two interconnected `ImplicitComponent`s."""
+    """
+    A `Group` with two interconnected <ImplicitComponent>s.
+    """
 
     def __init__(self, lnSolverClass=LinearBlockGS,
                        nlSolverClass=NonlinearBlockGS,

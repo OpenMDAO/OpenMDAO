@@ -23,6 +23,26 @@ directories = [
 ]
 
 
+def _is_context_manager(func):
+    """
+    Detect if the given method or function is decorated with @contextmanager.
+
+    Parameters
+    ----------
+    func : function or method
+        The function or method to be tested.
+
+    Returns
+    -------
+    bool
+        True if the function or method is has the @contextmanager decorator,
+        otherwise False.
+
+    """
+    src = inspect.getsource(func)
+    return 'return GeneratorContextManager' in src
+
+
 class ReturnFinder(ast.NodeVisitor):
     """
     An implementation of node visitor only intended to visit a single
@@ -40,8 +60,8 @@ class ReturnFinder(ast.NodeVisitor):
     passes : bool
         Set to True if the method does nothing but pass (i.e. is not yet
         implemented or is a 'virtual' method in a base class)
-
     """
+
     def __init__(self):
         self.has_return = False
         self.passes = False
@@ -50,8 +70,9 @@ class ReturnFinder(ast.NodeVisitor):
         self._depth = 0
 
     def visit(self, node):
-        """ Visit nodes in the syntax tree to find instances of return. """
-
+        """
+        Visit nodes in the syntax tree to find instances of return.
+        """
         self._depth += 1
 
         is_func_def = isinstance(node, ast.FunctionDef)
@@ -98,23 +119,48 @@ class ReturnFinder(ast.NodeVisitor):
         self._depth -= 1
 
 
-class LintTestCase(unittest.TestCase):
+class DecoratorFinder(ast.NodeVisitor):
+    """
+    An implementation of node visitor used to find decorators on a
+    FunctionDef and record their names
 
-    def check_method_summary(self, dir_name, file_name,
-                                           class_name, method_name,
-                                           numpy_doc_string, failures):
+    Attributes
+    ----------
+    decorators : dict
+        The dict where the keys are function names and the values are
+        the corresponding decorators.
+    """
+
+    def __init__(self):
+        self.decorators = {}
+
+    def visit_FunctionDef(self, node):
         """
+        Called when a FunctionDef node is visited.  If decorators are found,
+        record them in self.decorators.
 
         Parameters
         ----------
-        dir_name : str
-            The name of the directory in which the method is defined.
-        file_name : str
-            The name of the file in which the method is defined.
-        class_name : str
-            The name of the class to which the method belongs
-        method_name : str
-            The name of the method
+        node : node
+            The node being visited
+
+        """
+        self.decorators[node.name] = []
+        for n in node.decorator_list:
+            name = ''
+            if isinstance(n, ast.Call):
+                name = n.func.attr if isinstance(n.func, ast.Attribute) else n.func.id
+            else:
+                name = n.attr if isinstance(n, ast.Attribute) else n.id
+            self.decorators[node.name].append(name)
+
+
+class LintTestCase(unittest.TestCase):
+
+    def check_summary(self, numpy_doc_string):
+        """
+        Parameters
+        ----------
         numpy_doc_string : numpydoc.docscrape.NumpyDocString
             An instance of the NumpyDocString parsed from the method
         failures : dict
@@ -141,30 +187,14 @@ class LintTestCase(unittest.TestCase):
         if not summary.endswith('.'):
             new_failures.append('Summary should end with a period.')
 
-        if new_failures:
-            key = '{0}/{1}:{2}.{3}'.format(dir_name, file_name, class_name,
-                                           method_name)
-            if key in failures:
-                failures[key] += new_failures
-            else:
-                failures[key] = new_failures
+        return new_failures
 
-
-    def check_method_parameters(self, dir_name, file_name, class_name,
-                                method_name, argspec, numpy_doc_string,
-                                failures):
+    def check_parameters(self, func, argspec, numpy_doc_string):
         """ Check that the parameters section is correct.
 
         Parameters
         ----------
-        dir_name : str
-            The name of the directory in which the method is defined.
-        file_name : str
-            The name of the file in which the method is defined.
-        class_name : str
-            The name of the class to which the method belongs
-        method_name : str
-            The name of the method
+        func :
         argspec : namedtuple
             Method argument information from inspect.getargspec (python2) or
             inspect.getfullargspec (python3)
@@ -178,7 +208,25 @@ class LintTestCase(unittest.TestCase):
         """
         new_failures = []
 
-        if len(argspec.args) > 1:
+        arg_set = set(argspec.args)
+
+        # Don't require documentation of self or cls
+        if 'self' in arg_set:
+            arg_set.remove('self')
+        if 'cls' in arg_set:
+            arg_set.remove('cls')
+
+        # Do require documentation of *args and **kwargs
+        if argspec.varargs:
+            arg_set |= {'*' + argspec.varargs}
+        if PY3:
+            if argspec.varkw:
+                arg_set |= {'**' + argspec.varkw}
+        else:
+            if argspec.keywords:
+                arg_set |= {'**' + argspec.keywords}
+
+        if len(arg_set) >= 1:
             if not numpy_doc_string['Parameters']:
                 new_failures.append('does not have a Parameters section')
                 #self.fail(fail_msg + '... does not have a Parameters section')
@@ -202,19 +250,6 @@ class LintTestCase(unittest.TestCase):
 
             documented_arg_set = set(item[0] for item in
                                      numpy_doc_string['Parameters'])
-            arg_set = set(argspec.args)
-
-            # Require documentation of *args and **kwargs
-            if argspec.varargs:
-                arg_set |= {argspec.varargs}
-            if argspec.keywords:
-                arg_set |= {argspec.keywords}
-
-            # Don't require documentation of self or cls
-            if 'self' in arg_set:
-                arg_set.remove('self')
-            if 'cls' in arg_set:
-                arg_set.remove('cls')
 
             # Arguments that aren't documented
             undocumented = arg_set - documented_arg_set
@@ -228,29 +263,15 @@ class LintTestCase(unittest.TestCase):
                 new_failures.append('documents nonexisting parameters: '
                                      '{0}'.format(str(list(overdocumented))))
 
-        if new_failures:
-            key = '{0}/{1}:{2}.{3}'.format(dir_name, file_name, class_name,
-                                           method_name)
-            if key in failures:
-                failures[key] += new_failures
-            else:
-                failures[key] = new_failures
+        return new_failures
 
-
-    def check_method_returns(self, dir_name, file_name, class_name,
-                             method_name, method, numpy_doc_string, failures):
+    def check_returns(self, func, numpy_doc_string):
         """ Check that the returns section is correct.
 
         Parameters
         ----------
-        dir_name : str
-            The name of the directory in which the method is defined.
-        file_name : str
-            The name of the file in which the method is defined.
-        class_name : str
-            The name of the class to which the method belongs
-        method_name : str
-            The name of the method
+        func : method or function
+            The method being checked
         numpy_doc_string : numpydoc.docscrape.NumpyDocString
             An instance of the NumpyDocString parsed from the method
         failures : dict
@@ -259,11 +280,9 @@ class LintTestCase(unittest.TestCase):
             with information about every failure. Form is
             { 'dir_name/file_name:class_name.method_name': [ messages ] }
         """
-        #print(dir_name, file_name, class_name, method_name)
-
         new_failures = []
 
-        method_src = inspect.getsource(method)
+        method_src = inspect.getsource(func)
         dedented_src = textwrap.dedent(method_src)
 
         f = ReturnFinder()
@@ -271,20 +290,13 @@ class LintTestCase(unittest.TestCase):
 
         # If the function does nothing but pass, return
         if f.passes:
-            return
+            return []
 
         doc_returns = numpy_doc_string['Returns']
         doc_yields = numpy_doc_string['Yields']
 
         # TODO:  Enforce Yields in docs for contextmanagers
-        # Static analysis can't see inside the function being wrapped by the
-        # contextmanager, so we have no way of knowing if it yields None or
-        # a meaningful value.
-
-        # if f.is_context_manager and not doc_yields:
-        #     new_failures.append('method is a context manager but does not '
-        #                         'have a \'Yields\' section in docstring')
-        if f.is_context_manager:
+        if _is_context_manager(func):
             pass
         elif doc_returns and not f.has_return:
             new_failures.append('method returns no value but found '
@@ -304,20 +316,13 @@ class LintTestCase(unittest.TestCase):
                 if desc == '':
                     new_failures.append('no description given for Return '
                                         '{0}'.format(name))
-        if new_failures:
-            key = '{0}/{1}:{2}.{3}'.format(dir_name, file_name, class_name,
-                                           method_name)
-            if key in failures:
-                failures[key] += new_failures
-            else:
-                failures[key] = new_failures
 
-        # if method_name == '_jacobian_context':
-        #     exit(0)
+        return new_failures
 
     def check_method(self, dir_name, file_name,
                      class_name, method_name, method, failures):
-        """ Perform docstring checks on each method.
+        """
+        Perform docstring checks on each method.
 
         Parameters
         ----------
@@ -343,11 +348,18 @@ class LintTestCase(unittest.TestCase):
             argspec = inspect.getargspec(method)
         doc = inspect.getdoc(method)
 
-        fail_msg = '{0}, {1} : {2} {3}'.format(dir_name, file_name, class_name,
-                                               method_name)
+        new_failures = []
+
+        # If the method is decorated with @contextmanager, skip it for now
+        if _is_context_manager(method):
+            return
         # Check if docstring is missing
         if doc is None:
-            self.fail(fail_msg + '... missing docstring')
+            new_failures.append('is missing docstring')
+            return
+
+        if not method.__doc__.startswith('\n'):
+            new_failures.append('docstring should start with a new line')
 
         # Check if docstring references another method
         if doc[:3] == 'See':
@@ -355,14 +367,98 @@ class LintTestCase(unittest.TestCase):
 
         nds = NumpyDocString(doc)
 
-        self.check_method_summary(dir_name, file_name, class_name, method_name,
-                                  nds, failures)
+        new_failures.extend(self.check_summary(nds))
 
-        self.check_method_parameters(dir_name, file_name, class_name,
-                                     method_name, argspec, nds, failures)
+        new_failures.extend(self.check_parameters(method, argspec, nds))
 
-        self.check_method_returns(dir_name, file_name, class_name, method_name,
-                                  method, nds, failures)
+        new_failures.extend(self.check_returns(method, nds))
+
+        if new_failures:
+            key = '{0}/{1}:{2}.{3}'.format(dir_name, file_name, class_name,
+                                           method_name)
+            if key in failures:
+                failures[key] += new_failures
+            else:
+                failures[key] = new_failures
+
+    def check_class(self, dir_name, file_name, class_name, clss, failures):
+
+        new_failures = []
+        doc = inspect.getdoc(clss)
+
+        # Check if docstring is missing
+        if doc is None:
+            new_failures.append('is missing docstring')
+            return
+
+        if not clss.__doc__.startswith('\n'):
+            new_failures.append('docstring should start with a new line')
+
+        if new_failures:
+            key = '{0}/{1}:{2}'.format(dir_name, file_name, class_name)
+            if key in failures:
+                failures[key] += new_failures
+            else:
+                failures[key] = new_failures
+
+    def check_function(self, dir_name, file_name, func_name, func, failures):
+        """ Perform docstring checks on a function.
+
+        Parameters
+        ----------
+        dir_name : str
+            The name of the directory in which the method is defined.
+        file_name : str
+            The name of the file in which the method is defined.
+        func_name : str
+            The name of the function being checked
+        fun : function
+            The function being tested.
+        failures : dict
+            The failures encountered by the method.  These are all stored
+            so that we can fail once at the end of the check_method method
+            with information about every failure. Form is
+            { 'dir_name/file_name:class_name.method_name': [ messages ] }
+        """
+
+        if PY3:
+            argspec = inspect.getfullargspec(func)
+        else:
+            argspec = inspect.getargspec(func)
+        doc = inspect.getdoc(func)
+
+        new_failures = []
+
+        # If the method is decorated with @contextmanager, skip it for now
+        if _is_context_manager(func):
+            return
+
+        # Check if docstring is missing
+        if doc is None:
+            new_failures.append('is missing docstring')
+            return
+
+        if not func.__doc__.startswith('\n'):
+            new_failures.append('docstring should start with a new line')
+
+        # Check if docstring references another function
+        if doc[:3] == 'See':
+            return
+
+        nds = NumpyDocString(doc)
+
+        new_failures.extend(self.check_summary(nds))
+
+        new_failures.extend(self.check_parameters(func, argspec, nds))
+
+        new_failures.extend(self.check_returns(func, nds))
+
+        if new_failures:
+            key = '{0}/{1}:{2}'.format(dir_name, file_name, func_name)
+            if key in failures:
+                failures[key] += new_failures
+            else:
+                failures[key] = new_failures
 
     def test_docstrings(self):
         topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -398,6 +494,7 @@ class LintTestCase(unittest.TestCase):
                     classes = [x for x in dir(mod)
                                if inspect.isclass(getattr(mod, x)) and
                                getattr(mod, x).__module__ == module_name]
+
                     for class_name in classes:
                         if print_info:
                             print(' '*4, class_name)
@@ -406,6 +503,9 @@ class LintTestCase(unittest.TestCase):
                         # skip namedtuples
                         if issubclass(clss, tuple):
                             continue
+
+                        self.check_class(dir_name, file_name, class_name, clss,
+                                         failures)
 
                         # Loop over methods
                         methods = [x for x in dir(clss)
@@ -419,13 +519,28 @@ class LintTestCase(unittest.TestCase):
                             self.check_method(dir_name, file_name, class_name,
                                               method_name, method, failures)
 
+                    # Loop over functions
+                    tree = ast.parse(inspect.getsource(mod))
+
+                    if hasattr(tree, 'body'):
+                        funcs = [node.name for node in tree.body if isinstance(node, ast.FunctionDef)]
+                    else:
+                        funcs = []
+
+                    for func_name in funcs:
+                        func = getattr(mod, func_name)
+                        self.check_function(dir_name, file_name, func_name,
+                                            func, failures)
+
         if failures:
             msg = '\n'
+            count = 0
             for key in failures:
                 msg += '{0}\n'.format(key)
+                count += len(failures[key])
                 for failure in failures[key]:
                     msg += '    {0}\n'.format(failure)
-
+            msg += 'Found {0} issues in docstrings'.format(count)
             self.fail(msg)
 
 

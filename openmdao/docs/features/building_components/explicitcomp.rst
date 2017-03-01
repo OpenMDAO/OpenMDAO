@@ -1,17 +1,17 @@
 :orphan:
 
-.. `Basic component types: 2. ExplicitComponent`
+.. _comp-type-2-explicitcomp:
 
-Basic component types: 2. ExplicitComponent
+Basic Component Types: 2. ExplicitComponent
 ===========================================
 
 Explicit variables are those that are computed as an explicit function of other variables.
 For instance, :math:`z` would be an explicit variable, given :math:`z = \sin(y)`, while :math:`y` would not be, given that it is defined implicitly by the nonlinear equation, :math:`\cos(x \cdot y) - z \cdot y = 0`.
 
-In OpenMDAO, Explicit variables are defined by writing a class that inherits from the <ExplicitComponent> class.
+In OpenMDAO, explicit variables are defined by writing a class that inherits from the  :ref:`Explicit Component <usr_openmdao.core.explicitcomponent.py>` class.
 The explicit variables would be considered *outputs* while the variables on which they depend would be considered *inputs* (e.g., :math:`y` in :math:`z = \sin(y)`).
 
-ExplicitComponent methods
+ExplicitComponent Methods
 -------------------------
 
 The implementation of each method will be illustrated using a simple explicit component that computes the output *area* as a function of inputs *length* and *width*.
@@ -37,7 +37,7 @@ The implementation of each method will be illustrated using a simple explicit co
   The :code:`outputs` are also provided for convenience.
 
   .. embed-code::
-      openmdao.core.tests.test_expl_comp.TestExplCompSimplePartial.compute_jacobian
+      openmdao.core.tests.test_expl_comp.TestExplCompSimplePartial.compute_partial_derivs
 
 - :code:`compute_jacvec_product(inputs, outputs, d_inputs, d_outputs, mode)` :
 

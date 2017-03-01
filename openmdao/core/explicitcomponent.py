@@ -2,20 +2,21 @@
 
 from __future__ import division
 
-import collections
-
 import numpy
-from scipy.sparse import coo_matrix, csr_matrix
-from six import string_types
+from six import iteritems, itervalues
 
 from openmdao.core.component import Component
 
 
 class ExplicitComponent(Component):
-    """Class to inherit from when all output variables are explicit."""
+    """
+    Class to inherit from when all output variables are explicit.
+    """
 
     def _apply_nonlinear(self):
-        """Compute residuals."""
+        """
+        Compute residuals. The model is assumed to be in a scaled state.
+        """
         with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                          residuals=[self._residuals]):
             self._residuals.set_vec(self._outputs)
@@ -24,7 +25,8 @@ class ExplicitComponent(Component):
             self._outputs += self._residuals
 
     def _solve_nonlinear(self):
-        """Compute outputs.
+        """
+        Compute outputs. The model is assumed to be in a scaled state.
 
         Returns
         -------
@@ -43,7 +45,8 @@ class ExplicitComponent(Component):
         return bool(failed), 0., 0.
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """Compute jac-vec product.
+        """
+        Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
@@ -74,7 +77,8 @@ class ExplicitComponent(Component):
                     d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode):
-        """Apply inverse jac product.
+        """
+        Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
@@ -105,24 +109,32 @@ class ExplicitComponent(Component):
         return False, 0., 0.
 
     def _linearize(self):
-        """Compute jacobian / factorization."""
+        """
+        Compute jacobian / factorization. The model is assumed to be in a scaled state.
+        """
         with self._jacobian_context() as J:
-            # negate constant subjacs (and others that will get overwritten)
-            # back to normal
-            self._negate_jac()
-
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
-                                             scale_jac=True):
-                self.compute_jacobian(self._inputs, self._outputs, J)
+                                             residuals=[self._residuals], scale_jac=True):
+                # Since the residuals are already negated, this call should come before negate_jac
+                # Additionally, computing the approximation before the call to compute_partials
+                # allows users to override FD'd values.
+                for approximation in itervalues(self._approx_schemes):
+                    approximation.compute_approximations(self, jac=J)
 
-            # re-negate the jacobian
-            self._negate_jac()
+                # negate constant subjacs (and others that will get overwritten)
+                # back to normal
+                self._negate_jac()
+                self.compute_partial_derivs(self._inputs, self._outputs, J)
+
+                # re-negate the jacobian
+                self._negate_jac()
 
             if self._owns_global_jac:
                 J._update()
 
     def _setup_variables(self, recurse=False):
-        """Assemble variable metadata and names lists.
+        """
+        Assemble variable metadata and names lists.
 
         Sets the following attributes:
             _var_allprocs_names
@@ -138,37 +150,54 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._setup_variables(False)
 
+        # Note: These declare calls are outside of initialize_partials so that users do not have to
+        # call the super version of initialize_partials. This is still post-initialize_variables.
         other_names = []
         for i, out_name in enumerate(self._var_myproc_names['output']):
             meta = self._var_myproc_metadata['output'][i]
             size = numpy.prod(meta['shape'])
             arange = numpy.arange(size)
-            self.declare_partials(out_name, out_name, rows=arange, cols=arange,
-                                  val=numpy.ones(size))
+
+            # No need to FD outputs wrt other outputs
+            if (out_name, out_name) in self._subjacs_info:
+                if 'method' in self._subjacs_info[out_name, out_name]:
+                    del self._subjacs_info[out_name, out_name]['method']
+            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
             for other_name in other_names:
                 self.declare_partials(out_name, other_name, dependent=False)
                 self.declare_partials(other_name, out_name, dependent=False)
             other_names.append(out_name)
 
     def _negate_jac(self):
-        """Negate this component's part of the jacobian."""
+        """
+        Negate this component's part of the jacobian.
+        """
         if self._jacobian._subjacs:
             for in_name in self._var_myproc_names['input']:
                 for out_name in self._var_myproc_names['output']:
                     key = (out_name, in_name)
                     if key in self._jacobian:
-                        self._jacobian._multiply_subjac(key, -1.0)
+                        ukey = self._jacobian._key2unique(key)
+                        self._jacobian._multiply_subjac(ukey, -1.0)
 
     def _set_partials_meta(self):
-        """Set subjacobian info into our jacobian."""
+        """
+        Set subjacobian info into our jacobian.
+        """
         with self._jacobian_context() as J:
-            for key, meta, typ in self._iter_partials_matches():
-                self._check_partials_meta(key, meta)
-                # only negate d_output/d_input partials
-                J._set_partials_meta(key, meta, typ == 'input')
+            for key, meta in iteritems(self._subjacs_info):
+                J._set_partials_meta(key, meta, meta['type'] == 'input')
+
+                method = meta.get('method', False)
+                if method and meta['dependent']:
+                    self._approx_schemes[method].add_approximation(key, meta)
+
+        for approx in itervalues(self._approx_schemes):
+            approx._init_approximations()
 
     def compute(self, inputs, outputs):
-        """Compute outputs given inputs.
+        """
+        Compute outputs given inputs. The model is assumed to be in an unscaled state.
 
         Parameters
         ----------
@@ -184,8 +213,9 @@ class ExplicitComponent(Component):
         """
         pass
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
-        """Compute sub-jacobian parts / factorization.
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        """
+        Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
 
         Parameters
         ----------
@@ -193,14 +223,15 @@ class ExplicitComponent(Component):
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
-        jacobian : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
         """
         pass
 
     def compute_jacvec_product(self, inputs, outputs,
                                d_inputs, d_outputs, mode):
-        r"""Compute jac-vector product.
+        r"""
+        Compute jac-vector product. The model is assumed to be in an unscaled state.
 
         If mode is:
             'fwd': d_inputs \|-> d_outputs

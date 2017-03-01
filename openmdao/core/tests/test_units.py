@@ -11,6 +11,18 @@ from openmdao.api import ExecComp
 from openmdao.devtools.testutil import assert_rel_error
 
 
+class SpeedComp(ExplicitComponent):
+    """Simple speed computation from distance and time with unit conversations."""
+
+    def initialize_variables(self):
+        self.add_input('distance', val=1.0, units='km')
+        self.add_input('time', val=1.0, units='h')
+        self.add_output('speed', val=1.0, units='km/h')
+
+    def compute(self, inputs, outputs):
+        outputs['speed'] = inputs['distance'] / inputs['time']
+
+
 class SrcComp(ExplicitComponent):
     """Source provides degrees Celsius."""
 
@@ -22,7 +34,7 @@ class SrcComp(ExplicitComponent):
         """ Pass through."""
         outputs['x2'] = inputs['x1']
 
-    def compute_jacobian(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
         partials['x2', 'x1'] = 1.0
 
@@ -38,7 +50,7 @@ class TgtCompF(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_jacobian(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
         partials['x3', 'x2'] = 1.0
 
@@ -54,7 +66,7 @@ class TgtCompC(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_jacobian(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
         partials['x3', 'x2'] = 1.0
 
@@ -70,7 +82,7 @@ class TgtCompK(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_jacobian(self, inputs, outputs, partials):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
         partials['x3', 'x2'] = 1.0
 
@@ -86,11 +98,11 @@ class TgtCompFMulti(ExplicitComponent):
         self.add_output('x3', 100.0)
         self.add_output('x3_', 100.0)
 
-    def compute(self, params, unknowns):
+    def compute(self, inputs, outputs):
         """ Pass through."""
-        unknowns['x3'] = params['x2']
+        outputs['x3'] = inputs['x2']
 
-    def compute_jacobian(self, params, unknowns, resids, J):
+    def compute_partial_derivs(self, inputs, outputs, resids, J):
         """ Derivative is 1.0"""
         J['_x3', 'x2'] = np.array([1.0])
         J['_x3', '_x2'] = 0.0
@@ -139,6 +151,31 @@ class UnitConvGroupImplicitConns(Group):
 
 class TestUnitConversion(unittest.TestCase):
     """ Testing automatic unit conversion."""
+
+    def test_speed(self):
+        comp = IndepVarComp()
+        comp.add_output('distance', val=1., units='m')
+        comp.add_output('time', val=1., units='s')
+
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('c1', comp)
+        prob.model.add_subsystem('c2', SpeedComp())
+        prob.model.add_subsystem('c3', ExecComp('f=speed', units={'speed': 'm/s'}))
+        prob.model.connect('c1.distance', 'c2.distance')
+        prob.model.connect('c1.time', 'c2.time')
+        prob.model.connect('c2.speed', 'c3.speed')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['c1.distance'], 1.)  # units: m
+        assert_rel_error(self, prob['c2.distance'], 1.e-3)  # units: km
+
+        assert_rel_error(self, prob['c1.time'], 1.)  # units: s
+        assert_rel_error(self, prob['c2.time'], 1./3600.)  # units: h
+
+        assert_rel_error(self, prob['c2.speed'], 3.6)  # units: km/h
+        assert_rel_error(self, prob['c3.f'], 1.0)  # units: km/h
 
     def test_basic(self):
         """Test that output values and total derivatives are correct."""
@@ -219,7 +256,7 @@ class TestUnitConversion(unittest.TestCase):
         #assert_rel_error(self, prob['tgtK.x3'], 373.15, 1e-6)
 
         ## Make sure we don't convert equal units
-        #self.assertEqual(prob.root.params.metadata('tgtC.x2').get('unit_conv'),
+        #self.assertEqual(prob.root.inputs.metadata('tgtC.x2').get('unit_conv'),
                          #None)
 
         #indep_list = ['x1']
@@ -362,7 +399,7 @@ class TestUnitConversion(unittest.TestCase):
         #assert_rel_error(self, prob['sub2.tgtK.x3'], 373.15, 1e-6)
 
         ## Make sure we don't convert equal units
-        #self.assertEqual(prob.root.sub2.params.metadata('tgtC.x2').get('unit_conv'),
+        #self.assertEqual(prob.root.sub2.inputs.metadata('tgtC.x2').get('unit_conv'),
                          #None)
 
         #indep_list = ['x1']
@@ -507,7 +544,7 @@ class TestUnitConversion(unittest.TestCase):
         #assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
     #def test_apply_linear_adjoint(self):
-        ## Make sure we can index into dparams
+        ## Make sure we can index into dinputs
 
         #class Attitude_Angular(Component):
             #""" Calculates angular velocity vector from the satellite's orientation
@@ -534,23 +571,23 @@ class TestUnitConversion(unittest.TestCase):
                 #self.dw_dOdot = np.zeros((n, 3, 3, 3))
                 #self.dw_dO = np.zeros((n, 3, 3, 3))
 
-            #def solve_nonlinear(self, params, unknowns, resids):
+            #def solve_nonlinear(self, inputs, outputs, resids):
                 #""" Calculate output. """
 
-                #O_BI = params['O_BI']
-                #Odot_BI = params['Odot_BI']
-                #w_B = unknowns['w_B']
+                #O_BI = inputs['O_BI']
+                #Odot_BI = inputs['Odot_BI']
+                #w_B = outputs['w_B']
 
                 #for i in range(0, self.n):
                     #w_B[0, i] = np.dot(Odot_BI[2, :, i], O_BI[1, :, i])
                     #w_B[1, i] = np.dot(Odot_BI[0, :, i], O_BI[2, :, i])
                     #w_B[2, i] = np.dot(Odot_BI[1, :, i], O_BI[0, :, i])
 
-            #def linearize(self, params, unknowns, resids):
+            #def linearize(self, inputs, outputs, resids):
                 #""" Calculate and save derivatives. (i.e., Jacobian) """
 
-                #O_BI = params['O_BI']
-                #Odot_BI = params['Odot_BI']
+                #O_BI = inputs['O_BI']
+                #Odot_BI = inputs['Odot_BI']
 
                 #for i in range(0, self.n):
                     #self.dw_dOdot[i, 0, 2, :] = O_BI[1, :, i]
@@ -562,7 +599,7 @@ class TestUnitConversion(unittest.TestCase):
                     #self.dw_dOdot[i, 2, 1, :] = O_BI[0, :, i]
                     #self.dw_dO[i, 2, 0, :] = Odot_BI[1, :, i]
 
-            #def apply_linear(self, params, unknowns, dparams, dunknowns, dresids, mode):
+            #def apply_linear(self, inputs, outputs, dinputs, doutputs, dresids, mode):
                 #""" Matrix-vector product with the Jacobian. """
 
                 #dw_B = dresids['w_B']
@@ -571,12 +608,12 @@ class TestUnitConversion(unittest.TestCase):
                     #for k in range(3):
                         #for i in range(3):
                             #for j in range(3):
-                                #if 'O_BI' in dparams:
+                                #if 'O_BI' in dinputs:
                                     #dw_B[k, :] += self.dw_dO[:, k, i, j] * \
-                                        #dparams['O_BI'][i, j, :]
-                                #if 'Odot_BI' in dparams:
+                                        #dinputs['O_BI'][i, j, :]
+                                #if 'Odot_BI' in dinputs:
                                     #dw_B[k, :] += self.dw_dOdot[:, k, i, j] * \
-                                        #dparams['Odot_BI'][i, j, :]
+                                        #dinputs['Odot_BI'][i, j, :]
 
                 #else:
 
@@ -584,12 +621,12 @@ class TestUnitConversion(unittest.TestCase):
                         #for i in range(3):
                             #for j in range(3):
 
-                                #if 'O_BI' in dparams:
-                                    #dparams['O_BI'][i, j, :] += self.dw_dO[:, k, i, j] * \
+                                #if 'O_BI' in dinputs:
+                                    #dinputs['O_BI'][i, j, :] += self.dw_dO[:, k, i, j] * \
                                         #dw_B[k, :]
 
-                                #if 'Odot_BI' in dparams:
-                                    #dparams['Odot_BI'][i, j, :] -= -self.dw_dOdot[:, k, i, j] * \
+                                #if 'Odot_BI' in dinputs:
+                                    #dinputs['Odot_BI'][i, j, :] -= -self.dw_dOdot[:, k, i, j] * \
                                         #dw_B[k, :]
 
         #prob = Problem()
@@ -795,30 +832,30 @@ class TestUnitConversion(unittest.TestCase):
                 #self.dx1count = 0
                 #self.dx2count = 0
 
-            #def solve_nonlinear(self, params, unknowns, resids):
+            #def solve_nonlinear(self, inputs, outputs, resids):
                 #""" Doesn't do much. """
-                #x1 = params['x1']
-                #x2 = params['x2']
-                #unknowns['y'] = 1.01*(x1 + x2)
+                #x1 = inputs['x1']
+                #x2 = inputs['x2']
+                #outputs['y'] = 1.01*(x1 + x2)
 
-            #def apply_linear(self, params, unknowns, dparams, dunknowns, dresids,
+            #def apply_linear(self, inputs, outputs, dinputs, doutputs, dresids,
                              #mode):
                 #"""Returns the product of the incoming vector with the Jacobian."""
 
                 #if mode == 'fwd':
-                    #if 'x1' in dparams:
-                        #dresids['y'] += 1.01*dparams['x1']
+                    #if 'x1' in dinputs:
+                        #dresids['y'] += 1.01*dinputs['x1']
                         #self.dx1count += 1
-                    #if 'x2' in dparams:
-                        #dresids['y'] += 1.01*dparams['x2']
+                    #if 'x2' in dinputs:
+                        #dresids['y'] += 1.01*dinputs['x2']
                         #self.dx2count += 1
 
                 #elif mode == 'rev':
-                    #if 'x1' in dparams:
-                        #dparams['x1'] = 1.01*dresids['y']
+                    #if 'x1' in dinputs:
+                        #dinputs['x1'] = 1.01*dresids['y']
                         #self.dx1count += 1
-                    #if 'x2' in dparams:
-                        #dparams['x2'] = 1.01*dresids['y']
+                    #if 'x2' in dinputs:
+                        #dinputs['x2'] = 1.01*dresids['y']
                         #self.dx2count += 1
 
         #prob = Problem()
@@ -852,7 +889,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.setup(check=False)
         #prob.run()
 
-        ## x1 deriv code should be called less if the dparams vec only
+        ## x1 deriv code should be called less if the dinputs vec only
         ## considers sub relevancy
         #self.assertTrue(sub.cc1.dx1count < sub.cc1.dx2count)
 
@@ -952,9 +989,9 @@ class TestUnitConversion(unittest.TestCase):
         #self.add_output('x2', 100.0, units='degC', pass_by_obj=True)
         #self.deriv_options['type'] = 'fd'
 
-    #def solve_nonlinear(self, params, unknowns, resids):
+    #def solve_nonlinear(self, inputs, outputs, resids):
         #""" No action."""
-        #unknowns['x2'] = params['x1']
+        #outputs['x2'] = inputs['x1']
 
 
 #class PBOTgtCompF(Component):
@@ -966,9 +1003,9 @@ class TestUnitConversion(unittest.TestCase):
         #self.add_output('x3', 100.0)
         #self.deriv_options['type'] = 'fd'
 
-    #def solve_nonlinear(self, params, unknowns, resids):
+    #def solve_nonlinear(self, inputs, outputs, resids):
         #""" No action."""
-        #unknowns['x3'] = params['x2']
+        #outputs['x3'] = inputs['x2']
 
 
 #class TestUnitConversionPBO(unittest.TestCase):
@@ -1016,7 +1053,7 @@ class TestUnitConversion(unittest.TestCase):
                 #self.add_output('x3', 2.0, units='m')
                 #self.deriv_options['type'] = 'fd'
 
-            #def solve_nonlinear(self, params, unknowns, resids):
+            #def solve_nonlinear(self, inputs, outputs, resids):
                 #""" No action."""
                 #pass
 
@@ -1031,7 +1068,7 @@ class TestUnitConversion(unittest.TestCase):
                 #self.add_param('x3', 0.0, units='ft')
                 #self.deriv_options['type'] = 'fd'
 
-            #def solve_nonlinear(self, params, unknowns, resids):
+            #def solve_nonlinear(self, inputs, outputs, resids):
                 #""" No action."""
                 #pass
 

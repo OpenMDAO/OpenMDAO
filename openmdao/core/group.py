@@ -14,10 +14,20 @@ from openmdao.utils.units import is_compatible
 
 
 class Group(System):
-    """Class used to group systems together; instantiate or inherit."""
+    """
+    Class used to group systems together; instantiate or inherit.
+    """
 
     def __init__(self, **kwargs):
-        """Set the solvers to nonlinear and linear block Gauss--Seidel by default."""
+        """
+        Set the solvers to nonlinear and linear block Gauss--Seidel by default.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            dict of arguments available here and in all descendants of this
+            Group.
+        """
         super(Group, self).__init__(**kwargs)
 
         # TODO: we cannot set the solvers with property setters at the moment
@@ -29,7 +39,8 @@ class Group(System):
             self._ln_solver = LinearBlockGS()
 
     def add(self, name, subsys, promotes=None):
-        """Deprecated version of <Group.add_subsystem>.
+        """
+        Deprecated version of <Group.add_subsystem>.
 
         Parameters
         ----------
@@ -48,9 +59,9 @@ class Group(System):
         self.add_subsystem(name, subsys, promotes=promotes)
 
     def add_subsystem(self, name, subsys, promotes=None,
-                      promotes_inputs=None, promotes_outputs=None,
-                      renames_inputs=None, renames_outputs=None):
-        """Add a subsystem.
+                      promotes_inputs=None, promotes_outputs=None):
+        """
+        Add a subsystem.
 
         Parameters
         ----------
@@ -68,12 +79,6 @@ class Group(System):
         promotes_outputs : str, iter of str, optional
             One or a list of output variable names specifying which subsystem output
             variables to 'promote' up to this group.
-        renames_inputs : list of (str, str) or dict, optional
-            A dict mapping old name to new name for any subsystem
-            input variables that should be renamed in this group.
-        renames_outputs : list of (str, str) or dict, optional
-            A dict mapping old name to new name for any subsystem
-            output variables that should be renamed in this group.
 
         Returns
         -------
@@ -81,7 +86,6 @@ class Group(System):
             the subsystem that was passed in. This is returned to
             enable users to instantiate and add a subsystem at the
             same time, and get the pointer back.
-
         """
         for sub in self._subsystems_allprocs:
             if name == sub.name:
@@ -105,15 +109,12 @@ class Group(System):
             subsys._var_promotes['input'] = set(promotes_inputs)
         if promotes_outputs:
             subsys._var_promotes['output'] = set(promotes_outputs)
-        if renames_inputs:
-            subsys._var_renames['input'] = dict(renames_inputs)
-        if renames_outputs:
-            subsys._var_renames['output'] = dict(renames_outputs)
 
         return subsys
 
     def connect(self, out_name, in_name, src_indices=None):
-        """Connect output out_name to input in_name in this namespace.
+        """
+        Connect output out_name to input in_name in this namespace.
 
         Parameters
         ----------
@@ -134,18 +135,14 @@ class Group(System):
             raise TypeError("src_indices must be an index array, did you mean"
                             " connect('%s', %s)?" % (out_name, in_name))
 
+        if isinstance(src_indices, Iterable):
+            src_indices = np.atleast_1d(src_indices)
+
         if isinstance(src_indices, np.ndarray):
             if not np.issubdtype(src_indices.dtype, np.integer):
                 raise TypeError("src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
                                 (out_name, in_name, src_indices.dtype.type))
-        elif isinstance(src_indices, Iterable):
-            types_in_src_idxs = set(type(idx) for idx in src_indices)
-            for t in types_in_src_idxs:
-                if not np.issubdtype(t, np.integer):
-                    raise TypeError("src_indices must contain integers, but src_indices for "
-                                    "connection from '%s' to '%s' contains non-integers." %
-                                    (out_name, in_name))
 
         # if multiple targets are given, recursively connect to each
         if isinstance(in_name, (list, tuple)):
@@ -167,7 +164,8 @@ class Group(System):
         self._var_connections[in_name] = (out_name, src_indices)
 
     def _setup_connections(self):
-        """Recursively assemble a list of input-output connections.
+        """
+        Recursively assemble a list of input-output connections.
 
         Sets the following attributes:
             _var_connections_indices
@@ -279,14 +277,20 @@ class Group(System):
                                       out_index + out_offset))
 
                     if src_indices is not None:
-                        # set the 'indices' metadata in the input variable
+                        # set the 'src_indices' metadata in the input variable
                         try:
                             in_myproc_index = myproc_in_names.index(in_name)
                         except ValueError:
                             pass
                         else:
                             meta = input_meta[in_myproc_index]
-                            meta['indices'] = np.array(src_indices, dtype=int)
+                            if meta['src_indices'] is not None:
+                                raise RuntimeError("%s: src_indices has been defined "
+                                                   "in both connect('%s', '%s') "
+                                                   "and add_input('%s', ...)." %
+                                                   (self.pathname, out_name,
+                                                    in_name, in_name))
+                            meta['src_indices'] = np.atleast_1d(src_indices)
 
                         # set src_indices to None to avoid unnecessary repeat
                         # of setting indices and shape metadata when we have
@@ -296,7 +300,8 @@ class Group(System):
         self._var_connections_indices = pairs
 
     def _find_subsys_with_promoted_name(self, var_name, io_type='output'):
-        """Find subsystem that contains promoted variable.
+        """
+        Find subsystem that contains promoted variable.
 
         Parameters
         ----------
@@ -317,7 +322,9 @@ class Group(System):
         return None
 
     def initialize_variables(self):
-        """Set up variable name and metadata lists."""
+        """
+        Set up variable name and metadata lists.
+        """
         self._var_pathdict = {}
         self._var_name2path = {'input': {}, 'output': {}}
 
@@ -379,7 +386,8 @@ class Group(System):
                         name2path[name] = path
 
     def get_subsystem(self, name):
-        """Return the system called 'name' in the current namespace.
+        """
+        Return the system called 'name' in the current namespace.
 
         Parameters
         ----------
@@ -402,14 +410,17 @@ class Group(System):
         return system
 
     def _apply_nonlinear(self):
-        """Compute residuals."""
+        """
+        Compute residuals. The model is assumed to be in a scaled state.
+        """
         self._transfers[None](self._inputs, self._outputs, 'fwd')
         # Apply recursion
         for subsys in self._subsystems_myproc:
             subsys._apply_nonlinear()
 
     def _solve_nonlinear(self):
-        """Compute outputs.
+        """
+        Compute outputs. The model is assumed to be in a scaled state.
 
         Returns
         -------
@@ -423,7 +434,8 @@ class Group(System):
         return self._nl_solver.solve()
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """Compute jac-vec product.
+        """
+        Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
@@ -462,7 +474,8 @@ class Group(System):
                             d_inputs, d_outputs, mode)
 
     def _solve_linear(self, vec_names, mode):
-        """Apply inverse jac product.
+        """
+        Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
@@ -483,7 +496,9 @@ class Group(System):
         return self._ln_solver.solve(vec_names, mode)
 
     def _linearize(self):
-        """Compute jacobian / factorization."""
+        """
+        Compute jacobian / factorization. The model is assumed to be in a scaled state.
+        """
         with self._jacobian_context() as J:
             for subsys in self._subsystems_myproc:
                 subsys._linearize()
@@ -491,3 +506,6 @@ class Group(System):
             # Update jacobian
             if self._owns_global_jac:
                 J._update()
+
+        if self._ln_solver is not None:
+            self._ln_solver._linearize()

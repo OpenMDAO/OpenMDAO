@@ -8,7 +8,8 @@ from openmdao.jacobians.global_jacobian import GlobalJacobian
 
 
 class Solver(object):
-    """Base solver class.
+    """
+    Base solver class.
 
     This class is subclassed by NonlinearSolver and LinearSolver,
     which are in turn subclassed by actual solver implementations.
@@ -32,7 +33,8 @@ class Solver(object):
     SOLVER = 'base_solver'
 
     def __init__(self, **kwargs):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
         Parameters
         ----------
@@ -59,14 +61,16 @@ class Solver(object):
         self.options.update(kwargs)
 
     def _declare_options(self):
-        """Declare options before kwargs are processed in the init method.
+        """
+        Declare options before kwargs are processed in the init method.
 
         This is optionally implemented by subclasses of Solver.
         """
         pass
 
     def _setup_solvers(self, system, depth):
-        """Assign system instance, set depth, and optionally perform setup.
+        """
+        Assign system instance, set depth, and optionally perform setup.
 
         Parameters
         ----------
@@ -79,7 +83,8 @@ class Solver(object):
         self._depth = depth
 
     def _mpi_print(self, iteration, res, res0):
-        """Print residuals from an iteration.
+        """
+        Print residuals from an iteration.
 
         Parameters
         ----------
@@ -116,7 +121,8 @@ class Solver(object):
             print(print_str)
 
     def _run_iterator(self):
-        """Run the iterative solver.
+        """
+        Run the iterative solver.
 
         Returns
         -------
@@ -145,7 +151,8 @@ class Solver(object):
         return fail, norm, norm / norm0
 
     def _iter_initialize(self):
-        """Perform any necessary pre-processing operations.
+        """
+        Perform any necessary pre-processing operations.
 
         Returns
         -------
@@ -157,11 +164,14 @@ class Solver(object):
         pass
 
     def _iter_execute(self):
-        """Perform the operations in the iteration loop."""
+        """
+        Perform the operations in the iteration loop.
+        """
         pass
 
     def _iter_get_norm(self):
-        """Return the norm of the residual.
+        """
+        Return the norm of the residual.
 
         Returns
         -------
@@ -170,20 +180,30 @@ class Solver(object):
         """
         pass
 
+    def _linearize(self):
+        """
+        Perform any required linearization operations such as matrix factorization.
+        """
+        pass
+
     def solve(self):
-        """Run the solver.
+        """
+        Run the solver.
 
         Returns
         -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
         float
-            initial error.
+            absolute error.
         float
-            error at the first iteration.
+            relative error.
         """
         pass
 
     def __str__(self):
-        """Return a string representation of the solver.
+        """
+        Return a string representation of the solver.
 
         Returns
         -------
@@ -194,22 +214,28 @@ class Solver(object):
 
 
 class NonlinearSolver(Solver):
-    """Base class for nonlinear solvers."""
+    """
+    Base class for nonlinear solvers.
+    """
 
     def solve(self):
-        """Run the solver.
+        """
+        Run the solver.
 
         Returns
         -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
         float
-            initial error.
+            absolute error.
         float
-            error at the first iteration.
+            relative error.
         """
         return self._run_iterator()
 
     def _iter_initialize(self):
-        """Perform any necessary pre-processing operations.
+        """
+        Perform any necessary pre-processing operations.
 
         Returns
         -------
@@ -226,7 +252,8 @@ class NonlinearSolver(Solver):
         return norm0, norm
 
     def _iter_get_norm(self):
-        """Return the norm of the residual.
+        """
+        Return the norm of the residual.
 
         Returns
         -------
@@ -238,10 +265,13 @@ class NonlinearSolver(Solver):
 
 
 class LinearSolver(Solver):
-    """Base class for linear solvers."""
+    """
+    Base class for linear solvers.
+    """
 
     def solve(self, vec_names, mode):
-        """Run the solver.
+        """
+        Run the solver.
 
         Parameters
         ----------
@@ -262,7 +292,8 @@ class LinearSolver(Solver):
         return self._run_iterator()
 
     def _iter_initialize(self):
-        """Perform any necessary pre-processing operations.
+        """
+        Perform any necessary pre-processing operations.
 
         Returns
         -------
@@ -290,7 +321,8 @@ class LinearSolver(Solver):
         return norm0, norm
 
     def _iter_get_norm(self):
-        """Return the norm of the residual.
+        """
+        Return the norm of the residual.
 
         Returns
         -------
@@ -321,10 +353,13 @@ class LinearSolver(Solver):
 
 
 class BlockLinearSolver(LinearSolver):
-    """A base class for LinearBlockGS and LinearBlockJac."""
+    """
+    A base class for LinearBlockGS and LinearBlockJac.
+    """
 
     def _iter_initialize(self):
-        """Perform any necessary pre-processing operations.
+        """
+        Perform any necessary pre-processing operations.
 
         Returns
         -------

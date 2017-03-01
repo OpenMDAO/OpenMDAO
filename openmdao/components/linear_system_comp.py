@@ -7,7 +7,8 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 
 
 class LinearSystemComp(ImplicitComponent):
-    """Component that solves a linear system, Ax=b.
+    """
+    Component that solves a linear system, Ax=b.
 
     Attributes
     ----------
@@ -16,18 +17,24 @@ class LinearSystemComp(ImplicitComponent):
     """
 
     def __init__(self, **kwargs):
-        """Define additional attributes."""
+        """
+        Define additional attributes.
+        """
         super(LinearSystemComp, self).__init__(**kwargs)
 
         self._lup = None
 
     def initialize(self):
-        """Define size parameter."""
+        """
+        Define size parameter.
+        """
         self.metadata.declare('size', value=1, type_=int,
                               desc='the size of the linear system')
 
     def initialize_variables(self):
-        """Matrix and RHS are inputs, solution vector is the output."""
+        """
+        Matrix and RHS are inputs, solution vector is the output.
+        """
         size = self.metadata['size']
 
         self.add_input("A", val=numpy.eye(size))
@@ -35,7 +42,8 @@ class LinearSystemComp(ImplicitComponent):
         self.add_output("x", shape=size)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        """R = Ax - b.
+        """
+        R = Ax - b.
 
         Parameters
         ----------
@@ -49,7 +57,8 @@ class LinearSystemComp(ImplicitComponent):
         residuals['x'] = inputs['A'].dot(outputs['x']) - inputs['b']
 
     def solve_nonlinear(self, inputs, outputs):
-        """Use numpy to solve Ax=b for x.
+        """
+        Use numpy to solve Ax=b for x.
 
         Parameters
         ----------
@@ -64,7 +73,8 @@ class LinearSystemComp(ImplicitComponent):
 
     def apply_linear(self, inputs, outputs, d_inputs, d_outputs,
                      d_residuals, mode):
-        r"""Compute jac-vector product.
+        r"""
+        Compute jac-vector product.
 
         Parameters
         ----------
@@ -100,7 +110,8 @@ class LinearSystemComp(ImplicitComponent):
                 d_inputs['b'] -= d_residuals['x']
 
     def solve_linear(self, d_outputs, d_residuals, mode):
-        r"""Back-substitution to solve the derivatives of the linear system.
+        r"""
+        Back-substitution to solve the derivatives of the linear system.
 
         If mode is:
             'fwd': d_residuals \|-> d_outputs

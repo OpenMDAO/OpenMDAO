@@ -19,15 +19,18 @@ directories = [
 
 
 class LintAttributesTestCase(unittest.TestCase):
-
-    """ Check that for each class, all attributes are documented in the class docstring.
+    """
+    Check that for each class, all attributes are documented in the class docstring.
 
     Parses the source code for the __init__ methods, searching for attribute declarations in every self.* =
     and ensure these attributes are in the 'Attributes' class docstring.
     """
+
     def test_attributes(self):
         topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         print_info = False
+
+        failures = {}
 
         # Regex to grab the attributes documentation section from the class.
         # This section stops at end of string or first empty line.
@@ -76,6 +79,7 @@ class LintAttributesTestCase(unittest.TestCase):
                                if inspect.isclass(getattr(mod, x)) and
                                getattr(mod, x).__module__ == module_name]
                     for class_name in classes:
+                        new_failures = []
                         if print_info:
                             print('  Class:{}'.format(class_name))
                         class_ = getattr(mod, class_name)
@@ -89,9 +93,7 @@ class LintAttributesTestCase(unittest.TestCase):
                         class_doc = inspect.getdoc(class_)
                         classdoc_matches = classdoc_re.findall(class_doc)
                         if len(classdoc_matches) > 1:
-                            self.fail('{}/{} : Class `{}` ... multiple '
-                                      'Attributes section in docstring'.format(
-                                dir_name, file_name, class_name))
+                            new_failures.append('multiple Attributes section in docstring')
                         classdoc_varnames_matches = classdoc_varnames_re.findall(classdoc_matches[0]) if(len(classdoc_matches) == 1) else []
 
                         # There is a valid __init__ section in the class
@@ -103,7 +105,7 @@ class LintAttributesTestCase(unittest.TestCase):
 
                             # no 'self.*=' statements in __init__ but there is an Attributes section
                             if(len(all_member_vars) == 0 and len(classdoc_matches) == 1):
-                                self.fail('%s/%s : Class `%s`... Attributes section not required' % (dir_name, file_name, class_name))
+                                new_failures.append('Attributes section not required')
 
                             # there are 'self.*=' statements in __init__ but there is no Attributes section
                             if(len(all_member_vars) > 0 and len(classdoc_matches) == 0):
@@ -128,15 +130,29 @@ class LintAttributesTestCase(unittest.TestCase):
                                             if(print_info): print("    Documented member `%s` in base class `%s`" % (v, pc.__name__))
                                             found_in_pc = True
                                     if not found_in_pc:
-                                        self.fail('%s/%s : Class `%s`, Member `%s` not documented in Attributes section of own class or parent class docstrings'
-                                                    % (dir_name, file_name, class_name, v))
+                                        new_failures.append('Member `{0}` not documented in Attributes section of own class or parent class docstrings'.format(v))
                                 else:
                                     if(print_info): print("    Documented member `%s`" % (v))
                         else: #no init section
                             if(len(classdoc_matches) == 0): # no Attributes section
                                 if(print_info): print('    Skipping Class `%s`... missing Attributes and init' % (class_name))
                             else: # one Attributes section
-                                self.fail('%s/%s : Class `%s`... Attributes section in docstring but no __init__ function' % (dir_name, file_name, class_name))
+                                new_failures.append('Attributes section in docstring but no __init__ function')
+                        if new_failures:
+                            key = '{0}/{1}:{2}'.format(dir_name, file_name, class_name)
+                            failures[key] = new_failures
+
+
+        if failures:
+            msg = '\n'
+            count = 0
+            for key in failures:
+                msg += '{0}\n'.format(key)
+                count += len(failures[key])
+                for failure in failures[key]:
+                    msg += '    {0}\n'.format(failure)
+            msg += 'Found {0} issues in docstrings'.format(count)
+            self.fail(msg)
 
 if __name__ == '__main__':
     unittest.main()

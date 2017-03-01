@@ -1,6 +1,8 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
 from __future__ import division, print_function
+import numpy
+from six import itervalues
 
 try:
     import petsc4py
@@ -56,12 +58,36 @@ KSP_TYPES = [
 
 
 def _get_petsc_vec_array_new(vec):
-    """Helper function to handle a petsc backwards incompatibility."""
+    """
+    Helper function to handle a petsc backwards incompatibility.
+
+    Parameters
+    ----------
+    vec : petsc vector
+        Vector whose data is being requested.
+
+    Returns
+    -------
+    ndarray
+        A readonly copy of the array of values from vec.
+    """
     return vec.getArray(readonly=True)
 
 
 def _get_petsc_vec_array_old(vec):
-    """Helper function to handle a petsc backwards incompatibility."""
+    """
+    Helper function to handle a petsc backwards incompatibility.
+
+    Parameters
+    ----------
+    vec : petsc vector
+        Vector whose data is being requested.
+
+    Returns
+    -------
+    ndarray
+        An array of values from vec.
+    """
     return vec.getArray()
 
 
@@ -79,7 +105,8 @@ else:
 
 
 class Monitor(object):
-    """Prints output from PETSc's KSP solvers.
+    """
+    Prints output from PETSc's KSP solvers.
 
     Callable object given to KSP as a callback for printing the residual.
 
@@ -94,7 +121,8 @@ class Monitor(object):
     """
 
     def __init__(self, solver):
-        """Store pointer to the openmdao solver and initialize norms.
+        """
+        Store pointer to the openmdao solver and initialize norms.
 
         Parameters
         ----------
@@ -106,7 +134,8 @@ class Monitor(object):
         self._norm0 = 1.0
 
     def __call__(self, ksp, counter, norm):
-        """Store norm if first iteration, and print norm.
+        """
+        Store norm if first iteration, and print norm.
 
         Parameters
         ----------
@@ -126,7 +155,8 @@ class Monitor(object):
 
 
 class PetscKSP(LinearSolver):
-    """LinearSolver that uses PetSC KSP to solve for a system's derivatives.
+    """
+    LinearSolver that uses PetSC KSP to solve for a system's derivatives.
 
     Options
     -------
@@ -146,11 +176,12 @@ class PetscKSP(LinearSolver):
     SOLVER = 'LN: PetscKSP'
 
     def __init__(self, **kwargs):
-        """Declare the solver options.
+        """
+        Declare the solver options.
 
         Parameters
         ----------
-        kwargs : {}
+        **kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
         if PETSc is None:
@@ -167,7 +198,9 @@ class PetscKSP(LinearSolver):
         self.precon = None
 
     def _declare_options(self):
-        """Declare options before kwargs are processed in the init method."""
+        """
+        Declare options before kwargs are processed in the init method.
+        """
         self.options.declare('ksp_type', value='fgmres', values=KSP_TYPES,
                              desc="KSP algorithm to use. Default is 'fgmres'.")
 
@@ -175,7 +208,8 @@ class PetscKSP(LinearSolver):
         self.options['maxiter'] = 100
 
     def _setup_solvers(self, system, depth):
-        """Assign system instance, set depth, and optionally perform setup.
+        """
+        Assign system instance, set depth, and optionally perform setup.
 
         Parameters
         ----------
@@ -190,7 +224,8 @@ class PetscKSP(LinearSolver):
             self.precon._setup_solvers(self._system, self._depth + 1)
 
     def mult(self, mat, in_vec, result):
-        """Apply Jacobian matrix (KSP Callback).
+        """
+        Apply Jacobian matrix (KSP Callback).
 
         The following attributes must be defined when solve is called to
         provide information used in this callback:
@@ -233,8 +268,16 @@ class PetscKSP(LinearSolver):
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
 
+    def _linearize(self):
+        """
+        Perform any required linearization operations such as matrix factorization.
+        """
+        if self.precon is not None:
+            self.precon._linearize()
+
     def solve(self, vec_names, mode):
-        """Solve the linear system for the problem in self._system.
+        """
+        Solve the linear system for the problem in self._system.
 
         The full solution vector is returned.
 
@@ -244,6 +287,15 @@ class PetscKSP(LinearSolver):
             list of vector names.
         mode : string
             Derivative mode, can be 'fwd' or 'rev'.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        float
+            absolute error.
+        float
+            relative error.
         """
         self._vec_names = vec_names
         self._mode = mode
@@ -285,8 +337,11 @@ class PetscKSP(LinearSolver):
             # stuff the result into the x vector
             x_vec.set_data(sol_array)
 
+        return False, 0., 0.
+
     def apply(self, mat, in_vec, result):
-        """Apply preconditioner.
+        """
+        Apply preconditioner.
 
         Parameters
         ----------
@@ -326,7 +381,8 @@ class PetscKSP(LinearSolver):
             result.array[:] = _get_petsc_vec_array(in_vec)
 
     def _get_ksp_solver(self, system, vec_name):
-        """Get an instance of the KSP solver for `vec_name` in `system`.
+        """
+        Get an instance of the KSP solver for `vec_name` in `system`.
 
         Instances will be created on first request and cached for future use.
 
@@ -346,13 +402,14 @@ class PetscKSP(LinearSolver):
         if vec_name in self._ksp:
             return self._ksp[vec_name]
 
-        rank = system.comm.rank + system._mpi_proc_range[0]
+        lsize = 0
+        for metadata in system._var_myproc_metadata['output']:
+            lsize += numpy.prod(metadata['shape'])
 
-        lsizes = system._assembler._variable_sizes_all['output'][rank]
-        sizes = sum(system._assembler._variable_sizes_all['output'])
-
-        lsize = sum(lsizes)
-        size = sum(sizes)
+        size = 0
+        global_var_sizes = system._assembler._variable_sizes_all['output']
+        for idx in itervalues(system._var_allprocs_indices['output']):
+            size += sum(global_var_sizes[:, idx])
 
         jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
                                            comm=system.comm)

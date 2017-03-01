@@ -89,8 +89,8 @@ Detailed docstring rules:
 
      Paragraph 1.
 
-     Args
-     ----
+     Parameters
+     ----------
      argument_name : Type
          description ending with a period.
 
@@ -112,8 +112,8 @@ Detailed docstring rules:
 
      Paragraph 1.
 
-     Args
-     ----
+     Parameters
+     ----------
      argument_name : Type
          description ending with a period.
 
@@ -179,6 +179,29 @@ source documentation.  The above syntax will pull docstring info and produce the
     :noindex:
 
 
+Adding a Link to an Autodoc Class in a `.rst` File
+--------------------------------------------------
+
+Sometimes in a document, you don't want or need to embed/display the entire
+autodoc of a class to make your point. At these times, you want to just provide
+the user with an easy way to link to the autodoc for quick reference.
+
+We'll do this with a `:ref:` tag.  The basic syntax looks like this:
+
+  .. code-block:: python
+
+    :ref:`LinkText <usr_openmdao.path.to.file.py>`
+
+note the `usr_` prefix to the path reference, followed by the path to the file in
+which the class lives. Here's a specific, working example:
+
+  .. code-block:: python
+
+    :ref:`Direct <usr_openmdao.solvers.ln_direct.py>`
+
+which makes a link like this, that leads to the Direct solver's user docs:
+
+    :ref:`Direct <usr_openmdao.solvers.ln_direct.py>`
 
 
 Feature Docs and their Custom Directives for Including Code in Documentation
@@ -233,45 +256,45 @@ show-unittest-examples
 
 
 embed-code
-+++++++++++++++++
+++++++++++
 
         `embed-code` is a custom directive that lets a developer drop a class or a
         class method directly into a feature doc by including that class or method's
         full, dotted python path.  The syntax for invoking the directive looks like this:
 
-        ::
+        .. code-block:: python
 
             .. embed-code::
               openmdao.tests.general_problem.GeneralComp
 
 
         What the above will do is replace the directive and its arg with the class
-        definition for `openmdao.tests.general_problem.GeneralComp`:
+        definition for `openmdao.tests.general_problem.GeneralComp` and will look like this:
 
-        ::
-
-            class GeneralComp(ExplicitComponent):
-
-              def initialize_variables(self):
-                  kwargs = self.metadata
-                  icomp = kwargs['icomp']
-                  ncomp = kwargs['ncomp']
-                  use_var_sets = kwargs['use_var_sets']
-
-                  for ind in range(ncomp):
-                      if use_var_sets:
-                          var_set = ind
-                      else:
-                          var_set = 0
-
-                      if ind is not icomp:
-                          self.add_input('v%i' % ind)
-                      else:
-                          self.add_output('v%i' % ind, var_set=var_set)
-
+        .. embed-code::
+          openmdao.tests.general_problem.GeneralComp
 
         This has the benefit of allowing you to drop entire code blocks into
         a feature doc that illustrate a usage example.
+
+
+embed-test
+++++++++++
+
+        `embed-test` is a custom directive that lets a developer drop a specific single test
+        directly into a feature doc by including that test's full, dotted python
+        path.  The syntax for invoking the directive looks like this:
+
+        .. code-block:: python
+
+          .. embed-test::
+            openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_simple
+
+        The output from the above syntax should just look like a normal code block,
+        with the test code and the results of the test run (output) reported separately:
+
+        .. embed-test::
+            openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_simple
 
 
 Tagging

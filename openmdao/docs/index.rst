@@ -45,6 +45,21 @@ Building components
    features/building_components/indepvarcomp
    features/building_components/explicitcomp
    features/building_components/implicitcomp
+   features/building_components/units
+   features/building_components/scaling
+
+Grouping components for more complex models
+===========================================
+
+.. toctree::
+    :maxdepth: 1
+
+    features/grouping_components/grouping_components
+    features/grouping_components/add_subsystem
+    features/grouping_components/get_subsystem
+    features/grouping_components/connect
+    features/grouping_components/src_indices
+
 
 Defining partial derivatives
 ================================
@@ -52,9 +67,6 @@ Defining partial derivatives
    :maxdepth: 1
 
    features/defining_partials/specifying_partials
-
-Grouping components for more complex models
-================================================================
 
 Solvers (nonlinear and linear)
 ================================
@@ -89,15 +101,15 @@ Visualization
 `Source Documentation`_
 ============================
 
-.. _OpenMDAO Reference Sheets: srcdocs/index.html
+.. _OpenMDAO Reference Sheets: _srcdocs/index.html
 
 `OpenMDAO Developer Source Documentation`__
 
-.. __: srcdocs/dev/index.html
+.. __: _srcdocs/dev/index.html
 
 `OpenMDAO User Source Documentation`__
 
-.. __: srcdocs/usr/index.html
+.. __: _srcdocs/usr/index.html
 
 .. toctree::
    :maxdepth: 1

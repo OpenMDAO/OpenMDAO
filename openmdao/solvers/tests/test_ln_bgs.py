@@ -12,14 +12,14 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.problem import Problem
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.ln_bgs import LinearBlockGS
-from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec, \
-     TestExplCompSimpleDense
+from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
+
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarStateConnection
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
-     FanOut, FanOutGrouped, ConvergeDiverge, ConvergeDivergeFlat, \
+     FanOut, FanOutGrouped, ConvergeDivergeFlat, \
      ConvergeDivergeGroups, Diamond, DiamondFlat
 
 class TestBGSSolver(unittest.TestCase):
@@ -35,18 +35,19 @@ class TestBGSSolver(unittest.TestCase):
         p.model.suppress_solver_output = True
 
         # forward
-        group._vectors['residual']['linear'].set_const(1.0)
-        group._vectors['output']['linear'].set_const(0.0)
-        group._solve_linear(['linear'], 'fwd')
+        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
+            group.run_solve_linear(['linear'], 'fwd')
 
-        self.assertTrue(group.ln_solver._iter_count == 2)
+            self.assertTrue(group.ln_solver._iter_count == 2)
 
-        # reverse
-        group._vectors['output']['linear'].set_const(1.0)
-        group._vectors['residual']['linear'].set_const(0.0)
-        group._solve_linear(['linear'], 'rev')
+            # reverse
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
+            group.run_solve_linear(['linear'], 'rev')
 
-        self.assertTrue(group.ln_solver._iter_count == 2)
+            self.assertTrue(group.ln_solver._iter_count == 2)
 
     def test_simple_matvec(self):
         # Tests derivatives on a simple comp that defines compute_jacvec.
@@ -311,7 +312,7 @@ class TestBGSSolver(unittest.TestCase):
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
         try:
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
         except AnalysisError as err:
             self.assertEqual(str(err), "Solve in '': ScipyGMRES failed to converge after 2 iterations")
         else:
@@ -469,6 +470,7 @@ class TestBGSSolver(unittest.TestCase):
         J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
         for key, val in iteritems(Jbase):
             assert_rel_error(self, J[key], val, .00001)
+
 
 if __name__ == "__main__":
     unittest.main()

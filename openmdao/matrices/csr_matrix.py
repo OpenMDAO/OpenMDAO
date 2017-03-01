@@ -1,4 +1,4 @@
-"""Define the CsrMatrix class."""
+"""Define the CSRmatrix class."""
 from __future__ import division
 
 import numpy
@@ -7,14 +7,17 @@ from scipy.sparse import coo_matrix, csr_matrix
 from six import iteritems
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map
-from openmdao.matrices.coo_matrix import CooMatrix
+from openmdao.matrices.coo_matrix import COOmatrix
 
 
-class CsrMatrix(CooMatrix):
-    """Sparse matrix in Compressed Row Storage format."""
+class CSRmatrix(COOmatrix):
+    """
+    Sparse matrix in Compressed Row Storage format.
+    """
 
     def _build(self, num_rows, num_cols):
-        """Allocate the matrix.
+        """
+        Allocate the matrix.
 
         Parameters
         ----------

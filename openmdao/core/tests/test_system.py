@@ -1,16 +1,21 @@
+""" Unit tests for the system interface."""
+
 import unittest
+from six import assertRaisesRegex
 
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+from openmdao.devtools.testutil import assert_rel_error
+
 
 class TestSystem(unittest.TestCase):
 
-    def test_get_set(self):
+    def test_vector_context_managers(self):
         g1 = Group()
-        indep = g1.add_subsystem('Indep', IndepVarComp('a', 5.0), promotes=['a'])
+        g1.add_subsystem('Indep', IndepVarComp('a', 5.0), promotes=['a'])
         g2 = g1.add_subsystem('G2', Group(), promotes=['*'])
-        c1_2 = g2.add_subsystem('C1', ExecComp('b=2*a'), promotes=['a', 'b'])
+        g2.add_subsystem('C1', ExecComp('b=2*a'), promotes=['a', 'b'])
 
         model = Group()
         model.add_subsystem('G1', g1, promotes=['b'])
@@ -19,88 +24,189 @@ class TestSystem(unittest.TestCase):
         p = Problem(model=model)
         model.suppress_solver_output = True
 
-        # test pre-setup errors
+        # Test pre-setup errors
         with self.assertRaises(Exception) as cm:
-            model.get_input('Sink.b')
+            with model.nonlinear_vector_context() as (inputs, outputs, residuals):
+                pass
         self.assertEqual(str(cm.exception),
-                         ": Cannot access input 'Sink.b'. Setup has not been called.")
+                         "Cannot get vectors because setup has not yet been called.")
+
         with self.assertRaises(Exception) as cm:
-            model.get_output('Sink.c')
+            with model.linear_vector_context('vec') as (d_inputs, d_outputs, d_residuals):
+                pass
         self.assertEqual(str(cm.exception),
-                         ": Cannot access output 'Sink.c'. Setup has not been called.")
-        with self.assertRaises(Exception) as cm:
-            model.get_residual('Sink.c')
-        self.assertEqual(str(cm.exception),
-                         ": Cannot access residual 'Sink.c'. Setup has not been called.")
-        with self.assertRaises(Exception) as cm:
-            model.set_input('Sink.b', 1.1)
-        self.assertEqual(str(cm.exception),
-                         ": Cannot access input 'Sink.b'. Setup has not been called.")
-        with self.assertRaises(Exception) as cm:
-            model.set_output('Sink.c', 2.2)
-        self.assertEqual(str(cm.exception),
-                         ": Cannot access output 'Sink.c'. Setup has not been called.")
-        with self.assertRaises(Exception) as cm:
-            model.set_residual('Sink.c', 3.3)
-        self.assertEqual(str(cm.exception),
-                         ": Cannot access residual 'Sink.c'. Setup has not been called.")
+                         "Cannot get vectors because setup has not yet been called.")
 
         p.setup()
         p.run_model()
 
-        self.assertEqual(model.get_input('G1.G2.C1.a'), 5.0)
-        self.assertEqual(g1.get_input('G2.C1.a'), 5.0)
+        # Test inputs with original values
+        with model.nonlinear_vector_context() as (inputs, outputs, residuals):
+            self.assertEqual(inputs['G1.G2.C1.a'], 5.)
 
-        g2.set_input('C1.a', -1.)
-        self.assertEqual(model.get_input('G1.G2.C1.a'), -1.)
-        self.assertEqual(g1.get_input('G2.C1.a'), -1.)
+        with g1.nonlinear_vector_context() as (inputs, outputs, residuals):
+            self.assertEqual(inputs['G2.C1.a'], 5.)
 
-        self.assertEqual(model.get_output('G1.G2.C1.b'), 10.0)
-        self.assertEqual(model.get_output('b'), 10.0)
-        self.assertEqual(g2.get_output('C1.b'), 10.0)
-        self.assertEqual(g2.get_output('b'), 10.0)
+        # Test inputs after setting a new value
+        with g2.nonlinear_vector_context() as (inputs, outputs, residuals):
+            inputs['C1.a'] = -1.
 
-        model.set_output('b', 123.)
-        self.assertEqual(model.get_output('G1.G2.C1.b'), 123.0)
-        self.assertEqual(model._outputs['G1.G2.C1.b'], 123.0)
-        self.assertEqual(model.get_output('b'), 123.0)
+        with model.nonlinear_vector_context() as (inputs, outputs, residuals):
+            self.assertEqual(inputs['G1.G2.C1.a'], -1.)
 
-        model.set_output('G1.G2.C1.b', 456.)
-        self.assertEqual(model.get_output('G1.G2.C1.b'), 456.)
-        self.assertEqual(model._outputs['G1.G2.C1.b'], 456.)
-        self.assertEqual(model.get_output('b'), 456.)
+        with g1.nonlinear_vector_context() as (inputs, outputs, residuals):
+            self.assertEqual(inputs['G2.C1.a'], -1.)
 
-        g2.set_output('b', 789.)
-        self.assertEqual(model.get_output('G1.G2.C1.b'), 789.)
-        self.assertEqual(model.get_output('b'), 789.)
-        self.assertEqual(g2.get_output('C1.b'), 789.)
-        self.assertEqual(g2.get_output('b'), 789.)
+        # Test outputs with original values
+        with model.nonlinear_vector_context() as (inputs, outputs, residuals):
+            self.assertEqual(outputs['G1.G2.C1.b'], 10.)
 
-        model.set_residual('b', 99.0)
-        self.assertEqual(model.get_residual('b'), 99.0)
-        self.assertEqual(model.get_residual('G1.G2.C1.b'), 99.0)
-        self.assertEqual(model._residuals['G1.G2.C1.b'], 99.0)
+        with g2.nonlinear_vector_context() as (inputs, outputs, residuals):
+            self.assertEqual(outputs['C1.b'], 10.)
 
-        # test bad varname errors
-        with self.assertRaises(KeyError) as cm:
-            model.get_input('Sink.bb')
-        self.assertEqual(str(cm.exception), '": input \'Sink.bb\' not found."')
-        with self.assertRaises(KeyError) as cm:
-            model.get_output('Sink.cc')
-        self.assertEqual(str(cm.exception), '": output \'Sink.cc\' not found."')
-        with self.assertRaises(KeyError) as cm:
-            model.get_residual('Sink.cc')
-        self.assertEqual(str(cm.exception), '": residual \'Sink.cc\' not found."')
+        # Test outputs after setting a new value
+        with model.nonlinear_vector_context() as (inputs, outputs, residuals):
+            outputs['G1.G2.C1.b'] = 123.
+            self.assertEqual(outputs['G1.G2.C1.b'], 123.)
 
-        with self.assertRaises(KeyError) as cm:
-            model.set_input('Sink.bb', 2.)
-        self.assertEqual(str(cm.exception), '": input \'Sink.bb\' not found."')
-        with self.assertRaises(KeyError) as cm:
-            model.set_output('Sink.cc', 2.)
-        self.assertEqual(str(cm.exception), '": output \'Sink.cc\' not found."')
-        with self.assertRaises(KeyError) as cm:
-            model.set_residual('Sink.cc', 2.)
-        self.assertEqual(str(cm.exception), '": residual \'Sink.cc\' not found."')
+        with g2.nonlinear_vector_context() as (inputs, outputs, residuals):
+            outputs['C1.b'] = 789.
+            self.assertEqual(outputs['C1.b'], 789.)
+
+        # Test residuals
+        with model.nonlinear_vector_context() as (inputs, outputs, residuals):
+            residuals['G1.G2.C1.b'] = 99.0
+            self.assertEqual(residuals['G1.G2.C1.b'], 99.0)
+
+        # Test linear
+        with model.linear_vector_context('linear') as (d_inputs, d_outputs, d_residuals):
+            d_outputs['G1.G2.C1.b'] = 10.
+            self.assertEqual(d_outputs['G1.G2.C1.b'], 10.)
+
+        # Test linear with invalid vec_name
+        with self.assertRaises(Exception) as cm:
+            with model.linear_vector_context('bad_name') as (d_inputs, d_outputs, d_residuals):
+                pass
+        self.assertEqual(str(cm.exception),
+                         "There is no linear vector named %s" % 'bad_name')
+
+    def test_set_checks_shape(self):
+        indep = IndepVarComp()
+        indep.add_output('a')
+        indep.add_output('x', shape=(5, 1))
+
+        g1 = Group()
+        g1.add_subsystem('Indep', indep, promotes=['a', 'x'])
+
+        g2 = g1.add_subsystem('G2', Group(), promotes=['*'])
+        g2.add_subsystem('C1', ExecComp('b=2*a'), promotes=['a', 'b'])
+        g2.add_subsystem('C2', ExecComp('y=2*x',
+                                        x=np.zeros((5, 1)),
+                                        y=np.zeros((5, 1))),
+                                        promotes=['x', 'y'])
+
+        model = Group()
+        model.add_subsystem('G1', g1, promotes=['b', 'y'])
+        model.add_subsystem('Sink', ExecComp(('c=2*b', 'z=2*y')),
+                                             promotes=['b', 'y'])
+
+        p = Problem(model=model)
+        p.setup()
+
+        p.model.suppress_solver_output = True
+        p.run_model()
+
+        msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"
+
+        num_val = -10
+        arr_val = -10*np.ones((5, 1))
+        bad_val = -10*np.ones((10))
+
+        with g2.nonlinear_vector_context() as (inputs, outputs, residuals):
+            #
+            # set input
+            #
+
+            # assign array to scalar
+            with assertRaisesRegex(self, ValueError, msg):
+                inputs['C1.a'] = arr_val
+
+            # assign scalar to array
+            inputs['C2.x'] = num_val
+            assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
+
+            # assign array to array
+            inputs['C2.x'] = arr_val
+            assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
+
+            # assign bad array shape to array
+            with assertRaisesRegex(self, ValueError, msg):
+                inputs['C2.x'] = bad_val
+
+            # assign list to array
+            inputs['C2.x'] = arr_val.tolist()
+            assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
+
+            # assign bad list shape to array
+            with assertRaisesRegex(self, ValueError, msg):
+                inputs['C2.x'] = bad_val.tolist()
+
+            #
+            # set output
+            #
+
+            # assign array to scalar
+            with assertRaisesRegex(self, ValueError, msg):
+                outputs['C1.b'] = arr_val
+
+            # assign scalar to array
+            outputs['C2.y'] = num_val
+            assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
+
+            # assign array to array
+            outputs['C2.y'] = arr_val
+            assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
+
+            # assign bad array shape to array
+            with assertRaisesRegex(self, ValueError, msg):
+                outputs['C2.y'] = bad_val
+
+            # assign list to array
+            outputs['C2.y'] = arr_val.tolist()
+            assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
+
+            # assign bad list shape to array
+            with assertRaisesRegex(self, ValueError, msg):
+                outputs['C2.y'] = bad_val.tolist()
+
+            #
+            # set residual
+            #
+
+            # assign array to scalar
+            with assertRaisesRegex(self, ValueError, msg):
+                residuals['C1.b'] = arr_val
+
+            # assign scalar to array
+            residuals['C2.y'] = num_val
+            assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
+
+            # assign array to array
+            residuals['C2.y'] = arr_val
+            assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
+
+            # assign bad array shape to array
+            with assertRaisesRegex(self, ValueError, msg):
+                residuals['C2.y'] = bad_val
+
+            # assign list to array
+            residuals['C2.y'] = arr_val.tolist()
+            assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
+
+            # assign bad list shape to array
+            with assertRaisesRegex(self, ValueError, msg):
+                residuals['C2.y'] = bad_val.tolist()
+
 
 if __name__ == "__main__":
     unittest.main()

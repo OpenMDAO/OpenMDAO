@@ -12,7 +12,8 @@ from openmdao.utils.general_utils import warn_deprecation
 
 
 class IndepVarComp(ExplicitComponent):
-    """Class to inherit from when all output variables are independent.
+    """
+    Class to inherit from when all output variables are independent.
 
     Attributes
     ----------
@@ -25,7 +26,8 @@ class IndepVarComp(ExplicitComponent):
     """
 
     def __init__(self, name=None, val=1.0, **kwargs):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
         Parameters
         ----------
@@ -36,7 +38,7 @@ class IndepVarComp(ExplicitComponent):
             in the case of declaring multiple variables at once.
         val : float or ndarray
             value of the variable if a single variable is being defined.
-        kwargs : dict
+        **kwargs : dict
             keyword arguments.
         """
         super(IndepVarComp, self).__init__(**kwargs)
@@ -80,7 +82,9 @@ class IndepVarComp(ExplicitComponent):
                                  "in IndepVarComp." % illegal)
 
     def initialize_variables(self):
-        """Define the independent variables as output variables."""
+        """
+        Define the independent variables as output variables.
+        """
         for (name, val, kwargs) in self._indep + self._indep_external:
             super(IndepVarComp, self).add_output(name, val, **kwargs)
 
@@ -92,7 +96,8 @@ class IndepVarComp(ExplicitComponent):
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
                    res_ref=1.0, res_ref0=0.0, var_set=0):
-        """Add an independent variable to this component.
+        """
+        Add an independent variable to this component.
 
         Parameters
         ----------
@@ -101,7 +106,7 @@ class IndepVarComp(ExplicitComponent):
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
         shape : int or tuple or list or None
-            Shape of this variable, only required if indices not provided and val is not an array.
+            Shape of this variable, only required if val is not an array.
             Default is None.
         units : str or None
             Units in which the output variables will be provided to the component during execution.

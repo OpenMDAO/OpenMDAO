@@ -23,19 +23,22 @@ class ParameterizedTestCases(unittest.TestCase):
             actual = {key: problem[key] for key in iterkeys(expected_values)}
             assert_rel_error(self, actual, expected_values, 1e-8)
 
+        error_bound = 1e-4 if root.metadata['finite_difference'] else 1e-8
+
         expected_totals = root.expected_totals
         if expected_totals:
             # Forward Derivatives Check
             totals = test.compute_totals('fwd')
-            assert_rel_error(self, totals, expected_totals, 1e-8)
+            assert_rel_error(self, totals, expected_totals, error_bound)
 
             # Reverse Derivatives Check
             totals = test.compute_totals('rev')
-            assert_rel_error(self, totals, expected_totals, 1e-8)
+            assert_rel_error(self, totals, expected_totals, error_bound)
 
 
 class ParameterizedTestCasesSubset(unittest.TestCase):
     """Duplicating some testing to demonstrate filters and default running."""
+
     @parametric_suite(jacobian_type='*',
                       num_comp=[2, 5, 10],
                       partial_type='aij',

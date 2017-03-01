@@ -7,9 +7,11 @@ import unittest
 
 from openmdao.solvers.ln_petsc_ksp import PetscKSP
 from openmdao.solvers.ln_bgs import LinearBlockGS
+from openmdao.solvers.ln_direct import DirectSolver
 
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group
+from openmdao.core.indepvarcomp import IndepVarComp
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -41,23 +43,24 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.model.suppress_solver_output = True
 
-        # forward
-        group._vectors['residual']['linear'].set_const(1.0)
-        group._vectors['output']['linear'].set_const(0.0)
-        group._solve_linear(['linear'], 'fwd')
+        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            # forward
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
+            group.run_solve_linear(['linear'], 'fwd')
 
-        output = group._vectors['output']['linear']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+            output = d_outputs._data
+            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
+            assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
 
-        # reverse
-        group._vectors['output']['linear'].set_const(1.0)
-        group._vectors['residual']['linear'].set_const(0.0)
-        group._solve_linear(['linear'], 'rev')
+            # reverse
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
+            group.run_solve_linear(['linear'], 'rev')
 
-        output = group._vectors['residual']['linear']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+            output = d_residuals._data
+            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
+            assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
 
     def test_solve_linear_ksp_gmres(self):
         """Solve implicit system with PetscKSP using 'gmres' method."""
@@ -69,21 +72,22 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.model.suppress_solver_output = True
 
-        # forward
-        group._vectors['residual']['linear'].set_const(1.0)
-        group._vectors['output']['linear'].set_const(0.0)
-        group._solve_linear(['linear'], 'fwd')
+        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            # forward
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
+            group.run_solve_linear(['linear'], 'fwd')
 
-        output = group._vectors['output']['linear']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
+            output = d_outputs._data
+            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
 
-        # reverse
-        group._vectors['output']['linear'].set_const(1.0)
-        group._vectors['residual']['linear'].set_const(0.0)
-        group._solve_linear(['linear'], 'rev')
+            # reverse
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
+            group.run_solve_linear(['linear'], 'rev')
 
-        output = group._vectors['residual']['linear']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
+            output = d_residuals._data
+            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
 
     def test_solve_linear_ksp_maxiter(self):
         """Verify that PetscKSP abides by the 'maxiter' option."""
@@ -95,19 +99,20 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.model.suppress_solver_output = True
 
-        # forward
-        group._vectors['residual']['linear'].set_const(1.0)
-        group._vectors['output']['linear'].set_const(0.0)
-        group._solve_linear(['linear'], 'fwd')
+        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            # forward
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
+            group.run_solve_linear(['linear'], 'fwd')
 
-        self.assertTrue(group.ln_solver._iter_count == 3)
+            self.assertTrue(group.ln_solver._iter_count == 3)
 
-        # reverse
-        group._vectors['output']['linear'].set_const(1.0)
-        group._vectors['residual']['linear'].set_const(0.0)
-        group._solve_linear(['linear'], 'rev')
+            # reverse
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
+            group.run_solve_linear(['linear'], 'rev')
 
-        self.assertTrue(group.ln_solver._iter_count == 3)
+            self.assertTrue(group.ln_solver._iter_count == 3)
 
     def test_solve_linear_ksp_precon(self):
         """Solve implicit system with PetscKSP using a preconditioner."""
@@ -119,27 +124,92 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.model.suppress_solver_output = True
 
+        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            # forward
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
+            group.run_solve_linear(['linear'], 'fwd')
+
+            output = d_outputs._data
+            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
+            assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+
+            self.assertTrue(precon._iter_count > 0)
+
+            # reverse
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
+            group.run_solve_linear(['linear'], 'rev')
+
+            output = d_residuals._data
+            assert_rel_error(self, output[0], group.expected_solution[0], 3e-15)
+            assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
+
+            self.assertTrue(precon._iter_count > 0)
+
+        # test the direct solver and make sure KSP correctly recurses for _linearize
+        precon = group.ln_solver.precon = DirectSolver()
+        p.setup(vector_class=PETScVector, check=False)
+
+        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            # forward
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
+            group.ln_solver._linearize()
+            group.run_solve_linear(['linear'], 'fwd')
+
+            output = d_outputs._data
+            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
+            assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+
+            # reverse
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
+            group.ln_solver._linearize()
+            group.run_solve_linear(['linear'], 'rev')
+
+            output = d_residuals._data
+            assert_rel_error(self, output[0], group.expected_solution[0], 3e-15)
+            assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
+
+    def test_solve_on_subsystem(self):
+        """solve an implicit system with KSP attached anywhere but the root"""
+
+        p = Problem()
+        model = p.model = Group()
+        dv = model.add_subsystem('des_vars', IndepVarComp())
+        # just need a dummy variable so the sizes don't match between root and g1
+        dv.add_output('dummy', val=1.0, shape=10)
+
+        g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=PetscKSP))
+
+        p.model.ln_solver.options['maxiter'] = 1
+        p.setup(vector_class=PETScVector, check=False)
+
+        p.model.suppress_solver_output = True
+
         # forward
-        group._vectors['residual']['linear'].set_const(1.0)
-        group._vectors['output']['linear'].set_const(0.0)
-        group._solve_linear(['linear'], 'fwd')
+        with g1.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            d_residuals.set_const(1.0)
+            d_outputs.set_const(0.0)
+            g1._solve_linear(['linear'], 'fwd')
 
-        output = group._vectors['output']['linear']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
-
-        self.assertTrue(precon._iter_count > 0)
+            output = d_outputs._data
+            # The empty first entry in _data is due to the dummy
+            #     variable being in a different variable set not owned by g1
+            assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
+            assert_rel_error(self, output[2], g1.expected_solution[1], 1e-15)
 
         # reverse
-        group._vectors['output']['linear'].set_const(1.0)
-        group._vectors['residual']['linear'].set_const(0.0)
-        group._solve_linear(['linear'], 'rev')
+        with g1.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            d_outputs.set_const(1.0)
+            d_residuals.set_const(0.0)
+            g1.ln_solver._linearize()
+            g1._solve_linear(['linear'], 'rev')
 
-        output = group._vectors['residual']['linear']._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 3e-15)
-        assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
-
-        self.assertTrue(precon._iter_count > 0)
+            output = d_residuals._data
+            assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
+            assert_rel_error(self, output[2], g1.expected_solution[1], 3e-15)
 
 
 if __name__ == "__main__":
