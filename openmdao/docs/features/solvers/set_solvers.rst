@@ -21,7 +21,7 @@ letting you build a hierarchical solver setup to efficiently converge your model
 Solvers for the Sellar Problem
 ----------------------------------
 
-The Sellar Problem has two components with a cyclic dependency, so a a nonlinear solver is necessary.
+The Sellar Problem has two components with a cyclic dependency, so the appropriate nonlinear solver is necessary.
 We'll use the :ref:`Newton <usr_openmdao.solvers.nl_newton.py>` nonlinear solver,
 which requires derivatives so we'll also use the :ref:`Direct <usr_openmdao.solvers.ln_direct.py>` linear solver
 

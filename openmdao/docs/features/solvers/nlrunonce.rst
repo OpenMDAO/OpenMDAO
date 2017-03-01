@@ -14,7 +14,12 @@ are satisfied:
 2. System does not contain any implicit states.
 
 Note that a subsystem may contain cycles or impicit states provided that it is
-fitted with a solver that can handle them such as NewtonSolver.
+fitted with a solver that can handle them such as :ref:`NewtonSolver <usr_openmdao.solvers.nl_newton.py>`.
+
+Here is an example of using an NLRunOnce solver for a simple model with the <Paraboloid> component.
+
+.. embed-test::
+    openmdao.solvers.tests.test_nl_runonce.TestNLRunOnceSolver.test_feature_solver
 
 
 
