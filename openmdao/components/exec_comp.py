@@ -88,7 +88,7 @@ class ExecComp(ExplicitComponent):
 
             import numpy as np
             from openmdao.api import ExecComp
-            excomp = ExecComp('y=np.sum(x)', x=np.ones(10,dtype=float))
+            excomp = ExecComp('y=numpy.sum(x)', x=np.ones(10,dtype=float))
 
         In this example, 'y' would be assumed to be the default type of float
         and would be given the default initial value of 0.0, while 'x' would be
