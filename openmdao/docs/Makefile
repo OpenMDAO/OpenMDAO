@@ -31,6 +31,11 @@ I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 html-update:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS)  $(BUILDDIR)/html
 
+single:
+	@echo $$file
+	touch $$file
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+
 clean:
 	rm -rf $(BUILDDIR)/*
 	rm -rf _srcdocs/usr
