@@ -47,6 +47,7 @@ def _compute_dA(system_size, theta):
 def array_idx(i, var_size):
     return slice(i * var_size, (i + 1) * var_size)
 
+
 class ExplicitCycleComp(ExplicitComponent):
 
     def _inputs_to_vector(self, inputs):

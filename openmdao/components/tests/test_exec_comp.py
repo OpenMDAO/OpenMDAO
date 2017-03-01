@@ -10,7 +10,7 @@ class TestExecComp(unittest.TestCase):
 
     def test_bad_kwargs(self):
         prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp('y=x+1.', xx=2.0))
+        prob.model.add_subsystem('C1', ExecComp('y=x+1.', xx=2.0))
         with self.assertRaises(Exception) as context:
             prob.setup(check=False)
         self.assertEqual(str(context.exception),
@@ -18,7 +18,7 @@ class TestExecComp(unittest.TestCase):
 
     def test_name_collision_const(self):
         prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp('e=x+1.'))
+        prob.model.add_subsystem('C1', ExecComp('e=x+1.'))
         with self.assertRaises(Exception) as context:
             prob.setup(check=False)
         self.assertEqual(str(context.exception),
@@ -26,7 +26,7 @@ class TestExecComp(unittest.TestCase):
 
     def test_name_collision_func(self):
         prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp('sin=x+1.'))
+        prob.model.add_subsystem('C1', ExecComp('sin=x+1.'))
         with self.assertRaises(Exception) as context:
             prob.setup(check=False)
         self.assertEqual(str(context.exception),
@@ -34,7 +34,7 @@ class TestExecComp(unittest.TestCase):
 
     def test_func_as_rhs_var(self):
         prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp('y=sin+1.'))
+        prob.model.add_subsystem('C1', ExecComp('y=sin+1.'))
         with self.assertRaises(Exception) as context:
             prob.setup(check=False)
         self.assertEqual(str(context.exception),
@@ -85,7 +85,7 @@ class TestExecComp(unittest.TestCase):
 
     def test_units(self):
         prob = Problem(model=Group())
-        indep = prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
+        prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
         C1 = prob.model.add_subsystem('C1', ExecComp('y=x+z+1.', x=2.0, z=2.0, units={'x':'m','y':'m'}))
         prob.model.connect('indep.x', 'C1.x')
 
@@ -167,11 +167,11 @@ class TestExecComp(unittest.TestCase):
     def test_simple_array_model2(self):
         prob = Problem()
         prob.model = Group()
-        comp = prob.model.add_subsystem('comp', ExecComp('y = mat.dot(x)',
-                                              x=np.zeros((2,)), y=np.zeros((2,)),
-                                              mat=np.array([[2.,7.],[5.,-3.]])))
+        prob.model.add_subsystem('comp', ExecComp('y = mat.dot(x)',
+                                                  x=np.zeros((2,)), y=np.zeros((2,)),
+                                                  mat=np.array([[2.,7.],[5.,-3.]])))
 
-        p1 = prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
+        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
 
         prob.model.connect('p1.x', 'comp.x')
 
@@ -209,7 +209,7 @@ class TestExecComp(unittest.TestCase):
 
     def test_complex_step2(self):
         prob = Problem(Group())
-        comp = prob.model.add_subsystem('comp', ExecComp('y=x*x + x*2.0'))
+        prob.model.add_subsystem('comp', ExecComp('y=x*x + x*2.0'))
         prob.model.add_subsystem('p1', IndepVarComp('x', 2.0))
         prob.model.connect('p1.x', 'comp.x')
         prob.model.suppress_solver_output = True
@@ -252,7 +252,7 @@ class TestExecComp(unittest.TestCase):
     def test_abs_array_complex_step(self):
         prob = Problem(model=Group())
         C1 = prob.model.add_subsystem('C1', ExecComp('y=2.0*abs(x)',
-                                          x=np.ones(3)*-2.0, y=np.zeros(3)))
+                                                     x=np.ones(3)*-2.0, y=np.zeros(3)))
 
         prob.setup(check=False)
         prob.model.suppress_solver_output = True
@@ -285,7 +285,7 @@ class TestExecComp(unittest.TestCase):
     def test_colon_names(self):
         prob = Problem(model=Group())
         C1 = prob.model.add_subsystem('C1', ExecComp('a:y=a:x+1.+b',
-                                     inits={'a:x':2.0}, b=0.5))
+                                                     inits={'a:x':2.0}, b=0.5))
         prob.setup(check=False)
 
         self.assertTrue('a:x' in C1._inputs)
@@ -316,7 +316,7 @@ class TestExecComp(unittest.TestCase):
 
     def test_complex_step2_colons(self):
         prob = Problem(Group())
-        comp = prob.model.add_subsystem('comp', ExecComp('foo:y=foo:x*foo:x + foo:x*2.0'))
+        prob.model.add_subsystem('comp', ExecComp('foo:y=foo:x*foo:x + foo:x*2.0'))
         prob.model.add_subsystem('p1', IndepVarComp('x', 2.0))
         prob.model.connect('p1.x', 'comp.foo:x')
 
@@ -337,12 +337,12 @@ class TestExecComp(unittest.TestCase):
     def test_simple_array_model2_colons(self):
         prob = Problem()
         prob.model = Group()
-        comp = prob.model.add_subsystem('comp', ExecComp('foo:y = foo:mat.dot(x)',
-                                              inits={'foo:y':np.zeros((2,)),
-                                                     'foo:mat':np.array([[2.,7.],[5.,-3.]])},
-                                              x=np.zeros((2,))))
+        prob.model.add_subsystem('comp', ExecComp('foo:y = foo:mat.dot(x)',
+                                                  inits={'foo:y':np.zeros((2,)),
+                                                         'foo:mat':np.array([[2.,7.],[5.,-3.]])},
+                                                  x=np.zeros((2,))))
 
-        p1 = prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
+        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
 
         prob.model.connect('p1.x', 'comp.x')
 
