@@ -320,10 +320,31 @@ class Problem(object):
         model._setupx_variable_allprocs_indices({'input': 0, 'output': 0})
         model._setup_connections()
 
+        # [REFACTOR VERIFICATION] for model._varx_allprocs_idx_range
         for type_ in ['input', 'output']:
             for ind in range(2):
                 assert model._var_allprocs_range[type_][ind] == \
                     model._varx_allprocs_idx_range[type_][ind]
+
+        # [REFACTOR VERIFICATION] for model._varx_abs_names, model._varx_abs2data_io
+        for type_ in ['input', 'output']:
+            assert len(model._varx_abs_names[type_]) == len(model._var_myproc_names[type_])
+            for abs_name in model._varx_abs_names[type_]:
+                assert model._varx_abs2data_io[abs_name]['rel'] in model._var_myproc_names[type_]
+
+        # [REFACTOR VERIFICATION] imported here because it's temporary and will be removed soon
+        from six import iteritems
+        # [REFACTOR VERIFICATION] for model._varx_allprocs_prom2abs_set
+        for type_ in ['input', 'output']:
+            count = 0
+            for prom_name, abs_names_set in iteritems(model._varx_allprocs_prom2abs_set[type_]):
+                count += len(abs_names_set)
+                assert prom_name in model._var_allprocs_names[type_]
+                for abs_name in abs_names_set:
+                    assert abs_name in model._var_allprocs_pathnames[type_]
+            assert count == len(model._var_allprocs_pathnames[type_])
+            assert (len(model._varx_allprocs_prom2abs_set[type_])
+                    == len(set(model._var_allprocs_names[type_])))
 
         # Assembler setup: variable metadata and indices
         nvars = {typ: len(model._var_allprocs_names[typ])
@@ -344,6 +365,14 @@ class Problem(object):
         # Assembler setup: compute data required for units/scaling
         assembler._setup_src_data(model._var_myproc_metadata['output'],
                                   model._var_myproc_indices['output'])
+
+        assembler._setupx_variables(allprocs_abs_names)
+
+        # [REFACTOR VERIFICATION] for assembler._varx_allprocs_abs_names
+        assert (model._var_allprocs_pathnames['input']
+                == assembler._varx_allprocs_abs_names['input'])
+        assert (model._var_allprocs_pathnames['output']
+                == assembler._varx_allprocs_abs_names['output'])
 
         # Set up scaling vectors
         model._setup_scaling()
