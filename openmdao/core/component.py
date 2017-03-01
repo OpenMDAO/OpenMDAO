@@ -644,7 +644,7 @@ class Component(System):
         # and _varx_allprocs_prom2abs_set was already computed in add_input / add_output.
         allprocs_abs_names = {'input': [], 'output': []}
         for type_ in ['input', 'output']:
-            allprocs_abs_names[type_].extend(self._varx_abs_names[type_])
+            allprocs_abs_names[type_] = self._varx_abs_names[type_])
 
         # Now allprocs_abs_names is ready, so we get use it to
         # count the total number of allprocs variables and put it in _varx_allprocs_idx_range.
