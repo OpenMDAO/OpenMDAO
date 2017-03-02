@@ -9,7 +9,9 @@ from openmdao.api import ImplicitComponent
 
 class TestImplCompArray(ImplicitComponent):
 
-    def initialize(self):
+    def __init__(self, **kwargs):
+        super(TestImplCompArray, self).__init__(**kwargs)
+
         self.metadata['mtx'] = numpy.array([
             [0.99, 0.01],
             [0.01, 0.99],

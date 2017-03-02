@@ -9,7 +9,9 @@ from openmdao.api import ExplicitComponent
 
 class TestExplCompArray(ExplicitComponent):
 
-    def initialize(self):
+    def __init__(self, **kwargs):
+        super(TestExplCompArray, self).__init__(**kwargs)
+
         self.metadata.declare('thickness', value=1.)
 
     def initialize_variables(self):

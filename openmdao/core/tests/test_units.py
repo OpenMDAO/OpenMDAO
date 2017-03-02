@@ -121,7 +121,9 @@ class UnitConvGroup(Group):
     units degF, degC, and degK respectively. Good for testing unit
     conversion."""
 
-    def initialize(self):
+    def __init__(self):
+        super(UnitConvGroup, self).__init__()
+
         self.add_subsystem('px1', IndepVarComp('x1', 100.0))
         self.add_subsystem('src', SrcComp())
         self.add_subsystem('tgtF', TgtCompF())
@@ -142,7 +144,9 @@ class UnitConvGroupImplicitConns(Group):
     In this version, all connections are Implicit.
     """
 
-    def initialize(self):
+    def __init__(self):
+        super(UnitConvGroupImplicitConns, self).__init__()
+
         self.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs='x1')
         self.add_subsystem('src', SrcComp(), promotes_inputs='x1', promotes_outputs='x2')
         self.add_subsystem('tgtF', TgtCompF(), promotes_inputs='x2')
