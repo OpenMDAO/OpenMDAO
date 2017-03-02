@@ -16,7 +16,9 @@ except ImportError:
 
 class SimpleGroup(Group):
 
-    def initialize(self):
+    def __init__(self):
+        super(SimpleGroup, self).__init__()
+
         self.add_subsystem('comp1', IndepVarComp('x', 5.0))
         self.add_subsystem('comp2', ExecComp('b=2*a'))
         self.connect('comp1.x', 'comp2.a')
@@ -24,7 +26,9 @@ class SimpleGroup(Group):
 
 class BranchGroup(Group):
 
-    def initialize(self):
+    def __init__(self):
+        super(BranchGroup, self).__init__()
+
         b1 = self.add_subsystem('Branch1', Group())
         g1 = b1.add_subsystem('G1', Group())
         g2 = g1.add_subsystem('G2', Group())
