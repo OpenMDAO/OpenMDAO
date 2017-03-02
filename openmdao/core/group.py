@@ -203,12 +203,12 @@ class Group(System):
             if out_name not in allprocs_out_names:
                 raise NameError("Output '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." %
-                                (out_name, self.name, out_name, in_name))
+                                (out_name, self.pathname, out_name, in_name))
 
             if in_name not in allprocs_in_names:
                 raise NameError("Input '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." %
-                                (in_name, self.name, out_name, in_name))
+                                (in_name, self.pathname, out_name, in_name))
 
             # throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -221,50 +221,7 @@ class Group(System):
             if out_subsys == in_subsys:
                 raise RuntimeError("Output and input are in the same System " +
                                    "for connection in '%s' from '%s' to '%s'." %
-                                   (self.name, out_name, in_name))
-
-            out_path = self._var_name2path['output'][out_name]
-            pdata = self._var_pathdict[out_path]
-            # TODO: we need to allgather unit information. Otherwise we can't
-            # error check units for any connections that cross processes
-            # because the metadata isn't available.
-            if pdata.myproc_idx is not None:
-                out_units = output_meta[pdata.myproc_idx]['units']
-                in_paths = self._var_name2path['input'][in_name]
-
-                for in_path in in_paths:
-                    pdata = self._var_pathdict[in_path]
-                    if pdata.myproc_idx is None:
-                        continue
-                    in_units = input_meta[pdata.myproc_idx]['units']
-
-                    # throw an error if one of input and output is unitless,
-                    # but the other isn't
-                    if (out_units and not in_units or
-                            in_units and not out_units):
-                        if out_units:
-                            out_units = "has units '%s'" % out_units
-                        else:
-                            out_units = "is unitless"
-                        if in_units:
-                            in_units = "has units '%s'" % in_units
-                        else:
-                            in_units = "is unitless"
-                        raise RuntimeError("Units must be specified for both or"
-                                           " neither side of connection in "
-                                           "'%s': '%s' %s but '%s' %s." %
-                                           (self.name, out_name, out_units,
-                                            in_name, in_units))
-
-                    # throw an error if the input and output units are not
-                    # compatible
-                    if not is_compatible(in_units, out_units):
-                        raise RuntimeError("Output and input units are not "
-                                           "compatible for connection in '%s':"
-                                           " '%s' has units '%s' but '%s' has "
-                                           "units '%s'." %
-                                           (self.name, out_name, out_units,
-                                            in_name, in_units))
+                                   (self.pathname, out_name, in_name))
 
             for in_index, name in enumerate(allprocs_in_names):
                 if name == in_name:
@@ -329,14 +286,27 @@ class Group(System):
         self._var_name2path = {'input': {}, 'output': {}}
 
         start = len(self.pathname) + 1 if self.pathname else 0
-        for typ in ['input', 'output']:
+        found_proms = [False for s in self._subsystems_myproc]
+
+        for ityp, typ in enumerate(['input', 'output']):
             my_idx_dict = {}  # maps absolute path to myproc idx
             myproc_names = self._var_myproc_names[typ]
             name2path = self._var_name2path[typ]
 
-            for subsys in self._subsystems_myproc:
+            for isub, subsys in enumerate(self._subsystems_myproc):
                 # Assemble the names list from subsystems
-                subsys._var_maps[typ] = subsys._get_maps(typ)
+                subsys._var_maps[typ], found = subsys._get_maps(typ)
+                found_proms[isub] |= found
+                if ityp == 1 and not found_proms[isub]:
+                    for io, lst in subsys._var_promotes.items():
+                        if lst:
+                            if io == 'any':
+                                suffix = ''
+                            else:
+                                suffix = '_%ss' % io
+                            raise RuntimeError("%s: no variables were promoted "
+                                               "based on promotes%s=%s" %
+                                               (subsys.pathname, suffix, list(lst)))
                 paths = subsys._var_allprocs_pathnames[typ]
 
                 for idx, subname in enumerate(subsys._var_allprocs_names[typ]):
@@ -401,7 +371,8 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._setupx_variables_myproc()
 
-            var_maps = {'input': subsys._get_maps('input'), 'output': subsys._get_maps('output')}
+            var_maps = {'input': subsys._get_maps('input')[0],
+                        'output': subsys._get_maps('output')[0]}
 
             for type_ in ['input', 'output']:
 
