@@ -42,6 +42,12 @@ For illustration, each of the following is a valid unit string representing the 
 - :code:`kg * m * s ** -2`
 - :code:`kkg * mm / s ** 2`
 
+.. note::
+
+    If units are not specified or are specified as :code:`None` then the variable
+    is a assumed to be unitless.  If such a variable is connected to a variable
+    with units, the connection will be allowed but a warning will be issued.
+
 Example
 -------
 
