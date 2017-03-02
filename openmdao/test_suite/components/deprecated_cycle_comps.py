@@ -75,6 +75,7 @@ class DeprecatedCycleComp(DeprecatedComponent):
     def __init__(self, **kwargs):
         super(DeprecatedCycleComp, self).__init__(**kwargs)
         self._cycle_names = {}
+
         if self.metadata['connection_type'] == 'implicit':
             idx = self.metadata['index']
             self._cycle_names['x'] = 'x_{}_{{}}'.format(idx)
@@ -251,6 +252,7 @@ class DeprecatedCycleComp(DeprecatedComponent):
 
     def linearize(self, inputs, outputs, resids):
         partials = {}
+
         if self.metadata['jacobian_type'] != 'matvec':
             angle_param = self._cycle_names[self.angle_param]
             angle = inputs[angle_param]
@@ -284,19 +286,12 @@ class DeprecatedCycleComp(DeprecatedComponent):
             theta = self._cycle_names['theta']
             partials[theta_out, theta] = self.make_jacobian_entry(dtheta, pd_type)
 
-        print(self.pathname, 'linearize() J:\n')
-        from pprint import pprint
-        pprint(partials)
         return partials
 
 
 class DeprecatedFirstComp(DeprecatedCycleComp):
     def __str__(self):
         return 'Deprecated Cycle Component - First'
-
-    def __init__(self, **kwargs):
-        super(DeprecatedFirstComp, self).__init__(**kwargs)
-        self.initialize_variables()
 
     def initialize_variables(self):
         self.add_param('psi', val=1.)
@@ -316,10 +311,6 @@ class DeprecatedFirstComp(DeprecatedCycleComp):
 class DeprecatedLastComp(DeprecatedFirstComp):
     def __str__(self):
         return 'Deprecated Cycle Component - Last'
-
-    def __init__(self, **kwargs):
-        super(DeprecatedLastComp, self).__init__(**kwargs)
-        self.initialize_variables()
 
     def initialize_variables(self):
         self.add_output('x_norm2', shape=(1,))
@@ -353,6 +344,7 @@ class DeprecatedLastComp(DeprecatedFirstComp):
 
     def linearize(self, inputs, outputs, resids):
         partials = {}
+
         if self.metadata['jacobian_type'] != 'matvec':
             pd_type = self.metadata['partial_type']
             for i in range(self.metadata['num_var']):
@@ -367,9 +359,7 @@ class DeprecatedLastComp(DeprecatedFirstComp):
             partials[theta_out, self._cycle_names['psi']] = \
                 self.make_jacobian_entry(np.array([-1/(2*k-2)]), pd_type)
 
-        print(self.pathname, 'linearize() J:\n')
-        from pprint import pprint
-        pprint(partials)
+        return partials
 
     def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
         if self.metadata['jacobian_type'] == 'matvec':
