@@ -246,6 +246,37 @@ class Component(BaseComponent):
             if self._owns_global_jac:
                 self._jacobian._update()
 
+    def _setup_variables(self, recurse=False):
+        """
+        Assemble variable metadata and names lists.
+
+        Sets the following attributes:
+            _var_allprocs_names
+            _var_myproc_names
+            _var_myproc_metadata
+            _var_pathdict
+            _var_name2path
+
+        Parameters
+        ----------
+        recurse : boolean
+            Ignored.
+        """
+        super(Component, self)._setup_variables(False)
+
+        # Note: These declare calls are outside of initialize_partials so that users do not have to
+        # call the super version of initialize_partials. This is still post-initialize_variables.
+        other_names = []
+        for i, out_name in enumerate(self._var_myproc_names['output']):
+            meta = self._var_myproc_metadata['output'][i]
+            size = numpy.prod(meta['shape'])
+            arange = numpy.arange(size)
+            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
+            for other_name in other_names:
+                self.declare_partials(out_name, other_name, dependent=False)
+                self.declare_partials(other_name, out_name, dependent=False)
+            other_names.append(out_name)
+
     def _negate_jac(self):
         """
         Negate this component's part of the jacobian.
@@ -355,8 +386,8 @@ class Component(BaseComponent):
 
         Returns
         -------
-        jacobian : dict
+        jacobian : dict or None
             Dictionary whose keys are tuples of the form ('unknown', 'param')
-            and whose values are ndarrays
+            and whose values are ndarrays. None if method is not imeplemented.
         """
         return None

@@ -277,9 +277,7 @@ class DeprecatedCycleComp(DeprecatedComponent):
                     J_y_angle = self.make_jacobian_entry(dA_x[array_idx(out_idx, var_size)],
                                                          pd_type)
 
-                    print(out_var, 'wrt', in_var, '=', J_y_x)
                     partials[out_var, in_var] = J_y_x
-                    print(out_var, 'wrt', angle_param, '=', J_y_angle)
                     partials[out_var, angle_param] = J_y_angle
 
             theta_out = self._cycle_names['theta_out']
