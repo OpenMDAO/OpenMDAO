@@ -371,7 +371,8 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._setupx_variables_myproc()
 
-            var_maps = {'input': subsys._get_maps('input'), 'output': subsys._get_maps('output')}
+            var_maps = {'input': subsys._get_maps('input')[0],
+                        'output': subsys._get_maps('output')[0]}
 
             for type_ in ['input', 'output']:
 
