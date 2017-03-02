@@ -364,7 +364,10 @@ class Problem(object):
 
         # Assembler setup: variable connections
         assembler._setup_connections(model._var_connections_indices,
-                                     model._var_allprocs_names)
+                                     model._var_allprocs_names,
+                                     model._var_allprocs_pathnames,
+                                     model._var_pathdict,
+                                     model._var_myproc_metadata)
 
         # Assembler setup: global transfer indices vector
         assembler._setup_src_indices(model._var_myproc_metadata,

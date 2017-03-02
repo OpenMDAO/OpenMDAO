@@ -1,6 +1,7 @@
 """ Tests the ins and outs of automatic unit conversion in OpenMDAO."""
 
 import unittest
+import warnings
 from six import iteritems
 from six.moves import cStringIO
 
@@ -151,6 +152,13 @@ class UnitConvGroupImplicitConns(Group):
 
 class TestUnitConversion(unittest.TestCase):
     """ Testing automatic unit conversion."""
+
+    def test_dangling_input_w_units(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('C1', ExecComp('y=x', units={'x': 'ft', 'y': 'm'}))
+        prob.setup()
+        prob.run_model()
+        # this test passes as long as it doesn't raise an exception
 
     def test_speed(self):
         comp = IndepVarComp()
@@ -324,19 +332,45 @@ class TestUnitConversion(unittest.TestCase):
         expected_msg = "The units 'junk' are invalid"
         self.assertTrue(expected_msg in str(cm.exception))
 
+    def test_add_unitless_output(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('indep', IndepVarComp('x', 0.0, units='unitless'))
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            prob.setup(check=False)
+            self.assertEqual(str(w[-1].message),
+                             "Output 'x' has units='unitless' but 'unitless' has "
+                             "been deprecated. Use units=None "
+                             "instead.  Note that connecting a unitless variable to "
+                             "one with units is no longer an error, but will issue "
+                             "a warning instead.")
+
+    def test_add_unitless_input(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('C1', ExecComp('y=x', units={'x': 'unitless'}))
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            prob.setup(check=False)
+        self.assertEqual(str(w[-1].message),
+                         "Input 'x' has units='unitless' but 'unitless' has "
+                         "been deprecated. Use units=None "
+                         "instead.  Note that connecting a unitless variable to "
+                         "one with units is no longer an error, but will issue "
+                         "a warning instead.")
+
     def test_incompatible_units(self):
         """Test error handling when only one of src and tgt have units."""
         prob = Problem(model=Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs='x1')
         prob.model.add_subsystem('src', SrcComp(), promotes_inputs='x1')
-        prob.model.add_subsystem('tgt', ExecComp('yy=xx', xx=0.0))
+        prob.model.add_subsystem('tgt', ExecComp('yy=xx', xx=0.0, units={'xx': 'unitless'}))
         prob.model.connect('src.x2', 'tgt.xx')
 
-        with self.assertRaises(Exception) as cm:
+        msg = "Output 'src.x2' with units of 'degC' is connected to input 'tgt.xx' which has no units."
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             prob.setup()
-        expected_msg = "Units must be specified for both or neither side of connection " + \
-                       "in '': 'src.x2' has units 'degC' but 'tgt.xx' is unitless."
-        self.assertTrue(expected_msg in str(cm.exception))
+        self.assertEqual(str(w[-1].message), msg)
 
     def test_basic_implicit_conn(self):
         """Test units with all implicit connections."""
@@ -653,39 +687,37 @@ class TestUnitConversion(unittest.TestCase):
                 #diff = abs(Jf[key][key2] - Jr[key][key2])
                 #assert_rel_error(self, diff, 0.0, 1e-10)
 
-    #def test_incompatible_connections(self):
+    def test_incompatible_connections(self):
 
-        #class BadComp(Component):
-            #def __init__(self):
-                #super(BadComp, self).__init__()
+        class BadComp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x2', 100.0, units='m')
+                self.add_output('x3', 100.0)
 
-                #self.add_param('x2', 100.0, units='m')
-                #self.add_output('x3', 100.0)
+        # Explicit Connection
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('src', SrcComp())
+        prob.model.add_subsystem('dest', BadComp())
+        prob.model.connect('src.x2', 'dest.x2')
+        with self.assertRaises(Exception) as cm:
+            prob.setup(check=False)
 
-        ## Explicit Connection
-        #prob = Problem()
-        #prob.root = Group()
-        #prob.root.add('src', SrcComp())
-        #prob.root.add('dest', BadComp())
-        #prob.root.connect('src.x2', 'dest.x2')
-        #with self.assertRaises(Exception) as cm:
-            #prob.setup(check=False)
+        expected_msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
 
-        #expected_msg = "Unit 'degC' in source 'src.x2' is incompatible with unit 'm' in target 'dest.x2'."
+        self.assertEqual(expected_msg, str(cm.exception))
 
-        #self.assertTrue(expected_msg in str(cm.exception))
+        # Implicit Connection
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('src', SrcComp(), promotes=['x2'])
+        prob.model.add_subsystem('dest', BadComp(),promotes=['x2'])
+        with self.assertRaises(Exception) as cm:
+            prob.setup(check=False)
 
-        ## Implicit Connection
-        #prob = Problem()
-        #prob.root = Group()
-        #prob.root.add('src', SrcComp(), promotes=['x2'])
-        #prob.root.add('dest', BadComp(),promotes=['x2'])
-        #with self.assertRaises(Exception) as cm:
-            #prob.setup(check=False)
+        expected_msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
 
-        #expected_msg = "Unit 'degC' in source 'src.x2' (x2) is incompatible with unit 'm' in target 'dest.x2' (x2)."
-
-        #self.assertTrue(expected_msg in str(cm.exception))
+        self.assertEqual(expected_msg, str(cm.exception))
 
     #def test_nested_relevancy_base(self):
 

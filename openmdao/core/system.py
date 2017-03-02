@@ -699,13 +699,11 @@ class System(object):
             dictionary mapping input/output variable names
             to promoted variable names.
         """
-        maps = {}
-
-        gname = self.name + '.' if self.name else ''
-
         promotes = self._var_promotes['any']
         promotes_typ = self._var_promotes[typ]
+        gname = self.name + '.' if self.name else ''
 
+        found = False
         if promotes:
             names = promotes
             patterns = [n for n in names if '*' in n or '?' in n]
@@ -716,21 +714,24 @@ class System(object):
             names = ()
             patterns = ()
 
+        maps = {}
         for name in self._var_allprocs_names[typ]:
             if name in names:
                 maps[name] = name
+                found = True
                 continue
 
             for pattern in patterns:
                 # if name matches, promote that variable to parent
                 if fnmatchcase(name, pattern):
                     maps[name] = name
+                    found = True
                     break
             else:
                 # Default: prepend the parent system's name
                 maps[name] = gname + name if gname else name
 
-        return maps
+        return maps, found
 
     @property
     def jacobian(self):

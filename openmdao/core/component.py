@@ -68,7 +68,7 @@ class Component(System):
             on all entries of source. Default is None.
         units : str or None
             Units in which this input variable will be provided to the component
-            during execution. Default is None, which means it has no units.
+            during execution. Default is None, which means it is unitless.
         desc : str
             description of the variable
         var_set : hashable object
@@ -79,6 +79,15 @@ class Component(System):
             warn_deprecation("In the future, the 'add_input' method must be "
                              "called from 'initialize_variables' rather than "
                              "in the '__init__' function.")
+
+        if units == 'unitless':
+            warn_deprecation("Input '%s' has units='unitless' but 'unitless' "
+                             "has been deprecated. Use "
+                             "units=None instead.  Note that connecting a "
+                             "unitless variable to one with units is no longer "
+                             "an error, but will issue a warning instead." %
+                             name)
+            units = None
 
         # First, type check all arguments
         if not isinstance(name, str):
@@ -187,6 +196,15 @@ class Component(System):
             warn_deprecation("In the future, the 'add_output' method must be "
                              "called from 'initialize_variables' rather than "
                              "in the '__init__' function.")
+
+        if units == 'unitless':
+            warn_deprecation("Output '%s' has units='unitless' but 'unitless' "
+                             "has been deprecated. Use "
+                             "units=None instead.  Note that connecting a "
+                             "unitless variable to one with units is no longer "
+                             "an error, but will issue a warning instead." %
+                             name)
+            units = None
 
         # First, type check all arguments
         if not isinstance(name, str):
