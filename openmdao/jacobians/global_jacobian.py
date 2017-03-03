@@ -1,7 +1,7 @@
 """Define the GlobalJacobian class."""
 from __future__ import division
 
-import numpy
+import numpy as np
 import scipy.sparse
 from six.moves import range
 
@@ -60,8 +60,8 @@ class GlobalJacobian(Jacobian):
         iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
         ivar_all0 = self._system._var_allprocs_range['output'][0]
 
-        ind1 = numpy.sum(sizes_all[iproc, ivar_all0:ivar_all])
-        ind2 = numpy.sum(sizes_all[iproc, ivar_all0:ivar_all + 1])
+        ind1 = np.sum(sizes_all[iproc, ivar_all0:ivar_all])
+        ind2 = np.sum(sizes_all[iproc, ivar_all0:ivar_all + 1])
 
         return ind1, ind2
 
@@ -155,10 +155,10 @@ class GlobalJacobian(Jacobian):
                                                   None, shape)
 
         iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
-        out_size = numpy.sum(
+        out_size = np.sum(
             assembler._variable_sizes_all['output'][iproc, out_start:out_end])
 
-        in_size = numpy.sum(
+        in_size = np.sum(
             assembler._variable_sizes_all['input'][iproc, in_start:in_end])
 
         self._int_mtx._build(out_size, out_size)

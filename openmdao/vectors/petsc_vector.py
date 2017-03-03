@@ -1,6 +1,6 @@
 """Define the PETSc Vector and Transfer classes."""
 from __future__ import division
-import numpy
+import numpy as np
 from petsc4py import PETSc
 
 from six.moves import range
@@ -23,8 +23,8 @@ class PETScTransfer(DefaultTransfer):
         for in_iset, out_iset in self._in_inds:
             key = (in_iset, out_iset)
             if len(self._in_inds[key]) > 0:
-                in_inds = numpy.array(self._in_inds[key], 'i')
-                out_inds = numpy.array(self._out_inds[key], 'i')
+                in_inds = np.array(self._in_inds[key], 'i')
+                out_inds = np.array(self._out_inds[key], 'i')
                 in_indexset = PETSc.IS().createGeneral(in_inds,
                                                        comm=self._comm)
                 out_indexset = PETSc.IS().createGeneral(out_inds,
@@ -110,5 +110,5 @@ class PETScVector(DefaultVector):
         """
         global_sum = 0
         for iset in range(len(self._data)):
-            global_sum += numpy.sum(self._data[iset]**2)
+            global_sum += np.sum(self._data[iset]**2)
         return self._system.comm.allreduce(global_sum) ** 0.5

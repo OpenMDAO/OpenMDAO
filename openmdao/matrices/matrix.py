@@ -1,6 +1,6 @@
 """Define the base Matrix class."""
 from __future__ import division
-import numpy
+import numpy as np
 
 
 class Matrix(object):
@@ -137,12 +137,12 @@ def _compute_index_map(jrows, jcols, irow, icol, src_indices):
 
     for i, idx in enumerate(src_indices):
         # pull out columns that match each index
-        idxarr = numpy.nonzero(jcols == i)[0]
+        idxarr = np.nonzero(jcols == i)[0]
         idxs.append(idxarr)
-        icols.append(numpy.full(idxarr.shape, idx, dtype=int))
+        icols.append(np.full(idxarr.shape, idx, dtype=int))
 
-    idxs = numpy.hstack(idxs)
-    icols = numpy.hstack(icols) + icol
+    idxs = np.hstack(idxs)
+    icols = np.hstack(icols) + icol
     irows = jrows[idxs] + irow
 
     return (irows, icols, idxs)

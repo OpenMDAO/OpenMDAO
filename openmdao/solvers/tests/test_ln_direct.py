@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function
 
-import numpy
+import numpy as np
 import unittest
 from six import iterkeys
 
@@ -16,9 +16,9 @@ from openmdao.devtools.testutil import assert_rel_error
 class TestImplComp(ImplicitComponent):
 
     def initialize_variables(self):
-        self.add_input('x', numpy.ones(2))
-        self.add_output('y', numpy.ones(2))
-        self.mtx = numpy.array([
+        self.add_input('x', np.ones(2))
+        self.add_output('y', np.ones(2))
+        self.mtx = np.array([
             [ 3., 4.],
             [ 2., 3.],
         ])
@@ -26,14 +26,14 @@ class TestImplComp(ImplicitComponent):
         # [ 3.,-4.],
         # [-2., 3.],
 
-        #self.declare_partials('y', 'x', val=-numpy.eye(2))
+        #self.declare_partials('y', 'x', val=-np.eye(2))
         #self.declare_partials('y', 'y', val=self.mtx)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals['y'] = self.mtx.dot(outputs['y']) - inputs['x']
 
     def linearize(self, inputs, outputs, partials):
-        partials['y', 'x'] = -numpy.eye(2)
+        partials['y', 'x'] = -np.eye(2)
         partials['y', 'y'] = self.mtx
 
 

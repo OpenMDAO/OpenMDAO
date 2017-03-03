@@ -1,6 +1,6 @@
 """Define the base Vector and Transfer classes."""
 from __future__ import division, print_function
-import numpy
+import numpy as np
 
 from six.moves import range
 
@@ -153,12 +153,12 @@ class Vector(object):
             data_inds = sub_variable_set_indices[bool_vector, 1]
             if len(data_inds) > 0:
                 sizes_array = variable_sizes[iset]
-                ind1 = numpy.sum(sizes_array[self._iproc, :data_inds[0]])
-                ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
-                ivar_map.append(numpy.empty(ind2 - ind1, int))
+                ind1 = np.sum(sizes_array[self._iproc, :data_inds[0]])
+                ind2 = np.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
+                ivar_map.append(np.empty(ind2 - ind1, int))
                 ind1_list.append(ind1)
             else:
-                ivar_map.append(numpy.zeros(0, int))
+                ivar_map.append(np.zeros(0, int))
                 ind1_list.append(0)
 
         # Populate ivar_map by looping over local variables in the system.
@@ -166,9 +166,9 @@ class Vector(object):
             ivar_all = variable_indices[ind]
             iset, ivar = variable_set_indices[ivar_all, :]
             sizes_array = variable_sizes[iset]
-            ind1 = numpy.sum(sizes_array[self._iproc, :ivar]) - \
+            ind1 = np.sum(sizes_array[self._iproc, :ivar]) - \
                 ind1_list[iset]
-            ind2 = numpy.sum(sizes_array[self._iproc, :ivar + 1]) - \
+            ind2 = np.sum(sizes_array[self._iproc, :ivar + 1]) - \
                 ind1_list[iset]
             ivar_map[iset][ind1:ind2] = ind
 
@@ -191,7 +191,7 @@ class Vector(object):
         if new_array is None:
             inds = self._system._var_myproc_indices[self._typ]
             sizes = self._assembler._variable_sizes_all[self._typ][self._iproc, inds]
-            new_array = numpy.zeros(numpy.sum(sizes))
+            new_array = np.zeros(np.sum(sizes))
 
         for ind, data in enumerate(self._data):
             new_array[self._indices[ind]] = data

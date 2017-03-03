@@ -1,7 +1,7 @@
 """Component unittests."""
 from __future__ import division
 
-import numpy
+import numpy as np
 import unittest
 import warnings
 
@@ -53,15 +53,15 @@ class TestExplicitComponent(unittest.TestCase):
         msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"
 
         with assertRaisesRegex(self, ValueError, msg):
-            comp.add_output('arr', val=numpy.ones((2,2)), shape=([2]))
+            comp.add_output('arr', val=np.ones((2,2)), shape=([2]))
 
         with assertRaisesRegex(self, ValueError, msg):
-            comp.add_input('arr', val=numpy.ones((2,2)), shape=([2]))
+            comp.add_input('arr', val=np.ones((2,2)), shape=([2]))
 
         msg = "Shape of indices does not match shape for '.*': Expected (.*) but got (.*)"
 
         with assertRaisesRegex(self, ValueError, msg):
-            comp.add_input('arr', val=numpy.ones((2,2)), src_indices=[0,1])
+            comp.add_input('arr', val=np.ones((2,2)), src_indices=[0,1])
 
     def test_deprecated_vars_in_init(self):
         """test that deprecation warning is issued if vars are declared in __init__."""
@@ -86,7 +86,7 @@ class TestImplicitComponent(unittest.TestCase):
     def test___init___simple(self):
         """Test a simple implicit component."""
         x = -0.5
-        a = numpy.abs(numpy.exp(0.5 * x) / x)
+        a = np.abs(np.exp(0.5 * x) / x)
 
         comp = TestImplCompSimple()
         prob = Problem(comp).setup(check=False)
@@ -100,9 +100,9 @@ class TestImplicitComponent(unittest.TestCase):
         comp = TestImplCompArray()
         prob = Problem(comp).setup(check=False)
 
-        prob['rhs'] = numpy.ones(2)
+        prob['rhs'] = np.ones(2)
         prob.run_model()
-        assert_rel_error(self, prob['x'], numpy.ones(2))
+        assert_rel_error(self, prob['x'], np.ones(2))
 
 
 if __name__ == '__main__':

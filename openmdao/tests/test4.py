@@ -1,5 +1,5 @@
 from __future__ import division
-import numpy
+import numpy as np
 import unittest
 import scipy.sparse.linalg
 
@@ -89,7 +89,7 @@ class Test(unittest.TestCase):
         #view_model(self.p, show_browser=False)
 
     def assertEqualArrays(self, a, b, tol=1e-3):
-        self.assertTrue(numpy.linalg.norm(a-b) < tol)
+        self.assertTrue(np.linalg.norm(a-b) < tol)
 
     def test_apply_linear(self):
         root = self.p.model
