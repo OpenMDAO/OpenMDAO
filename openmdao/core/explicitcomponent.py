@@ -4,7 +4,7 @@ from __future__ import division
 
 import inspect
 
-import numpy
+import numpy as np
 from six import iteritems, itervalues
 
 from openmdao.core.component import Component
@@ -227,8 +227,8 @@ class ExplicitComponent(Component):
         other_names = []
         for i, out_name in enumerate(self._var_myproc_names['output']):
             meta = self._var_myproc_metadata['output'][i]
-            size = numpy.prod(meta['shape'])
-            arange = numpy.arange(size)
+            size = np.prod(meta['shape'])
+            arange = np.arange(size)
 
             # No need to FD outputs wrt other outputs
             if (out_name, out_name) in self._subjacs_info:

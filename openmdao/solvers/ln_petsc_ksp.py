@@ -1,7 +1,7 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
 from __future__ import division, print_function
-import numpy
+import numpy as np
 from six import itervalues
 
 try:
@@ -404,7 +404,7 @@ class PetscKSP(LinearSolver):
 
         lsize = 0
         for abs_name in system._varx_abs_names['output']:
-            lsize += numpy.prod(system._varx_abs2data_io[abs_name]['metadata']['shape'])
+            lsize += np.prod(system._varx_abs2data_io[abs_name]['metadata']['shape'])
 
         size = 0
         global_var_sizes = system._assembler._variable_sizes_all['output']

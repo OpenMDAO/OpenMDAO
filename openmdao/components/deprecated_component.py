@@ -2,7 +2,7 @@
 
 from __future__ import division
 
-import numpy
+import numpy as np
 
 from openmdao.core.component import Component as BaseComponent
 from openmdao.utils.general_utils import warn_deprecation
@@ -236,8 +236,8 @@ class Component(BaseComponent):
             for out_name in self._var_myproc_names['output']:
                 if out_name in self._output_names:
                     size = len(self._outputs._views_flat[out_name])
-                    ones = numpy.ones(size)
-                    arange = numpy.arange(size)
+                    ones = np.ones(size)
+                    arange = np.arange(size)
                     self._jacobian[out_name, out_name] = (ones, arange, arange)
 
             for out_name in self._var_myproc_names['output']:

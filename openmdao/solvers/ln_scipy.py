@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function
 
-import numpy
+import numpy as np
 from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
@@ -117,7 +117,7 @@ class ScipyIterativeSolver(LinearSolver):
         res : ndarray
             the current residual vector.
         """
-        norm = numpy.linalg.norm(res)
+        norm = np.linalg.norm(res)
         if self._iter_count == 0:
             if norm != 0.0:
                 self._norm0 = norm

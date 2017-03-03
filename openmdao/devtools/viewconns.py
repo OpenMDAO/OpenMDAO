@@ -7,7 +7,7 @@ from itertools import chain
 
 from six import iteritems
 
-import numpy
+import numpy as np
 
 from openmdao.core.problem import Problem
 from openmdao.devtools.compat import abs_conn_iter, abs_varname_iter, \
@@ -17,10 +17,10 @@ from openmdao.devtools.webview import webview
 
 @contextlib.contextmanager
 def printoptions(*args, **kwargs):
-    original = numpy.get_printoptions()
-    numpy.set_printoptions(*args, **kwargs)
+    original = np.get_printoptions()
+    np.set_printoptions(*args, **kwargs)
     yield
-    numpy.set_printoptions(**original)
+    np.set_printoptions(**original)
 
 def view_connections(root, outfile='connections.html', show_browser=True,
                      src_filter='', tgt_filter='', precision=6):
@@ -76,12 +76,12 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             tmeta = tmetas[t]
             idxs = tmeta['src_indices']
             if idxs is None:
-                idxs = numpy.arange(numpy.prod(tmeta['shape']), dtype=int)
+                idxs = np.arange(np.prod(tmeta['shape']), dtype=int)
 
             if t in connections:
                 s = connections[t]
                 val = system._outputs[s]
-                if isinstance(val, numpy.ndarray) and idxs is not None:
+                if isinstance(val, np.ndarray) and idxs is not None:
                     shape = val.shape
                     val = system._outputs[s].flatten()[idxs].reshape(shape)
                 else:
@@ -99,8 +99,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             else: # unconnected param
                 val = system._inputs[t]
 
-            if isinstance(val, numpy.ndarray):
-                val = numpy.array2string(val)
+            if isinstance(val, np.ndarray):
+                val = np.array2string(val)
             else:
                 val = str(val)
 
