@@ -7,15 +7,13 @@ import unittest
 
 import numpy as np
 
-from openmdao.core.group import Group
-from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.core.problem import Problem
+from openmdao.api import Group, IndepVarComp, Problem, GlobalJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.ln_bgs import LinearBlockGS
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
-
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarStateConnection, SellarDerivatives
+from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
@@ -23,6 +21,32 @@ from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
      ConvergeDivergeGroups, Diamond, DiamondFlat
 
 class TestBGSSolver(unittest.TestCase):
+
+    def test_globaljac_err(self):
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('x_param', IndepVarComp('length', 3.0),
+                            promotes=['length'])
+        model.add_subsystem('mycomp', TestExplCompSimpleDense(),
+                            promotes=['length', 'width', 'area'])
+
+        model.ln_solver = LinearBlockGS()
+        model.suppress_solver_output = True
+
+        prob.model.jacobian = GlobalJacobian()
+        prob.setup(check=False, mode='fwd')
+
+        prob['width'] = 2.0
+        prob.run_model()
+
+        of = ['area']
+        wrt = ['length']
+
+        with self.assertRaises(RuntimeError) as context:
+            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+
+        self.assertEqual(str(context.exception),
+                         "A block linear solver 'LN: LNBGS' is being used with a GlobalJacobian in system ''")
 
     def test_solve_linear_maxiter(self):
         """Verify that LinearBlockGS abides by the 'maxiter' option."""
