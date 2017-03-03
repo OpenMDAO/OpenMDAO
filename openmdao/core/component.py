@@ -141,7 +141,7 @@ class Component(System):
                                             'my_idx': len(self._varx_abs_names['input']),
                                             'type_': 'input', 'metadata': metadata}
         self._varx_abs_names['input'].append(abs_name)
-        self._varx_allprocs_prom2abs_set['input'][name] = set([abs_name])
+        self._varx_allprocs_prom2abs_list['input'][name] = set([abs_name])
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
@@ -273,7 +273,7 @@ class Component(System):
                                             'my_idx': len(self._varx_abs_names['output']),
                                             'type_': 'output', 'metadata': metadata}
         self._varx_abs_names['output'].append(abs_name)
-        self._varx_allprocs_prom2abs_set['output'][name] = set([abs_name])
+        self._varx_allprocs_prom2abs_list['output'][name] = [abs_name]
 
     def approx_partials(self, of, wrt, method='fd', **kwargs):
         """
@@ -636,7 +636,7 @@ class Component(System):
         Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
 
         Sets the following attributes:
-            _varx_allprocs_prom2abs_set
+            _varx_allprocs_prom2abs_list
 
         Returns
         -------
@@ -652,14 +652,14 @@ class Component(System):
 
         # Now that we know the pathname, convert _varx_abs_names from names to abs_names.
         for type_ in ['input', 'output']:
-            allprocs_prom2abs_set = {}
+            allprocs_prom2abs_list = {}
             for name in self._varx_abs_names[type_]:
                 abs_name = get_abs_name(name)
-                allprocs_prom2abs_set[name] = set([abs_name])
-            self._varx_allprocs_prom2abs_set[type_] = allprocs_prom2abs_set
+                allprocs_prom2abs_list[name] = [abs_name]
+            self._varx_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
 
         # If this is a component, myproc names = allprocs names
-        # and _varx_allprocs_prom2abs_set was already computed in add_input / add_output.
+        # and _varx_allprocs_prom2abs_list was already computed in add_input / add_output.
         allprocs_abs_names = {'input': [], 'output': []}
         for type_ in ['input', 'output']:
             allprocs_abs_names[type_] = self._varx_abs_names[type_]

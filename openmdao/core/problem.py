@@ -344,16 +344,16 @@ class Problem(object):
 
         # [REFACTOR VERIFICATION] imported here because it's temporary and will be removed soon
         from six import iteritems
-        # [REFACTOR VERIFICATION] for model._varx_allprocs_prom2abs_set
+        # [REFACTOR VERIFICATION] for model._varx_allprocs_prom2abs_list
         for type_ in ['input', 'output']:
             count = 0
-            for prom_name, abs_names_set in iteritems(model._varx_allprocs_prom2abs_set[type_]):
-                count += len(abs_names_set)
+            for prom_name, abs_names_list in iteritems(model._varx_allprocs_prom2abs_list[type_]):
+                count += len(abs_names_list)
                 assert prom_name in model._var_allprocs_names[type_]
-                for abs_name in abs_names_set:
+                for abs_name in abs_names_list:
                     assert abs_name in model._var_allprocs_pathnames[type_]
             assert count == len(model._var_allprocs_pathnames[type_])
-            assert (len(model._varx_allprocs_prom2abs_set[type_])
+            assert (len(model._varx_allprocs_prom2abs_list[type_])
                     == len(set(model._var_allprocs_names[type_])))
 
         # Assembler setup: variable metadata and indices
