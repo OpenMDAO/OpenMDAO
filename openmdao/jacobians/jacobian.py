@@ -17,24 +17,22 @@ class Jacobian(object):
     Attributes
     ----------
     _system : <System>
-        pointer to the system that is currently operating on this Jacobian.
+        Pointer to the system that is currently operating on this Jacobian.
     _subjacs : dict
-        dictionary containing the user-supplied sub-Jacobians.
+        Dictionary of the user-supplied sub-Jacobians keyed by absolute names.
     _subjacs_info : dict
-        Dict of subjacobian metadata keyed on (resid_path, (in/out)_path).
+        Dictionary of the sub-Jacobian metadata keyed by absolute names.
     _int_mtx : <Matrix>
-        global internal Jacobian.
+        Global internal Jacobian.
     _ext_mtx : <Matrix>
-        global external Jacobian.
+        Global external Jacobian.
     _keymap : dict
         Mapping of original (output, input) key to (output, source) in cases
         where the input has src_indices.
-    _iter_list_rel_unprom : [(out_name, in_name), ...]
-        list of output-input pairs to iterate over where the names are relative, unpromoted.
-    _iter_list_pathnames : [(out_name, in_name), ...]
-        list of output-input pairs to iterate over where the names are unique pathnames.
+    _iter_list : [(out_name, in_name), ...]
+        List of output-input pairs to iterate over where the keys are absolute names.
     options : <OptionsDictionary>
-        options dictionary.
+        Options dictionary.
     """
 
     def __init__(self, **kwargs):
@@ -63,13 +61,10 @@ class Jacobian(object):
         """
         Return shape of sub-jacobian for variables making up the key tuple.
 
-        This assumes that no inputs and outputs share the same name,
-        so it should only be called from a Component, never from a Group.
-
         Parameters
         ----------
         key : (str, str)
-            output name, input name of sub-Jacobian.
+            Absolute output name, input name of sub-Jacobian.
 
         Returns
         -------
@@ -79,12 +74,12 @@ class Jacobian(object):
             local size of the input variable.
         """
         out_name, in_name = key
-        return (np.prod(self._system._var2meta[out_name]['shape']),
-                np.prod(self._system._var2meta[in_name]['shape']))
+        return (np.prod(self._system._varx_abs2data_io[out_name]['metadata']['shape']),
+                np.prod(self._system._varx_abs2data_io[in_name]['metadata']['shape']))
 
     def _key2unique(self, key):
         """
-        Map output-input local name pair to a unique key.
+        Map output-input name pair from promoted names to absolute names.
 
         This should only be called when self._system is a Component or
         key parts are all outputs.  If the key contains an input name, that
@@ -93,15 +88,28 @@ class Jacobian(object):
         Parameters
         ----------
         key : (str, str)
-            output name, input name of sub-Jacobian. Names are local, promoted.
+            Promoted output, input name tuple of sub-Jacobian.
 
         Returns
         -------
-        out_path : str
-            pathname of output variable.
-        in_path : str
-            pathname of input variable.
+        (str, str)
+            Absolute output, input name tuple of sub-Jacobian.
         """
+        prom2abs_set = self._system._varx_allprocs_prom2abs_set
+        prom_out, prom_in = key
+
+        if prom_out not in prom2abs_set['output']:
+            msg = 'The first entry in key ("{}", "{}") is invalid'
+            raise ValueError(msg.format(prom_out, prom_in))
+        else:
+            abs_out = prom2abs_set['output'][prom_out]
+
+        if prom_in not in prom2abs_set['output'] and prom_in not in prom2abs_set['input']:
+            msg = 'The second entry in key ("{}", "{}") is invalid'
+            raise ValueError(msg.format(prom_out, prom_in))
+        elif prom_in not in prom2abs_set['input']:
+            abs_out = prom2abs_set['output'][prom_in]
+
         if key[1] in self._system._var_name2path['input']:
             return (self._system._var_name2path['output'][key[0]],
                     self._system._var_name2path['input'][key[1]][0])
