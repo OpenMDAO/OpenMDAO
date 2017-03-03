@@ -159,3 +159,14 @@ class TestGeneralizedDict(TestOptionsDict):
         self.dict._assemble_global_dict(parent_dict)
 
         self.assertIs(self.dict._global_dict['test2'], obj2)
+
+    def test_default_values(self):
+        self.dict.declare('foo', value=False)
+        self.assertFalse(self.dict['foo'])
+
+        self.dict.declare('foobar', value="barfoo")
+        self.assertEqual(self.dict['foobar'], "barfoo")
+
+
+if __name__ == "__main__":
+    unittest.main()

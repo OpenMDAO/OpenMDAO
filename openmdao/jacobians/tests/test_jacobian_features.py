@@ -1,3 +1,5 @@
+from __future__ import print_function, division
+
 import unittest
 import numpy as np
 import scipy as sp
@@ -33,10 +35,9 @@ class SimpleComp(ExplicitComponent):
         partials['f', 'x'] = 1.
         partials['f', 'z'] = np.ones((1, 4))
 
-        partials['g', 'y1'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
-        partials['g', 'y2'] = [[1, 0], [0, 1], [1, 0], [0, 1]]
-        partials['g', 'y3'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
-
+        partials['g', 'y1'] = np.array([[1, 0], [1, 0], [0, 1], [0, 1]])
+        partials['g', 'y2'] = np.array([[1, 0], [0, 1], [1, 0], [0, 1]])
+        partials['g', 'y3'] = np.array([[1, 0], [1, 0], [0, 1], [0, 1]])
         partials['g', 'x'] = np.eye(2)
 
 
@@ -74,6 +75,42 @@ class SimpleCompConst(SimpleComp):
 
     def compute_partial_derivs(self, inputs, outputs, partials):
         pass
+
+class SimpleCompFD(SimpleComp):
+    def __init__(self, **kwargs):
+        super(SimpleCompFD, self).__init__()
+        self.kwargs = kwargs
+
+    def initialize_partials(self):
+        self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
+        self.declare_partials('g', 'z', dependent=False)
+
+        self.approx_partials('*', '*', **self.kwargs)
+
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        pass
+
+
+class SimpleCompMixedFD(SimpleComp):
+    def __init__(self, **kwargs):
+        super(SimpleCompMixedFD, self).__init__()
+        self.kwargs = kwargs
+
+    def initialize_partials(self):
+        self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
+        self.declare_partials('g', 'z', dependent=False)
+
+        self.approx_partials('g', 'x', **self.kwargs)
+        self.approx_partials('g', 'y2', **self.kwargs)
+
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        partials['f', 'x'] = 1.
+        partials['f', 'z'] = np.ones((1, 4))
+
+        partials['g', 'y1'] = np.array([[1, 0], [1, 0], [0, 1], [0, 1]])
+        partials['g', 'y3'] = np.array([[1, 0], [1, 0], [0, 1], [0, 1]])
+
+        # dg/dx and dg/dy2 are FD'd
 
 
 class SimpleCompKwarg(SimpleComp):
@@ -215,6 +252,111 @@ class TestJacobianFeatures(unittest.TestCase):
 
         assert_rel_error(self, totals, jacobian)
 
+    @parameterized.expand(
+        itertools.product([1e-6, 1e-8],  # Step size
+                          ['forward', 'central', 'backward'],  # FD Form
+                          ['rel', 'abs'],  # Step calc
+                          )
+    )
+    def test_fd(self, step, form, step_calc):
+        comp = SimpleCompFD(step=step, form=form, step_calc=step_calc)
+        problem = self.problem
+        model = problem.model
+        model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
+
+        problem.setup(check=True)
+        problem.run_model()
+        totals = problem.compute_total_derivs(['f', 'g'],
+                                              ['x', 'y1', 'y2', 'y3', 'z'])
+        jacobian = {}
+        jacobian['f', 'x'] = 1.
+        jacobian['f', 'z'] = np.ones((1, 4))
+        jacobian['f', 'y1'] = np.zeros((1, 2))
+        jacobian['f', 'y2'] = np.zeros((1, 2))
+        jacobian['f', 'y3'] = np.zeros((1, 2))
+
+        jacobian['g', 'y1'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+        jacobian['g', 'y2'] = [[1, 0], [0, 1], [1, 0], [0, 1]]
+        jacobian['g', 'y3'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+
+        jacobian['g', 'x'] = [[1], [0], [0], [1]]
+        jacobian['g', 'z'] = np.zeros((4, 4))
+
+        assert_rel_error(self, totals, jacobian, 1e-6)
+
+    def test_mixed_fd(self):
+        comp = SimpleCompMixedFD()
+        problem = self.problem
+        model = problem.model
+        model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
+
+        problem.setup(check=True)
+        problem.run_model()
+        totals = problem.compute_total_derivs(['f', 'g'],
+                                              ['x', 'y1', 'y2', 'y3', 'z'])
+        jacobian = {}
+        jacobian['f', 'x'] = 1.
+        jacobian['f', 'z'] = np.ones((1, 4))
+        jacobian['f', 'y1'] = np.zeros((1, 2))
+        jacobian['f', 'y2'] = np.zeros((1, 2))
+        jacobian['f', 'y3'] = np.zeros((1, 2))
+
+        jacobian['g', 'y1'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+        jacobian['g', 'y2'] = [[1, 0], [0, 1], [1, 0], [0, 1]]
+        jacobian['g', 'y3'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+
+        jacobian['g', 'x'] = [[1], [0], [0], [1]]
+        jacobian['g', 'z'] = np.zeros((4, 4))
+
+        assert_rel_error(self, totals, jacobian, 1e-6)
+
+    def test_units_fd(self):
+        class UnitCompBase(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('T', val=284., units="degR", desc="Temperature")
+                self.add_input('P', val=1., units='lbf/inch**2', desc="Pressure")
+
+                self.add_output('flow:T', val=284., units="degR", desc="Temperature")
+                self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
+
+            def initialize_partials(self):
+                self.approx_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                outputs['flow:T'] = inputs['T']
+                outputs['flow:P'] = inputs['P']
+
+        p = Problem()
+        model = p.model = Group()
+        indep = model.add_subsystem('indep', IndepVarComp(), promotes=['*'])
+
+        indep.add_output('T', val=100., units='degK')
+        indep.add_output('P', val=1., units='bar')
+
+        units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
+
+        p.setup()
+        p.run_model()
+        totals = p.compute_total_derivs(['flow:T', 'flow:P'], ['T', 'P'])
+        expected_totals = {
+            ('flow:T', 'T'): 9/5,
+            ('flow:P', 'T'): 0.,
+            ('flow:T', 'P'): 0.,
+            ('flow:P', 'P'): 14.50377,
+        }
+        assert_rel_error(self, totals, expected_totals, 1e-6)
+
+        expected_subjacs = {
+            ('units.flow:T', 'units.T'): -1.,
+            ('units.flow:P', 'units.T'): 0.,
+            ('units.flow:T', 'units.P'): 0.,
+            ('units.flow:P', 'units.P'): -1.,
+        }
+
+        with units._units_scaling_context(scale_jac=True):
+            jac = units._jacobian._subjacs
+            for deriv, val in iteritems(expected_subjacs):
+                assert_rel_error(self, jac[deriv], val, 1e-6)
 
 if __name__ == '__main__':
     unittest.main()

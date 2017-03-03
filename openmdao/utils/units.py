@@ -985,13 +985,8 @@ def convert_units(val, old_units, new_units=None):
     float
         value in new units.
     """
-    if not old_units and not new_units:  # dimensionless
+    if not old_units or not new_units:  # one side has no units
         return val
-    elif not old_units or not new_units:
-        # A descriptive exception should have been thrown when checking the connection.
-        raise RuntimeError("Units are inconsistent between an input and an output. "
-                           "A descriptive error should have been given earlier. "
-                           "Please contact the developers.")
 
     old_unit = _find_unit(old_units)
     if new_units:
