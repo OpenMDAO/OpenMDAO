@@ -31,9 +31,9 @@ class Vector(object):
     _iproc : int
         Global processor index.
     _views : dict
-        Dictionary mapping variable names to the ndarray views.
+        Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
-        Dictionary mapping variable names to the flattened ndarray views.
+        Dictionary mapping absolute variable names to the flattened ndarray views.
     _idxs : dict
         Either 0 or slice(None), used so that 1-sized vectors are made floats.
     _names : set([str, ...])
@@ -136,23 +136,23 @@ class Vector(object):
         and it yields the index of the local variable.
 
         """
-        variable_sizes = self._assembler._variable_sizes[self._typ]
-        variable_set_indices = self._assembler._variable_set_indices[self._typ]
+        system = self._system
+        assembler = system._assembler
 
-        ind1, ind2 = self._system._var_allprocs_range[self._typ]
+        ind1, ind2 = system._varx_allprocs_idx_range[self._typ]
+
+        variable_set_indices = assembler._variable_set_indices[self._typ]
         sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
-
-        variable_indices = self._system._var_myproc_indices[self._typ]
 
         # Create the index arrays for each var_set for ivar_map.
         # Also store the starting points in the data/index vector.
         ivar_map = []
         ind1_list = []
-        for iset in range(len(variable_sizes)):
+        for iset in range(len(assembler._variable_sizes[self._typ])):
             bool_vector = sub_variable_set_indices[:, 0] == iset
             data_inds = sub_variable_set_indices[bool_vector, 1]
             if len(data_inds) > 0:
-                sizes_array = variable_sizes[iset]
+                sizes_array = assembler._variable_sizes[self._typ][iset]
                 ind1 = np.sum(sizes_array[self._iproc, :data_inds[0]])
                 ind2 = np.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
                 ivar_map.append(np.empty(ind2 - ind1, int))
@@ -162,15 +162,14 @@ class Vector(object):
                 ind1_list.append(0)
 
         # Populate ivar_map by looping over local variables in the system.
-        for ind in range(len(variable_indices)):
-            ivar_all = variable_indices[ind]
-            iset, ivar = variable_set_indices[ivar_all, :]
-            sizes_array = variable_sizes[iset]
-            ind1 = np.sum(sizes_array[self._iproc, :ivar]) - \
-                ind1_list[iset]
-            ind2 = np.sum(sizes_array[self._iproc, :ivar + 1]) - \
-                ind1_list[iset]
-            ivar_map[iset][ind1:ind2] = ind
+        for abs_name in system._varx_abs_names[self._typ]:
+            idx = assembler._varx_allprocs_abs2idx_io[abs_name]
+            my_idx = system._varx_abs2data_io[abs_name]['my_idx']
+            iset, ivar = variable_set_indices[idx, :]
+            sizes_array = assembler._variable_sizes[self._typ][iset]
+            ind1 = np.sum(sizes_array[self._iproc, :ivar]) - ind1_list[iset]
+            ind2 = np.sum(sizes_array[self._iproc, :ivar + 1]) - ind1_list[iset]
+            ivar_map[iset][ind1:ind2] = my_idx
 
         self._ivar_map = ivar_map
 
@@ -189,9 +188,12 @@ class Vector(object):
             Array combining the data of all the varsets.
         """
         if new_array is None:
-            inds = self._system._var_myproc_indices[self._typ]
-            sizes = self._assembler._variable_sizes_all[self._typ][self._iproc, inds]
-            new_array = np.zeros(np.sum(sizes))
+            total_size = 0
+            for abs_name in self._system._varx_abs_names[self._typ]:
+                idx = self._assembler._varx_allprocs_abs2idx_io[abs_name]
+                total_size += self._assembler._variable_sizes_all[self._typ][self._iproc, idx]
+
+            new_array = np.zeros(total_size)
 
         for ind, data in enumerate(self._data):
             new_array[self._indices[ind]] = data
@@ -249,41 +251,70 @@ class Vector(object):
         """
         return iter(self._names)
 
-    def __getitem__(self, key):
+    def _prom_name2abs_name(self, prom_name):
+        """
+        Map the given promoted name to the absolute name.
+
+        This is only valid when the name is unique; otherwise, a KeyError is thrown.
+
+        Parameters
+        ----------
+        prom_name : str
+            Promoted variable name in the owning system's namespace.
+
+        Returns
+        -------
+        str
+            Absolute variable name.
+        """
+        prom2abs_list = self._system._varx_allprocs_prom2abs_list[self._typ]
+
+        if prom_name not in prom2abs_list:
+            msg = 'The name {} is invalid'
+            raise KeyError(msg.format(prom_name))
+        elif len(prom2abs_list[prom_name]) == 1:
+            return prom2abs_list[prom_name][0]
+        else:
+            msg = 'The name {} is non-unique so it must be accessed from a lower-level system.'
+            raise KeyError(msg.format(prom_name))
+
+    def __getitem__(self, prom_name):
         """
         Get the unscaled variable value in true units.
 
         Parameters
         ----------
-        key : str
-            Variable name in the owning system's namespace.
+        prom_name : str
+            Promoted variable name in the owning system's namespace.
 
         Returns
         -------
         float or ndarray
             variable value (not scaled, not dimensionless).
         """
-        if key in self._names:
-            return self._views[key][self._idxs[key]]
+        abs_name = self._prom_name2abs_name(prom_name)
+        if abs_name in self._names:
+            return self._views[abs_name][self._idxs[abs_name]]
         else:
-            raise KeyError("Variable '%s' not found." % key)
+            raise KeyError("Variable '%s' not found." % abs_name)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, prom_name, value):
         """
         Set the unscaled variable value in true units.
 
         Parameters
         ----------
-        key : str
-            Variable name in the owning system's namespace.
+        prom_name : str
+            Promoted variable name in the owning system's namespace.
         value : float or list or tuple or ndarray
             variable value to set (not scaled, not dimensionless)
         """
-        if key in self._names:
-            value, shape = ensure_compatible(key, value, self._views[key].shape)
-            self._views[key][:] = value
+        abs_name = self._prom_name2abs_name(prom_name)
+        if abs_name in self._names:
+            value, shape = ensure_compatible(abs_name, value, self._views[abs_name].shape)
+            self._views[abs_name][:] = value
         else:
-            raise KeyError("Variable '%s' not found." % key)
+            raise KeyError("Variable '%s' not found." % abs_name)
 
     def _initialize_data(self, root_vector):
         """

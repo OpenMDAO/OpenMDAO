@@ -101,7 +101,7 @@ class System(object):
     _varx_abs2data_io : dict
         Dictionary mapping absolute names to dicts with keys (prom, rel, my_idx, type_, metadata).
         The my_idx entry is the index among variables in this system, on this processor.
-        The type entry is either 'input' or 'output'.
+        The type_ entry is either 'input' or 'output'.
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         dict of vector objects. These are the derivatives vectors.
     _vector_transfers : dict
@@ -851,27 +851,26 @@ class System(object):
                 d_inputs.set_const(0.0)
                 d_outputs.set_const(0.0)
 
+        var_ids = self._vector_var_ids[vec_name]
+
         out_names = []
         res_names = []
-        var_ids = self._vector_var_ids[vec_name]
-        out_ind = self._var_allprocs_range['output'][0]
-        for out_name in self._var_allprocs_names['output']:
-            if out_ind in var_ids:
-                res_names.append(out_name)
-                if var_inds is None or (var_inds[0] <= out_ind < var_inds[1] or
-                                        var_inds[2] <= out_ind < var_inds[3]):
-                    out_names.append(out_name)
-            out_ind += 1
+        for out_abs_name in self._varx_abs_names['output']:
+            out_idx = self._assembler._varx_allprocs_abs2idx_io[out_abs_name]
+            if out_idx in var_ids:
+                res_names.append(out_abs_name)
+                if var_inds is None or (var_inds[0] <= out_idx < var_inds[1] or
+                                        var_inds[2] <= out_idx < var_inds[3]):
+                    out_names.append(out_abs_name)
 
         in_names = []
-        in_ind = self._var_allprocs_range['input'][0]
-        for in_name in self._var_allprocs_names['input']:
-            out_ind = self._assembler._input_src_ids[in_ind]
-            if out_ind in var_ids:
-                if var_inds is None or (var_inds[0] <= out_ind < var_inds[1] or
-                                        var_inds[2] <= out_ind < var_inds[3]):
-                    in_names.append(in_name)
-            in_ind += 1
+        for in_abs_name in self._varx_abs_names['input']:
+            in_idx = self._assembler._varx_allprocs_abs2idx_io[in_abs_name]
+            out_idx = self._assembler._input_src_ids[in_idx]
+            if out_idx in var_ids:
+                if var_inds is None or (var_inds[0] <= out_idx < var_inds[1] or
+                                        var_inds[2] <= out_idx < var_inds[3]):
+                    in_names.append(in_abs_name)
 
         d_inputs._names = set(in_names)
         d_outputs._names = set(out_names)
