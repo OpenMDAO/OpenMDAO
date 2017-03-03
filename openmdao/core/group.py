@@ -52,6 +52,11 @@ class Group(System):
             A list of variable names specifying which subsystem variables
             to 'promote' up to this group. This is for backwards compatibility
             with older versions of OpenMDAO.
+
+        Returns
+        -------
+        System
+            The System that was passed in.
         """
         warn_deprecation('This method provides backwards compatibility with '
                          'OpenMDAO <= 1.x ; use add_subsystem instead.')
