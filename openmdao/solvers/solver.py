@@ -145,7 +145,7 @@ class Solver(object):
             self._iter_execute()
             norm = self._iter_get_norm()
             self._iter_count += 1
-            self._mpi_print(self._iter_count, norm / norm0, norm)
+            self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (numpy.isinf(norm) or numpy.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
         return fail, norm, norm / norm0
