@@ -32,6 +32,14 @@ class System(object):
     Never instantiated; subclassed by <Group> or <Component>.
     All subclasses have their attributes defined here.
 
+    In attribute names:
+        abs / abs_name : absolute, unpromoted variable name, seen from root (unique).
+        rel / rel_name : relative, unpromoted variable name, seen from current system (unique).
+        prom / prom_name : relative, promoted variable name, seen from current system (non-unique).
+        idx : global variable index among variables on all procs (I/O indices separate).
+        my_idx : index among variables in this system, on this processor (I/O indices separate).
+        io : indicates explicitly that input and output variables are combined in the same dict.
+
     Attributes
     ----------
     name : str
@@ -83,6 +91,17 @@ class System(object):
     _var_connections_indices : [(int, int), ...]
         _var_connections with variable indices instead of names.  Entries
         have the form (input_index, output_index).
+    _varx_allprocs_prom2abs_set : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to set of all absolute names.
+        For outputs, the set will have length one since promoted output names are unique.
+    _varx_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
+        Global index range of owned variables with respect to all model variables.
+    _varx_abs_names : {'input': [str, ...], 'output': [str, ...]}
+        List of absolute names of owned variables existing on current proc.
+    _varx_abs2data_io : dict
+        Dictionary mapping absolute names to dicts with keys (prom, rel, my_idx, type_, metadata).
+        The my_idx entry is the index among variables in this system, on this processor.
+        The type entry is either 'input' or 'output'.
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         dict of vector objects. These are the derivatives vectors.
     _vector_transfers : dict
@@ -172,6 +191,12 @@ class System(object):
         self._var_connections = {}
         self._var_connections_indices = []
 
+        # [REFACTOR]
+        self._varx_allprocs_prom2abs_set = {'input': {}, 'output': {}}
+        self._varx_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
+        self._varx_abs_names = {'input': [], 'output': []}
+        self._varx_abs2data_io = {}
+
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._vector_transfers = {}
         self._vector_var_ids = {}
@@ -260,6 +285,46 @@ class System(object):
                                          sub_global_dict, assembler,
                                          sub_proc_range)
 
+    def _setupx_variables_myproc(self):
+        """
+        Compute variable dict/list for variables on the current processor.
+
+        Sets the following attributes:
+            _varx_abs2data_io
+            _varx_abs_names
+        """
+        pass
+
+    def _setupx_variable_allprocs_names(self):
+        """
+        Get the names for variables on all processors.
+
+        Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
+
+        Sets the following attributes:
+            _varx_allprocs_prom2abs_set
+
+        Returns
+        -------
+        {'input': [str, ...], 'output': [str, ...]}
+            List of absolute names of owned variables existing on current proc.
+        """
+        pass
+
+    def _setupx_variable_allprocs_indices(self, global_index):
+        """
+        Compute the global index range for variables on all processors.
+
+        Computes the following attributes:
+            _varx_allprocs_idx_range
+
+        Parameters
+        ----------
+        global_index : {'input': int, 'output': int}
+            current global variable counter.
+        """
+        pass
+
     def _setup_variables(self, recurse=True):
         """
         Assemble variable metadata and names lists.
@@ -291,6 +356,12 @@ class System(object):
                 self._var_allprocs_pathnames[typ] = []
                 self._var_myproc_names[typ] = []
                 self._var_myproc_metadata[typ] = []
+
+            # [REFACTOR]
+            self._varx_abs2data_io = {}
+            for type_ in ['input', 'output']:
+                self._varx_abs_names[type_] = []
+                self._varx_allprocs_prom2abs_set[type_] = {}
 
             self.initialize_variables()
 
