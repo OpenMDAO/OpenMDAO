@@ -1,5 +1,5 @@
 from __future__ import division, print_function
-import numpy
+import numpy as np
 import unittest
 
 from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector
@@ -55,15 +55,15 @@ class GeneralProblem(object):
 
         for ngroup in ngroup_level:
             nsub = len(current_systems)
-            nsub_group = int(numpy.floor(nsub/ngroup)) * numpy.ones(ngroup, int)
-            nsub_group[-1] += nsub - numpy.sum(nsub_group)
+            nsub_group = int(np.floor(nsub/ngroup)) * np.ones(ngroup, int)
+            nsub_group[-1] += nsub - np.sum(nsub_group)
             next_systems = []
             next_sysnames = []
             for igroup in range(ngroup):
                 group = Group()
                 group._mpi_proc_allocator.parallel = parallel_groups
-                ind1 = numpy.sum(nsub_group[:igroup])
-                ind2 = numpy.sum(nsub_group[:igroup + 1])
+                ind1 = np.sum(nsub_group[:igroup])
+                ind2 = np.sum(nsub_group[:igroup + 1])
                 for ind in range(ind1, ind2):
                     if isinstance(current_systems[ind], Group):
                         promotes = None

@@ -1,5 +1,5 @@
 from __future__ import division
-import numpy
+import numpy as np
 import unittest
 
 from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector
@@ -46,7 +46,7 @@ class Test(unittest.TestCase):
         self.p.model.suppress_solver_output = True
 
     def assertEqualArrays(self, a, b):
-        self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
+        self.assertTrue(np.linalg.norm(a-b) < 1e-15)
 
     def assertList(self, ab_list):
         for a, b in ab_list:
@@ -68,28 +68,28 @@ class Test(unittest.TestCase):
         compA_inds = self.p.model.get_subsystem('A')._var_myproc_indices
         compB_inds = self.p.model.get_subsystem('B')._var_myproc_indices
 
-        self.assertEqualArrays(root_inds['input'], numpy.array([0]))
-        self.assertEqualArrays(root_inds['output'], numpy.array([0,1]))
+        self.assertEqualArrays(root_inds['input'], np.array([0]))
+        self.assertEqualArrays(root_inds['output'], np.array([0,1]))
 
-        self.assertEqualArrays(compA_inds['input'], numpy.array([]))
-        self.assertEqualArrays(compA_inds['output'], numpy.array([0]))
+        self.assertEqualArrays(compA_inds['input'], np.array([]))
+        self.assertEqualArrays(compA_inds['output'], np.array([0]))
 
-        self.assertEqualArrays(compB_inds['input'], numpy.array([0]))
-        self.assertEqualArrays(compB_inds['output'], numpy.array([1]))
+        self.assertEqualArrays(compB_inds['input'], np.array([0]))
+        self.assertEqualArrays(compB_inds['output'], np.array([1]))
 
     def test__var_allprocs_ranges(self):
         root_rng = self.p.model._var_allprocs_range
         compA_rng = self.p.model.get_subsystem('A')._var_allprocs_range
         compB_rng = self.p.model.get_subsystem('B')._var_allprocs_range
 
-        self.assertEqualArrays(root_rng['input'], numpy.array([0,1]))
-        self.assertEqualArrays(root_rng['output'], numpy.array([0,2]))
+        self.assertEqualArrays(root_rng['input'], np.array([0,1]))
+        self.assertEqualArrays(root_rng['output'], np.array([0,2]))
 
-        self.assertEqualArrays(compA_rng['input'], numpy.array([0,0]))
-        self.assertEqualArrays(compA_rng['output'], numpy.array([0,1]))
+        self.assertEqualArrays(compA_rng['input'], np.array([0,0]))
+        self.assertEqualArrays(compA_rng['output'], np.array([0,1]))
 
-        self.assertEqualArrays(compB_rng['input'], numpy.array([0,1]))
-        self.assertEqualArrays(compB_rng['output'], numpy.array([1,2]))
+        self.assertEqualArrays(compB_rng['input'], np.array([0,1]))
+        self.assertEqualArrays(compB_rng['output'], np.array([1,2]))
 
     def test_connections(self):
         root = self.p.model

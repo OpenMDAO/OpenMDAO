@@ -1,6 +1,6 @@
 """Define the base Jacobian class."""
 from __future__ import division
-import numpy
+import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 from six.moves import range
 
@@ -79,8 +79,8 @@ class Jacobian(object):
             local size of the input variable.
         """
         out_name, in_name = key
-        return (numpy.prod(self._system._var2meta[out_name]['shape']),
-                numpy.prod(self._system._var2meta[in_name]['shape']))
+        return (np.prod(self._system._var2meta[out_name]['shape']),
+                np.prod(self._system._var2meta[in_name]['shape']))
 
     def _key2unique(self, key):
         """
@@ -122,7 +122,7 @@ class Jacobian(object):
         """
         jac = self._subjacs[ukey]
 
-        if isinstance(jac, numpy.ndarray):
+        if isinstance(jac, np.ndarray):
             self._subjacs[ukey] = val * jac
         elif isinstance(jac, (coo_matrix, csr_matrix)):
             self._subjacs[ukey].data *= val  # DOK not supported
@@ -208,11 +208,11 @@ class Jacobian(object):
         """
         ukey = self._key2unique(key)
 
-        if numpy.isscalar(jac) or isinstance(jac, numpy.ndarray):
+        if np.isscalar(jac) or isinstance(jac, np.ndarray):
             shape = self._key2shape(key)
-            jac = numpy.atleast_2d(jac).reshape(shape)
-            # numpy.promote_types will choose the smallest dtype that can contain both arguments
-            safe_dtype = numpy.promote_types(jac.dtype, float)
+            jac = np.atleast_2d(jac).reshape(shape)
+            # np.promote_types will choose the smallest dtype that can contain both arguments
+            safe_dtype = np.promote_types(jac.dtype, float)
             jac = jac.astype(safe_dtype, copy=False)
         elif isinstance(jac, (coo_matrix, csr_matrix)):
             pass

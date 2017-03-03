@@ -1,13 +1,13 @@
 """Define the default Vector and Transfer classes."""
 from __future__ import division
-import numpy
+import numpy as np
 
 import numbers
 from six.moves import range, zip
 
 from openmdao.vectors.vector import Vector, Transfer
 
-real_types = tuple([numbers.Real, numpy.float32, numpy.float64])
+real_types = tuple([numbers.Real, np.float32, np.float64])
 
 
 class DefaultTransfer(Transfer):
@@ -46,8 +46,7 @@ class DefaultTransfer(Transfer):
                     in_inds = self._in_inds[key]
                     out_inds = self._out_inds[key]
                     tmp = in_vec._root_vector._data[in_iset][in_inds]
-                    numpy.add.at(out_vec._root_vector._data[out_iset],
-                                 out_inds, tmp)
+                    np.add.at(out_vec._root_vector._data[out_iset], out_inds, tmp)
 
 
 class DefaultVector(Vector):
@@ -66,9 +65,9 @@ class DefaultVector(Vector):
         [ndarray[:], ...]
             list of zeros arrays of correct size, one for each var_set.
         """
-        data = [numpy.zeros(numpy.sum(sizes[self._iproc, :]))
+        data = [np.zeros(np.sum(sizes[self._iproc, :]))
                 for sizes in self._assembler._variable_sizes[self._typ]]
-        indices = [numpy.zeros(numpy.sum(sizes[self._iproc, :]), int)
+        indices = [np.zeros(np.sum(sizes[self._iproc, :]), int)
                    for sizes in self._assembler._variable_sizes[self._typ]]
 
         variable_indices = self._system._var_myproc_indices[self._typ]
@@ -81,11 +80,11 @@ class DefaultVector(Vector):
             var_name = variable_names[ind]
             ivar_set, ivar = set_indices[ivar_all, :]
 
-            ind1 = numpy.sum(sizes[ivar_set][self._iproc, :ivar])
-            ind2 = numpy.sum(sizes[ivar_set][self._iproc, :ivar + 1])
-            ind1_all = numpy.sum(sizes_all[self._iproc, :ivar_all])
-            ind2_all = numpy.sum(sizes_all[self._iproc, :ivar_all + 1])
-            indices[ivar_set][ind1:ind2] = numpy.arange(ind1_all, ind2_all)
+            ind1 = np.sum(sizes[ivar_set][self._iproc, :ivar])
+            ind2 = np.sum(sizes[ivar_set][self._iproc, :ivar + 1])
+            ind1_all = np.sum(sizes_all[self._iproc, :ivar_all])
+            ind2_all = np.sum(sizes_all[self._iproc, :ivar_all + 1])
+            indices[ivar_set][ind1:ind2] = np.arange(ind1_all, ind2_all)
 
         return data, indices
 
@@ -105,7 +104,7 @@ class DefaultVector(Vector):
         ind1, ind2 = self._system._var_allprocs_range[self._typ]
         sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
 
-        ind_offset = numpy.sum(variable_sizes_all[self._iproc, :ind1])
+        ind_offset = np.sum(variable_sizes_all[self._iproc, :ind1])
 
         data = []
         indices = []
@@ -114,13 +113,13 @@ class DefaultVector(Vector):
             data_inds = sub_variable_set_indices[bool_vector, 1]
             if len(data_inds) > 0:
                 sizes_array = variable_sizes[iset]
-                ind1 = numpy.sum(sizes_array[self._iproc, :data_inds[0]])
-                ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
+                ind1 = np.sum(sizes_array[self._iproc, :data_inds[0]])
+                ind2 = np.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
                 data.append(self._root_vector._data[iset][ind1:ind2])
                 indices.append(self._root_vector._indices[iset][ind1:ind2] - ind_offset)
             else:
-                data.append(numpy.zeros(0))
-                indices.append(numpy.zeros(0, int))
+                data.append(np.zeros(0))
+                indices.append(np.zeros(0, int))
 
         return data, indices
 
@@ -173,8 +172,8 @@ class DefaultVector(Vector):
         for ind, name in enumerate(variable_myproc_names):
             ivar_all = variable_myproc_indices[ind]
             iset, ivar = variable_set_indices[ivar_all, :]
-            ind1 = numpy.sum(variable_sizes[iset][self._iproc, :ivar])
-            ind2 = numpy.sum(variable_sizes[iset][self._iproc, :ivar + 1])
+            ind1 = np.sum(variable_sizes[iset][self._iproc, :ivar])
+            ind2 = np.sum(variable_sizes[iset][self._iproc, :ivar + 1])
 
             # TODO: Optimize by precomputing offsets
             if iset not in ind_offsets:
@@ -188,7 +187,7 @@ class DefaultVector(Vector):
 
             # The shape entry overrides value's shape, which is why we don't
             # use the shape of val as the reference
-            if numpy.prod(meta[ind]['shape']) == 1:
+            if np.prod(meta[ind]['shape']) == 1:
                 idxs[name] = 0
             else:
                 idxs[name] = slice(None)
@@ -203,7 +202,7 @@ class DefaultVector(Vector):
         """
         for iset in range(len(self._data)):
             data = self._data[iset]
-            self._data[iset] = numpy.array(data)
+            self._data[iset] = np.array(data)
 
     def __iadd__(self, vec):
         """
@@ -308,7 +307,7 @@ class DefaultVector(Vector):
         """
         global_sum = 0
         for data in self._data:
-            global_sum += numpy.sum(data**2)
+            global_sum += np.sum(data**2)
         return global_sum ** 0.5
 
     def _scale(self, coeffs):
@@ -359,14 +358,14 @@ class DefaultVector(Vector):
 
             mask = du_data != 0
             if mask.any():
-                abs_du_mask = numpy.abs(du_data[mask])
+                abs_du_mask = np.abs(du_data[mask])
 
                 # Check lower bound
-                max_d_alpha = numpy.amax((lower_data[mask] - u_data[mask]) / abs_du_mask)
+                max_d_alpha = np.amax((lower_data[mask] - u_data[mask]) / abs_du_mask)
                 d_alpha = max(d_alpha, max_d_alpha)
 
                 # Check upper bound
-                max_d_alpha = numpy.amax((u_data[mask] - upper_data[mask]) / abs_du_mask)
+                max_d_alpha = np.amax((u_data[mask] - upper_data[mask]) / abs_du_mask)
                 d_alpha = max(d_alpha, max_d_alpha)
 
         # d_alpha will not be negative because it was initialized to be 0
@@ -415,14 +414,14 @@ class DefaultVector(Vector):
             # the step required to get up to the lower bound.
             # For du, we normalize by alpha since du eventually gets
             # multiplied by alpha.
-            change = numpy.maximum(u_data, lower_data) - u_data
+            change = np.maximum(u_data, lower_data) - u_data
             u_data += change
             du_data += change / alpha
 
             # If u < upper, we're just adding zero. Otherwise, we're adding
             # the step required to get down to the upper bound, but normalized
             # by alpha since du eventually gets multiplied by alpha.
-            change = numpy.minimum(u_data, upper_data) - u_data
+            change = np.minimum(u_data, upper_data) - u_data
             u_data += change
             du_data += change / alpha
 
@@ -459,14 +458,14 @@ class DefaultVector(Vector):
             # the step required to get up to the lower bound.
             # For du, we normalize by alpha since du eventually gets
             # multiplied by alpha.
-            change_lower = numpy.maximum(u_data, lower_data) - u_data
+            change_lower = np.maximum(u_data, lower_data) - u_data
             u_data += change_lower
             du_data += change_lower / alpha
 
             # If u < upper, we're just adding zero. Otherwise, we're adding
             # the step required to get down to the upper bound, but normalized
             # by alpha since du eventually gets multiplied by alpha.
-            change_upper = numpy.minimum(u_data, upper_data) - u_data
+            change_upper = np.minimum(u_data, upper_data) - u_data
             u_data += change_upper
             du_data += change_upper / alpha
 

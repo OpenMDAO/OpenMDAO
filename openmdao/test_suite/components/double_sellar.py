@@ -6,7 +6,8 @@ from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, Sel
 
 class SubSellar(Group):
 
-    def initialize(self):
+    def __init__(self, **kwargs):
+        super(SubSellar, self).__init__(**kwargs)
 
         self.add_subsystem('d1', SellarDis1withDerivatives(),
                            promotes=['x', 'z', 'y1', 'y2'])
@@ -16,7 +17,8 @@ class SubSellar(Group):
 
 class DoubleSellar(Group):
 
-    def initialize(self):
+    def __init__(self, **kwargs):
+        super(DoubleSellar, self).__init__(**kwargs)
 
         self.add_subsystem('g1', SubSellar())
         self.add_subsystem('g2', SubSellar())

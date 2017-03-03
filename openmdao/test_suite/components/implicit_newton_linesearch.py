@@ -1,6 +1,6 @@
 """Components used mainly for testing Newton and line searches."""
 
-import numpy
+import numpy as np
 import unittest
 from math import exp
 
@@ -116,10 +116,10 @@ class ImplCompTwoStatesArrays(ImplicitComponent):
     """
 
     def initialize_variables(self):
-        self.add_input('x', numpy.zeros((3, 1)))
-        self.add_output('y', numpy.zeros((3, 1)))
-        self.add_output('z', 2.0*numpy.ones((3, 1)), lower=1.5,
-            upper=numpy.array([2.6, 2.5, 2.65]).reshape((3,1)))
+        self.add_input('x', np.zeros((3, 1)))
+        self.add_output('y', np.zeros((3, 1)))
+        self.add_output('z', 2.0*np.ones((3, 1)), lower=1.5,
+            upper=np.array([2.6, 2.5, 2.65]).reshape((3,1)))
 
         self.maxiter = 10
         self.atol = 1.0e-12
@@ -142,10 +142,10 @@ class ImplCompTwoStatesArrays(ImplicitComponent):
         """
 
         # Output equation
-        jac[('y', 'x')] = -numpy.diag(numpy.array([1.0, 1.0, 1.0]))
-        jac[('y', 'y')] = numpy.diag(numpy.array([1.0, 1.0, 1.0]))
-        jac[('y', 'z')] = -numpy.diag(numpy.array([2.0, 2.0, 2.0]))
+        jac[('y', 'x')] = -np.diag(np.array([1.0, 1.0, 1.0]))
+        jac[('y', 'y')] = np.diag(np.array([1.0, 1.0, 1.0]))
+        jac[('y', 'z')] = -np.diag(np.array([2.0, 2.0, 2.0]))
 
         # State equation
-        jac[('z', 'z')] = (inputs['x'] + 1.0) * numpy.eye(3)
-        jac[('z', 'x')] = outputs['z'] * numpy.eye(3)
+        jac[('z', 'z')] = (inputs['x'] + 1.0) * np.eye(3)
+        jac[('z', 'x')] = outputs['z'] * np.eye(3)

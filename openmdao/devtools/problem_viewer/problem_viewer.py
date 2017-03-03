@@ -1,5 +1,5 @@
 from six.moves import range
-import numpy
+import numpy as np
 import os
 import pickle
 import json

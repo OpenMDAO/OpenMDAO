@@ -2,7 +2,7 @@
 
 import logging
 
-import numpy
+import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
@@ -72,8 +72,8 @@ def compute_sys_graph(group, input_src_ids, comps_only=False):
     o_start, o_end = group._var_allprocs_range['output']
 
     # mapping arrays to find the system ID given the variable ID
-    invar2sys = numpy.empty(i_end - i_start, dtype=int)
-    outvar2sys = numpy.empty(o_end - o_start, dtype=int)
+    invar2sys = np.empty(i_end - i_start, dtype=int)
+    outvar2sys = np.empty(o_end - o_start, dtype=int)
 
     for i, s in enumerate(subsystems):
         start, end = s._var_allprocs_range['input']
@@ -196,8 +196,8 @@ def _get_out_of_order_subs(group, input_src_ids):
     o_start, o_end = group._var_allprocs_range['output']
 
     # mapping arrays to find the system ID given the variable ID
-    invar2sys = numpy.empty(i_end - i_start, dtype=int)
-    outvar2sys = numpy.empty(o_end - o_start, dtype=int)
+    invar2sys = np.empty(i_end - i_start, dtype=int)
+    outvar2sys = np.empty(o_end - o_start, dtype=int)
 
     for i, s in enumerate(subsystems):
         start, end = s._var_allprocs_range['input']

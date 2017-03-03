@@ -1,6 +1,6 @@
 """ Test for the Backktracking Line Search"""
 
-import numpy
+import numpy as np
 import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp
@@ -159,7 +159,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
     def setUp(self):
         top = Problem()
         top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', numpy.ones((3,1))))
+        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3,1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
@@ -170,7 +170,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top.setup(check=False)
 
         self.top = top
-        self.ub = numpy.array([2.6, 2.5, 2.65])
+        self.ub = np.array([2.6, 2.5, 2.65])
 
     def test_nolinesearch(self):
         top = self.top
