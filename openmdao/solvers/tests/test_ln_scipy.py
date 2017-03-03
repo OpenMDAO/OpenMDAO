@@ -601,8 +601,46 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
+    def test_feature_maxiter(self):
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.ln_solver = ScipyIterativeSolver()
+        model.ln_solver.options['maxiter'] = 3
+
+        prob.setup()
+        prob.run_model()
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 0.0, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 0.0, .00001)
+
+    def test_feature_atol(self):
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.ln_solver = ScipyIterativeSolver()
+        model.ln_solver.options['atol'] = 1.0e-3
+
+        prob.setup()
+        prob.run_model()
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001055699, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
 
 if __name__ == "__main__":
     unittest.main()
