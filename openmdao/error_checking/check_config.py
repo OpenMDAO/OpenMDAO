@@ -10,7 +10,6 @@ import networkx as nx
 
 from openmdao.core.group import Group
 from openmdao.core.component import Component
-from openmdao.devtools.compat import abs_varname_iter
 
 
 def check_config(problem, logger=None):
@@ -236,8 +235,7 @@ def _check_hanging_inputs(problem, logger):
     input_src_ids = problem._assembler._input_src_ids
 
     hanging = sorted([
-        name for i, name in enumerate(abs_varname_iter(problem.model, 'input',
-                                                       local=False)) if
+        name for i, name in enumerate(problem._assembler._varx_allprocs_abs_names['intput']) if
                                                        input_src_ids[i] == -1
     ])
 
