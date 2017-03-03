@@ -150,7 +150,7 @@ class Monitor(object):
             self._norm0 = norm
         self._norm = norm
 
-        self._solver._mpi_print(counter, norm / self._norm0, norm)
+        self._solver._mpi_print(counter, norm, norm / self._norm0)
         self._solver._iter_count += 1
 
 
