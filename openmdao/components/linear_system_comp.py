@@ -21,15 +21,10 @@ class LinearSystemComp(ImplicitComponent):
         Define additional attributes.
         """
         super(LinearSystemComp, self).__init__(**kwargs)
-
-        self._lup = None
-
-    def initialize(self):
-        """
-        Define size parameter.
-        """
         self.metadata.declare('size', value=1, type_=int,
                               desc='the size of the linear system')
+
+        self._lup = None
 
     def initialize_variables(self):
         """
@@ -39,7 +34,7 @@ class LinearSystemComp(ImplicitComponent):
 
         self.add_input("A", val=np.eye(size))
         self.add_input("b", val=np.ones(size))
-        self.add_output("x", shape=size)
+        self.add_output("x", shape=size, val=2.)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """

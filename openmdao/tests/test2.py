@@ -51,7 +51,8 @@ class Comp4(ExplicitComponent):
 
 class GroupG(Group):
 
-    def initialize(self):
+    def __init__(self):
+        super(GroupG, self).__init__()
         self.add_subsystem('C1', Comp1(), promotes=['*'])
         self.add_subsystem('C2', Comp2(), promotes=['*'])
         self.add_subsystem('C3', Comp3(), promotes=['*'])

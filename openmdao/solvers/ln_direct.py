@@ -55,6 +55,7 @@ class DirectSolver(LinearSolver):
             else:
                 raise RuntimeError('Direct solver not implemented for mtx type %s in system %s'
                                    % (type(mtx), system.pathname))
+
         else:
             # First make a backup of the vectors
             b_data = system._vectors['residual']['linear'].get_data()

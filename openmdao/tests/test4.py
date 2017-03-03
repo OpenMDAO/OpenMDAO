@@ -71,7 +71,8 @@ class CompB(ImplicitComponent):
 
 class GroupG(Group):
 
-    def initialize(self):
+    def __init__(self, **kwargs):
+        super(GroupG, self).__init__(**kwargs)
         self.add_subsystem('CA', CompA(), promotes=['*'])
         self.add_subsystem('CB', CompB(), promotes=['*'])
 
@@ -82,7 +83,6 @@ class Test(unittest.TestCase):
         group = GroupG()
         self.p = Problem(group)
 
-        gmres = scipy.sparse.linalg.gmres
         self.p.model.ln_solver = LinearBlockGS()
         self.p.setup(check=False)
 

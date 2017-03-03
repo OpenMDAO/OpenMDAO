@@ -54,7 +54,6 @@ class CycleGroup(ParametericTestGroup):
             'var_shape': [(2, 3), (3,)],
         })
 
-    def _initialize_metadata(self):
         self.metadata.declare('num_comp', type_=int, value=2,
                               desc='Total number of components')
         self.metadata.declare('num_var', type_=int, value=1,
@@ -77,9 +76,6 @@ class CycleGroup(ParametericTestGroup):
         self.metadata.declare('finite_difference', value=False,
                               type_=bool,
                               desc='If the derivatives should be finite differenced.')
-
-    def initialize(self):
-        self._initialize_metadata()
 
         num_comp = self.metadata['num_comp']
         if num_comp < 2:
@@ -147,7 +143,6 @@ class CycleGroup(ParametericTestGroup):
                            promotes_inputs=first_comp._cycle_promotes_in,
                            promotes_outputs=first_comp._cycle_promotes_out)
         prev_name = first_name
-
 
         connection_variables = [('y_{0}'.format(i), 'x_{0}'.format(i)) for i in range(num_var)]
         connection_variables.append(('theta_out', 'theta'))

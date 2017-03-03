@@ -95,7 +95,6 @@ class ExplicitCycleComp(ExplicitComponent):
             self._cycle_names['theta_out'] = 'theta_out'
             self._cycle_promotes_in = self._cycle_promotes_out = []
 
-    def initialize(self):
         self.metadata.declare('jacobian_type', value='matvec',
                               values=['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
                               desc='method of assembling derivatives')

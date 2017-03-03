@@ -228,8 +228,6 @@ class System(object):
         self._design_vars = {}
         self._responses = {}
 
-        self.initialize()
-
     def _setup_processors(self, path, comm, global_dict,
                           assembler, proc_range):
         """
@@ -1659,16 +1657,6 @@ class System(object):
     def _linearize(self):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
-        """
-        pass
-
-    def initialize(self):
-        """
-        Optional user-defined method run once during instantiation.
-
-        Available attributes:
-            name
-            metadata (only local)
         """
         pass
 
