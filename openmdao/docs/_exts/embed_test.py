@@ -26,7 +26,7 @@ def depart_skipped_or_failed_node(self, node):
         self.body.append("output only available for HTML\n")
         return
 
-    html = ('<div class="cell border-box-sizing code_cell rendered"><div class="output"><div class="inner_cell"><div class="{}"><pre>{}</pre></div></div></div></div>'.format(node["kind"], node["text"]) )
+    html = '<div class="cell border-box-sizing code_cell rendered"><div class="output"><div class="inner_cell"><div class="{}"><pre>{}</pre></div></div></div></div>'.format(node["kind"], node["text"])
     self.body.append(html)
 
 
@@ -40,7 +40,7 @@ def visit_in_or_out_node(self, node):
 
 def depart_in_or_out_node(self, node):
     """
-    This function creates the formatting that sets up the look of
+    This function creates the formatting that sets up the look of the blocks
     The look of the formatting is controlled by _theme/static/style.css
     """
     if not isinstance(self, HTMLTranslator):
