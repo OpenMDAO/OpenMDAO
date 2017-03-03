@@ -118,44 +118,22 @@ div.failed pre {
 
 
 /* The following sets up the In/Out blocks for embedded tests */
-div.input_prompt {
-    color: #303F9F;
-    float: left;
-    padding: 0px;
-}
-
 div.input_area {
     border-radius: 1px;
-    padding: 0px;
+
 }
 
-div.output_prompt {
-    color: #D84315;
-    float: left;
-    padding: 0px;
+div.input_area pre {
+    background-color: white;
+    border-radius: 2px;
+    margin-top: 0px;
+    margin-bottom: 0px;
 }
 
 div.output_area pre {
-    background-color: transparent;
-    border-radius: 1px;
-    padding: 0px;
-}
-
-div.highlight{
-  margin:.4em;
-  border: none;
-  padding: 0px;
-  background-color:transparent;
-}
-
-.prompt {
-    min-width: 14ex;
-    /*padding: .4em;*/
-    padding: 0px;
-    margin: 0;
-    font-family: monospace;
-    text-align: left;
-    user-select: none;
-    cursor: default;
+    background-color: #ddd;
+    border-radius: 2px;
+    margin-top: 0px;
+    margin-bottom: 0px;
 }
 /* End of In/Out block markup */
