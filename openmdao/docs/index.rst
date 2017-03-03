@@ -74,7 +74,8 @@ Solvers (nonlinear and linear)
    features/solvers/solver_options
    features/solvers/nlrunonce
    features/solvers/nlbgs
-
+   features/solvers/nlbjac
+   features/solvers/nlnewton
 
 Running your models
 ================================

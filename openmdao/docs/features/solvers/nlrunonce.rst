@@ -13,7 +13,7 @@ are satisfied:
 1. System does not contain a cycle.
 2. System does not contain any implicit states.
 
-Note that a subsystem may contain cycles or impicit states provided that it is
+Note that a subsystem may contain cycles or implicit states provided that it is
 fitted with a solver that can handle them such as :ref:`NewtonSolver <usr_openmdao.solvers.nl_newton.py>`.
 
 Here is an example of using an NLRunOnce solver for a simple model with the <Paraboloid> component.
