@@ -6,7 +6,7 @@ import scipy.sparse as sparse
 import itertools
 import unittest
 
-from openmdao.api import ExplicitComponent
+from openmdao.core.explicitcomponent import ExplicitComponent
 
 
 PSI = 1.

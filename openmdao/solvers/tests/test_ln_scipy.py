@@ -16,7 +16,8 @@ from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver, gmres
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec, \
      TestExplCompSimpleDense
-from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
+     SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
@@ -83,30 +84,6 @@ class TestScipyIterativeSolver(unittest.TestCase):
             group.run_solve_linear(['linear'], 'rev')
 
             self.assertTrue(group.ln_solver._iter_count == 2)
-
-    def test_feature_simple(self):
-        """Tests feature for adding a Scipy GMRES solver and calculating the
-        derivatives."""
-        # Tests derivatives on a simple comp that defines compute_jacvec.
-        prob = Problem()
-        model = prob.model = Group()
-        model.add_subsystem('x_param', IndepVarComp('length', 3.0),
-                            promotes=['length'])
-        model.add_subsystem('mycomp', TestExplCompSimpleDense(),
-                            promotes=['length', 'width', 'area'])
-
-        model.ln_solver = ScipyIterativeSolver()
-        model.suppress_solver_output = True
-
-        prob.setup(check=False, mode='fwd')
-        prob['width'] = 2.0
-        prob.run_model()
-
-        of = ['area']
-        wrt = ['length']
-
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
 
     def test_simple_matvec(self):
         # Tests derivatives on a simple comp that defines compute_jacvec.
@@ -588,6 +565,44 @@ class TestScipyIterativeSolver(unittest.TestCase):
             assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
             assert_rel_error(self, output[2], g1.expected_solution[1], 3e-15)
 
+
+class TestScipyIterativeSolverFeature(unittest.TestCase):
+
+    def test_feature_simple(self):
+        """Tests feature for adding a Scipy GMRES solver and calculating the
+        derivatives."""
+        # Tests derivatives on a simple comp that defines compute_jacvec.
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('x_param', IndepVarComp('length', 3.0),
+                            promotes=['length'])
+        model.add_subsystem('mycomp', TestExplCompSimpleDense(),
+                            promotes=['length', 'width', 'area'])
+
+        model.ln_solver = ScipyIterativeSolver()
+        model.suppress_solver_output = True
+
+        prob.setup(check=False, mode='fwd')
+        prob['width'] = 2.0
+        prob.run_model()
+
+        of = ['area']
+        wrt = ['length']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
+
+    def test_specify_solver(self):
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.ln_solver = ScipyIterativeSolver()
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
 if __name__ == "__main__":
     unittest.main()

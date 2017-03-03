@@ -14,7 +14,9 @@ except ImportError:
     # Necessary for the file to parse
     h5py = None
 
-from openmdao.api import ImplicitComponent, Problem, Group
+from openmdao.core.group import Group
+from openmdao.core.problem import Problem
+from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
 #from openmdao.util.record_util import is_valid_sqlite3_db
 import base64

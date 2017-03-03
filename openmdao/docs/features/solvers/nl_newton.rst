@@ -65,3 +65,24 @@ we modify the model to use :ref:`DirectSolver <usr_openmdao.solvers.ln_direct.py
 
 Specifying a Linesearch algorithm
 ---------------------------------
+
+The NewtonSolver supports specification of a supplemental algorithm that can find a better point
+along the Newton search direction. This is typically used for cases where we have declared upper
+or lower bounds on some of the model outputs and we want to prevent Newton from moving into this
+non feasible space during iteration. An algorithm that does this is called a Line Search.
+
+By default, the NewtonSolver does not perform any line search. We will show how to specify one. First,
+let's set up a problem that has implicit bounds on one of its states.
+
+.. embed-code::
+    openmdao.test_suite.components.implicit_newton_linesearch.ImplCompTwoStates
+
+In this component, the state "z" is only valid between 1.5 and 2.5, while the other state is valid
+everywhere. You can verify that if NewtonSolver is used with no backtracking specified, the solution
+violates the bounds on "z".  Here, we specify :ref:`BacktrackingLineSearch <usr_openmdao.solvers.nl_btlinesearch.py>`
+as our line search algorithm, and we get a solution on the lower bounds for "z".
+
+.. embed-test::
+    openmdao.solvers.tests.test_nl_btlinesearch.TestFeatureBacktrackingLineSearch.test_feature_specification
+
+.. tags:: Solver, NonlinearSolver

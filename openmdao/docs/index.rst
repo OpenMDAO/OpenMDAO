@@ -72,10 +72,16 @@ Solvers (nonlinear and linear)
 
    features/solvers/set_solvers
    features/solvers/solver_options
-   features/solvers/nlrunonce
-   features/solvers/nlbgs
-   features/solvers/nlbjac
-   features/solvers/nlnewton
+   features/solvers/nl_runonce
+   features/solvers/nl_bgs
+   features/solvers/nl_bjac
+   features/solvers/nl_newton
+   features/solvers/ln_runonce
+   features/solvers/ln_direct
+   features/solvers/ln_bgs
+   features/solvers/ln_scipy
+   features/solvers/ln_petscksp
+   features/solvers/ln_bjac
 
 Running your models
 ================================

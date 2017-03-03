@@ -1,8 +1,8 @@
-"""Test the DirectSolver linear solver class."""
+"""Runs a parametric test over several of the linear solvers."""
 
 from __future__ import division, print_function
 
-import numpy
+import numpy as np
 import unittest
 from six import iterkeys
 
@@ -18,15 +18,14 @@ from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.parametric_suite import parametric_suite
-from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
 class ImplComp4Test(ImplicitComponent):
 
     def initialize_variables(self):
-        self.add_input('x', numpy.ones(2))
-        self.add_output('y', numpy.ones(2))
-        self.mtx = numpy.array([
+        self.add_input('x', np.ones(2))
+        self.add_output('y', np.ones(2))
+        self.mtx = np.array([
             [ 3., 4.],
             [ 2., 3.],
         ])
@@ -34,14 +33,14 @@ class ImplComp4Test(ImplicitComponent):
         # [ 3.,-4.],
         # [-2., 3.],
 
-        #self.declare_partials('y', 'x', val=-numpy.eye(2))
+        #self.declare_partials('y', 'x', val=-np.eye(2))
         #self.declare_partials('y', 'y', val=self.mtx)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals['y'] = self.mtx.dot(outputs['y']) - inputs['x']
 
     def linearize(self, inputs, outputs, partials):
-        partials['y', 'x'] = -numpy.eye(2)
+        partials['y', 'x'] = -np.eye(2)
         partials['y', 'y'] = self.mtx
 
 
@@ -140,21 +139,6 @@ class TestDirectSolver(unittest.TestCase):
             # Reverse Derivatives Check
             totals = param_instance.compute_totals('rev')
             assert_rel_error(self, totals, expected_totals, 1e-8)
-
-
-class TestDirectSolverFeature(unittest.TestCase):
-
-    def test_specify_solver(self):
-        prob = Problem()
-        model = prob.model = SellarDerivatives()
-
-        model.ln_solver = DirectSolver()
-
-        prob.setup()
-        prob.run_model()
-
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
 if __name__ == "__main__":
     unittest.main()

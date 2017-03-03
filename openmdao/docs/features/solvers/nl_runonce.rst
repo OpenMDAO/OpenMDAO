@@ -6,7 +6,7 @@ Nonlinear Solver: NLRunOnce
 ===========================
 
 The simplest solver in OpenMDAO is the NLRunOnce solver, which executes the
-system's components or subsystems sequentially. Not iteration is performed by
+system's components or subsystems sequentially. No iteration is performed by
 this solver, so it can only be used in systems where the following conditions
 are satisfied:
 
@@ -21,5 +21,4 @@ Here is an example of using an NLRunOnce solver for a simple model with the <Par
 .. embed-test::
     openmdao.solvers.tests.test_nl_runonce.TestNLRunOnceSolver.test_feature_solver
 
-
-
+.. tags:: Solver, NonlinearSolver
