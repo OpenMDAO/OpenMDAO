@@ -1,13 +1,9 @@
 import sys
-
-from docutils import nodes
-from docutils.parsers.rst.directives import unchanged
-
-
 import sphinx
 from sphinx.util.compat import Directive
 from sphinx.writers.html import HTMLTranslator
-
+from docutils import nodes
+from docutils.parsers.rst.directives import unchanged
 from openmdao.docs._utils.docutil import get_unit_test_source_and_run_outputs, get_unit_test_source_and_run_outputs_in_out
 
 if sys.version_info[0] == 2:
@@ -29,7 +25,7 @@ def depart_skipped_or_failed_node(self, node):
         self.body.append("output only available for HTML\n")
         return
 
-    html = '<div class="container"><div class="cell border-box-sizing code_cell rendered"><div class="output"><div class="prompt output_prompt">Out&nbsp;[{}]:</div><div class="inner_cell"><div class="{}"><pre>{}</pre></div></div></div></div></div>'.format(node["number"], node["kind"], node["text"])
+    html = '<div class="cell border-box-sizing code_cell rendered"><div class="output"><div class="inner_cell"><div class="{}"><pre>{}</pre></div></div></div></div>'.format(node["kind"], node["text"])
     self.body.append(html)
 
 class in_or_out_node(nodes.Element):
@@ -41,17 +37,15 @@ def visit_in_or_out_node(self, node):
 def depart_in_or_out_node(self, node):
     """
     This function creates the formatting that sets up the look of
-    In[1]: print(x)
-    Out[1]: 5
     The look of the formatting is controlled by _theme/static/style.css
     """
     if not isinstance(self, HTMLTranslator):
         self.body.append("output only available for HTML\n")
         return
     if node["kind"] == "In":
-        html = '<div class="container"><div class="cell border-box-sizing code_cell rendered"><div class="input"><div class="prompt input_prompt">{}&nbsp;[{}]:</div><div class="inner_cell"><div class="input_area"><div class="highlight"><pre>{}</pre></div></div></div></div></div></div>'.format(node["kind"], node["number"], node["text"])
+        html = '<div class="cell border-box-sizing code_cell rendered"><div class="input_area"><pre>{}</pre></div></div>'.format(node["text"])
     elif node["kind"] == "Out":
-        html = '<div class="container"><div class="cell border-box-sizing code_cell rendered"><div class="output"><div class="prompt output_prompt">{}&nbsp;[{}]:</div><div class="inner_cell"><div class="output_area"><div class="highlight"><pre>{}</pre></div></div></div></div></div></div>'.format(node["kind"], node["number"], node["text"])
+        html = '<div class="cell border-box-sizing code_cell rendered"><div class="output_area"><pre>{}</pre></div></div>'.format(node["text"])
 
     self.body.append(html)
 
