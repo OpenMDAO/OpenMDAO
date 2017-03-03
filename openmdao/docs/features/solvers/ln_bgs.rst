@@ -1,0 +1,55 @@
+:orphan:
+
+.. _linearblockgs:
+
+Linear Solver: LinearBlockGS
+============================
+
+The LinearBlockGS uses Gauss Seidel to solve the linear system. Like the
+:ref:`DirectSolver <usr_openmdao.solvers.ln_direct.py>`, it is analogous to applying the chain
+rule to solve for the derivatives. However, the LinearBlockGS solver iterates until the linear
+residual is below a tolerance, or the maximum number of iterations has been exceeded. As such,
+it is generally usable for any system topology, and can handle cycles and implicit states
+alike. It is not always the best solver to choose, however, and it may have some problems for
+components whose first derivatives don't satisfy the Lipschitz condition with L<1, and tend
+to diverge. In such a case, you may need to use a solver such as :ref:`ScipyIterativeSolver <usr_openmdao.solvers.ln_scipy.py>`.
+
+With the LinearBlockGS solver, you can specify different linear solvers in the subsystems and they
+will be utilized to solve the subsystem linear problem.
+
+Here, we calculate the total derivatives across the Sellar system.
+
+.. embed-test::
+    openmdao.solvers.tests.test_ln_bgs.TestBGSSolverFeature.test_specify_solver
+
+Settings: maxiter
+-----------------
+
+This lets you specify the maximum number of Gauss Seidel iterations to apply. In this example, we
+cut it back from the default (10) to 2 so that it terminates a few iterations earlier and doesn't
+reach the specified absolute or relative tolerance.
+
+.. embed-test::
+    openmdao.solvers.tests.test_ln_bgs.TestBGSSolverFeature.test_feature_maxiter
+
+Settings: atol
+--------------
+
+Here, we set the absolute tolerance to a looser value that will trigger an earlier termination. After
+each iteration, the norm of the linear residuals is calculated by calling `apply_linear`. If this norm value is lower than the absolute
+tolerance `atol`, the iteration will terminate.
+
+.. embed-test::
+    openmdao.solvers.tests.test_ln_bgs.TestBGSSolverFeature.test_feature_atol
+
+Settings: rtol
+--------------
+
+Here, we set the relative tolerance to a looser value that will trigger an earlier termination. After
+each iteration, the norm of the linear residuals is calculated by calling `apply_linear`. If the ratio of the currently calculated norm to the
+initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
+
+.. embed-test::
+    openmdao.solvers.tests.test_ln_bgs.TestBGSSolverFeature.test_feature_rtol
+
+.. tags:: Solver, LinearSolver

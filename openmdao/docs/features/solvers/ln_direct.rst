@@ -11,7 +11,8 @@ assembles a global Jacobian for all of its subsystems, any linear solver that is
 any of its subsystems does not participate in this calculation (though they may be used in other
 ways such as in subystem Newton solves.)
 
-Here, we calculate the total derivatives across the Sellar system.
+Here we calculate the total derivatives of the Sellar system objective with respect to the design
+variable 'z'.
 
 .. embed-test::
     openmdao.solvers.tests.test_ln_direct.TestDirectSolverFeature.test_specify_solver

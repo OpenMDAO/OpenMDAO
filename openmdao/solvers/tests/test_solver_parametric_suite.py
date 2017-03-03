@@ -44,7 +44,7 @@ class ImplComp4Test(ImplicitComponent):
         partials['y', 'y'] = self.mtx
 
 
-class TestDirectSolver(unittest.TestCase):
+class TestLinearSolverParametricSuite(unittest.TestCase):
 
     def test_direct_solver_comp(self):
         """
