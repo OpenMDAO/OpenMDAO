@@ -63,6 +63,13 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp1.a'], 3.0)
         self.assertEqual(p['comp1.b'], 6.0)
 
+    def test_group_add(self):
+        model=Group()
+        ecomp = ExecComp('b=2.0*a', a=3.0, b=6.0)
+        comp1 = model.add('comp1', ecomp)
+
+        self.assertTrue(ecomp is comp1)
+
     def test_group_simple_promoted(self):
         p = Problem(model=Group())
         p.model.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
