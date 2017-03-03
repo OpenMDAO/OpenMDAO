@@ -57,25 +57,25 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     input_src_ids = system._assembler._input_src_ids
     istart_idx, iend_idx = system._varx_allprocs_idx_range['input']
     ostart_idx, oend_idx = system._varx_allprocs_idx_range['output']
+
     abs_tgt_names = system._varx_abs_names['input']
     abs_src_names = system._varx_abs_names['output']
-    global_idxs = system._assembler._varx_allprocs_abs2idx_io
+
     connections = {}
     for tgt_idx, src_idx in enumerate(input_src_ids):
         if src_idx > -1 and (istart_idx <= tgt_idx < iend_idx or
                              ostart_idx <= src_idx < oend_idx):
             connections[abs_tgt_names[tgt_idx]] = abs_src_names[src_idx]
-    tmetas = dict(abs_meta_iter(system, 'input'))
-    smetas = dict(abs_meta_iter(system, 'output'))
 
     src2tgts = {}
-    units = {n: m.get('units','') for n,m in chain(iteritems(smetas), iteritems(tmetas))}
+    units = {n: data['metadata'].get('units','')
+                for n, data in iteritems(system._varx_abs2data_io)}
     vals = {}
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
         for idx, t in enumerate(abs_tgt_names):
-            tmeta = tmetas[t]
+            tmeta = system._varx_abs2data_io[t]['metadata']
             idxs = tmeta['src_indices']
             if idxs is None:
                 idxs = np.arange(np.prod(tmeta['shape']), dtype=int)
@@ -91,8 +91,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
                 # if there's a unit conversion, express the value in the
                 # units of the target
-                if tmeta['units']:
-                    val = convert_units(val, smetas[s]['units'], tmeta['units'])
+                if units[t]:
+                    val = convert_units(val, units[s], units[t])
 
                 if s not in src2tgts:
                     src2tgts[s] = [t]

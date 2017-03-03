@@ -235,7 +235,7 @@ def _check_hanging_inputs(problem, logger):
     input_src_ids = problem._assembler._input_src_ids
 
     hanging = sorted([
-        name for i, name in enumerate(problem._assembler._varx_allprocs_abs_names['intput']) if
+        name for i, name in enumerate(problem._assembler._varx_allprocs_abs_names['input']) if
                                                        input_src_ids[i] == -1
     ])
 
