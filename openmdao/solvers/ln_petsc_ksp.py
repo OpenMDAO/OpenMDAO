@@ -408,12 +408,9 @@ class PetscKSP(LinearSolver):
 
         size = 0
         global_var_sizes = system._assembler._variable_sizes_all['output']
-        global_idxs = system._assembler._varx_allprocs_abs2idx_io
         idx_start, idx_end = system._varx_allprocs_idx_range['output']
-        for name in system._assembler._varx_allprocs_abs_names['output']:
-            idx = global_idxs[name]
-            if idx_start <= idx < idx_end:
-                size += sum(global_var_sizes[:, idx])
+        for idx in range(idx_start, idx_end):
+            size += sum(global_var_sizes[:, idx])
 
         jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
                                            comm=system.comm)
