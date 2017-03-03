@@ -82,7 +82,7 @@ class Solver(object):
         self._system = system
         self._depth = depth
 
-    def _mpi_print(self, iteration, a_res, rel_res):
+    def _mpi_print(self, iteration, abs_res, rel_res):
         """
         Print residuals from an iteration.
 
@@ -90,7 +90,7 @@ class Solver(object):
         ----------
         iteration : int
             iteration counter, 0-based.
-        a_res : float
+        abs_res : float
             current absolute residual norm.
         rel_res : float
             current relative residual norm.
@@ -117,7 +117,7 @@ class Solver(object):
 
             print_str = ' ' * depth + '-' * self._depth
             print_str += sys_name + solver_name
-            print_str += ' %3d | %.9g %.9g' % (iteration, a_res, rel_res)
+            print_str += ' %3d | %.9g %.9g' % (iteration, abs_res, rel_res)
             print(print_str)
 
     def _run_iterator(self):
