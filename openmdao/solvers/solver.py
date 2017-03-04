@@ -333,10 +333,10 @@ class LinearSolver(Solver):
         """
         system = self._system
         var_inds = [
-            system._var_allprocs_range['output'][0],
-            system._var_allprocs_range['output'][1],
-            system._var_allprocs_range['output'][0],
-            system._var_allprocs_range['output'][1],
+            system._varx_allprocs_idx_range['output'][0],
+            system._varx_allprocs_idx_range['output'][1],
+            system._varx_allprocs_idx_range['output'][0],
+            system._varx_allprocs_idx_range['output'][1],
         ]
         system._apply_linear(self._vec_names, self._mode, var_inds)
 

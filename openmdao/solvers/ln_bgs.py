@@ -1,4 +1,6 @@
 """Define the LinearBlockJac class."""
+from six.moves import range
+
 from openmdao.solvers.solver import BlockLinearSolver
 
 
@@ -26,10 +28,10 @@ class LinearBlockGS(BlockLinearSolver):
                     system._vector_transfers[vec_name][mode, isub](
                         d_inputs, d_outputs, mode)
                 var_inds = [
-                    system._var_allprocs_range['output'][0],
-                    subsys._var_allprocs_range['output'][0],
-                    subsys._var_allprocs_range['output'][1],
-                    system._var_allprocs_range['output'][1],
+                    system._varx_allprocs_idx_range['output'][0],
+                    subsys._varx_allprocs_idx_range['output'][0],
+                    subsys._varx_allprocs_idx_range['output'][1],
+                    system._varx_allprocs_idx_range['output'][1],
                 ]
                 subsys._apply_linear(vec_names, mode, var_inds)
                 for vec_name in vec_names:
@@ -39,10 +41,11 @@ class LinearBlockGS(BlockLinearSolver):
                 subsys._solve_linear(vec_names, mode)
 
         elif mode == 'rev':
-            system._subsystems_myproc.reverse()
-            system._subsystems_myproc_inds.reverse()
-            for ind, subsys in enumerate(system._subsystems_myproc):
-                isub = system._subsystems_myproc_inds[ind]
+            subsystems = system._subsystems_myproc
+            subinds = system._subsystems_myproc_inds
+            for revidx in range(len(system._subsystems_myproc) - 1, -1, -1):
+                isub = subinds[revidx]
+                subsys = subsystems[isub]
                 for vec_name in vec_names:
                     d_inputs = system._vectors['input'][vec_name]
                     d_outputs = system._vectors['output'][vec_name]
@@ -54,11 +57,9 @@ class LinearBlockGS(BlockLinearSolver):
                     b_vec += self._rhs_vecs[vec_name]
                 subsys._solve_linear(vec_names, mode)
                 var_inds = [
-                    system._var_allprocs_range['output'][0],
-                    subsys._var_allprocs_range['output'][0],
-                    subsys._var_allprocs_range['output'][1],
-                    system._var_allprocs_range['output'][1],
+                    system._varx_allprocs_idx_range['output'][0],
+                    subsys._varx_allprocs_idx_range['output'][0],
+                    subsys._varx_allprocs_idx_range['output'][1],
+                    system._varx_allprocs_idx_range['output'][1],
                 ]
                 subsys._apply_linear(vec_names, mode, var_inds)
-            system._subsystems_myproc.reverse()
-            system._subsystems_myproc_inds.reverse()

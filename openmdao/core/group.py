@@ -372,32 +372,28 @@ class Group(System):
         for type_ in ['input', 'output']:
             self._varx_abs_names[type_] = []
 
+        name_offset = len(self.pathname) if self.pathname else 0
+        iotypes = ('input', 'output')
+
         # Perform recursion to populate the dict and list bottom-up
         for subsys in self._subsystems_myproc:
             subsys._setupx_variables_myproc()
 
-            var_maps = {'input': subsys._get_maps('input')[0],
-                        'output': subsys._get_maps('output')[0]}
-
-            for type_ in ['input', 'output']:
+            for type_ in iotypes:
+                var_maps = subsys._get_maps(type_)[0]
+                self._varx_abs_names[type_].extend(subsys._varx_abs_names[type_])
 
                 # Assemble _varx_abs2data_io and _varx_abs_names by concatenating from subsystems.
                 for abs_name in subsys._varx_abs_names[type_]:
                     sub_data = subsys._varx_abs2data_io[abs_name]
 
-                    sub_prom_name = sub_data['prom']
-                    metadata = sub_data['metadata']
-
-                    prom_name = var_maps[type_][sub_prom_name]
-                    if self.pathname == '':
-                        rel_name = abs_name
-                    else:
-                        rel_name = abs_name[len(self.pathname) + 1:]
-
-                    self._varx_abs2data_io[abs_name] = {'prom': prom_name, 'rel': rel_name,
-                                                        'my_idx': len(self._varx_abs_names[type_]),
-                                                        'type_': type_, 'metadata': metadata}
-                    self._varx_abs_names[type_].append(abs_name)
+                    self._varx_abs2data_io[abs_name] = {
+                        'prom': var_maps[sub_data['prom']],
+                        'rel': abs_name[name_offset:] if name_offset > 0 else abs_name,
+                        'my_idx': len(self._varx_abs_names[type_]),
+                        'type_': type_,
+                        'metadata': sub_data['metadata']
+                    }
 
     def _setupx_variable_allprocs_names(self):
         """
