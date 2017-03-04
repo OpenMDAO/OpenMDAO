@@ -406,7 +406,7 @@ class Group(System):
         Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
 
         Sets the following attributes:
-            _varx_allprocs_prom2abs_set
+            _varx_allprocs_prom2abs_list
 
         Returns
         -------
@@ -422,39 +422,37 @@ class Group(System):
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_].extend(subsys_allprocs_abs_names[type_])
 
-        # For _varx_allprocs_prom2abs_set, essentially invert the abs2prom map in
+        # For _varx_allprocs_prom2abs_list, essentially invert the abs2prom map in
         # _varx_abs2data_io to capture at least the local maps.
-        self._varx_allprocs_prom2abs_set = {'input': {}, 'output': {}}
+        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         for abs_name, data in iteritems(self._varx_abs2data_io):
             type_ = data['type_']
             prom_name = data['prom']
-            if prom_name not in self._varx_allprocs_prom2abs_set[type_]:
-                self._varx_allprocs_prom2abs_set[type_][prom_name] = [abs_name]
+            if prom_name not in self._varx_allprocs_prom2abs_list[type_]:
+                self._varx_allprocs_prom2abs_list[type_][prom_name] = [abs_name]
             else:
-                self._varx_allprocs_prom2abs_set[type_][prom_name].append(abs_name)
+                self._varx_allprocs_prom2abs_list[type_][prom_name].append(abs_name)
 
         # If we're running in parallel, gather contributions from other procs.
         if self.comm.size > 1:
             for type_ in ['input', 'output']:
                 sub_comm = self._subsystems_myproc[0].comm
                 if sub_comm.rank == 0:
-                    raw = (allprocs_abs_names[type_], self._varx_allprocs_prom2abs_set[type_])
+                    raw = (allprocs_abs_names[type_], self._varx_allprocs_prom2abs_list[type_])
                 else:
                     raw = ([], {})
 
                 allprocs_abs_names[type_] = []
-                allprocs_prom2abs_set = {}
-                for abs_names, prom2abs_set in self.comm.allgather(raw):
+                allprocs_prom2abs_list = {}
+                for abs_names, prom2abs_list in self.comm.allgather(raw):
                     allprocs_abs_names[type_].extend(abs_names)
-                    for prom_name, abs_names_set in iteritems(prom2abs_set):
-                        if prom_name not in allprocs_prom2abs_set:
-                            allprocs_prom2abs_set[prom_name] = abs_names_set
+                    for prom_name, abs_names_list in iteritems(prom2abs_list):
+                        if prom_name not in allprocs_prom2abs_list:
+                            allprocs_prom2abs_list[prom_name] = abs_names_list
                         else:
-                            allprocs_prom2abs_set[prom_name].extend(abs_names_set)
+                            allprocs_prom2abs_list[prom_name].extend(abs_names_list)
 
-                for prom_name, abs_names_set in iteritems(allprocs_prom2abs_set):
-                    allprocs_prom2abs_set[prom_name] = set(abs_names_set)
-                self._varx_allprocs_prom2abs_set[type_] = allprocs_prom2abs_set
+                self._varx_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
 
         # We use allprocs_abs_names to count the total number of allprocs variables
         # and put it in _varx_allprocs_idx_range.
