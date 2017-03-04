@@ -381,7 +381,6 @@ class Group(System):
 
             for type_ in iotypes:
                 var_maps = subsys._get_maps(type_)[0]
-                self._varx_abs_names[type_].extend(subsys._varx_abs_names[type_])
 
                 # Assemble _varx_abs2data_io and _varx_abs_names by concatenating from subsystems.
                 for abs_name in subsys._varx_abs_names[type_]:
@@ -394,6 +393,7 @@ class Group(System):
                         'type_': type_,
                         'metadata': sub_data['metadata']
                     }
+                    self._varx_abs_names[type_].append(abs_name)
 
     def _setupx_variable_allprocs_names(self):
         """

@@ -938,7 +938,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         for of, wrt in sorted_keys:
             derivative_info = derivatives[of, wrt]
-            print('333333333', derivative_info.keys(), derivatives.keys())
             forward = derivative_info['J_fwd']
             reverse = derivative_info['J_rev']
             fd = derivative_info['J_fd']

@@ -142,6 +142,12 @@ class TestProblemCheckPartials(unittest.TestCase):
                 reverse = partial['J_rev']
                 fd = partial['J_fd']
                 self.assertAlmostEqual(np.linalg.norm(forward - reverse), 0.)
+                print('1-----', fd)
+                print('2-----', forward)
+                print('3-----', reverse)
+                model.run_linearize()
+                print(model._jacobian._subjacs)
+                print(model._jacobian._subjacs_info)
                 self.assertAlmostEqual(np.linalg.norm(forward - fd), 0., delta=1e-6)
 
     def test_units(self):

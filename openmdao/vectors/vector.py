@@ -4,7 +4,7 @@ import numpy as np
 
 from six.moves import range
 
-from openmdao.utils.general_utils import ensure_compatible
+from openmdao.utils.general_utils import ensure_compatible, rel_name2abs_name
 
 
 class Vector(object):
