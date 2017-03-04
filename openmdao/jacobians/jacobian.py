@@ -241,6 +241,11 @@ class Jacobian(object):
         Iterate over subjacs keyed by absolute names.
 
         This includes only subjacs that have been set and are part of the current system.
+
+        Returns
+        -------
+        iterator
+            Iterator over subjacs keyed by absolute names that have been set on this Jacobian.
         """
         return iter(self._iter_list)
 

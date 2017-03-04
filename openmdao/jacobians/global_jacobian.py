@@ -88,7 +88,8 @@ class GlobalJacobian(Jacobian):
         for abs_name in system._varx_abs_names['input']:
             idx = assembler._varx_allprocs_abs2idx_io[abs_name]
             in_offsets[abs_name] = self._get_var_range(idx, 'input')[0]
-            src_indices_dict[abs_name] = system._varx_abs2data_io[abs_name]['src_indices']
+            src_indices_dict[abs_name] = \
+                system._varx_abs2data_io[abs_name]['metadata']['src_indices']
 
         start = len(system.pathname) + 1 if system.pathname else 0
 
@@ -128,20 +129,22 @@ class GlobalJacobian(Jacobian):
 
                     in_idx = assembler._varx_allprocs_abs2idx_io[in_abs_name]
                     out_idx = assembler._input_src_ids[in_idx]
-                    out_abs_name = assembler._varx_allprocs_abs_names['output'][out_idx]
-                    out_offset = out_offsets[out_abs_name]
-                    src_indices = src_indices_dict[in_abs_name]
 
                     if out_start <= out_idx < out_end:
+                        out_abs_name = assembler._varx_allprocs_abs_names['output'][out_idx]
+                        out_offset = out_offsets[out_abs_name]
+                        src_indices = src_indices_dict[in_abs_name]
+
                         if src_indices is None:
-                            self._int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
+                            self._int_mtx._add_submat(abs_key, info, res_offset, out_offset,
+                                                      None, shape)
                         else:
                             # need to add an entry for d(output)/d(source)
                             # instead of d(output)/d(input) when we have
                             # src_indices
-                            abs_key = (res_abs_name, out_abs_name)
-                            self._keymap[key] = abs_key
-                            self._int_mtx._add_submat(abs_key, info, res_offset, out_offset,
+                            abs_key2 = (res_abs_name, out_abs_name)
+                            self._keymap[abs_key] = abs_key2
+                            self._int_mtx._add_submat(abs_key2, info, res_offset, out_offset,
                                                       src_indices, shape)
                     elif out_idx != -1:  # skip unconnected inputs
                         self._ext_mtx._add_submat(abs_key, info, res_offset, in_offset, None, shape)
@@ -173,7 +176,7 @@ class GlobalJacobian(Jacobian):
                 if abs_key in self._subjacs:
                     self._int_mtx._update_submat(abs_key, self._subjacs[abs_key])
 
-            for in_abs_name in system._varx_abs_names['output']:
+            for in_abs_name in system._varx_abs_names['input']:
 
                 abs_key = (res_abs_name, in_abs_name)
                 if abs_key in self._subjacs:

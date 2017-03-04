@@ -602,17 +602,17 @@ class System(object):
                 # We set into the bounds vector first and then apply a and b because
                 # meta['lower'] and meta['upper'] could be lists or tuples.
                 if metadata['lower'] is None:
-                    self._lower_bounds._views[abs_name] = -np.inf
+                    self._lower_bounds._views[abs_name][:] = -np.inf
                 else:
                     shape = self._lower_bounds._views[abs_name].shape
                     value = ensure_compatible(abs_name, metadata['lower'], shape)[0]
-                    self._lower_bounds._views[abs_name] = a + b * value
+                    self._lower_bounds._views[abs_name][:] = a + b * value
                 if metadata['upper'] is None:
-                    self._upper_bounds._views[abs_name] = np.inf
+                    self._upper_bounds._views[abs_name][:] = np.inf
                 else:
-                    shape = self._lower_bounds._views[abs_name].shape
+                    shape = self._upper_bounds._views[abs_name].shape
                     value = ensure_compatible(abs_name, metadata['upper'], shape)[0]
-                    self._upper_bounds._views[abs_name] = a + b * value
+                    self._upper_bounds._views[abs_name][:] = a + b * value
 
         # Perform recursion
         for subsys in self._subsystems_myproc:

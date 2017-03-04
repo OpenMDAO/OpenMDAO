@@ -20,7 +20,8 @@ from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
 
-from openmdao.utils.general_utils import warn_deprecation, ensure_compatible, rel_key2abs_key, abs_key2rel_key
+from openmdao.utils.general_utils import \
+    warn_deprecation, ensure_compatible, rel_key2abs_key, abs_key2rel_key
 from openmdao.vectors.default_vector import DefaultVector
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
@@ -562,8 +563,10 @@ class Problem(object):
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
-                                    in_size = np.prod(comp._varx_abs2data_io[wrt]['metadata']['shape'])
-                                    out_size = np.prod(comp._varx_abs2data_io[of]['metadata']['shape'])
+                                    in_size = np.prod(
+                                        comp._varx_abs2data_io[wrt]['metadata']['shape'])
+                                    out_size = np.prod(
+                                        comp._varx_abs2data_io[of]['metadata']['shape'])
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     for i, j, val in zip(jac_i, jac_j, jac_val):
@@ -609,8 +612,8 @@ class Problem(object):
                 # Since all partials for outputs for explicit comps are declared, assume anything
                 # missing is an input deriv.
                 rel_key = abs_key2rel_key(comp, abs_key)
-                if (explicit_comp
-                        and (abs_key not in subjac_info or subjac_info[abs_key]['type'] == 'input')):
+                if (explicit_comp and (abs_key not in subjac_info or
+                                       subjac_info[abs_key]['type'] == 'input')):
                     partials_data[c_name][rel_key][jac_key] = -partial
                 else:
                     partials_data[c_name][rel_key][jac_key] = partial

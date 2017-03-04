@@ -268,7 +268,6 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     return values
 
 
-
 def rel_name2abs_name(system, rel_name):
     """
     Map relative variable name to absolute variable name.
@@ -311,7 +310,7 @@ def abs_name2rel_name(system, abs_name):
     if system.pathname == '':
         return abs_name
     else:
-        return abs_name[len(system.pathname)+1:]
+        return abs_name[len(system.pathname) + 1:]
 
 
 def rel_key2abs_key(system, rel_key):

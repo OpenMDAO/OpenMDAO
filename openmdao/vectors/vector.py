@@ -240,29 +240,23 @@ class Vector(object):
         """
         return abs_name in self._names
 
-    def __contains__(self, prom_name):
+    def __contains__(self, name):
         """
         Check if the variable is involved in the current mat-vec product.
 
         Parameters
         ----------
-        prom_name : str
-            Promoted variable name in the owning system's namespace.
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
 
         Returns
         -------
         boolean
             True or False.
         """
-        prom2abs_list = self._system._varx_allprocs_prom2abs_list[self._typ]
-
-        if prom_name not in prom2abs_list:
-            return False
-        elif len(prom2abs_list[prom_name]) == 1:
-            abs_name = prom2abs_list[prom_name][0]
-            return abs_name in self._names
-        else:
-            return False
+        abs_name1 = self._prom_name2abs_name(name)
+        abs_name2 = rel_name2abs_name(self._system, name)
+        return abs_name1 in self._names or abs_name2 in self._names
 
     def __iter__(self):
         """
@@ -273,7 +267,12 @@ class Vector(object):
         listiterator
             iterator over the variable names.
         """
-        return iter(self._names)
+        iter_list = []
+        for abs_name in self._system._varx_abs_names[self._typ]:
+            if abs_name in self._names:
+                rel_name = self._system._varx_abs2data_io[abs_name]['rel']
+                iter_list.append(rel_name)
+        return iter(iter_list)
 
     def _prom_name2abs_name(self, prom_name):
         """
@@ -293,50 +292,60 @@ class Vector(object):
         """
         prom2abs_list = self._system._varx_allprocs_prom2abs_list[self._typ]
 
-        if prom_name not in prom2abs_list:
-            msg = 'The name {} is invalid'
-            raise KeyError(msg.format(prom_name))
-        elif len(prom2abs_list[prom_name]) == 1:
-            return prom2abs_list[prom_name][0]
+        if prom_name in prom2abs_list:
+            abs_list = prom2abs_list[prom_name]
+            if len(abs_list) == 1:
+                return abs_list[0]
+            else:
+                msg = 'The promoted name {} is invalid because it is non-unique.'
+                raise KeyError(msg.format(prom_name))
         else:
-            msg = 'The name {} is non-unique so it must be accessed from a lower-level system.'
-            raise KeyError(msg.format(prom_name))
+            return None
 
-    def __getitem__(self, prom_name):
+    def __getitem__(self, name):
         """
         Get the unscaled variable value in true units.
 
         Parameters
         ----------
-        prom_name : str
-            Promoted variable name in the owning system's namespace.
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
 
         Returns
         -------
         float or ndarray
             variable value (not scaled, not dimensionless).
         """
-        abs_name = self._prom_name2abs_name(prom_name)
-        if abs_name in self._names:
-            return self._views[abs_name][self._idxs[abs_name]]
+        abs_name1 = self._prom_name2abs_name(name)
+        abs_name2 = rel_name2abs_name(self._system, name)
+
+        if abs_name1 in self._names:
+            return self._views[abs_name1][self._idxs[abs_name1]]
+        elif abs_name2 in self._names:
+            return self._views[abs_name2][self._idxs[abs_name2]]
         else:
             raise KeyError("Variable '%s' not found." % abs_name)
 
-    def __setitem__(self, prom_name, value):
+    def __setitem__(self, name, value):
         """
         Set the unscaled variable value in true units.
 
         Parameters
         ----------
-        prom_name : str
-            Promoted variable name in the owning system's namespace.
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
         value : float or list or tuple or ndarray
             variable value to set (not scaled, not dimensionless)
         """
-        abs_name = self._prom_name2abs_name(prom_name)
-        if abs_name in self._names:
-            value, shape = ensure_compatible(prom_name, value, self._views[abs_name].shape)
-            self._views[abs_name][:] = value
+        abs_name1 = self._prom_name2abs_name(name)
+        abs_name2 = rel_name2abs_name(self._system, name)
+
+        if abs_name1 in self._names:
+            value, shape = ensure_compatible(name, value, self._views[abs_name1].shape)
+            self._views[abs_name1][:] = value
+        elif abs_name2 in self._names:
+            value, shape = ensure_compatible(name, value, self._views[abs_name2].shape)
+            self._views[abs_name2][:] = value
         else:
             raise KeyError("Variable '%s' not found." % abs_name)
 
