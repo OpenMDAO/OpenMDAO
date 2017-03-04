@@ -208,6 +208,8 @@ class ExplicitComponent(Component):
         """
         Set up partial derivative sparsity structures and approximation schemes.
         """
+        self.initialize_partials()
+
         # Note: These declare calls are outside of initialize_partials so that users do not have to
         # call the super version of initialize_partials. This is still post-initialize_variables.
         other_names = []
