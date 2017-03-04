@@ -87,6 +87,7 @@ def abs_key2rel_key(system, abs_key):
     rel_key1 = abs_name2rel_name(system, abs_key[1])
     return (rel_key0, rel_key1)
 
+
 def prom_name2abs_name(system, prom_name, type_):
     """
     Map the given promoted name to the absolute name.
@@ -119,6 +120,7 @@ def prom_name2abs_name(system, prom_name, type_):
     else:
         return None
 
+
 def name2abs_name(system, name, names, type_):
     """
     Map the given promoted or relative name to the absolute name.
@@ -149,6 +151,7 @@ def name2abs_name(system, name, names, type_):
         return abs_name2
     else:
         return None
+
 
 def prom_key2abs_key(system, prom_key):
     """
@@ -189,6 +192,7 @@ def prom_key2abs_key(system, prom_key):
         return (abs_name0, abs_name1)
     else:
         return None
+
 
 def key2abs_key(system, key):
     """
