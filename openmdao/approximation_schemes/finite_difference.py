@@ -83,18 +83,18 @@ class FiniteDifference(ApproximationScheme):
         super(FiniteDifference, self).__init__()
         self._exec_list = []
 
-    def add_approximation(self, key, kwargs):
+    def add_approximation(self, abs_key, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
         Parameters
         ----------
-        key : tuple(str,str)
-            Pairing of (of, wrt) for the derivative.
+        abs_key : tuple(str,str)
+            Absolute name pairing of (of, wrt) for the derivative.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
-        of, wrt = key
+        of, wrt = abs_key
         fd_options = DEFAULT_FD_OPTIONS.copy()
         fd_options.update(kwargs)
         if fd_options['order'] is None:
@@ -183,7 +183,7 @@ class FiniteDifference(ApproximationScheme):
             coeffs = fd_form.coeffs / step
             current_coeff = fd_form.current_coeff / step
 
-            in_size = np.prod(system._var2meta[wrt]['shape'])
+            in_size = np.prod(system._varx_abs2data_io[wrt]['metadata']['shape'])
 
             result = system._outputs._clone(True)
 
@@ -194,7 +194,7 @@ class FiniteDifference(ApproximationScheme):
             for approx_tuple in approximations:
                 of = approx_tuple[0]
                 # TODO: Sparse derivatives
-                out_size = np.prod(system._var2meta[of]['shape'])
+                out_size = np.prod(system._varx_abs2data_io[of]['metadata']['shape'])
                 outputs.append((of, np.zeros((out_size, in_size))))
 
             for idx in range(in_size):
@@ -210,5 +210,9 @@ class FiniteDifference(ApproximationScheme):
                 for of, subjac in outputs:
                     subjac[:, idx] = result._views_flat[of]
 
-            for of, subjac in outputs:
-                jac[of, wrt] = subjac
+            if isinstance(jac, dict):
+                for of, subjac in outputs:
+                    jac[of, wrt] = subjac
+            else:
+                for of, subjac in outputs:
+                    jac._subjacs[of, wrt] = subjac

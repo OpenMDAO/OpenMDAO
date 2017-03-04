@@ -18,7 +18,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.general_utils import \
-    determine_adder_scaler, format_as_float_or_array
+    determine_adder_scaler, format_as_float_or_array, ensure_compatible
 
 
 # This is for storing various data mapped to var pathname
@@ -361,7 +361,6 @@ class System(object):
             self._varx_abs2data_io = {}
             for type_ in ['input', 'output']:
                 self._varx_abs_names[type_] = []
-                self._varx_allprocs_prom2abs_list[type_] = {}
 
             self.initialize_variables()
 
@@ -441,6 +440,12 @@ class System(object):
             for name in self._var_allprocs_names[typ]:
                 self._var_allprocs_indices[typ][name] = idx
                 idx += 1
+
+    def _setup_partials(self):
+        """
+        Set up partial derivative sparsity structures and approximation schemes.
+        """
+        pass
 
     def _setup_connections(self):
         """
@@ -586,23 +591,28 @@ class System(object):
 
         # if this is the top-most group, we will set the values here as well.
         if is_top:
-            for ind, meta in enumerate(self._var_myproc_metadata['output']):
-                name = self._var_myproc_names['output'][ind]
-                a, b = self._scaling_to_norm['output'][ind, :]
+            for abs_name in self._varx_abs_names['output']:
+                data = self._varx_abs2data_io[abs_name]
+                my_idx = data['my_idx']
+                metadata = data['metadata']
+
+                a, b = self._scaling_to_norm['output'][my_idx, :]
 
                 # We have to convert from physical, unscaled to scaled, dimensionless.
                 # We set into the bounds vector first and then apply a and b because
                 # meta['lower'] and meta['upper'] could be lists or tuples.
-                if meta['lower'] is None:
-                    self._lower_bounds[name] = -np.inf
+                if metadata['lower'] is None:
+                    self._lower_bounds._views[abs_name] = -np.inf
                 else:
-                    self._lower_bounds[name] = meta['lower']
-                    self._lower_bounds[name] = a + b * self._lower_bounds[name]
-                if meta['upper'] is None:
-                    self._upper_bounds[name] = np.inf
+                    shape = self._lower_bounds._views[abs_name].shape
+                    value = ensure_compatible(abs_name, metadata['lower'], shape)[0]
+                    self._lower_bounds._views[abs_name] = a + b * value
+                if metadata['upper'] is None:
+                    self._upper_bounds._views[abs_name] = np.inf
                 else:
-                    self._upper_bounds[name] = meta['upper']
-                    self._upper_bounds[name] = a + b * self._upper_bounds[name]
+                    shape = self._lower_bounds._views[abs_name].shape
+                    value = ensure_compatible(abs_name, metadata['upper'], shape)[0]
+                    self._upper_bounds._views[abs_name] = a + b * value
 
         # Perform recursion
         for subsys in self._subsystems_myproc:

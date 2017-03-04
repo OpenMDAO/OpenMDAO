@@ -9,14 +9,14 @@ class ApproximationScheme(object):
     Base class used to define the interface for derivative approximation schemes.
     """
 
-    def add_approximation(self, key, kwargs):
+    def add_approximation(self, abs_key, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
         Parameters
         ----------
-        key : tuple(str,str)
-            Pairing of (of, wrt) for the derivative.
+        abs_key : tuple(str,str)
+            Absolute name pairing of (of, wrt) for the derivative.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
@@ -54,7 +54,7 @@ class ApproximationScheme(object):
         Parameters
         ----------
         input_deltas : list
-            List of (input name, indices, delta) tuples
+            List of (input name, indices, delta) tuples.
         deriv_type : str
             One of 'total' or 'partial', indicating if total or partial derivatives are being
             approximated.
@@ -79,7 +79,7 @@ class ApproximationScheme(object):
         outputs = system._outputs
 
         for in_name, idxs, delta in input_deltas:
-            if in_name in outputs:
+            if in_name in outputs._views_flat:
                 outputs._views_flat[in_name][idxs] += delta
             else:
                 inputs._views_flat[in_name][idxs] += delta
@@ -91,7 +91,7 @@ class ApproximationScheme(object):
         results_vec.set_vec(cache)
 
         for in_name, idxs, delta in input_deltas:
-            if in_name in outputs:
+            if in_name in outputs._views_flat:
                 outputs._views_flat[in_name][idxs] -= delta
             else:
                 inputs._views_flat[in_name][idxs] -= delta

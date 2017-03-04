@@ -224,21 +224,45 @@ class Vector(object):
         for ind, data in enumerate(self._data):
             data[:] += array[self._indices[ind]]
 
-    def __contains__(self, key):
+    def _contains_abs(self, abs_name):
         """
         Check if the variable is involved in the current mat-vec product.
 
         Parameters
         ----------
-        key : str
-            variable name in the owning system's namespace.
+        abs_name : str
+            Absolute variable name in the owning system's namespace.
 
         Returns
         -------
         boolean
             True or False.
         """
-        return key in self._names
+        return abs_name in self._names
+
+    def __contains__(self, prom_name):
+        """
+        Check if the variable is involved in the current mat-vec product.
+
+        Parameters
+        ----------
+        prom_name : str
+            Promoted variable name in the owning system's namespace.
+
+        Returns
+        -------
+        boolean
+            True or False.
+        """
+        prom2abs_list = self._system._varx_allprocs_prom2abs_list[self._typ]
+
+        if prom_name not in prom2abs_list:
+            return False
+        elif len(prom2abs_list[prom_name]) == 1:
+            abs_name = prom2abs_list[prom_name][0]
+            return abs_name in self._names
+        else:
+            return False
 
     def __iter__(self):
         """
@@ -311,7 +335,7 @@ class Vector(object):
         """
         abs_name = self._prom_name2abs_name(prom_name)
         if abs_name in self._names:
-            value, shape = ensure_compatible(abs_name, value, self._views[abs_name].shape)
+            value, shape = ensure_compatible(prom_name, value, self._views[abs_name].shape)
             self._views[abs_name][:] = value
         else:
             raise KeyError("Variable '%s' not found." % abs_name)

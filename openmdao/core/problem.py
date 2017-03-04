@@ -20,7 +20,7 @@ from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
 
-from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
+from openmdao.utils.general_utils import warn_deprecation, ensure_compatible, rel_key2abs_key, abs_key2rel_key
 from openmdao.vectors.default_vector import DefaultVector
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
@@ -153,50 +153,46 @@ class Problem(object):
 
         return pathname, pdata
 
-    def __getitem__(self, name):
+    def __getitem__(self, prom_name):
         """
         Get an output/input variable.
 
         Parameters
         ----------
-        name : str
-            name of the variable in the root system's namespace.
+        prom_name : str
+            Promoted variable name in the root system's namespace.
 
         Returns
         -------
         float or ndarray
             the requested output/input variable.
         """
-        pathname, pdata = self._get_path_data(name)
-
-        if pdata.typ == 'output':
-            return self.model._outputs[pathname]
+        if prom_name in self.model._outputs:
+            return self.model._outputs[prom_name]
+        elif prom_name in self.model._inputs:
+            return self.model._inputs[prom_name]
         else:
-            return self.model._inputs[pathname]
+            msg = 'The name {} is invalid'
+            raise KeyError(msg.format(prom_name))
 
-    def __setitem__(self, name, value):
+    def __setitem__(self, prom_name, value):
         """
         Set an output/input variable.
 
         Parameters
         ----------
-        name : str
-            name of the output/input variable in the root system's namespace.
+        prom_name : str
+            Promoted variable name in the root system's namespace.
         value : float or ndarray or list
             value to set this variable to.
         """
-        pathname, pdata = self._get_path_data(name)
-
-        if pdata.typ == 'output':
-            meta = self.model._var_myproc_metadata['output'][pdata.myproc_idx]
-            if 'shape' in meta:
-                value, _ = ensure_compatible(pathname, value, meta['shape'])
-            self.model._outputs[pathname] = value
+        if prom_name in self.model._outputs:
+            self.model._outputs[prom_name] = value
+        elif prom_name in self.model._inputs:
+            self.model._inputs[prom_name] = value
         else:
-            meta = self.model._var_myproc_metadata['input'][pdata.myproc_idx]
-            if 'shape' in meta:
-                value, _ = ensure_compatible(pathname, value, meta['shape'])
-            self.model._inputs[pathname] = value
+            msg = 'The name {} is invalid'
+            raise KeyError(msg.format(prom_name))
 
     @property
     def root(self):
@@ -328,6 +324,7 @@ class Problem(object):
         model._setupx_variables_myproc()
         allprocs_abs_names = model._setupx_variable_allprocs_names()
         model._setupx_variable_allprocs_indices({'input': 0, 'output': 0})
+        model._setup_partials()
         model._setup_connections()
 
         # [REFACTOR VERIFICATION] for model._varx_allprocs_idx_range
@@ -553,18 +550,20 @@ class Problem(object):
                         wrt_pattern, wrt_out, wrt_in = wrt_bundle
 
                         wrt_matches = chain(wrt_out, wrt_in)
-                        for (of, wrt) in product(of_matches, wrt_matches):
-                            deriv_value = subjacs.get((c_name + '.' + of, c_name + '.' + wrt))
+                        for rel_key in product(of_matches, wrt_matches):
+                            abs_key = rel_key2abs_key(comp, rel_key)
+                            of, wrt = abs_key
+                            deriv_value = subjacs.get(abs_key)
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                in_size = np.prod(comp._var2meta[wrt]['shape'])
-                                out_size = np.prod(comp._var2meta[of]['shape'])
+                                in_size = np.prod(comp._varx_abs2data_io[wrt]['metadata']['shape'])
+                                out_size = np.prod(comp._varx_abs2data_io[of]['metadata']['shape'])
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
-                                    in_size = np.prod(comp._var2meta[wrt]['shape'])
-                                    out_size = np.prod(comp._var2meta[of]['shape'])
+                                    in_size = np.prod(comp._varx_abs2data_io[wrt]['metadata']['shape'])
+                                    out_size = np.prod(comp._varx_abs2data_io[of]['metadata']['shape'])
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     for i, j, val in zip(jac_i, jac_j, jac_val):
@@ -574,6 +573,7 @@ class Problem(object):
                                 elif sparse.issparse(deriv_value):
                                     deriv_value = deriv_value.todense()
 
+                            of, wrt = rel_key
                             partials_data[c_name][of, wrt][jac_key] = deriv_value
 
                     if explicit_comp:
@@ -599,19 +599,21 @@ class Problem(object):
                 wrt_pattern, wrt_out, wrt_in = wrt_bundle
 
                 wrt_matches = chain(wrt_out, wrt_in)
-                for (of, wrt) in product(of_matches, wrt_matches):
-                    approximation.add_approximation((of, wrt), global_options)
+                for rel_key in product(of_matches, wrt_matches):
+                    abs_key = rel_key2abs_key(comp, rel_key)
+                    approximation.add_approximation(abs_key, global_options)
 
             approx_jac = {}
             approximation.compute_approximations(comp, jac=approx_jac)
-            for d_key, partial in iteritems(approx_jac):
+            for abs_key, partial in iteritems(approx_jac):
                 # Since all partials for outputs for explicit comps are declared, assume anything
                 # missing is an input deriv.
+                rel_key = abs_key2rel_key(comp, abs_key)
                 if (explicit_comp
-                        and (d_key not in subjac_info or subjac_info[d_key]['type'] == 'input')):
-                    partials_data[c_name][d_key][jac_key] = -partial
+                        and (abs_key not in subjac_info or subjac_info[abs_key]['type'] == 'input')):
+                    partials_data[c_name][rel_key][jac_key] = -partial
                 else:
-                    partials_data[c_name][d_key][jac_key] = partial
+                    partials_data[c_name][rel_key][jac_key] = partial
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
@@ -936,6 +938,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         for of, wrt in sorted_keys:
             derivative_info = derivatives[of, wrt]
+            print('333333333', derivative_info.keys(), derivatives.keys())
             forward = derivative_info['J_fwd']
             reverse = derivative_info['J_rev']
             fd = derivative_info['J_fd']

@@ -508,6 +508,13 @@ class Group(System):
         for type_ in ['input', 'output']:
             global_index[type_] = self._varx_allprocs_idx_range[type_][1]
 
+    def _setup_partials(self):
+        """
+        Set up partial derivative sparsity structures and approximation schemes.
+        """
+        for subsys in self._subsystems_myproc:
+            subsys._setup_partials()
+
     def get_subsystem(self, name):
         """
         Return the system called 'name' in the current namespace.

@@ -27,7 +27,7 @@ class DefaultJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        for abs_key in self._iter_pathnames():
+        for abs_key in self._iter_abs_names():
             subjac = self._subjacs[abs_key]
 
             if type(subjac) is np.ndarray or scipy.sparse.issparse(subjac):
@@ -52,9 +52,9 @@ class DefaultJacobian(Jacobian):
                     re = d_residuals._views_flat[abs_key[0]]
                     op = d_outputs._views_flat[abs_key[1]]
                     if mode == 'fwd':
-                        np.add.at(re, subjac[1], ip[subjac[2]] * subjac[0])
+                        np.add.at(re, subjac[1], op[subjac[2]] * subjac[0])
                     if mode == 'rev':
-                        np.add.at(op, subjac[2], op[subjac[1]] * subjac[0])
+                        np.add.at(op, subjac[2], re[subjac[1]] * subjac[0])
 
                 if d_residuals._contains_abs(abs_key[0]) and d_inputs._contains_abs(abs_key[1]):
                     re = d_residuals._views_flat[abs_key[0]]
@@ -62,4 +62,4 @@ class DefaultJacobian(Jacobian):
                     if mode == 'fwd':
                         np.add.at(re, subjac[1], ip[subjac[2]] * subjac[0])
                     if mode == 'rev':
-                        np.add.at(ip, subjac[2], op[subjac[1]] * subjac[0])
+                        np.add.at(ip, subjac[2], re[subjac[1]] * subjac[0])
