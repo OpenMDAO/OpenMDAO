@@ -5,6 +5,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 from six.moves import range
 
 from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.name_maps import key2abs_key
 
 
 class Jacobian(object):
@@ -75,50 +76,6 @@ class Jacobian(object):
         return (np.prod(self._system._varx_abs2data_io[abs_key[0]]['metadata']['shape']),
                 np.prod(self._system._varx_abs2data_io[abs_key[1]]['metadata']['shape']))
 
-    def _prom_key2abs_key(self, prom_key):
-        """
-        Map output-input name pair from promoted names to absolute names.
-
-        This is only valid when the key is unique; otherwise, a KeyError is thrown.
-
-        Parameters
-        ----------
-        prom_key : (str, str)
-            Promoted name pair of sub-Jacobian.
-
-        Returns
-        -------
-        (str, str)
-            Absolute output, input name tuple of sub-Jacobian.
-        """
-        prom2abs_list = self._system._varx_allprocs_prom2abs_list
-
-        # First promoted name is invalid
-        if prom_key[0] not in prom2abs_list['output']:
-            msg = 'The first entry in key ("{}", "{}") is invalid'
-            raise KeyError(msg.format(prom_key[0], prom_key[1]))
-        # First promoted name is valid
-        else:
-            abs_key0 = prom2abs_list['output'][prom_key[0]][0]
-
-        # Second promoted name is an output so it is valid
-        if prom_key[1] in prom2abs_list['output']:
-            abs_key1 = prom2abs_list['output'][prom_key[1]][0]
-        # Second promoted name is an input - it is valid if unique
-        elif prom_key[1] in prom2abs_list['input']:
-            if len(prom2abs_list['input'][prom_key[1]]) > 1:
-                msg = 'The second entry in key ("{}", "{}") is non-unique' \
-                    + 'so it must be accessed from a lower-level system.'
-                raise KeyError(msg.format(prom_key[0], prom_key[1]))
-            else:
-                abs_key1 = prom2abs_list['input'][prom_key[1]][0]
-        # Second promoted name is invalid
-        else:
-            msg = 'The second entry in key ("{}", "{}") is invalid'
-            raise KeyError(msg.format(prom_key[0], prom_key[1]))
-
-        return (abs_key0, abs_key1)
-
     def _multiply_subjac(self, abs_key, val):
         """
         Multiply this sub-Jacobian by val.
@@ -156,53 +113,61 @@ class Jacobian(object):
 
         self._iter_list = iter_list
 
-    def __contains__(self, prom_key):
+    def __contains__(self, key):
         """
-        Return if self contains a sub-jac for the given promoted output-input name pair.
+        Return whether there is a subjac for the given promoted or relative name pair.
 
         Parameters
         ----------
-        prom_key : (str, str)
-            Promoted name pair of sub-Jacobian.
+        key : (str, str)
+            Promoted or relative name pair of sub-Jacobian.
 
         Returns
         -------
         boolean
             return whether sub-Jacobian has been defined.
         """
-        abs_key = self._prom_key2abs_key(prom_key)
+        abs_key = key2abs_key(self._system, key)
         return abs_key in self._subjacs
 
-    def __getitem__(self, prom_key):
+    def __getitem__(self, key):
         """
         Get sub-Jacobian.
 
         Parameters
         ----------
-        prom_key : (str, str)
-            Promoted name pair of sub-Jacobian.
+        key : (str, str)
+            Promoted or relative name pair of sub-Jacobian.
 
         Returns
         -------
         ndarray or spmatrix or list[3]
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        abs_key = self._prom_key2abs_key(prom_key)
-        return self._subjacs[abs_key]
+        abs_key = key2abs_key(self._system, key)
+        if abs_key in self._subjacs:
+            return self._subjacs[abs_key]
+        else:
+            msg = 'Variable name pair "{}", "{}" not found.'
+            raise KeyError(msg.format(key[0], key[1]))
 
-    def __setitem__(self, prom_key, subjac):
+    def __setitem__(self, key, subjac):
         """
         Set sub-Jacobian.
 
         Parameters
         ----------
-        prom_key : (str, str)
-            Promoted name pair of sub-Jacobian.
+        key : (str, str)
+            Promoted or relative name pair of sub-Jacobian.
         subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        abs_key = self._prom_key2abs_key(prom_key)
-        self._set_abs(abs_key, subjac)
+        abs_key = key2abs_key(self._system, key)
+        if abs_key is not None:
+            self._set_abs(abs_key, subjac)
+        else:
+            msg = 'Variable name pair "{}", "{}" not valid.'
+            raise KeyError(msg.format(key[0], key[1]))
 
     def _set_abs(self, abs_key, subjac):
         """
@@ -236,7 +201,7 @@ class Jacobian(object):
 
         self._subjacs[abs_key] = subjac
 
-    def _iter_abs_names(self):
+    def _iter_abs_keys(self):
         """
         Iterate over subjacs keyed by absolute names.
 
@@ -281,7 +246,7 @@ class Jacobian(object):
             0th and 1st order coefficients for scaling/unscaling.
             The keys are 'input', 'output', and 'residual'.
         """
-        for abs_key in self._iter_abs_names():
+        for abs_key in self._iter_abs_keys():
             self._scale_subjac(abs_key, coeffs)
 
     def _initialize(self):

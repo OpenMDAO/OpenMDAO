@@ -4,7 +4,8 @@ import numpy as np
 
 from six.moves import range
 
-from openmdao.utils.general_utils import ensure_compatible, rel_name2abs_name
+from openmdao.utils.general_utils import ensure_compatible
+from openmdao.utils.name_maps import name2abs_name
 
 
 class Vector(object):
@@ -240,6 +241,22 @@ class Vector(object):
         """
         return abs_name in self._names
 
+    def __iter__(self):
+        """
+        Iterator over variables involved in the current mat-vec product (relative names).
+
+        Returns
+        -------
+        listiterator
+            iterator over the variable names.
+        """
+        iter_list = []
+        for abs_name in self._system._varx_abs_names[self._typ]:
+            if abs_name in self._names:
+                rel_name = self._system._varx_abs2data_io[abs_name]['rel']
+                iter_list.append(rel_name)
+        return iter(iter_list)
+
     def __contains__(self, name):
         """
         Check if the variable is involved in the current mat-vec product.
@@ -254,53 +271,8 @@ class Vector(object):
         boolean
             True or False.
         """
-        abs_name1 = self._prom_name2abs_name(name)
-        abs_name2 = rel_name2abs_name(self._system, name)
-        return abs_name1 in self._names or abs_name2 in self._names
-
-    def __iter__(self):
-        """
-        Iterator over variables involved in the current mat-vec product.
-
-        Returns
-        -------
-        listiterator
-            iterator over the variable names.
-        """
-        iter_list = []
-        for abs_name in self._system._varx_abs_names[self._typ]:
-            if abs_name in self._names:
-                rel_name = self._system._varx_abs2data_io[abs_name]['rel']
-                iter_list.append(rel_name)
-        return iter(iter_list)
-
-    def _prom_name2abs_name(self, prom_name):
-        """
-        Map the given promoted name to the absolute name.
-
-        This is only valid when the name is unique; otherwise, a KeyError is thrown.
-
-        Parameters
-        ----------
-        prom_name : str
-            Promoted variable name in the owning system's namespace.
-
-        Returns
-        -------
-        str
-            Absolute variable name.
-        """
-        prom2abs_list = self._system._varx_allprocs_prom2abs_list[self._typ]
-
-        if prom_name in prom2abs_list:
-            abs_list = prom2abs_list[prom_name]
-            if len(abs_list) == 1:
-                return abs_list[0]
-            else:
-                msg = 'The promoted name {} is invalid because it is non-unique.'
-                raise KeyError(msg.format(prom_name))
-        else:
-            return None
+        abs_name = name2abs_name(self._system, name, self._names, self._typ)
+        return abs_name is not None
 
     def __getitem__(self, name):
         """
@@ -316,15 +288,12 @@ class Vector(object):
         float or ndarray
             variable value (not scaled, not dimensionless).
         """
-        abs_name1 = self._prom_name2abs_name(name)
-        abs_name2 = rel_name2abs_name(self._system, name)
-
-        if abs_name1 in self._names:
-            return self._views[abs_name1][self._idxs[abs_name1]]
-        elif abs_name2 in self._names:
-            return self._views[abs_name2][self._idxs[abs_name2]]
+        abs_name = name2abs_name(self._system, name, self._names, self._typ)
+        if abs_name is not None:
+            return self._views[abs_name][self._idxs[abs_name]]
         else:
-            raise KeyError("Variable '%s' not found." % abs_name)
+            msg = 'Variable name "{}" not found.'
+            raise KeyError(msg.format(name))
 
     def __setitem__(self, name, value):
         """
@@ -337,17 +306,13 @@ class Vector(object):
         value : float or list or tuple or ndarray
             variable value to set (not scaled, not dimensionless)
         """
-        abs_name1 = self._prom_name2abs_name(name)
-        abs_name2 = rel_name2abs_name(self._system, name)
-
-        if abs_name1 in self._names:
-            value, shape = ensure_compatible(name, value, self._views[abs_name1].shape)
-            self._views[abs_name1][:] = value
-        elif abs_name2 in self._names:
-            value, shape = ensure_compatible(name, value, self._views[abs_name2].shape)
-            self._views[abs_name2][:] = value
+        abs_name = name2abs_name(self._system, name, self._names, self._typ)
+        if abs_name is not None:
+            value, shape = ensure_compatible(name, value, self._views[abs_name].shape)
+            self._views[abs_name][:] = value
         else:
-            raise KeyError("Variable '%s' not found." % abs_name)
+            msg = 'Variable name "{}" not found.'
+            raise KeyError(msg.format(name))
 
     def _initialize_data(self, root_vector):
         """

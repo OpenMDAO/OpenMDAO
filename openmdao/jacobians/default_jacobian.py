@@ -27,7 +27,7 @@ class DefaultJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        for abs_key in self._iter_abs_names():
+        for abs_key in self._iter_abs_keys():
             subjac = self._subjacs[abs_key]
 
             if type(subjac) is np.ndarray or scipy.sparse.issparse(subjac):

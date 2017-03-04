@@ -19,10 +19,10 @@ from openmdao.core.driver import Driver
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
-
-from openmdao.utils.general_utils import \
-    warn_deprecation, ensure_compatible, rel_key2abs_key, abs_key2rel_key
 from openmdao.vectors.default_vector import DefaultVector
+
+from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
+from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])

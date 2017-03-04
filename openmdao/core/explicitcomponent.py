@@ -8,7 +8,8 @@ import numpy as np
 from six import iteritems, itervalues
 
 from openmdao.core.component import Component
-from openmdao.utils.general_utils import warn_deprecation, rel_key2abs_key
+from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.name_maps import rel_key2abs_key
 
 
 class ExplicitComponent(Component):

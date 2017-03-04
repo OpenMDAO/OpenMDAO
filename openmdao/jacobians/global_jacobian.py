@@ -98,10 +98,10 @@ class GlobalJacobian(Jacobian):
         for s in self._system.system_iter(local=True, recurse=True,
                                           include_self=True, typ=Component):
 
-            for res_abs_name in system._varx_abs_names['output']:
+            for res_abs_name in s._varx_abs_names['output']:
                 res_offset = out_offsets[res_abs_name]
 
-                for out_abs_name in system._varx_abs_names['output']:
+                for out_abs_name in s._varx_abs_names['output']:
                     out_offset = out_offsets[out_abs_name]
 
                     abs_key = (res_abs_name, out_abs_name)
@@ -114,7 +114,7 @@ class GlobalJacobian(Jacobian):
 
                     self._int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
 
-                for in_abs_name in system._varx_abs_names['input']:
+                for in_abs_name in s._varx_abs_names['input']:
                     in_offset = in_offsets[in_abs_name]
 
                     abs_key = (res_abs_name, in_abs_name)

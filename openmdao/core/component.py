@@ -18,7 +18,8 @@ from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation, rel_name2abs_name, rel_key2abs_key
+    warn_deprecation
+from openmdao.utils.name_maps import rel_name2abs_name, rel_key2abs_key, abs_key2rel_key
 
 
 class Component(System):
@@ -464,10 +465,10 @@ class Component(System):
         meta : dict
             Metadata dictionary from declare_partials.
         """
-        of, wrt = abs_key
+        of, wrt = abs_key2rel_key(self, abs_key)
         if meta['dependent']:
-            out_size = np.prod(self._varx_abs2data_io[of]['metadata']['shape'])
-            in_size = np.prod(self._varx_abs2data_io[wrt]['metadata']['shape'])
+            out_size = np.prod(self._varx_abs2data_io[abs_key[0]]['metadata']['shape'])
+            in_size = np.prod(self._varx_abs2data_io[abs_key[1]]['metadata']['shape'])
             rows = meta['rows']
             cols = meta['cols']
             if rows is not None:
