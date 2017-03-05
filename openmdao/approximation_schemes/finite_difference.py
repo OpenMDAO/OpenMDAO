@@ -6,8 +6,9 @@ from collections import namedtuple
 from itertools import groupby
 from six.moves import range
 
-
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
+from openmdao.utils.name_maps import abs_key2rel_key
+
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 
@@ -210,9 +211,6 @@ class FiniteDifference(ApproximationScheme):
                 for of, subjac in outputs:
                     subjac[:, idx] = result._views_flat[of]
 
-            if isinstance(jac, dict):
-                for of, subjac in outputs:
-                    jac[of, wrt] = subjac
-            else:
-                for of, subjac in outputs:
-                    jac._subjacs[of, wrt] = subjac
+            for of, subjac in outputs:
+                rel_key = abs_key2rel_key(system, (of, wrt))
+                jac[rel_key] = subjac

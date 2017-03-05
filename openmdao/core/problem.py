@@ -576,8 +576,7 @@ class Problem(object):
                                 elif sparse.issparse(deriv_value):
                                     deriv_value = deriv_value.todense()
 
-                            of, wrt = rel_key
-                            partials_data[c_name][of, wrt][jac_key] = deriv_value
+                            partials_data[c_name][rel_key][jac_key] = deriv_value
 
                     if explicit_comp:
                         comp._negate_jac()
@@ -608,10 +607,10 @@ class Problem(object):
 
             approx_jac = {}
             approximation.compute_approximations(comp, jac=approx_jac)
-            for abs_key, partial in iteritems(approx_jac):
+            for rel_key, partial in iteritems(approx_jac):
+                abs_key = rel_key2abs_key(comp, rel_key)
                 # Since all partials for outputs for explicit comps are declared, assume anything
                 # missing is an input deriv.
-                rel_key = abs_key2rel_key(comp, abs_key)
                 if (explicit_comp and (abs_key not in subjac_info or
                                        subjac_info[abs_key]['type'] == 'input')):
                     partials_data[c_name][rel_key][jac_key] = -partial
