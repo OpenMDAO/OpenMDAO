@@ -154,46 +154,46 @@ class Problem(object):
 
         return pathname, pdata
 
-    def __getitem__(self, prom_name):
+    def __getitem__(self, name):
         """
         Get an output/input variable.
 
         Parameters
         ----------
-        prom_name : str
-            Promoted variable name in the root system's namespace.
+        name : str
+            Promoted or relative variable name in the root system's namespace.
 
         Returns
         -------
         float or ndarray
             the requested output/input variable.
         """
-        if prom_name in self.model._outputs:
-            return self.model._outputs[prom_name]
-        elif prom_name in self.model._inputs:
-            return self.model._inputs[prom_name]
+        if name in self.model._outputs:
+            return self.model._outputs[name]
+        elif name in self.model._inputs:
+            return self.model._inputs[name]
         else:
             msg = 'The name {} is invalid'
-            raise KeyError(msg.format(prom_name))
+            raise KeyError(msg.format(name))
 
-    def __setitem__(self, prom_name, value):
+    def __setitem__(self, name, value):
         """
         Set an output/input variable.
 
         Parameters
         ----------
-        prom_name : str
-            Promoted variable name in the root system's namespace.
+        name : str
+            Promoted or relative variable name in the root system's namespace.
         value : float or ndarray or list
             value to set this variable to.
         """
-        if prom_name in self.model._outputs:
-            self.model._outputs[prom_name] = value
-        elif prom_name in self.model._inputs:
-            self.model._inputs[prom_name] = value
+        if name in self.model._outputs:
+            self.model._outputs[name] = value
+        elif name in self.model._inputs:
+            self.model._inputs[name] = value
         else:
             msg = 'The name {} is invalid'
-            raise KeyError(msg.format(prom_name))
+            raise KeyError(msg.format(name))
 
     @property
     def root(self):
