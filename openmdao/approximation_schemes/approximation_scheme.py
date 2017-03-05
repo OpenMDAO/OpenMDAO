@@ -54,7 +54,7 @@ class ApproximationScheme(object):
         Parameters
         ----------
         input_deltas : list
-            List of (input name, indices, delta) tuples.
+            List of (input name, indices, delta) tuples, where input name is an absolute name.
         deriv_type : str
             One of 'total' or 'partial', indicating if total or partial derivatives are being
             approximated.

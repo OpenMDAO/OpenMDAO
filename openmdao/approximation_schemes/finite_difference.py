@@ -174,7 +174,7 @@ class FiniteDifference(ApproximationScheme):
             fd_form = _generate_fd_coeff(form, order)
 
             if step_calc == 'rel':
-                if wrt in system._outputs:
+                if wrt in system._outputs._views_flat:
                     scale = np.linalg.norm(system._outputs._views_flat[wrt])
                 else:
                     scale = np.linalg.norm(system._inputs._views_flat[wrt])
