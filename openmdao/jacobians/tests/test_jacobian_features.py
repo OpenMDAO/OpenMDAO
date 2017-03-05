@@ -177,21 +177,21 @@ class TestJacobianFeatures(unittest.TestCase):
     @parameterized.expand([
         ({'of': 'f', 'wrt': 'z', 'val': np.ones((1, 5))},
          'simple: d\(f\)/d\(z\): Expected 1x4 but val is 1x5'),
-        # ({'of': 'f', 'wrt': 'z', 'rows': [0, -1, 4], 'cols': [0, 0, 0]},
-        #  'simple: d\(f\)/d\(z\): row indices must be non-negative'),
-        # ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, -1, 4]},
-        #  'simple: d\(f\)/d\(z\): col indices must be non-negative'),
-        # ({'of': 'f', 'wrt': 'z', 'rows': [0, 0], 'cols': [0, 4]},
-        #  'simple: d\(f\)/d\(z\): Expected 1x4 but declared at least 1x5'),
-        # ({'of': 'f', 'wrt': 'z', 'rows': [0, 10]},
-        #  'If one of rows/cols is specified, then both must be specified'),
-        # ({'of': 'f', 'wrt': 'z', 'cols': [0, 10]},
-        #  'If one of rows/cols is specified, then both must be specified'),
-        # ({'of': 'f', 'wrt': 'z', 'rows': [0], 'cols': [0, 3]},
-        #  'rows and cols must have the same shape, rows: \(1L?,\), cols: \(2L?,\)'),
-        # ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, 1, 3], 'val': [0, 1]},
-        #  'If rows and cols are specified, val must be a scalar or have the same shape, '
-        #  'val: \(2L?,\), rows/cols: \(3L?,\)'),
+        ({'of': 'f', 'wrt': 'z', 'rows': [0, -1, 4], 'cols': [0, 0, 0]},
+         'simple: d\(f\)/d\(z\): row indices must be non-negative'),
+        ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, -1, 4]},
+         'simple: d\(f\)/d\(z\): col indices must be non-negative'),
+        ({'of': 'f', 'wrt': 'z', 'rows': [0, 0], 'cols': [0, 4]},
+         'simple: d\(f\)/d\(z\): Expected 1x4 but declared at least 1x5'),
+        ({'of': 'f', 'wrt': 'z', 'rows': [0, 10]},
+         'If one of rows/cols is specified, then both must be specified'),
+        ({'of': 'f', 'wrt': 'z', 'cols': [0, 10]},
+         'If one of rows/cols is specified, then both must be specified'),
+        ({'of': 'f', 'wrt': 'z', 'rows': [0], 'cols': [0, 3]},
+         'rows and cols must have the same shape, rows: \(1L?,\), cols: \(2L?,\)'),
+        ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, 1, 3], 'val': [0, 1]},
+         'If rows and cols are specified, val must be a scalar or have the same shape, '
+         'val: \(2L?,\), rows/cols: \(3L?,\)'),
     ])
     def test_bad_sizes(self, partials_kwargs, error_msg):
         comp = SimpleCompKwarg(partials_kwargs)
