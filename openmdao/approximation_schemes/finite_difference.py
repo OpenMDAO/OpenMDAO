@@ -75,6 +75,8 @@ class FiniteDifference(ApproximationScheme):
     ----------
     _exec_list : list
         A list of which derivatives (in execution order) to compute.
+        The entries are of the form (of, wrt, fd_options), where of and wrt are absolute names
+        and fd_options is a dictionary.
     """
 
     def __init__(self):

@@ -30,11 +30,9 @@ class ApproximationScheme(object):
         ----------
         system : System
             System on which the execution is run.
-
         jac : None or dict-like
             If None, update system with the approximated sub-Jacobians. Otherwise, store the
             approximations in the given dict-like object.
-
         deriv_type : str
             One of 'total' or 'partial', indicating if total or partial derivatives are being
             approximated.
