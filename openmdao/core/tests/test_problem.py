@@ -313,6 +313,8 @@ class TestProblem(unittest.TestCase):
 
         # the output variable, referenced by the promoted name
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
+        # the connected input variable, referenced by the absolute path
+        assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
 
     def test_feature_set_get_array(self):
         prob = Problem()
