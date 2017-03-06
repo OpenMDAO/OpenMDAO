@@ -14,6 +14,7 @@ from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.ln_bgs import LinearBlockGS
 from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver, gmres
+from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec, \
      TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
@@ -641,6 +642,22 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001055699, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
+
+    def test_specify_precon(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NewtonSolver()
+        prob.model.ln_sollver = ScipyIterativeSolver()
+
+        prob.model.ln_solver.precon = LinearBlockGS()
+        prob.model.ln_solver.precon.options['maxiter'] = 2
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
 if __name__ == "__main__":
     unittest.main()

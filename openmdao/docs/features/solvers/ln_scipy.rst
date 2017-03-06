@@ -40,11 +40,11 @@ Settings: atol
 
 Here, we set the absolute tolerance to a much tighter value (default is 1.0e-12) to show what happens. In
 practice, the tolerance serves a dual role in GMRES. In addition to being a termination criteria, the tolerance
-also defines what GMRES coniders to be tiny. Tiny numbers are replaced by zero when the argument vector is
+also defines what GMRES considers to be tiny. Tiny numbers are replaced by zero when the argument vector is
 normalized at the start of each new matrix-vector product. The end result here is that we iterate longer to get
 a marginally better answer.
 
-You may need to adjust this setting if you have abnormally large or small values in your global jacobian.
+You may need to adjust this setting if you have abnormally large or small values in your global Jacobean.
 
 .. embed-test::
     openmdao.solvers.tests.test_ln_scipy.TestScipyIterativeSolverFeature.test_feature_atol
@@ -56,5 +56,21 @@ The 'rtol' setting is not supported by Scipy GMRES.
 
 Specifying a Preconditioner
 ---------------------------
+
+You can specify a preconditioner to improve the convergence of the iterative linear solution. The
+motivation for using a preconditioner is the observation that iterative methods have better convergence
+properties if the linear system has a smaller condition number, so the goal of the preconditioner is to
+improve the condition number in part or all of the Jacobian.
+
+Here, we add a Gauss Seidel preconditioner to the simple Sellar solution with Newton. Note that the number of
+GMRES iterations is lower when using the preconditioner.
+
+.. embed-test::
+    openmdao.solvers.tests.test_ln_scipy.TestScipyIterativeSolverFeature.test_specify_precon
+
+**A note on nesting ScipyIterativeSolver under a preconditoner:** The underlying GMRES module is not
+re-entrant, so it cannot be called as a new instance while it is running. If you need to use gmres under
+gmres in a preconditioner stack, you should use :ref:`PetscKSP <usr_openmdao.solvers.ln_petsc_ksp.py>` at
+one (ore more) of the levels.
 
 .. tags:: Solver, LinearSolver
