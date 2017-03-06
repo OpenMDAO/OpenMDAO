@@ -10,8 +10,8 @@ and `solve_linear` once on each subsystem. It is directly analogous to applying 
 chain rule to the whole system without any iteration at the top level. This linear solver can only be
 used in systems where the following conditions are satisfied:
 
-1. System does not contain a cycle.
-2. System does not contain any implicit states.
+1. System does not contain a cycle, though subsystems may.
+2. System does not contain any implicit states, though subsystems may.
 
 However, subsystems can contain cycles or implicit states provided that they are using the appropriate
 solver such as :ref:`ScipyIterativeSolver <usr_openmdao.solvers.ln_scipy.py>`

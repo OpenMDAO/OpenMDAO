@@ -19,45 +19,45 @@ Here, we calculate the total derivatives across the Sellar system.
 .. embed-test::
     openmdao.solvers.tests.test_ln_scipy.TestScipyIterativeSolverFeature.test_specify_solver
 
-Settings: maxiter
------------------
+Options
+-------
 
-This lets you specify the maximum number of GMRES iterations to apply. The default maximum is 1000, which
-is much higher than the other linear solvers because each multiplication by the system Jacobian is considered
-to be an iteration. You may have to decrease this value if you have a coupled system that is converging
-very slowly. (Of course, in such a case, it may be better to add a preconditioner.)  Alternatively, you
-may have to raise it if you have an extremely large number of components in your system (a 1000-component
-ring would need 1000 iterations just to make it around once.)
+- maxiter
 
-This example shows what happens if you set maxiter too low (the derivatives should be nonzero, but it stops too
-soon.)
+  This lets you specify the maximum number of GMRES iterations to apply. The default maximum is 1000, which
+  is much higher than the other linear solvers because each multiplication by the system Jacobian is considered
+  to be an iteration. You may have to decrease this value if you have a coupled system that is converging
+  very slowly. (Of course, in such a case, it may be better to add a preconditioner.)  Alternatively, you
+  may have to raise it if you have an extremely large number of components in your system (a 1000-component
+  ring would need 1000 iterations just to make it around once.)
 
-.. embed-test::
-    openmdao.solvers.tests.test_ln_scipy.TestScipyIterativeSolverFeature.test_feature_maxiter
+  This example shows what happens if you set maxiter too low (the derivatives should be nonzero, but it stops too
+  soon.)
 
-Settings: atol
---------------
+  .. embed-test::
+      openmdao.solvers.tests.test_ln_scipy.TestScipyIterativeSolverFeature.test_feature_maxiter
 
-Here, we set the absolute tolerance to a much tighter value (default is 1.0e-12) to show what happens. In
-practice, the tolerance serves a dual role in GMRES. In addition to being a termination criteria, the tolerance
-also defines what GMRES considers to be tiny. Tiny numbers are replaced by zero when the argument vector is
-normalized at the start of each new matrix-vector product. The end result here is that we iterate longer to get
-a marginally better answer.
+- atol
 
-You may need to adjust this setting if you have abnormally large or small values in your global Jacobean.
+  Here, we set the absolute tolerance to a much tighter value (default is 1.0e-12) to show what happens. In
+  practice, the tolerance serves a dual role in GMRES. In addition to being a termination criteria, the tolerance
+  also defines what GMRES considers to be tiny. Tiny numbers are replaced by zero when the argument vector is
+  normalized at the start of each new matrix-vector product. The end result here is that we iterate longer to get
+  a marginally better answer.
 
-.. embed-test::
-    openmdao.solvers.tests.test_ln_scipy.TestScipyIterativeSolverFeature.test_feature_atol
+  You may need to adjust this setting if you have abnormally large or small values in your global Jacobean.
 
-Settings: rtol
---------------
+  .. embed-test::
+      openmdao.solvers.tests.test_ln_scipy.TestScipyIterativeSolverFeature.test_feature_atol
 
-The 'rtol' setting is not supported by Scipy GMRES.
+- rtol
+
+  The 'rtol' setting is not supported by Scipy GMRES.
 
 Specifying a Preconditioner
 ---------------------------
 
-You can specify a preconditioner to improve the convergence of the iterative linear solution. The
+You can specify a preconditioner to improve the convergence of the iterative linear solution by setting the `precon` attribute. The
 motivation for using a preconditioner is the observation that iterative methods have better convergence
 properties if the linear system has a smaller condition number, so the goal of the preconditioner is to
 improve the condition number in part or all of the Jacobian.
