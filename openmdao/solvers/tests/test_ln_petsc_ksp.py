@@ -215,6 +215,7 @@ class TestPetscKSP(unittest.TestCase):
             assert_rel_error(self, output[2], g1.expected_solution[1], 3e-15)
 
 
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestPetscKSPSolverFeature(unittest.TestCase):
 
     def test_specify_solver(self):
