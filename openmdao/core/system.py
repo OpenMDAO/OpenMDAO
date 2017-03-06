@@ -91,9 +91,9 @@ class System(object):
     _var_connections_indices : [(int, int), ...]
         _var_connections with variable indices instead of names.  Entries
         have the form (input_index, output_index).
-    _varx_allprocs_prom2abs_set : {'input': dict, 'output': dict}
-        Dictionary mapping promoted names to set of all absolute names.
-        For outputs, the set will have length one since promoted output names are unique.
+    _varx_allprocs_prom2abs_list : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to list of all absolute names.
+        For outputs, the list will have length one since promoted output names are unique.
     _varx_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
         Global index range of owned variables with respect to all model variables.
     _varx_abs_names : {'input': [str, ...], 'output': [str, ...]}
@@ -192,7 +192,7 @@ class System(object):
         self._var_connections_indices = []
 
         # [REFACTOR]
-        self._varx_allprocs_prom2abs_set = {'input': {}, 'output': {}}
+        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         self._varx_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
         self._varx_abs_names = {'input': [], 'output': []}
         self._varx_abs2data_io = {}
@@ -302,7 +302,7 @@ class System(object):
         Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
 
         Sets the following attributes:
-            _varx_allprocs_prom2abs_set
+            _varx_allprocs_prom2abs_list
 
         Returns
         -------
@@ -361,7 +361,7 @@ class System(object):
             self._varx_abs2data_io = {}
             for type_ in ['input', 'output']:
                 self._varx_abs_names[type_] = []
-                self._varx_allprocs_prom2abs_set[type_] = {}
+                self._varx_allprocs_prom2abs_list[type_] = {}
 
             self.initialize_variables()
 
