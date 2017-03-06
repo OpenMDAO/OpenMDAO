@@ -630,7 +630,7 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         model = prob.model = SellarDerivatives()
 
         model.ln_solver = ScipyIterativeSolver()
-        model.ln_solver.options['atol'] = 1.0e-3
+        model.ln_solver.options['atol'] = 1.0e-20
 
         prob.setup()
         prob.run_model()
