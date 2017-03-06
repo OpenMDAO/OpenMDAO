@@ -4,8 +4,8 @@ from __future__ import division
 
 import inspect
 
-import numpy
-from six import iteritems
+import numpy as np
+from six import iteritems, itervalues
 
 from openmdao.core.component import Component
 from openmdao.utils.general_utils import warn_deprecation
@@ -185,16 +185,21 @@ class ExplicitComponent(Component):
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
         """
         with self._jacobian_context() as J:
-            # negate constant subjacs (and others that will get overwritten)
-            # back to normal
-            self._negate_jac()
-
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
-                                             scale_jac=True):
+                                             residuals=[self._residuals], scale_jac=True):
+                # Since the residuals are already negated, this call should come before negate_jac
+                # Additionally, computing the approximation before the call to compute_partials
+                # allows users to override FD'd values.
+                for approximation in itervalues(self._approx_schemes):
+                    approximation.compute_approximations(self, jac=J)
+
+                # negate constant subjacs (and others that will get overwritten)
+                # back to normal
+                self._negate_jac()
                 self.compute_partial_derivs(self._inputs, self._outputs, J)
 
-            # re-negate the jacobian
-            self._negate_jac()
+                # re-negate the jacobian
+                self._negate_jac()
 
             if self._owns_global_jac:
                 J._update()
@@ -222,8 +227,13 @@ class ExplicitComponent(Component):
         other_names = []
         for i, out_name in enumerate(self._var_myproc_names['output']):
             meta = self._var_myproc_metadata['output'][i]
-            size = numpy.prod(meta['shape'])
-            arange = numpy.arange(size)
+            size = np.prod(meta['shape'])
+            arange = np.arange(size)
+
+            # No need to FD outputs wrt other outputs
+            if (out_name, out_name) in self._subjacs_info:
+                if 'method' in self._subjacs_info[out_name, out_name]:
+                    del self._subjacs_info[out_name, out_name]['method']
             self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
             for other_name in other_names:
                 self.declare_partials(out_name, other_name, dependent=False)
@@ -249,6 +259,13 @@ class ExplicitComponent(Component):
         with self._jacobian_context() as J:
             for key, meta in iteritems(self._subjacs_info):
                 J._set_partials_meta(key, meta, meta['type'] == 'input')
+
+                method = meta.get('method', False)
+                if method and meta['dependent']:
+                    self._approx_schemes[method].add_approximation(key, meta)
+
+        for approx in itervalues(self._approx_schemes):
+            approx._init_approximations()
 
     def compute(self, inputs, outputs):
         """

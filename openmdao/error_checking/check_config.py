@@ -2,7 +2,7 @@
 
 import logging
 
-import numpy
+import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
@@ -10,7 +10,6 @@ import networkx as nx
 
 from openmdao.core.group import Group
 from openmdao.core.component import Component
-from openmdao.devtools.compat import abs_varname_iter
 
 
 def check_config(problem, logger=None):
@@ -68,25 +67,24 @@ def compute_sys_graph(group, input_src_ids, comps_only=False):
     else:
         subsystems = group._subsystems_allprocs
 
-    i_start, i_end = group._var_allprocs_range['input']
-    o_start, o_end = group._var_allprocs_range['output']
+    i_start, i_end = group._varx_allprocs_idx_range['input']
+    o_start, o_end = group._varx_allprocs_idx_range['output']
 
     # mapping arrays to find the system ID given the variable ID
-    invar2sys = numpy.empty(i_end - i_start, dtype=int)
-    outvar2sys = numpy.empty(o_end - o_start, dtype=int)
+    invar2sys = np.empty(i_end - i_start, dtype=int)
+    outvar2sys = np.empty(o_end - o_start, dtype=int)
 
     for i, s in enumerate(subsystems):
-        start, end = s._var_allprocs_range['input']
+        start, end = s._varx_allprocs_idx_range['input']
         invar2sys[start - i_start:end - i_start] = i
 
-        start, end = s._var_allprocs_range['output']
+        start, end = s._varx_allprocs_idx_range['output']
         outvar2sys[start - o_start:end - o_start] = i
 
     graph = nx.DiGraph()
 
     for in_id, src_id in enumerate(input_src_ids):
-        if (src_id != -1 and (o_start <= src_id < o_end) and
-                (i_start <= in_id < i_end)):
+        if ((o_start <= src_id < o_end) and (i_start <= in_id < i_end)):
             # offset the ids to index into our var2sys arrays
             graph.add_edge(subsystems[outvar2sys[src_id - o_start]].pathname,
                            subsystems[invar2sys[in_id - i_start]].pathname)
@@ -192,24 +190,23 @@ def _get_out_of_order_subs(group, input_src_ids):
     """
     subsystems = group._subsystems_allprocs
 
-    i_start, i_end = group._var_allprocs_range['input']
-    o_start, o_end = group._var_allprocs_range['output']
+    i_start, i_end = group._varx_allprocs_idx_range['input']
+    o_start, o_end = group._varx_allprocs_idx_range['output']
 
     # mapping arrays to find the system ID given the variable ID
-    invar2sys = numpy.empty(i_end - i_start, dtype=int)
-    outvar2sys = numpy.empty(o_end - o_start, dtype=int)
+    invar2sys = np.empty(i_end - i_start, dtype=int)
+    outvar2sys = np.empty(o_end - o_start, dtype=int)
 
     for i, s in enumerate(subsystems):
-        start, end = s._var_allprocs_range['input']
+        start, end = s._varx_allprocs_idx_range['input']
         invar2sys[start - i_start:end - i_start] = i
 
-        start, end = s._var_allprocs_range['output']
+        start, end = s._varx_allprocs_idx_range['output']
         outvar2sys[start - o_start:end - o_start] = i
 
     ubcs = {}
     for in_id, src_id in enumerate(input_src_ids):
-        if (src_id != -1 and (o_start <= src_id < o_end) and
-                (i_start <= in_id < i_end)):
+        if ((o_start <= src_id < o_end) and (i_start <= in_id < i_end)):
             # offset the ids to index into our var2sys arrays
             src_sysID = outvar2sys[src_id - o_start]
             tgt_sysID = invar2sys[in_id - i_start]
@@ -236,8 +233,7 @@ def _check_hanging_inputs(problem, logger):
     input_src_ids = problem._assembler._input_src_ids
 
     hanging = sorted([
-        name for i, name in enumerate(abs_varname_iter(problem.model, 'input',
-                                                       local=False)) if
+        name for i, name in enumerate(problem._assembler._varx_allprocs_abs_names['input']) if
                                                        input_src_ids[i] == -1
     ])
 

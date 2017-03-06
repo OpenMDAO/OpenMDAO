@@ -52,11 +52,16 @@ class Group(System):
             A list of variable names specifying which subsystem variables
             to 'promote' up to this group. This is for backwards compatibility
             with older versions of OpenMDAO.
+
+        Returns
+        -------
+        System
+            The System that was passed in.
         """
         warn_deprecation('This method provides backwards compatibility with '
                          'OpenMDAO <= 1.x ; use add_subsystem instead.')
 
-        self.add_subsystem(name, subsys, promotes=promotes)
+        return self.add_subsystem(name, subsys, promotes=promotes)
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None):
@@ -203,12 +208,12 @@ class Group(System):
             if out_name not in allprocs_out_names:
                 raise NameError("Output '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." %
-                                (out_name, self.name, out_name, in_name))
+                                (out_name, self.pathname, out_name, in_name))
 
             if in_name not in allprocs_in_names:
                 raise NameError("Input '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." %
-                                (in_name, self.name, out_name, in_name))
+                                (in_name, self.pathname, out_name, in_name))
 
             # throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -221,50 +226,7 @@ class Group(System):
             if out_subsys == in_subsys:
                 raise RuntimeError("Output and input are in the same System " +
                                    "for connection in '%s' from '%s' to '%s'." %
-                                   (self.name, out_name, in_name))
-
-            out_path = self._var_name2path['output'][out_name]
-            pdata = self._var_pathdict[out_path]
-            # TODO: we need to allgather unit information. Otherwise we can't
-            # error check units for any connections that cross processes
-            # because the metadata isn't available.
-            if pdata.myproc_idx is not None:
-                out_units = output_meta[pdata.myproc_idx]['units']
-                in_paths = self._var_name2path['input'][in_name]
-
-                for in_path in in_paths:
-                    pdata = self._var_pathdict[in_path]
-                    if pdata.myproc_idx is None:
-                        continue
-                    in_units = input_meta[pdata.myproc_idx]['units']
-
-                    # throw an error if one of input and output is unitless,
-                    # but the other isn't
-                    if (out_units and not in_units or
-                            in_units and not out_units):
-                        if out_units:
-                            out_units = "has units '%s'" % out_units
-                        else:
-                            out_units = "is unitless"
-                        if in_units:
-                            in_units = "has units '%s'" % in_units
-                        else:
-                            in_units = "is unitless"
-                        raise RuntimeError("Units must be specified for both or"
-                                           " neither side of connection in "
-                                           "'%s': '%s' %s but '%s' %s." %
-                                           (self.name, out_name, out_units,
-                                            in_name, in_units))
-
-                    # throw an error if the input and output units are not
-                    # compatible
-                    if not is_compatible(in_units, out_units):
-                        raise RuntimeError("Output and input units are not "
-                                           "compatible for connection in '%s':"
-                                           " '%s' has units '%s' but '%s' has "
-                                           "units '%s'." %
-                                           (self.name, out_name, out_units,
-                                            in_name, in_units))
+                                   (self.pathname, out_name, in_name))
 
             for in_index, name in enumerate(allprocs_in_names):
                 if name == in_name:
@@ -329,14 +291,27 @@ class Group(System):
         self._var_name2path = {'input': {}, 'output': {}}
 
         start = len(self.pathname) + 1 if self.pathname else 0
-        for typ in ['input', 'output']:
+        found_proms = [False for s in self._subsystems_myproc]
+
+        for ityp, typ in enumerate(['input', 'output']):
             my_idx_dict = {}  # maps absolute path to myproc idx
             myproc_names = self._var_myproc_names[typ]
             name2path = self._var_name2path[typ]
 
-            for subsys in self._subsystems_myproc:
+            for isub, subsys in enumerate(self._subsystems_myproc):
                 # Assemble the names list from subsystems
-                subsys._var_maps[typ] = subsys._get_maps(typ)
+                subsys._var_maps[typ], found = subsys._get_maps(typ)
+                found_proms[isub] |= found
+                if ityp == 1 and not found_proms[isub]:
+                    for io, lst in subsys._var_promotes.items():
+                        if lst:
+                            if io == 'any':
+                                suffix = ''
+                            else:
+                                suffix = '_%ss' % io
+                            raise RuntimeError("%s: no variables were promoted "
+                                               "based on promotes%s=%s" %
+                                               (subsys.pathname, suffix, list(lst)))
                 paths = subsys._var_allprocs_pathnames[typ]
 
                 for idx, subname in enumerate(subsys._var_allprocs_names[typ]):
@@ -384,6 +359,155 @@ class Group(System):
                         name2path[name] = [path]
                     else:
                         name2path[name] = path
+
+    def _setupx_variables_myproc(self):
+        """
+        Compute variable dict/list for variables on the current processor.
+
+        Sets the following attributes:
+            _varx_abs2data_io
+            _varx_abs_names
+        """
+        self._varx_abs2data_io = {}
+        for type_ in ['input', 'output']:
+            self._varx_abs_names[type_] = []
+
+        name_offset = len(self.pathname) if self.pathname else 0
+        iotypes = ('input', 'output')
+
+        # Perform recursion to populate the dict and list bottom-up
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_variables_myproc()
+
+            for type_ in iotypes:
+                var_maps = subsys._get_maps(type_)[0]
+                self._varx_abs_names[type_].extend(subsys._varx_abs_names[type_])
+
+                # Assemble _varx_abs2data_io and _varx_abs_names by concatenating from subsystems.
+                for abs_name in subsys._varx_abs_names[type_]:
+                    sub_data = subsys._varx_abs2data_io[abs_name]
+
+                    self._varx_abs2data_io[abs_name] = {
+                        'prom': var_maps[sub_data['prom']],
+                        'rel': abs_name[name_offset:] if name_offset > 0 else abs_name,
+                        'my_idx': len(self._varx_abs_names[type_]),
+                        'type_': type_,
+                        'metadata': sub_data['metadata']
+                    }
+
+    def _setupx_variable_allprocs_names(self):
+        """
+        Get the names for variables on all processors.
+
+        Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
+
+        Sets the following attributes:
+            _varx_allprocs_prom2abs_list
+
+        Returns
+        -------
+        {'input': [str, ...], 'output': [str, ...]}
+            List of absolute names of owned variables existing on current proc.
+        """
+        allprocs_abs_names = {'input': [], 'output': []}
+
+        # First, concatenate the allprocs variable names from subsystems on my proc.
+        for subsys in self._subsystems_myproc:
+            subsys_allprocs_abs_names = subsys._setupx_variable_allprocs_names()
+
+            for type_ in ['input', 'output']:
+                allprocs_abs_names[type_].extend(subsys_allprocs_abs_names[type_])
+
+        # For _varx_allprocs_prom2abs_list, essentially invert the abs2prom map in
+        # _varx_abs2data_io to capture at least the local maps.
+        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        for abs_name, data in iteritems(self._varx_abs2data_io):
+            type_ = data['type_']
+            prom_name = data['prom']
+            if prom_name not in self._varx_allprocs_prom2abs_list[type_]:
+                self._varx_allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+            else:
+                self._varx_allprocs_prom2abs_list[type_][prom_name].append(abs_name)
+
+        # If we're running in parallel, gather contributions from other procs.
+        if self.comm.size > 1:
+            for type_ in ['input', 'output']:
+                sub_comm = self._subsystems_myproc[0].comm
+                if sub_comm.rank == 0:
+                    raw = (allprocs_abs_names[type_], self._varx_allprocs_prom2abs_list[type_])
+                else:
+                    raw = ([], {})
+
+                allprocs_abs_names[type_] = []
+                allprocs_prom2abs_list = {}
+                for abs_names, prom2abs_list in self.comm.allgather(raw):
+                    allprocs_abs_names[type_].extend(abs_names)
+                    for prom_name, abs_names_list in iteritems(prom2abs_list):
+                        if prom_name not in allprocs_prom2abs_list:
+                            allprocs_prom2abs_list[prom_name] = abs_names_list
+                        else:
+                            allprocs_prom2abs_list[prom_name].extend(abs_names_list)
+
+                self._varx_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
+
+        # We use allprocs_abs_names to count the total number of allprocs variables
+        # and put it in _varx_allprocs_idx_range.
+        for type_ in ['input', 'output']:
+            self._varx_allprocs_idx_range[type_] = [0, len(allprocs_abs_names[type_])]
+
+        return allprocs_abs_names
+
+    def _setupx_variable_allprocs_indices(self, global_index):
+        """
+        Compute the global index range for variables on all processors.
+
+        Computes the following attributes:
+            _varx_allprocs_idx_range
+
+        Parameters
+        ----------
+        global_index : {'input': int, 'output': int}
+            current global variable counter.
+        """
+        # At this point, _varx_allprocs_idx_range is correct except for an offset.
+        # We apply the global_index offset to make _varx_allprocs_idx_range correct.
+        for type_ in ['input', 'output']:
+            for ind in range(2):
+                self._varx_allprocs_idx_range[type_][ind] += global_index[type_]
+
+        # Pre-recursion: compute index to pass to subsystems.
+        # This index is the number of variables on procs before current proc
+        # Necessary because of multiple global counters on different procs
+        if self.comm.size > 1:
+            subsys0 = self._subsystems_myproc[0]
+            for type_ in ['input', 'output']:
+                # Note: the following is valid because _varx_allprocs_idx_range
+                # contains [0, # allprocs vars] at this point because
+                # _setupx_variable_allprocs_names has been run but the recursion
+                # for the current method has not been performed yet.
+                local_var_size = subsys0._varx_allprocs_idx_range[type_][1]
+
+                # Compute the variable count list; 0 on rank > 0 procs
+                sub_comm = subsys0.comm
+                if sub_comm.rank == 0:
+                    nvar_myproc = local_var_size
+                else:
+                    nvar_myproc = 0
+                nvar_allprocs = self.comm.allgather(nvar_myproc)
+
+                # Compute the offset
+                iproc = self.comm.rank
+                nvar_myproc = local_var_size
+                global_index[type_] += np.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
+
+        # Perform recursion
+        for subsys in self._subsystems_myproc:
+            subsys_allprocs_abs_names = subsys._setupx_variable_allprocs_indices(global_index)
+
+        # Reset index dict to the global variable counter on all procs.
+        # Necessary for younger siblings to have proper index values.
+        for type_ in ['input', 'output']:
+            global_index[type_] = self._varx_allprocs_idx_range[type_][1]
 
     def get_subsystem(self, name):
         """

@@ -48,12 +48,12 @@ class CycleGroup(ParametericTestGroup):
             'component_class': ['explicit'],
             'connection_type': ['implicit', 'explicit'],
             'partial_type': ['array', 'sparse', 'aij'],
+            'finite_difference': [False, True],
             'num_comp': [3, 2],
             'num_var': [3, 1],
             'var_shape': [(2, 3), (3,)],
         })
 
-    def _initialize_metadata(self):
         self.metadata.declare('num_comp', type_=int, value=2,
                               desc='Total number of components')
         self.metadata.declare('num_var', type_=int, value=1,
@@ -73,9 +73,9 @@ class CycleGroup(ParametericTestGroup):
         self.metadata.declare('partial_type', value='array',
                               values=['array', 'sparse', 'aij'],
                               desc='type of partial derivatives')
-
-    def initialize(self):
-        self._initialize_metadata()
+        self.metadata.declare('finite_difference', value=False,
+                              type_=bool,
+                              desc='If the derivatives should be finite differenced.')
 
         num_comp = self.metadata['num_comp']
         if num_comp < 2:
@@ -128,6 +128,7 @@ class CycleGroup(ParametericTestGroup):
             'jacobian_type': self.metadata['jacobian_type'],
             'partial_type': self.metadata['partial_type'],
             'connection_type': conn_type,
+            'finite_difference': self.metadata['finite_difference']
         }
 
         self.add_subsystem('psi_comp', IndepVarComp('psi', PSI))
@@ -142,7 +143,6 @@ class CycleGroup(ParametericTestGroup):
                            promotes_inputs=first_comp._cycle_promotes_in,
                            promotes_outputs=first_comp._cycle_promotes_out)
         prev_name = first_name
-
 
         connection_variables = [('y_{0}'.format(i), 'x_{0}'.format(i)) for i in range(num_var)]
         connection_variables.append(('theta_out', 'theta'))

@@ -1,7 +1,7 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 
 from __future__ import division, print_function
-import numpy
+import numpy as np
 
 from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.jacobians.global_jacobian import GlobalJacobian
@@ -82,7 +82,7 @@ class Solver(object):
         self._system = system
         self._depth = depth
 
-    def _mpi_print(self, iteration, res, res0):
+    def _mpi_print(self, iteration, abs_res, rel_res):
         """
         Print residuals from an iteration.
 
@@ -90,10 +90,10 @@ class Solver(object):
         ----------
         iteration : int
             iteration counter, 0-based.
-        res : float
-            current residual norm.
-        res0 : float
-            initial residual norm.
+        abs_res : float
+            current absolute residual norm.
+        rel_res : float
+            current relative residual norm.
         """
         if (self.options['iprint'] and self._system.comm.rank == 0 and
                 not self._system._suppress_solver_output):
@@ -117,7 +117,7 @@ class Solver(object):
 
             print_str = ' ' * depth + '-' * self._depth
             print_str += sys_name + solver_name
-            print_str += ' %3d | %.9g %.9g' % (iteration, res, res0)
+            print_str += ' %3d | %.9g %.9g' % (iteration, abs_res, rel_res)
             print(print_str)
 
     def _run_iterator(self):
@@ -139,14 +139,14 @@ class Solver(object):
 
         norm0, norm = self._iter_initialize()
         self._iter_count = 0
-        self._mpi_print(self._iter_count, norm / norm0, norm0)
+        self._mpi_print(self._iter_count, norm, norm / norm0)
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
             self._iter_execute()
             norm = self._iter_get_norm()
             self._iter_count += 1
-            self._mpi_print(self._iter_count, norm / norm0, norm)
-        fail = (numpy.isinf(norm) or numpy.isnan(norm) or
+            self._mpi_print(self._iter_count, norm, norm / norm0)
+        fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
         return fail, norm, norm / norm0
 
@@ -333,10 +333,10 @@ class LinearSolver(Solver):
         """
         system = self._system
         var_inds = [
-            system._var_allprocs_range['output'][0],
-            system._var_allprocs_range['output'][1],
-            system._var_allprocs_range['output'][0],
-            system._var_allprocs_range['output'][1],
+            system._varx_allprocs_idx_range['output'][0],
+            system._varx_allprocs_idx_range['output'][1],
+            system._varx_allprocs_idx_range['output'][0],
+            system._varx_allprocs_idx_range['output'][1],
         ]
         system._apply_linear(self._vec_names, self._mode, var_inds)
 

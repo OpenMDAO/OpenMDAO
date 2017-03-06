@@ -1,5 +1,5 @@
 from __future__ import division
-import numpy
+import numpy as np
 import unittest
 
 from .general_problem import GeneralProblem

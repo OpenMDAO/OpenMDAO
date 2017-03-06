@@ -2,7 +2,8 @@
 
 from __future__ import division
 
-import numpy
+import numpy as np
+from six import itervalues
 
 from openmdao.core.component import Component
 
@@ -119,7 +120,7 @@ class ImplicitComponent(Component):
                 abs_errors.append(result[1])
                 rel_errors.append(result[2])
 
-            return failed, numpy.linalg.norm(abs_errors), numpy.linalg.norm(rel_errors)
+            return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
     def _linearize(self):
         """
@@ -128,6 +129,10 @@ class ImplicitComponent(Component):
         with self._jacobian_context() as J:
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                              scale_jac=True):
+                # Computing the approximation before the call to compute_partials allows users to
+                # override FD'd values.
+                for approximation in itervalues(self._approx_schemes):
+                    approximation.compute_approximations(self, jac=J)
                 self.linearize(self._inputs, self._outputs, J)
 
             if self._owns_global_jac:
