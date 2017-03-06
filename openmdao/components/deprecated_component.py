@@ -153,16 +153,29 @@ class Component(BaseComponent):
                 d_outputs._scale(self._scaling_to_phys['output'])
                 d_residuals._scale(self._scaling_to_phys['residual'])
 
+                # negate the residuals for only the explicit variables
+                # and pass in the vectors in the correct order
+                # (assuming clippy’s apply_linear mapped d_inputs to d_residuals).
+                # If it mapped d_inputs to d_outputs, you'd have to copy what’s
+                # in d_outputs to d_residuals, but only for the explicit variables.
+                # For the implicit variables, you shouldn’t have to touch anything
+
                 for name in d_residuals:
                     if name in self._output_names:
-                        d_residuals[name] *= -1.0
+                        if name not in self._state_names:
+                            d_outputs[name] = d_residuals[name]
+                        else:
+                            d_residuals[name] *= -1.0
 
                 self.apply_linear(self._inputs, self._outputs,
                                   d_inputs, d_outputs, d_residuals, mode)
 
                 for name in d_residuals:
                     if name in self._output_names:
-                        d_residuals[name] *= -1.0
+                        if name not in self._state_names:
+                            d_residuals[name] = d_outputs[name]
+                        else:
+                            d_residuals[name] *= -1.0
 
                 self._inputs._scale(self._scaling_to_norm['input'])
                 self._outputs._scale(self._scaling_to_norm['output'])

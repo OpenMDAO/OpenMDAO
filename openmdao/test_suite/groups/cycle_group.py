@@ -47,7 +47,7 @@ class CycleGroup(ParametericTestGroup):
         super(CycleGroup, self).__init__(**kwargs)
 
         self.default_params.update({
-            'component_class': ['explicit'],
+            'component_class': ['explicit', 'deprecated'],
             'connection_type': ['implicit', 'explicit'],
             'partial_type': ['array', 'sparse', 'aij'],
             'num_comp': [3, 2],
