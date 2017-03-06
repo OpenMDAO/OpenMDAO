@@ -613,13 +613,7 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
         os.remove(code_to_run_path)
 
     if PY3:
-        try:
-            # in Python 3, run_outputs is of type bytes!
-            run_outputs = "".join(map(chr, run_outputs))
-
-        except Exception as err:
-            print('run_outputs', run_outputs)
-            raise Exception(err)
+        run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
 
     if not skipped and not failed:
         #####################
