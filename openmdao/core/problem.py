@@ -316,8 +316,9 @@ class Problem(object):
         # Assembler setup: variable metadata and indices
         nvars = {typ: len(assembler._varx_allprocs_abs_names[typ])
                  for typ in ['input', 'output']}
-        assembler._setup_variables(nvars, model._var_myproc_metadata,
-                                   model._var_myproc_indices)
+        assembler._setup_variables(nvars, model._varx_abs2data_io,
+                                   assembler._varx_allprocs_abs2idx_io,
+                                   model._varx_abs_names)
 
         # Assembler setup: variable connections
         assembler._setup_connections(model._var_connections_indices,

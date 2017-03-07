@@ -109,7 +109,7 @@ class Assembler(object):
             for idx, abs_name in enumerate(allprocs_abs_names[type_]):
                 self._varx_allprocs_abs2idx_io[abs_name] = idx
 
-    def _setup_variables(self, nvars, variable_metadata, variable_indices):
+    def _setup_variables(self, nvars, data, indices, abs_names):
         """
         Compute the variable sets and sizes.
 
@@ -123,22 +123,24 @@ class Assembler(object):
         ----------
         nvars : {'input': int, 'output': int}
             global number of variables.
-        variable_metadata : {'input': list, 'output': list}
-            list of metadata dictionaries of variables that exist on this proc.
-        variable_indices : {'input': ndarray[:], 'output': ndarray[:]}
-            integer arrays of global indices of variables on this proc.
+        data : {vname1: {'metadata': {}, ...}, ...}
+            dict of abs var name to data dict for variables on this proc.
+        indices : {vname1: idx1, vname2: idx2, ...}
+            dit of abs var name to global index for variables on this proc.
+        abs_names : {'input': [str, ...], 'output': [str, ...]}
+            lists of absolute names of input and output variables on this proc.
         """
         nproc = self._comm.size
 
         for typ in ['input', 'output']:
-            nvar = len(variable_metadata[typ])
+            nvar = len(abs_names[typ])
             nvar_all = nvars[typ]
 
             # Locally determine var_set for each var
             local_set_dict = {}
-            for ivar, meta in enumerate(variable_metadata[typ]):
-                ivar_all = variable_indices[typ][ivar]
-                local_set_dict[ivar_all] = meta['var_set']
+            for ivar, absname in enumerate(abs_names[typ]):
+                ivar_all = indices[absname]
+                local_set_dict[ivar_all] = data[absname]['metadata']['var_set']
 
             # Broadcast ivar_all-iset pairs to all procs
             if self._comm.size > 1:
@@ -177,9 +179,9 @@ class Assembler(object):
         # Populate the sizes arrays
         iproc = self._comm.rank
         for typ in ['input', 'output']:
-            for ivar, meta in enumerate(variable_metadata[typ]):
-                size = np.prod(meta['shape'])
-                ivar_all = variable_indices[typ][ivar]
+            for ivar, absname in enumerate(abs_names[typ]):
+                size = np.prod(data[absname]['metadata']['shape'])
+                ivar_all = indices[absname]
                 iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
                 self._variable_sizes[typ][iset][iproc, ivar_set] = size
                 self._variable_sizes_all[typ][iproc, ivar_all] = size
