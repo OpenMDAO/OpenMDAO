@@ -116,7 +116,6 @@ class EmbedTestDirective(Directive):
 
             if skipped or failed:  # do the old way
                 # we want the body of test code to be formatted and code highlighted
-                #body = in_or_out_node(kind="In", number=n, text=src, language="python")
                 body = nodes.literal_block(src, src)
                 body['language'] = 'python'
                 doc_nodes.append(body)
