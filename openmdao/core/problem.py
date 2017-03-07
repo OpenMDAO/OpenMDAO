@@ -173,7 +173,7 @@ class Problem(object):
         elif name in self.model._inputs:
             return self.model._inputs[name]
         else:
-            msg = 'The name {} is invalid'
+            msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
 
     def __setitem__(self, name, value):
@@ -192,7 +192,7 @@ class Problem(object):
         elif name in self.model._inputs:
             self.model._inputs[name] = value
         else:
-            msg = 'The name {} is invalid'
+            msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
 
     @property
