@@ -5,7 +5,7 @@ import re
 from collections import OrderedDict
 from itertools import product
 
-import numpy
+import numpy as np
 from numpy import ndarray, imag, complex as npcomplex
 
 from six import string_types
@@ -86,9 +86,9 @@ class ExecComp(ExplicitComponent):
 
         ::
 
-            import numpy
+            import numpy as np
             from openmdao.api import ExecComp
-            excomp = ExecComp('y=numpy.sum(x)', x=numpy.ones(10,dtype=float))
+            excomp = ExecComp('y=numpy.sum(x)', x=np.ones(10,dtype=float))
 
         In this example, 'y' would be assumed to be the default type of float
         and would be given the default initial value of 0.0, while 'x' would be
@@ -258,14 +258,14 @@ class ExecComp(ExplicitComponent):
 
         non_pbo_outputs = self._non_pbo_outputs
 
-        for param in inputs._views:
+        for param in inputs:
 
             pwrap = _TmpDict(inputs)
 
             pval = inputs[param]
             if isinstance(pval, ndarray):
                 # replace the param array with a complex copy
-                pwrap[param] = numpy.asarray(pval, npcomplex)
+                pwrap[param] = np.asarray(pval, npcomplex)
                 idx_iter = array_idx_iter(pwrap[param].shape)
                 psize = pval.size
             else:
@@ -289,7 +289,7 @@ class ExecComp(ExplicitComponent):
                 for u in non_pbo_outputs:
                     jval = imag(uwrap[u] / self.complex_stepsize)
                     if (u, param) not in partials:  # create the dict entry
-                        partials[(u, param)] = numpy.zeros((jval.size, psize))
+                        partials[(u, param)] = np.zeros((jval.size, psize))
 
                     # set the column in the Jacobian entry
                     partials[(u, param)][:, i] = jval.flat
@@ -334,7 +334,7 @@ class _TmpDict(object):
         elif self._complex:
             val = self._inner[name]
             if isinstance(val, ndarray):
-                self._changed[name] = numpy.asarray(val, dtype=npcomplex)
+                self._changed[name] = np.asarray(val, dtype=npcomplex)
             else:
                 self._changed[name] = npcomplex(val)
             return self._changed[name]
@@ -377,9 +377,9 @@ class _IODict(object):
 
     def __getitem__(self, name):
         name = self._to_colons[name]
-        try:
+        if name in self._outputs:
             return self._outputs[name]
-        except KeyError:
+        else:
             return self._inputs[name]
 
     def __setitem__(self, name, value):
@@ -426,7 +426,7 @@ _expr_dict = {}
 _import_functs(math, _expr_dict,
                names=['factorial', 'fsum', 'lgamma', 'erf', 'erfc', 'gamma'])
 
-_import_functs(numpy, _expr_dict,
+_import_functs(np, _expr_dict,
                names=['cosh', 'ldexp', 'hypot', 'tan', 'isnan', 'log', 'fabs',
                       'floor', 'sqrt', 'frexp', 'degrees', 'pi', 'log10',
                       'modf', 'copysign', 'cos', 'ceil', 'isinf', 'sinh',
@@ -441,7 +441,7 @@ _import_functs(numpy, _expr_dict,
 # generally return complex numbers even if the args are floats.
 _expr_dict['cmath'] = cmath
 
-_expr_dict['numpy'] = numpy
+_expr_dict['numpy'] = np
 
 
 # if scipy is available, add some functions
@@ -459,7 +459,7 @@ else:
 
 def _cs_abs(x):
     if isinstance(x, ndarray):
-        return x * numpy.sign(x)
+        return x * np.sign(x)
     elif x.real < 0.0:
         return -x
     return x

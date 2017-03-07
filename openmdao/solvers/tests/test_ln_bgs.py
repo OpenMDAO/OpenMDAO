@@ -7,15 +7,13 @@ import unittest
 
 import numpy as np
 
-from openmdao.core.group import Group
-from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.core.problem import Problem
+from openmdao.api import Group, IndepVarComp, Problem, GlobalJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.ln_bgs import LinearBlockGS
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
-
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
-     SellarStateConnection
+     SellarStateConnection, SellarDerivatives
+from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
@@ -23,6 +21,32 @@ from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
      ConvergeDivergeGroups, Diamond, DiamondFlat
 
 class TestBGSSolver(unittest.TestCase):
+
+    def test_globaljac_err(self):
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('x_param', IndepVarComp('length', 3.0),
+                            promotes=['length'])
+        model.add_subsystem('mycomp', TestExplCompSimpleDense(),
+                            promotes=['length', 'width', 'area'])
+
+        model.ln_solver = LinearBlockGS()
+        model.suppress_solver_output = True
+
+        prob.model.jacobian = GlobalJacobian()
+        prob.setup(check=False, mode='fwd')
+
+        prob['width'] = 2.0
+        prob.run_model()
+
+        of = ['area']
+        wrt = ['length']
+
+        with self.assertRaises(RuntimeError) as context:
+            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+
+        self.assertEqual(str(context.exception),
+                         "A block linear solver 'LN: LNBGS' is being used with a GlobalJacobian in system ''")
 
     def test_solve_linear_maxiter(self):
         """Verify that LinearBlockGS abides by the 'maxiter' option."""
@@ -471,6 +495,75 @@ class TestBGSSolver(unittest.TestCase):
         for key, val in iteritems(Jbase):
             assert_rel_error(self, J[key], val, .00001)
 
+
+class TestBGSSolverFeature(unittest.TestCase):
+
+    def test_specify_solver(self):
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.ln_solver = LinearBlockGS()
+
+        prob.setup()
+        prob.run_model()
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
+    def test_feature_maxiter(self):
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.ln_solver = LinearBlockGS()
+        model.ln_solver.options['maxiter'] = 2
+
+        prob.setup()
+        prob.run_model()
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.60230118004, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78022500547, .00001)
+
+    def test_feature_atol(self):
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.ln_solver = LinearBlockGS()
+        model.ln_solver.options['atol'] = 1.0e-3
+
+        prob.setup()
+        prob.run_model()
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61016296175, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78456955704, .00001)
+
+    def test_feature_rtol(self):
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.ln_solver = LinearBlockGS()
+        model.ln_solver.options['rtol'] = 1.0e-3
+
+        prob.setup()
+        prob.run_model()
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61016296175, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78456955704, .00001)
 
 if __name__ == "__main__":
     unittest.main()

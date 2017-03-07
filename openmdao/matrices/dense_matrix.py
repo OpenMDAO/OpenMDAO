@@ -1,6 +1,6 @@
 """Define the DenseMatrix class."""
 from __future__ import division, print_function
-import numpy
+import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map
@@ -22,7 +22,7 @@ class DenseMatrix(Matrix):
         num_cols : int
             number of cols in the matrix.
         """
-        self._matrix = matrix = numpy.zeros((num_rows, num_cols))
+        self._matrix = matrix = np.zeros((num_rows, num_cols))
         submats = self._submats
         metadata = self._metadata
 
@@ -33,16 +33,16 @@ class DenseMatrix(Matrix):
             val = info['value']
 
             if rows is None and (val is None or isinstance(val,
-                                                           numpy.ndarray)):
+                                                           np.ndarray)):
                 nrows, ncols = shape
                 irow2 = irow + nrows
                 if src_indices is None:
                     icol2 = icol + ncols
                     metadata[key] = (slice(irow, irow2),
-                                     slice(icol, icol2), numpy.ndarray)
+                                     slice(icol, icol2), np.ndarray)
                 else:
                     metadata[key] = (slice(irow, irow2),
-                                     src_indices + icol, numpy.ndarray)
+                                     src_indices + icol, np.ndarray)
             elif isinstance(val, (coo_matrix, csr_matrix)):
                 jac = val.tocoo()
                 if src_indices is None:
@@ -53,7 +53,7 @@ class DenseMatrix(Matrix):
                                                             jac.col,
                                                             irow, icol,
                                                             src_indices)
-                    revidxs = numpy.argsort(idxs)
+                    revidxs = np.argsort(idxs)
                     irows, icols = irows[revidxs], icols[revidxs]
 
                 metadata[key] = (irows, icols, type(val))
@@ -65,7 +65,7 @@ class DenseMatrix(Matrix):
                     irows, icols, idxs = _compute_index_map(rows, cols,
                                                             irow, icol,
                                                             src_indices)
-                    revidxs = numpy.argsort(idxs)
+                    revidxs = np.argsort(idxs)
                     irows, icols = irows[revidxs], icols[revidxs]
 
                 metadata[key] = (irows, icols, list)
@@ -87,7 +87,7 @@ class DenseMatrix(Matrix):
                             "the type (%s) used at init time." % (key,
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
-        if isinstance(jac, numpy.ndarray):
+        if isinstance(jac, np.ndarray):
             self._matrix[irows, icols] = jac
         elif isinstance(jac, (coo_matrix, csr_matrix)):
             self._matrix[irows, icols] = jac.data

@@ -1,7 +1,7 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 
 from __future__ import division, print_function
-import numpy
+import numpy as np
 
 from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.jacobians.global_jacobian import GlobalJacobian
@@ -139,14 +139,14 @@ class Solver(object):
 
         norm0, norm = self._iter_initialize()
         self._iter_count = 0
-        self._mpi_print(self._iter_count, norm / norm0, norm0)
+        self._mpi_print(self._iter_count, norm, norm / norm0)
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
             self._iter_execute()
             norm = self._iter_get_norm()
             self._iter_count += 1
             self._mpi_print(self._iter_count, norm, norm / norm0)
-        fail = (numpy.isinf(norm) or numpy.isnan(norm) or
+        fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
         return fail, norm, norm / norm0
 
@@ -333,10 +333,10 @@ class LinearSolver(Solver):
         """
         system = self._system
         var_inds = [
-            system._var_allprocs_range['output'][0],
-            system._var_allprocs_range['output'][1],
-            system._var_allprocs_range['output'][0],
-            system._var_allprocs_range['output'][1],
+            system._varx_allprocs_idx_range['output'][0],
+            system._varx_allprocs_idx_range['output'][1],
+            system._varx_allprocs_idx_range['output'][0],
+            system._varx_allprocs_idx_range['output'][1],
         ]
         system._apply_linear(self._vec_names, self._mode, var_inds)
 

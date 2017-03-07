@@ -4,7 +4,7 @@ from __future__ import division
 
 import collections
 
-import numpy
+import numpy as np
 from six import string_types
 
 from openmdao.core.explicitcomponent import ExplicitComponent

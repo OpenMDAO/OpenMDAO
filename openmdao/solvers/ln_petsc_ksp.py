@@ -1,7 +1,7 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
 from __future__ import division, print_function
-import numpy
+import numpy as np
 from six import itervalues
 
 try:
@@ -261,7 +261,7 @@ class PetscKSP(LinearSolver):
         x_vec.set_data(_get_petsc_vec_array(in_vec))
 
         # apply linear
-        ind1, ind2 = system._var_allprocs_range['output']
+        ind1, ind2 = system._varx_allprocs_idx_range['output']
         var_inds = [ind1, ind2, ind1, ind2]
         system._apply_linear([vec_name], self._mode, var_inds)
 
@@ -403,12 +403,13 @@ class PetscKSP(LinearSolver):
             return self._ksp[vec_name]
 
         lsize = 0
-        for metadata in system._var_myproc_metadata['output']:
-            lsize += numpy.prod(metadata['shape'])
+        for abs_name in system._varx_abs_names['output']:
+            lsize += np.prod(system._varx_abs2data_io[abs_name]['metadata']['shape'])
 
         size = 0
         global_var_sizes = system._assembler._variable_sizes_all['output']
-        for idx in itervalues(system._var_allprocs_indices['output']):
+        idx_start, idx_end = system._varx_allprocs_idx_range['output']
+        for idx in range(idx_start, idx_end):
             size += sum(global_var_sizes[:, idx])
 
         jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],

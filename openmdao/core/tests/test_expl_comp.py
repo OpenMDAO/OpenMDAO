@@ -1,7 +1,7 @@
 """Simple example demonstrating how to implement an explicit component."""
 from __future__ import division
 
-import numpy
+import numpy as np
 import unittest
 
 from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp

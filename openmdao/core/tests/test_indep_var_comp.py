@@ -1,7 +1,7 @@
 """IndepVarComp tests used in the IndepVarComp feature doc."""
 from __future__ import division
 
-import numpy
+import numpy as np
 import unittest
 
 from openmdao.api import Problem, IndepVarComp
@@ -36,7 +36,7 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_simple_array(self):
         """Define one independent array variable."""
-        array = numpy.array([
+        array = np.array([
             [1., 2.],
             [3., 4.],
         ])

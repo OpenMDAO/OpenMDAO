@@ -4,7 +4,7 @@ from __future__ import division
 from six import iteritems, string_types
 from collections import Iterable
 
-import numpy
+import numpy as np
 
 from openmdao.core.system import System, PathData
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
@@ -52,11 +52,16 @@ class Group(System):
             A list of variable names specifying which subsystem variables
             to 'promote' up to this group. This is for backwards compatibility
             with older versions of OpenMDAO.
+
+        Returns
+        -------
+        System
+            The System that was passed in.
         """
         warn_deprecation('This method provides backwards compatibility with '
                          'OpenMDAO <= 1.x ; use add_subsystem instead.')
 
-        self.add_subsystem(name, subsys, promotes=promotes)
+        return self.add_subsystem(name, subsys, promotes=promotes)
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None):
@@ -136,10 +141,10 @@ class Group(System):
                             " connect('%s', %s)?" % (out_name, in_name))
 
         if isinstance(src_indices, Iterable):
-            src_indices = numpy.atleast_1d(src_indices)
+            src_indices = np.atleast_1d(src_indices)
 
-        if isinstance(src_indices, numpy.ndarray):
-            if not numpy.issubdtype(src_indices.dtype, numpy.integer):
+        if isinstance(src_indices, np.ndarray):
+            if not np.issubdtype(src_indices.dtype, np.integer):
                 raise TypeError("src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
                                 (out_name, in_name, src_indices.dtype.type))
@@ -247,7 +252,7 @@ class Group(System):
                                                    "and add_input('%s', ...)." %
                                                    (self.pathname, out_name,
                                                     in_name, in_name))
-                            meta['src_indices'] = numpy.atleast_1d(src_indices)
+                            meta['src_indices'] = np.atleast_1d(src_indices)
 
                         # set src_indices to None to avoid unnecessary repeat
                         # of setting indices and shape metadata when we have
@@ -367,31 +372,27 @@ class Group(System):
         for type_ in ['input', 'output']:
             self._varx_abs_names[type_] = []
 
+        name_offset = len(self.pathname) if self.pathname else 0
+        iotypes = ('input', 'output')
+
         # Perform recursion to populate the dict and list bottom-up
         for subsys in self._subsystems_myproc:
             subsys._setupx_variables_myproc()
 
-            var_maps = {'input': subsys._get_maps('input')[0],
-                        'output': subsys._get_maps('output')[0]}
-
-            for type_ in ['input', 'output']:
+            for type_ in iotypes:
+                var_maps = subsys._get_maps(type_)[0]
 
                 # Assemble _varx_abs2data_io and _varx_abs_names by concatenating from subsystems.
                 for abs_name in subsys._varx_abs_names[type_]:
                     sub_data = subsys._varx_abs2data_io[abs_name]
 
-                    sub_prom_name = sub_data['prom']
-                    metadata = sub_data['metadata']
-
-                    prom_name = var_maps[type_][sub_prom_name]
-                    if self.pathname == '':
-                        rel_name = abs_name
-                    else:
-                        rel_name = abs_name[len(self.pathname) + 1:]
-
-                    self._varx_abs2data_io[abs_name] = {'prom': prom_name, 'rel': rel_name,
-                                                        'my_idx': len(self._varx_abs_names[type_]),
-                                                        'type_': type_, 'metadata': metadata}
+                    self._varx_abs2data_io[abs_name] = {
+                        'prom': var_maps[sub_data['prom']],
+                        'rel': abs_name[name_offset:] if name_offset > 0 else abs_name,
+                        'my_idx': len(self._varx_abs_names[type_]),
+                        'type_': type_,
+                        'metadata': sub_data['metadata']
+                    }
                     self._varx_abs_names[type_].append(abs_name)
 
     def _setupx_variable_allprocs_names(self):
@@ -401,7 +402,7 @@ class Group(System):
         Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
 
         Sets the following attributes:
-            _varx_allprocs_prom2abs_set
+            _varx_allprocs_prom2abs_list
 
         Returns
         -------
@@ -417,39 +418,37 @@ class Group(System):
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_].extend(subsys_allprocs_abs_names[type_])
 
-        # For _varx_allprocs_prom2abs_set, essentially invert the abs2prom map in
+        # For _varx_allprocs_prom2abs_list, essentially invert the abs2prom map in
         # _varx_abs2data_io to capture at least the local maps.
-        self._varx_allprocs_prom2abs_set = {'input': {}, 'output': {}}
+        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         for abs_name, data in iteritems(self._varx_abs2data_io):
             type_ = data['type_']
             prom_name = data['prom']
-            if prom_name not in self._varx_allprocs_prom2abs_set[type_]:
-                self._varx_allprocs_prom2abs_set[type_][prom_name] = [abs_name]
+            if prom_name not in self._varx_allprocs_prom2abs_list[type_]:
+                self._varx_allprocs_prom2abs_list[type_][prom_name] = [abs_name]
             else:
-                self._varx_allprocs_prom2abs_set[type_][prom_name].append(abs_name)
+                self._varx_allprocs_prom2abs_list[type_][prom_name].append(abs_name)
 
         # If we're running in parallel, gather contributions from other procs.
         if self.comm.size > 1:
             for type_ in ['input', 'output']:
                 sub_comm = self._subsystems_myproc[0].comm
                 if sub_comm.rank == 0:
-                    raw = (allprocs_abs_names[type_], self._varx_allprocs_prom2abs_set[type_])
+                    raw = (allprocs_abs_names[type_], self._varx_allprocs_prom2abs_list[type_])
                 else:
                     raw = ([], {})
 
                 allprocs_abs_names[type_] = []
-                allprocs_prom2abs_set = {}
-                for abs_names, prom2abs_set in self.comm.allgather(raw):
+                allprocs_prom2abs_list = {}
+                for abs_names, prom2abs_list in self.comm.allgather(raw):
                     allprocs_abs_names[type_].extend(abs_names)
-                    for prom_name, abs_names_set in iteritems(prom2abs_set):
-                        if prom_name not in allprocs_prom2abs_set:
-                            allprocs_prom2abs_set[prom_name] = abs_names_set
+                    for prom_name, abs_names_list in iteritems(prom2abs_list):
+                        if prom_name not in allprocs_prom2abs_list:
+                            allprocs_prom2abs_list[prom_name] = abs_names_list
                         else:
-                            allprocs_prom2abs_set[prom_name].extend(abs_names_set)
+                            allprocs_prom2abs_list[prom_name].extend(abs_names_list)
 
-                for prom_name, abs_names_set in iteritems(allprocs_prom2abs_set):
-                    allprocs_prom2abs_set[prom_name] = set(abs_names_set)
-                self._varx_allprocs_prom2abs_set[type_] = allprocs_prom2abs_set
+                self._varx_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
 
         # We use allprocs_abs_names to count the total number of allprocs variables
         # and put it in _varx_allprocs_idx_range.
@@ -499,7 +498,7 @@ class Group(System):
                 # Compute the offset
                 iproc = self.comm.rank
                 nvar_myproc = local_var_size
-                global_index[type_] += numpy.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
+                global_index[type_] += np.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
@@ -509,6 +508,13 @@ class Group(System):
         # Necessary for younger siblings to have proper index values.
         for type_ in ['input', 'output']:
             global_index[type_] = self._varx_allprocs_idx_range[type_][1]
+
+    def _setup_partials(self):
+        """
+        Set up partial derivative sparsity structures and approximation schemes.
+        """
+        for subsys in self._subsystems_myproc:
+            subsys._setup_partials()
 
     def get_subsystem(self, name):
         """

@@ -1,6 +1,6 @@
 """Define the DefaultAllocator class."""
 from __future__ import division
-import numpy
+import numpy as np
 from six.moves import range
 
 from openmdao.proc_allocators.proc_allocator import ProcAllocator
@@ -43,19 +43,19 @@ class DefaultAllocator(ProcAllocator):
             kwargs = self.kwargs
             if 'weights' in kwargs and len(kwargs['weights']) == nsub:
                 weights = kwargs['weights']
-                weights = 1.0 * weights / numpy.sum(weights)
+                weights = 1.0 * weights / np.sum(weights)
             else:
-                weights = numpy.ones(nsub) / nsub
+                weights = np.ones(nsub) / nsub
 
             # Next-one-up algorithm to assign procs to subsystems
-            num_procs = numpy.ones(nsub, int)
-            pctg_procs = numpy.zeros(nsub)
+            num_procs = np.ones(nsub, int)
+            pctg_procs = np.zeros(nsub)
             for ind in range(nproc - nsub):
-                pctg_procs[:] = 1.0 * num_procs / numpy.sum(num_procs)
-                num_procs[numpy.argmax(weights - pctg_procs)] += 1
+                pctg_procs[:] = 1.0 * num_procs / np.sum(num_procs)
+                num_procs[np.argmax(weights - pctg_procs)] += 1
 
             # Compute the coloring
-            color = numpy.zeros(nproc, int)
+            color = np.zeros(nproc, int)
             start, end = 0, 0
             for isub in range(nsub):
                 end += num_procs[isub]
@@ -63,21 +63,21 @@ class DefaultAllocator(ProcAllocator):
                 start += num_procs[isub]
 
             isub = color[iproc]
-            iproc1 = proc_range[0] + numpy.sum(num_procs[:isub])
-            iproc2 = proc_range[0] + numpy.sum(num_procs[:isub + 1])
+            iproc1 = proc_range[0] + np.sum(num_procs[:isub])
+            iproc2 = proc_range[0] + np.sum(num_procs[:isub + 1])
             # Result
             isubs = [isub]
             sub_comm = comm.Split(isub)
             sub_proc_range = [iproc1, iproc2]
         else:
             # TODO: improve this algorithm - maybe Fortran/C
-            bool_unused_sub = numpy.ones(nsub, bool)
+            bool_unused_sub = np.ones(nsub, bool)
             isubs_list = [[] for ind in range(nproc)]
-            proc_load = numpy.zeros(nproc)
+            proc_load = np.zeros(nproc)
             # Assign the slowest subsystem to the most free processor
             for ind in range(nsub):
-                iproc = numpy.argmin(proc_load)
-                isub = numpy.argmax(weights[bool_unused_sub])
+                iproc = np.argmin(proc_load)
+                isub = np.argmax(weights[bool_unused_sub])
 
                 bool_unused_sub[isub] = False
                 isubs_list[iproc].append(isub)

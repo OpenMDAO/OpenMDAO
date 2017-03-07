@@ -1,6 +1,6 @@
 """Define the LinearSystemComp class."""
 from __future__ import division, print_function
-import numpy
+import numpy as np
 from scipy import linalg
 
 from openmdao.core.implicitcomponent import ImplicitComponent
@@ -32,8 +32,8 @@ class LinearSystemComp(ImplicitComponent):
         """
         size = self.metadata['size']
 
-        self.add_input("A", val=numpy.eye(size))
-        self.add_input("b", val=numpy.ones(size))
+        self.add_input("A", val=np.eye(size))
+        self.add_input("b", val=np.ones(size))
         self.add_output("x", shape=size, val=2.)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
@@ -100,7 +100,7 @@ class LinearSystemComp(ImplicitComponent):
             if 'x' in d_outputs:
                 d_outputs['x'] += inputs['A'].T.dot(d_residuals['x'])
             if 'A' in d_inputs:
-                d_inputs['A'] += numpy.outer(outputs['x'], d_residuals['x']).T
+                d_inputs['A'] += np.outer(outputs['x'], d_residuals['x']).T
             if 'b' in d_inputs:
                 d_inputs['b'] -= d_residuals['x']
 

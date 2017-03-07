@@ -50,3 +50,5 @@ iprint = 2: print for every solver iteration
 
 .. embed-test::
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_iprint_2
+
+.. tags:: Solver

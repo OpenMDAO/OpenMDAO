@@ -1,6 +1,6 @@
 """Define the DefaultAssembler class."""
 from __future__ import division
-import numpy
+import numpy as np
 
 from six.moves import range
 
@@ -48,8 +48,8 @@ class DefaultAssembler(Assembler):
 
         in_ind1, in_ind2 = var_range['input']
         out_ind1, out_ind2 = var_range['output']
-        in_isub_var = -numpy.ones(in_ind2 - in_ind1, int)
-        out_isub_var = -numpy.ones(out_ind2 - out_ind1, int)
+        in_isub_var = -np.ones(in_ind2 - in_ind1, int)
+        out_isub_var = -np.ones(out_ind2 - out_ind1, int)
         for ind, subsys in enumerate(subsystems_myproc):
             isub = subsystems_inds[ind]
 
@@ -98,25 +98,25 @@ class DefaultAssembler(Assembler):
                     ind1, ind2 = self._src_indices_range[in_ivar_set, :]
                     inds = self._src_indices[ind1:ind2]
 
-                    output_inds = numpy.zeros(inds.shape[0], int)
+                    output_inds = np.zeros(inds.shape[0], int)
                     ind1, ind2 = 0, 0
                     for iproc in range(self._comm.size):
                         ind2 += out_sizes[iproc, out_ivar_set]
 
-                        on_iproc = numpy.logical_and(ind1 <= inds, inds < ind2)
+                        on_iproc = np.logical_and(ind1 <= inds, inds < ind2)
                         offset = -ind1
-                        offset += numpy.sum(out_sizes[:iproc, :])
-                        offset += numpy.sum(out_sizes[iproc, :out_ivar_set])
+                        offset += np.sum(out_sizes[:iproc, :])
+                        offset += np.sum(out_sizes[iproc, :out_ivar_set])
                         output_inds[on_iproc] = inds[on_iproc] + offset
 
                         ind1 += out_sizes[iproc, out_ivar_set]
 
                     iproc = self._comm.rank
 
-                    ind1 = ind2 = numpy.sum(in_sizes[:iproc, :])
-                    ind1 += numpy.sum(in_sizes[iproc, :in_ivar_set])
-                    ind2 += numpy.sum(in_sizes[iproc, :in_ivar_set + 1])
-                    input_inds = numpy.arange(ind1, ind2)
+                    ind1 = ind2 = np.sum(in_sizes[:iproc, :])
+                    ind1 += np.sum(in_sizes[iproc, :in_ivar_set])
+                    ind2 += np.sum(in_sizes[iproc, :in_ivar_set + 1])
+                    input_inds = np.arange(ind1, ind2)
 
                     xfer_in_inds[in_iset, out_iset].append(input_inds)
                     xfer_out_inds[in_iset, out_iset].append(output_inds)
@@ -131,9 +131,9 @@ class DefaultAssembler(Assembler):
 
         def merge(indices_list):
             if len(indices_list) > 0:
-                return numpy.concatenate(indices_list)
+                return np.concatenate(indices_list)
             else:
-                return numpy.array([], int)
+                return np.array([], int)
 
         for iset in range(len(self._variable_sizes['input'])):
             for jset in range(len(self._variable_sizes['output'])):

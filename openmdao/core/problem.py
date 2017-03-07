@@ -19,9 +19,10 @@ from openmdao.core.driver import Driver
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
+from openmdao.vectors.default_vector import DefaultVector
 
 from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
-from openmdao.vectors.default_vector import DefaultVector
+from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
@@ -160,19 +161,20 @@ class Problem(object):
         Parameters
         ----------
         name : str
-            name of the variable in the root system's namespace.
+            Promoted or relative variable name in the root system's namespace.
 
         Returns
         -------
         float or ndarray
             the requested output/input variable.
         """
-        pathname, pdata = self._get_path_data(name)
-
-        if pdata.typ == 'output':
-            return self.model._outputs[pathname]
+        if name in self.model._outputs:
+            return self.model._outputs[name]
+        elif name in self.model._inputs:
+            return self.model._inputs[name]
         else:
-            return self.model._inputs[pathname]
+            msg = 'The name {} is invalid'
+            raise KeyError(msg.format(name))
 
     def __setitem__(self, name, value):
         """
@@ -181,22 +183,17 @@ class Problem(object):
         Parameters
         ----------
         name : str
-            name of the output/input variable in the root system's namespace.
+            Promoted or relative variable name in the root system's namespace.
         value : float or ndarray or list
             value to set this variable to.
         """
-        pathname, pdata = self._get_path_data(name)
-
-        if pdata.typ == 'output':
-            meta = self.model._var_myproc_metadata['output'][pdata.myproc_idx]
-            if 'shape' in meta:
-                value, _ = ensure_compatible(pathname, value, meta['shape'])
-            self.model._outputs[pathname] = value
+        if name in self.model._outputs:
+            self.model._outputs[name] = value
+        elif name in self.model._inputs:
+            self.model._inputs[name] = value
         else:
-            meta = self.model._var_myproc_metadata['input'][pdata.myproc_idx]
-            if 'shape' in meta:
-                value, _ = ensure_compatible(pathname, value, meta['shape'])
-            self.model._inputs[pathname] = value
+            msg = 'The name {} is invalid'
+            raise KeyError(msg.format(name))
 
     @property
     def root(self):
@@ -328,6 +325,7 @@ class Problem(object):
         model._setupx_variables_myproc()
         allprocs_abs_names = model._setupx_variable_allprocs_names()
         model._setupx_variable_allprocs_indices({'input': 0, 'output': 0})
+        model._setup_partials()
         model._setup_connections()
 
         # [REFACTOR VERIFICATION] for model._varx_allprocs_idx_range
@@ -344,16 +342,16 @@ class Problem(object):
 
         # [REFACTOR VERIFICATION] imported here because it's temporary and will be removed soon
         from six import iteritems
-        # [REFACTOR VERIFICATION] for model._varx_allprocs_prom2abs_set
+        # [REFACTOR VERIFICATION] for model._varx_allprocs_prom2abs_list
         for type_ in ['input', 'output']:
             count = 0
-            for prom_name, abs_names_set in iteritems(model._varx_allprocs_prom2abs_set[type_]):
-                count += len(abs_names_set)
+            for prom_name, abs_names_list in iteritems(model._varx_allprocs_prom2abs_list[type_]):
+                count += len(abs_names_list)
                 assert prom_name in model._var_allprocs_names[type_]
-                for abs_name in abs_names_set:
+                for abs_name in abs_names_list:
                     assert abs_name in model._var_allprocs_pathnames[type_]
             assert count == len(model._var_allprocs_pathnames[type_])
-            assert (len(model._varx_allprocs_prom2abs_set[type_])
+            assert (len(model._varx_allprocs_prom2abs_list[type_])
                     == len(set(model._var_allprocs_names[type_])))
 
         # Assembler setup: variable metadata and indices
@@ -550,18 +548,22 @@ class Problem(object):
                         wrt_pattern, wrt_out, wrt_in = wrt_bundle
 
                         wrt_matches = chain(wrt_out, wrt_in)
-                        for (of, wrt) in product(of_matches, wrt_matches):
-                            deriv_value = subjacs.get((c_name + '.' + of, c_name + '.' + wrt))
+                        for rel_key in product(of_matches, wrt_matches):
+                            abs_key = rel_key2abs_key(comp, rel_key)
+                            of, wrt = abs_key
+                            deriv_value = subjacs.get(abs_key)
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                in_size = np.prod(comp._var2meta[wrt]['shape'])
-                                out_size = np.prod(comp._var2meta[of]['shape'])
+                                in_size = np.prod(comp._varx_abs2data_io[wrt]['metadata']['shape'])
+                                out_size = np.prod(comp._varx_abs2data_io[of]['metadata']['shape'])
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
-                                    in_size = np.prod(comp._var2meta[wrt]['shape'])
-                                    out_size = np.prod(comp._var2meta[of]['shape'])
+                                    in_size = np.prod(
+                                        comp._varx_abs2data_io[wrt]['metadata']['shape'])
+                                    out_size = np.prod(
+                                        comp._varx_abs2data_io[of]['metadata']['shape'])
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     for i, j, val in zip(jac_i, jac_j, jac_val):
@@ -571,7 +573,7 @@ class Problem(object):
                                 elif sparse.issparse(deriv_value):
                                     deriv_value = deriv_value.todense()
 
-                            partials_data[c_name][of, wrt][jac_key] = deriv_value
+                            partials_data[c_name][rel_key][jac_key] = deriv_value
 
                     if explicit_comp:
                         comp._negate_jac()
@@ -596,19 +598,21 @@ class Problem(object):
                 wrt_pattern, wrt_out, wrt_in = wrt_bundle
 
                 wrt_matches = chain(wrt_out, wrt_in)
-                for (of, wrt) in product(of_matches, wrt_matches):
-                    approximation.add_approximation((of, wrt), global_options)
+                for rel_key in product(of_matches, wrt_matches):
+                    abs_key = rel_key2abs_key(comp, rel_key)
+                    approximation.add_approximation(abs_key, global_options)
 
             approx_jac = {}
             approximation.compute_approximations(comp, jac=approx_jac)
-            for d_key, partial in iteritems(approx_jac):
+            for rel_key, partial in iteritems(approx_jac):
+                abs_key = rel_key2abs_key(comp, rel_key)
                 # Since all partials for outputs for explicit comps are declared, assume anything
                 # missing is an input deriv.
-                if (explicit_comp
-                        and (d_key not in subjac_info or subjac_info[d_key]['type'] == 'input')):
-                    partials_data[c_name][d_key][jac_key] = -partial
+                if (explicit_comp and (abs_key not in subjac_info or
+                                       subjac_info[abs_key]['type'] == 'input')):
+                    partials_data[c_name][rel_key][jac_key] = -partial
                 else:
-                    partials_data[c_name][d_key][jac_key] = partial
+                    partials_data[c_name][rel_key][jac_key] = partial
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
