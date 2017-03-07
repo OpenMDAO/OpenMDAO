@@ -944,8 +944,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         # Sorted keys ensures deterministic ordering
         sorted_keys = sorted(iterkeys(derivatives))
 
-        # Pull out the outputs of explicit components so we can ignore output-output derivatives.
-
         for of, wrt in sorted_keys:
             derivative_info = derivatives[of, wrt]
             forward = derivative_info['J_fwd']
