@@ -314,18 +314,14 @@ class Problem(object):
         assembler._setupx_variables(allprocs_abs_names)
 
         # Assembler setup: variable metadata and indices
-        nvars = {typ: len(assembler._varx_allprocs_abs_names[typ])
-                 for typ in ['input', 'output']}
-        assembler._setup_variables(nvars, model._varx_abs2data_io,
+        assembler._setup_variables(model._varx_abs2data_io,
                                    assembler._varx_allprocs_abs2idx_io,
                                    model._varx_abs_names)
 
         # Assembler setup: variable connections
         assembler._setup_connections(model._var_connections_indices,
-                                     model._var_allprocs_names,
-                                     model._var_allprocs_pathnames,
-                                     model._var_pathdict,
-                                     model._var_myproc_metadata)
+                                     model._varx_allprocs_prom2abs_list,
+                                     model._varx_abs2data_io)
 
         # Assembler setup: global transfer indices vector
         assembler._setup_src_indices(model._var_myproc_metadata,

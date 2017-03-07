@@ -109,7 +109,7 @@ class Assembler(object):
             for idx, abs_name in enumerate(allprocs_abs_names[type_]):
                 self._varx_allprocs_abs2idx_io[abs_name] = idx
 
-    def _setup_variables(self, nvars, data, indices, abs_names):
+    def _setup_variables(self, data, indices, abs_names):
         """
         Compute the variable sets and sizes.
 
@@ -121,8 +121,6 @@ class Assembler(object):
 
         Parameters
         ----------
-        nvars : {'input': int, 'output': int}
-            global number of variables.
         data : {vname1: {'metadata': {}, ...}, ...}
             dict of abs var name to data dict for variables on this proc.
         indices : {vname1: idx1, vname2: idx2, ...}
@@ -134,7 +132,7 @@ class Assembler(object):
 
         for typ in ['input', 'output']:
             nvar = len(abs_names[typ])
-            nvar_all = nvars[typ]
+            nvar_all = len(self._varx_allprocs_abs_names[typ])
 
             # Locally determine var_set for each var
             local_set_dict = {}
@@ -196,8 +194,7 @@ class Assembler(object):
                 self._comm.Allgather(self._variable_sizes_all[typ][iproc, :],
                                      self._variable_sizes_all[typ])
 
-    def _setup_connections(self, connections, allprocs_names,
-                           allprocs_pathnames, pathdict, metadata):
+    def _setup_connections(self, connections, prom2abs, abs2data):
         """
         Identify implicit connections and combine with explicit ones.
 
@@ -209,58 +206,53 @@ class Assembler(object):
         connections : [(int, int), ...]
             index pairs representing user defined variable connections
             (in_ind, out_ind).
-        allprocs_names : {'input': [str, ...], 'output': [str, ...]}
-            list of names of all owned variables, not just on current proc.
-        allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
-            list of pathnames of all owned variables, not just on current proc.
-        pathdict : {str: PathData, str: PathData, ...}
-            Mapping of absolute pathname to PathData object
-        metadata : {'input': [{}, {}, ...], 'output': [{}, {}, ...]}
-            Metadata dictionaries for local variables.
+        prom2abs : {'input': dict, 'output': dict}
+            Mapping of promoted name to absolute names (global)
+        abs2data : {str: {}, ...}
+            Mapping of absolute pathname to data dict  (local)
         """
-        out_names = allprocs_names['output']
-        in_names = allprocs_names['input']
-        out_paths = allprocs_pathnames['output']
-        in_paths = allprocs_pathnames['input']
-        nvar_input = len(allprocs_names['input'])
-        out_meta = metadata['output']
-        in_meta = metadata['input']
-        input_src_ids = np.full(nvar_input, -1, dtype=int)
-        output_tgt_ids = [[] for i in range(len(allprocs_names['output']))]
+        out_paths = self._varx_allprocs_abs_names['output']
+        in_paths = self._varx_allprocs_abs_names['input']
+        input_src_ids = np.full(len(in_paths), -1, dtype=int)
+        output_tgt_ids = [[] for i in range(len(out_paths))]
+        abs2idx = self._varx_allprocs_abs2idx_io
+        prom2abs_out = prom2abs['output']
+        prom2abs_in = prom2abs['input']
 
         # Add user defined connections to the _input_src_ids vector
         for in_ID, out_ID in connections:
             input_src_ids[in_ID] = out_ID
             output_tgt_ids[out_ID].append(in_ID)
 
-        # Loop over input variables
-        for in_ID, iname in enumerate(in_names):
+        # Add connections for any promoted input names that match promoted
+        # output names.
+        for prom in prom2abs_out:
+            if prom in prom2abs_in:
+                oidx = abs2idx[prom2abs_out[prom][0]]
+                for ipath in prom2abs_in[prom]:
+                    iidx = abs2idx[ipath]
+                    input_src_ids[iidx] = oidx
+                    output_tgt_ids[oidx].append(iidx)
 
-            for out_ID, oname in enumerate(out_names):
-                # If name is also an output variable, add this implicit connection
-                if iname == oname:
-                    input_src_ids[in_ID] = out_ID
-                    output_tgt_ids[out_ID].append(in_ID)
-                    break
-
+        # Now check unit compatability for each connection
         for out_ID, in_IDs in enumerate(output_tgt_ids):
             if in_IDs:
-                odata = pathdict[out_paths[out_ID]]
-                if odata.myproc_idx is None:
-                    # TODO: we need to allgather unit info. Otherwise we can't
+                if out_paths[out_ID] not in abs2data:
+                    # TODO: we need to gather unit info. Otherwise we can't
                     # check units for connections that cross proc boundaries.
                     continue
-                out_units = out_meta[odata.myproc_idx]['units']
+                odata = abs2data[out_paths[out_ID]]
+                out_units = odata['metadata']['units']
                 in_unit_list = []
                 for in_ID in in_IDs:
-                    idata = pathdict[in_paths[in_ID]]
-                    # TODO: fix this after we have allgathered metadata for units,
+                    # TODO: fix this after we have gathered metadata for units,
                     # but for now, if any input is out-of-process, skip all of
                     # the units checks
-                    if idata.myproc_idx is None:
+                    if in_paths[in_ID] not in abs2data:
                         in_unit_list = []
                         break
-                    in_unit_list.append((in_meta[idata.myproc_idx]['units'], in_ID))
+                    idata = abs2data[in_paths[in_ID]]
+                    in_unit_list.append((idata['metadata']['units'], in_ID))
 
                 if out_units:
                     for in_units, in_ID in in_unit_list:
