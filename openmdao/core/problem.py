@@ -395,7 +395,7 @@ class Problem(object):
             vectors[key] = vector_class(vec_name, typ, self.model)
 
         # TODO: implement this properly
-        ind1, ind2 = self.model._var_allprocs_range['output']
+        ind1, ind2 = self.model._varx_allprocs_idx_range['output']
         vector_var_ids = np.arange(ind1, ind2)
 
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
@@ -713,18 +713,16 @@ class Problem(object):
         if global_names:
             oldwrt, oldof = wrt, of
         else:
-            paths = model._var_allprocs_pathnames
-            indices = model._var_allprocs_indices
             oldof = of
             of = []
             for names in oldof:
-                of.append(tuple(paths['output'][indices['output'][name]]
+                of.append(tuple(model._varx_allprocs_prom2abs_list['output'][name][0]
                                 for name in names))
 
             oldwrt = wrt
             wrt = []
             for names in oldwrt:
-                wrt.append(tuple(paths['output'][indices['output'][name]]
+                wrt.append(tuple(model._varx_allprocs_prom2abs_list['output'][name][0]
                                  for name in names))
 
         if mode == 'fwd':
