@@ -315,7 +315,6 @@ class Problem(object):
 
         # Assembler setup: variable metadata and indices
         assembler._setup_variables(model._varx_abs2data_io,
-                                   assembler._varx_allprocs_abs2idx_io,
                                    model._varx_abs_names)
 
         # Assembler setup: variable connections
@@ -324,10 +323,8 @@ class Problem(object):
                                      model._varx_abs2data_io)
 
         # Assembler setup: global transfer indices vector
-        assembler._setup_src_indices(model._var_myproc_metadata,
-                                     model._var_myproc_indices['input'],
-                                     model._var_pathdict,
-                                     model._var_allprocs_pathnames)
+        assembler._setup_src_indices(model._varx_abs2data_io,
+                                     model._varx_abs_names)
 
         # Assembler setup: compute data required for units/scaling
         assembler._setup_src_data(model._var_myproc_metadata['output'],

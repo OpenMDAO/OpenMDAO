@@ -109,7 +109,7 @@ class Assembler(object):
             for idx, abs_name in enumerate(allprocs_abs_names[type_]):
                 self._varx_allprocs_abs2idx_io[abs_name] = idx
 
-    def _setup_variables(self, data, indices, abs_names):
+    def _setup_variables(self, data, abs_names):
         """
         Compute the variable sets and sizes.
 
@@ -123,12 +123,11 @@ class Assembler(object):
         ----------
         data : {vname1: {'metadata': {}, ...}, ...}
             dict of abs var name to data dict for variables on this proc.
-        indices : {vname1: idx1, vname2: idx2, ...}
-            dit of abs var name to global index for variables on this proc.
         abs_names : {'input': [str, ...], 'output': [str, ...]}
             lists of absolute names of input and output variables on this proc.
         """
         nproc = self._comm.size
+        indices = self._varx_allprocs_abs2idx_io
 
         for typ in ['input', 'output']:
             nvar = len(abs_names[typ])
@@ -278,8 +277,7 @@ class Assembler(object):
 
         self._input_src_ids = input_src_ids
 
-    def _setup_src_indices(self, metadata, myproc_var_global_indices,
-                           var_pathdict, var_allprocs_pathnames):
+    def _setup_src_indices(self, data, abs_names):
         """
         Assemble global list of src_indices.
 
@@ -289,66 +287,62 @@ class Assembler(object):
 
         Parameters
         ----------
-        metadata : {'input': [{}, ...], 'output': [{}, ...]}
-            list of metadata dictionaries of variables that exist on this proc.
-        myproc_var_global_indices : ndarray[:]
-            integer arrays of global indices of variables on this proc.
-        var_pathdict : dict
-            dict that maps absolute pathname to promoted name, global and local index.
-        var_allprocs_pathnames : {'input': [], 'output': []}
-            absolute pathnames for each input and output var.
+        data : {vname1: {'metadata': {}, ...}, ...}
+            dict of abs var name to data dict for variables on this proc.
+        abs_names : {'input': [str, ...], 'output': [str, ...]}
+            lists of absolute names of input and output variables on this proc.
         """
-        input_metadata = metadata['input']
-        output_metadata = metadata['output']
+        abs2idx = self._varx_allprocs_abs2idx_io
+        indices = self._varx_allprocs_abs2idx_io
+        out_all_paths = self._varx_allprocs_abs_names['output']
+        in_paths = abs_names['input']
 
         # Compute total size of indices vector
         total_idx_size = 0
-        sizes = np.zeros(len(input_metadata), dtype=int)
+        sizes = np.zeros(len(in_paths), dtype=int)
 
-        for ind, meta in enumerate(input_metadata):
-            sizes[ind] = np.prod(meta['shape'])
+        for ind, abs_name in enumerate(in_paths):
+            sizes[ind] = np.prod(data[abs_name]['metadata']['shape'])
 
         total_idx_size = np.sum(sizes)
 
         # Allocate arrays
         self._src_indices = np.zeros(total_idx_size, int)
-        self._src_indices_range = np.zeros(
-            (myproc_var_global_indices.shape[0], 2), int)
+        self._src_indices_range = np.zeros((len(in_paths), 2), int)
 
         # Populate arrays
         ind1, ind2 = 0, 0
-        for ind, meta in enumerate(input_metadata):
+        for ind, abs_name in enumerate(in_paths):
+            in_meta = data[abs_name]['metadata']
             isize = sizes[ind]
             ind2 += isize
-            src_indices = meta['src_indices']
+            src_indices = in_meta['src_indices']
             if src_indices is None:
                 self._src_indices[ind1:ind2] = np.arange(isize, dtype=int)
             elif src_indices.ndim == 1:
                 self._src_indices[ind1:ind2] = src_indices
             else:
-                src_id = self._input_src_ids[myproc_var_global_indices[ind]]
+                src_id = self._input_src_ids[indices[abs_name]]
                 if src_id == -1:  # input is not connected
                     self._src_indices[ind1:ind2] = np.arange(isize, dtype=int)
                 else:
-                    pdata = var_pathdict[var_allprocs_pathnames['output'][src_id]]
                     # TODO: the src may not be in this processes and we need its shape
-                    if pdata.myproc_idx is None:
+                    if out_all_paths[src_id] not in data:
                         raise NotImplementedError("accessing source metadata from "
                                                   "another process isn't supported "
                                                   "yet.")
-                    src_shape = output_metadata[pdata.myproc_idx]['shape']
+                    src_shape = data[out_all_paths[src_id]]['metadata']['shape']
                     if len(src_shape) == 1:
                         self._src_indices[ind1:ind2] = src_indices.flat
                     else:
-                        tgt_shape = meta['shape']
+                        tgt_shape = in_meta['shape']
                         # loop over src_indices tuples to get indices into the source
                         entries = [list(range(x)) for x in tgt_shape]
                         cols = np.vstack(src_indices[i] for i in product(*entries))
                         dimidxs = [cols[:, i] for i in range(cols.shape[1])]
                         self._src_indices[ind1:ind2] = np.ravel_multi_index(dimidxs, src_shape)
 
-            self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
-                                                                          ind2]
+            self._src_indices_range[indices[abs_name], :] = [ind1, ind2]
             ind1 += isize
 
     def _setup_src_data(self, variable_metadata, variable_indices):
