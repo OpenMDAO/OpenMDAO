@@ -116,8 +116,9 @@ class FiniteDifference(ApproximationScheme):
 
         Returns
         -------
-        tuple(str, str, float, int, str)
+        tuple(str, str, float, int, str):
             Sorting key (wrt, form, step_size, order, step_calc)
+
         """
         fd_options = approx_tuple[2]
         return (approx_tuple[1], fd_options['form'], fd_options['order'],

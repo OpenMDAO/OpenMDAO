@@ -116,3 +116,11 @@ Visualization
    :maxdepth: 1
 
    tags/index
+
+Style for Developers
+====================
+
+.. toctree::
+   :maxdepth: 1
+
+   style_guide/doc_style_guide.rst
