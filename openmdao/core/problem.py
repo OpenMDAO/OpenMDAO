@@ -616,7 +616,11 @@ class Problem(object):
                     approximation.add_approximation(abs_key, global_options)
 
             approx_jac = {}
+            approximation._init_approximations()
+
+            # Peform the FD here.
             approximation.compute_approximations(comp, jac=approx_jac)
+
             for rel_key, partial in iteritems(approx_jac):
                 abs_key = rel_key2abs_key(comp, rel_key)
                 # Since all partials for outputs for explicit comps are declared, assume anything

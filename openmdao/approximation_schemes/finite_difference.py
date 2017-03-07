@@ -163,7 +163,7 @@ class FiniteDifference(ApproximationScheme):
         # Note: groupby requires a pre-sorted list.
         sorted_exec = sorted(self._exec_list, key=self._key_fun)
 
-        for key, approximations in groupby(sorted_exec, self._key_fun):
+        for key, approximations in groupby(self._exec_list, self._key_fun):
             # groupby (along with this key function) will group all 'of's that have the same wrt and
             # step size.
             wrt, form, order, step, step_calc = key
