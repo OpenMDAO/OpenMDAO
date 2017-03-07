@@ -1,0 +1,65 @@
+:orphan:
+
+.. _nlbjac:
+
+Nonlinear Solver: NonlinearBlockJac
+===================================
+
+The NonlinearBlockJac solver is a nonlinear solver that uses the block Jacobi method to solve
+the system. When to choose this solver over :ref:`NonlinearBlockGS <usr_openmdao.solvers.nl_bgs.py>`
+is an advanced topic, but it is valid for systems that satisfy the same conditions:
+
+1. System (or subsystem) contains a cycle, though subsystems may.
+2. System does not contain any implicit states, though subsystems may.
+
+Note that you may not know if you satisfy the second condition, so choosing a solver can be "trial and error." If
+NonlinearBlockJac doesn't work, then you will need to use :ref:`NewtonSolver <usr_openmdao.solvers.nl_newton.py>`.
+
+The main difference over `NonlinearBlockGS` is that data passing is delayed until after all subsystems have been
+executed.
+
+Here, we choose the NonlinearBlockJac to solve the Sellar problem, which has two components with a
+cyclic dependency, has no implicit states, and works very well with Jacobi.
+
+.. embed-test::
+    openmdao.solvers.tests.test_nl_bjac.TestNLBlockJacobi.test_feature_basic
+
+This solver runs all of the subsystems each iteration, but just passes the data along all connections
+simultaneously once per iteration. After each iteration, the iteration count and the residual norm are
+checked to see if termination has been satisfied.
+
+You can control the termination criteria for the solver using the following options:
+
+Options
+-------
+
+- maxiter
+
+  This lets you specify the maximum number of Jacobi iterations to apply. In this example, we
+  cut it back from the default (10) to 2 so that it terminates a few iterations earlier and doesn't
+  reach the specified absolute or relative tolerance.
+
+  .. embed-test::
+      openmdao.solvers.tests.test_nl_bjac.TestNLBlockJacobi.test_feature_maxiter
+
+- atol
+
+  Here, we set the absolute tolerance to a looser value that will trigger an earlier termination. After
+  each iteration, the norm of the residuals is calculated by calling `apply_nonlinear` on implicit
+  components and `evaluate` on explicit components. If this norm value is lower than the absolute
+  tolerance `atol`, the iteration will terminate.
+
+  .. embed-test::
+      openmdao.solvers.tests.test_nl_bjac.TestNLBlockJacobi.test_feature_atol
+
+- rtol
+
+  Here, we set the relative tolerance to a looser value that will trigger an earlier termination. After
+  each iteration, the norm of the residuals is calculated by calling `apply_nonlinear` on implicit
+  components and `evaluate` on explicit components. If the ratio of the currently calculated norm to the
+  initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
+
+  .. embed-test::
+      openmdao.solvers.tests.test_nl_bjac.TestNLBlockJacobi.test_feature_rtol
+
+.. tags:: Solver, NonlinearSolver

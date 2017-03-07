@@ -73,9 +73,9 @@ class TestNumpyVec(unittest.TestCase):
         for a, b in ab_list:
             self.assertEqualArrays(a, b)
 
-    def test__var_allprocs_names(self):
+    def test_prom_names(self):
         root = self.p.model
-        names = root._var_allprocs_names['output']
+        names = sorted(root._varx_allprocs_prom2abs_list['output'])
         self.assertEqual(names, ['v1', 'v2', 'v3', 'v4'])
 
     def test__variable_set_IDs(self):
