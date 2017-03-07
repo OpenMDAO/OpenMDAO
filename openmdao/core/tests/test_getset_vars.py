@@ -27,32 +27,32 @@ class TestGetSetVariables(unittest.TestCase):
         # -------------------------------------------------------------------
 
         # inputs
-        p['g.c.x'] = 1.0
-        print(p['g.c.x'])
+        p['g.c.x'] = 5.0
+        self.assertEqual(p['g.c.x'], 5.0)
 
         # outputs
-        p['g.c.y'] = 1.0
-        print(p['g.c.y'])
+        p['g.c.y'] = 5.0
+        self.assertEqual(p['g.c.y'], 5.0)
 
         with g.nonlinear_vector_context() as (inputs, outputs, residuals):
 
             # inputs
-            inputs['c.x'] = 1.0
-            print(inputs['c.x'])
+            inputs['c.x'] = 5.0
+            self.assertEqual(inputs['c.x'], 5.0)
 
             # outputs
-            outputs['c.y'] = 1.0
-            print(outputs['c.y'])
+            outputs['c.y'] = 5.0
+            self.assertEqual(outputs['c.y'], 5.0)
 
         with g.jacobian_context() as jac:
 
             # d(output)/d(input)
-            jac['c.y', 'c.x'] = 1.0
-            print(jac['c.y', 'c.x'])
+            jac['c.y', 'c.x'] = 5.0
+            self.assertEqual(jac['c.y', 'c.x'], 5.0)
 
             # d(output)/d(output)
-            jac['c.y', 'c.y'] = 1.0
-            print(jac['c.y', 'c.y'])
+            jac['c.y', 'c.y'] = 5.0
+            self.assertEqual(jac['c.y', 'c.y'], 5.0)
 
     def test_with_promotion(self):
         """
@@ -76,38 +76,38 @@ class TestGetSetVariables(unittest.TestCase):
         # -------------------------------------------------------------------
 
         # inputs
-        p['g.c2.x'] = 1.0
-        print(p['g.c2.x'])
+        p['g.c2.x'] = 5.0
+        self.assertEqual(p['g.c2.x'], 5.0)
 
         # outputs
-        p['g.c2.y'] = 1.0
-        print(p['g.c2.y'])
-        p['y'] = 1.0
-        print(p['y'])
+        p['g.c2.y'] = 5.0
+        self.assertEqual(p['g.c2.y'], 5.0)
+        p['y'] = 5.0
+        self.assertEqual(p['y'], 5.0)
 
         with g.nonlinear_vector_context() as (inputs, outputs, residuals):
 
             # inputs
-            inputs['c2.x'] = 1.0
-            print(inputs['c2.x'])
+            inputs['c2.x'] = 5.0
+            self.assertEqual(inputs['c2.x'], 5.0)
 
             # outputs
-            outputs['c2.y'] = 1.0
-            print(outputs['c2.y'])
-            outputs['y'] = 1.0
-            print(outputs['y'])
+            outputs['c2.y'] = 5.0
+            self.assertEqual(outputs['c2.y'], 5.0)
+            outputs['y'] = 5.0
+            self.assertEqual(outputs['y'], 5.0)
 
         with g.jacobian_context() as jac:
 
             # d(outputs)/d(inputs)
-            jac['c2.y', 'c2.x'] = 1.0
-            print(jac['c2.y', 'c2.x'])
+            jac['c2.y', 'c2.x'] = 5.0
+            self.assertEqual(jac['c2.y', 'c2.x'], 5.0)
 
             # d(outputs)/d(outputs)
-            jac['c2.y', 'c2.y'] = 1.0
-            print(jac['c2.y', 'c2.y'])
-            jac['y', 'y'] = 1.0
-            print(jac['y', 'y'])
+            jac['c2.y', 'c2.y'] = 5.0
+            self.assertEqual(jac['c2.y', 'c2.y'], 5.0)
+            jac['y', 'y'] = 5.0
+            self.assertEqual(jac['y', 'y'], 5.0)
 
     def test_no_promotion_errors(self):
         """
@@ -130,61 +130,61 @@ class TestGetSetVariables(unittest.TestCase):
 
         # inputs
         with assertRaisesRegex(self, KeyError, msg.format('x')):
-            p['x'] = 1.0
+            p['x'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('x')):
-            print(p['x'])
+            self.assertEqual(p['x'], 5.0)
 
         # outputs
         with assertRaisesRegex(self, KeyError, msg.format('y')):
-            p['y'] = 1.0
+            p['y'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('y')):
-            print(p['y'])
+            self.assertEqual(p['y'], 5.0)
 
         msg = 'Variable name "{}" not found.'
         with g.nonlinear_vector_context() as (inputs, outputs, residuals):
 
             # inputs
             with assertRaisesRegex(self, KeyError, msg.format('x')):
-                inputs['x'] = 1.0
+                inputs['x'] = 5.0
             with assertRaisesRegex(self, KeyError, msg.format('x')):
-                print(inputs['x'])
+                self.assertEqual(inputs['x'], 5.0)
             with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
-                inputs['g.c.x'] = 1.0
+                inputs['g.c.x'] = 5.0
             with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
-                print(inputs['g.c.x'])
+                self.assertEqual(inputs['g.c.x'], 5.0)
 
             # outputs
             with assertRaisesRegex(self, KeyError, msg.format('y')):
-                outputs['y'] = 1.0
+                outputs['y'] = 5.0
             with assertRaisesRegex(self, KeyError, msg.format('y')):
-                print(outputs['y'])
+                self.assertEqual(outputs['y'], 5.0)
             with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
-                outputs['g.c.y'] = 1.0
+                outputs['g.c.y'] = 5.0
             with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
-                print(outputs['g.c.y'])
+                self.assertEqual(outputs['g.c.y'], 5.0)
 
         msg = 'Variable name pair \("{}", "{}"\) not found.'
         with g.jacobian_context() as jac:
 
             # d(output)/d(input)
             with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
-                jac['y', 'x'] = 1.0
+                jac['y', 'x'] = 5.0
             with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
-                print(jac['y', 'x'])
+                self.assertEqual(jac['y', 'x'], 5.0)
             with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
-                jac['g.c.y', 'g.c.x'] = 1.0
+                jac['g.c.y', 'g.c.x'] = 5.0
             with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
-                print(jac['g.c.y', 'g.c.x'])
+                self.assertEqual(jac['g.c.y', 'g.c.x'], 5.0)
 
             # d(output)/d(output)
             with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
-                jac['y', 'y'] = 1.0
+                jac['y', 'y'] = 5.0
             with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
-                print(jac['y', 'y'])
+                self.assertEqual(jac['y', 'y'], 5.0)
             with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
-                jac['g.c.y', 'g.c.y'] = 1.0
+                jac['g.c.y', 'g.c.y'] = 5.0
             with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
-                print(jac['g.c.y', 'g.c.y'])
+                self.assertEqual(jac['g.c.y', 'g.c.y'], 5.0)
 
     def test_with_promotion_errors(self):
         """
@@ -213,19 +213,19 @@ class TestGetSetVariables(unittest.TestCase):
 
             # inputs
             with assertRaisesRegex(self, KeyError, msg2.format('x')):
-                inputs['x'] = 1.0
+                inputs['x'] = 5.0
             with assertRaisesRegex(self, KeyError, msg2.format('x')):
-                print(inputs['x'])
+                self.assertEqual(inputs['x'], 5.0)
             with assertRaisesRegex(self, KeyError, msg1.format('g.c2.x')):
-                inputs['g.c2.x'] = 1.0
+                inputs['g.c2.x'] = 5.0
             with assertRaisesRegex(self, KeyError, msg1.format('g.c2.x')):
-                print(inputs['g.c2.x'])
+                self.assertEqual(inputs['g.c2.x'], 5.0)
 
             # outputs
             with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y')):
-                outputs['g.c2.y'] = 1.0
+                outputs['g.c2.y'] = 5.0
             with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y')):
-                print(outputs['g.c2.y'])
+                self.assertEqual(outputs['g.c2.y'], 5.0)
 
         msg1 = 'Variable name pair \("{}", "{}"\) not found.'
         msg2 = 'The promoted name "{}" is invalid because it is non-unique.'
@@ -233,19 +233,19 @@ class TestGetSetVariables(unittest.TestCase):
 
             # d(outputs)/d(inputs)
             with assertRaisesRegex(self, KeyError, msg2.format('x')):
-                jac['y', 'x'] = 1.0
+                jac['y', 'x'] = 5.0
             with assertRaisesRegex(self, KeyError, msg2.format('x')):
-                print(jac['y', 'x'])
+                self.assertEqual(jac['y', 'x'], 5.0)
             with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
-                jac['g.c2.y', 'g.c2.x'] = 1.0
+                jac['g.c2.y', 'g.c2.x'] = 5.0
             with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
-                print(jac['g.c2.y', 'g.c2.x'])
+                self.assertEqual(jac['g.c2.y', 'g.c2.x'], 5.0)
 
             # d(outputs)/d(outputs)
             with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
-                jac['g.c2.y', 'g.c2.y'] = 1.0
+                jac['g.c2.y', 'g.c2.y'] = 5.0
             with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
-                print(jac['g.c2.y', 'g.c2.y'])
+                self.assertEqual(jac['g.c2.y', 'g.c2.y'], 5.0)
 
 
 if __name__ == '__main__':
