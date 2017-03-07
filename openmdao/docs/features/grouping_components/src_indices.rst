@@ -33,7 +33,7 @@ array, or if it was shape (1,2) and connected to a flat source array.
 
 .. code::
 
-    self.add_input('x', 1.0, src_indices=numpy.array([[3,1]]), shape=1)
+    self.add_input('x', 1.0, src_indices=np.array([[3,1]]), shape=1)
 
 5.  If the source array is flat and the input is shape (2,2), the *add_input*
 call might look like this:

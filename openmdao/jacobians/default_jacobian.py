@@ -1,6 +1,6 @@
 """Define the DefaultJacobian class."""
 from __future__ import division
-import numpy
+import numpy as np
 import scipy.sparse
 from six.moves import range
 
@@ -27,40 +27,39 @@ class DefaultJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        for out_name, in_name in self._iter_rel_unprom():
-            ukey = self._key2unique((out_name, in_name))
-            jac = self._subjacs[ukey]
+        for abs_key in self._iter_abs_keys():
+            subjac = self._subjacs[abs_key]
 
-            if type(jac) is numpy.ndarray or scipy.sparse.issparse(jac):
-                if out_name in d_residuals and in_name in d_outputs:
-                    op = d_residuals._views_flat[out_name]
-                    ip = d_outputs._views_flat[in_name]
+            if type(subjac) is np.ndarray or scipy.sparse.issparse(subjac):
+                if d_residuals._contains_abs(abs_key[0]) and d_outputs._contains_abs(abs_key[1]):
+                    re = d_residuals._views_flat[abs_key[0]]
+                    op = d_outputs._views_flat[abs_key[1]]
                     if mode == 'fwd':
-                        op += jac.dot(ip)
+                        re += subjac.dot(op)
                     elif mode == 'rev':
-                        ip += jac.T.dot(op)
+                        op += subjac.T.dot(re)
 
-                if out_name in d_residuals and in_name in d_inputs:
-                    op = d_residuals._views_flat[out_name]
-                    ip = d_inputs._views_flat[in_name]
+                if d_residuals._contains_abs(abs_key[0]) and d_inputs._contains_abs(abs_key[1]):
+                    re = d_residuals._views_flat[abs_key[0]]
+                    ip = d_inputs._views_flat[abs_key[1]]
                     if mode == 'fwd':
-                        op += jac.dot(ip)
+                        re += subjac.dot(ip)
                     elif mode == 'rev':
-                        ip += jac.T.dot(op)
+                        ip += subjac.T.dot(re)
 
-            elif type(jac) is list:
-                if out_name in d_residuals and in_name in d_outputs:
-                    op = d_residuals._views_flat[out_name]
-                    ip = d_outputs._views_flat[in_name]
+            elif type(subjac) is list:
+                if d_residuals._contains_abs(abs_key[0]) and d_outputs._contains_abs(abs_key[1]):
+                    re = d_residuals._views_flat[abs_key[0]]
+                    op = d_outputs._views_flat[abs_key[1]]
                     if mode == 'fwd':
-                        numpy.add.at(op, jac[1], ip[jac[2]] * jac[0])
+                        np.add.at(re, subjac[1], op[subjac[2]] * subjac[0])
                     if mode == 'rev':
-                        numpy.add.at(ip, jac[2], op[jac[1]] * jac[0])
+                        np.add.at(op, subjac[2], re[subjac[1]] * subjac[0])
 
-                if out_name in d_residuals and in_name in d_inputs:
-                    op = d_residuals._views_flat[out_name]
-                    ip = d_inputs._views_flat[in_name]
+                if d_residuals._contains_abs(abs_key[0]) and d_inputs._contains_abs(abs_key[1]):
+                    re = d_residuals._views_flat[abs_key[0]]
+                    ip = d_inputs._views_flat[abs_key[1]]
                     if mode == 'fwd':
-                        numpy.add.at(op, jac[1], ip[jac[2]] * jac[0])
+                        np.add.at(re, subjac[1], ip[subjac[2]] * subjac[0])
                     if mode == 'rev':
-                        numpy.add.at(ip, jac[2], op[jac[1]] * jac[0])
+                        np.add.at(ip, subjac[2], re[subjac[1]] * subjac[0])

@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function
 
-import numpy
+import numpy as np
 from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
@@ -38,15 +38,16 @@ class ScipyIterativeSolver(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        # TODO : These are the defaults we used in OpenMDAO Alpha
-        # self.options['maxiter'] = 1000
-        # self.options['atol'] = 1.0e-12
-
         self.options.declare('solver', type_=object, value=gmres,
                              desc='function handle for actual solver')
 
+        self.options.declare('restart', value=20, type_=int,
+                             desc='Number of iterations between restarts. Larger values increase '
+                                  'iteration cost, but may be necessary for convergence')
+
         # changing the default maxiter from the base class
-        self.options['maxiter'] = 100
+        self.options['maxiter'] = 1000
+        self.options['atol'] = 1.0e-12
 
     def _setup_solvers(self, system, depth):
         """
@@ -87,7 +88,7 @@ class ScipyIterativeSolver(LinearSolver):
         """
         vec_name = self._vec_name
         system = self._system
-        ind1, ind2 = system._var_allprocs_range['output']
+        ind1, ind2 = system._varx_allprocs_idx_range['output']
 
         if self._mode == 'fwd':
             x_vec = system._vectors['output'][vec_name]
@@ -98,10 +99,10 @@ class ScipyIterativeSolver(LinearSolver):
 
         x_vec.set_data(in_vec)
         var_inds = [
-            system._var_allprocs_range['output'][0],
-            system._var_allprocs_range['output'][1],
-            system._var_allprocs_range['output'][0],
-            system._var_allprocs_range['output'][1],
+            system._varx_allprocs_idx_range['output'][0],
+            system._varx_allprocs_idx_range['output'][1],
+            system._varx_allprocs_idx_range['output'][0],
+            system._varx_allprocs_idx_range['output'][1],
         ]
         system._apply_linear([vec_name], self._mode, var_inds)
 
@@ -117,13 +118,13 @@ class ScipyIterativeSolver(LinearSolver):
         res : ndarray
             the current residual vector.
         """
-        norm = numpy.linalg.norm(res)
+        norm = np.linalg.norm(res)
         if self._iter_count == 0:
             if norm != 0.0:
                 self._norm0 = norm
             else:
                 self._norm0 = 1.0
-        self._mpi_print(self._iter_count, norm / self._norm0, norm)
+        self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1
 
     def solve(self, vec_names, mode):
@@ -155,6 +156,7 @@ class ScipyIterativeSolver(LinearSolver):
         maxiter = self.options['maxiter']
         atol = self.options['atol']
         rtol = self.options['rtol']
+        restart = self.options['restart']
 
         for vec_name in self._vec_names:
             self._vec_name = vec_name
@@ -181,7 +183,7 @@ class ScipyIterativeSolver(LinearSolver):
 
             self._iter_count = 0
             x_vec.set_data(
-                solver(linop, b_vec.get_data(), M=M,
+                solver(linop, b_vec.get_data(), M=M, restart=restart,
                        x0=x_vec_combined, maxiter=maxiter, tol=atol,
                        callback=self._monitor)[0])
 

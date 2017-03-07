@@ -1,5 +1,5 @@
 from __future__ import division
-import numpy
+import numpy as np
 import unittest
 import scipy.sparse.linalg
 
@@ -71,7 +71,8 @@ class CompB(ImplicitComponent):
 
 class GroupG(Group):
 
-    def initialize(self):
+    def __init__(self, **kwargs):
+        super(GroupG, self).__init__(**kwargs)
         self.add_subsystem('CA', CompA(), promotes=['*'])
         self.add_subsystem('CB', CompB(), promotes=['*'])
 
@@ -82,14 +83,13 @@ class Test(unittest.TestCase):
         group = GroupG()
         self.p = Problem(group)
 
-        gmres = scipy.sparse.linalg.gmres
         self.p.model.ln_solver = LinearBlockGS()
         self.p.setup(check=False)
 
         #view_model(self.p, show_browser=False)
 
     def assertEqualArrays(self, a, b, tol=1e-3):
-        self.assertTrue(numpy.linalg.norm(a-b) < tol)
+        self.assertTrue(np.linalg.norm(a-b) < tol)
 
     def test_apply_linear(self):
         root = self.p.model

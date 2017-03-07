@@ -2,10 +2,11 @@
 
 from __future__ import division
 
-import numpy
+import numpy as np
 
 from openmdao.core.component import Component as BaseComponent
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.name_maps import rel_key2abs_key
 
 
 class Component(BaseComponent):
@@ -143,9 +144,6 @@ class Component(BaseComponent):
         for vec_name in vec_names:
             with self._matvec_context(vec_name, var_inds, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
-                print('d_inputs:', d_inputs._names, d_inputs.get_data())
-                print('d_outputs:', d_outputs._names, d_outputs.get_data())
-                print('d_residuals:', d_residuals._names, d_residuals.get_data())
                 with self._jacobian_context():
                     self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                           mode)
@@ -163,11 +161,22 @@ class Component(BaseComponent):
                 # in d_outputs to d_residuals, but only for the explicit variables.
                 # For the implicit variables, you shouldn’t have to touch anything
 
+                print('output names:', self._output_names)
+                print('state names:', self._state_names)
+
+                print('d_residuals:', d_residuals, d_residuals._names, d_residuals.get_data())
+                print('d_outputs:', d_outputs, d_outputs._names, d_outputs.get_data())
+                print('d_inputs:', d_inputs, d_inputs._names, d_inputs.get_data())
+
                 for name in d_residuals:
                     if name in self._output_names:
                         if name not in self._state_names:
                             d_outputs[name] = d_residuals[name]
                             d_residuals[name] *= -1.0
+
+                print('d_residuals:', d_residuals, d_residuals._names, d_residuals.get_data())
+                print('d_outputs:', d_outputs, d_outputs._names, d_outputs.get_data())
+                print('d_inputs:', d_inputs, d_inputs._names, d_inputs.get_data())
 
                 self.apply_linear(self._inputs, self._outputs,
                                   d_inputs, d_outputs, d_residuals, mode)
@@ -204,6 +213,7 @@ class Component(BaseComponent):
         float
             absolute error.
         """
+        print(self.pathname, '_solve_linear()')
         if self._ln_solver is not None:
             return self._ln_solver(vec_names, mode)
         else:
@@ -214,9 +224,9 @@ class Component(BaseComponent):
                 d_outputs._scale(self._scaling_to_phys['output'])
                 d_residuals._scale(self._scaling_to_phys['residual'])
 
-            success = self.solve_linear(self._vectors['output'],
-                                        self._vectors['residual'],
-                                        vec_names, mode)
+            self.solve_linear(self._vectors['output'],
+                              self._vectors['residual'],
+                              vec_names, mode)
 
             for vec_name in vec_names:
                 for name in d_outputs:
@@ -229,7 +239,7 @@ class Component(BaseComponent):
                 d_outputs._scale(self._scaling_to_norm['output'])
                 d_residuals._scale(self._scaling_to_norm['residual'])
 
-            return success
+            return False, 0., 0.
 
     def _linearize(self):
         """
@@ -247,11 +257,12 @@ class Component(BaseComponent):
             self._inputs._scale(self._scaling_to_norm['input'])
             self._outputs._scale(self._scaling_to_norm['output'])
 
+            pro2abs = self._var_name2path['output']
             for out_name in self._var_myproc_names['output']:
                 if out_name in self._output_names:
-                    size = len(self._outputs._views_flat[out_name])
-                    ones = numpy.ones(size)
-                    arange = numpy.arange(size)
+                    size = len(self._outputs._views_flat[pro2abs[out_name]])
+                    ones = np.ones(size)
+                    arange = np.arange(size)
                     self._jacobian[out_name, out_name] = (ones, arange, arange)
 
             # re-negate the jacobian
@@ -260,31 +271,26 @@ class Component(BaseComponent):
             if self._owns_global_jac:
                 self._jacobian._update()
 
-    def _setup_variables(self, recurse=False):
+    def _setup_partials(self):
         """
-        Assemble variable metadata and names lists.
-
-        Sets the following attributes:
-            _var_allprocs_names
-            _var_myproc_names
-            _var_myproc_metadata
-            _var_pathdict
-            _var_name2path
-
-        Parameters
-        ----------
-        recurse : boolean
-            Ignored.
+        Set up partial derivative sparsity structures and approximation schemes.
         """
-        super(Component, self)._setup_variables(False)
+        self.initialize_partials()
 
         # Note: These declare calls are outside of initialize_partials so that users do not have to
         # call the super version of initialize_partials. This is still post-initialize_variables.
         other_names = []
         for i, out_name in enumerate(self._var_myproc_names['output']):
             meta = self._var_myproc_metadata['output'][i]
-            size = numpy.prod(meta['shape'])
-            arange = numpy.arange(size)
+            size = np.prod(meta['shape'])
+            arange = np.arange(size)
+
+            # No need to FD outputs wrt other outputs
+            abs_key = rel_key2abs_key(self, (out_name, out_name))
+            if abs_key in self._subjacs_info:
+                if 'method' in self._subjacs_info[abs_key]:
+                    del self._subjacs_info[abs_key]['method']
+
             self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
             for other_name in other_names:
                 self.declare_partials(out_name, other_name, dependent=False)
@@ -296,12 +302,11 @@ class Component(BaseComponent):
         Negate this component's part of the jacobian.
         """
         if self._jacobian._subjacs:
-            for in_name in self._var_myproc_names['input']:
-                for out_name in self._var_myproc_names['output']:
-                    key = (out_name, in_name)
-                    if key in self._jacobian:
-                        ukey = self._jacobian._key2unique(key)
-                        self._jacobian._multiply_subjac(ukey, -1.0)
+            for res_name in self._varx_abs_names['output']:
+                for in_name in self._varx_abs_names['input']:
+                    abs_key = (res_name, in_name)
+                    if abs_key in self._jacobian._subjacs:
+                        self._jacobian._multiply_subjac(abs_key, -1.)
 
     def apply_nonlinear(self, params, unknowns, residuals):
         """
@@ -383,6 +388,7 @@ class Component(BaseComponent):
         mode : str
             either 'fwd' or 'rev'
         """
+        print(self.pathname, 'solve_linear()')
         pass
 
     def linearize(self, params, unknowns, residuals):

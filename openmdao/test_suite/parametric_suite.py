@@ -8,10 +8,15 @@ import collections
 from nose_parameterized import parameterized
 from unittest import SkipTest
 
+from openmdao.core.problem import Problem
+from openmdao.jacobians.global_jacobian import GlobalJacobian
+from openmdao.matrices.coo_matrix import COOmatrix
+from openmdao.matrices.csr_matrix import CSRmatrix
+from openmdao.matrices.dense_matrix import DenseMatrix
+from openmdao.solvers.ln_scipy import ScipyIterativeSolver
+from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.test_suite.groups.cycle_group import CycleGroup
-from openmdao.api import Problem
-from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
-from openmdao.api import GlobalJacobian, DenseMatrix, COOmatrix, CSRmatrix
+from openmdao.vectors.default_vector import DefaultVector
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector

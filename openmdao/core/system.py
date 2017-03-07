@@ -9,7 +9,7 @@ import sys
 from six import iteritems, string_types
 from six.moves import range
 
-import numpy
+import numpy as np
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
@@ -18,7 +18,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.general_utils import \
-    determine_adder_scaler, format_as_float_or_array
+    determine_adder_scaler, format_as_float_or_array, ensure_compatible
 
 
 # This is for storing various data mapped to var pathname
@@ -31,6 +31,14 @@ class System(object):
 
     Never instantiated; subclassed by <Group> or <Component>.
     All subclasses have their attributes defined here.
+
+    In attribute names:
+        abs / abs_name : absolute, unpromoted variable name, seen from root (unique).
+        rel / rel_name : relative, unpromoted variable name, seen from current system (unique).
+        prom / prom_name : relative, promoted variable name, seen from current system (non-unique).
+        idx : global variable index among variables on all procs (I/O indices separate).
+        my_idx : index among variables in this system, on this processor (I/O indices separate).
+        io : indicates explicitly that input and output variables are combined in the same dict.
 
     Attributes
     ----------
@@ -83,6 +91,17 @@ class System(object):
     _var_connections_indices : [(int, int), ...]
         _var_connections with variable indices instead of names.  Entries
         have the form (input_index, output_index).
+    _varx_allprocs_prom2abs_list : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to list of all absolute names.
+        For outputs, the list will have length one since promoted output names are unique.
+    _varx_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
+        Global index range of owned variables with respect to all model variables.
+    _varx_abs_names : {'input': [str, ...], 'output': [str, ...]}
+        List of absolute names of owned variables existing on current proc.
+    _varx_abs2data_io : dict
+        Dictionary mapping absolute names to dicts with keys (prom, rel, my_idx, type_, metadata).
+        The my_idx entry is the index among variables in this system, on this processor.
+        The type_ entry is either 'input' or 'output'.
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         dict of vector objects. These are the derivatives vectors.
     _vector_transfers : dict
@@ -172,6 +191,12 @@ class System(object):
         self._var_connections = {}
         self._var_connections_indices = []
 
+        # [REFACTOR]
+        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._varx_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
+        self._varx_abs_names = {'input': [], 'output': []}
+        self._varx_abs2data_io = {}
+
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._vector_transfers = {}
         self._vector_var_ids = {}
@@ -202,8 +227,6 @@ class System(object):
 
         self._design_vars = {}
         self._responses = {}
-
-        self.initialize()
 
     def _setup_processors(self, path, comm, global_dict,
                           assembler, proc_range):
@@ -262,6 +285,46 @@ class System(object):
                                          sub_global_dict, assembler,
                                          sub_proc_range)
 
+    def _setupx_variables_myproc(self):
+        """
+        Compute variable dict/list for variables on the current processor.
+
+        Sets the following attributes:
+            _varx_abs2data_io
+            _varx_abs_names
+        """
+        pass
+
+    def _setupx_variable_allprocs_names(self):
+        """
+        Get the names for variables on all processors.
+
+        Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
+
+        Sets the following attributes:
+            _varx_allprocs_prom2abs_list
+
+        Returns
+        -------
+        {'input': [str, ...], 'output': [str, ...]}
+            List of absolute names of owned variables existing on current proc.
+        """
+        pass
+
+    def _setupx_variable_allprocs_indices(self, global_index):
+        """
+        Compute the global index range for variables on all processors.
+
+        Computes the following attributes:
+            _varx_allprocs_idx_range
+
+        Parameters
+        ----------
+        global_index : {'input': int, 'output': int}
+            current global variable counter.
+        """
+        pass
+
     def _setup_variables(self, recurse=True):
         """
         Assemble variable metadata and names lists.
@@ -293,6 +356,11 @@ class System(object):
                 self._var_allprocs_pathnames[typ] = []
                 self._var_myproc_names[typ] = []
                 self._var_myproc_metadata[typ] = []
+
+            # [REFACTOR]
+            self._varx_abs2data_io = {}
+            for type_ in ['input', 'output']:
+                self._varx_abs_names[type_] = []
 
             self.initialize_variables()
 
@@ -341,7 +409,7 @@ class System(object):
                     iproc = self.comm.rank
                     nvar_myproc = local_var_size
                     global_index[typ] += \
-                        numpy.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
+                        np.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
 
             # Perform the recursion
             if recurse:
@@ -353,13 +421,13 @@ class System(object):
                 raw = []
                 for subsys in self._subsystems_myproc:
                     raw.append(subsys._var_myproc_indices[typ])
-                self._var_myproc_indices[typ] = numpy.concatenate(raw)
+                self._var_myproc_indices[typ] = np.concatenate(raw)
 
         # If component, _var_myproc_indices is simply an arange
         else:
             for typ in ['input', 'output']:
                 ind1, ind2 = self._var_allprocs_range[typ]
-                self._var_myproc_indices[typ] = numpy.arange(ind1, ind2)
+                self._var_myproc_indices[typ] = np.arange(ind1, ind2)
 
         # Reset index dict to the global variable count on all procs
         # Necessary for younger siblings to have proper index values
@@ -372,6 +440,12 @@ class System(object):
             for name in self._var_allprocs_names[typ]:
                 self._var_allprocs_indices[typ][name] = idx
                 idx += 1
+
+    def _setup_partials(self):
+        """
+        Set up partial derivative sparsity structures and approximation schemes.
+        """
+        pass
 
     def _setup_connections(self):
         """
@@ -446,9 +520,9 @@ class System(object):
 
         # Initialize scaling arrays
         for scaling in (self._scaling_to_norm, self._scaling_to_phys):
-            scaling['input'] = numpy.empty((nvar_in, 2))
-            scaling['output'] = numpy.empty((nvar_out, 2))
-            scaling['residual'] = numpy.empty((nvar_out, 2))
+            scaling['input'] = np.empty((nvar_in, 2))
+            scaling['output'] = np.empty((nvar_out, 2))
+            scaling['residual'] = np.empty((nvar_out, 2))
 
         # ref0 and ref are the values of the variable in the specified
         # units at which the scaled values are 0 and 1, respectively
@@ -517,23 +591,28 @@ class System(object):
 
         # if this is the top-most group, we will set the values here as well.
         if is_top:
-            for ind, meta in enumerate(self._var_myproc_metadata['output']):
-                name = self._var_myproc_names['output'][ind]
-                a, b = self._scaling_to_norm['output'][ind, :]
+            for abs_name in self._varx_abs_names['output']:
+                data = self._varx_abs2data_io[abs_name]
+                my_idx = data['my_idx']
+                metadata = data['metadata']
+
+                a, b = self._scaling_to_norm['output'][my_idx, :]
 
                 # We have to convert from physical, unscaled to scaled, dimensionless.
                 # We set into the bounds vector first and then apply a and b because
                 # meta['lower'] and meta['upper'] could be lists or tuples.
-                if meta['lower'] is None:
-                    self._lower_bounds[name] = -numpy.inf
+                if metadata['lower'] is None:
+                    self._lower_bounds._views[abs_name][:] = -np.inf
                 else:
-                    self._lower_bounds[name] = meta['lower']
-                    self._lower_bounds[name] = a + b * self._lower_bounds[name]
-                if meta['upper'] is None:
-                    self._upper_bounds[name] = numpy.inf
+                    shape = self._lower_bounds._views[abs_name].shape
+                    value = ensure_compatible(abs_name, metadata['lower'], shape)[0]
+                    self._lower_bounds._views[abs_name][:] = a + b * value
+                if metadata['upper'] is None:
+                    self._upper_bounds._views[abs_name][:] = np.inf
                 else:
-                    self._upper_bounds[name] = meta['upper']
-                    self._upper_bounds[name] = a + b * self._upper_bounds[name]
+                    shape = self._upper_bounds._views[abs_name].shape
+                    value = ensure_compatible(abs_name, metadata['upper'], shape)[0]
+                    self._upper_bounds._views[abs_name][:] = a + b * value
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
@@ -628,13 +707,11 @@ class System(object):
             dictionary mapping input/output variable names
             to promoted variable names.
         """
-        maps = {}
-
-        gname = self.name + '.' if self.name else ''
-
         promotes = self._var_promotes['any']
         promotes_typ = self._var_promotes[typ]
+        gname = self.name + '.' if self.name else ''
 
+        found = False
         if promotes:
             names = promotes
             patterns = [n for n in names if '*' in n or '?' in n]
@@ -645,21 +722,24 @@ class System(object):
             names = ()
             patterns = ()
 
+        maps = {}
         for name in self._var_allprocs_names[typ]:
             if name in names:
                 maps[name] = name
+                found = True
                 continue
 
             for pattern in patterns:
                 # if name matches, promote that variable to parent
                 if fnmatchcase(name, pattern):
                     maps[name] = name
+                    found = True
                     break
             else:
                 # Default: prepend the parent system's name
                 maps[name] = gname + name if gname else name
 
-        return maps
+        return maps, found
 
     @property
     def jacobian(self):
@@ -781,27 +861,26 @@ class System(object):
                 d_inputs.set_const(0.0)
                 d_outputs.set_const(0.0)
 
+        var_ids = self._vector_var_ids[vec_name]
+
         out_names = []
         res_names = []
-        var_ids = self._vector_var_ids[vec_name]
-        out_ind = self._var_allprocs_range['output'][0]
-        for out_name in self._var_allprocs_names['output']:
-            if out_ind in var_ids:
-                res_names.append(out_name)
-                if var_inds is None or (var_inds[0] <= out_ind < var_inds[1] or
-                                        var_inds[2] <= out_ind < var_inds[3]):
-                    out_names.append(out_name)
-            out_ind += 1
+        for out_abs_name in self._varx_abs_names['output']:
+            out_idx = self._assembler._varx_allprocs_abs2idx_io[out_abs_name]
+            if out_idx in var_ids:
+                res_names.append(out_abs_name)
+                if var_inds is None or (var_inds[0] <= out_idx < var_inds[1] or
+                                        var_inds[2] <= out_idx < var_inds[3]):
+                    out_names.append(out_abs_name)
 
         in_names = []
-        in_ind = self._var_allprocs_range['input'][0]
-        for in_name in self._var_allprocs_names['input']:
-            out_ind = self._assembler._input_src_ids[in_ind]
-            if out_ind in var_ids:
-                if var_inds is None or (var_inds[0] <= out_ind < var_inds[1] or
-                                        var_inds[2] <= out_ind < var_inds[3]):
-                    in_names.append(in_name)
-            in_ind += 1
+        for in_abs_name in self._varx_abs_names['input']:
+            in_idx = self._assembler._varx_allprocs_abs2idx_io[in_abs_name]
+            out_idx = self._assembler._input_src_ids[in_idx]
+            if out_idx in var_ids:
+                if var_inds is None or (var_inds[0] <= out_idx < var_inds[1] or
+                                        var_inds[2] <= out_idx < var_inds[3]):
+                    in_names.append(in_abs_name)
 
         d_inputs._names = set(in_names)
         d_outputs._names = set(out_names)
@@ -1587,16 +1666,6 @@ class System(object):
     def _linearize(self):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
-        """
-        pass
-
-    def initialize(self):
-        """
-        Optional user-defined method run once during instantiation.
-
-        Available attributes:
-            name
-            metadata (only local)
         """
         pass
 

@@ -6,17 +6,20 @@ import sys
 import inspect
 
 from fnmatch import fnmatchcase
-import numpy
-from itertools import product
+import numpy as np
+from itertools import product, chain
 from six import string_types, iteritems
 from scipy.sparse import issparse
 from copy import deepcopy
+from collections import OrderedDict
 
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
-from openmdao.utils.general_utils import \
-    format_as_float_or_array, ensure_compatible, warn_deprecation
+from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
+    warn_deprecation
+from openmdao.utils.name_maps import rel_name2abs_name, rel_key2abs_key, abs_key2rel_key
 
 
 class Component(System):
@@ -27,6 +30,8 @@ class Component(System):
     ----------
     _var2meta : dict
         A mapping of local variable name to its metadata.
+    _approx_schemes : OrderedDict
+        A mapping of approximation types to the associated ApproximationScheme.
     """
 
     def __init__(self, **kwargs):
@@ -40,6 +45,7 @@ class Component(System):
         """
         super(Component, self).__init__(**kwargs)
         self._var2meta = {}
+        self._approx_schemes = OrderedDict()
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
                   desc='', var_set=0):
@@ -63,7 +69,7 @@ class Component(System):
             on all entries of source. Default is None.
         units : str or None
             Units in which this input variable will be provided to the component
-            during execution. Default is None, which means it has no units.
+            during execution. Default is None, which means it is unitless.
         desc : str
             description of the variable
         var_set : hashable object
@@ -75,15 +81,24 @@ class Component(System):
                              "called from 'initialize_variables' rather than "
                              "in the '__init__' function.")
 
+        if units == 'unitless':
+            warn_deprecation("Input '%s' has units='unitless' but 'unitless' "
+                             "has been deprecated. Use "
+                             "units=None instead.  Note that connecting a "
+                             "unitless variable to one with units is no longer "
+                             "an error, but will issue a warning instead." %
+                             name)
+            units = None
+
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
-        if not numpy.isscalar(val) and not isinstance(val, (list, tuple, numpy.ndarray)):
+        if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray)):
             raise TypeError('The val argument should be a float, list, tuple, or ndarray')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
         if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
-                                                                    numpy.ndarray)):
+                                                                    np.ndarray)):
             raise TypeError('The src_indices argument should be an int, list, '
                             'tuple, or ndarray')
         if units is not None and not isinstance(units, str):
@@ -104,7 +119,7 @@ class Component(System):
         if src_indices is None:
             metadata['src_indices'] = None
         else:
-            metadata['src_indices'] = numpy.atleast_1d(src_indices)
+            metadata['src_indices'] = np.atleast_1d(src_indices)
 
         # units: taken as is
         metadata['units'] = units
@@ -119,6 +134,15 @@ class Component(System):
         self._var_myproc_names['input'].append(name)
         self._var_myproc_metadata['input'].append(metadata)
         self._var2meta[name] = metadata
+
+        # [REFACTOR]
+        # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
+        abs_name = name
+        self._varx_abs2data_io[abs_name] = {'prom': name, 'rel': name,
+                                            'my_idx': len(self._varx_abs_names['input']),
+                                            'type_': 'input', 'metadata': metadata}
+        self._varx_abs_names['input'].append(abs_name)
+        self._varx_allprocs_prom2abs_list['input'][name] = [abs_name]
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
@@ -174,10 +198,19 @@ class Component(System):
                              "called from 'initialize_variables' rather than "
                              "in the '__init__' function.")
 
+        if units == 'unitless':
+            warn_deprecation("Output '%s' has units='unitless' but 'unitless' "
+                             "has been deprecated. Use "
+                             "units=None instead.  Note that connecting a "
+                             "unitless variable to one with units is no longer "
+                             "an error, but will issue a warning instead." %
+                             name)
+            units = None
+
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
-        if not numpy.isscalar(val) and not isinstance(val, (list, tuple, numpy.ndarray)):
+        if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray)):
             raise TypeError('The val argument should be a float, list, tuple, or ndarray')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
@@ -191,7 +224,7 @@ class Component(System):
             upper = format_as_float_or_array('upper', upper)
 
         for item in [ref, ref0, res_ref, res_ref]:
-            if not numpy.isscalar(item):
+            if not np.isscalar(item):
                 raise TypeError('The %s argument should be a float' % (item.__name__))
 
         # Check that units are valid
@@ -211,11 +244,11 @@ class Component(System):
         metadata['desc'] = desc
 
         # lower, upper: check the shape if necessary
-        if lower is not None and not numpy.isscalar(lower) and \
-                numpy.atleast_1d(lower).shape != metadata['shape']:
+        if lower is not None and not np.isscalar(lower) and \
+                np.atleast_1d(lower).shape != metadata['shape']:
             raise ValueError('The lower argument has the wrong shape')
-        if upper is not None and not numpy.isscalar(upper) and \
-                numpy.atleast_1d(upper).shape != metadata['shape']:
+        if upper is not None and not np.isscalar(upper) and \
+                np.atleast_1d(upper).shape != metadata['shape']:
             raise ValueError('The upper argument has the wrong shape')
         metadata['lower'] = lower
         metadata['upper'] = upper
@@ -233,6 +266,65 @@ class Component(System):
         self._var_myproc_names['output'].append(name)
         self._var_myproc_metadata['output'].append(metadata)
         self._var2meta[name] = metadata
+
+        # [REFACTOR]
+        # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
+        abs_name = name
+        self._varx_abs2data_io[abs_name] = {'prom': name, 'rel': name,
+                                            'my_idx': len(self._varx_abs_names['output']),
+                                            'type_': 'output', 'metadata': metadata}
+        self._varx_abs_names['output'].append(abs_name)
+        self._varx_allprocs_prom2abs_list['output'][name] = [abs_name]
+
+    def approx_partials(self, of, wrt, method='fd', **kwargs):
+        """
+        Inform the framework that the specified derivatives are to be approximated.
+
+        Parameters
+        ----------
+        of : str or list of str
+            The name of the residual(s) that derivatives are being computed for.
+            May also contain a glob pattern.
+        wrt : str or list of str
+            The name of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+        method : str
+            The type of approximation that should be used. Valid options include:
+                - 'fd': Finite Difference
+        **kwargs : dict
+            Keyword arguments for controlling the behavior of the approximation.
+        """
+        supported_methods = {'fd': FiniteDifference}
+
+        if method not in supported_methods:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method, supported_methods.keys()))
+
+        if method not in self._approx_schemes:
+            self._approx_schemes[method] = supported_methods[method]()
+
+        pattern_matches = self._find_partial_matches(of, wrt)
+
+        for of_bundle, wrt_bundle in product(*pattern_matches):
+            of_pattern, of_matches = of_bundle
+            wrt_pattern, wrt_out, wrt_in = wrt_bundle
+            if not of_matches:
+                raise ValueError('No matches were found for of="{}"'.format(of_pattern))
+            if not (wrt_out or wrt_in):
+                raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
+
+            for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
+                for rel_key in product(of_matches, wrt_matches):
+                    meta_changes = {
+                        'method': method,
+                        'type': type_
+                    }
+                    abs_key = rel_key2abs_key(self, rel_key)
+                    meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
+                    meta.update(meta_changes)
+                    meta.update(kwargs)
+                    self._subjacs_info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):
@@ -270,16 +362,16 @@ class Component(System):
             raise ValueError('If one of rows/cols is specified, then both must be specified')
 
         if val is not None and not issparse(val):
-            val = numpy.atleast_1d(val)
-            # numpy.promote_types  will choose the smallest dtype that can contain both arguments
-            safe_dtype = numpy.promote_types(val.dtype, float)
+            val = np.atleast_1d(val)
+            # np.promote_types  will choose the smallest dtype that can contain both arguments
+            safe_dtype = np.promote_types(val.dtype, float)
             val = val.astype(safe_dtype, copy=False)
 
         if rows is not None:
             if isinstance(rows, (list, tuple)):
-                rows = numpy.array(rows, dtype=int)
+                rows = np.array(rows, dtype=int)
             if isinstance(cols, (list, tuple)):
-                cols = numpy.array(cols, dtype=int)
+                cols = np.array(cols, dtype=int)
 
             if rows.shape != cols.shape:
                 raise ValueError('rows and cols must have the same shape,'
@@ -289,7 +381,9 @@ class Component(System):
                 raise ValueError('If rows and cols are specified, val must be a scalar or have the '
                                  'same shape, val: {}, rows/cols: {}'.format(val.shape, rows.shape))
 
-        multiple_items, pattern_matches = self._find_partial_matches(of, wrt)
+        pattern_matches = self._find_partial_matches(of, wrt)
+
+        multiple_items = False
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
@@ -302,9 +396,12 @@ class Component(System):
             make_copies = (multiple_items
                            or len(of_matches) > 1
                            or (len(wrt_in) + len(wrt_out)) > 1)
+            # Setting this to true means that future loop iterations (i.e. if there are multiple
+            # items in either of or wrt) will make copies.
+            multiple_items = True
 
             for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
-                for key in product(of_matches, wrt_matches):
+                for rel_key in product(of_matches, wrt_matches):
                     meta_changes = {
                         'rows': rows,
                         'cols': cols,
@@ -312,10 +409,11 @@ class Component(System):
                         'dependent': dependent,
                         'type': type_
                     }
-                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    abs_key = rel_key2abs_key(self, rel_key)
+                    meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
                     meta.update(meta_changes)
-                    self._check_partials_meta(key, meta)
-                    self._subjacs_info[key] = meta
+                    self._check_partials_meta(abs_key, meta)
+                    self._subjacs_info[abs_key] = meta
 
     def _find_partial_matches(self, of, wrt):
         """
@@ -324,22 +422,23 @@ class Component(System):
         Parameters
         ----------
         of : str or list of str
-            The name of the residual(s) that derivatives are being computed for.
+            The relative name of the residual(s) that derivatives are being computed for.
             May also contain a glob pattern.
         wrt : str or list of str
-            The name of the variables that derivatives are taken with respect to.
+            The relative name of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
 
         Returns
         -------
-        bool, tuple(list, list)
-            Bool for if there are multiple items in either of/wrt, tuple containing the of/wrt match
+        tuple(list, list)
+            Pair of lists containing pattern matches (if any). Returns (of_matches, wrt_matches)
+            where of_matches is a list of tuples (pattern, matches) and wrt_matches is a list of
+            tuples (pattern, output_matches, input_matches).
         """
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         glob_patterns = {'*', '?', '['}
-        multiple_items = len(of_list) > 1 or len(wrt_list) > 1
         outs = self._var_allprocs_names['output']
         ins = self._var_allprocs_names['input']
 
@@ -353,23 +452,23 @@ class Component(System):
         of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, outs), find_matches(pattern, ins))
                                for pattern in wrt_list]
-        return multiple_items, (of_pattern_matches, wrt_pattern_matches)
+        return of_pattern_matches, wrt_pattern_matches
 
-    def _check_partials_meta(self, key, meta):
+    def _check_partials_meta(self, abs_key, meta):
         """
         Check a given partial derivative and metadata for the correct shapes.
 
         Parameters
         ----------
-        key : tuple(str,str)
-            The of/wrt pair defining the partial derivative.
+        abs_key : tuple(str,str)
+            The of/wrt pair (given absolute names) defining the partial derivative.
         meta : dict
             Metadata dictionary from declare_partials.
         """
-        of, wrt = key
+        of, wrt = abs_key2rel_key(self, abs_key)
         if meta['dependent']:
-            out_size = numpy.prod(self._var2meta[of]['shape'])
-            in_size = numpy.prod(self._var2meta[wrt]['shape'])
+            out_size = np.prod(self._varx_abs2data_io[abs_key[0]]['metadata']['shape'])
+            in_size = np.prod(self._varx_abs2data_io[abs_key[1]]['metadata']['shape'])
             rows = meta['rows']
             cols = meta['cols']
             if rows is not None:
@@ -408,6 +507,13 @@ class Component(System):
                 self._check_partials_meta(key, meta)
                 J._set_partials_meta(key, meta)
 
+                method = meta.get('method', False)
+                if method and meta['dependent']:
+                    self._approx_schemes[method].add_approximation(key, meta)
+
+        for approx in self._approx_schemes:
+            approx._init_approximations()
+
     def _setup_variables(self, recurse=False):
         """
         Assemble variable metadata and names lists.
@@ -445,7 +551,10 @@ class Component(System):
                 else:
                     self._var_name2path[typ][name] = path
 
-        # Now that variables are available, we can setup partials
+    def _setup_partials(self):
+        """
+        Set up partial derivative sparsity structures and approximation schemes.
+        """
         self.initialize_partials()
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
@@ -495,3 +604,84 @@ class Component(System):
             outputs = self._outputs
             for i, meta in enumerate(self._var_myproc_metadata['output']):
                 outputs[names[i]] = meta['value']
+
+    def _setupx_variables_myproc(self):
+        """
+        Compute variable dict/list for variables on the current processor.
+
+        Sets the following attributes:
+            _varx_abs2data_io
+            _varx_abs_names
+        """
+        # Now that we know the pathname, convert _varx_abs_names from names to abs_names.
+        for type_ in ['input', 'output']:
+            abs_names = []
+            for name in self._varx_abs_names[type_]:
+                abs_name = rel_name2abs_name(self, name)
+                abs_names.append(abs_name)
+            self._varx_abs_names[type_] = abs_names
+
+        # Now that we know the pathname, convert _varx_abs2data_io from names to abs_names.
+        abs2data_io = {}
+        for name, data in iteritems(self._varx_abs2data_io):
+            abs_name = rel_name2abs_name(self, name)
+            abs2data_io[abs_name] = data
+        self._varx_abs2data_io = abs2data_io
+
+    def _setupx_variable_allprocs_names(self):
+        """
+        Get the names for variables on all processors.
+
+        Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
+
+        Sets the following attributes:
+            _varx_allprocs_prom2abs_list
+
+        Returns
+        -------
+        {'input': [str, ...], 'output': [str, ...]}
+            List of absolute names of owned variables existing on current proc.
+        """
+        # Now that we know the pathname, convert _varx_abs_names from names to abs_names.
+        for type_ in ['input', 'output']:
+            allprocs_prom2abs_list = {}
+            for name in self._varx_allprocs_prom2abs_list[type_]:
+                abs_name = rel_name2abs_name(self, name)
+                allprocs_prom2abs_list[name] = [abs_name]
+            self._varx_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
+
+        # If this is a component, myproc names = allprocs names
+        # and _varx_allprocs_prom2abs_list was already computed in add_input / add_output.
+        allprocs_abs_names = {'input': [], 'output': []}
+        for type_ in ['input', 'output']:
+            allprocs_abs_names[type_] = self._varx_abs_names[type_]
+
+        # We use allprocs_abs_names to count the total number of allprocs variables
+        # and put it in _varx_allprocs_idx_range.
+        for type_ in ['input', 'output']:
+            self._varx_allprocs_idx_range[type_] = [0, len(allprocs_abs_names[type_])]
+
+        return allprocs_abs_names
+
+    def _setupx_variable_allprocs_indices(self, global_index):
+        """
+        Compute the global index range for variables on all processors.
+
+        Computes the following attributes:
+            _varx_allprocs_idx_range
+
+        Parameters
+        ----------
+        global_index : {'input': int, 'output': int}
+            current global variable counter.
+        """
+        # At this point, _varx_allprocs_idx_range is correct except for an offset.
+        # We apply the global_index offset to make _varx_allprocs_idx_range correct.
+        for type_ in ['input', 'output']:
+            for ind in range(2):
+                self._varx_allprocs_idx_range[type_][ind] += global_index[type_]
+
+        # Reset index dict to the global variable counter on all procs.
+        # Necessary for younger siblings to have proper index values.
+        for type_ in ['input', 'output']:
+            global_index[type_] = self._varx_allprocs_idx_range[type_][1]

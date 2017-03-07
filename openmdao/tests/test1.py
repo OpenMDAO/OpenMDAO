@@ -1,5 +1,5 @@
 from __future__ import division
-import numpy
+import numpy as np
 import unittest
 
 from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector
@@ -46,7 +46,7 @@ class Test(unittest.TestCase):
         self.p.model.suppress_solver_output = True
 
     def assertEqualArrays(self, a, b):
-        self.assertTrue(numpy.linalg.norm(a-b) < 1e-15)
+        self.assertTrue(np.linalg.norm(a-b) < 1e-15)
 
     def assertList(self, ab_list):
         for a, b in ab_list:
@@ -58,38 +58,41 @@ class Test(unittest.TestCase):
         self.assertEqual(len(root._subsystems_allprocs), 2)
         self.assertEqual(len(root._subsystems_myproc), 2)
 
-    def test__var_allprocs_names(self):
+    def test_prom_names(self):
         root = self.p.model
         compA = root.get_subsystem('A')
-        self.assertEqual(compA._var_allprocs_names['output'], ['x'])
+        self.assertEqual(list(compA._varx_allprocs_prom2abs_list['output'].keys()), ['x'])
 
-    def test__var_myproc_indices(self):
-        root_inds = self.p.model._var_myproc_indices
-        compA_inds = self.p.model.get_subsystem('A')._var_myproc_indices
-        compB_inds = self.p.model.get_subsystem('B')._var_myproc_indices
+    def test_var_indices(self):
+        def get_inds(p, sname, type_):
+            system = p.model.get_subsystem(sname) if sname else p.model
+            idxs = p._assembler._varx_allprocs_abs2idx_io
+            return np.array([
+                idxs[name] for name in system._varx_abs_names[type_]
+            ])
 
-        self.assertEqualArrays(root_inds['input'], numpy.array([0]))
-        self.assertEqualArrays(root_inds['output'], numpy.array([0,1]))
+        self.assertEqualArrays(get_inds(self.p, '', 'input'), np.array([0]))
+        self.assertEqualArrays(get_inds(self.p, '', 'output'), np.array([0,1]))
 
-        self.assertEqualArrays(compA_inds['input'], numpy.array([]))
-        self.assertEqualArrays(compA_inds['output'], numpy.array([0]))
+        self.assertEqualArrays(get_inds(self.p, 'A', 'input'), np.array([]))
+        self.assertEqualArrays(get_inds(self.p, 'A', 'output'), np.array([0]))
 
-        self.assertEqualArrays(compB_inds['input'], numpy.array([0]))
-        self.assertEqualArrays(compB_inds['output'], numpy.array([1]))
+        self.assertEqualArrays(get_inds(self.p, 'B', 'input'), np.array([0]))
+        self.assertEqualArrays(get_inds(self.p, 'B', 'output'), np.array([1]))
 
-    def test__var_allprocs_ranges(self):
-        root_rng = self.p.model._var_allprocs_range
-        compA_rng = self.p.model.get_subsystem('A')._var_allprocs_range
-        compB_rng = self.p.model.get_subsystem('B')._var_allprocs_range
+    def test_varx_allprocs_idx_range(self):
+        root_rng = self.p.model._varx_allprocs_idx_range
+        compA_rng = self.p.model.get_subsystem('A')._varx_allprocs_idx_range
+        compB_rng = self.p.model.get_subsystem('B')._varx_allprocs_idx_range
 
-        self.assertEqualArrays(root_rng['input'], numpy.array([0,1]))
-        self.assertEqualArrays(root_rng['output'], numpy.array([0,2]))
+        self.assertEqualArrays(root_rng['input'], np.array([0,1]))
+        self.assertEqualArrays(root_rng['output'], np.array([0,2]))
 
-        self.assertEqualArrays(compA_rng['input'], numpy.array([0,0]))
-        self.assertEqualArrays(compA_rng['output'], numpy.array([0,1]))
+        self.assertEqualArrays(compA_rng['input'], np.array([0,0]))
+        self.assertEqualArrays(compA_rng['output'], np.array([0,1]))
 
-        self.assertEqualArrays(compB_rng['input'], numpy.array([0,1]))
-        self.assertEqualArrays(compB_rng['output'], numpy.array([1,2]))
+        self.assertEqualArrays(compB_rng['input'], np.array([0,1]))
+        self.assertEqualArrays(compB_rng['output'], np.array([1,2]))
 
     def test_connections(self):
         root = self.p.model
