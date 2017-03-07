@@ -345,18 +345,19 @@ class Assembler(object):
             self._src_indices_range[indices[abs_name], :] = [ind1, ind2]
             ind1 += isize
 
-    def _setup_src_data(self, variable_metadata, variable_indices):
+    def _setup_src_data(self, abs_out_names, data):
         """
         Compute and store unit/scaling information for inputs.
 
         Parameters
         ----------
-        variable_metadata : list of dict
-            list of metadata dictionaries for outputs of root system.
-        variable_indices : int ndarray
-            global indices of outputs that exist on this processor.
+        abs_out_names : list of str
+            list of absolute names of outputs for the root system on this proc.
+        data : {str: {}, ...}
+            Mapping of absolute name to data dict for vars on this proc.
         """
-        nvar_out = len(variable_metadata)
+        nvar_out = len(abs_out_names)
+        indices = self._varx_allprocs_abs2idx_io
 
         # The out_* variables are lists of units, output indices, and scaling coeffs.
         # for local outputs. These will initialized, then broadcast to all processors
@@ -365,10 +366,10 @@ class Assembler(object):
         # ordered by target input, rather than all the outputs in order.
 
         # List of units of locally declared output variables.
-        out_units = [meta['units'] for meta in variable_metadata]
+        out_units = [data[name]['metadata']['units'] for name in abs_out_names]
 
         # List of global indices of the locally declared output variables.
-        out_inds = variable_indices
+        out_inds = [indices[name] for name in abs_out_names]
 
         # List of scaling coefficients such that
         # physical_unscaled = c0 + c1 * unitless_scaled
@@ -376,7 +377,8 @@ class Assembler(object):
         # Below, ref0 and ref are the values of the variable in the specified
         # units at which the scaled values are 0 and 1, respectively.
         out_scaling = np.empty((nvar_out, 2))
-        for ivar_out, meta in enumerate(variable_metadata):
+        for ivar_out, abs_name in enumerate(abs_out_names):
+            meta = data[abs_name]['metadata']
             out_scaling[ivar_out, 0] = meta['ref0']
             out_scaling[ivar_out, 1] = meta['ref'] - meta['ref0']
 

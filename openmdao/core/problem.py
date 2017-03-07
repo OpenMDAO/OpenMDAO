@@ -327,8 +327,8 @@ class Problem(object):
                                      model._varx_abs_names)
 
         # Assembler setup: compute data required for units/scaling
-        assembler._setup_src_data(model._var_myproc_metadata['output'],
-                                  model._var_myproc_indices['output'])
+        assembler._setup_src_data(model._varx_abs_names['output'],
+                                  model._varx_abs2data_io)
 
         # [REFACTOR VERIFICATION] for assembler._varx_allprocs_abs_names
         assert (model._var_allprocs_pathnames['input']
