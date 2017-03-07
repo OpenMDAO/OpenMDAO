@@ -38,15 +38,16 @@ class ScipyIterativeSolver(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        # TODO : These are the defaults we used in OpenMDAO Alpha
-        # self.options['maxiter'] = 1000
-        # self.options['atol'] = 1.0e-12
-
         self.options.declare('solver', type_=object, value=gmres,
                              desc='function handle for actual solver')
 
+        self.options.declare('restart', value=20, type_=int,
+                             desc='Number of iterations between restarts. Larger values increase '
+                                  'iteration cost, but may be necessary for convergence')
+
         # changing the default maxiter from the base class
-        self.options['maxiter'] = 100
+        self.options['maxiter'] = 1000
+        self.options['atol'] = 1.0e-12
 
     def _setup_solvers(self, system, depth):
         """
@@ -155,6 +156,7 @@ class ScipyIterativeSolver(LinearSolver):
         maxiter = self.options['maxiter']
         atol = self.options['atol']
         rtol = self.options['rtol']
+        restart = self.options['restart']
 
         for vec_name in self._vec_names:
             self._vec_name = vec_name
@@ -181,7 +183,7 @@ class ScipyIterativeSolver(LinearSolver):
 
             self._iter_count = 0
             x_vec.set_data(
-                solver(linop, b_vec.get_data(), M=M,
+                solver(linop, b_vec.get_data(), M=M, restart=restart,
                        x0=x_vec_combined, maxiter=maxiter, tol=atol,
                        callback=self._monitor)[0])
 

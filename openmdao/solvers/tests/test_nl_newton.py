@@ -272,5 +272,79 @@ class TestNewton(unittest.TestCase):
                              msg='Should get there pretty quick because of utol.')
 
 
+class TestNewtonFeatures(unittest.TestCase):
+
+    def test_feature_basic(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NewtonSolver()
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_feature_maxiter(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NewtonSolver()
+
+        nlgbs.options['maxiter'] = 2
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.5878516779, .00001)
+        assert_rel_error(self, prob['y2'], 12.0607416105, .00001)
+
+    def test_feature_rtol(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NewtonSolver()
+
+        nlgbs.options['rtol'] = 1e-3
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.5878516779, .00001)
+        assert_rel_error(self, prob['y2'], 12.0607416105, .00001)
+
+    def test_feature_atol(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NewtonSolver()
+
+        nlgbs.options['atol'] = 1e-4
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.5882856302, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_feature_ln_solver(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NewtonSolver()
+        prob.ln_solver = DirectSolver()
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
 if __name__ == "__main__":
     unittest.main()
