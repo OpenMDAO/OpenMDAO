@@ -381,7 +381,6 @@ class Group(System):
 
             for type_ in iotypes:
                 var_maps = subsys._get_maps(type_)[0]
-                self._varx_abs_names[type_].extend(subsys._varx_abs_names[type_])
 
                 # Assemble _varx_abs2data_io and _varx_abs_names by concatenating from subsystems.
                 for abs_name in subsys._varx_abs_names[type_]:
@@ -394,6 +393,7 @@ class Group(System):
                         'type_': type_,
                         'metadata': sub_data['metadata']
                     }
+                    self._varx_abs_names[type_].append(abs_name)
 
     def _setupx_variable_allprocs_names(self):
         """
@@ -508,6 +508,13 @@ class Group(System):
         # Necessary for younger siblings to have proper index values.
         for type_ in ['input', 'output']:
             global_index[type_] = self._varx_allprocs_idx_range[type_][1]
+
+    def _setup_partials(self):
+        """
+        Set up partial derivative sparsity structures and approximation schemes.
+        """
+        for subsys in self._subsystems_myproc:
+            subsys._setup_partials()
 
     def get_subsystem(self, name):
         """

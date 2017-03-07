@@ -258,7 +258,7 @@ class ExecComp(ExplicitComponent):
 
         non_pbo_outputs = self._non_pbo_outputs
 
-        for param in inputs._views:
+        for param in inputs:
 
             pwrap = _TmpDict(inputs)
 
@@ -377,9 +377,9 @@ class _IODict(object):
 
     def __getitem__(self, name):
         name = self._to_colons[name]
-        try:
+        if name in self._outputs:
             return self._outputs[name]
-        except KeyError:
+        else:
             return self._inputs[name]
 
     def __setitem__(self, name, value):

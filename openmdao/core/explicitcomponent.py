@@ -9,6 +9,7 @@ from six import iteritems, itervalues
 
 from openmdao.core.component import Component
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.name_maps import rel_key2abs_key
 
 
 class ExplicitComponent(Component):
@@ -204,23 +205,11 @@ class ExplicitComponent(Component):
             if self._owns_global_jac:
                 J._update()
 
-    def _setup_variables(self, recurse=False):
+    def _setup_partials(self):
         """
-        Assemble variable metadata and names lists.
-
-        Sets the following attributes:
-            _var_allprocs_names
-            _var_myproc_names
-            _var_myproc_metadata
-            _var_pathdict
-            _var_name2path
-
-        Parameters
-        ----------
-        recurse : boolean
-            Ignored.
+        Set up partial derivative sparsity structures and approximation schemes.
         """
-        super(ExplicitComponent, self)._setup_variables(False)
+        self.initialize_partials()
 
         # Note: These declare calls are outside of initialize_partials so that users do not have to
         # call the super version of initialize_partials. This is still post-initialize_variables.
@@ -231,9 +220,10 @@ class ExplicitComponent(Component):
             arange = np.arange(size)
 
             # No need to FD outputs wrt other outputs
-            if (out_name, out_name) in self._subjacs_info:
-                if 'method' in self._subjacs_info[out_name, out_name]:
-                    del self._subjacs_info[out_name, out_name]['method']
+            abs_key = rel_key2abs_key(self, (out_name, out_name))
+            if abs_key in self._subjacs_info:
+                if 'method' in self._subjacs_info[abs_key]:
+                    del self._subjacs_info[abs_key]['method']
             self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
             for other_name in other_names:
                 self.declare_partials(out_name, other_name, dependent=False)
@@ -245,24 +235,23 @@ class ExplicitComponent(Component):
         Negate this component's part of the jacobian.
         """
         if self._jacobian._subjacs:
-            for in_name in self._var_myproc_names['input']:
-                for out_name in self._var_myproc_names['output']:
-                    key = (out_name, in_name)
-                    if key in self._jacobian:
-                        ukey = self._jacobian._key2unique(key)
-                        self._jacobian._multiply_subjac(ukey, -1.0)
+            for res_name in self._varx_abs_names['output']:
+                for in_name in self._varx_abs_names['input']:
+                    abs_key = (res_name, in_name)
+                    if abs_key in self._jacobian._subjacs:
+                        self._jacobian._multiply_subjac(abs_key, -1.)
 
     def _set_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
         """
         with self._jacobian_context() as J:
-            for key, meta in iteritems(self._subjacs_info):
-                J._set_partials_meta(key, meta, meta['type'] == 'input')
+            for abs_key, meta in iteritems(self._subjacs_info):
+                J._set_partials_meta(abs_key, meta, meta['type'] == 'input')
 
                 method = meta.get('method', False)
                 if method and meta['dependent']:
-                    self._approx_schemes[method].add_approximation(key, meta)
+                    self._approx_schemes[method].add_approximation(abs_key, meta)
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()

@@ -6,8 +6,9 @@ from collections import namedtuple
 from itertools import groupby
 from six.moves import range
 
-
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
+from openmdao.utils.name_maps import abs_key2rel_key
+
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 
@@ -74,6 +75,8 @@ class FiniteDifference(ApproximationScheme):
     ----------
     _exec_list : list
         A list of which derivatives (in execution order) to compute.
+        The entries are of the form (of, wrt, fd_options), where of and wrt are absolute names
+        and fd_options is a dictionary.
     """
 
     def __init__(self):
@@ -83,18 +86,18 @@ class FiniteDifference(ApproximationScheme):
         super(FiniteDifference, self).__init__()
         self._exec_list = []
 
-    def add_approximation(self, key, kwargs):
+    def add_approximation(self, abs_key, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
         Parameters
         ----------
-        key : tuple(str,str)
-            Pairing of (of, wrt) for the derivative.
+        abs_key : tuple(str,str)
+            Absolute name pairing of (of, wrt) for the derivative.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
-        of, wrt = key
+        of, wrt = abs_key
         fd_options = DEFAULT_FD_OPTIONS.copy()
         fd_options.update(kwargs)
         if fd_options['order'] is None:
@@ -173,7 +176,7 @@ class FiniteDifference(ApproximationScheme):
             fd_form = _generate_fd_coeff(form, order)
 
             if step_calc == 'rel':
-                if wrt in system._outputs:
+                if wrt in system._outputs._views_flat:
                     scale = np.linalg.norm(system._outputs._views_flat[wrt])
                 else:
                     scale = np.linalg.norm(system._inputs._views_flat[wrt])
@@ -183,7 +186,7 @@ class FiniteDifference(ApproximationScheme):
             coeffs = fd_form.coeffs / step
             current_coeff = fd_form.current_coeff / step
 
-            in_size = np.prod(system._var2meta[wrt]['shape'])
+            in_size = np.prod(system._varx_abs2data_io[wrt]['metadata']['shape'])
 
             result = system._outputs._clone(True)
 
@@ -194,7 +197,7 @@ class FiniteDifference(ApproximationScheme):
             for approx_tuple in approximations:
                 of = approx_tuple[0]
                 # TODO: Sparse derivatives
-                out_size = np.prod(system._var2meta[of]['shape'])
+                out_size = np.prod(system._varx_abs2data_io[of]['metadata']['shape'])
                 outputs.append((of, np.zeros((out_size, in_size))))
 
             for idx in range(in_size):
@@ -211,4 +214,5 @@ class FiniteDifference(ApproximationScheme):
                     subjac[:, idx] = result._views_flat[of]
 
             for of, subjac in outputs:
-                jac[of, wrt] = subjac
+                rel_key = abs_key2rel_key(system, (of, wrt))
+                jac[rel_key] = subjac
