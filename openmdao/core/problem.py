@@ -111,49 +111,6 @@ class Problem(object):
         self._assembler = assembler_class(comm)
         self._use_ref_vector = use_ref_vector
 
-    def _get_path_data(self, name):
-        """
-        Get absolute pathname and related data.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable in the root system's namespace. May be
-            a promoted name or an unpromoted name.
-
-        Returns
-        -------
-        str, PathData
-            absolute pathname and PathData namedtuple
-        """
-        try:
-            pdata = self.model._var_pathdict[name]
-            pathname = name
-        except KeyError:
-            # name is not an absolute path
-            try:
-                pathname = self.model._var_name2path['output'][name]
-            except KeyError:
-                try:
-                    paths = self.model._var_name2path['input'][name]
-                except KeyError:
-                    raise KeyError("Variable '%s' not found." % name)
-
-                if len(paths) > 1:
-                    raise RuntimeError("Variable name '%s' is not unique and "
-                                       "matches the following: %s. "
-                                       "Use the absolute pathname instead." %
-                                       (name, paths))
-                pathname = paths[0]
-
-            pdata = self.model._var_pathdict[pathname]
-
-        if pdata.myproc_idx is None:
-            raise RuntimeError("Variable '%s' is not found in this process" %
-                               name)
-
-        return pathname, pdata
-
     def __getitem__(self, name):
         """
         Get an output/input variable.
@@ -354,8 +311,10 @@ class Problem(object):
             assert (len(model._varx_allprocs_prom2abs_list[type_])
                     == len(set(model._var_allprocs_names[type_])))
 
+        assembler._setupx_variables(allprocs_abs_names)
+
         # Assembler setup: variable metadata and indices
-        nvars = {typ: len(model._var_allprocs_names[typ])
+        nvars = {typ: len(assembler._varx_allprocs_abs_names[typ])
                  for typ in ['input', 'output']}
         assembler._setup_variables(nvars, model._var_myproc_metadata,
                                    model._var_myproc_indices)
@@ -376,8 +335,6 @@ class Problem(object):
         # Assembler setup: compute data required for units/scaling
         assembler._setup_src_data(model._var_myproc_metadata['output'],
                                   model._var_myproc_indices['output'])
-
-        assembler._setupx_variables(allprocs_abs_names)
 
         # [REFACTOR VERIFICATION] for assembler._varx_allprocs_abs_names
         assert (model._var_allprocs_pathnames['input']
