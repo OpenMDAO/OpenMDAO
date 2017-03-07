@@ -26,14 +26,14 @@ DEFAULT_ORDER = {
 }
 
 FD_COEFFS = {
-    ('forward', 1): FDForm(deltas=np.array([1]),
-                           coeffs=np.array([1]),
-                           current_coeff=-1.),
-    ('backward', 1): FDForm(deltas=np.array([-1]),
-                            coeffs=np.array([-1]),
-                            current_coeff=1.),
-    ('central', 2): FDForm(deltas=np.array([1, -1]),
-                           coeffs=np.array([1 / 2, -1 / 2]),
+    ('forward', 1): FDForm(deltas=np.array([1.0]),
+                           coeffs=np.array([1.0]),
+                           current_coeff=-1.0),
+    ('backward', 1): FDForm(deltas=np.array([-1.0]),
+                            coeffs=np.array([-1.0]),
+                            current_coeff=1.0),
+    ('central', 2): FDForm(deltas=np.array([1.0, -1.0]),
+                           coeffs=np.array([0.5, -0.5]),
                            current_coeff=0.),
 }
 
@@ -206,6 +206,7 @@ class FiniteDifference(ApproximationScheme):
                     result *= current_coeff
                 else:
                     result.set_const(0.)
+
                 for delta, coeff in zip(deltas, coeffs):
                     input_delta = [(wrt, idx, delta)]
                     result.add_scal_vec(coeff, self._run_point(system, input_delta, deriv_type))

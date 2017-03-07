@@ -550,7 +550,12 @@ class Problem(object):
                         of_pattern, of_matches = of_bundle
                         wrt_pattern, wrt_out, wrt_in = wrt_bundle
 
-                        wrt_matches = chain(wrt_out, wrt_in)
+                        # The only outputs in wrt should be implicit states.
+                        if explicit_comp:
+                            wrt_matches = wrt_in
+                        else:
+                            wrt_matches = chain(wrt_out, wrt_in)
+
                         for rel_key in product(of_matches, wrt_matches):
                             abs_key = rel_key2abs_key(comp, rel_key)
                             of, wrt = abs_key
@@ -600,13 +605,22 @@ class Problem(object):
                 of_pattern, of_matches = of_bundle
                 wrt_pattern, wrt_out, wrt_in = wrt_bundle
 
-                wrt_matches = chain(wrt_out, wrt_in)
+                # The only outputs in wrt should be implicit states.
+                if explicit_comp:
+                    wrt_matches = wrt_in
+                else:
+                    wrt_matches = chain(wrt_out, wrt_in)
+
                 for rel_key in product(of_matches, wrt_matches):
                     abs_key = rel_key2abs_key(comp, rel_key)
                     approximation.add_approximation(abs_key, global_options)
 
             approx_jac = {}
+            approximation._init_approximations()
+
+            # Peform the FD here.
             approximation.compute_approximations(comp, jac=approx_jac)
+
             for rel_key, partial in iteritems(approx_jac):
                 abs_key = rel_key2abs_key(comp, rel_key)
                 # Since all partials for outputs for explicit comps are declared, assume anything
@@ -934,10 +948,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         # Sorted keys ensures deterministic ordering
         sorted_keys = sorted(iterkeys(derivatives))
 
-        # Pull out the outputs of explicit components so we can ignore output-output derivatives.
-        if explicit:
-            outputs = {key[0] for key in sorted_keys}
-
         for of, wrt in sorted_keys:
             derivative_info = derivatives[of, wrt]
             forward = derivative_info['J_fwd']
@@ -963,7 +973,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                                                     rev_error / fd_norm,
                                                                     fwd_rev_error / fd_norm)
 
-            if out_stream and (not explicit or wrt not in outputs):
+            if out_stream:
                 if compact_print:
                     out_stream.write(deriv_line.format(
                         _pad_name(of, 13, True),
