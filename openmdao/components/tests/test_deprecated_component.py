@@ -2,10 +2,19 @@ from __future__ import print_function
 
 import unittest
 
-from openmdao.api import Problem, IndepVarComp, Component, Group, NewtonSolver
-from openmdao.api import GlobalJacobian, DenseMatrix, ScipyIterativeSolver
+from openmdao.api import Problem, IndepVarComp, Component, Group
 
-from openmdao.devtools.testutil import assert_rel_error
+try:
+    # OpenMDAO 2.x
+    from openmdao.api import ScipyIterativeSolver
+    from openmdao.devtools.testutil import assert_rel_error
+    openmdao_version = 2
+except ImportError:
+    # OpenMDAO 1.x
+    from openmdao.api import ScipyOptimizer as ScipyIterativeSolver
+    from openmdao.test.util import assert_rel_error
+    from openmdao.solvers.scipy_gmres import ScipyGMRES
+    openmdao_version = 1
 
 
 class TestComp(Component):
@@ -21,7 +30,6 @@ class TestComp(Component):
     def apply_nonlinear(self, p, u, r):
 
         r['z1'] = 5. - u['z1']+p['y']
-
         r['z2'] = u['z2'] - (2*p['x'] + 2*u['z1'])
 
     def solve_nonlinear(self, p, u, r):
@@ -41,40 +49,99 @@ class TestComp(Component):
         return J
 
 
+class TestCompApply(TestComp):
+
+    def apply_linear(self, p, u, dp, du, dr, mode):
+
+        if mode == 'fwd':
+
+            if 'x' in dp:
+                if 'z2' in dr:
+                    dr['z2'] = 2.0*dp['x']
+
+            if 'y' in dp:
+                if 'z1' in dr:
+                    dr['z1'] = dp['y']
+
+            if 'z1' in du:
+                if 'z2' in dr:
+                    dr['z2'] = 2.0*dp['z1']
+
+        elif mode == 'rev':
+
+            if 'x' in dp:
+                if 'z2' in dr:
+                    dp['x'] = 2.0*dr['z2']
+
+            if 'y' in dp:
+                if 'z1' in dr:
+                    dp['y'] = dr['z1']
+
+            if 'z1' in du:
+                if 'z2' in dr:
+                    dp['z1'] = 2.0*dr['z2']
+
+
 class DepCompTestCase(unittest.TestCase):
 
     def test_run_model(self):
         group = Group()
-        group.add_subsystem('sys1', IndepVarComp('x', val=4.))
-        group.add_subsystem('sys2', IndepVarComp('y', val=3.))
-        group.add_subsystem('sys3', TestComp())
+        group.add('sys1', IndepVarComp('x', val=4.))
+        group.add('sys2', IndepVarComp('y', val=3.))
+        group.add('sys3', TestComp())
+
+        if openmdao_version == 1:
+            params, unknowns, dunknowns = {}, {}, {}
+            dparams = {'x': 4., 'y': 3}
+            dresids = {'z1': 0., 'z2': 0.}
+            group.sys3.apply_linear(params, unknowns, dparams, dunknowns, dresids, 'fwd')
+            print('J:', group.sys3._jacobian_cache)
 
         p = Problem()
-        p.model = group
+        p.root = group
+        if openmdao_version == 1:
+            p.root.ln_solver = ScipyGMRES()
         p.setup(check=False)
-        p.model.suppress_solver_output = True
+        p.root.suppress_solver_output = True
 
-        p.run_model()
+        p.run()
 
         assert_rel_error(self, p['sys3.z1'], 8., 1e-10)
         assert_rel_error(self, p['sys3.z2'], 24, 1e-10)
+
+        if openmdao_version == 2:
+            J = p.compute_total_derivs(of=['sys3.z1', 'sys3.z2'],
+                                       wrt=['sys1.x', 'sys2.y'])
+        else:
+            # OpenMDAO 1.x
+            J = p.check_total_derivatives()
+        print(J)
 
     def test_run_with_linearize(self):
         group = Group()
-        group.add_subsystem('sys1', IndepVarComp('x', val=4.))
-        group.add_subsystem('sys2', IndepVarComp('y', val=3.))
-        group.add_subsystem('sys3', TestComp())
+        group.add('sys1', IndepVarComp('x', val=4.))
+        group.add('sys2', IndepVarComp('y', val=3.))
+        group.add('sys3', TestComp())
 
         p = Problem()
-        p.model = group
-        p.model.nl_solver.ln_solver = ScipyIterativeSolver()
+        p.root = group
+        p.root.nl_solver.ln_solver = ScipyIterativeSolver()
+        if openmdao_version == 1:
+            p.root.ln_solver = ScipyGMRES()
         p.setup(check=False)
-        p.model.suppress_solver_output = True
+        p.root.suppress_solver_output = True
 
-        p.run_model()
+        p.run()
 
         assert_rel_error(self, p['sys3.z1'], 8., 1e-10)
         assert_rel_error(self, p['sys3.z2'], 24, 1e-10)
+
+        if openmdao_version == 2:
+            J = p.compute_total_derivs(of=['sys3.z1', 'sys3.z2'],
+                                       wrt=['sys1.x', 'sys2.y'])
+        else:
+            J = p.check_total_derivatives()
+        print(J)
 
 
 if __name__ == "__main__":

@@ -143,6 +143,9 @@ class Component(BaseComponent):
         for vec_name in vec_names:
             with self._matvec_context(vec_name, var_inds, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
+                print('d_inputs:', d_inputs._names, d_inputs.get_data())
+                print('d_outputs:', d_outputs._names, d_outputs.get_data())
+                print('d_residuals:', d_residuals._names, d_residuals.get_data())
                 with self._jacobian_context():
                     self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                           mode)
@@ -164,7 +167,6 @@ class Component(BaseComponent):
                     if name in self._output_names:
                         if name not in self._state_names:
                             d_outputs[name] = d_residuals[name]
-                        else:
                             d_residuals[name] *= -1.0
 
                 self.apply_linear(self._inputs, self._outputs,
@@ -174,8 +176,7 @@ class Component(BaseComponent):
                     if name in self._output_names:
                         if name not in self._state_names:
                             d_residuals[name] = d_outputs[name]
-                        else:
-                            d_residuals[name] *= -1.0
+                            # d_residuals[name] *= -1.0
 
                 self._inputs._scale(self._scaling_to_norm['input'])
                 self._outputs._scale(self._scaling_to_norm['output'])

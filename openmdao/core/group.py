@@ -56,7 +56,7 @@ class Group(System):
         warn_deprecation('This method provides backwards compatibility with '
                          'OpenMDAO <= 1.x ; use add_subsystem instead.')
 
-        self.add_subsystem(name, subsys, promotes=promotes)
+        return self.add_subsystem(name, subsys, promotes=promotes)
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None):
