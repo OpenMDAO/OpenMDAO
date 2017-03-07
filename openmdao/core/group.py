@@ -199,6 +199,9 @@ class Group(System):
         in_offset = self._var_allprocs_range['input'][0]
         out_offset = self._var_allprocs_range['output'][0]
 
+        print("allprocs_in_names:", allprocs_in_names)
+        print("allprocs_out_names:", allprocs_out_names)
+
         # Loop through user-defined connections
         for in_name, (out_name, src_indices) \
                 in iteritems(self._var_connections):
@@ -348,17 +351,9 @@ class Group(System):
                 self._var_pathdict[path] = PathData(name, idx,
                                                     my_idx_dict.get(path), typ)
                 if name in name2path:
-                    if typ is 'input':
-                        name2path[name].append(path)
-                    else:
-                        raise RuntimeError("Output name '%s' refers to "
-                                           "multiple outputs: %s." %
-                                           (name, [path, name2path[name]]))
+                    name2path[name].append(path)
                 else:
-                    if typ is 'input':
-                        name2path[name] = [path]
-                    else:
-                        name2path[name] = path
+                    name2path[name] = [path]
 
     def _setupx_variables_myproc(self):
         """

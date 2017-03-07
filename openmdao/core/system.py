@@ -267,6 +267,7 @@ class System(object):
         self.initialize_processors()
 
         nsub = len(self._subsystems_allprocs)
+
         # If this is a group:
         if nsub > 0:
             # Call the load balancing algorithm

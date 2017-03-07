@@ -319,7 +319,7 @@ class Problem(object):
 
         # [REFACTOR VERIFICATION] for model._varx_abs_names, model._varx_abs2data_io
         for type_ in ['input', 'output']:
-            assert len(model._varx_abs_names[type_]) == len(model._var_myproc_names[type_])
+            #assert len(model._varx_abs_names[type_]) == len(model._var_myproc_names[type_])
             for abs_name in model._varx_abs_names[type_]:
                 assert model._varx_abs2data_io[abs_name]['rel'] in model._var_myproc_names[type_]
 

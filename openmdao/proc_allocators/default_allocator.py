@@ -38,15 +38,15 @@ class DefaultAllocator(ProcAllocator):
 
         # TODO: improve this algorithm - maybe Fortran/C
         # TODO: maybe combine the 2 cases below
-        if nproc >= nsub:
             # Define the normalized weights for all subsystems
-            kwargs = self.kwargs
-            if 'weights' in kwargs and len(kwargs['weights']) == nsub:
-                weights = kwargs['weights']
-                weights = 1.0 * weights / np.sum(weights)
-            else:
-                weights = np.ones(nsub) / nsub
+        options = self.options
+        if 'weights' in options and len(options['weights']) == nsub:
+            weights = options['weights']
+            weights = 1.0 * weights / np.sum(weights)
+        else:
+            weights = np.ones(nsub) / nsub
 
+        if nproc >= nsub:
             # Next-one-up algorithm to assign procs to subsystems
             num_procs = np.ones(nsub, int)
             pctg_procs = np.zeros(nsub)
@@ -89,5 +89,7 @@ class DefaultAllocator(ProcAllocator):
             isubs = isubs_list[iproc]
             sub_comm = comm.Split(iproc)
             sub_proc_range = [iproc1, iproc2]
+
+        print("comm:",comm.size, "subcomm:", sub_comm.size)
 
         return isubs, sub_comm, sub_proc_range

@@ -25,6 +25,7 @@ class TestParallelGroups(unittest.TestCase):
     def test_fan_out_grouped(self):
 
         prob = Problem(FanOutGrouped())
+        prob.model._mpi_proc_allocator.options['parallel'] = True
         prob.setup(vector_class=PETScVector, check=False)
         prob.model.suppress_solver_output = True
         prob.run_model()
@@ -36,6 +37,7 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.model = FanInGrouped()
+        prob.model._mpi_proc_allocator.options['parallel'] = True
         prob.setup(vector_class=PETScVector, check=False)
         prob.model.suppress_solver_output = True
         prob.run_model()
@@ -46,6 +48,7 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.model = Diamond()
+        prob.model._mpi_proc_allocator.options['parallel'] = True
         prob.setup(vector_class=PETScVector, check=False)
         prob.model.suppress_solver_output = True
         prob.run_model()
@@ -57,6 +60,7 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.model = ConvergeDiverge()
+        prob.model._mpi_proc_allocator.options['parallel'] = True
         prob.setup(vector_class=PETScVector, check=False)
         prob.model.suppress_solver_output = True
         prob.run_model()
