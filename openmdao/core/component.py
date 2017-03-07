@@ -17,8 +17,9 @@ from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
-from openmdao.utils.general_utils import \
-    format_as_float_or_array, ensure_compatible, warn_deprecation
+from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
+    warn_deprecation
+from openmdao.utils.name_maps import rel_name2abs_name, rel_key2abs_key, abs_key2rel_key
 
 
 class Component(System):
@@ -314,15 +315,16 @@ class Component(System):
                 raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
 
             for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
-                for key in product(of_matches, wrt_matches):
+                for rel_key in product(of_matches, wrt_matches):
                     meta_changes = {
                         'method': method,
                         'type': type_
                     }
-                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    abs_key = rel_key2abs_key(self, rel_key)
+                    meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
                     meta.update(meta_changes)
                     meta.update(kwargs)
-                    self._subjacs_info[key] = meta
+                    self._subjacs_info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):
@@ -399,7 +401,7 @@ class Component(System):
             multiple_items = True
 
             for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
-                for key in product(of_matches, wrt_matches):
+                for rel_key in product(of_matches, wrt_matches):
                     meta_changes = {
                         'rows': rows,
                         'cols': cols,
@@ -407,10 +409,11 @@ class Component(System):
                         'dependent': dependent,
                         'type': type_
                     }
-                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    abs_key = rel_key2abs_key(self, rel_key)
+                    meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
                     meta.update(meta_changes)
-                    self._check_partials_meta(key, meta)
-                    self._subjacs_info[key] = meta
+                    self._check_partials_meta(abs_key, meta)
+                    self._subjacs_info[abs_key] = meta
 
     def _find_partial_matches(self, of, wrt):
         """
@@ -419,10 +422,10 @@ class Component(System):
         Parameters
         ----------
         of : str or list of str
-            The name of the residual(s) that derivatives are being computed for.
+            The relative name of the residual(s) that derivatives are being computed for.
             May also contain a glob pattern.
         wrt : str or list of str
-            The name of the variables that derivatives are taken with respect to.
+            The relative name of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
 
@@ -451,21 +454,21 @@ class Component(System):
                                for pattern in wrt_list]
         return of_pattern_matches, wrt_pattern_matches
 
-    def _check_partials_meta(self, key, meta):
+    def _check_partials_meta(self, abs_key, meta):
         """
         Check a given partial derivative and metadata for the correct shapes.
 
         Parameters
         ----------
-        key : tuple(str,str)
-            The of/wrt pair defining the partial derivative.
+        abs_key : tuple(str,str)
+            The of/wrt pair (given absolute names) defining the partial derivative.
         meta : dict
             Metadata dictionary from declare_partials.
         """
-        of, wrt = key
+        of, wrt = abs_key2rel_key(self, abs_key)
         if meta['dependent']:
-            out_size = np.prod(self._var2meta[of]['shape'])
-            in_size = np.prod(self._var2meta[wrt]['shape'])
+            out_size = np.prod(self._varx_abs2data_io[abs_key[0]]['metadata']['shape'])
+            in_size = np.prod(self._varx_abs2data_io[abs_key[1]]['metadata']['shape'])
             rows = meta['rows']
             cols = meta['cols']
             if rows is not None:
@@ -548,7 +551,10 @@ class Component(System):
                 else:
                     self._var_name2path[typ][name] = path
 
-        # Now that variables are available, we can setup partials
+    def _setup_partials(self):
+        """
+        Set up partial derivative sparsity structures and approximation schemes.
+        """
         self.initialize_partials()
 
     def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
@@ -607,25 +613,18 @@ class Component(System):
             _varx_abs2data_io
             _varx_abs_names
         """
-        def get_abs_name(name):
-            if self.pathname == '':
-                abs_name = name
-            else:
-                abs_name = self.pathname + '.' + name
-            return abs_name
-
         # Now that we know the pathname, convert _varx_abs_names from names to abs_names.
         for type_ in ['input', 'output']:
             abs_names = []
             for name in self._varx_abs_names[type_]:
-                abs_name = get_abs_name(name)
+                abs_name = rel_name2abs_name(self, name)
                 abs_names.append(abs_name)
             self._varx_abs_names[type_] = abs_names
 
         # Now that we know the pathname, convert _varx_abs2data_io from names to abs_names.
         abs2data_io = {}
         for name, data in iteritems(self._varx_abs2data_io):
-            abs_name = get_abs_name(name)
+            abs_name = rel_name2abs_name(self, name)
             abs2data_io[abs_name] = data
         self._varx_abs2data_io = abs2data_io
 
@@ -643,18 +642,11 @@ class Component(System):
         {'input': [str, ...], 'output': [str, ...]}
             List of absolute names of owned variables existing on current proc.
         """
-        def get_abs_name(name):
-            if self.pathname == '':
-                abs_name = name
-            else:
-                abs_name = self.pathname + '.' + name
-            return abs_name
-
         # Now that we know the pathname, convert _varx_abs_names from names to abs_names.
         for type_ in ['input', 'output']:
             allprocs_prom2abs_list = {}
-            for name in self._varx_abs_names[type_]:
-                abs_name = get_abs_name(name)
+            for name in self._varx_allprocs_prom2abs_list[type_]:
+                abs_name = rel_name2abs_name(self, name)
                 allprocs_prom2abs_list[name] = [abs_name]
             self._varx_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
 

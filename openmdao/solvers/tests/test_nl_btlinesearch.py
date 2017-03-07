@@ -272,5 +272,35 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
             self.assertTrue(2.4 <= top['comp.z'][ind] <= self.ub[ind])
 
 
+class TestFeatureBacktrackingLineSearch(unittest.TestCase):
+
+    def test_feature_specification(self):
+        top = Problem()
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
+        top.model.add_subsystem('comp', ImplCompTwoStates())
+        top.model.connect('px.x', 'comp.x')
+
+        top.model.nl_solver = NewtonSolver()
+        top.model.nl_solver.options['maxiter'] = 10
+        top.model.ln_solver = ScipyIterativeSolver()
+
+        top.setup(check=False)
+
+        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
+                                                                     bound_enforcement='vector')
+        ls.options['maxiter'] = 10
+        ls.options['alpha'] = 10.0
+
+        # Setup again because we assigned a new linesearch
+        top.setup(check=False)
+
+        # Test lower bound: should go to the lower bound and stall
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.0
+        top['comp.z'] = 1.6
+        top.run_model()
+        assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
+
 if __name__ == "__main__":
     unittest.main()

@@ -582,3 +582,7 @@ class TestObjectiveOnModel(unittest.TestCase):
 
         self.assertEqual(str(context.exception), 'If specified, indices must '
                                                  'be a sequence of integers.')
+
+
+if __name__ == '__main__':
+    unittest.main()

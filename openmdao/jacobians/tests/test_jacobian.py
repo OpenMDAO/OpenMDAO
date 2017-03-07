@@ -362,3 +362,7 @@ class TestJacobian(unittest.TestCase):
         msg = "d1: jacobian has changed and setup was not called."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
+
+
+if __name__ == '__main__':
+    unittest.main()

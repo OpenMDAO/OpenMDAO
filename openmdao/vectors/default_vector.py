@@ -70,16 +70,17 @@ class DefaultVector(Vector):
         indices = [np.zeros(np.sum(sizes[self._iproc, :]), int)
                    for sizes in self._assembler._variable_sizes[self._typ]]
 
-        variable_indices = self._system._var_myproc_indices[self._typ]
-        variable_names = self._system._var_myproc_names[self._typ]
-        set_indices = self._assembler._variable_set_indices[self._typ]
-        sizes_all = self._assembler._variable_sizes_all[self._typ]
-        sizes = self._assembler._variable_sizes[self._typ]
+        system = self._system
+        assembler = self._assembler
 
-        for ind, ivar_all in enumerate(variable_indices):
-            var_name = variable_names[ind]
-            ivar_set, ivar = set_indices[ivar_all, :]
+        sizes_all = assembler._variable_sizes_all[self._typ]
+        sizes = assembler._variable_sizes[self._typ]
 
+        for abs_name in system._varx_abs_names[self._typ]:
+            idx = assembler._varx_allprocs_abs2idx_io[abs_name]
+            ivar_set, ivar = assembler._variable_set_indices[self._typ][idx, :]
+
+            ivar_all = idx
             ind1 = np.sum(sizes[ivar_set][self._iproc, :ivar])
             ind2 = np.sum(sizes[ivar_set][self._iproc, :ivar + 1])
             ind1_all = np.sum(sizes_all[self._iproc, :ivar_all])
@@ -97,22 +98,23 @@ class DefaultVector(Vector):
         [ndarray[:], ...]
             list of zeros arrays of correct size, one for each var_set.
         """
-        variable_sizes = self._assembler._variable_sizes[self._typ]
-        variable_sizes_all = self._assembler._variable_sizes_all[self._typ]
-        variable_set_indices = self._assembler._variable_set_indices[self._typ]
+        system = self._system
+        assembler = system._assembler
 
-        ind1, ind2 = self._system._var_allprocs_range[self._typ]
+        ind1, ind2 = self._system._varx_allprocs_idx_range[self._typ]
+
+        variable_set_indices = assembler._variable_set_indices[self._typ]
         sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
 
-        ind_offset = np.sum(variable_sizes_all[self._iproc, :ind1])
+        ind_offset = np.sum(assembler._variable_sizes_all[self._typ][self._iproc, :ind1])
 
         data = []
         indices = []
-        for iset in range(len(variable_sizes)):
+        for iset in range(len(assembler._variable_sizes[self._typ])):
             bool_vector = sub_variable_set_indices[:, 0] == iset
             data_inds = sub_variable_set_indices[bool_vector, 1]
             if len(data_inds) > 0:
-                sizes_array = variable_sizes[iset]
+                sizes_array = assembler._variable_sizes[self._typ][iset]
                 ind1 = np.sum(sizes_array[self._iproc, :data_inds[0]])
                 ind2 = np.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
                 data.append(self._root_vector._data[iset][ind1:ind2])
@@ -152,13 +154,8 @@ class DefaultVector(Vector):
         - _idxs
 
         """
-        variable_sizes = self._assembler._variable_sizes[self._typ]
-        variable_set_indices = self._assembler._variable_set_indices[self._typ]
-
         system = self._system
-        variable_myproc_names = system._var_myproc_names[self._typ]
-        variable_myproc_indices = system._var_myproc_indices[self._typ]
-        meta = system._var_myproc_metadata[self._typ]
+        assembler = self._assembler
 
         views = {}
         views_flat = {}
@@ -169,11 +166,12 @@ class DefaultVector(Vector):
 
         ind_offsets = {}
 
-        for ind, name in enumerate(variable_myproc_names):
-            ivar_all = variable_myproc_indices[ind]
-            iset, ivar = variable_set_indices[ivar_all, :]
-            ind1 = np.sum(variable_sizes[iset][self._iproc, :ivar])
-            ind2 = np.sum(variable_sizes[iset][self._iproc, :ivar + 1])
+        for abs_name in system._varx_abs_names[self._typ]:
+            idx = assembler._varx_allprocs_abs2idx_io[abs_name]
+            iset, ivar = assembler._variable_set_indices[self._typ][idx, :]
+            sizes_array = assembler._variable_sizes[self._typ][iset]
+            ind1 = np.sum(sizes_array[self._iproc, :ivar])
+            ind2 = np.sum(sizes_array[self._iproc, :ivar + 1])
 
             # TODO: Optimize by precomputing offsets
             if iset not in ind_offsets:
@@ -181,16 +179,18 @@ class DefaultVector(Vector):
             ind1 -= ind_offsets[iset]
             ind2 -= ind_offsets[iset]
 
-            views[name] = self._data[iset][ind1:ind2]
-            views_flat[name] = self._data[iset][ind1:ind2]
-            views[name].shape = meta[ind]['shape']
+            metadata = system._varx_abs2data_io[abs_name]['metadata']
+
+            views[abs_name] = self._data[iset][ind1:ind2]
+            views_flat[abs_name] = self._data[iset][ind1:ind2]
+            views[abs_name].shape = metadata['shape']
 
             # The shape entry overrides value's shape, which is why we don't
             # use the shape of val as the reference
-            if np.prod(meta[ind]['shape']) == 1:
-                idxs[name] = 0
+            if np.prod(metadata['shape']) == 1:
+                idxs[abs_name] = 0
             else:
-                idxs[name] = slice(None)
+                idxs[abs_name] = slice(None)
 
         self._views = self._names = views
         self._views_flat = views_flat
