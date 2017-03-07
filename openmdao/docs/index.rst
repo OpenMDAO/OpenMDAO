@@ -99,10 +99,6 @@ Visualization
 
 .. _OpenMDAO Reference Sheets: _srcdocs/index.html
 
-`OpenMDAO Developer Source Documentation`__
-
-.. __: _srcdocs/dev/index.html
-
 `OpenMDAO User Source Documentation`__
 
 .. __: _srcdocs/usr/index.html

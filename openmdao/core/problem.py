@@ -486,11 +486,8 @@ class Problem(object):
             First key is the component name;
             Second key is the (output, input) tuple of strings;
             Third key is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev'];
-            For 'rel error', 'abs error', 'magnitude' the value is:
-                A tuple containing norms for forward - fd, adjoint - fd, forward - adjoint.
-            For 'J_fd', 'J_fwd', 'J_rev' the value is:
-                A numpy array representing the computed Jacobian for the three different methods
-                of computation.
+            For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for forward - fd, adjoint - fd, forward - adjoint.
+            For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed Jacobian for the three different methods of computation.
         """
         if not global_options:
             global_options = DEFAULT_FD_OPTIONS.copy()
