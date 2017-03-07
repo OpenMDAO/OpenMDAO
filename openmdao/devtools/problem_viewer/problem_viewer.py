@@ -1,5 +1,5 @@
 from six.moves import range
-import numpy
+import numpy as np
 import os
 import pickle
 import json
@@ -14,7 +14,9 @@ except ImportError:
     # Necessary for the file to parse
     h5py = None
 
-from openmdao.api import ImplicitComponent, Problem, Group
+from openmdao.core.group import Group
+from openmdao.core.problem import Problem
+from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
 #from openmdao.util.record_util import is_valid_sqlite3_db
 import base64
@@ -70,7 +72,7 @@ def _get_tree_dict(system):
 def _get_viewer_data(problem_or_rootgroup):
     """Get the data needed by the N2 viewer as a dictionary."""
     if isinstance(problem_or_rootgroup, Problem):
-        root_group = problem_or_rootgroup.root
+        root_group = problem_or_rootgroup.model
     elif isinstance(problem_or_rootgroup, Group):
         if not problem_or_rootgroup.pathname: # root group
             root_group = problem_or_rootgroup
@@ -109,8 +111,8 @@ def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_brows
     of the specified type.  Optionally pops up a web browser to
     view the file.
 
-    Args
-    ----
+    Parameters
+    ----------
     problem_or_filename : Either a Problem() or a string
         Problem() : The Problem (after problem.setup()) for the desired tree.
         string : The filename of the case recorder file containing the data required to build the tree.

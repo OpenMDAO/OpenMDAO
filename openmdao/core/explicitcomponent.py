@@ -2,67 +2,126 @@
 
 from __future__ import division
 
-import collections
+import inspect
 
-import numpy
-from six import string_types
+import numpy as np
+from six import iteritems, itervalues
 
 from openmdao.core.component import Component
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class ExplicitComponent(Component):
-    """Class to inherit from when all output variables are explicit."""
+    """
+    Class to inherit from when all output variables are explicit.
+    """
+
+    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
+                   lower=None, upper=None, ref=1.0, ref0=0.0,
+                   res_ref=None, res_ref0=None, var_set=0):
+        """
+        Add an output variable to the component.
+
+        For ExplicitComponent, res_ref and res_ref0 default to the values in res and res0 unless
+        otherwise specified.
+
+        Parameters
+        ----------
+        name : str
+            name of the variable in this component's namespace.
+        val : float or list or tuple or ndarray
+            The initial value of the variable being added in user-defined units. Default is 1.0.
+        shape : int or tuple or list or None
+            Shape of this variable, only required if val is not an array.
+            Default is None.
+        units : str or None
+            Units in which the output variables will be provided to the component during execution.
+            Default is None, which means it has no units.
+        res_units : str or None
+            Units in which the residuals of this output will be given to the user when requested.
+            Default is None, which means it has no units.
+        desc : str
+            description of the variable.
+        lower : float or list or tuple or ndarray or None
+            lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            consistent with the shape arg (if given), or (3) an array_like matching the shape of
+            val, if val is array_like. A value of None means this output has no lower bound.
+            Default is None.
+        upper : float or list or tuple or ndarray or None
+            upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            consistent with the shape arg (if given), or (3) an array_like matching the shape of
+            val, if val is array_like. A value of None means this output has no upper bound.
+            Default is None.
+        ref : float
+            Scaling parameter. The value in the user-defined units of this output variable when
+            the scaled value is 1. Default is 1.
+        ref0 : float
+            Scaling parameter. The value in the user-defined units of this output variable when
+            the scaled value is 0. Default is 0.
+        res_ref : float
+            Scaling parameter. The value in the user-defined res_units of this output's residual
+            when the scaled value is 1. Default is None, which means residual scaling matches
+            output scaling.
+        res_ref0 : float
+            Scaling parameter. The value in the user-defined res_units of this output's residual
+            when the scaled value is 0. Default is None, which means residual scaling matches
+            output scaling.
+        var_set : hashable object
+            For advanced users only. ID or color for this variable, relevant for reconfigurability.
+            Default is 0.
+        """
+        if res_ref is None:
+            res_ref = ref
+        if res_ref0 is None:
+            res_ref0 = ref0
+
+        if inspect.stack()[1][3] == '__init__':
+            warn_deprecation("In the future, the 'add_output' method must be "
+                             "called from 'initialize_variables' rather than "
+                             "in the '__init__' function.")
+
+        super(ExplicitComponent, self).add_output(name, val=val, shape=shape, units=units,
+                                                  res_units=res_units, desc=desc, lower=lower,
+                                                  upper=upper, ref=ref, ref0=ref0, res_ref=res_ref,
+                                                  res_ref0=res_ref0, var_set=var_set)
 
     def _apply_nonlinear(self):
-        """Compute residuals."""
-        inputs = self._inputs
-        outputs = self._outputs
-        residuals = self._residuals
-
-        residuals.set_vec(outputs)
-
-        self._inputs.scale(self._scaling_to_phys['input'])
-        self._outputs.scale(self._scaling_to_phys['output'])
-
-        self.compute(inputs, outputs)
-
-        self._inputs.scale(self._scaling_to_norm['input'])
-        self._outputs.scale(self._scaling_to_norm['output'])
-
-        residuals -= outputs
-        outputs += residuals
+        """
+        Compute residuals. The model is assumed to be in a scaled state.
+        """
+        with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
+                                         residuals=[self._residuals]):
+            self._residuals.set_vec(self._outputs)
+            self.compute(self._inputs, self._outputs)
+            self._residuals -= self._outputs
+            self._outputs += self._residuals
 
     def _solve_nonlinear(self):
-        """Compute outputs.
+        """
+        Compute outputs. The model is assumed to be in a scaled state.
 
         Returns
         -------
         boolean
             Failure flag; True if failed to converge, False is successful.
         float
-            relative error.
-        float
             absolute error.
+        float
+            relative error.
         """
-        inputs = self._inputs
-        outputs = self._outputs
-        residuals = self._residuals
+        with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
+                                         residuals=[self._residuals]):
+            self._residuals.set_const(0.0)
+            failed = self.compute(self._inputs, self._outputs)
 
-        residuals.set_const(0.0)
-
-        self._inputs.scale(self._scaling_to_phys['input'])
-        self._outputs.scale(self._scaling_to_phys['output'])
-
-        self.compute(inputs, outputs)
-
-        self._inputs.scale(self._scaling_to_norm['input'])
-        self._outputs.scale(self._scaling_to_norm['output'])
+        return bool(failed), 0., 0.
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
-        """Compute jac-vec product.
+        """
+        Compute jac-vec product. The model is assumed to be in a scaled state.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -74,33 +133,27 @@ class ExplicitComponent(Component):
         for vec_name in vec_names:
             with self._matvec_context(vec_name, var_inds, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
-                self._jacobian._system = self
-                self._jacobian._apply(d_inputs, d_outputs, d_residuals,
-                                      mode)
 
-                self._inputs.scale(self._scaling_to_phys['input'])
-                self._outputs.scale(self._scaling_to_phys['output'])
-                d_inputs.scale(self._scaling_to_phys['input'])
-                d_residuals.scale(self._scaling_to_phys['residual'])
+                # Jacobian and vectors are all scaled, unitless
+                with self._jacobian_context() as J:
+                    J._apply(d_inputs, d_outputs, d_residuals, mode)
 
-                d_residuals *= -1.0
-
-                self.compute_jacvec_product(
-                    self._inputs, self._outputs,
-                    d_inputs, d_residuals, mode)
-
-                d_residuals *= -1.0
-
-                self._inputs.scale(self._scaling_to_norm['input'])
-                self._outputs.scale(self._scaling_to_norm['output'])
-                d_inputs.scale(self._scaling_to_norm['input'])
-                d_residuals.scale(self._scaling_to_norm['residual'])
+                # Jacobian and vectors are all unscaled, dimensional
+                with self._units_scaling_context(inputs=[self._inputs, d_inputs],
+                                                 outputs=[self._outputs],
+                                                 residuals=[d_residuals]):
+                    d_residuals *= -1.0
+                    self.compute_jacvec_product(
+                        self._inputs, self._outputs,
+                        d_inputs, d_residuals, mode)
+                    d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode):
-        """Apply inverse jac product.
+        """
+        Apply inverse jac product. The model is assumed to be in a scaled state.
 
-        Args
-        ----
+        Parameters
+        ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
@@ -111,88 +164,154 @@ class ExplicitComponent(Component):
         boolean
             Failure flag; True if failed to converge, False is successful.
         float
-            relative error.
-        float
             absolute error.
+        float
+            relative error.
         """
         for vec_name in vec_names:
             d_outputs = self._vectors['output'][vec_name]
             d_residuals = self._vectors['residual'][vec_name]
-            if mode == 'fwd':
-                d_outputs.set_vec(d_residuals)
-            elif mode == 'rev':
-                d_residuals.set_vec(d_outputs)
 
-    def _linearize(self, initial=False):
-        """Compute jacobian / factorization.
+            with self._units_scaling_context(outputs=[d_outputs], residuals=[d_residuals]):
+                if mode == 'fwd':
+                    d_outputs.set_vec(d_residuals)
+                elif mode == 'rev':
+                    d_residuals.set_vec(d_outputs)
 
-        Args
-        ----
-        initial : boolean
-            whether this is the initial call to assemble the Jacobian.
+        return False, 0., 0.
+
+    def _linearize(self):
         """
-        self._jacobian._system = self
+        Compute jacobian / factorization. The model is assumed to be in a scaled state.
+        """
+        with self._jacobian_context() as J:
+            with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
+                                             residuals=[self._residuals], scale_jac=True):
+                # Since the residuals are already negated, this call should come before negate_jac
+                # Additionally, computing the approximation before the call to compute_partials
+                # allows users to override FD'd values.
+                for approximation in itervalues(self._approx_schemes):
+                    approximation.compute_approximations(self, jac=J)
 
-        self._inputs.scale(self._scaling_to_phys['input'])
-        self._outputs.scale(self._scaling_to_phys['output'])
+                # negate constant subjacs (and others that will get overwritten)
+                # back to normal
+                self._negate_jac()
+                self.compute_partial_derivs(self._inputs, self._outputs, J)
 
-        self.compute_jacobian(self._inputs, self._outputs, self._jacobian)
+                # re-negate the jacobian
+                self._negate_jac()
 
-        self._inputs.scale(self._scaling_to_norm['input'])
-        self._outputs.scale(self._scaling_to_norm['output'])
+            if self._owns_global_jac:
+                J._update()
 
-        for out_name in self._var_myproc_names['output']:
-            size = len(self._outputs._views_flat[out_name])
-            ones = numpy.ones(size)
-            arange = numpy.arange(size)
-            self._jacobian[out_name, out_name] = (ones, arange, arange)
+    def _setup_variables(self, recurse=False):
+        """
+        Assemble variable metadata and names lists.
 
-        for out_name in self._var_myproc_names['output']:
+        Sets the following attributes:
+            _var_allprocs_names
+            _var_myproc_names
+            _var_myproc_metadata
+            _var_pathdict
+            _var_name2path
+
+        Parameters
+        ----------
+        recurse : boolean
+            Ignored.
+        """
+        super(ExplicitComponent, self)._setup_variables(False)
+
+        # Note: These declare calls are outside of initialize_partials so that users do not have to
+        # call the super version of initialize_partials. This is still post-initialize_variables.
+        other_names = []
+        for i, out_name in enumerate(self._var_myproc_names['output']):
+            meta = self._var_myproc_metadata['output'][i]
+            size = np.prod(meta['shape'])
+            arange = np.arange(size)
+
+            # No need to FD outputs wrt other outputs
+            if (out_name, out_name) in self._subjacs_info:
+                if 'method' in self._subjacs_info[out_name, out_name]:
+                    del self._subjacs_info[out_name, out_name]['method']
+            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
+            for other_name in other_names:
+                self.declare_partials(out_name, other_name, dependent=False)
+                self.declare_partials(other_name, out_name, dependent=False)
+            other_names.append(out_name)
+
+    def _negate_jac(self):
+        """
+        Negate this component's part of the jacobian.
+        """
+        if self._jacobian._subjacs:
             for in_name in self._var_myproc_names['input']:
-                if (out_name, in_name) in self._jacobian:
-                    self._jacobian._negate((out_name, in_name))
+                for out_name in self._var_myproc_names['output']:
+                    key = (out_name, in_name)
+                    if key in self._jacobian:
+                        ukey = self._jacobian._key2unique(key)
+                        self._jacobian._multiply_subjac(ukey, -1.0)
 
-        self._jacobian._precompute_iter()
-        if not initial and self._jacobian._top_name == self.pathname:
-            self._jacobian._update()
+    def _set_partials_meta(self):
+        """
+        Set subjacobian info into our jacobian.
+        """
+        with self._jacobian_context() as J:
+            for key, meta in iteritems(self._subjacs_info):
+                J._set_partials_meta(key, meta, meta['type'] == 'input')
+
+                method = meta.get('method', False)
+                if method and meta['dependent']:
+                    self._approx_schemes[method].add_approximation(key, meta)
+
+        for approx in itervalues(self._approx_schemes):
+            approx._init_approximations()
 
     def compute(self, inputs, outputs):
-        """Compute outputs given inputs.
+        """
+        Compute outputs given inputs. The model is assumed to be in an unscaled state.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
+
+        Returns
+        -------
+        bool or None
+            None or False if run successfully; True if there was a failure.
         """
         pass
 
-    def compute_jacobian(self, inputs, outputs, jacobian):
-        """Compute sub-jacobian parts / factorization.
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        """
+        Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
-        jacobian : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
         """
         pass
 
     def compute_jacvec_product(self, inputs, outputs,
                                d_inputs, d_outputs, mode):
-        r"""Compute jac-vector product.
+        r"""
+        Compute jac-vector product. The model is assumed to be in an unscaled state.
 
         If mode is:
             'fwd': d_inputs \|-> d_outputs
 
             'rev': d_outputs \|-> d_inputs
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector

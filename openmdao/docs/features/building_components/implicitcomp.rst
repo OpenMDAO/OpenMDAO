@@ -1,0 +1,63 @@
+:orphan:
+
+.. _comp-type-3-implicitcomp:
+
+Basic Component Types: 3. ImplicitComponent
+===========================================
+
+Implicit variables are those that are computed as an implicit function of other variables.
+For instance, :math:`y` would be an implicit variable, given that it is computed by solving :math:`\cos(x \cdot y) - z \cdot y = 0`.
+
+Implicit variables are defined by writing a class that inherits from the :ref:`ImplicitComponent <usr_openmdao.core.implicitcomponent.py>` class.
+The implicit variables would be considered *outputs* (e.g., :math:`y` in the example above) while the variables on which they depend would be considered *inputs* (e.g., :math:`x` and :math:`z` in the example above).
+
+ImplicitComponent Methods
+-------------------------
+
+The implementation of each method will be illustrated using a simple implicit component that computes the output :math:`x` implicitly via a quadratic equation, :math:`ax^2 + bx + c =0`, where :math:`a`, :math:`b`, and :math:`c` are inputs to the component.
+
+- :code:`initialize_variables()` :
+
+  Declare input and output variables via :code:`add_input` and :code:`add_output`.
+  Information like variable names, sizes, units, and bounds are declared.
+
+  .. embed-code::
+      openmdao.core.tests.test_impl_comp.TestImplCompSimpleCompute.initialize_variables
+
+- :code:`apply_nonlinear(inputs, outputs, residuals)` :
+
+  Compute the :code:`residuals` given the :code:`inputs` and :code:`outputs`.
+
+  .. embed-code::
+      openmdao.core.tests.test_impl_comp.TestImplCompSimpleCompute.apply_nonlinear
+
+- :code:`solve_nonlinear(inputs, outputs)` :
+
+  [Optional] Compute the :code:`outputs` given the :code:`inputs`.
+
+  .. embed-code::
+      openmdao.core.tests.test_impl_comp.TestImplCompSimpleCompute.solve_nonlinear
+
+- :code:`linearize(inputs, outputs, partials)` :
+
+  [Optional] The component's partial derivatives of interest are those of the :code:`residuals` with respect to the :code:`inputs` and the :code:`outputs`.
+  If the user computes the partial derivatives explicitly, they are provided here.
+  If the user wants to implement partial derivatives in a matrix-free way, this method provides a place to perform any necessary assembly or pre-processing for the matrix-vector products.
+  Regardless of how the partial derivatives are computed, this method provides a place to perform any relevant factorizations for directly solving or preconditioning the linear system.
+
+  .. embed-code::
+      openmdao.core.tests.test_impl_comp.TestImplCompSimpleLinearize.linearize
+
+- :code:`apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)` :
+
+  [Optional] If the user wants to implement partial derivatives in a matrix-free way, this method performs the matrix-vector product. If mode is 'fwd', this method computes :math:`d\_{residuals} = J \cdot [ d\_{inputs} \quad d\_{outputs} ]^T`. If mode is 'rev', this method computes :math:`[ d\_{inputs} \quad d\_{outputs} ]^T = J^T \cdot d\_{residuals}`.
+
+  .. embed-code::
+      openmdao.core.tests.test_impl_comp.TestImplCompSimpleJacVec.apply_linear
+
+- :code:`solve_linear(d_outputs, d_residuals, mode)` :
+
+  [Optional] Solves a linear system where the matrix is :math:`d\_{residuals} / d\_{outputs}` or its transpose. If mode is 'fwd', the right-hand side vector is :math:`d\_{residuals}` and the solution vector is :math:`d\_{outputs}`. If mode is 'rev', the right-hand side vector is :math:`d\_{outputs}` and the solution vector is :math:`d\_{residuals}`.
+
+  .. embed-code::
+      openmdao.core.tests.test_impl_comp.TestImplCompSimpleJacVec.solve_linear

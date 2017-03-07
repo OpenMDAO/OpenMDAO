@@ -7,19 +7,18 @@ from itertools import chain
 
 from six import iteritems
 
-import numpy
+import numpy as np
 
-from openmdao.api import Problem
-from openmdao.devtools.compat import abs_conn_iter, abs_varname_iter, \
-                                     abs_meta_iter, abs2prom_map
+from openmdao.core.problem import Problem
+from openmdao.utils.units import convert_units
 from openmdao.devtools.webview import webview
 
 @contextlib.contextmanager
 def printoptions(*args, **kwargs):
-    original = numpy.get_printoptions()
-    numpy.set_printoptions(*args, **kwargs)
+    original = np.get_printoptions()
+    np.set_printoptions(*args, **kwargs)
     yield
-    numpy.set_printoptions(**original)
+    np.set_printoptions(**original)
 
 def view_connections(root, outfile='connections.html', show_browser=True,
                      src_filter='', tgt_filter='', precision=6):
@@ -27,8 +26,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     Generates a self-contained html file containing a detailed connection
     viewer.  Optionally pops up a web browser to view the file.
 
-    Args
-    ----
+    Parameters
+    ----------
     root : system or Problem
         The root for the desired tree.
 
@@ -55,56 +54,55 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     else:
         system = root
 
-    abs_tgt_names = list(abs_varname_iter(system, 'input', local=True))
-    abs_src_names = list(abs_varname_iter(system, 'output', local=True))
-    src_vals = [system._outputs[n]
-                    for n in system._var_myproc_names['output']]
-    tgt_vals = [system._inputs[n]
-                    for n in system._var_myproc_names['input']]
-    connections = dict(abs_conn_iter(system))
-    tmetas = dict(abs_meta_iter(system, 'input'))
-    to_prom_out = abs2prom_map(system, 'output', local=True)
-    to_prom_in = abs2prom_map(system, 'input', local=True)
-    to_prom = to_prom_out.copy()
-    to_prom.update(to_prom_in)
+    input_src_ids = system._assembler._input_src_ids
+    istart_idx, iend_idx = system._varx_allprocs_idx_range['input']
+    ostart_idx, oend_idx = system._varx_allprocs_idx_range['output']
+
+    abs_tgt_names = system._varx_abs_names['input']
+    abs_src_names = system._varx_abs_names['output']
+
+    connections = {}
+    for tgt_idx, src_idx in enumerate(input_src_ids):
+        if src_idx > -1 and (istart_idx <= tgt_idx < iend_idx or
+                             ostart_idx <= src_idx < oend_idx):
+            connections[abs_tgt_names[tgt_idx]] = abs_src_names[src_idx]
 
     src2tgts = {}
-    # units = {n: m.get('units','') for n,m in chain(iteritems(system._unknowns_dict),
-    #                                                iteritems(system._params_dict))}
-    units = {}  # no units yet
+    units = {n: data['metadata'].get('units','')
+                for n, data in iteritems(system._varx_abs2data_io)}
     vals = {}
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
         for idx, t in enumerate(abs_tgt_names):
-            tmeta = tmetas[t]
-            idxs = tmeta['indices']
+            tmeta = system._varx_abs2data_io[t]['metadata']
+            idxs = tmeta['src_indices']
             if idxs is None:
-                idxs = numpy.arange(numpy.prod(tmeta['shape']), dtype=int)
+                idxs = np.arange(np.prod(tmeta['shape']), dtype=int)
 
             if t in connections:
                 s = connections[t]
-                val = system._outputs[to_prom_out[s]]
-                if isinstance(val, numpy.ndarray) and idxs is not None:
-                    val = system._outputs[to_prom_out[s]][idxs]
+                val = system._outputs[s]
+                if isinstance(val, np.ndarray) and idxs is not None:
+                    shape = val.shape
+                    val = system._outputs[s].flatten()[idxs].reshape(shape)
                 else:
-                    val = system._outputs[to_prom_out[s]]
+                    val = system._outputs[s]
 
-                # # if there's a unit conversion, express the value in the
-                # # units of the target
-                # if 'unit_conv' in tmeta:
-                #     scale, offset = tmeta['unit_conv']
-                #     val = (val + offset) * scale
+                # if there's a unit conversion, express the value in the
+                # units of the target
+                if units[t]:
+                    val = convert_units(val, units[s], units[t])
 
                 if s not in src2tgts:
                     src2tgts[s] = [t]
                 else:
                     src2tgts[s].append(t)
             else: # unconnected param
-                val = system._inputs[to_prom_in[t]]
+                val = system._inputs[t]
 
-            if isinstance(val, numpy.ndarray):
-                val = numpy.array2string(val)
+            if isinstance(val, np.ndarray):
+                val = np.array2string(val)
             else:
                 val = str(val)
 
@@ -113,7 +111,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         noconn_srcs = sorted((n for n in abs_src_names
                                 if n not in src2tgts), reverse=True)
         for s in noconn_srcs:
-            vals[s] = str(system._outputs[to_prom_out[s]])
+            vals[s] = str(system._outputs[s])
 
     vals['NO CONNECTION'] = ''
 
@@ -140,7 +138,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     data = {
         'src2tgts': sorted(iteritems(src2tgts)),
-        'proms': to_prom,
+        'proms': None,
         'units': units,
         'vals': vals,
         'src_systems': src_systems,

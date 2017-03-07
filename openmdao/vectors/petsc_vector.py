@@ -1,6 +1,6 @@
 """Define the PETSc Vector and Transfer classes."""
 from __future__ import division
-import numpy
+import numpy as np
 from petsc4py import PETSc
 
 from six.moves import range
@@ -9,10 +9,13 @@ from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
 
 
 class PETScTransfer(DefaultTransfer):
-    """PETSc Transfer implementation for running in parallel."""
+    """
+    PETSc Transfer implementation for running in parallel.
+    """
 
     def _initialize_transfer(self):
-        """Set up the transfer; do any necessary pre-computation.
+        """
+        Set up the transfer; do any necessary pre-computation.
 
         Optionally implemented by the subclass.
         """
@@ -20,8 +23,8 @@ class PETScTransfer(DefaultTransfer):
         for in_iset, out_iset in self._in_inds:
             key = (in_iset, out_iset)
             if len(self._in_inds[key]) > 0:
-                in_inds = numpy.array(self._in_inds[key], 'i')
-                out_inds = numpy.array(self._out_inds[key], 'i')
+                in_inds = np.array(self._in_inds[key], 'i')
+                out_inds = np.array(self._out_inds[key], 'i')
                 in_indexset = PETSc.IS().createGeneral(in_inds,
                                                        comm=self._comm)
                 out_indexset = PETSc.IS().createGeneral(out_inds,
@@ -33,10 +36,11 @@ class PETScTransfer(DefaultTransfer):
                 self._transfers[key] = transfer
 
     def __call__(self, in_vec, out_vec, mode='fwd'):
-        """Perform transfer.
+        """
+        Perform transfer.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : <Vector>
             pointer to the input vector.
         out_vec : <Vector>
@@ -63,7 +67,8 @@ class PETScTransfer(DefaultTransfer):
 
 
 class PETScVector(DefaultVector):
-    """PETSc Vector implementation for running in parallel.
+    """
+    PETSc Vector implementation for running in parallel.
 
     Most methods use the DefaultVector's implementation.
     """
@@ -71,14 +76,15 @@ class PETScVector(DefaultVector):
     TRANSFER = PETScTransfer
 
     def _initialize_data(self, root_vector):
-        """Internally allocate vectors.
+        """
+        Internally allocate vectors.
 
         Sets the following attributes:
 
         - _data
 
-        Args
-        ----
+        Parameters
+        ----------
         root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
@@ -94,7 +100,8 @@ class PETScVector(DefaultVector):
             self._petsc.append(petsc)
 
     def get_norm(self):
-        """Return the norm of this vector.
+        """
+        Return the norm of this vector.
 
         Returns
         -------
@@ -103,5 +110,5 @@ class PETScVector(DefaultVector):
         """
         global_sum = 0
         for iset in range(len(self._data)):
-            global_sum += numpy.sum(self._data[iset]**2)
+            global_sum += np.sum(self._data[iset]**2)
         return self._system.comm.allreduce(global_sum) ** 0.5

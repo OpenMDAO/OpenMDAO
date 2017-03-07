@@ -1,12 +1,8 @@
 """ Unit test for the solver printing behavior. """
 
-import sys
 import unittest
 
-from six.moves import cStringIO
-
-from openmdao.api import Problem, Group, NewtonSolver, ScipyIterativeSolver
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver
 from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
@@ -30,8 +26,6 @@ class TestSolverPrint(unittest.TestCase):
         ln_scipy.options['iprint'] = -1
         prob.run_model()
 
-        # TODO: capture stdout for both the test assert and docs embedding
-
     def test_feature_iprint_0(self):
 
         prob = Problem()
@@ -50,8 +44,6 @@ class TestSolverPrint(unittest.TestCase):
 
         prob.run_model()
 
-        # TODO: capture stdout for both the test assert and docs embedding
-
     def test_feature_iprint_1(self):
 
         prob = Problem()
@@ -69,8 +61,6 @@ class TestSolverPrint(unittest.TestCase):
         ln_scipy.options['iprint'] = 0
         prob.run_model()
 
-        # TODO: capture stdout for both the test assert and docs embedding
-
     def test_feature_iprint_2(self):
 
         prob = Problem()
@@ -87,8 +77,6 @@ class TestSolverPrint(unittest.TestCase):
         newton.options['iprint'] = 2
         ln_scipy.options['iprint'] = 1
         prob.run_model()
-
-        # TODO: capture stdout for both the test assert and docs embedding
 
 
 if __name__ == "__main__":

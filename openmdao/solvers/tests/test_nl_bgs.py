@@ -31,6 +31,64 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
+    def test_feature_basic(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_feature_maxiter(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+
+        nlgbs.options['maxiter'] = 2
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.5454858939, .00001)
+        assert_rel_error(self, prob['y2'], 12.0542542372, .00001)
+
+    def test_feature_rtol(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+
+        nlgbs.options['rtol'] = 1e-3
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.5891491526, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_feature_atol(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+
+        nlgbs.options['atol'] = 1e-4
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.5882856302, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
     def test_sellar(self):
         # Basic sellar test.
 

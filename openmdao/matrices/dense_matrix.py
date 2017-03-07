@@ -1,93 +1,93 @@
 """Define the DenseMatrix class."""
 from __future__ import division, print_function
-import numpy
+import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map
 
 
 class DenseMatrix(Matrix):
-    """Dense global matrix."""
+    """
+    Dense global matrix.
+    """
 
     def _build(self, num_rows, num_cols):
-        """Allocate the matrix.
+        """
+        Allocate the matrix.
 
-        Args
-        ----
+        Parameters
+        ----------
         num_rows : int
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
         """
-        matrix = numpy.zeros((num_rows, num_cols))
-        submat_meta_iter = ((self._out_submats, self._out_metadata),
-                            (self._in_submats, self._in_metadata))
+        self._matrix = matrix = np.zeros((num_rows, num_cols))
+        submats = self._submats
+        metadata = self._metadata
 
-        for submats, metadata in submat_meta_iter:
-            for key in submats:
-                jac, irow, icol, src_indices = submats[key]
+        for key in submats:
+            info, irow, icol, src_indices, shape = submats[key]
+            rows = info['rows']
+            cols = info['cols']
+            val = info['value']
 
-                if isinstance(jac, numpy.ndarray):
-                    nrows, ncols = jac.shape
-                    irow2 = irow + nrows
-                    if src_indices is None:
-                        icol2 = icol + ncols
-                        metadata[key] = (slice(irow, irow2),
-                                         slice(icol, icol2))
-                    else:
-                        metadata[key] = (slice(irow, irow2),
-                                         src_indices + icol)
+            if rows is None and (val is None or isinstance(val,
+                                                           np.ndarray)):
+                nrows, ncols = shape
+                irow2 = irow + nrows
+                if src_indices is None:
+                    icol2 = icol + ncols
+                    metadata[key] = (slice(irow, irow2),
+                                     slice(icol, icol2), np.ndarray)
+                else:
+                    metadata[key] = (slice(irow, irow2),
+                                     src_indices + icol, np.ndarray)
+            elif isinstance(val, (coo_matrix, csr_matrix)):
+                jac = val.tocoo()
+                if src_indices is None:
+                    irows = irow + jac.row
+                    icols = icol + jac.col
+                else:
+                    irows, icols, idxs = _compute_index_map(jac.row,
+                                                            jac.col,
+                                                            irow, icol,
+                                                            src_indices)
+                    revidxs = np.argsort(idxs)
+                    irows, icols = irows[revidxs], icols[revidxs]
 
-                    irows, icols = metadata[key]
-                    matrix[irows, icols] = jac
-                elif isinstance(jac, (coo_matrix, csr_matrix)):
-                    jac = jac.tocoo()
-                    if src_indices is None:
-                        irows = irow + jac.row
-                        icols = icol + jac.col
-                    else:
-                        irows, icols, idxs = _compute_index_map(jac.row,
-                                                                jac.col,
-                                                                irow, icol,
-                                                                src_indices)
-                        revidxs = numpy.argsort(idxs)
-                        irows, icols = irows[revidxs], icols[revidxs]
+                metadata[key] = (irows, icols, type(val))
+            elif rows is not None:
+                if src_indices is None:
+                    irows = rows + irow
+                    icols = cols + icol
+                else:
+                    irows, icols, idxs = _compute_index_map(rows, cols,
+                                                            irow, icol,
+                                                            src_indices)
+                    revidxs = np.argsort(idxs)
+                    irows, icols = irows[revidxs], icols[revidxs]
 
-                    metadata[key] = (irows, icols)
-                    matrix[irows, icols] = jac.data
+                metadata[key] = (irows, icols, list)
 
-                elif isinstance(jac, list):
-                    if src_indices is None:
-                        irows = jac[1] + irow
-                        icols = jac[2] + icol
-                    else:
-                        irows, icols, idxs = _compute_index_map(jac[1], jac[2],
-                                                                irow, icol,
-                                                                src_indices)
-                        revidxs = numpy.argsort(idxs)
-                        irows, icols = irows[revidxs], icols[revidxs]
+    def _update_submat(self, key, jac):
+        """
+        Update the values of a sub-jacobian.
 
-                    metadata[key] = (irows, icols)
-                    matrix[irows, icols] = jac[0]
-
-        self._matrix = matrix
-
-    def _update_submat(self, submats, metadata, key, jac):
-        """Update the values of a sub-jacobian.
-
-        Args
-        ----
-        submats : dict
-            dictionary of sub-jacobian data keyed by (out_ind, in_ind).
-        metadata : dict
-            implementation-specific data for the sub-jacobians.
+        Parameters
+        ----------
         key : (int, int)
             the global output and input variable indices.
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
-        irows, icols = metadata[key]
-        if isinstance(jac, numpy.ndarray):
+        irows, icols, jac_type = self._metadata[key]
+        if not isinstance(jac, jac_type):
+            raise TypeError("Jacobian entry for %s is of different type (%s) than "
+                            "the type (%s) used at init time." % (key,
+                                                                  type(jac).__name__,
+                                                                  jac_type.__name__))
+        if isinstance(jac, np.ndarray):
             self._matrix[irows, icols] = jac
         elif isinstance(jac, (coo_matrix, csr_matrix)):
             self._matrix[irows, icols] = jac.data
@@ -95,10 +95,11 @@ class DenseMatrix(Matrix):
             self._matrix[irows, icols] = jac[0]
 
     def _prod(self, in_vec, mode):
-        """Perform a matrix vector product.
+        """
+        Perform a matrix vector product.
 
-        Args
-        ----
+        Parameters
+        ----------
         in_vec : ndarray[:]
             incoming vector to multiply.
         mode : str

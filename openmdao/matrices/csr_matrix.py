@@ -1,22 +1,26 @@
-"""Define the CsrMatrix class."""
+"""Define the CSRmatrix class."""
 from __future__ import division
 
-import numpy
+import numpy as np
 from numpy import ndarray
 from scipy.sparse import coo_matrix, csr_matrix
+from six import iteritems
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map
-from openmdao.matrices.coo_matrix import CooMatrix
+from openmdao.matrices.coo_matrix import COOmatrix
 
 
-class CsrMatrix(CooMatrix):
-    """Sparse matrix in Compressed Row Storage format."""
+class CSRmatrix(COOmatrix):
+    """
+    Sparse matrix in Compressed Row Storage format.
+    """
 
     def _build(self, num_rows, num_cols):
-        """Allocate the matrix.
+        """
+        Allocate the matrix.
 
-        Args
-        ----
+        Parameters
+        ----------
         num_rows : int
             number of rows in the matrix.
         num_cols : int
@@ -25,7 +29,7 @@ class CsrMatrix(CooMatrix):
         data, rows, cols = self._build_sparse(num_rows, num_cols)
 
         # get a set of indices that sorts into row major order
-        srtidxs = numpy.lexsort((cols, rows))
+        srtidxs = np.lexsort((cols, rows))
 
         data = data[srtidxs]
         rows = rows[srtidxs]
@@ -34,23 +38,25 @@ class CsrMatrix(CooMatrix):
         # now sort these back into ascending order (our original stacked order)
         # so in _update_submat() we can just extract the individual index
         # arrays that will map each block into the combined data array.
-        revidxs = numpy.argsort(srtidxs)
+        revidxs = np.argsort(srtidxs)
 
-        metadata = self._in_metadata
-        for key in metadata:
-            ind1, ind2, idxs = metadata[key]
+        metadata = self._metadata
+        for key, (ind1, ind2, idxs, jac_type) in iteritems(metadata):
             if idxs is None:
-                metadata[key] = revidxs[ind1:ind2]
+                metadata[key] = (revidxs[ind1:ind2], jac_type)
             else:
                 # apply the reverse index to each part of revidxs so that
                 # we can avoid copying the index array during updates.
-                metadata[key] = revidxs[ind1:ind2][numpy.argsort(idxs)]
-
-        metadata = self._out_metadata
-        for key in metadata:
-            metadata[key] = revidxs[metadata[key]]
+                metadata[key] = (revidxs[ind1:ind2][np.argsort(idxs)],
+                                 jac_type)
 
         # data array for the CSR should be the same as for the COO since
         # it was already in sorted order.
-        self._matrix = coo_matrix((data, (rows, cols)),
-                                  shape=(num_rows, num_cols)).tocsr()
+        coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
+        self._matrix = coo.tocsr()
+
+        # make sure data size is the same between coo and csr, else indexing is
+        # messed up
+        if coo.data.size != self._matrix.data.size:
+            raise ValueError("CSR matrix data contains duplicate row/col entries. "
+                             "This would break internal indexing.")

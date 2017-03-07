@@ -43,6 +43,7 @@ class TestLinearSystem(unittest.TestCase):
         lingrp = prob.model.get_subsystem('lingrp')
         lingrp.ln_solver = ScipyIterativeSolver()
 
+        prob.model.suppress_solver_output = True
         prob.run_model()
 
         assert_rel_error(self, prob['lin.x'], self.x, .0001)
@@ -55,36 +56,39 @@ class TestLinearSystem(unittest.TestCase):
         lingrp = prob.model.get_subsystem('lingrp')
         lingrp.ln_solver = ScipyIterativeSolver()
 
+        prob.setup(check=False)
+        prob.model.suppress_solver_output = True
         prob.run_model()
 
-        # Forward mode with RHS of self.b
-        lingrp._vectors['residual']['linear']['lin.x'] = self.b
-        lingrp._solve_linear(['linear'], 'fwd')
-        sol = lingrp._vectors['output']['linear']['lin.x']
-        assert_rel_error(self, sol, self.x, .0001)
+        with lingrp.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
+            # Forward mode with RHS of self.b
+            d_residuals['lin.x'] = self.b
+            lingrp.run_solve_linear(['linear'], 'fwd')
+            sol = d_outputs['lin.x']
+            assert_rel_error(self, sol, self.x, .0001)
 
-        # Reverse mode with RHS of self.b_T
-        lingrp._vectors['output']['linear']['lin.x'] = self.b_T
-        lingrp._solve_linear(['linear'], 'rev')
-        sol = lingrp._vectors['residual']['linear']['lin.x']
-        assert_rel_error(self, sol, self.x, .0001)
+            # Reverse mode with RHS of self.b_T
+            d_outputs['lin.x'] = self.b_T
+            lingrp.run_solve_linear(['linear'], 'rev')
+            sol = d_residuals['lin.x']
+            assert_rel_error(self, sol, self.x, .0001)
 
-        # Compare against calculated derivs
-        # Ainv = np.linalg.inv(A)
-        # dx_dA = np.outer(Ainv, -x).reshape(3, 9)
-        # dx_db = Ainv
+            # Compare against calculated derivs
+            # Ainv = np.linalg.inv(A)
+            # dx_dA = np.outer(Ainv, -x).reshape(3, 9)
+            # dx_db = Ainv
 
-        # J = prob.calc_gradient(['p1.A', 'p2.b'], ['lin.x'], mode='fwd', return_format='dict')
-        # assert_rel_error(self, J['lin.x']['p1.A'], dx_dA, .0001)
-        # assert_rel_error(self, J['lin.x']['p2.b'], dx_db, .0001)
+            # J = prob.calc_gradient(['p1.A', 'p2.b'], ['lin.x'], mode='fwd', return_format='dict')
+            # assert_rel_error(self, J['lin.x']['p1.A'], dx_dA, .0001)
+            # assert_rel_error(self, J['lin.x']['p2.b'], dx_db, .0001)
 
-        # J = prob.calc_gradient(['p1.A', 'p2.b'], ['lin.x'], mode='rev', return_format='dict')
-        # assert_rel_error(self, J['lin.x']['p1.A'], dx_dA, .0001)
-        # assert_rel_error(self, J['lin.x']['p2.b'], dx_db, .0001)
+            # J = prob.calc_gradient(['p1.A', 'p2.b'], ['lin.x'], mode='rev', return_format='dict')
+            # assert_rel_error(self, J['lin.x']['p1.A'], dx_dA, .0001)
+            # assert_rel_error(self, J['lin.x']['p2.b'], dx_db, .0001)
 
-        # J = prob.calc_gradient(['p1.A', 'p2.b'], ['lin.x'], mode='fd', return_format='dict')
-        # assert_rel_error(self, J['lin.x']['p1.A'], dx_dA, .0001)
-        # assert_rel_error(self, J['lin.x']['p2.b'], dx_db, .0001)
+            # J = prob.calc_gradient(['p1.A', 'p2.b'], ['lin.x'], mode='fd', return_format='dict')
+            # assert_rel_error(self, J['lin.x']['p1.A'], dx_dA, .0001)
+            # assert_rel_error(self, J['lin.x']['p2.b'], dx_db, .0001)
 
 
 if __name__ == "__main__":

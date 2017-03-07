@@ -6,7 +6,8 @@ from six import iteritems
 import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
-    NewtonSolver, ExecComp, ScipyIterativeSolver, ImplicitComponent
+    NewtonSolver, ExecComp, ScipyIterativeSolver, ImplicitComponent, \
+    DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarNoDerivatives, SellarDerivatives, \
@@ -14,6 +15,23 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
 
 
 class TestNewton(unittest.TestCase):
+
+    def test_specify_newton_ln_solver_in_system(self):
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.nl_solver = NewtonSolver()
+        # used for analytic derivatives
+        model.ln_solver = DirectSolver()
+
+        prob.setup()
+
+        self.assertIsInstance(model.nl_solver.ln_solver, DirectSolver)
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_newton_basic(self):
         """ Feature test for slotting a Newton solver and using it to solve
@@ -117,8 +135,6 @@ class TestNewton(unittest.TestCase):
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nl_solver = NewtonSolver()
-        prob.model.ln_solver = LinearBlockGS()
-        prob.model.ln_solver.options['maxiter'] = 2
 
         prob.setup(check=False)
         prob.model.suppress_solver_output = True
@@ -182,7 +198,7 @@ class TestNewton(unittest.TestCase):
         prob.model.ln_solver.options['maxiter'] = 1
 
         # The good solver
-        prob.model.nl_solver.set_subsolver('linear', ScipyIterativeSolver())
+        prob.model.nl_solver.ln_solver = ScipyIterativeSolver()
 
         prob.model.suppress_solver_output = True
         prob.setup(check=False)
@@ -194,7 +210,7 @@ class TestNewton(unittest.TestCase):
         ## Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nl_solver._iter_count, 8)
         self.assertEqual(prob.model.ln_solver._iter_count, 0)
-        self.assertGreater(prob.model.nl_solver.options['subsolvers']['linear']._iter_count, 0)
+        self.assertGreater(prob.model.nl_solver.ln_solver._iter_count, 0)
 
     def test_implicit_utol(self):
         # We are setup for reach utol termination condition quite quickly.
@@ -215,26 +231,26 @@ class TestNewton(unittest.TestCase):
                 # States
                 self.add_output('z', 0.0)
 
-            def compute(self, params, unknowns):
+            def compute(self, inputs, outputs):
                 pass
 
-            def apply_nonlinear(self, params, unknowns, resids):
+            def apply_nonlinear(self, inputs, outputs, resids):
                 """ Don't solve; just calculate the residual."""
 
-                x = params['x']
-                z = unknowns['z']
+                x = inputs['x']
+                z = outputs['z']
 
                 resids['z'] = (z**3 + 3.0*z**2 - 6.0*z + x)*1e15
 
-            def linearize(self, params, unknowns, J):
+            def linearize(self, inputs, outputs, partials):
                 """Analytical derivatives."""
 
-                x = params['x']
-                z = unknowns['z']
+                x = inputs['x']
+                z = outputs['z']
 
                 # State equation
-                J[('z', 'z')] = (3.0*z**2 + 6.0*z - 6.0)*1e15
-                J[('z', 'x')] = 1.0*1e15
+                partials[('z', 'z')] = (3.0*z**2 + 6.0*z - 6.0)*1e15
+                partials[('z', 'x')] = 1.0*1e15
 
         prob = Problem()
         root = prob.model = Group()
@@ -255,6 +271,80 @@ class TestNewton(unittest.TestCase):
         self.assertLessEqual(prob.model.nl_solver._iter_count, 4,
                              msg='Should get there pretty quick because of utol.')
 
+
+class TestNewtonFeatures(unittest.TestCase):
+
+    def test_feature_basic(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NewtonSolver()
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_feature_maxiter(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NewtonSolver()
+
+        nlgbs.options['maxiter'] = 2
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.5878516779, .00001)
+        assert_rel_error(self, prob['y2'], 12.0607416105, .00001)
+
+    def test_feature_rtol(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NewtonSolver()
+
+        nlgbs.options['rtol'] = 1e-3
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.5878516779, .00001)
+        assert_rel_error(self, prob['y2'], 12.0607416105, .00001)
+
+    def test_feature_atol(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NewtonSolver()
+
+        nlgbs.options['atol'] = 1e-4
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.5882856302, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_feature_ln_solver(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        nlgbs = prob.model.nl_solver = NewtonSolver()
+        prob.ln_solver = DirectSolver()
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
 if __name__ == "__main__":
     unittest.main()

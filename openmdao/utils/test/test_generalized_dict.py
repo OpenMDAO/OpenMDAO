@@ -21,6 +21,12 @@ class TestOptionsDict(unittest.TestCase):
         expected_msg = "Entry 'test' has the wrong type (<{} 'int'>)".format(class_or_type)
         self.assertEqual(expected_msg, str(context.exception))
 
+        # make sure bools work
+        self.dict.declare('flag', value=False, type_=bool)
+        self.assertEqual(self.dict['flag'], False)
+        self.dict['flag'] = True
+        self.assertEqual(self.dict['flag'], True)
+
     def test_unnamed_args(self):
         with self.assertRaises(KeyError) as context:
             self.dict['test'] = 1
@@ -112,6 +118,16 @@ class TestOptionsDict(unittest.TestCase):
                         " <object object at 0x[0-9A-Fa-f]+>\]")
         assertRegex(self, str(context.exception), expected_msg)
 
+    def test_read_only(self):
+        opt = OptionsDictionary(read_only=True)
+        opt.declare('permanent', 3.0)
+
+        with self.assertRaises(KeyError) as context:
+            opt['permanent'] = 4.0
+
+        expected_msg = ("Tried to set 'permanent' on a read-only OptionsDictionary")
+        assertRegex(self, str(context.exception), expected_msg)
+
 
 class TestGeneralizedDict(TestOptionsDict):
     def setUp(self):
@@ -143,3 +159,14 @@ class TestGeneralizedDict(TestOptionsDict):
         self.dict._assemble_global_dict(parent_dict)
 
         self.assertIs(self.dict._global_dict['test2'], obj2)
+
+    def test_default_values(self):
+        self.dict.declare('foo', value=False)
+        self.assertFalse(self.dict['foo'])
+
+        self.dict.declare('foobar', value="barfoo")
+        self.assertEqual(self.dict['foobar'], "barfoo")
+
+
+if __name__ == "__main__":
+    unittest.main()

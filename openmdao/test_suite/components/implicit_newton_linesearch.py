@@ -1,6 +1,6 @@
 """Components used mainly for testing Newton and line searches."""
 
-import numpy
+import numpy as np
 import unittest
 from math import exp
 
@@ -8,7 +8,8 @@ from openmdao.api import ImplicitComponent
 
 
 class ImplCompOneState(ImplicitComponent):
-    """A Simple Implicit Component
+    """
+    A Simple Implicit Component
 
     R(x,y) = 0.5y^2 + 2y + exp(-16y^2) + 2exp(-5y) - x
 
@@ -22,16 +23,18 @@ class ImplCompOneState(ImplicitComponent):
         self.add_output('y', val=1.0)
 
     def apply_nonlinear(self, inputs, outputs, resids):
-        """ Don't solve; just calculate the residual."""
-
+        """
+        Don't solve; just calculate the residual.
+        """
         x = inputs['x']
         y = outputs['y']
 
         resids['y'] = 0.5*y*y + 2.0*y + exp(-16.0*y*y) + 2.0*exp(-5.0*y) - x
 
     def linearize(self, inputs, outputs, J):
-        """Analytical derivatives."""
-
+        """
+        Analytical derivatives.
+        """
         y = outputs['y']
 
         # State equation
@@ -40,7 +43,8 @@ class ImplCompOneState(ImplicitComponent):
 
 
 class ImplCompTwoStates(ImplicitComponent):
-    """ A Simple Implicit Component with an additional output equation.
+    """
+    A Simple Implicit Component with an additional output equation.
 
     f(x,z) = xz + z - 4
     y = x + 2z
@@ -66,7 +70,9 @@ class ImplCompTwoStates(ImplicitComponent):
         self.atol = 1.0e-12
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        """ Don't solve; just calculate the residual."""
+        """
+        Don't solve; just calculate the residual.
+        """
 
         x = inputs['x']
         y = outputs['y']
@@ -76,7 +82,9 @@ class ImplCompTwoStates(ImplicitComponent):
         residuals['z'] = x*z + z - 4.0
 
     def linearize(self, inputs, outputs, jac):
-        """Analytical derivatives."""
+        """
+        Analytical derivatives.
+        """
 
         # Output equation
         jac[('y', 'x')] = -1.0
@@ -89,7 +97,8 @@ class ImplCompTwoStates(ImplicitComponent):
 
 
 class ImplCompTwoStatesArrays(ImplicitComponent):
-    """ A Simple Implicit Component with an additional output equation.
+    """
+    A Simple Implicit Component with an additional output equation.
 
     f(x,z) = xz + z - 4
     y = x + 2z
@@ -107,15 +116,18 @@ class ImplCompTwoStatesArrays(ImplicitComponent):
     """
 
     def initialize_variables(self):
-        self.add_input('x', numpy.zeros((3, 1)))
-        self.add_output('y', numpy.zeros((3, 1)))
-        self.add_output('z', 2.0*numpy.ones((3, 1)), lower=1.5, upper=[2.6, 2.5, 2.65])
+        self.add_input('x', np.zeros((3, 1)))
+        self.add_output('y', np.zeros((3, 1)))
+        self.add_output('z', 2.0*np.ones((3, 1)), lower=1.5,
+            upper=np.array([2.6, 2.5, 2.65]).reshape((3,1)))
 
         self.maxiter = 10
         self.atol = 1.0e-12
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        """ Don't solve; just calculate the residual."""
+        """
+        Don't solve; just calculate the residual.
+        """
 
         x = inputs['x']
         y = outputs['y']
@@ -125,13 +137,15 @@ class ImplCompTwoStatesArrays(ImplicitComponent):
         residuals['z'] = x*z + z - 4.0
 
     def linearize(self, inputs, outputs, jac):
-        """Analytical derivatives."""
+        """
+        Analytical derivatives.
+        """
 
         # Output equation
-        jac[('y', 'x')] = -numpy.diag(numpy.array([1.0, 1.0, 1.0]))
-        jac[('y', 'y')] = numpy.diag(numpy.array([1.0, 1.0, 1.0]))
-        jac[('y', 'z')] = -numpy.diag(numpy.array([2.0, 2.0, 2.0]))
+        jac[('y', 'x')] = -np.diag(np.array([1.0, 1.0, 1.0]))
+        jac[('y', 'y')] = np.diag(np.array([1.0, 1.0, 1.0]))
+        jac[('y', 'z')] = -np.diag(np.array([2.0, 2.0, 2.0]))
 
         # State equation
-        jac[('z', 'z')] = (inputs['x'] + 1.0) * numpy.eye(3)
-        jac[('z', 'x')] = outputs['z'] * numpy.eye(3)
+        jac[('z', 'z')] = (inputs['x'] + 1.0) * np.eye(3)
+        jac[('z', 'x')] = outputs['z'] * np.eye(3)

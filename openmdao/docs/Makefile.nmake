@@ -20,11 +20,30 @@ ALLSPHINXOPTS   = -d $(BUILDDIR)\doctrees $(SPHINXOPTS) .
 # the i18n builder cannot share the environment and doctrees with the others
 I18NSPHINXOPTS  = $(SPHINXOPTS) .
 
-.PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext
+.PHONY: help clean all html-update dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext
+
+#first item in makefile is default action of "make"
+html-update:
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+
+all:
+	python _utils/create_feature_docs_unit_test_db.py
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "usr"
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "dev"
+	rm feature_docs_unit_test_db.sqlite
+	IF EXIST $(BUILDDIR) rmdir /s /q $(BUILDDIR)
+	IF EXIST _srcdocs\usr rmdir /s /q _srcdocs\usr
+	IF EXIST _srcdocs\dev rmdir /s /q _srcdocs\dev
+	IF EXIST tags rmdir /s /q tags
+	@echo
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)\html."
+
+html: all
 
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
-	@echo "  html       to make standalone HTML files"
+	@echo "  all       to make all standalone HTML files"
+	@echo "  html       to make all standalone HTML files"
 	@echo "  dirhtml    to make HTML files named index.html in directories"
 	@echo "  singlehtml to make a single large HTML file"
 	@echo "  pickle     to make pickle files"
@@ -51,22 +70,9 @@ help:
 
 clean:
 	IF EXIST $(BUILDDIR) rmdir /s /q $(BUILDDIR)
-	IF EXIST srcdocs\usr rmdir /s /q srcdocs\usr
-	IF EXIST srcdocs\dev rmdir /s /q srcdocs\dev
+	IF EXIST _srcdocs\usr rmdir /s /q _srcdocs\usr
+	IF EXIST _srcdocs\dev rmdir /s /q _srcdocs\dev
 	IF EXIST tags rmdir /s /q tags
-
-
-html:
-	python utils/create_feature_docs_unit_test_db.py
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "usr"
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "dev"
-	rm feature_docs_unit_test_db.sqlite
-	IF EXIST $(BUILDDIR) rmdir /s /q $(BUILDDIR)
-	IF EXIST srcdocs\usr rmdir /s /q srcdocs\usr
-	IF EXIST srcdocs\dev rmdir /s /q srcdocs\dev
-	IF EXIST tags rmdir /s /q tags
-	@echo
-	@echo "Build finished. The HTML pages are in $(BUILDDIR)\html."
 
 dirhtml:
 	$(SPHINXBUILD) -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)\dirhtml

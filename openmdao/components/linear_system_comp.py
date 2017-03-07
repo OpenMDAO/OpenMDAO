@@ -1,13 +1,14 @@
 """Define the LinearSystemComp class."""
 from __future__ import division, print_function
-import numpy
+import numpy as np
 from scipy import linalg
 
 from openmdao.core.implicitcomponent import ImplicitComponent
 
 
 class LinearSystemComp(ImplicitComponent):
-    """Component that solves a linear system, Ax=b.
+    """
+    Component that solves a linear system, Ax=b.
 
     Attributes
     ----------
@@ -16,29 +17,31 @@ class LinearSystemComp(ImplicitComponent):
     """
 
     def __init__(self, **kwargs):
-        """Define additional attributes."""
+        """
+        Define additional attributes.
+        """
         super(LinearSystemComp, self).__init__(**kwargs)
-
-        self._lup = None
-
-    def initialize(self):
-        """Define size parameter."""
         self.metadata.declare('size', value=1, type_=int,
                               desc='the size of the linear system')
 
+        self._lup = None
+
     def initialize_variables(self):
-        """Matrix and RHS are inputs, solution vector is the output."""
+        """
+        Matrix and RHS are inputs, solution vector is the output.
+        """
         size = self.metadata['size']
 
-        self.add_input("A", val=numpy.eye(size))
-        self.add_input("b", val=numpy.ones(size))
-        self.add_output("x", shape=size)
+        self.add_input("A", val=np.eye(size))
+        self.add_input("b", val=np.ones(size))
+        self.add_output("x", shape=size, val=2.)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        """R = Ax - b.
+        """
+        R = Ax - b.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -49,10 +52,11 @@ class LinearSystemComp(ImplicitComponent):
         residuals['x'] = inputs['A'].dot(outputs['x']) - inputs['b']
 
     def solve_nonlinear(self, inputs, outputs):
-        """Use numpy to solve Ax=b for x.
+        """
+        Use numpy to solve Ax=b for x.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -64,10 +68,11 @@ class LinearSystemComp(ImplicitComponent):
 
     def apply_linear(self, inputs, outputs, d_inputs, d_outputs,
                      d_residuals, mode):
-        r"""Compute jac-vector product.
+        r"""
+        Compute jac-vector product.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
@@ -95,20 +100,21 @@ class LinearSystemComp(ImplicitComponent):
             if 'x' in d_outputs:
                 d_outputs['x'] += inputs['A'].T.dot(d_residuals['x'])
             if 'A' in d_inputs:
-                d_inputs['A'] += numpy.outer(outputs['x'], d_residuals['x']).T
+                d_inputs['A'] += np.outer(outputs['x'], d_residuals['x']).T
             if 'b' in d_inputs:
                 d_inputs['b'] -= d_residuals['x']
 
     def solve_linear(self, d_outputs, d_residuals, mode):
-        r"""Back-substitution to solve the derivatives of the linear system.
+        r"""
+        Back-substitution to solve the derivatives of the linear system.
 
         If mode is:
             'fwd': d_residuals \|-> d_outputs
 
             'rev': d_outputs \|-> d_residuals
 
-        Args
-        ----
+        Parameters
+        ----------
         d_outputs : Vector
             unscaled, dimensional quantities read via d_outputs[key]
         d_residuals : Vector

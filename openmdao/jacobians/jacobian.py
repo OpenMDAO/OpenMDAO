@@ -1,6 +1,6 @@
 """Define the base Jacobian class."""
 from __future__ import division
-import numpy
+import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 from six.moves import range
 
@@ -8,23 +8,20 @@ from openmdao.utils.generalized_dict import OptionsDictionary
 
 
 class Jacobian(object):
-    """Base Jacobian class.
+    """
+    Base Jacobian class.
 
     This class provides a dictionary interface for sub-Jacobians and
     performs matrix-vector products when apply_linear is called.
 
     Attributes
     ----------
-    _top_name : str
-        name of the system at which we allocate the global Jacobian.
-    _assembler : <Assembler>
-        pointer to the assembler.
     _system : <System>
         pointer to the system that is currently operating on this Jacobian.
-    _out_dict : dict
-        dictionary containing the user-supplied internal sub-Jacobians.
-    _in_dict : dict
-        dictionary containing the user-supplied external sub-Jacobians.
+    _subjacs : dict
+        dictionary containing the user-supplied sub-Jacobians.
+    _subjacs_info : dict
+        Dict of subjacobian metadata keyed on (resid_path, (in/out)_path).
     _int_mtx : <Matrix>
         global internal Jacobian.
     _ext_mtx : <Matrix>
@@ -32,170 +29,190 @@ class Jacobian(object):
     _keymap : dict
         Mapping of original (output, input) key to (output, source) in cases
         where the input has src_indices.
-    _iter_list : [(out_name, in_name), ...]
-        list of output-input pairs to iterate over.
+    _iter_list_rel_unprom : [(out_name, in_name), ...]
+        list of output-input pairs to iterate over where the names are relative, unpromoted.
+    _iter_list_pathnames : [(out_name, in_name), ...]
+        list of output-input pairs to iterate over where the names are unique pathnames.
     options : <OptionsDictionary>
         options dictionary.
     """
 
     def __init__(self, **kwargs):
-        """Initialize all attributes.
+        """
+        Initialize all attributes.
 
-        Args
-        ----
+        Parameters
+        ----------
         **kwargs : dict
             options dictionary.
         """
-        self._top_name = None
-        self._assembler = None
         self._system = None
 
-        self._out_dict = {}
-        self._in_dict = {}
+        self._subjacs = {}
+        self._subjacs_info = {}
         self._int_mtx = None
         self._ext_mtx = None
         self._keymap = {}
-        self._iter_list = []
+        self._iter_list_rel_unprom = None
+        self._iter_list_pathnames = None
 
         self.options = OptionsDictionary()
         self.options.update(kwargs)
 
-    def _process_key(self, key):
-        """Map output-input pair names to indices and sizes.
+    def _key2shape(self, key):
+        """
+        Return shape of sub-jacobian for variables making up the key tuple.
 
-        Args
-        ----
+        This assumes that no inputs and outputs share the same name,
+        so it should only be called from a Component, never from a Group.
+
+        Parameters
+        ----------
         key : (str, str)
             output name, input name of sub-Jacobian.
 
         Returns
         -------
-        dct : dict
-            either the internal or the external dictionary.
-        out_ind : int
-            global index of output variable.
-        in_ind : int
-            global index of input variable.
         out_size : int
             local size of the output variable.
         in_size : int
             local size of the input variable.
-        typ : str
-            'input' or 'output'.
         """
         out_name, in_name = key
-        outputs = self._system._outputs
-        inputs = self._system._inputs
-        indices = self._system._var_allprocs_indices
+        return (np.prod(self._system._var2meta[out_name]['shape']),
+                np.prod(self._system._var2meta[in_name]['shape']))
 
-        out_size = len(outputs._views_flat[out_name])
-        out_ind = indices['output'][out_name]
-        if in_name in inputs:
-            in_size = len(inputs._views_flat[in_name])
-            in_ind = indices['input'][in_name]
-            dct = self._in_dict
-            typ = 'input'
-        elif in_name in outputs:
-            in_size = len(outputs._views_flat[in_name])
-            in_ind = indices['output'][in_name]
-            dct = self._out_dict
-            typ = 'output'
-        else:
-            in_size = 0
-            in_ind = -1
-            dct = None
-            typ = ''
-
-        return dct, out_ind, in_ind, out_size, in_size, typ
-
-    def _negate(self, key):
-        """Multiply this sub-Jacobian by -1.0, for explicit variables.
-
-        Args
-        ----
-        key : (str, str)
-            output name, input name of sub-Jacobian.
+    def _key2unique(self, key):
         """
-        dct, out_ind, in_ind, out_size, in_size, typ = self._process_key(key)
-        jac = dct[out_ind, in_ind]
+        Map output-input local name pair to a unique key.
 
-        if isinstance(jac, numpy.ndarray):
-            dct[out_ind, in_ind] = -jac
+        This should only be called when self._system is a Component or
+        key parts are all outputs.  If the key contains an input name, that
+        may not be unique in a Group context.
+
+        Parameters
+        ----------
+        key : (str, str)
+            output name, input name of sub-Jacobian. Names are local, promoted.
+
+        Returns
+        -------
+        out_path : str
+            pathname of output variable.
+        in_path : str
+            pathname of input variable.
+        """
+        if key[1] in self._system._var_name2path['input']:
+            return (self._system._var_name2path['output'][key[0]],
+                    self._system._var_name2path['input'][key[1]][0])
+        else:
+            return (self._system._var_name2path['output'][key[0]],
+                    self._system._var_name2path['output'][key[1]])
+
+    def _multiply_subjac(self, ukey, val):
+        """
+        Multiply this sub-Jacobian by val.
+
+        Parameters
+        ----------
+        ukey : (str, str)
+            Output name, input name of sub-Jacobian. The names are the full global pathnames.
+        val : float
+            value to multiply by.
+        """
+        jac = self._subjacs[ukey]
+
+        if isinstance(jac, np.ndarray):
+            self._subjacs[ukey] = val * jac
         elif isinstance(jac, (coo_matrix, csr_matrix)):
-            dct[out_ind, in_ind].data *= -1.0  # DOK not supported
+            self._subjacs[ukey].data *= val  # DOK not supported
         elif len(jac) == 3:
-            dct[out_ind, in_ind][0] *= -1.0
-        elif len(jac) == 2:
-            # In this case, negation is not necessary because sparse FD
-            # works on the residuals which already contains the negation
-            pass
+            self._subjacs[ukey][0] *= val
 
     def _precompute_iter(self):
-        """Assemble list of output-input pairs by name."""
+        """
+        Cache lists of (output, input) pairs found in the jacobian for the current System.
+
+        The two lists are:
+        1. _iter_list_rel_unprom : list of unpromoted names viewed from this system
+        2. _iter_list_pathnames : list of global, unique pathnames
+        """
         system = self._system
+        start = len(system.pathname) + 1 if system.pathname else 0
+        out_paths = system._var_allprocs_pathnames['output']
+        in_paths = system._var_allprocs_pathnames['input']
+        out_offset = system._var_allprocs_range['output'][0]
+        in_offset = system._var_allprocs_range['input'][0]
+        in_indices = system._var_myproc_indices['input']
+        out_indices = system._var_myproc_indices['output']
 
-        self._iter_list = []
-        for re_name in system._var_myproc_names['output']:
-            re_ind = system._var_allprocs_indices['output'][re_name]
+        iter_list_rel_unprom = []
+        iter_list_pathnames = []
+        for re_ind in out_indices:
+            re_path = out_paths[re_ind - out_offset]
+            re_unprom = re_path[start:]
 
-            for out_name in system._var_myproc_names['output']:
-                out_ind = system._var_allprocs_indices['output'][out_name]
+            for out_ind in out_indices:
+                out_path = out_paths[out_ind - out_offset]
+                out_unprom = out_path[start:]
 
-                if (re_ind, out_ind) in self._out_dict:
-                    self._iter_list.append((re_name, out_name))
+                if (re_path, out_path) in self._subjacs:
+                    iter_list_rel_unprom.append((re_unprom, out_unprom))
+                    iter_list_pathnames.append((re_path, out_path))
 
-            for in_name in system._var_myproc_names['input']:
-                in_ind = system._var_allprocs_indices['input'][in_name]
+            for in_ind in in_indices:
+                in_path = in_paths[in_ind - in_offset]
+                in_unprom = in_path[start:]
 
-                if (re_ind, in_ind) in self._in_dict:
-                    self._iter_list.append((re_name, in_name))
+                if (re_path, in_path) in self._subjacs:
+                    iter_list_rel_unprom.append((re_unprom, in_unprom))
+                    iter_list_pathnames.append((re_path, in_path))
+
+        self._iter_list_rel_unprom = iter_list_rel_unprom
+        self._iter_list_pathnames = iter_list_pathnames
 
     def __contains__(self, key):
-        """Map output-input pairs names to indices.
+        """
+        Map output-input pairs names to indices.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (str, str)
-            output name, input name of sub-Jacobian.
+            output name, input name of sub-Jacobian. Names are promoted names.
 
         Returns
         -------
         boolean
             return whether sub-Jacobian has been defined.
         """
-        dct, out_ind, in_ind, out_size, in_size, typ = self._process_key(key)
-        if dct is None:
-            return False
-        else:
-            return (out_ind, in_ind) in dct
-
-    def __iter__(self):
-        """Return iterator from pre-computed _iter_list.
-
-        Returns
-        -------
-        listiterator
-            iterator returning (out_name, in_name) pairs.
-        """
-        return iter(self._iter_list)
+        outname2path = self._system._var_name2path['output']
+        if key[0] in outname2path:
+            if key[1] in self._system._var_name2path['input']:
+                out_path = outname2path[key[0]]
+                for ipath in self._system._var_name2path['input'][key[1]]:
+                    return (out_path, ipath) in self._subjacs
+            elif key[1] in outname2path:
+                return (outname2path[key[0]], outname2path[key[1]]) in self._subjacs
+        return False
 
     def __setitem__(self, key, jac):
-        """Set sub-Jacobian.
+        """
+        Set sub-Jacobian.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (str, str)
-            output name, input name of sub-Jacobian.
-        jac : int or float or ndarray or list[3] or tuple[3]
+            output name, input name of sub-Jacobian. Names are promoted names.
+        jac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        system = self._system
-        dct, out_ind, in_ind, out_size, in_size, typ = self._process_key(key)
+        ukey = self._key2unique(key)
 
-        if numpy.isscalar(jac) or isinstance(jac, numpy.ndarray):
-            jac = numpy.atleast_2d(jac).reshape((out_size, in_size))
-            # numpy.promote_types will choose the smallest dtype that can contain both arguments
-            safe_dtype = numpy.promote_types(jac.dtype, float)
+        if np.isscalar(jac) or isinstance(jac, np.ndarray):
+            shape = self._key2shape(key)
+            jac = np.atleast_2d(jac).reshape(shape)
+            # np.promote_types will choose the smallest dtype that can contain both arguments
+            safe_dtype = np.promote_types(jac.dtype, float)
             jac = jac.astype(safe_dtype, copy=False)
         elif isinstance(jac, (coo_matrix, csr_matrix)):
             pass
@@ -210,66 +227,81 @@ class Jacobian(object):
             raise TypeError("Sub-jacobian of type '%s' for key %s is "
                             "not supported." % (type(jac).__name__, key))
 
-        ind = system._var_myproc_names['output'].index(key[0])
-        r_factor = system._scaling_to_norm['residual'][ind, 1]
-
-        ind = system._var_myproc_names[typ].index(key[1])
-        c_factor = system._scaling_to_norm[typ][ind, 1]
-
-        if isinstance(jac, numpy.ndarray):
-            jac *= r_factor / c_factor
-        elif isinstance(jac, (coo_matrix, csr_matrix)):
-            jac.data *= r_factor / c_factor
-        elif len(jac) == 3:
-            jac[0] *= r_factor / c_factor
-
-        dct[out_ind, in_ind] = jac
+        self._subjacs[ukey] = jac
 
     def __getitem__(self, key):
-        """Get sub-Jacobian.
+        """
+        Get sub-Jacobian.
 
-        Args
-        ----
+        Parameters
+        ----------
         key : (str, str)
-            output name, input name of sub-Jacobian.
+            output name, input name of sub-Jacobian. Names are promoted names.
 
         Returns
         -------
         jac : ndarray or spmatrix or list[3]
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        system = self._system
-        dct, out_ind, in_ind, out_size, in_size, typ = self._process_key(key)
-        jac = dct[out_ind, in_ind]
+        ukey = self._key2unique(key)
+        return self._subjacs[ukey]
 
-        ind = system._var_myproc_names['output'].index(key[0])
-        r_factor = system._scaling_to_phys['residual'][ind, 1]
+    def _iter_pathnames(self):
+        return iter(self._iter_list_pathnames)
 
-        ind = system._var_myproc_names[typ].index(key[1])
-        c_factor = system._scaling_to_phys[typ][ind, 1]
+    def _iter_rel_unprom(self):
+        return iter(self._iter_list_rel_unprom)
 
-        if isinstance(jac, numpy.ndarray):
-            jac *= r_factor / c_factor
-        elif isinstance(jac, (coo_matrix, csr_matrix)):
-            jac.data *= r_factor / c_factor
-        elif len(jac) == 3:
-            jac[0] *= r_factor / c_factor
+    def _scale_subjac(self, ukey, coeffs):
+        """
+        Change the scaling state of a single subjac.
 
-        return jac
+        Parameters
+        ----------
+        ukey : (str, str)
+            Output name, input name of sub-Jacobian. The names are the full global pathnames.
+        coeffs : dict of ndarray[nvar_myproc, 2]
+            0th and 1st order coefficients for scaling/unscaling.
+            The keys are 'input', 'output', and 'residual'
+        """
+        ind0 = self._system._var_pathdict[ukey[0]].myproc_idx
+        ind1 = self._system._var_pathdict[ukey[1]].myproc_idx
+        typ = self._system._var_pathdict[ukey[1]].typ
+
+        val = coeffs['residual'][ind0, 1] / coeffs[typ][ind1, 1]
+        self._multiply_subjac(ukey, val)
+
+    def _scale(self, coeffs):
+        """
+        Change the scaling state for all subjacs under the current system.
+
+        Parameters
+        ----------
+        coeffs : dict of ndarray[nvar_myproc, 2]
+            0th and 1st order coefficients for scaling/unscaling.
+            The keys are 'input', 'output', and 'residual'.
+        """
+        for ukey in self._iter_pathnames():
+            self._scale_subjac(ukey, coeffs)
 
     def _initialize(self):
-        """Allocate the global matrices."""
+        """
+        Allocate the global matrices.
+        """
         pass
 
     def _update(self):
-        """Read the user's sub-Jacobians and set into the global matrix."""
+        """
+        Read the user's sub-Jacobians and set into the global matrix.
+        """
         pass
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
-        """Compute matrix-vector product.
+        """
+        Compute matrix-vector product.
 
-        Args
-        ----
+        Parameters
+        ----------
         d_inputs : Vector
             inputs linear vector.
         d_outputs : Vector
@@ -280,3 +312,29 @@ class Jacobian(object):
             'fwd' or 'rev'.
         """
         pass
+
+    def _set_partials_meta(self, key, meta, negate=False):
+        """
+        Store subjacobian metadata.
+
+        Parameters
+        ----------
+        key : (str, str)
+            output name, input name of sub-Jacobian. The names are promoted names.
+        meta : dict
+            Metadata dictionary for the subjacobian.
+        negate : bool
+            If True negate the given value, if any.
+        """
+        ukey = self._key2unique(key)
+        if ukey is None:
+            raise KeyError("Could not find unique key for %s." % (key,))
+        self._subjacs_info[ukey] = (meta, self._key2shape(key))
+
+        val = meta['value']
+        if val is not None:
+            if negate:
+                val *= -1.
+            if meta['rows'] is not None:
+                val = [val, meta['rows'], meta['cols']]
+            self.__setitem__(key, val)
