@@ -61,7 +61,7 @@ class Test(unittest.TestCase):
     def test_prom_names(self):
         root = self.p.model
         compA = root.get_subsystem('A')
-        self.assertEqual(list(compA._varx_allprocs_prom2abs_list['output'].keys()), ['A.x'])
+        self.assertEqual(list(compA._varx_allprocs_prom2abs_list['output'].keys()), ['x'])
 
     def test_var_indices(self):
         def get_inds(p, sname, type_):
