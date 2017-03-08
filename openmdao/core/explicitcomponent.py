@@ -136,7 +136,7 @@ class ExplicitComponent(Component):
                 d_inputs, d_outputs, d_residuals = vecs
 
                 # Jacobian and vectors are all scaled, unitless
-                with self._jacobian_context() as J:
+                with self.jacobian_context() as J:
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
 
                 # Jacobian and vectors are all unscaled, dimensional
@@ -184,7 +184,7 @@ class ExplicitComponent(Component):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
         """
-        with self._jacobian_context() as J:
+        with self.jacobian_context() as J:
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                              residuals=[self._residuals], scale_jac=True):
                 # Since the residuals are already negated, this call should come before negate_jac
@@ -244,7 +244,7 @@ class ExplicitComponent(Component):
         """
         Set subjacobian info into our jacobian.
         """
-        with self._jacobian_context() as J:
+        with self.jacobian_context() as J:
             for abs_key, meta in iteritems(self._subjacs_info):
                 J._set_partials_meta(abs_key, meta, meta['type'] == 'input')
 
