@@ -202,9 +202,9 @@ class Assembler(object):
 
         Parameters
         ----------
-        connections : [(int, int), ...]
-            index pairs representing user defined variable connections
-            (in_ind, out_ind).
+        connections : [(str, str), ...]
+            abs name pairs representing user defined variable connections
+            (in_abs, out_abs).
         prom2abs : {'input': dict, 'output': dict}
             Mapping of promoted name to absolute names (global)
         abs2data : {str: {}, ...}
@@ -219,9 +219,9 @@ class Assembler(object):
         prom2abs_in = prom2abs['input']
 
         # Add user defined connections to the _input_src_ids vector
-        for in_ID, out_ID in connections:
+        for in_abs, out_abs in connections:
             input_src_ids[in_ID] = out_ID
-            output_tgts[out_ID].append(in_ID)
+            output_tgts[out_abs].append(in_abs)
 
         # Add connections for any promoted input names that match promoted
         # output names.
