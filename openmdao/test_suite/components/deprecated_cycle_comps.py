@@ -96,7 +96,6 @@ class DeprecatedCycleComp(DeprecatedComponent):
 
         self.initialize_variables()
 
-    def initialize(self):
         self.metadata.declare('jacobian_type', value='matvec',
                               values=['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
                               desc='method of assembling derivatives')

@@ -155,29 +155,11 @@ class Component(BaseComponent):
                 d_outputs._scale(self._scaling_to_phys['output'])
                 d_residuals._scale(self._scaling_to_phys['residual'])
 
-                # negate the residuals for only the explicit variables
-                # and pass in the vectors in the correct order
-                # (assuming clippy’s apply_linear mapped d_inputs to d_residuals).
-                # If it mapped d_inputs to d_outputs, you'd have to copy what’s
-                # in d_outputs to d_residuals, but only for the explicit variables.
-                # For the implicit variables, you shouldn’t have to touch anything
-
-                print('output names:', self._output_names)
-                print('state names:', self._state_names)
-
-                print('d_residuals:', d_residuals, d_residuals._names, d_residuals.get_data())
-                print('d_outputs:', d_outputs, d_outputs._names, d_outputs.get_data())
-                print('d_inputs:', d_inputs, d_inputs._names, d_inputs.get_data())
-
                 for name in d_residuals:
                     if name in self._output_names:
                         if name not in self._state_names:
                             d_outputs[name] = d_residuals[name]
                             d_residuals[name] *= -1.0
-
-                print('d_residuals:', d_residuals, d_residuals._names, d_residuals.get_data())
-                print('d_outputs:', d_outputs, d_outputs._names, d_outputs.get_data())
-                print('d_inputs:', d_inputs, d_inputs._names, d_inputs.get_data())
 
                 self.apply_linear(self._inputs, self._outputs,
                                   d_inputs, d_outputs, d_residuals, mode)
@@ -186,7 +168,7 @@ class Component(BaseComponent):
                     if name in self._output_names:
                         if name not in self._state_names:
                             d_residuals[name] = d_outputs[name]
-                            # d_residuals[name] *= -1.0
+                            d_residuals[name] *= -1.0
 
                 self._inputs._scale(self._scaling_to_norm['input'])
                 self._outputs._scale(self._scaling_to_norm['output'])
@@ -214,7 +196,6 @@ class Component(BaseComponent):
         float
             absolute error.
         """
-        print(self.pathname, '_solve_linear()')
         if self._ln_solver is not None:
             return self._ln_solver(vec_names, mode)
         else:
@@ -389,7 +370,6 @@ class Component(BaseComponent):
         mode : str
             either 'fwd' or 'rev'
         """
-        print(self.pathname, 'solve_linear()')
         pass
 
     def linearize(self, params, unknowns, residuals):

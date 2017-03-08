@@ -1,5 +1,5 @@
 """Define the base Vector and Transfer classes."""
-from __future__ import division, print_function
+from __future__ import division
 import numpy as np
 
 from six.moves import range
@@ -289,7 +289,6 @@ class Vector(object):
             variable value (not scaled, not dimensionless).
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
-        print('Vector %s __getitem__(%s):' % (self._name, name), abs_name)
         if abs_name is not None:
             return self._views[abs_name][self._idxs[abs_name]]
         else:
