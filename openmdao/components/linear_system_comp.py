@@ -28,13 +28,13 @@ class LinearSystemComp(ImplicitComponent):
         super(LinearSystemComp, self).__init__(**kwargs)
         self.metadata.declare('size', value=1, type_=int,
                               desc='the size of the linear system')
-        self.metadata.declare('deriv_type', value='dense',
+        self.metadata.declare('partial_type', value='dense',
                               values=['dense', 'sparse', 'matrix_free'],
                               desc='the way the derivatives are defined')
 
         self._lup = None
 
-        if self.metadata['deriv_type'] == "matrix_free":
+        if self.metadata['partial_type'] == "matrix_free":
             self.apply_linear = self._mat_vec_prod
 
     def initialize_variables(self):
@@ -51,13 +51,14 @@ class LinearSystemComp(ImplicitComponent):
 
     def initialize_partials(self):
 
-        deriv_type = self.metadata['deriv_type']
+        partial_type = self.metadata['partial_type']
 
         size = self.metadata['size']
         row_col = range(size)
 
-        if deriv_type == 'sparse':
-            self.declare_partials('x', 'b', val=-1, rows=row_col, cols=row_col)
+        if partial_type == 'sparse':
+            self.declare_partials('x', 'b', val=-np.ones(size), rows=row_col, cols=row_col)
+            # self.declare_partials('x', 'b', val=-1, rows=row_col, cols=row_col)
 
             rows = []
             cols = []
@@ -65,9 +66,13 @@ class LinearSystemComp(ImplicitComponent):
                 for j in xrange(size):
                     rows.append(i)
                     cols.append(i*size+j)
-            self.declare_partials('x', 'A', rows=row_col, cols=row_col)
 
-        elif deriv_type == "dense":
+            self.dx_da_rows = rows
+            self.dx_da_cols = cols
+
+            self.declare_partials('x', 'A', val=np.ones(size**2), rows=rows, cols=cols)
+
+        elif partial_type == "dense":
             self.declare_partials('x', 'b', val=-np.eye(size))
 
     def apply_nonlinear(self, inputs, outputs, residuals):
@@ -101,13 +106,13 @@ class LinearSystemComp(ImplicitComponent):
         outputs['x'] = linalg.lu_solve(self._lup, inputs['b'])
 
     def linearize(self, inputs, outputs, J):
-        deriv_type = self.metadata['deriv_type']
-        if deriv_type == "matrix_free":
+        partial_type = self.metadata['partial_type']
+        if partial_type == "matrix_free":
             return
 
         x = outputs['x']
         size = self.metadata['size']
-        if deriv_type == "dense":
+        if partial_type == "dense":
             dx_dA = np.zeros((size, size**2))
             for i in xrange(size):
                 dx_dA[i, i*size:(i+1)*size] = x
@@ -118,8 +123,10 @@ class LinearSystemComp(ImplicitComponent):
             # constant, defined int initialize_partials
             # J['x', 'b'] = -np.eye()
 
-        elif deriv_type == "sparse":
-            J['x', 'A'] = np.tile(x, size)
+        elif partial_type == "sparse":
+
+            J['x', 'A'] = (np.tile(x, size), self.dx_da_rows, self.dx_da_cols)
+            # J['x', 'A'].set_data(np.tile(x, size))
             J['x', 'x'] = inputs['A']
 
             # constant, defined int initialize_partials
@@ -130,7 +137,7 @@ class LinearSystemComp(ImplicitComponent):
         """
         Compute jac-vector product.
 
-        linear operator for the partial derivative jacobian, only used if the 'deriv_type'
+        linear operator for the partial derivative jacobian, only used if the 'partial_type'
         metadata is set to 'matrix_free'.
 
         Parameters
@@ -191,4 +198,5 @@ class LinearSystemComp(ImplicitComponent):
             sol_vec, rhs_vec = d_residuals, d_outputs
             t = 1
 
+        # print("foobar", rhs_vec['x'])
         sol_vec['x'] = linalg.lu_solve(self._lup, rhs_vec['x'], trans=t)
