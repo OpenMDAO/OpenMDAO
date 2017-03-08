@@ -64,6 +64,7 @@ class Component(BaseComponent):
         """
         if 'resid_scaler' in kwargs:
             kwargs['res_ref'] = kwargs['resid_scaler']
+            del kwargs['resid_scaler']
 
         super(Component, self).add_output(name, val, **kwargs)
         self._state_names.append(name)

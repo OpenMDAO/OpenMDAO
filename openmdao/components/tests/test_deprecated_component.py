@@ -2,152 +2,266 @@ from __future__ import print_function
 from pprint import pprint
 
 import unittest
+from six import iteritems
+
+import numpy as np
 
 from openmdao.api import Problem, IndepVarComp, Component, Group
 
 try:
     # OpenMDAO 2.x
-    from openmdao.api import ScipyIterativeSolver
     from openmdao.devtools.testutil import assert_rel_error
     openmdao_version = 2
 except ImportError:
     # OpenMDAO 1.x
-    from openmdao.api import ScipyOptimizer as ScipyIterativeSolver
     from openmdao.test.util import assert_rel_error
     from openmdao.solvers.scipy_gmres import ScipyGMRES
     openmdao_version = 1
 
 
-class TestComp(Component):
+class SimpleImplicitComp(Component):
+    """ A Simple Implicit Component with an additional output equation.
+    f(x,z) = xz + z - 4
+    y = x + 2z
 
-    def __init__(self):
-        super(TestComp, self).__init__()
+    Sol: when x = 0.5, z = 2.666
+    Coupled derivs:
+    y = x + 8/(x+1)
+    dy_dx = 1 - 8/(x+1)**2 = -2.5555555555555554
+    z = 4/(x+1)
+    dz_dx = -4/(x+1)**2 = -1.7777777777777777
+    """
 
-        self.add_param('x', val=4.)
-        self.add_param('y', val=3.)
-        self.add_state('z1', val=0.)
-        self.add_output('z2', val=0.)
+    def __init__(self, resid_scaler=1.0):
+        super(SimpleImplicitComp, self).__init__()
 
-    def apply_nonlinear(self, p, u, r):
+        # Params
+        self.add_param('x', 0.5)
 
-        r['z1'] = 5. - u['z1']+p['y']
-        r['z2'] = u['z2'] - (2*p['x'] + 2*u['z1'])
+        # Unknowns
+        self.add_output('y', 0.0)
 
-    def solve_nonlinear(self, p, u, r):
+        # States
+        self.add_state('z', 0.0, resid_scaler=resid_scaler)
 
-        u['z1'] = 5. + p['y']
-        u['z2'] = 2*p['x'] + 2*u['z1']
+        self.maxiter = 10
+        self.atol = 1.0e-12
 
-    def linearize(self, p, u, r):
+    def solve_nonlinear(self, params, unknowns, resids):
+        """ Simple iterative solve. (Babylonian method)."""
+
+        x = params['x']
+        z = unknowns['z']
+        znew = z
+
+        iter = 0
+        eps = 1.0e99
+        while iter < self.maxiter and abs(eps) > self.atol:
+            z = znew
+            znew = 4.0 - x*z
+
+            eps = x*znew + znew - 4.0
+
+        unknowns['z'] = znew
+        unknowns['y'] = x + 2.0*znew
+
+        resids['z'] = eps
+        #print(unknowns['y'], unknowns['z'])
+
+    def apply_nonlinear(self, params, unknowns, resids):
+        """ Don't solve; just calculate the residual."""
+
+        x = params['x']
+        z = unknowns['z']
+        resids['z'] = x*z + z - 4.0
+
+        # Output equations need to evaluate a residual just like an explicit comp.
+        resids['y'] = x + 2.0*z - unknowns['y']
+        #print(x, unknowns['y'], z, resids['z'], resids['y'])
+
+    def linearize(self, params, unknowns, resids):
+        """Analytical derivatives."""
 
         J = {}
-        J['z1', 'y'] = 1.
-        J['z1', 'z1'] = -1.
 
-        J['z2', 'x'] = 2.
-        J['z2', 'z1'] = 2
+        # Output equation
+        J[('y', 'x')] = np.array([1.0])
+        J[('y', 'z')] = np.array([2.0])
+
+        # State equation
+        J[('z', 'z')] = np.array([params['x'] + 1.0])
+        J[('z', 'x')] = np.array([unknowns['z']])
 
         return J
 
+class SimpleImplicitCompApply(SimpleImplicitComp):
+    """ Use apply_linear instead."""
 
-class TestCompApply(TestComp):
-
-    def apply_linear(self, p, u, dp, du, dr, mode):
-        print('TestCompApply.apply_linear()\n----------------------------')
-        if openmdao_version == 1:
-            vals = list(p[key] for key in p.keys())
-            print(vals)
-            print('p:', p.keys(), list(p[key] for key in p.keys()))
-            print('u:', u.keys(), list(u[key] for key in u.keys()))
-            print('dp:', dp.keys(), list(dp[key] for key in dp.keys()))
-            print('du:', du.keys(), list(du[key] for key in du.keys()))
-            print('dr:', dr.keys(), list(dr[key] for key in dr.keys()))
-
-        if openmdao_version == 2:
-            print('p:', p._names, p.get_data())
-            print('u:', u._names, u.get_data())
-            print('dp:', dp._names, dp.get_data())
-            print('du:', du._names, du.get_data())
-            print('dr:', dr._names, dr.get_data())
+    def apply_linear(self, params, unknowns, dparams, dunknowns, dresids,
+                     mode):
+        """Returns the product of the incoming vector with the Jacobian."""
 
         if mode == 'fwd':
-            if 'x' in dp:
-                if 'z2' in dr:
-                    dr['z2'] = 2.0*dp['x']
-            if 'y' in dp:
-                if 'z1' in dr:
-                    dr['z1'] = dp['y']
-            if 'z1' in du:
-                if 'z2' in dr:
-                    dr['z2'] = 2.0*du['z1']
+            if 'y' in dresids:
+                if 'x' in dparams:
+                    dresids['y'] += dparams['x']
+                if 'z' in dunknowns:
+                    dresids['y'] += 2.0*dunknowns['z']
+
+            if 'z' in dresids:
+                if 'x' in dparams:
+                    dresids['z'] += (np.array([unknowns['z']])).dot(dparams['x'])
+                if 'z' in dunknowns:
+                    dresids['z'] += (np.array([params['x'] + 1.0])).dot(dunknowns['z'])
+
         elif mode == 'rev':
-            if 'x' in dp:
-                if 'z2' in dr:
-                    dp['x'] = 2.0*dr['z2']
-            if 'y' in dp:
-                if 'z1' in dr:
-                    dp['y'] = dr['z1']
-            if 'z1' in du:
-                if 'z2' in dr:
-                    du['z1'] = 2.0*dr['z2']
+            #dparams['x'] = self.multiplier*dresids['y']
+            if 'y' in dresids:
+                if 'x' in dparams:
+                    dparams['x'] += dresids['y']
+                if 'z' in dunknowns:
+                    dunknowns['z'] += 2.0*dresids['y']
+
+            if 'z' in dresids:
+                if 'x' in dparams:
+                    dparams['x'] += (np.array([unknowns['z']])).dot(dresids['z'])
+                if 'z' in dunknowns:
+                    dunknowns['z'] += (np.array([params['x'] + 1.0])).dot(dresids['z'])
 
 
 class DepCompTestCase(unittest.TestCase):
 
-    def test_run_model(self):
-        p = Problem(Group())
+    def test_simple_implicit(self):
 
-        p.root.add('sys1', IndepVarComp('x', val=4.), promotes=['x'])
-        p.root.add('sys2', IndepVarComp('y', val=3.), promotes=['y'])
-        p.root.add('sys3', TestCompApply(), promotes=['x', 'y'])
+        prob = Problem(Group())
+        if openmdao_version == 1:
+            prob.root.ln_solver = ScipyGMRES()
+        prob.root.add('comp', SimpleImplicitComp())
+        prob.root.add('p1', IndepVarComp('x', 0.5))
+
+        prob.root.connect('p1.x', 'comp.x')
+
+        prob.setup(check=False)
+        prob.run()
 
         if openmdao_version == 1:
-            p.root.ln_solver = ScipyGMRES()
-
-        p.setup(check=False)
-        # p.root.suppress_solver_output = True
-        p.run()
-
-        assert_rel_error(self, p['sys3.z1'], 8., 1e-10)
-        assert_rel_error(self, p['sys3.z2'], 24, 1e-10)
-
-        if openmdao_version == 1:
-            J = p.calc_gradient(['x', 'y'], ['sys3.z1', 'sys3.z2'])
-
-        if openmdao_version == 2:
-            J = p.compute_total_derivs(of=['sys3.z1', 'sys3.z2'],
-                                       wrt=['x', 'y'])
-
-        print('Jacobian:')
+            J = prob.calc_gradient(['p1.x'], ['comp.y'], mode='fwd')
+        else:
+            J = prob.compute_total_derivs(of=['comp.y'], wrt=['p1.x'])
+        print('J:')
         pprint(J)
+        assert_rel_error(self, J[0][0], -2.5555511, 1e-5)
 
-    def test_run_with_linearize(self):
-        p = Problem(Group())
+        # Check partials
+        data = prob.check_partial_derivatives(out_stream=None)
 
-        p.root.add('sys1', IndepVarComp('x', val=4.), promotes=['x'])
-        p.root.add('sys2', IndepVarComp('y', val=3.), promotes=['y'])
-        p.root.add('sys3', TestCompApply(), promotes=['x', 'y'])
+        for key1, val1 in iteritems(data):
+            for key2, val2 in iteritems(val1):
+                assert_rel_error(self, val2['abs error'][0], 0.0, 1e-5)
+                assert_rel_error(self, val2['abs error'][1], 0.0, 1e-5)
+                assert_rel_error(self, val2['abs error'][2], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][0], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][1], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][2], 0.0, 1e-5)
 
-        p.root.nl_solver.ln_solver = ScipyIterativeSolver()
+        assert_rel_error(self, data['comp'][('y', 'x')]['J_fwd'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, data['comp'][('y', 'z')]['J_fwd'][0][0], 2.0, 1e-6)
+        assert_rel_error(self, data['comp'][('z', 'x')]['J_fwd'][0][0], 2.66666667, 1e-6)
+        assert_rel_error(self, data['comp'][('z', 'z')]['J_fwd'][0][0], 1.5, 1e-6)
+
+        print('Check Partials:')
+        pprint(data)
+
+        # Check total derivs
+        data = prob.check_total_derivatives(out_stream=None)
+
+        for key1, val1 in iteritems(data):
+            assert_rel_error(self, val1['abs error'][0], 0.0, 1e-5)
+            assert_rel_error(self, val1['abs error'][1], 0.0, 1e-5)
+            assert_rel_error(self, val1['abs error'][2], 0.0, 1e-5)
+            assert_rel_error(self, val1['rel error'][0], 0.0, 1e-5)
+            assert_rel_error(self, val1['rel error'][1], 0.0, 1e-5)
+            assert_rel_error(self, val1['rel error'][2], 0.0, 1e-5)
+
+        print('Check Totals:')
+        pprint(data)
+
+    def test_simple_implicit_resid(self):
+
+        prob = Problem()
+        prob.root = Group()
         if openmdao_version == 1:
-            p.root.ln_solver = ScipyGMRES()
+            prob.root.ln_solver = ScipyGMRES()
+        prob.root.add('comp', SimpleImplicitComp(resid_scaler=0.001))
+        prob.root.add('p1', IndepVarComp('x', 0.5))
 
-        p.setup(check=False)
-        # p.root.suppress_solver_output = True
-        p.run()
+        prob.root.connect('p1.x', 'comp.x')
 
-        assert_rel_error(self, p['sys3.z1'], 8., 1e-10)
-        assert_rel_error(self, p['sys3.z2'], 24, 1e-10)
+        prob.setup(check=False)
+        prob.run()
 
         if openmdao_version == 1:
-            J = p.calc_gradient(['x', 'y'], ['sys3.z1', 'sys3.z2'])
-
-        if openmdao_version == 2:
-            J = p.compute_total_derivs(of=['sys3.z1', 'sys3.z2'],
-                                       wrt=['x', 'y'])
-
-        print('Jacobian:')
+            J = prob.calc_gradient(['p1.x'], ['comp.y'], mode='fwd')
+        else:
+            J = prob.compute_total_derivs(of=['comp.y'], wrt=['p1.x'])
+        print('J:')
         pprint(J)
+        assert_rel_error(self, J[0][0], -2.5555511, 1e-5)
+
+        # Check partials
+        data = prob.check_partial_derivatives(out_stream=None)
+
+        for key1, val1 in iteritems(data):
+            for key2, val2 in iteritems(val1):
+                assert_rel_error(self, val2['abs error'][0], 0.0, 1e-3)
+                assert_rel_error(self, val2['abs error'][1], 0.0, 1e-3)
+                assert_rel_error(self, val2['abs error'][2], 0.0, 1e-3)
+                assert_rel_error(self, val2['rel error'][0], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][1], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][2], 0.0, 1e-5)
+
+        assert_rel_error(self, data['comp'][('y', 'x')]['J_fwd'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, data['comp'][('y', 'z')]['J_fwd'][0][0], 2.0, 1e-6)
+        assert_rel_error(self, data['comp'][('z', 'x')]['J_fwd'][0][0], 2.66666667/0.001, 1e-6)
+        assert_rel_error(self, data['comp'][('z', 'z')]['J_fwd'][0][0], 1.50/0.001, 1e-6)
+
+    def test_simple_implicit_apply(self):
+
+        prob = Problem(Group())
+        if openmdao_version == 1:
+            prob.root.ln_solver = ScipyGMRES()
+        prob.root.add('comp', SimpleImplicitCompApply())
+        prob.root.add('p1', IndepVarComp('x', 0.5))
+
+        prob.root.connect('p1.x', 'comp.x')
+
+        prob.setup(check=False)
+        prob.run()
+
+        if openmdao_version == 1:
+            J = prob.calc_gradient(['p1.x'], ['comp.y'], mode='fwd')
+        else:
+            J = prob.compute_total_derivs(of=['comp.y'], wrt=['p1.x'])
+        print('J:')
+        pprint(J)
+        assert_rel_error(self, J[0][0], -2.5555511, 1e-5)
+
+        # Check partials
+        data = prob.check_partial_derivatives(out_stream=None)
+
+        for key1, val1 in iteritems(data):
+            for key2, val2 in iteritems(val1):
+                assert_rel_error(self, val2['abs error'][0], 0.0, 1e-5)
+                assert_rel_error(self, val2['abs error'][1], 0.0, 1e-5)
+                assert_rel_error(self, val2['abs error'][2], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][0], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][1], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][2], 0.0, 1e-5)
+
+        assert_rel_error(self, data['comp'][('y', 'x')]['J_fwd'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, data['comp'][('y', 'z')]['J_fwd'][0][0], 2.0, 1e-6)
+        assert_rel_error(self, data['comp'][('z', 'x')]['J_fwd'][0][0], 2.66666667, 1e-6)
+        assert_rel_error(self, data['comp'][('z', 'z')]['J_fwd'][0][0], 1.5, 1e-6)
 
 
 if __name__ == "__main__":
