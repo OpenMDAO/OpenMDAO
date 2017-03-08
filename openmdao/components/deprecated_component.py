@@ -145,7 +145,7 @@ class Component(BaseComponent):
         for vec_name in vec_names:
             with self._matvec_context(vec_name, var_inds, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
-                with self._jacobian_context():
+                with self.jacobian_context():
                     self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                           mode)
 
@@ -246,7 +246,7 @@ class Component(BaseComponent):
         """
         Compute jacobian / factorization.
         """
-        with self._jacobian_context():
+        with self.jacobian_context():
             self._inputs._scale(self._scaling_to_phys['input'])
             self._outputs._scale(self._scaling_to_phys['output'])
 

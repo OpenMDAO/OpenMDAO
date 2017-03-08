@@ -32,7 +32,7 @@ html-update:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS)  $(BUILDDIR)/html
 
 single:
-	@echo $$file
+	#to remake a file based on its dependecy (e.g. code-embed) changing, not its rst file
 	touch $$file
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 

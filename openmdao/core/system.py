@@ -758,27 +758,6 @@ class System(object):
         self._jacobian_changed = True
 
     @contextmanager
-    def _jacobian_context(self):
-        """
-        Context manager for jacobians.
-
-        Sets this system's _jacobian._system attribute to the current system.
-
-        Yields
-        ------
-        <Jacobian>
-            The current system's jacobian with its _system set to self.
-        """
-        if self._jacobian_changed:
-            raise RuntimeError("%s: jacobian has changed and setup was not "
-                               "called." % self.pathname)
-        oldsys = self._jacobian._system
-        self._jacobian._system = self
-        self._jacobian._precompute_iter()
-        yield self._jacobian
-        self._jacobian._system = oldsys
-
-    @contextmanager
     def _units_scaling_context(self, inputs=[], outputs=[], residuals=[], scale_jac=False):
         """
         Context manager for units and scaling for vectors and Jacobians.
@@ -934,6 +913,25 @@ class System(object):
                self._vectors['residual'][vec_name])
 
     @contextmanager
+    def jacobian_context(self):
+        """
+        Context manager that yields the Jacobian assigned to this system in this system's context.
+
+        Yields
+        ------
+        <Jacobian>
+            The current system's jacobian with its _system set to self.
+        """
+        if self._jacobian_changed:
+            raise RuntimeError("%s: jacobian has changed and setup was not "
+                               "called." % self.pathname)
+        oldsys = self._jacobian._system
+        self._jacobian._system = self
+        self._jacobian._precompute_iter()
+        yield self._jacobian
+        self._jacobian._system = oldsys
+
+    @contextmanager
     def _scaled_context(self):
         """
         Context manager that temporarily puts all vectors and Jacobians in a scaled state.
@@ -962,7 +960,7 @@ class System(object):
 
         for system in self.system_iter(include_self=True, recurse=True):
             if system._owns_global_jac:
-                with system._jacobian_context():
+                with system.jacobian_context():
                     system._jacobian._precompute_iter()
                     system._jacobian._scale(scaling)
 

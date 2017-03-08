@@ -289,7 +289,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.run_linearize()
 
         expected = constructor(value)
-        with prob.model._subsystems_allprocs[0]._jacobian_context() as J:
+        with prob.model._subsystems_allprocs[0].jacobian_context() as J:
             jac_out = J['out', 'in'] * -1
 
         self.assertEqual(len(jac_out.shape), 2)
