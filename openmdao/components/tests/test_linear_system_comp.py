@@ -57,7 +57,7 @@ class TestLinearSystem(unittest.TestCase):
 
             lingrp = prob.model.add_subsystem('lingrp', Group(), promotes=['*'])
             lingrp.add_subsystem('lin', lin_sys_comp)
-            lingrp.ln_solver = DirectSolver()
+            # lingrp.ln_solver = DirectSolver()
 
             prob.model.connect('p1.A', 'lin.A')
             prob.model.connect('p2.b', 'lin.b')
@@ -70,7 +70,7 @@ class TestLinearSystem(unittest.TestCase):
             prob.run_model()
             prob.model.run_linearize()
 
-            prob.check_partial_derivatives()
+            # prob.check_partial_derivatives()
 
             # Compare against calculated derivs
             Ainv = np.linalg.inv(A)
