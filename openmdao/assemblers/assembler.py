@@ -109,7 +109,7 @@ class Assembler(object):
             for idx, abs_name in enumerate(allprocs_abs_names[type_]):
                 self._varx_allprocs_abs2idx_io[abs_name] = idx
 
-    def _setup_variables(self, nvars, variable_metadata, variable_indices):
+    def _setup_variables(self, abs2data, abs_names):
         """
         Compute the variable sets and sizes.
 
@@ -121,24 +121,23 @@ class Assembler(object):
 
         Parameters
         ----------
-        nvars : {'input': int, 'output': int}
-            global number of variables.
-        variable_metadata : {'input': list, 'output': list}
-            list of metadata dictionaries of variables that exist on this proc.
-        variable_indices : {'input': ndarray[:], 'output': ndarray[:]}
-            integer arrays of global indices of variables on this proc.
+        abs2data : {vname1: {'metadata': {}, ...}, ...}
+            dict of abs var name to data dict for variables on this proc.
+        abs_names : {'input': [str, ...], 'output': [str, ...]}
+            lists of absolute names of input and output variables on this proc.
         """
         nproc = self._comm.size
+        indices = self._varx_allprocs_abs2idx_io
 
         for typ in ['input', 'output']:
-            nvar = len(variable_metadata[typ])
-            nvar_all = nvars[typ]
+            nvar = len(abs_names[typ])
+            nvar_all = len(self._varx_allprocs_abs_names[typ])
 
             # Locally determine var_set for each var
             local_set_dict = {}
-            for ivar, meta in enumerate(variable_metadata[typ]):
-                ivar_all = variable_indices[typ][ivar]
-                local_set_dict[ivar_all] = meta['var_set']
+            for ivar, absname in enumerate(abs_names[typ]):
+                ivar_all = indices[absname]
+                local_set_dict[ivar_all] = abs2data[absname]['metadata']['var_set']
 
             # Broadcast ivar_all-iset pairs to all procs
             if self._comm.size > 1:
@@ -177,9 +176,9 @@ class Assembler(object):
         # Populate the sizes arrays
         iproc = self._comm.rank
         for typ in ['input', 'output']:
-            for ivar, meta in enumerate(variable_metadata[typ]):
-                size = np.prod(meta['shape'])
-                ivar_all = variable_indices[typ][ivar]
+            for ivar, absname in enumerate(abs_names[typ]):
+                size = np.prod(abs2data[absname]['metadata']['shape'])
+                ivar_all = indices[absname]
                 iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
                 self._variable_sizes[typ][iset][iproc, ivar_set] = size
                 self._variable_sizes_all[typ][iproc, ivar_all] = size
@@ -194,8 +193,7 @@ class Assembler(object):
                 self._comm.Allgather(self._variable_sizes_all[typ][iproc, :],
                                      self._variable_sizes_all[typ])
 
-    def _setup_connections(self, connections, allprocs_names,
-                           allprocs_pathnames, pathdict, metadata):
+    def _setup_connections(self, connections, prom2abs, abs2data):
         """
         Identify implicit connections and combine with explicit ones.
 
@@ -207,58 +205,53 @@ class Assembler(object):
         connections : [(int, int), ...]
             index pairs representing user defined variable connections
             (in_ind, out_ind).
-        allprocs_names : {'input': [str, ...], 'output': [str, ...]}
-            list of names of all owned variables, not just on current proc.
-        allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
-            list of pathnames of all owned variables, not just on current proc.
-        pathdict : {str: PathData, str: PathData, ...}
-            Mapping of absolute pathname to PathData object
-        metadata : {'input': [{}, {}, ...], 'output': [{}, {}, ...]}
-            Metadata dictionaries for local variables.
+        prom2abs : {'input': dict, 'output': dict}
+            Mapping of promoted name to absolute names (global)
+        abs2data : {str: {}, ...}
+            Mapping of absolute pathname to data dict  (local)
         """
-        out_names = allprocs_names['output']
-        in_names = allprocs_names['input']
-        out_paths = allprocs_pathnames['output']
-        in_paths = allprocs_pathnames['input']
-        nvar_input = len(allprocs_names['input'])
-        out_meta = metadata['output']
-        in_meta = metadata['input']
-        input_src_ids = np.full(nvar_input, -1, dtype=int)
-        output_tgt_ids = [[] for i in range(len(allprocs_names['output']))]
+        out_paths = self._varx_allprocs_abs_names['output']
+        in_paths = self._varx_allprocs_abs_names['input']
+        input_src_ids = np.full(len(in_paths), -1, dtype=int)
+        output_tgt_ids = [[] for i in range(len(out_paths))]
+        abs2idx = self._varx_allprocs_abs2idx_io
+        prom2abs_out = prom2abs['output']
+        prom2abs_in = prom2abs['input']
 
         # Add user defined connections to the _input_src_ids vector
         for in_ID, out_ID in connections:
             input_src_ids[in_ID] = out_ID
             output_tgt_ids[out_ID].append(in_ID)
 
-        # Loop over input variables
-        for in_ID, iname in enumerate(in_names):
+        # Add connections for any promoted input names that match promoted
+        # output names.
+        for prom in prom2abs_out:
+            if prom in prom2abs_in:
+                oidx = abs2idx[prom2abs_out[prom][0]]
+                for ipath in prom2abs_in[prom]:
+                    iidx = abs2idx[ipath]
+                    input_src_ids[iidx] = oidx
+                    output_tgt_ids[oidx].append(iidx)
 
-            for out_ID, oname in enumerate(out_names):
-                # If name is also an output variable, add this implicit connection
-                if iname == oname:
-                    input_src_ids[in_ID] = out_ID
-                    output_tgt_ids[out_ID].append(in_ID)
-                    break
-
+        # Now check unit compatability for each connection
         for out_ID, in_IDs in enumerate(output_tgt_ids):
             if in_IDs:
-                odata = pathdict[out_paths[out_ID]]
-                if odata.myproc_idx is None:
-                    # TODO: we need to allgather unit info. Otherwise we can't
+                if out_paths[out_ID] not in abs2data:
+                    # TODO: we need to gather unit info. Otherwise we can't
                     # check units for connections that cross proc boundaries.
                     continue
-                out_units = out_meta[odata.myproc_idx]['units']
+                odata = abs2data[out_paths[out_ID]]
+                out_units = odata['metadata']['units']
                 in_unit_list = []
                 for in_ID in in_IDs:
-                    idata = pathdict[in_paths[in_ID]]
-                    # TODO: fix this after we have allgathered metadata for units,
+                    # TODO: fix this after we have gathered metadata for units,
                     # but for now, if any input is out-of-process, skip all of
                     # the units checks
-                    if idata.myproc_idx is None:
+                    if in_paths[in_ID] not in abs2data:
                         in_unit_list = []
                         break
-                    in_unit_list.append((in_meta[idata.myproc_idx]['units'], in_ID))
+                    idata = abs2data[in_paths[in_ID]]
+                    in_unit_list.append((idata['metadata']['units'], in_ID))
 
                 if out_units:
                     for in_units, in_ID in in_unit_list:
@@ -284,8 +277,7 @@ class Assembler(object):
 
         self._input_src_ids = input_src_ids
 
-    def _setup_src_indices(self, metadata, myproc_var_global_indices,
-                           var_pathdict, var_allprocs_pathnames):
+    def _setup_src_indices(self, abs2data, abs_names):
         """
         Assemble global list of src_indices.
 
@@ -295,80 +287,77 @@ class Assembler(object):
 
         Parameters
         ----------
-        metadata : {'input': [{}, ...], 'output': [{}, ...]}
-            list of metadata dictionaries of variables that exist on this proc.
-        myproc_var_global_indices : ndarray[:]
-            integer arrays of global indices of variables on this proc.
-        var_pathdict : dict
-            dict that maps absolute pathname to promoted name, global and local index.
-        var_allprocs_pathnames : {'input': [], 'output': []}
-            absolute pathnames for each input and output var.
+        abs2data : {vname1: {'metadata': {}, ...}, ...}
+            dict of abs var name to data dict for variables on this proc.
+        abs_names : {'input': [str, ...], 'output': [str, ...]}
+            lists of absolute names of input and output variables on this proc.
         """
-        input_metadata = metadata['input']
-        output_metadata = metadata['output']
+        abs2idx = self._varx_allprocs_abs2idx_io
+        indices = self._varx_allprocs_abs2idx_io
+        out_all_paths = self._varx_allprocs_abs_names['output']
+        in_paths = abs_names['input']
 
         # Compute total size of indices vector
         total_idx_size = 0
-        sizes = np.zeros(len(input_metadata), dtype=int)
+        sizes = np.zeros(len(in_paths), dtype=int)
 
-        for ind, meta in enumerate(input_metadata):
-            sizes[ind] = np.prod(meta['shape'])
+        for ind, abs_name in enumerate(in_paths):
+            sizes[ind] = np.prod(abs2data[abs_name]['metadata']['shape'])
 
         total_idx_size = np.sum(sizes)
 
         # Allocate arrays
         self._src_indices = np.zeros(total_idx_size, int)
-        self._src_indices_range = np.zeros(
-            (myproc_var_global_indices.shape[0], 2), int)
+        self._src_indices_range = np.zeros((len(in_paths), 2), int)
 
         # Populate arrays
         ind1, ind2 = 0, 0
-        for ind, meta in enumerate(input_metadata):
+        for ind, abs_name in enumerate(in_paths):
+            in_meta = abs2data[abs_name]['metadata']
             isize = sizes[ind]
             ind2 += isize
-            src_indices = meta['src_indices']
+            src_indices = in_meta['src_indices']
             if src_indices is None:
                 self._src_indices[ind1:ind2] = np.arange(isize, dtype=int)
             elif src_indices.ndim == 1:
                 self._src_indices[ind1:ind2] = src_indices
             else:
-                src_id = self._input_src_ids[myproc_var_global_indices[ind]]
+                src_id = self._input_src_ids[indices[abs_name]]
                 if src_id == -1:  # input is not connected
                     self._src_indices[ind1:ind2] = np.arange(isize, dtype=int)
                 else:
-                    pdata = var_pathdict[var_allprocs_pathnames['output'][src_id]]
                     # TODO: the src may not be in this processes and we need its shape
-                    if pdata.myproc_idx is None:
+                    if out_all_paths[src_id] not in abs2data:
                         raise NotImplementedError("accessing source metadata from "
                                                   "another process isn't supported "
                                                   "yet.")
-                    src_shape = output_metadata[pdata.myproc_idx]['shape']
+                    src_shape = abs2data[out_all_paths[src_id]]['metadata']['shape']
                     if len(src_shape) == 1:
                         self._src_indices[ind1:ind2] = src_indices.flat
                     else:
-                        tgt_shape = meta['shape']
+                        tgt_shape = in_meta['shape']
                         # loop over src_indices tuples to get indices into the source
                         entries = [list(range(x)) for x in tgt_shape]
                         cols = np.vstack(src_indices[i] for i in product(*entries))
                         dimidxs = [cols[:, i] for i in range(cols.shape[1])]
                         self._src_indices[ind1:ind2] = np.ravel_multi_index(dimidxs, src_shape)
 
-            self._src_indices_range[myproc_var_global_indices[ind], :] = [ind1,
-                                                                          ind2]
+            self._src_indices_range[indices[abs_name], :] = [ind1, ind2]
             ind1 += isize
 
-    def _setup_src_data(self, variable_metadata, variable_indices):
+    def _setup_src_data(self, abs_out_names, abs2data):
         """
         Compute and store unit/scaling information for inputs.
 
         Parameters
         ----------
-        variable_metadata : list of dict
-            list of metadata dictionaries for outputs of root system.
-        variable_indices : int ndarray
-            global indices of outputs that exist on this processor.
+        abs_out_names : list of str
+            list of absolute names of outputs for the root system on this proc.
+        abs2data : {str: {}, ...}
+            Mapping of absolute name to data dict for vars on this proc.
         """
-        nvar_out = len(variable_metadata)
+        nvar_out = len(abs_out_names)
+        indices = self._varx_allprocs_abs2idx_io
 
         # The out_* variables are lists of units, output indices, and scaling coeffs.
         # for local outputs. These will initialized, then broadcast to all processors
@@ -377,10 +366,10 @@ class Assembler(object):
         # ordered by target input, rather than all the outputs in order.
 
         # List of units of locally declared output variables.
-        out_units = [meta['units'] for meta in variable_metadata]
+        out_units = [abs2data[name]['metadata']['units'] for name in abs_out_names]
 
         # List of global indices of the locally declared output variables.
-        out_inds = variable_indices
+        out_inds = [indices[name] for name in abs_out_names]
 
         # List of scaling coefficients such that
         # physical_unscaled = c0 + c1 * unitless_scaled
@@ -388,7 +377,8 @@ class Assembler(object):
         # Below, ref0 and ref are the values of the variable in the specified
         # units at which the scaled values are 0 and 1, respectively.
         out_scaling = np.empty((nvar_out, 2))
-        for ivar_out, meta in enumerate(variable_metadata):
+        for ivar_out, abs_name in enumerate(abs_out_names):
+            meta = abs2data[abs_name]['metadata']
             out_scaling[ivar_out, 0] = meta['ref0']
             out_scaling[ivar_out, 1] = meta['ref'] - meta['ref0']
 
