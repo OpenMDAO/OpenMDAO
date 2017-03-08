@@ -113,13 +113,13 @@ class Test(unittest.TestCase):
             d_outputs.set_const(0.0)
             root.run_solve_linear(['linear'], 'fwd')
             output = d_outputs._data[0]
-            assert_rel_error(self, output, [1, 5])
+            assert_rel_error(self, output, [1, 5], 1e-10)
 
             d_outputs.set_const(11.0)
             d_residuals.set_const(0.0)
             root.run_solve_linear(['linear'], 'rev')
             output = d_residuals._data[0]
-            assert_rel_error(self, output, [1, 5])
+            assert_rel_error(self, output, [1, 5], 1e-10)
 
 
 if __name__ == '__main__':
