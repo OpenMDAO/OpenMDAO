@@ -5,7 +5,8 @@ import scipy.sparse.linalg
 
 from openmdao.api import Problem, ImplicitComponent, Group
 from openmdao.api import LinearBlockGS
-from openmdao.api import view_model
+from openmdao.devtools.testutil import assert_rel_error
+
 
 class CompA(ImplicitComponent):
 
@@ -88,9 +89,6 @@ class Test(unittest.TestCase):
 
         #view_model(self.p, show_browser=False)
 
-    def assertEqualArrays(self, a, b, tol=1e-3):
-        self.assertTrue(np.linalg.norm(a-b) < tol)
-
     def test_apply_linear(self):
         root = self.p.model
         root.suppress_solver_output = True
@@ -99,12 +97,12 @@ class Test(unittest.TestCase):
             d_outputs.set_const(1.0)
             root.run_apply_linear(['linear'], 'fwd')
             output = d_residuals._data[0]
-            self.assertEqualArrays(output, [7, 3])
+            assert_rel_error(self, output, [7, 3])
 
             d_residuals.set_const(1.0)
             root.run_apply_linear(['linear'], 'rev')
             output = d_outputs._data[0]
-            self.assertEqualArrays(output, [7, 3])
+            assert_rel_error(self, output, [7, 3])
 
     def test_solve_linear(self):
         root = self.p.model
@@ -115,13 +113,13 @@ class Test(unittest.TestCase):
             d_outputs.set_const(0.0)
             root.run_solve_linear(['linear'], 'fwd')
             output = d_outputs._data[0]
-            self.assertEqualArrays(output, [1, 5])
+            assert_rel_error(self, output, [1, 5])
 
             d_outputs.set_const(11.0)
             d_residuals.set_const(0.0)
             root.run_solve_linear(['linear'], 'rev')
             output = d_residuals._data[0]
-            self.assertEqualArrays(output, [1, 5])
+            assert_rel_error(self, output, [1, 5])
 
 
 if __name__ == '__main__':
