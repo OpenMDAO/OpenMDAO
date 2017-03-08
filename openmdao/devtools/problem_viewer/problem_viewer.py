@@ -82,10 +82,11 @@ def _get_viewer_data(problem_or_rootgroup):
     else:
         raise TypeError('get_model_viewer_data only accepts Problems or Groups')
 
+    abs2data = root_group._varx_abs2data_io
     connections_list = []
-    for in_ind, out_ind in root_group._var_connections_indices:
-        in_name = root_group._var_allprocs_names['input'][in_ind]
-        out_name = root_group._var_allprocs_names['output'][out_ind]
+    for in_abs, out_abs in root_group._var_connections_abs:
+        in_name = abs2data[in_abs]['prom']
+        out_name = abs2data[out_abs]['prom']
 
         dct = OrderedDict()
         dct['src'] = out_name

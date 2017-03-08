@@ -173,14 +173,14 @@ class Group(System):
         Recursively assemble a list of input-output connections.
 
         Sets the following attributes:
-            _var_connections_indices
+            _var_connections_abs
         """
         # Perform recursion and assemble pairs from subsystems
         pairs = []
         for subsys in self._subsystems_myproc:
             subsys._setup_connections()
             if subsys.comm.rank == 0:
-                pairs.extend(subsys._var_connections_indices)
+                pairs.extend(subsys._var_connections_abs)
 
         # Do an allgather to gather from root procs of all subsystems
         if self.comm.size > 1:
@@ -191,13 +191,15 @@ class Group(System):
 
         allprocs_in_names = self._var_allprocs_names['input']
         myproc_in_names = self._var_myproc_names['input']
-        myproc_out_names = self._var_myproc_names['output']
-        allprocs_out_names = self._var_allprocs_names['output']
-        input_meta = self._var_myproc_metadata['input']
-        output_meta = self._var_myproc_metadata['output']
 
-        in_offset = self._var_allprocs_range['input'][0]
-        out_offset = self._var_allprocs_range['output'][0]
+        allprocs_out_names = self._var_allprocs_names['output']
+
+        in_offset = self._varx_allprocs_idx_range['input'][0]
+        out_offset = self._varx_allprocs_idx_range['output'][0]
+
+        abs2data = self._varx_abs2data_io
+        prom2abs_in = self._varx_allprocs_prom2abs_list['input']
+        prom2abs_out = self._varx_allprocs_prom2abs_list['output']
 
         # Loop through user-defined connections
         for in_name, (out_name, src_indices) \
@@ -205,83 +207,40 @@ class Group(System):
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
-            if out_name not in allprocs_out_names:
+            if out_name not in prom2abs_out:
                 raise NameError("Output '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." %
                                 (out_name, self.pathname, out_name, in_name))
 
-            if in_name not in allprocs_in_names:
+            if in_name not in prom2abs_in:
                 raise NameError("Input '%s' does not exist for connection "
                                 "in '%s' from '%s' to '%s'." %
                                 (in_name, self.pathname, out_name, in_name))
 
             # throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
-            out_subsys = out_name.rsplit('.', 1)[0] if '.' in out_name \
-                else self._find_subsys_with_promoted_name(out_name, 'output')
+            abs_out = prom2abs_out[out_name][0]
+            out_subsys = abs_out.rsplit('.', 1)[0]
+            for abs_in in prom2abs_in[in_name]:
+                in_subsys = abs_in.rsplit('.', 1)[0]
+                if out_subsys == in_subsys:
+                    raise RuntimeError("Output and input are in the same System " +
+                                       "for connection in '%s' from '%s' to '%s'." %
+                                       (self.pathname, out_name, in_name))
 
-            in_subsys = in_name.rsplit('.', 1)[0] if '.' in in_name \
-                else self._find_subsys_with_promoted_name(in_name, 'input')
+                if src_indices is not None:
+                    meta = abs2data[abs_in]['metadata']
+                    if meta['src_indices'] is not None:
+                        raise RuntimeError("%s: src_indices has been defined "
+                                           "in both connect('%s', '%s') "
+                                           "and add_input('%s', ...)." %
+                                           (self.pathname, out_name,
+                                            in_name, in_name))
+                    meta['src_indices'] = np.atleast_1d(src_indices)
 
-            if out_subsys == in_subsys:
-                raise RuntimeError("Output and input are in the same System " +
-                                   "for connection in '%s' from '%s' to '%s'." %
-                                   (self.pathname, out_name, in_name))
+                pairs.append((abs_in, abs_out))
 
-            for in_index, name in enumerate(allprocs_in_names):
-                if name == in_name:
-                    try:
-                        out_index = allprocs_out_names.index(out_name)
-                    except ValueError:
-                        continue
-                    else:
-                        pairs.append((in_index + in_offset,
-                                      out_index + out_offset))
-
-                    if src_indices is not None:
-                        # set the 'src_indices' metadata in the input variable
-                        try:
-                            in_myproc_index = myproc_in_names.index(in_name)
-                        except ValueError:
-                            pass
-                        else:
-                            meta = input_meta[in_myproc_index]
-                            if meta['src_indices'] is not None:
-                                raise RuntimeError("%s: src_indices has been defined "
-                                                   "in both connect('%s', '%s') "
-                                                   "and add_input('%s', ...)." %
-                                                   (self.pathname, out_name,
-                                                    in_name, in_name))
-                            meta['src_indices'] = np.atleast_1d(src_indices)
-
-                        # set src_indices to None to avoid unnecessary repeat
-                        # of setting indices and shape metadata when we have
-                        # multiple inputs promoted to the same name.
-                        src_indices = None
-
-        self._var_connections_indices = pairs
-
-    def _find_subsys_with_promoted_name(self, var_name, io_type='output'):
-        """
-        Find subsystem that contains promoted variable.
-
-        Parameters
-        ----------
-        var_name : str
-            variable name
-        io_type : str
-            'output' or 'input'.
-
-        Returns
-        -------
-        str
-            name of subsystem, None if not found.
-        """
-        for subsys in self._subsystems_allprocs:
-            for name, prom_name in iteritems(subsys._var_maps[io_type]):
-                if var_name == prom_name:
-                    return subsys.name
-        return None
+        self._var_connections_abs = pairs
 
     def initialize_variables(self):
         """

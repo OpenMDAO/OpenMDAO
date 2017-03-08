@@ -88,9 +88,9 @@ class System(object):
         (used to calculate _var_maps)
     _var_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
-    _var_connections_indices : [(int, int), ...]
-        _var_connections with variable indices instead of names.  Entries
-        have the form (input_index, output_index).
+    _var_connections_abs : [(str, str), ...]
+        _var_connections with absolute variable names.  Entries
+        have the form (input, output).
     _varx_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
@@ -189,7 +189,7 @@ class System(object):
         self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
 
         self._var_connections = {}
-        self._var_connections_indices = []
+        self._var_connections_abs = []
 
         # [REFACTOR]
         self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}

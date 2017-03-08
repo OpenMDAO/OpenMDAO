@@ -97,8 +97,8 @@ class Test(unittest.TestCase):
     def test_connections(self):
         root = self.p.model
 
-        self.assertEqual(root._var_connections_indices[0][0], 0)
-        self.assertEqual(root._var_connections_indices[0][1], 0)
+        self.assertEqual(root._var_connections_abs[0][0], 'B.x')
+        self.assertEqual(root._var_connections_abs[0][1], 'A.x')
 
     def test_GS(self):
         root = self.p.model

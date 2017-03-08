@@ -224,12 +224,12 @@ class Assembler(object):
         out_meta = metadata['output']
         in_meta = metadata['input']
         input_src_ids = np.full(nvar_input, -1, dtype=int)
-        output_tgt_ids = [[] for i in range(len(allprocs_names['output']))]
+        output_tgts = [[] for i in range(len(allprocs_names['output']))]
 
         # Add user defined connections to the _input_src_ids vector
         for in_ID, out_ID in connections:
             input_src_ids[in_ID] = out_ID
-            output_tgt_ids[out_ID].append(in_ID)
+            output_tgts[out_ID].append(in_ID)
 
         # Loop over input variables
         for in_ID, iname in enumerate(in_names):

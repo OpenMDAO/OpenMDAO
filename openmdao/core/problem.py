@@ -361,7 +361,7 @@ class Problem(object):
                                    model._var_myproc_indices)
 
         # Assembler setup: variable connections
-        assembler._setup_connections(model._var_connections_indices,
+        assembler._setup_connections(model._var_connections_abs
                                      model._var_allprocs_names,
                                      model._var_allprocs_pathnames,
                                      model._var_pathdict,
