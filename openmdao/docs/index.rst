@@ -108,10 +108,6 @@ Visualization
 
 .. _OpenMDAO Reference Sheets: _srcdocs/index.html
 
-`OpenMDAO Developer Source Documentation`__
-
-.. __: _srcdocs/dev/index.html
-
 `OpenMDAO User Source Documentation`__
 
 .. __: _srcdocs/usr/index.html
@@ -120,3 +116,11 @@ Visualization
    :maxdepth: 1
 
    tags/index
+
+Style for Developers
+====================
+
+.. toctree::
+   :maxdepth: 1
+
+   style_guide/doc_style_guide.rst
