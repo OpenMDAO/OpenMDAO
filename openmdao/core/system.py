@@ -418,9 +418,8 @@ class System(object):
 
             # Post-recursion: assemble local variable indices from subsystems
             for typ in ['input', 'output']:
-                raw = []
-                for subsys in self._subsystems_myproc:
-                    raw.append(subsys._var_myproc_indices[typ])
+                raw = [subsys._var_myproc_indices[typ]
+                       for subsys in self._subsystems_myproc]
                 self._var_myproc_indices[typ] = np.concatenate(raw)
 
         # If component, _var_myproc_indices is simply an arange

@@ -111,49 +111,6 @@ class Problem(object):
         self._assembler = assembler_class(comm)
         self._use_ref_vector = use_ref_vector
 
-    def _get_path_data(self, name):
-        """
-        Get absolute pathname and related data.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable in the root system's namespace. May be
-            a promoted name or an unpromoted name.
-
-        Returns
-        -------
-        str, PathData
-            absolute pathname and PathData namedtuple
-        """
-        try:
-            pdata = self.model._var_pathdict[name]
-            pathname = name
-        except KeyError:
-            # name is not an absolute path
-            try:
-                pathname = self.model._var_name2path['output'][name]
-            except KeyError:
-                try:
-                    paths = self.model._var_name2path['input'][name]
-                except KeyError:
-                    raise KeyError("Variable '%s' not found." % name)
-
-                if len(paths) > 1:
-                    raise RuntimeError("Variable name '%s' is not unique and "
-                                       "matches the following: %s. "
-                                       "Use the absolute pathname instead." %
-                                       (name, paths))
-                pathname = paths[0]
-
-            pdata = self.model._var_pathdict[pathname]
-
-        if pdata.myproc_idx is None:
-            raise RuntimeError("Variable '%s' is not found in this process" %
-                               name)
-
-        return pathname, pdata
-
     def __getitem__(self, name):
         """
         Get an output/input variable.
@@ -354,30 +311,24 @@ class Problem(object):
             assert (len(model._varx_allprocs_prom2abs_list[type_])
                     == len(set(model._var_allprocs_names[type_])))
 
+        assembler._setupx_variables(allprocs_abs_names)
+
         # Assembler setup: variable metadata and indices
-        nvars = {typ: len(model._var_allprocs_names[typ])
-                 for typ in ['input', 'output']}
-        assembler._setup_variables(nvars, model._var_myproc_metadata,
-                                   model._var_myproc_indices)
+        assembler._setup_variables(model._varx_abs2data_io,
+                                   model._varx_abs_names)
 
         # Assembler setup: variable connections
-        assembler._setup_connections(model._var_connections_abs
-                                     model._var_allprocs_names,
-                                     model._var_allprocs_pathnames,
-                                     model._var_pathdict,
-                                     model._var_myproc_metadata)
+        assembler._setup_connections(model._var_connections_abs,
+                                     model._varx_allprocs_prom2abs_list,
+                                     model._varx_abs2data_io)
 
         # Assembler setup: global transfer indices vector
-        assembler._setup_src_indices(model._var_myproc_metadata,
-                                     model._var_myproc_indices['input'],
-                                     model._var_pathdict,
-                                     model._var_allprocs_pathnames)
+        assembler._setup_src_indices(model._varx_abs2data_io,
+                                     model._varx_abs_names)
 
         # Assembler setup: compute data required for units/scaling
-        assembler._setup_src_data(model._var_myproc_metadata['output'],
-                                  model._var_myproc_indices['output'])
-
-        assembler._setupx_variables(allprocs_abs_names)
+        assembler._setup_src_data(model._varx_abs_names['output'],
+                                  model._varx_abs2data_io)
 
         # [REFACTOR VERIFICATION] for assembler._varx_allprocs_abs_names
         assert (model._var_allprocs_pathnames['input']
@@ -444,7 +395,7 @@ class Problem(object):
             vectors[key] = vector_class(vec_name, typ, self.model)
 
         # TODO: implement this properly
-        ind1, ind2 = self.model._var_allprocs_range['output']
+        ind1, ind2 = self.model._varx_allprocs_idx_range['output']
         vector_var_ids = np.arange(ind1, ind2)
 
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
@@ -779,18 +730,16 @@ class Problem(object):
         if global_names:
             oldwrt, oldof = wrt, of
         else:
-            paths = model._var_allprocs_pathnames
-            indices = model._var_allprocs_indices
             oldof = of
             of = []
             for names in oldof:
-                of.append(tuple(paths['output'][indices['output'][name]]
+                of.append(tuple(model._varx_allprocs_prom2abs_list['output'][name][0]
                                 for name in names))
 
             oldwrt = wrt
             wrt = []
             for names in oldwrt:
-                wrt.append(tuple(paths['output'][indices['output'][name]]
+                wrt.append(tuple(model._varx_allprocs_prom2abs_list['output'][name][0]
                                  for name in names))
 
         if mode == 'fwd':
