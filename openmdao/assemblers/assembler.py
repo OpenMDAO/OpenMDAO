@@ -109,7 +109,7 @@ class Assembler(object):
             for idx, abs_name in enumerate(allprocs_abs_names[type_]):
                 self._varx_allprocs_abs2idx_io[abs_name] = idx
 
-    def _setup_variables(self, data, abs_names):
+    def _setup_variables(self, abs2data, abs_names):
         """
         Compute the variable sets and sizes.
 
@@ -121,7 +121,7 @@ class Assembler(object):
 
         Parameters
         ----------
-        data : {vname1: {'metadata': {}, ...}, ...}
+        abs2data : {vname1: {'metadata': {}, ...}, ...}
             dict of abs var name to data dict for variables on this proc.
         abs_names : {'input': [str, ...], 'output': [str, ...]}
             lists of absolute names of input and output variables on this proc.
@@ -137,7 +137,7 @@ class Assembler(object):
             local_set_dict = {}
             for ivar, absname in enumerate(abs_names[typ]):
                 ivar_all = indices[absname]
-                local_set_dict[ivar_all] = data[absname]['metadata']['var_set']
+                local_set_dict[ivar_all] = abs2data[absname]['metadata']['var_set']
 
             # Broadcast ivar_all-iset pairs to all procs
             if self._comm.size > 1:
@@ -177,7 +177,7 @@ class Assembler(object):
         iproc = self._comm.rank
         for typ in ['input', 'output']:
             for ivar, absname in enumerate(abs_names[typ]):
-                size = np.prod(data[absname]['metadata']['shape'])
+                size = np.prod(abs2data[absname]['metadata']['shape'])
                 ivar_all = indices[absname]
                 iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
                 self._variable_sizes[typ][iset][iproc, ivar_set] = size
@@ -277,7 +277,7 @@ class Assembler(object):
 
         self._input_src_ids = input_src_ids
 
-    def _setup_src_indices(self, data, abs_names):
+    def _setup_src_indices(self, abs2data, abs_names):
         """
         Assemble global list of src_indices.
 
@@ -287,7 +287,7 @@ class Assembler(object):
 
         Parameters
         ----------
-        data : {vname1: {'metadata': {}, ...}, ...}
+        abs2data : {vname1: {'metadata': {}, ...}, ...}
             dict of abs var name to data dict for variables on this proc.
         abs_names : {'input': [str, ...], 'output': [str, ...]}
             lists of absolute names of input and output variables on this proc.
@@ -302,7 +302,7 @@ class Assembler(object):
         sizes = np.zeros(len(in_paths), dtype=int)
 
         for ind, abs_name in enumerate(in_paths):
-            sizes[ind] = np.prod(data[abs_name]['metadata']['shape'])
+            sizes[ind] = np.prod(abs2data[abs_name]['metadata']['shape'])
 
         total_idx_size = np.sum(sizes)
 
@@ -313,7 +313,7 @@ class Assembler(object):
         # Populate arrays
         ind1, ind2 = 0, 0
         for ind, abs_name in enumerate(in_paths):
-            in_meta = data[abs_name]['metadata']
+            in_meta = abs2data[abs_name]['metadata']
             isize = sizes[ind]
             ind2 += isize
             src_indices = in_meta['src_indices']
@@ -327,11 +327,11 @@ class Assembler(object):
                     self._src_indices[ind1:ind2] = np.arange(isize, dtype=int)
                 else:
                     # TODO: the src may not be in this processes and we need its shape
-                    if out_all_paths[src_id] not in data:
+                    if out_all_paths[src_id] not in abs2data:
                         raise NotImplementedError("accessing source metadata from "
                                                   "another process isn't supported "
                                                   "yet.")
-                    src_shape = data[out_all_paths[src_id]]['metadata']['shape']
+                    src_shape = abs2data[out_all_paths[src_id]]['metadata']['shape']
                     if len(src_shape) == 1:
                         self._src_indices[ind1:ind2] = src_indices.flat
                     else:
@@ -345,7 +345,7 @@ class Assembler(object):
             self._src_indices_range[indices[abs_name], :] = [ind1, ind2]
             ind1 += isize
 
-    def _setup_src_data(self, abs_out_names, data):
+    def _setup_src_data(self, abs_out_names, abs2data):
         """
         Compute and store unit/scaling information for inputs.
 
@@ -353,7 +353,7 @@ class Assembler(object):
         ----------
         abs_out_names : list of str
             list of absolute names of outputs for the root system on this proc.
-        data : {str: {}, ...}
+        abs2data : {str: {}, ...}
             Mapping of absolute name to data dict for vars on this proc.
         """
         nvar_out = len(abs_out_names)
@@ -366,7 +366,7 @@ class Assembler(object):
         # ordered by target input, rather than all the outputs in order.
 
         # List of units of locally declared output variables.
-        out_units = [data[name]['metadata']['units'] for name in abs_out_names]
+        out_units = [abs2data[name]['metadata']['units'] for name in abs_out_names]
 
         # List of global indices of the locally declared output variables.
         out_inds = [indices[name] for name in abs_out_names]
@@ -378,7 +378,7 @@ class Assembler(object):
         # units at which the scaled values are 0 and 1, respectively.
         out_scaling = np.empty((nvar_out, 2))
         for ivar_out, abs_name in enumerate(abs_out_names):
-            meta = data[abs_name]['metadata']
+            meta = abs2data[abs_name]['metadata']
             out_scaling[ivar_out, 0] = meta['ref0']
             out_scaling[ivar_out, 1] = meta['ref'] - meta['ref0']
 
