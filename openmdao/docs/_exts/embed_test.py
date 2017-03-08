@@ -40,7 +40,7 @@ def visit_in_or_out_node(self, node):
 
 def depart_in_or_out_node(self, node):
     """
-    This function creates the formatting that sets up the look of
+    This function creates the formatting that sets up the look of the blocks.
     The look of the formatting is controlled by _theme/static/style.css
     """
     if not isinstance(self, HTMLTranslator):
