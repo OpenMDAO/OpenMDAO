@@ -66,7 +66,7 @@ class ImplicitComponent(Component):
                 d_inputs, d_outputs, d_residuals = vecs
 
                 # Jacobian and vectors are all scaled, unitless
-                with self._jacobian_context() as J:
+                with self.jacobian_context() as J:
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
 
                 # Jacobian and vectors are all unscaled, dimensional
@@ -126,7 +126,7 @@ class ImplicitComponent(Component):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
         """
-        with self._jacobian_context() as J:
+        with self.jacobian_context() as J:
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
                                              scale_jac=True):
                 # Computing the approximation before the call to compute_partials allows users to

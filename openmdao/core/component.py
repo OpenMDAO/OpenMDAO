@@ -502,7 +502,7 @@ class Component(System):
         """
         Set subjacobian info into our jacobian.
         """
-        with self._jacobian_context() as J:
+        with self.jacobian_context() as J:
             for key, meta in iteritems(self._subjacs_info):
                 self._check_partials_meta(key, meta)
                 J._set_partials_meta(key, meta)

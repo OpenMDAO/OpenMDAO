@@ -578,7 +578,7 @@ class Group(System):
             ranges of variable IDs involved in this matrix-vector product.
             The ordering is [lb1, ub1, lb2, ub2].
         """
-        with self._jacobian_context() as J:
+        with self.jacobian_context() as J:
             # Use global Jacobian
             if self._owns_global_jac:
                 for vec_name in vec_names:
@@ -630,7 +630,7 @@ class Group(System):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
         """
-        with self._jacobian_context() as J:
+        with self.jacobian_context() as J:
             for subsys in self._subsystems_myproc:
                 subsys._linearize()
 
