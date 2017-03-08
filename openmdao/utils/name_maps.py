@@ -115,7 +115,7 @@ def prom_name2abs_name(system, prom_name, type_):
         if len(abs_list) == 1:
             return abs_list[0]
         else:
-            msg = 'The promoted name {} is invalid because it is non-unique.'
+            msg = 'The promoted name "{}" is invalid because it is non-unique.'
             raise KeyError(msg.format(prom_name))
     else:
         return None
@@ -185,8 +185,8 @@ def prom_key2abs_key(system, prom_key):
     elif abs_name1out is None:
         abs_name1 = abs_name1in
     else:
-        msg = 'The promoted name {} is invalid because it is non-unique.'
-        raise KeyError(msg.format(prom_name))
+        msg = 'The promoted name "{}" is invalid because it is non-unique.'
+        raise KeyError(msg.format(prom_key[1]))
 
     if abs_name0 is not None and abs_name1 is not None:
         return (abs_name0, abs_name1)

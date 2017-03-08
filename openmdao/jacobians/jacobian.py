@@ -148,7 +148,7 @@ class Jacobian(object):
         if abs_key in self._subjacs:
             return self._subjacs[abs_key]
         else:
-            msg = 'Variable name pair "{}", "{}" not found.'
+            msg = 'Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(key[0], key[1]))
 
     def __setitem__(self, key, subjac):
@@ -166,7 +166,7 @@ class Jacobian(object):
         if abs_key is not None:
             self._set_abs(abs_key, subjac)
         else:
-            msg = 'Variable name pair "{}", "{}" not valid.'
+            msg = 'Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(key[0], key[1]))
 
     def _set_abs(self, abs_key, subjac):
