@@ -47,8 +47,6 @@ class LinearSystemComp(ImplicitComponent):
         self.add_input("b", val=np.ones(size))
         self.add_output("x", shape=size, val=2.)
 
-        self.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
-
     def initialize_partials(self):
 
         partial_type = self.metadata['partial_type']
