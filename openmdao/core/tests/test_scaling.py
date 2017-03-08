@@ -9,7 +9,7 @@ from six import iteritems
 from six.moves import range
 
 from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp
-from openmdao.api import NewtonSolver, ScipyIterativeSolver
+from openmdao.api import NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
 
 from openmdao.devtools.testutil import assert_rel_error
 
@@ -236,8 +236,10 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model._suppress_solver_output = True
         model.nl_solver.options['maxiter'] = 1
+        model.nl_solver = NonlinearBlockGS()
+
+        model._suppress_solver_output = True
 
         prob.setup(check=False)
         prob.run_model()
@@ -267,8 +269,10 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model._suppress_solver_output = True
+        model.nl_solver = NonlinearBlockGS()
         model.nl_solver.options['maxiter'] = 1
+
+        model._suppress_solver_output = True
 
         prob.setup(check=False)
         prob.run_model()
@@ -295,8 +299,10 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model._suppress_solver_output = True
+        model.nl_solver = NonlinearBlockGS()
         model.nl_solver.options['maxiter'] = 1
+
+        model._suppress_solver_output = True
 
         prob.setup(check=False)
         prob.run_model()
@@ -325,8 +331,10 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model._suppress_solver_output = True
+        model.nl_solver = NonlinearBlockGS()
         model.nl_solver.options['maxiter'] = 1
+
+        model._suppress_solver_output = True
 
         prob.setup(check=False)
         prob.run_model()
