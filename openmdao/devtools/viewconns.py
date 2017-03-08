@@ -54,18 +54,11 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     else:
         system = root
 
-    input_src_ids = system._assembler._input_src_ids
-    istart_idx, iend_idx = system._varx_allprocs_idx_range['input']
-    ostart_idx, oend_idx = system._varx_allprocs_idx_range['output']
+    input_srcs = system._assembler._input_srcs
 
-    abs_tgt_names = system._varx_abs_names['input']
-    abs_src_names = system._varx_abs_names['output']
-
-    connections = {}
-    for tgt_idx, src_idx in enumerate(input_src_ids):
-        if src_idx > -1 and (istart_idx <= tgt_idx < iend_idx or
-                             ostart_idx <= src_idx < oend_idx):
-            connections[abs_tgt_names[tgt_idx]] = abs_src_names[src_idx]
+    connections = {
+        tgt: src for tgt, src in iteritems(input_srcs) if src is not None
+    }
 
     src2tgts = {}
     units = {n: data['metadata'].get('units','')

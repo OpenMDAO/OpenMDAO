@@ -128,9 +128,11 @@ class GlobalJacobian(Jacobian):
                     self._keymap[abs_key] = abs_key
 
                     in_idx = assembler._varx_allprocs_abs2idx_io[in_abs_name]
-                    out_idx = assembler._input_src_ids[in_idx]
+                    out_abs_name = assembler._input_srcs[in_abs_name]
+                    if out_abs_name is not None:
+                        out_idx = assembler._varx_allprocs_abs2idx_io[out_abs_name]
 
-                    if out_start <= out_idx < out_end:
+                    if out_abs_name is not None and out_start <= out_idx < out_end:
                         out_abs_name = assembler._varx_allprocs_abs_names['output'][out_idx]
                         out_offset = out_offsets[out_abs_name]
                         src_indices = src_indices_dict[in_abs_name]
@@ -146,7 +148,7 @@ class GlobalJacobian(Jacobian):
                             self._keymap[abs_key] = abs_key2
                             self._int_mtx._add_submat(abs_key2, info, res_offset, out_offset,
                                                       src_indices, shape)
-                    elif out_idx != -1:  # skip unconnected inputs
+                    elif out_abs_name is None:  # skip unconnected inputs
                         self._ext_mtx._add_submat(abs_key, info, res_offset, in_offset, None, shape)
 
         iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
@@ -180,12 +182,14 @@ class GlobalJacobian(Jacobian):
 
                 abs_key = (res_abs_name, in_abs_name)
                 if abs_key in self._subjacs:
-                    in_idx = assembler._varx_allprocs_abs2idx_io[in_abs_name]
-                    out_idx = assembler._input_src_ids[in_idx]
-                    if out_start <= out_idx < out_end:
-                        self._int_mtx._update_submat(self._keymap[abs_key], self._subjacs[abs_key])
-                    elif out_idx != -1:  # skip unconnected inputs
+                    out_abs_name = assembler._input_srcs[in_abs_name]
+                    if out_abs_name is None:
                         self._ext_mtx._update_submat(abs_key, self._subjacs[abs_key])
+                    else:
+                        out_idx = assembler._varx_allprocs_abs2idx_io[out_abs_name]
+                        if out_start <= out_idx < out_end:
+                            self._int_mtx._update_submat(self._keymap[abs_key],
+                                                         self._subjacs[abs_key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """

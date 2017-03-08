@@ -82,7 +82,12 @@ class DefaultAssembler(Assembler):
         in_ind1, in_ind2 = var_range['input']
         out_ind1, out_ind2 = var_range['output']
         for in_ind in range(in_ind1, in_ind2):
-            out_ind = self._input_src_ids[in_ind]
+            iabs = self._varx_allprocs_abs_names['input'][in_ind]
+            oabs = self._input_srcs[iabs]
+            if oabs is None:
+                continue
+
+            out_ind = self._varx_allprocs_abs2idx_io[oabs]
             if out_ind1 <= out_ind < out_ind2:
 
                 in_isub = in_isub_var[in_ind - in_ind1]

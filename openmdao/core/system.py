@@ -853,8 +853,10 @@ class System(object):
 
         in_names = []
         for in_abs_name in self._varx_abs_names['input']:
-            in_idx = self._assembler._varx_allprocs_abs2idx_io[in_abs_name]
-            out_idx = self._assembler._input_src_ids[in_idx]
+            out_abs = self._assembler._input_srcs[in_abs_name]
+            if out_abs is None:
+                continue
+            out_idx = self._assembler._varx_allprocs_abs2idx_io[out_abs]
             if out_idx in var_ids:
                 if var_inds is None or (var_inds[0] <= out_idx < var_inds[1] or
                                         var_inds[2] <= out_idx < var_inds[3]):

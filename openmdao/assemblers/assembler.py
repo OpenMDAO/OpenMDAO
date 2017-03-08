@@ -6,6 +6,7 @@ from itertools import product
 import numpy as np
 import warnings
 
+from six import iteritems
 from six.moves import range
 
 from openmdao.utils.units import conversion_to_base_units, convert_units, is_compatible
@@ -49,8 +50,9 @@ class Assembler(object):
         Both inputs and outputs are contained in one combined dictionary.
     _varx_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of all owned variables, on all procs (maps idx to abs_name).
-    _input_src_ids : int ndarray[num_input_var]
-        the output variable ID for each input variable ID.
+    _input_srcs : {str: str}
+        The output absolute name for each input absolute name.  A value of None
+        indicates that no output is connected to that input.
     _src_indices : int ndarray[:]
         all the input indices vectors concatenated together.
     _src_indices_range : int ndarray[num_input_var_all, 2]
@@ -83,7 +85,7 @@ class Assembler(object):
         self._varx_allprocs_abs2meta_io = {}
         self._varx_allprocs_abs_names = {'input': [], 'output': []}
 
-        self._input_src_ids = None
+        self._input_srcs = None
         self._src_indices = None
         self._src_indices_range = None
 
@@ -198,7 +200,7 @@ class Assembler(object):
         Identify implicit connections and combine with explicit ones.
 
         Sets the following attributes:
-            _input_src_ids
+            _input_srcs
 
         Parameters
         ----------
@@ -212,70 +214,61 @@ class Assembler(object):
         """
         out_paths = self._varx_allprocs_abs_names['output']
         in_paths = self._varx_allprocs_abs_names['input']
-        input_src_ids = np.full(len(in_paths), -1, dtype=int)
-        output_tgts = [[] for i in range(len(out_paths))]
+        input_srcs = {name: None for name in in_paths}
+        output_tgts = {name: [] for name in out_paths}
         abs2idx = self._varx_allprocs_abs2idx_io
         prom2abs_out = prom2abs['output']
         prom2abs_in = prom2abs['input']
 
-        # Add user defined connections to the _input_src_ids vector
-        for in_abs, out_abs in connections:
-            input_src_ids[in_ID] = out_ID
-            output_tgts[out_abs].append(in_abs)
+        # Add user defined connections to the _input_srcs vector
+        for ipath, opath in connections:
+            input_srcs[ipath] = opath
+            output_tgts[opath].append(ipath)
 
         # Add connections for any promoted input names that match promoted
         # output names.
         for prom in prom2abs_out:
             if prom in prom2abs_in:
-                oidx = abs2idx[prom2abs_out[prom][0]]
+                opath = prom2abs_out[prom][0]
                 for ipath in prom2abs_in[prom]:
-                    iidx = abs2idx[ipath]
-                    input_src_ids[iidx] = oidx
-                    output_tgt_ids[oidx].append(iidx)
+                    input_srcs[ipath] = opath
+                    output_tgts[opath].append(ipath)
 
         # Now check unit compatability for each connection
-        for out_ID, in_IDs in enumerate(output_tgt_ids):
-            if in_IDs:
-                if out_paths[out_ID] not in abs2data:
+        for opath, ipaths in iteritems(output_tgts):
+            if ipaths:
+                if opath not in abs2data:
                     # TODO: we need to gather unit info. Otherwise we can't
                     # check units for connections that cross proc boundaries.
                     continue
-                odata = abs2data[out_paths[out_ID]]
+                odata = abs2data[opath]
                 out_units = odata['metadata']['units']
-                in_unit_list = []
-                for in_ID in in_IDs:
+
+                for ipath in ipaths:
                     # TODO: fix this after we have gathered metadata for units,
                     # but for now, if any input is out-of-process, skip all of
                     # the units checks
-                    if in_paths[in_ID] not in abs2data:
+                    if ipath not in abs2data:
                         in_unit_list = []
                         break
-                    idata = abs2data[in_paths[in_ID]]
-                    in_unit_list.append((idata['metadata']['units'], in_ID))
-
-                if out_units:
-                    for in_units, in_ID in in_unit_list:
+                    in_units = abs2data[ipath]['metadata']['units']
+                    if out_units:
                         if not in_units:
                             warnings.warn("Output '%s' with units of '%s' is "
                                           "connected to input '%s' which has no"
-                                          " units." % (out_paths[out_ID],
-                                                       out_units,
-                                                       in_paths[in_ID]))
+                                          " units." % (opath, out_units, ipath))
                         elif not is_compatible(in_units, out_units):
                             raise RuntimeError("Output units of '%s' for '%s' are"
                                                " incompatible with input units of "
                                                "'%s' for '%s'." %
-                                               (out_units, out_paths[out_ID],
-                                                in_units, in_paths[in_ID]))
-                else:
-                    for u, in_ID in in_unit_list:
-                        if u is not None:
-                            warnings.warn("Input '%s' with units of '%s' is "
-                                          "connected to output '%s' which has "
-                                          "no units." % (in_paths[in_ID], u,
-                                                         out_paths[out_ID]))
+                                               (out_units, opath, in_units, ipath))
 
-        self._input_src_ids = input_src_ids
+                    elif in_units is not None:
+                        warnings.warn("Input '%s' with units of '%s' is "
+                                      "connected to output '%s' which has "
+                                      "no units." % (ipath, in_units, opath))
+
+        self._input_srcs = input_srcs
 
     def _setup_src_indices(self, abs2data, abs_names):
         """
@@ -301,8 +294,8 @@ class Assembler(object):
         total_idx_size = 0
         sizes = np.zeros(len(in_paths), dtype=int)
 
-        for ind, abs_name in enumerate(in_paths):
-            sizes[ind] = np.prod(abs2data[abs_name]['metadata']['shape'])
+        for ind, abs_in in enumerate(in_paths):
+            sizes[ind] = np.prod(abs2data[abs_in]['metadata']['shape'])
 
         total_idx_size = np.sum(sizes)
 
@@ -312,8 +305,8 @@ class Assembler(object):
 
         # Populate arrays
         ind1, ind2 = 0, 0
-        for ind, abs_name in enumerate(in_paths):
-            in_meta = abs2data[abs_name]['metadata']
+        for ind, abs_in in enumerate(in_paths):
+            in_meta = abs2data[abs_in]['metadata']
             isize = sizes[ind]
             ind2 += isize
             src_indices = in_meta['src_indices']
@@ -322,16 +315,16 @@ class Assembler(object):
             elif src_indices.ndim == 1:
                 self._src_indices[ind1:ind2] = src_indices
             else:
-                src_id = self._input_src_ids[indices[abs_name]]
-                if src_id == -1:  # input is not connected
+                src = self._input_srcs[abs_in]
+                if src is None:  # input is not connected
                     self._src_indices[ind1:ind2] = np.arange(isize, dtype=int)
                 else:
                     # TODO: the src may not be in this processes and we need its shape
-                    if out_all_paths[src_id] not in abs2data:
+                    if src not in abs2data:
                         raise NotImplementedError("accessing source metadata from "
                                                   "another process isn't supported "
                                                   "yet.")
-                    src_shape = abs2data[out_all_paths[src_id]]['metadata']['shape']
+                    src_shape = abs2data[src]['metadata']['shape']
                     if len(src_shape) == 1:
                         self._src_indices[ind1:ind2] = src_indices.flat
                     else:
@@ -342,7 +335,7 @@ class Assembler(object):
                         dimidxs = [cols[:, i] for i in range(cols.shape[1])]
                         self._src_indices[ind1:ind2] = np.ravel_multi_index(dimidxs, src_shape)
 
-            self._src_indices_range[indices[abs_name], :] = [ind1, ind2]
+            self._src_indices_range[indices[abs_in], :] = [ind1, ind2]
             ind1 += isize
 
     def _setup_src_data(self, abs_out_names, abs2data):
@@ -365,49 +358,41 @@ class Assembler(object):
         # be put in the _src_units and _src_scaling_0/1 attributes, where they are
         # ordered by target input, rather than all the outputs in order.
 
-        # List of units of locally declared output variables.
-        out_units = [abs2data[name]['metadata']['units'] for name in abs_out_names]
-
-        # List of global indices of the locally declared output variables.
-        out_inds = [indices[name] for name in abs_out_names]
-
-        # List of scaling coefficients such that
+        # dict of units and scaling info of locally declared output variables.
         # physical_unscaled = c0 + c1 * unitless_scaled
         # where c0 and c1 are the two columns of out_scaling.
         # Below, ref0 and ref are the values of the variable in the specified
         # units at which the scaled values are 0 and 1, respectively.
-        out_scaling = np.empty((nvar_out, 2))
-        for ivar_out, abs_name in enumerate(abs_out_names):
-            meta = abs2data[abs_name]['metadata']
-            out_scaling[ivar_out, 0] = meta['ref0']
-            out_scaling[ivar_out, 1] = meta['ref'] - meta['ref0']
+        out_scaling = {
+            name: (abs2data[name]['metadata']['units'],
+                   abs2data[name]['metadata']['ref'],
+                   abs2data[name]['metadata']['ref0'])
+                        for name in abs_out_names
+        }
 
         # Broadcast to all procs
         if self._comm.size > 1:
-            out_units_raw = self._comm.allgather(out_units)
-            out_inds_raw = self._comm.allgather(out_inds)
             out_scaling_raw = self._comm.allgather(out_scaling)
-
-            out_units = []
-            for str_list in out_units_raw:
-                out_units.extend(str_list)
-            out_inds = np.vstack(out_inds_raw)
-            out_scaling = np.vstack(out_scaling_raw)
+            iproc = self._comm.rank
+            for rank, scaling in enumerate(out_scaling_raw):
+                if iproc != rank:
+                    out_scaling.update(scaling)
 
         # Now, we can store the units and scaling coefficients by input
         # by referring to the out_* variables via the input-to-src mapping
-        # which is called _input_src_ids.
-        nvar_in = len(self._input_src_ids)
+        # which is called _input_srcs.
+        nvar_in = len(self._input_srcs)
         self._src_units = [None for ind in range(nvar_in)]
         self._src_scaling = np.empty((nvar_in, 2))
-        for ivar_in, ivar_out in enumerate(self._input_src_ids):
-            if ivar_out != -1:
-                ind = np.where(out_inds == ivar_out)[0][0]
-                self._src_units[ivar_in] = out_units[ind]
-                self._src_scaling[ivar_in, :] = out_scaling[ind, :]
-            else:
+        for in_abs, out_abs in iteritems(self._input_srcs):
+            ivar_in = indices[in_abs]
+            if out_abs is None:
                 self._src_units[ivar_in] = None
                 self._src_scaling[ivar_in, :] = [0., 1.]
+            else:
+                units, ref, ref0 = out_scaling[out_abs]
+                self._src_units[ivar_in] = units
+                self._src_scaling[ivar_in, :] = (ref0, ref - ref0)
 
     def _compute_transfers(self, nsub_allprocs, var_range,
                            subsystems_myproc, subsystems_inds):
