@@ -7,7 +7,8 @@ import warnings
 
 from six import assertRaisesRegex
 
-from openmdao.api import Problem, ExplicitComponent
+from openmdao.api import Problem, ExplicitComponent, Group
+from openmdao.core.component import Component
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
@@ -80,6 +81,35 @@ class TestExplicitComponent(unittest.TestCase):
                          "called from 'initialize_variables' rather than "
                          "in the '__init__' function.")
 
+    def test_setup_bug1(self):
+        # This tests a bug where, if you run setup more than once on a derived component class,
+        # the _varx_abs_names continually gets prepended with the component global path.
+
+        class NewBase(Component):
+            def __init__(self, **kwargs):
+                super(NewBase, self).__init__(**kwargs)
+
+        class MyComp(NewBase):
+            def __init__(self, **kwargs):
+                super(MyComp, self).__init__(**kwargs)
+                self.add_input('x', val=0.0)
+                self.add_output('y', val=0.0)
+
+        from openmdao.components.tests.test_deprecated_component import TestComp
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('comp', MyComp())
+
+        prob.setup(check=False)
+        comp = model.get_subsystem('comp')
+        self.assertEqual(comp._varx_abs_names['input'], ['comp.x'])
+        self.assertEqual(comp._varx_abs_names['output'], ['comp.y'])
+
+        prob.run_model()
+        prob.setup(check=False)
+        self.assertEqual(comp._varx_abs_names['input'], ['comp.x'])
+        self.assertEqual(comp._varx_abs_names['output'], ['comp.y'])
 
 class TestImplicitComponent(unittest.TestCase):
 

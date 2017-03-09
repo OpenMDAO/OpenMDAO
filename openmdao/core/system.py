@@ -102,6 +102,10 @@ class System(object):
         Dictionary mapping absolute names to dicts with keys (prom, rel, my_idx, type_, metadata).
         The my_idx entry is the index among variables in this system, on this processor.
         The type_ entry is either 'input' or 'output'.
+    _varx_rel_names : {'input': [str, ...], 'output': [str, ...]}
+        List of relative names of owned variables existing on current proc.
+        This is only needed while adding inputs and outputs. During setup, these are used to
+        determine the _varx_abs_names.
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         dict of vector objects. These are the derivatives vectors.
     _vector_transfers : dict
@@ -196,6 +200,7 @@ class System(object):
         self._varx_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
         self._varx_abs_names = {'input': [], 'output': []}
         self._varx_abs2data_io = {}
+        self._varx_rel_names = {'input': [], 'output': []}
 
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._vector_transfers = {}
@@ -361,6 +366,7 @@ class System(object):
             self._varx_abs2data_io = {}
             for type_ in ['input', 'output']:
                 self._varx_abs_names[type_] = []
+                self._varx_rel_names[type_] = []
 
             self.initialize_variables()
 
