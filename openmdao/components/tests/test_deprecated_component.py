@@ -20,6 +20,16 @@ except ImportError:
     openmdao_version = 1
 
 
+def print_vectors(**kwargs):
+    for vec_name in kwargs:
+        if openmdao_version == 1:
+            print(vec_name, ':')
+            for key, meta in iteritems(kwargs[vec_name]):
+                print(key, meta['val'])
+        else:
+            print(vec_name, ':', kwargs[vec_name]._names)
+
+
 class SimpleImplicitComp(Component):
     """ A Simple Implicit Component with an additional output equation.
     f(x,z) = xz + z - 4
@@ -50,6 +60,9 @@ class SimpleImplicitComp(Component):
 
     def solve_nonlinear(self, params, unknowns, resids):
         """ Simple iterative solve. (Babylonian method)."""
+        print('-------------------------------------------')
+        print('solve_nonlinear()')
+        print_vectors(params=params, unknowns=unknowns, resids=resids)
 
         x = params['x']
         z = unknowns['z']
@@ -69,8 +82,15 @@ class SimpleImplicitComp(Component):
         resids['z'] = eps
         #print(unknowns['y'], unknowns['z'])
 
+        print('----->')
+        print_vectors(unknowns=unknowns, resids=resids)
+        print('-------------------------------------------')
+
     def apply_nonlinear(self, params, unknowns, resids):
         """ Don't solve; just calculate the residual."""
+        print('-------------------------------------------')
+        print('apply_nonlinear()')
+        print_vectors(params=params, unknowns=unknowns, resids=resids)
 
         x = params['x']
         z = unknowns['z']
@@ -79,6 +99,10 @@ class SimpleImplicitComp(Component):
         # Output equations need to evaluate a residual just like an explicit comp.
         resids['y'] = x + 2.0*z - unknowns['y']
         #print(x, unknowns['y'], z, resids['z'], resids['y'])
+
+        print('----->')
+        print_vectors(resids=resids)
+        print('-------------------------------------------')
 
     def linearize(self, params, unknowns, resids):
         """Analytical derivatives."""
@@ -93,7 +117,12 @@ class SimpleImplicitComp(Component):
         J[('z', 'z')] = np.array([params['x'] + 1.0])
         J[('z', 'x')] = np.array([unknowns['z']])
 
+        print('-------------------------------------------')
+        print('linearize()')
+        pprint(J)
         return J
+        print('-------------------------------------------')
+
 
 class SimpleImplicitCompApply(SimpleImplicitComp):
     """ Use apply_linear instead."""
@@ -101,6 +130,9 @@ class SimpleImplicitCompApply(SimpleImplicitComp):
     def apply_linear(self, params, unknowns, dparams, dunknowns, dresids,
                      mode):
         """Returns the product of the incoming vector with the Jacobian."""
+        print('-------------------------------------------')
+        print('apply_linear()', mode)
+        print_vectors(dparams=dparams, dunknowns=dunknowns, dresids=dresids)
 
         if mode == 'fwd':
             if 'y' in dresids:
@@ -115,6 +147,9 @@ class SimpleImplicitCompApply(SimpleImplicitComp):
                 if 'z' in dunknowns:
                     dresids['z'] += (np.array([params['x'] + 1.0])).dot(dunknowns['z'])
 
+            print('----->')
+            print_vectors(dresids=dresids)
+
         elif mode == 'rev':
             #dparams['x'] = self.multiplier*dresids['y']
             if 'y' in dresids:
@@ -128,6 +163,11 @@ class SimpleImplicitCompApply(SimpleImplicitComp):
                     dparams['x'] += (np.array([unknowns['z']])).dot(dresids['z'])
                 if 'z' in dunknowns:
                     dunknowns['z'] += (np.array([params['x'] + 1.0])).dot(dresids['z'])
+
+            print('----->')
+            print_vectors(dunknowns=dunknowns, dresids=dresids)
+
+        print('-------------------------------------------')
 
 
 class DepCompTestCase(unittest.TestCase):
@@ -225,7 +265,7 @@ class DepCompTestCase(unittest.TestCase):
         prob.run()
 
         if openmdao_version == 1:
-            J = prob.calc_gradient(['p1.x'], ['comp.y'], mode='fwd')
+            J = prob.calc_gradient(['p1.x'], ['comp.y'], mode='rev')
             assert_rel_error(self, J[0][0], -2.5555511, 1e-5)
         else:
             J = prob.compute_total_derivs(of=['comp.y'], wrt=['p1.x'])
