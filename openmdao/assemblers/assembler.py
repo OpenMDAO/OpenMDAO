@@ -80,7 +80,6 @@ class Assembler(object):
         self._variable_set_IDs = {'input': {}, 'output': {}}
         self._variable_set_indices = {'input': None, 'output': None}
 
-        # [REFACTOR]
         self._varx_allprocs_abs2idx_io = {}
         self._varx_allprocs_abs2meta_io = {}
         self._varx_allprocs_abs_names = {'input': [], 'output': []}

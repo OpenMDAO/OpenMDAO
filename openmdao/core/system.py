@@ -173,25 +173,12 @@ class System(object):
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
 
-        # self._var_allprocs_names = {'input': [], 'output': []}
-        # self._var_allprocs_pathnames = {'input': [], 'output': []}
-        # self._var_allprocs_range = {'input': [0, 0], 'output': [0, 0]}
-        # self._var_allprocs_indices = {'input': {}, 'output': {}}
-        #
-        # self._var_myproc_names = {'input': [], 'output': []}
-        # self._var_myproc_metadata = {'input': [], 'output': []}
-        # self._var_myproc_indices = {'input': None, 'output': None}
-        #
-        # self._var_pathdict = {}
-        # self._var_name2path = {'input': {}, 'output': {}}
-
         self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
 
         self._var_connections = {}
         self._var_connections_abs = []
 
-        # [REFACTOR]
         self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         self._varx_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
         self._varx_abs_names = {'input': [], 'output': []}
@@ -403,18 +390,6 @@ class System(object):
             if recurse:
                 for subsys in self._subsystems_myproc:
                     subsys._setup_variable_indices(global_index)
-
-            # # Post-recursion: assemble local variable indices from subsystems
-            # for typ in ['input', 'output']:
-            #     raw = [subsys._var_myproc_indices[typ]
-            #            for subsys in self._subsystems_myproc]
-            #     self._var_myproc_indices[typ] = np.concatenate(raw)
-
-        # # If component, _var_myproc_indices is simply an arange
-        # else:
-        #     for typ in ['input', 'output']:
-        #         ind1, ind2 = self._varx_allprocs_idx_range[typ]
-        #         self._var_myproc_indices[typ] = np.arange(ind1, ind2)
 
         # Reset index dict to the global variable count on all procs
         # Necessary for younger siblings to have proper index values

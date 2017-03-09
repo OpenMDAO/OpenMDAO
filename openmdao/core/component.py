@@ -54,7 +54,6 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
         self._approx_schemes = OrderedDict()
 
-        # [REFACTOR]
         self._varx_rel_names = {'input': [], 'output': []}
         self._varx_rel2data_io = {}
 

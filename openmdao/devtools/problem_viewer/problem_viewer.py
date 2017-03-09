@@ -33,9 +33,10 @@ def _get_tree_dict(system):
 
         children = []
         for typ in ['input', 'output']:
-            for ind in range(len(system._var_myproc_names[typ])):
-                name = system._var_myproc_names[typ][ind]
-                meta = system._var_myproc_metadata[typ][ind]
+            for ind, abs_name in enumerate(system._varx_abs_names[typ]):
+                data = system._varx_abs2data_io[abs_name]
+                meta = data['metadata']
+                name = data['prom']
 
                 var_dict = OrderedDict()
                 var_dict['name'] = name

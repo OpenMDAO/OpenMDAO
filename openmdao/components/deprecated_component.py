@@ -233,16 +233,16 @@ class Component(BaseComponent):
             self._inputs._scale(self._scaling_to_norm['input'])
             self._outputs._scale(self._scaling_to_norm['output'])
 
-            for out_name in self._var_myproc_names['output']:
+            for out_name in self._varx_rel_names['output']:
                 if out_name in self._output_names:
                     size = len(self._outputs._views_flat[out_name])
                     ones = np.ones(size)
                     arange = np.arange(size)
                     self._jacobian[out_name, out_name] = (ones, arange, arange)
 
-            for out_name in self._var_myproc_names['output']:
+            for out_name in self._varx_rel_names['output']:
                 if out_name in self._output_names:
-                    for in_name in self._var_myproc_names['input']:
+                    for in_name in self._varx_rel_names['input']:
                         if (out_name, in_name) in self._jacobian:
                             self._jacobian._negate((out_name, in_name))
 
