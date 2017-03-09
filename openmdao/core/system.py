@@ -285,23 +285,14 @@ class System(object):
                                          sub_global_dict, assembler,
                                          sub_proc_range)
 
-    def _setupx_variables_myproc(self):
+    def _setupx_variables(self):
         """
-        Compute variable dict/list for variables on the current processor.
+        Compute variable dict/list for variables on the current processor and
+        all processors.
 
         Sets the following attributes:
             _varx_abs2data_io
             _varx_abs_names
-        """
-        pass
-
-    def _setupx_variable_allprocs_names(self):
-        """
-        Get the names for variables on all processors.
-
-        Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
-
-        Sets the following attributes:
             _varx_allprocs_prom2abs_list
 
         Returns
@@ -687,55 +678,64 @@ class System(object):
                                                     self.comm)
         return transfers
 
-    def _get_maps(self, typ):
+    def _get_maps(self):
         """
         Define variable maps based on promotes lists.
 
-        Parameters
-        ----------
-        typ : str
-            Either 'input' or 'output'.
-
         Returns
         -------
-        dict of {str:str, ...}
+        dict of {'input': {str:str, ...}, 'output': {str:str, ...}}
             dictionary mapping input/output variable names
             to promoted variable names.
         """
         promotes = self._var_promotes['any']
-        promotes_typ = self._var_promotes[typ]
-        gname = self.name + '.' if self.name else ''
-
-        found = False
         if promotes:
             names = promotes
             patterns = [n for n in names if '*' in n or '?' in n]
-        elif promotes_typ:
-            names = promotes_typ
-            patterns = [n for n in names if '*' in n or '?' in n]
-        else:
-            names = ()
-            patterns = ()
+        gname = self.name + '.' if self.name else ''
 
-        maps = {}
-        # TODO: rearrange this loop for better efficiency
-        for name in self._varx_allprocs_prom2abs_list[typ]:
-            if name in names:
-                maps[name] = name
-                found = True
-                continue
+        maps = {'input': {}, 'output': {}}
+        found = False
+        for typ in ('input', 'output'):
+            promotes_typ = self._var_promotes[typ]
 
-            for pattern in patterns:
-                # if name matches, promote that variable to parent
-                if fnmatchcase(name, pattern):
-                    maps[name] = name
-                    found = True
-                    break
+            if promotes:
+                pass
+            elif promotes_typ:
+                names = promotes_typ
+                patterns = [n for n in names if '*' in n or '?' in n]
             else:
-                # Default: prepend the parent system's name
-                maps[name] = gname + name if gname else name
+                names = ()
+                patterns = ()
 
-        return maps, found
+            for name in self._varx_allprocs_prom2abs_list[typ]:
+                if name in names:
+                    maps[typ][name] = name
+                    found = True
+                    continue
+
+                for pattern in patterns:
+                    # if name matches, promote that variable to parent
+                    if fnmatchcase(name, pattern):
+                        maps[typ][name] = name
+                        found = True
+                        break
+                else:
+                    # Default: prepend the parent system's name
+                    maps[typ][name] = gname + name if gname else name
+
+        if not found:
+            for io, lst in self._var_promotes.items():
+                if lst:
+                    if io == 'any':
+                        suffix = ''
+                    else:
+                        suffix = '_%ss' % io
+                    raise RuntimeError("%s: no variables were promoted "
+                                       "based on promotes%s=%s" %
+                                       (self.pathname, suffix, list(lst)))
+
+        return maps
 
     @property
     def jacobian(self):

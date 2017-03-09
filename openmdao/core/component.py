@@ -269,7 +269,7 @@ class Component(System):
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         self._varx_rel2data_io[name] = {'prom': name, 'rel': name,
                                         'my_idx': len(self._varx_rel_names['output']),
-                                        'type': 'output', 'metadata': metadata}
+                                            'type': 'output', 'metadata': metadata}
         self._varx_rel_names['output'].append(name)
         self._varx_allprocs_prom2abs_list['output'][name] = [name]
 
@@ -565,21 +565,30 @@ class Component(System):
             for name in self._varx_abs_names['output']:
                 outputs[abs2data[name]['rel']] = abs2data[name]['metadata']['value']
 
-    def _setupx_variables_myproc(self):
+    def _setupx_variables(self):
         """
         Compute variable dict/list for variables on the current processor.
 
         Sets the following attributes:
             _varx_abs2data_io
             _varx_abs_names
+            _varx_allprocs_prom2abs_list
+
+        Returns
+        -------
+        {'input': [str, ...], 'output': [str, ...]}
+            List of absolute names of owned variables existing on current proc.
         """
         # Now that we know the pathname, convert _varx_rel_names from names to abs_names.
         for type_ in ['input', 'output']:
             abs_names = []
+            allprocs_prom2abs_list = {}
             for name in self._varx_rel_names[type_]:
                 abs_name = rel_name2abs_name(self, name)
                 abs_names.append(abs_name)
+                allprocs_prom2abs_list[name] = [abs_name]
             self._varx_abs_names[type_] = abs_names
+            self._varx_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
 
         # Now that we know the pathname, convert _varx_rel2data_io from names to abs_names.
         abs2data_io = {}
@@ -588,40 +597,15 @@ class Component(System):
             abs2data_io[abs_name] = data
         self._varx_abs2data_io = abs2data_io
 
-    def _setupx_variable_allprocs_names(self):
-        """
-        Get the names for variables on all processors.
-
-        Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
-
-        Sets the following attributes:
-            _varx_allprocs_prom2abs_list
-
-        Returns
-        -------
-        {'input': [str, ...], 'output': [str, ...]}
-            List of absolute names of owned variables existing on current proc.
-        """
-        # Now that we know the pathname, convert _varx_abs_names from names to abs_names.
-        for type_ in ['input', 'output']:
-            allprocs_prom2abs_list = {}
-            for name in self._varx_allprocs_prom2abs_list[type_]:
-                abs_name = rel_name2abs_name(self, name)
-                allprocs_prom2abs_list[name] = [abs_name]
-            self._varx_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
-
         # If this is a component, myproc names = allprocs names
         # and _varx_allprocs_prom2abs_list was already computed in add_input / add_output.
-        allprocs_abs_names = {'input': [], 'output': []}
-        for type_ in ['input', 'output']:
-            allprocs_abs_names[type_] = self._varx_abs_names[type_]
 
         # We use allprocs_abs_names to count the total number of allprocs variables
         # and put it in _varx_allprocs_idx_range.
         for type_ in ['input', 'output']:
-            self._varx_allprocs_idx_range[type_] = [0, len(allprocs_abs_names[type_])]
+            self._varx_allprocs_idx_range[type_] = [0, len(self._varx_abs_names[type_])]
 
-        return allprocs_abs_names
+        return self._varx_abs_names
 
     def _setupx_variable_allprocs_indices(self, global_index):
         """

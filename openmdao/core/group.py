@@ -243,61 +243,13 @@ class Group(System):
         """
         pass
 
-    def _setupx_variables_myproc(self):
+    def _setupx_variables(self):
         """
         Compute variable dict/list for variables on the current processor.
 
         Sets the following attributes:
             _varx_abs2data_io
             _varx_abs_names
-        """
-        self._varx_abs2data_io = {}
-        for type_ in ['input', 'output']:
-            self._varx_abs_names[type_] = []
-
-        name_offset = len(self.pathname) + 1 if self.pathname else 0
-        iotypes = ('input', 'output')
-
-        found_proms = [False for s in self._subsystems_myproc]
-
-        # Perform recursion to populate the dict and list bottom-up
-        for isub, subsys in enumerate(self._subsystems_myproc):
-            subsys._setupx_variables_myproc()
-
-            for type_ in iotypes:
-                var_maps, found = subsys._get_maps(type_)
-                found_proms[isub] |= found
-                if type_ == 1 and not found_proms[isub]:
-                    for io, lst in subsys._var_promotes.items():
-                        if lst:
-                            if io == 'any':
-                                suffix = ''
-                            else:
-                                suffix = '_%ss' % io
-                            raise RuntimeError("%s: no variables were promoted "
-                                               "based on promotes%s=%s" %
-                                               (subsys.pathname, suffix, list(lst)))
-
-                # Assemble _varx_abs2data_io and _varx_abs_names by concatenating from subsystems.
-                for abs_name in subsys._varx_abs_names[type_]:
-                    sub_data = subsys._varx_abs2data_io[abs_name]
-
-                    self._varx_abs2data_io[abs_name] = {
-                        'prom': var_maps[sub_data['prom']],
-                        'rel': abs_name[name_offset:] if name_offset > 0 else abs_name,
-                        'my_idx': len(self._varx_abs_names[type_]),
-                        'type': type_,
-                        'metadata': sub_data['metadata']
-                    }
-                    self._varx_abs_names[type_].append(abs_name)
-
-    def _setupx_variable_allprocs_names(self):
-        """
-        Get the names for variables on all processors.
-
-        Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
-
-        Sets the following attributes:
             _varx_allprocs_prom2abs_list
 
         Returns
@@ -305,14 +257,35 @@ class Group(System):
         {'input': [str, ...], 'output': [str, ...]}
             List of absolute names of owned variables existing on current proc.
         """
+        self._varx_abs2data_io = {}
+        for type_ in ['input', 'output']:
+            self._varx_abs_names[type_] = []
+
+        name_offset = len(self.pathname) + 1 if self.pathname else 0
+        iotypes = ('input', 'output')
         allprocs_abs_names = {'input': [], 'output': []}
 
-        # First, concatenate the allprocs variable names from subsystems on my proc.
-        for subsys in self._subsystems_myproc:
-            subsys_allprocs_abs_names = subsys._setupx_variable_allprocs_names()
+        # Perform recursion to populate the dict and list bottom-up
+        for isub, subsys in enumerate(self._subsystems_myproc):
+            subsys_allprocs_abs_names = subsys._setupx_variables()
 
-            for type_ in ['input', 'output']:
+            var_maps = subsys._get_maps()
+            for type_ in iotypes:
+                # concatenate the allprocs variable names from subsystems on my proc.
                 allprocs_abs_names[type_].extend(subsys_allprocs_abs_names[type_])
+
+                # Assemble _varx_abs2data_io and _varx_abs_names by concatenating from subsystems.
+                for abs_name in subsys._varx_abs_names[type_]:
+                    sub_data = subsys._varx_abs2data_io[abs_name]
+
+                    self._varx_abs2data_io[abs_name] = {
+                        'prom': var_maps[type_][sub_data['prom']],
+                        'rel': abs_name[name_offset:] if name_offset > 0 else abs_name,
+                        'my_idx': len(self._varx_abs_names[type_]),
+                        'type': type_,
+                        'metadata': sub_data['metadata']
+                    }
+                    self._varx_abs_names[type_].append(abs_name)
 
         # For _varx_allprocs_prom2abs_list, essentially invert the abs2prom map in
         # _varx_abs2data_io to capture at least the local maps.
@@ -379,7 +352,7 @@ class Group(System):
             for type_ in ['input', 'output']:
                 # Note: the following is valid because _varx_allprocs_idx_range
                 # contains [0, # allprocs vars] at this point because
-                # _setupx_variable_allprocs_names has been run but the recursion
+                # _setupx_variables has been run but the recursion
                 # for the current method has not been performed yet.
                 local_var_size = subsys0._varx_allprocs_idx_range[type_][1]
 
