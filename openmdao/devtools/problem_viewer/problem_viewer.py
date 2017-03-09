@@ -33,8 +33,8 @@ def _get_tree_dict(system):
 
         children = []
         for typ in ['input', 'output']:
-            for ind, abs_name in enumerate(system._varx_abs_names[typ]):
-                data = system._varx_abs2data_io[abs_name]
+            for ind, abs_name in enumerate(system._var_abs_names[typ]):
+                data = system._var_abs2data_io[abs_name]
                 meta = data['metadata']
                 name = data['prom']
 
@@ -83,7 +83,7 @@ def _get_viewer_data(problem_or_rootgroup):
     else:
         raise TypeError('get_model_viewer_data only accepts Problems or Groups')
 
-    abs2data = root_group._varx_abs2data_io
+    abs2data = root_group._var_abs2data_io
     connections_list = []
     for in_abs, out_abs in root_group._var_connections_abs:
         in_name = abs2data[in_abs]['prom']

@@ -287,21 +287,21 @@ class Problem(object):
         assembler._setupx_variables(allprocs_abs_names)
 
         # Assembler setup: variable metadata and indices
-        assembler._setup_variables(model._varx_abs2data_io,
-                                   model._varx_abs_names)
+        assembler._setup_variables(model._var_abs2data_io,
+                                   model._var_abs_names)
 
         # Assembler setup: variable connections
         assembler._setup_connections(model._var_connections_abs,
-                                     model._varx_allprocs_prom2abs_list,
-                                     model._varx_abs2data_io)
+                                     model._var_allprocs_prom2abs_list,
+                                     model._var_abs2data_io)
 
         # Assembler setup: global transfer indices vector
-        assembler._setup_src_indices(model._varx_abs2data_io,
-                                     model._varx_abs_names)
+        assembler._setup_src_indices(model._var_abs2data_io,
+                                     model._var_abs_names)
 
         # Assembler setup: compute data required for units/scaling
-        assembler._setup_src_data(model._varx_abs_names['output'],
-                                  model._varx_abs2data_io)
+        assembler._setup_src_data(model._var_abs_names['output'],
+                                  model._var_abs2data_io)
 
         # Set up scaling vectors
         model._setup_scaling()
@@ -362,7 +362,7 @@ class Problem(object):
             vectors[key] = vector_class(vec_name, typ, self.model)
 
         # TODO: implement this properly
-        ind1, ind2 = self.model._varx_allprocs_idx_range['output']
+        ind1, ind2 = self.model._var_allprocs_idx_range['output']
         vector_var_ids = np.arange(ind1, ind2)
 
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
@@ -483,16 +483,16 @@ class Problem(object):
                             deriv_value = subjacs.get(abs_key)
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                in_size = np.prod(comp._varx_abs2data_io[wrt]['metadata']['shape'])
-                                out_size = np.prod(comp._varx_abs2data_io[of]['metadata']['shape'])
+                                in_size = np.prod(comp._var_abs2data_io[wrt]['metadata']['shape'])
+                                out_size = np.prod(comp._var_abs2data_io[of]['metadata']['shape'])
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
                                     in_size = np.prod(
-                                        comp._varx_abs2data_io[wrt]['metadata']['shape'])
+                                        comp._var_abs2data_io[wrt]['metadata']['shape'])
                                     out_size = np.prod(
-                                        comp._varx_abs2data_io[of]['metadata']['shape'])
+                                        comp._var_abs2data_io[of]['metadata']['shape'])
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     for i, j, val in zip(jac_i, jac_j, jac_val):
@@ -700,13 +700,13 @@ class Problem(object):
             oldof = of
             of = []
             for names in oldof:
-                of.append(tuple(model._varx_allprocs_prom2abs_list['output'][name][0]
+                of.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                 for name in names))
 
             oldwrt = wrt
             wrt = []
             for names in oldwrt:
-                wrt.append(tuple(model._varx_allprocs_prom2abs_list['output'][name][0]
+                wrt.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                  for name in names))
 
         if mode == 'fwd':

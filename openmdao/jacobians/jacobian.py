@@ -73,8 +73,8 @@ class Jacobian(object):
         in_size : int
             local size of the input variable.
         """
-        return (np.prod(self._system._varx_abs2data_io[abs_key[0]]['metadata']['shape']),
-                np.prod(self._system._varx_abs2data_io[abs_key[1]]['metadata']['shape']))
+        return (np.prod(self._system._var_abs2data_io[abs_key[0]]['metadata']['shape']),
+                np.prod(self._system._var_abs2data_io[abs_key[1]]['metadata']['shape']))
 
     def _multiply_subjac(self, abs_key, val):
         """
@@ -103,11 +103,11 @@ class Jacobian(object):
         system = self._system
 
         iter_list = []
-        for res_name in system._varx_abs_names['output']:
-            for out_name in system._varx_abs_names['output']:
+        for res_name in system._var_abs_names['output']:
+            for out_name in system._var_abs_names['output']:
                 if (res_name, out_name) in self._subjacs:
                     iter_list.append((res_name, out_name))
-            for in_name in system._varx_abs_names['input']:
+            for in_name in system._var_abs_names['input']:
                 if (res_name, in_name) in self._subjacs:
                     iter_list.append((res_name, in_name))
 
@@ -226,8 +226,8 @@ class Jacobian(object):
             0th and 1st order coefficients for scaling/unscaling.
             The keys are 'input', 'output', and 'residual'
         """
-        data0 = self._system._varx_abs2data_io[abs_key[0]]
-        data1 = self._system._varx_abs2data_io[abs_key[1]]
+        data0 = self._system._var_abs2data_io[abs_key[0]]
+        data1 = self._system._var_abs2data_io[abs_key[1]]
 
         ind0 = data0['my_idx']
         ind1 = data1['my_idx']

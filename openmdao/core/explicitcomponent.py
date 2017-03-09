@@ -211,12 +211,12 @@ class ExplicitComponent(Component):
         """
         self.initialize_partials()
 
-        abs2data = self._varx_abs2data_io
+        abs2data = self._var_abs2data_io
 
         # Note: These declare calls are outside of initialize_partials so that users do not have to
         # call the super version of initialize_partials. This is still post-initialize_variables.
         other_names = []
-        for out_abs in self._varx_abs_names['output']:
+        for out_abs in self._var_abs_names['output']:
             meta = abs2data[out_abs]['metadata']
             out_name = abs2data[out_abs]['prom']
             size = np.prod(meta['shape'])
@@ -238,8 +238,8 @@ class ExplicitComponent(Component):
         Negate this component's part of the jacobian.
         """
         if self._jacobian._subjacs:
-            for res_name in self._varx_abs_names['output']:
-                for in_name in self._varx_abs_names['input']:
+            for res_name in self._var_abs_names['output']:
+                for in_name in self._var_abs_names['input']:
                     abs_key = (res_name, in_name)
                     if abs_key in self._jacobian._subjacs:
                         self._jacobian._multiply_subjac(abs_key, -1.)

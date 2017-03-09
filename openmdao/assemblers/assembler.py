@@ -41,14 +41,14 @@ class Assembler(object):
                              'output': ndarray[nvar_all, 2]}
         the first column is the var_set ID and
         the second column is the variable index within the var_set.
-    _varx_allprocs_abs2idx_io : dict
+    _var_allprocs_abs2idx_io : dict
         Dictionary mapping absolute names to global indices.
         Both inputs and outputs are contained in one combined dictionary.
         For the global indices, input and output variable indices are tracked separately.
-    _varx_allprocs_abs2meta_io : dict
+    _var_allprocs_abs2meta_io : dict
         Dictionary mapping absolute names to metadata dictionaries.
         Both inputs and outputs are contained in one combined dictionary.
-    _varx_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
+    _var_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of all owned variables, on all procs (maps idx to abs_name).
     _input_srcs : {str: str}
         The output absolute name for each input absolute name.  A value of None
@@ -80,9 +80,9 @@ class Assembler(object):
         self._variable_set_IDs = {'input': {}, 'output': {}}
         self._variable_set_indices = {'input': None, 'output': None}
 
-        self._varx_allprocs_abs2idx_io = {}
-        self._varx_allprocs_abs2meta_io = {}
-        self._varx_allprocs_abs_names = {'input': [], 'output': []}
+        self._var_allprocs_abs2idx_io = {}
+        self._var_allprocs_abs2meta_io = {}
+        self._var_allprocs_abs_names = {'input': [], 'output': []}
 
         self._input_srcs = None
         self._src_indices = None
@@ -96,19 +96,19 @@ class Assembler(object):
         Compute absolute name to/from idx maps for variables on all procs.
 
         Sets the following attributes:
-            _varx_allprocs_abs_names
-            _varx_allprocs_abs2idx_io
+            _var_allprocs_abs_names
+            _var_allprocs_abs2idx_io
 
         Parameters
         ----------
         allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
             List of absolute names of all owned variables, on all procs (maps idx to abs_name).
         """
-        self._varx_allprocs_abs_names = allprocs_abs_names
-        self._varx_allprocs_abs2idx_io = {}
+        self._var_allprocs_abs_names = allprocs_abs_names
+        self._var_allprocs_abs2idx_io = {}
         for type_ in ['input', 'output']:
             for idx, abs_name in enumerate(allprocs_abs_names[type_]):
-                self._varx_allprocs_abs2idx_io[abs_name] = idx
+                self._var_allprocs_abs2idx_io[abs_name] = idx
 
     def _setup_variables(self, abs2data, abs_names):
         """
@@ -128,11 +128,11 @@ class Assembler(object):
             lists of absolute names of input and output variables on this proc.
         """
         nproc = self._comm.size
-        indices = self._varx_allprocs_abs2idx_io
+        indices = self._var_allprocs_abs2idx_io
 
         for typ in ['input', 'output']:
             nvar = len(abs_names[typ])
-            nvar_all = len(self._varx_allprocs_abs_names[typ])
+            nvar_all = len(self._var_allprocs_abs_names[typ])
 
             # Locally determine var_set for each var
             local_set_dict = {}
@@ -211,11 +211,11 @@ class Assembler(object):
         abs2data : {str: {}, ...}
             Mapping of absolute pathname to data dict  (local)
         """
-        out_paths = self._varx_allprocs_abs_names['output']
-        in_paths = self._varx_allprocs_abs_names['input']
+        out_paths = self._var_allprocs_abs_names['output']
+        in_paths = self._var_allprocs_abs_names['input']
         input_srcs = {name: None for name in in_paths}
         output_tgts = {name: [] for name in out_paths}
-        abs2idx = self._varx_allprocs_abs2idx_io
+        abs2idx = self._var_allprocs_abs2idx_io
         prom2abs_out = prom2abs['output']
         prom2abs_in = prom2abs['input']
 
@@ -284,9 +284,9 @@ class Assembler(object):
         abs_names : {'input': [str, ...], 'output': [str, ...]}
             lists of absolute names of input and output variables on this proc.
         """
-        abs2idx = self._varx_allprocs_abs2idx_io
-        indices = self._varx_allprocs_abs2idx_io
-        out_all_paths = self._varx_allprocs_abs_names['output']
+        abs2idx = self._var_allprocs_abs2idx_io
+        indices = self._var_allprocs_abs2idx_io
+        out_all_paths = self._var_allprocs_abs_names['output']
         in_paths = abs_names['input']
 
         # Compute total size of indices vector
@@ -349,7 +349,7 @@ class Assembler(object):
             Mapping of absolute name to data dict for vars on this proc.
         """
         nvar_out = len(abs_out_names)
-        indices = self._varx_allprocs_abs2idx_io
+        indices = self._var_allprocs_abs2idx_io
 
         # The out_* variables are lists of units, output indices, and scaling coeffs.
         # for local outputs. These will initialized, then broadcast to all processors

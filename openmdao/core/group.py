@@ -189,12 +189,12 @@ class Group(System):
             for sub_pairs in pairs_raw:
                 pairs.extend(sub_pairs)
 
-        in_offset = self._varx_allprocs_idx_range['input'][0]
-        out_offset = self._varx_allprocs_idx_range['output'][0]
+        in_offset = self._var_allprocs_idx_range['input'][0]
+        out_offset = self._var_allprocs_idx_range['output'][0]
 
-        abs2data = self._varx_abs2data_io
-        prom2abs_in = self._varx_allprocs_prom2abs_list['input']
-        prom2abs_out = self._varx_allprocs_prom2abs_list['output']
+        abs2data = self._var_abs2data_io
+        prom2abs_in = self._var_allprocs_prom2abs_list['input']
+        prom2abs_out = self._var_allprocs_prom2abs_list['output']
 
         # Loop through user-defined connections
         for in_name, (out_name, src_indices) \
@@ -248,18 +248,18 @@ class Group(System):
         Compute variable dict/list for variables on the current processor.
 
         Sets the following attributes:
-            _varx_abs2data_io
-            _varx_abs_names
-            _varx_allprocs_prom2abs_list
+            _var_abs2data_io
+            _var_abs_names
+            _var_allprocs_prom2abs_list
 
         Returns
         -------
         {'input': [str, ...], 'output': [str, ...]}
             List of absolute names of owned variables existing on current proc.
         """
-        self._varx_abs2data_io = {}
+        self._var_abs2data_io = {}
         for type_ in ['input', 'output']:
-            self._varx_abs_names[type_] = []
+            self._var_abs_names[type_] = []
 
         name_offset = len(self.pathname) + 1 if self.pathname else 0
         iotypes = ('input', 'output')
@@ -274,31 +274,31 @@ class Group(System):
                 # concatenate the allprocs variable names from subsystems on my proc.
                 allprocs_abs_names[type_].extend(subsys_allprocs_abs_names[type_])
 
-                # Assemble _varx_abs2data_io and _varx_abs_names by concatenating from subsystems.
-                for abs_name in subsys._varx_abs_names[type_]:
-                    sub_data = subsys._varx_abs2data_io[abs_name]
+                # Assemble _var_abs2data_io and _var_abs_names by concatenating from subsystems.
+                for abs_name in subsys._var_abs_names[type_]:
+                    sub_data = subsys._var_abs2data_io[abs_name]
 
-                    self._varx_abs2data_io[abs_name] = {
+                    self._var_abs2data_io[abs_name] = {
                         'prom': var_maps[type_][sub_data['prom']],
                         'rel': abs_name[name_offset:] if name_offset > 0 else abs_name,
-                        'my_idx': len(self._varx_abs_names[type_]),
+                        'my_idx': len(self._var_abs_names[type_]),
                         'type': type_,
                         'metadata': sub_data['metadata']
                     }
-                    self._varx_abs_names[type_].append(abs_name)
+                    self._var_abs_names[type_].append(abs_name)
 
-        # For _varx_allprocs_prom2abs_list, essentially invert the abs2prom map in
-        # _varx_abs2data_io to capture at least the local maps.
-        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        for abs_name, data in iteritems(self._varx_abs2data_io):
+        # For _var_allprocs_prom2abs_list, essentially invert the abs2prom map in
+        # _var_abs2data_io to capture at least the local maps.
+        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        for abs_name, data in iteritems(self._var_abs2data_io):
             type_ = data['type']
             prom_name = data['prom']
-            if prom_name not in self._varx_allprocs_prom2abs_list[type_]:
-                self._varx_allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+            if prom_name not in self._var_allprocs_prom2abs_list[type_]:
+                self._var_allprocs_prom2abs_list[type_][prom_name] = [abs_name]
             else:
-                self._varx_allprocs_prom2abs_list[type_][prom_name].append(abs_name)
+                self._var_allprocs_prom2abs_list[type_][prom_name].append(abs_name)
 
-        for prom_name, lst in iteritems(self._varx_allprocs_prom2abs_list['output']):
+        for prom_name, lst in iteritems(self._var_allprocs_prom2abs_list['output']):
             if len(lst) > 1:
                 raise RuntimeError("Output name '%s' refers to "
                                    "multiple outputs: %s." %
@@ -309,7 +309,7 @@ class Group(System):
             for type_ in ['input', 'output']:
                 sub_comm = self._subsystems_myproc[0].comm
                 if sub_comm.rank == 0:
-                    raw = (allprocs_abs_names[type_], self._varx_allprocs_prom2abs_list[type_])
+                    raw = (allprocs_abs_names[type_], self._var_allprocs_prom2abs_list[type_])
                 else:
                     raw = ([], {})
 
@@ -323,12 +323,12 @@ class Group(System):
                         else:
                             allprocs_prom2abs_list[prom_name].extend(abs_names_list)
 
-                self._varx_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
+                self._var_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
 
         # We use allprocs_abs_names to count the total number of allprocs variables
-        # and put it in _varx_allprocs_idx_range.
+        # and put it in _var_allprocs_idx_range.
         for type_ in ['input', 'output']:
-            self._varx_allprocs_idx_range[type_] = [0, len(allprocs_abs_names[type_])]
+            self._var_allprocs_idx_range[type_] = [0, len(allprocs_abs_names[type_])]
 
         return allprocs_abs_names
 
@@ -337,18 +337,18 @@ class Group(System):
         Compute the global index range for variables on all processors.
 
         Computes the following attributes:
-            _varx_allprocs_idx_range
+            _var_allprocs_idx_range
 
         Parameters
         ----------
         global_index : {'input': int, 'output': int}
             current global variable counter.
         """
-        # At this point, _varx_allprocs_idx_range is correct except for an offset.
-        # We apply the global_index offset to make _varx_allprocs_idx_range correct.
+        # At this point, _var_allprocs_idx_range is correct except for an offset.
+        # We apply the global_index offset to make _var_allprocs_idx_range correct.
         for type_ in ['input', 'output']:
             for ind in range(2):
-                self._varx_allprocs_idx_range[type_][ind] += global_index[type_]
+                self._var_allprocs_idx_range[type_][ind] += global_index[type_]
 
         # Pre-recursion: compute index to pass to subsystems.
         # This index is the number of variables on procs before current proc
@@ -356,11 +356,11 @@ class Group(System):
         if self.comm.size > 1:
             subsys0 = self._subsystems_myproc[0]
             for type_ in ['input', 'output']:
-                # Note: the following is valid because _varx_allprocs_idx_range
+                # Note: the following is valid because _var_allprocs_idx_range
                 # contains [0, # allprocs vars] at this point because
                 # _setupx_variables has been run but the recursion
                 # for the current method has not been performed yet.
-                local_var_size = subsys0._varx_allprocs_idx_range[type_][1]
+                local_var_size = subsys0._var_allprocs_idx_range[type_][1]
 
                 # Compute the variable count list; 0 on rank > 0 procs
                 sub_comm = subsys0.comm
@@ -382,7 +382,7 @@ class Group(System):
         # Reset index dict to the global variable counter on all procs.
         # Necessary for younger siblings to have proper index values.
         for type_ in ['input', 'output']:
-            global_index[type_] = self._varx_allprocs_idx_range[type_][1]
+            global_index[type_] = self._var_allprocs_idx_range[type_][1]
 
     def _setup_partials(self):
         """

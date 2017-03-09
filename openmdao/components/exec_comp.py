@@ -161,7 +161,7 @@ class ExecComp(ExplicitComponent):
 
         # need to exclude any non-pbo outputs (like case_rank in ExecComp4Test)
         # TODO: for now, assume all outputs are non-pbo
-        self._non_pbo_outputs = self._varx_rel_names['output']
+        self._non_pbo_outputs = self._var_rel_names['output']
 
         self._to_colons = {}
         from_colons = self._from_colons = {}

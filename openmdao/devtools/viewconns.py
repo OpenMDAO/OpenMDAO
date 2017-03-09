@@ -62,13 +62,13 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     src2tgts = {}
     units = {n: data['metadata'].get('units','')
-                for n, data in iteritems(system._varx_abs2data_io)}
+                for n, data in iteritems(system._var_abs2data_io)}
     vals = {}
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
         for idx, t in enumerate(abs_tgt_names):
-            tmeta = system._varx_abs2data_io[t]['metadata']
+            tmeta = system._var_abs2data_io[t]['metadata']
             idxs = tmeta['src_indices']
             if idxs is None:
                 idxs = np.arange(np.prod(tmeta['shape']), dtype=int)

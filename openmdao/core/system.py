@@ -67,7 +67,7 @@ class System(object):
         list of promoted names of all owned variables, not just on current proc.
     _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
         list of pathnames of all owned variables, not just on current proc.
-    _varx_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
+    _var_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
         index range of owned variables with respect to all problem variables.
     _var_allprocs_indices : {'input': dict, 'output': dict}
         dictionary of global indices keyed by the variable name.
@@ -91,14 +91,14 @@ class System(object):
     _var_connections_abs : [(str, str), ...]
         _var_connections with absolute variable names.  Entries
         have the form (input, output).
-    _varx_allprocs_prom2abs_list : {'input': dict, 'output': dict}
+    _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
-    _varx_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
+    _var_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
         Global index range of owned variables with respect to all model variables.
-    _varx_abs_names : {'input': [str, ...], 'output': [str, ...]}
+    _var_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of owned variables existing on current proc.
-    _varx_abs2data_io : dict
+    _var_abs2data_io : dict
         Dictionary mapping absolute names to dicts with keys (prom, rel, my_idx, type_, metadata).
         The my_idx entry is the index among variables in this system, on this processor.
         The type_ entry is either 'input' or 'output'.
@@ -179,10 +179,10 @@ class System(object):
         self._var_connections = {}
         self._var_connections_abs = []
 
-        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        self._varx_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
-        self._varx_abs_names = {'input': [], 'output': []}
-        self._varx_abs2data_io = {}
+        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._var_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
+        self._var_abs_names = {'input': [], 'output': []}
+        self._var_abs2data_io = {}
 
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._vector_transfers = {}
@@ -277,9 +277,9 @@ class System(object):
         Compute data structs for variables on current and all processors.
 
         Sets the following attributes:
-            _varx_abs2data_io
-            _varx_abs_names
-            _varx_allprocs_prom2abs_list
+            _var_abs2data_io
+            _var_abs_names
+            _var_allprocs_prom2abs_list
 
         Returns
         -------
@@ -293,7 +293,7 @@ class System(object):
         Compute the global index range for variables on all processors.
 
         Computes the following attributes:
-            _varx_allprocs_idx_range
+            _var_allprocs_idx_range
 
         Parameters
         ----------
@@ -328,13 +328,13 @@ class System(object):
             # majority of components won't need to be configured more than once
 
             # Empty the lists in case this is part of a reconfiguration
-            self._varx_abs2data_io = {}
+            self._var_abs2data_io = {}
             for type_ in ['input', 'output']:
-                self._varx_abs_names[type_] = []
+                self._var_abs_names[type_] = []
 
                 # Only Components have this:
                 try:
-                    self._varx_rel_names[type_] = []
+                    self._var_rel_names[type_] = []
                 except AttributeError:
                     pass
 
@@ -345,7 +345,7 @@ class System(object):
         Define the variable indices and range.
 
         Sets the following attributes:
-            _varx_allprocs_idx_range
+            _var_allprocs_idx_range
             _var_myproc_indices
 
         Parameters
@@ -357,9 +357,9 @@ class System(object):
         """
         # Define the global variable range for the system
         for typ in ['input', 'output']:
-            size = len(self._varx_allprocs_prom2abs_list[typ])
-            self._varx_allprocs_idx_range[typ][0] = global_index[typ]
-            self._varx_allprocs_idx_range[typ][1] = global_index[typ] + size
+            size = len(self._var_allprocs_prom2abs_list[typ])
+            self._var_allprocs_idx_range[typ][0] = global_index[typ]
+            self._var_allprocs_idx_range[typ][1] = global_index[typ] + size
 
         # If group, compute _var_myproc_indices as follows
         if len(self._subsystems_myproc) > 0:
@@ -370,7 +370,7 @@ class System(object):
             # Necessary because of multiple global counters on different procs
             if self.comm.size > 1:
                 for typ in ['input', 'output']:
-                    local_var_size = len(subsys0._varx_allprocs_prom2abs_list[typ])
+                    local_var_size = len(subsys0._var_allprocs_prom2abs_list[typ])
 
                     # Compute the variable count list; 0 on rank > 0 procs
                     sub_comm = subsys0.comm
@@ -394,7 +394,7 @@ class System(object):
         # Reset index dict to the global variable count on all procs
         # Necessary for younger siblings to have proper index values
         for typ in ['input', 'output']:
-            global_index[typ] = self._varx_allprocs_idx_range[typ][1]
+            global_index[typ] = self._var_allprocs_idx_range[typ][1]
 
     def _setup_partials(self):
         """
@@ -470,8 +470,8 @@ class System(object):
         """
         Set up scaling vectors.
         """
-        nvar_in = len(self._varx_abs_names['input'])
-        nvar_out = len(self._varx_abs_names['output'])
+        nvar_in = len(self._var_abs_names['input'])
+        nvar_out = len(self._var_abs_names['output'])
 
         # Initialize scaling arrays
         for scaling in (self._scaling_to_norm, self._scaling_to_phys):
@@ -497,9 +497,9 @@ class System(object):
         #   b0 = g(a0)
         #   b1 = d0 + d1 a1 - d0
         #   b1 = g(a1) - g(0)
-        abs2idx = self._assembler._varx_allprocs_abs2idx_io
-        abs2data = self._varx_abs2data_io
-        for ind, abs_name in enumerate(self._varx_abs_names['input']):
+        abs2idx = self._assembler._var_allprocs_abs2idx_io
+        abs2data = self._var_abs2data_io
+        for ind, abs_name in enumerate(self._var_abs_names['input']):
             global_ind = abs2idx[abs_name]
             meta = abs2data[abs_name]['metadata']
             self._scaling_to_phys['input'][ind, 0] = \
@@ -508,7 +508,7 @@ class System(object):
                 convert_units(src_scaling[global_ind, 1], src_units[global_ind], meta['units']) - \
                 convert_units(0., src_units[global_ind], meta['units'])
 
-        for ind, abs_name in enumerate(self._varx_abs_names['output']):
+        for ind, abs_name in enumerate(self._var_abs_names['output']):
             meta = abs2data[abs_name]['metadata']
 
             # Compute scaling arrays for outputs; no unit conversion needed
@@ -551,8 +551,8 @@ class System(object):
 
         # if this is the top-most group, we will set the values here as well.
         if is_top:
-            for abs_name in self._varx_abs_names['output']:
-                data = self._varx_abs2data_io[abs_name]
+            for abs_name in self._var_abs_names['output']:
+                data = self._var_abs2data_io[abs_name]
                 my_idx = data['my_idx']
                 metadata = data['metadata']
 
@@ -622,7 +622,7 @@ class System(object):
         transfer_class = vectors['output'].TRANSFER
 
         nsub_allprocs = len(self._subsystems_allprocs)
-        var_range = self._varx_allprocs_idx_range
+        var_range = self._var_allprocs_idx_range
         subsystems_myproc = self._subsystems_myproc
         subsystems_inds = self._subsystems_myproc_inds
 
@@ -682,7 +682,7 @@ class System(object):
                 names = ()
                 patterns = ()
 
-            for name in self._varx_allprocs_prom2abs_list[typ]:
+            for name in self._var_allprocs_prom2abs_list[typ]:
                 if name in names:
                     maps[typ][name] = name
                     found = True
@@ -814,8 +814,8 @@ class System(object):
 
         out_names = []
         res_names = []
-        for out_abs_name in self._varx_abs_names['output']:
-            out_idx = self._assembler._varx_allprocs_abs2idx_io[out_abs_name]
+        for out_abs_name in self._var_abs_names['output']:
+            out_idx = self._assembler._var_allprocs_abs2idx_io[out_abs_name]
             if out_idx in var_ids:
                 res_names.append(out_abs_name)
                 if var_inds is None or (var_inds[0] <= out_idx < var_inds[1] or
@@ -823,11 +823,11 @@ class System(object):
                     out_names.append(out_abs_name)
 
         in_names = []
-        for in_abs_name in self._varx_abs_names['input']:
+        for in_abs_name in self._var_abs_names['input']:
             out_abs = self._assembler._input_srcs[in_abs_name]
             if out_abs is None:
                 continue
-            out_idx = self._assembler._varx_allprocs_abs2idx_io[out_abs]
+            out_idx = self._assembler._var_allprocs_abs2idx_io[out_abs]
             if out_idx in var_ids:
                 if var_inds is None or (var_inds[0] <= out_idx < var_inds[1] or
                                         var_inds[2] <= out_idx < var_inds[3]):
@@ -1368,7 +1368,7 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        pro2abs = self._varx_allprocs_prom2abs_list['output']
+        pro2abs = self._var_allprocs_prom2abs_list['output']
 
         # Human readable error message during Driver setup.
         try:
@@ -1416,7 +1416,7 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        prom2abs = self._varx_allprocs_prom2abs_list['output']
+        prom2abs = self._var_allprocs_prom2abs_list['output']
 
         # Human readable error message during Driver setup.
         try:

@@ -25,11 +25,11 @@ class TestExplicitComponent(unittest.TestCase):
         prob = Problem(comp).setup(check=False)
 
         # check optional metadata (desc)
-        self.assertEqual(comp._varx_abs2data_io['length']['metadata']['desc'],
+        self.assertEqual(comp._var_abs2data_io['length']['metadata']['desc'],
                          'length of rectangle')
-        self.assertEqual(comp._varx_abs2data_io['width']['metadata']['desc'],
+        self.assertEqual(comp._var_abs2data_io['width']['metadata']['desc'],
                          'width of rectangle')
-        self.assertEqual(comp._varx_abs2data_io['area']['metadata']['desc'],
+        self.assertEqual(comp._var_abs2data_io['area']['metadata']['desc'],
                          'area of rectangle')
 
         prob['length'] = 3.
@@ -83,7 +83,7 @@ class TestExplicitComponent(unittest.TestCase):
 
     def test_setup_bug1(self):
         # This tests a bug where, if you run setup more than once on a derived component class,
-        # the _varx_abs_names continually gets prepended with the component global path.
+        # the _var_abs_names continually gets prepended with the component global path.
 
         class NewBase(Component):
             def __init__(self, **kwargs):
@@ -101,13 +101,13 @@ class TestExplicitComponent(unittest.TestCase):
 
         prob.setup(check=False)
         comp = model.get_subsystem('comp')
-        self.assertEqual(comp._varx_abs_names['input'], ['comp.x'])
-        self.assertEqual(comp._varx_abs_names['output'], ['comp.y'])
+        self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
+        self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
 
         prob.run_model()
         prob.setup(check=False)
-        self.assertEqual(comp._varx_abs_names['input'], ['comp.x'])
-        self.assertEqual(comp._varx_abs_names['output'], ['comp.y'])
+        self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
+        self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
 
 class TestImplicitComponent(unittest.TestCase):
 
