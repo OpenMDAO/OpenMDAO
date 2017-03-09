@@ -32,6 +32,14 @@ class Component(System):
         A mapping of local variable name to its metadata.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
+    _varx_rel2data_io : dict
+        Dictionary mapping rellative names to dicts with keys (prom, rel, my_idx, type_, metadata).
+        This is only needed while adding inputs and outputs. During setup, these are used to
+        build _varx_abs2data_io.
+    _varx_rel_names : {'input': [str, ...], 'output': [str, ...]}
+        List of relative names of owned variables existing on current proc.
+        This is only needed while adding inputs and outputs. During setup, these are used to
+        determine the _varx_abs_names.
     """
 
     def __init__(self, **kwargs):
@@ -46,6 +54,10 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
         self._var2meta = {}
         self._approx_schemes = OrderedDict()
+
+        # [REFACTOR]
+        self._varx_rel_names = {'input': [], 'output': []}
+        self._varx_rel2data_io = {}
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
                   desc='', var_set=0):
