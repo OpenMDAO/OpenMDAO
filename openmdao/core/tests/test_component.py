@@ -95,8 +95,6 @@ class TestExplicitComponent(unittest.TestCase):
                 self.add_input('x', val=0.0)
                 self.add_output('y', val=0.0)
 
-        from openmdao.components.tests.test_deprecated_component import TestComp
-
         prob = Problem()
         model = prob.model = Group()
         model.add_subsystem('comp', MyComp())
