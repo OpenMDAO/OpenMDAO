@@ -138,7 +138,7 @@ class Component(System):
         # [REFACTOR]
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         abs_name = name
-        self._varx_abs2data_io[abs_name] = {'prom': name, 'rel': name,
+        self._varx_rel2data_io[abs_name] = {'prom': name, 'rel': name,
                                             'my_idx': len(self._varx_rel_names['input']),
                                             'type_': 'input', 'metadata': metadata}
         self._varx_rel_names['input'].append(abs_name)
@@ -270,7 +270,7 @@ class Component(System):
         # [REFACTOR]
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         abs_name = name
-        self._varx_abs2data_io[abs_name] = {'prom': name, 'rel': name,
+        self._varx_rel2data_io[abs_name] = {'prom': name, 'rel': name,
                                             'my_idx': len(self._varx_rel_names['output']),
                                             'type_': 'output', 'metadata': metadata}
         self._varx_rel_names['output'].append(abs_name)
@@ -621,9 +621,9 @@ class Component(System):
                 abs_names.append(abs_name)
             self._varx_abs_names[type_] = abs_names
 
-        # Now that we know the pathname, convert _varx_abs2data_io from names to abs_names.
+        # Now that we know the pathname, convert _varx_rel2data_io from names to abs_names.
         abs2data_io = {}
-        for name, data in iteritems(self._varx_abs2data_io):
+        for name, data in iteritems(self._varx_rel2data_io):
             abs_name = rel_name2abs_name(self, name)
             abs2data_io[abs_name] = data
         self._varx_abs2data_io = abs2data_io
