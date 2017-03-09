@@ -269,7 +269,7 @@ class Component(System):
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         self._varx_rel2data_io[name] = {'prom': name, 'rel': name,
                                         'my_idx': len(self._varx_rel_names['output']),
-                                            'type': 'output', 'metadata': metadata}
+                                        'type': 'output', 'metadata': metadata}
         self._varx_rel_names['output'].append(name)
         self._varx_allprocs_prom2abs_list['output'][name] = [name]
 

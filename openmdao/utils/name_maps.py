@@ -214,13 +214,13 @@ def key2abs_key(system, key):
     (str, str) or None
         Absolute name pair of sub-Jacobian if unique abs_key found or None otherwise.
     """
-    abs_key1 = prom_key2abs_key(system, key)
-    abs_key2 = rel_key2abs_key(system, key)
+    abs_key = prom_key2abs_key(system, key)
+    if abs_key is not None:
+        return abs_key
 
-    if abs_key1 is not None:
-        return abs_key1
-    elif (abs_key2[0] in system._varx_abs_names['output']
-          and abs_key2[1] in system._varx_abs2data_io):
-        return abs_key2
+    abs_key = rel_key2abs_key(system, key)
+    if (abs_key[0] in system._varx_abs_names['output']
+            and abs_key[1] in system._varx_abs2data_io):
+        return abs_key
     else:
         return None

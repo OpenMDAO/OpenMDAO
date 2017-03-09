@@ -161,8 +161,7 @@ class ExecComp(ExplicitComponent):
 
         # need to exclude any non-pbo outputs (like case_rank in ExecComp4Test)
         # TODO: for now, assume all outputs are non-pbo
-        abs2data = self._varx_abs2data_io
-        self._non_pbo_outputs = [abs2data[n]['prom'] for n in self._varx_abs_names['output']]
+        self._non_pbo_outputs = self._varx_rel_names['output']
 
         self._to_colons = {}
         from_colons = self._from_colons = {}

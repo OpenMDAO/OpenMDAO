@@ -298,6 +298,12 @@ class Group(System):
             else:
                 self._varx_allprocs_prom2abs_list[type_][prom_name].append(abs_name)
 
+        for prom_name, lst in iteritems(self._varx_allprocs_prom2abs_list['output']):
+            if len(lst) > 1:
+                raise RuntimeError("Output name '%s' refers to "
+                                   "multiple outputs: %s." %
+                                   (prom_name, sorted(lst)))
+
         # If we're running in parallel, gather contributions from other procs.
         if self.comm.size > 1:
             for type_ in ['input', 'output']:

@@ -287,8 +287,7 @@ class System(object):
 
     def _setupx_variables(self):
         """
-        Compute variable dict/list for variables on the current processor and
-        all processors.
+        Compute data structs for variables on current and all processors.
 
         Sets the following attributes:
             _varx_abs2data_io
@@ -1394,11 +1393,11 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        pro2abs = self._varx_allprocs_prom2abs_list
+        pro2abs = self._varx_allprocs_prom2abs_list['output']
 
         # Human readable error message during Driver setup.
         try:
-            out = {pro2abs[name]: data for name, data in iteritems(self._design_vars)}
+            out = {pro2abs[name][0]: data for name, data in iteritems(self._design_vars)}
         except KeyError as err:
             msg = "Output not found for design variable {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
@@ -1442,11 +1441,11 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        prom2abs = self._varx_allprocs_prom2abs_list
+        prom2abs = self._varx_allprocs_prom2abs_list['output']
 
         # Human readable error message during Driver setup.
         try:
-            out = {prom2abs[name]: data for name, data in iteritems(self._responses)}
+            out = {prom2abs[name][0]: data for name, data in iteritems(self._responses)}
         except KeyError as err:
             msg = "Output not found for response {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
