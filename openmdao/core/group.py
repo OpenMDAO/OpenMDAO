@@ -189,11 +189,6 @@ class Group(System):
             for sub_pairs in pairs_raw:
                 pairs.extend(sub_pairs)
 
-        allprocs_in_names = self._var_allprocs_names['input']
-        myproc_in_names = self._var_myproc_names['input']
-
-        allprocs_out_names = self._var_allprocs_names['output']
-
         in_offset = self._varx_allprocs_idx_range['input'][0]
         out_offset = self._varx_allprocs_idx_range['output'][0]
 
@@ -246,78 +241,7 @@ class Group(System):
         """
         Set up variable name and metadata lists.
         """
-        self._var_pathdict = {}
-        self._var_name2path = {'input': {}, 'output': {}}
-
-        start = len(self.pathname) + 1 if self.pathname else 0
-        found_proms = [False for s in self._subsystems_myproc]
-
-        for ityp, typ in enumerate(['input', 'output']):
-            my_idx_dict = {}  # maps absolute path to myproc idx
-            myproc_names = self._var_myproc_names[typ]
-            name2path = self._var_name2path[typ]
-
-            for isub, subsys in enumerate(self._subsystems_myproc):
-                # Assemble the names list from subsystems
-                subsys._var_maps[typ], found = subsys._get_maps(typ)
-                found_proms[isub] |= found
-                if ityp == 1 and not found_proms[isub]:
-                    for io, lst in subsys._var_promotes.items():
-                        if lst:
-                            if io == 'any':
-                                suffix = ''
-                            else:
-                                suffix = '_%ss' % io
-                            raise RuntimeError("%s: no variables were promoted "
-                                               "based on promotes%s=%s" %
-                                               (subsys.pathname, suffix, list(lst)))
-                paths = subsys._var_allprocs_pathnames[typ]
-
-                for idx, subname in enumerate(subsys._var_allprocs_names[typ]):
-                    name = subsys._var_maps[typ][subname]
-                    self._var_allprocs_names[typ].append(name)
-                    self._var_allprocs_pathnames[typ].append(paths[idx])
-                    my_idx_dict[paths[idx]] = len(myproc_names)
-                    myproc_names.append(paths[idx][start:])
-
-                # Assemble the metadata list from the subsystems
-                metadata = subsys._var_myproc_metadata[typ]
-                self._var_myproc_metadata[typ].extend(metadata)
-
-            # The names list is on all procs, allgather all names
-            if self.comm.size > 1:
-
-                # One representative proc from each sub_comm adds names
-                sub_comm = self._subsystems_myproc[0].comm
-                if sub_comm.rank == 0:
-                    names = (self._var_allprocs_names[typ],
-                             self._var_allprocs_pathnames[typ])
-                else:
-                    names = ([], [])
-
-                # Every proc on this comm now has global variable names
-                self._var_allprocs_names[typ] = []
-                self._var_allprocs_pathnames[typ] = []
-                for names, pathnames in self.comm.allgather(names):
-                    self._var_allprocs_names[typ].extend(names)
-                    self._var_allprocs_pathnames[typ].extend(pathnames)
-
-            for idx, name in enumerate(self._var_allprocs_names[typ]):
-                path = self._var_allprocs_pathnames[typ][idx]
-                self._var_pathdict[path] = PathData(name, idx,
-                                                    my_idx_dict.get(path), typ)
-                if name in name2path:
-                    if typ is 'input':
-                        name2path[name].append(path)
-                    else:
-                        raise RuntimeError("Output name '%s' refers to "
-                                           "multiple outputs: %s." %
-                                           (name, [path, name2path[name]]))
-                else:
-                    if typ is 'input':
-                        name2path[name] = [path]
-                    else:
-                        name2path[name] = path
+        pass
 
     def _setupx_variables_myproc(self):
         """
@@ -331,15 +255,28 @@ class Group(System):
         for type_ in ['input', 'output']:
             self._varx_abs_names[type_] = []
 
-        name_offset = len(self.pathname) if self.pathname else 0
+        name_offset = len(self.pathname) + 1 if self.pathname else 0
         iotypes = ('input', 'output')
 
+        found_proms = [False for s in self._subsystems_myproc]
+
         # Perform recursion to populate the dict and list bottom-up
-        for subsys in self._subsystems_myproc:
+        for isub, subsys in enumerate(self._subsystems_myproc):
             subsys._setupx_variables_myproc()
 
             for type_ in iotypes:
-                var_maps = subsys._get_maps(type_)[0]
+                var_maps, found = subsys._get_maps(type_)
+                found_proms[isub] |= found
+                if type_ == 1 and not found_proms[isub]:
+                    for io, lst in subsys._var_promotes.items():
+                        if lst:
+                            if io == 'any':
+                                suffix = ''
+                            else:
+                                suffix = '_%ss' % io
+                            raise RuntimeError("%s: no variables were promoted "
+                                               "based on promotes%s=%s" %
+                                               (subsys.pathname, suffix, list(lst)))
 
                 # Assemble _varx_abs2data_io and _varx_abs_names by concatenating from subsystems.
                 for abs_name in subsys._varx_abs_names[type_]:
@@ -349,7 +286,7 @@ class Group(System):
                         'prom': var_maps[sub_data['prom']],
                         'rel': abs_name[name_offset:] if name_offset > 0 else abs_name,
                         'my_idx': len(self._varx_abs_names[type_]),
-                        'type_': type_,
+                        'type': type_,
                         'metadata': sub_data['metadata']
                     }
                     self._varx_abs_names[type_].append(abs_name)
@@ -381,7 +318,7 @@ class Group(System):
         # _varx_abs2data_io to capture at least the local maps.
         self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         for abs_name, data in iteritems(self._varx_abs2data_io):
-            type_ = data['type_']
+            type_ = data['type']
             prom_name = data['prom']
             if prom_name not in self._varx_allprocs_prom2abs_list[type_]:
                 self._varx_allprocs_prom2abs_list[type_][prom_name] = [abs_name]

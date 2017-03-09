@@ -144,10 +144,11 @@ def name2abs_name(system, name, names, type_):
         Absolute variable name if unique abs_name found or None otherwise.
     """
     abs_name1 = prom_name2abs_name(system, name, type_)
-    abs_name2 = rel_name2abs_name(system, name)
     if abs_name1 in names:
         return abs_name1
-    elif abs_name2 in names:
+
+    abs_name2 = rel_name2abs_name(system, name)
+    if abs_name2 in names:
         return abs_name2
     else:
         return None

@@ -44,7 +44,6 @@ class Component(System):
             available here and in all descendants of this system.
         """
         super(Component, self).__init__(**kwargs)
-        self._var2meta = {}
         self._approx_schemes = OrderedDict()
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
@@ -130,17 +129,11 @@ class Component(System):
         # var_set: taken as is
         metadata['var_set'] = var_set
 
-        self._var_allprocs_names['input'].append(name)
-        self._var_myproc_names['input'].append(name)
-        self._var_myproc_metadata['input'].append(metadata)
-        self._var2meta[name] = metadata
-
-        # [REFACTOR]
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         abs_name = name
         self._varx_abs2data_io[abs_name] = {'prom': name, 'rel': name,
                                             'my_idx': len(self._varx_abs_names['input']),
-                                            'type_': 'input', 'metadata': metadata}
+                                            'type': 'input', 'metadata': metadata}
         self._varx_abs_names['input'].append(abs_name)
         self._varx_allprocs_prom2abs_list['input'][name] = [abs_name]
 
@@ -262,17 +255,11 @@ class Component(System):
         # var_set: taken as is
         metadata['var_set'] = var_set
 
-        self._var_allprocs_names['output'].append(name)
-        self._var_myproc_names['output'].append(name)
-        self._var_myproc_metadata['output'].append(metadata)
-        self._var2meta[name] = metadata
-
-        # [REFACTOR]
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         abs_name = name
         self._varx_abs2data_io[abs_name] = {'prom': name, 'rel': name,
                                             'my_idx': len(self._varx_abs_names['output']),
-                                            'type_': 'output', 'metadata': metadata}
+                                            'type': 'output', 'metadata': metadata}
         self._varx_abs_names['output'].append(abs_name)
         self._varx_allprocs_prom2abs_list['output'][name] = [abs_name]
 
@@ -439,8 +426,8 @@ class Component(System):
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         glob_patterns = {'*', '?', '['}
-        outs = self._var_allprocs_names['output']
-        ins = self._var_allprocs_names['input']
+        outs = self._varx_allprocs_prom2abs_list['output']
+        ins = self._varx_allprocs_prom2abs_list['input']
 
         def find_matches(pattern, var_list):
             if glob_patterns.intersection(pattern):
@@ -514,43 +501,6 @@ class Component(System):
         for approx in self._approx_schemes:
             approx._init_approximations()
 
-    def _setup_variables(self, recurse=False):
-        """
-        Assemble variable metadata and names lists.
-
-        Sets the following attributes:
-            _var_allprocs_names
-            _var_myproc_names
-            _var_myproc_metadata
-            _var_pathdict
-            _var_name2path
-
-        Parameters
-        ----------
-        recurse : boolean
-            Ignored.
-        """
-        super(Component, self)._setup_variables(False)
-
-        # set up absolute path info
-        self._var_pathdict = {}
-        self._var_name2path = {'input': {}, 'output': {}}
-        for typ in ['input', 'output']:
-            names = self._var_allprocs_names[typ]
-            if self.pathname:
-                self._var_allprocs_pathnames[typ] = paths = [
-                    '.'.join((self.pathname, n)) for n in names
-                ]
-            else:
-                self._var_allprocs_pathnames[typ] = paths = names
-            for idx, name in enumerate(names):
-                path = paths[idx]
-                self._var_pathdict[path] = PathData(name, idx, idx, typ)
-                if typ is 'input':
-                    self._var_name2path[typ][name] = (path,)
-                else:
-                    self._var_name2path[typ][name] = path
-
     def _setup_partials(self):
         """
         Set up partial derivative sparsity structures and approximation schemes.
@@ -594,16 +544,16 @@ class Component(System):
         #       value of 1.0 being broadcast into all values in the vector
         #       that were allocated according to the shape.
         if vectors['input']._name is 'nonlinear':
-            names = self._var_myproc_names['input']
             inputs = self._inputs
-            for i, meta in enumerate(self._var_myproc_metadata['input']):
-                inputs[names[i]] = meta['value']
-
-        if vectors['output']._name is 'nonlinear':
-            names = self._var_myproc_names['output']
             outputs = self._outputs
-            for i, meta in enumerate(self._var_myproc_metadata['output']):
-                outputs[names[i]] = meta['value']
+            abs2data = self._varx_abs2data_io
+
+            for name in self._varx_abs_names['input']:
+                inputs[abs2data[name]['rel']] = abs2data[name]['metadata']['value']
+
+            # inputs are nonlinear, so are outputs
+            for name in self._varx_abs_names['output']:
+                outputs[abs2data[name]['rel']] = abs2data[name]['metadata']['value']
 
     def _setupx_variables_myproc(self):
         """

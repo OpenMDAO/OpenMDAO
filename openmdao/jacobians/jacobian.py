@@ -231,7 +231,7 @@ class Jacobian(object):
 
         ind0 = data0['my_idx']
         ind1 = data1['my_idx']
-        type_ = data1['type_']
+        type_ = data1['type']
 
         val = coeffs['residual'][ind0, 1] / coeffs[type_][ind1, 1]
         self._multiply_subjac(abs_key, val)
