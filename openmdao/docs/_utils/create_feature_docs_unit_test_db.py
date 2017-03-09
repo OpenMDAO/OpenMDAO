@@ -17,9 +17,8 @@
             feature
             title
 
-        The method_path is the dotted path to the
-            unit test method,
-            e.g. openmdao.tests.test_exec_comp.TestExecComp.test_complex_step
+        The method_path is the dotted path to the unit test method,
+            e.g. openmdao.core.tests.test_expl_comp.TestExplCompSimple.test_simple
 
         The feature is the argument from the Feature section
 
