@@ -3,6 +3,7 @@ import numpy as np
 import unittest
 
 from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector
+from openmdao.devtools.testutil import assert_rel_error
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -45,13 +46,6 @@ class Test(unittest.TestCase):
         self.p = Problem(group).setup(DefaultVector)
         self.p.model.suppress_solver_output = True
 
-    def assertEqualArrays(self, a, b):
-        self.assertTrue(np.linalg.norm(a-b) < 1e-15)
-
-    def assertList(self, ab_list):
-        for a, b in ab_list:
-            self.assertEqualArrays(a, b)
-
     def test_subsystems(self):
         root = self.p.model
 
@@ -71,28 +65,28 @@ class Test(unittest.TestCase):
                 idxs[name] for name in system._varx_abs_names[type_]
             ])
 
-        self.assertEqualArrays(get_inds(self.p, '', 'input'), np.array([0]))
-        self.assertEqualArrays(get_inds(self.p, '', 'output'), np.array([0,1]))
+        assert_rel_error(self, get_inds(self.p, '', 'input'), np.array([0]))
+        assert_rel_error(self, get_inds(self.p, '', 'output'), np.array([0,1]))
 
-        self.assertEqualArrays(get_inds(self.p, 'A', 'input'), np.array([]))
-        self.assertEqualArrays(get_inds(self.p, 'A', 'output'), np.array([0]))
+        assert_rel_error(self, get_inds(self.p, 'A', 'input'), np.array([]))
+        assert_rel_error(self, get_inds(self.p, 'A', 'output'), np.array([0]))
 
-        self.assertEqualArrays(get_inds(self.p, 'B', 'input'), np.array([0]))
-        self.assertEqualArrays(get_inds(self.p, 'B', 'output'), np.array([1]))
+        assert_rel_error(self, get_inds(self.p, 'B', 'input'), np.array([0]))
+        assert_rel_error(self, get_inds(self.p, 'B', 'output'), np.array([1]))
 
     def test_varx_allprocs_idx_range(self):
         root_rng = self.p.model._varx_allprocs_idx_range
         compA_rng = self.p.model.get_subsystem('A')._varx_allprocs_idx_range
         compB_rng = self.p.model.get_subsystem('B')._varx_allprocs_idx_range
 
-        self.assertEqualArrays(root_rng['input'], np.array([0,1]))
-        self.assertEqualArrays(root_rng['output'], np.array([0,2]))
+        assert_rel_error(self, root_rng['input'], np.array([0,1]))
+        assert_rel_error(self, root_rng['output'], np.array([0,2]))
 
-        self.assertEqualArrays(compA_rng['input'], np.array([0,0]))
-        self.assertEqualArrays(compA_rng['output'], np.array([0,1]))
+        assert_rel_error(self, compA_rng['input'], np.array([0,0]))
+        assert_rel_error(self, compA_rng['output'], np.array([0,1]))
 
-        self.assertEqualArrays(compB_rng['input'], np.array([0,1]))
-        self.assertEqualArrays(compB_rng['output'], np.array([1,2]))
+        assert_rel_error(self, compB_rng['input'], np.array([0,1]))
+        assert_rel_error(self, compB_rng['output'], np.array([1,2]))
 
     def test_connections(self):
         root = self.p.model
@@ -108,29 +102,21 @@ class Test(unittest.TestCase):
             compB = root.get_subsystem('B')
 
             if root.comm.rank == 0:
-                self.assertList([
-                    [root._outputs['A.x'], 0],
-                    [compA._outputs['x'],  0],
-                ])
+                assert_rel_error(self, root._outputs['A.x'], 0)
+                assert_rel_error(self, compA._outputs['x'], 0)
                 compA._outputs['x'] = 10
             if root.comm.rank == 2:
-                self.assertList([
-                    [compB._inputs['x'],   0],
-                    [compB._outputs['f'],  0],
-                ])
+                assert_rel_error(self, compB._inputs['x'], 0)
+                assert_rel_error(self, compB._outputs['f'], 0)
 
             root.run_solve_nonlinear()
 
             if root.comm.rank == 0:
-                self.assertList([
-                    [root._outputs['A.x'], 10],
-                    [compA._outputs['x'],  10],
-                ])
+                assert_rel_error(self, root._outputs['A.x'], 10)
+                assert_rel_error(self, compA._outputs['x'], 10)
             if root.comm.rank == 2:
-                self.assertList([
-                    [compB._inputs['x'],   10],
-                    [compB._outputs['f'],  20],
-                ])
+                assert_rel_error(self, compB._inputs['x'], 10)
+                assert_rel_error(self, compB._outputs['f'], 20)
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")

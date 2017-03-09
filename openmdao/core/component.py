@@ -32,6 +32,14 @@ class Component(System):
         A mapping of local variable name to its metadata.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
+    _varx_rel2data_io : dict
+        Dictionary mapping rellative names to dicts with keys (prom, rel, my_idx, type_, metadata).
+        This is only needed while adding inputs and outputs. During setup, these are used to
+        build _varx_abs2data_io.
+    _varx_rel_names : {'input': [str, ...], 'output': [str, ...]}
+        List of relative names of owned variables existing on current proc.
+        This is only needed while adding inputs and outputs. During setup, these are used to
+        determine the _varx_abs_names.
     """
 
     def __init__(self, **kwargs):
@@ -45,6 +53,10 @@ class Component(System):
         """
         super(Component, self).__init__(**kwargs)
         self._approx_schemes = OrderedDict()
+
+        # [REFACTOR]
+        self._varx_rel_names = {'input': [], 'output': []}
+        self._varx_rel2data_io = {}
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
                   desc='', var_set=0):
@@ -130,12 +142,11 @@ class Component(System):
         metadata['var_set'] = var_set
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
-        abs_name = name
-        self._varx_abs2data_io[abs_name] = {'prom': name, 'rel': name,
-                                            'my_idx': len(self._varx_abs_names['input']),
-                                            'type': 'input', 'metadata': metadata}
-        self._varx_abs_names['input'].append(abs_name)
-        self._varx_allprocs_prom2abs_list['input'][name] = [abs_name]
+        self._varx_rel2data_io[name] = {'prom': name, 'rel': name,
+                                        'my_idx': len(self._varx_rel_names['input']),
+                                        'type': 'input', 'metadata': metadata}
+        self._varx_rel_names['input'].append(name)
+        self._varx_allprocs_prom2abs_list['input'][name] = [name]
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
@@ -256,12 +267,11 @@ class Component(System):
         metadata['var_set'] = var_set
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
-        abs_name = name
-        self._varx_abs2data_io[abs_name] = {'prom': name, 'rel': name,
-                                            'my_idx': len(self._varx_abs_names['output']),
-                                            'type': 'output', 'metadata': metadata}
-        self._varx_abs_names['output'].append(abs_name)
-        self._varx_allprocs_prom2abs_list['output'][name] = [abs_name]
+        self._varx_rel2data_io[name] = {'prom': name, 'rel': name,
+                                        'my_idx': len(self._varx_rel_names['output']),
+                                        'type': 'output', 'metadata': metadata}
+        self._varx_rel_names['output'].append(name)
+        self._varx_allprocs_prom2abs_list['output'][name] = [name]
 
     def approx_partials(self, of, wrt, method='fd', **kwargs):
         """
@@ -563,17 +573,17 @@ class Component(System):
             _varx_abs2data_io
             _varx_abs_names
         """
-        # Now that we know the pathname, convert _varx_abs_names from names to abs_names.
+        # Now that we know the pathname, convert _varx_rel_names from names to abs_names.
         for type_ in ['input', 'output']:
             abs_names = []
-            for name in self._varx_abs_names[type_]:
+            for name in self._varx_rel_names[type_]:
                 abs_name = rel_name2abs_name(self, name)
                 abs_names.append(abs_name)
             self._varx_abs_names[type_] = abs_names
 
-        # Now that we know the pathname, convert _varx_abs2data_io from names to abs_names.
+        # Now that we know the pathname, convert _varx_rel2data_io from names to abs_names.
         abs2data_io = {}
-        for name, data in iteritems(self._varx_abs2data_io):
+        for name, data in iteritems(self._varx_rel2data_io):
             abs_name = rel_name2abs_name(self, name)
             abs2data_io[abs_name] = data
         self._varx_abs2data_io = abs2data_io

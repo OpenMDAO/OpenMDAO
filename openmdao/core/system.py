@@ -355,6 +355,12 @@ class System(object):
             for type_ in ['input', 'output']:
                 self._varx_abs_names[type_] = []
 
+                # Only Components have this:
+                try:
+                    self._varx_rel_names[type_] = []
+                except AttributeError:
+                    pass
+
             self.initialize_variables()
 
     def _setup_variable_indices(self, global_index, recurse=True):
