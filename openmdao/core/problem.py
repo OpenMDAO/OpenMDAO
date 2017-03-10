@@ -104,6 +104,9 @@ class Problem(object):
 
             model = root
 
+        if model is None:
+            model = Group()
+
         self.model = model
         self.comm = comm
         self.driver = Driver()
