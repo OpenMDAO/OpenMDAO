@@ -277,10 +277,8 @@ class Problem(object):
 
         # Recursive system setup
         model._setup_processors('', comm, {}, assembler, [0, comm.size])
-        model._setup_variables()
+        allprocs_abs_names = model._setup_variables()
         model._setup_variable_indices({'input': 0, 'output': 0})
-        allprocs_abs_names = model._setupx_variables()
-        model._setupx_variable_allprocs_indices({'input': 0, 'output': 0})
         model._setup_partials()
         model._setup_connections()
 

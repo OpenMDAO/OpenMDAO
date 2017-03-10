@@ -272,50 +272,24 @@ class System(object):
                                          sub_global_dict, assembler,
                                          sub_proc_range)
 
-    def _setupx_variables(self):
+    def _setup_variables(self, recurse=True):
         """
-        Compute data structs for variables on current and all processors.
+        Assemble variable metadata and names lists.
 
         Sets the following attributes:
             _var_abs2data_io
             _var_abs_names
             _var_allprocs_prom2abs_list
 
-        Returns
-        -------
-        {'input': [str, ...], 'output': [str, ...]}
-            List of absolute names of owned variables existing on current proc.
-        """
-        pass
-
-    def _setupx_variable_allprocs_indices(self, global_index):
-        """
-        Compute the global index range for variables on all processors.
-
-        Computes the following attributes:
-            _var_allprocs_idx_range
-
-        Parameters
-        ----------
-        global_index : {'input': int, 'output': int}
-            current global variable counter.
-        """
-        pass
-
-    def _setup_variables(self, recurse=True):
-        """
-        Assemble variable metadata and names lists.
-
-        Sets the following attributes:
-            _var_allprocs_names
-            _var_allprocs_pathnames
-            _var_myproc_names
-            _var_myproc_metadata
-
         Parameters
         ----------
         recurse : boolean
             recursion is not performed if traversing up the tree after reconf.
+
+        Returns
+        -------
+        {'input': [str, ...], 'output': [str, ...]}
+            List of absolute names of owned variables existing on current proc.
         """
         # Perform recursion
         if recurse:
@@ -346,7 +320,6 @@ class System(object):
 
         Sets the following attributes:
             _var_allprocs_idx_range
-            _var_myproc_indices
 
         Parameters
         ----------
@@ -355,46 +328,7 @@ class System(object):
         recurse : boolean
             recursion is not performed if traversing up the tree after reconf.
         """
-        # Define the global variable range for the system
-        for typ in ['input', 'output']:
-            size = len(self._var_allprocs_prom2abs_list[typ])
-            self._var_allprocs_idx_range[typ][0] = global_index[typ]
-            self._var_allprocs_idx_range[typ][1] = global_index[typ] + size
-
-        # If group, compute _var_myproc_indices as follows
-        if len(self._subsystems_myproc) > 0:
-            subsys0 = self._subsystems_myproc[0]
-
-            # Pre-recursion: compute 'index' to pass to subsystems
-            # Need offset: number of variables on procs before current proc
-            # Necessary because of multiple global counters on different procs
-            if self.comm.size > 1:
-                for typ in ['input', 'output']:
-                    local_var_size = len(subsys0._var_allprocs_prom2abs_list[typ])
-
-                    # Compute the variable count list; 0 on rank > 0 procs
-                    sub_comm = subsys0.comm
-                    if sub_comm.rank == 0:
-                        nvar_myproc = local_var_size
-                    else:
-                        nvar_myproc = 0
-                    nvar_allprocs = self.comm.allgather(nvar_myproc)
-
-                    # Compute the offset
-                    iproc = self.comm.rank
-                    nvar_myproc = local_var_size
-                    global_index[typ] += \
-                        np.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
-
-            # Perform the recursion
-            if recurse:
-                for subsys in self._subsystems_myproc:
-                    subsys._setup_variable_indices(global_index)
-
-        # Reset index dict to the global variable count on all procs
-        # Necessary for younger siblings to have proper index values
-        for typ in ['input', 'output']:
-            global_index[typ] = self._var_allprocs_idx_range[typ][1]
+        pass
 
     def _setup_partials(self):
         """
