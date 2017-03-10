@@ -286,11 +286,6 @@ class System(object):
         ----------
         recurse : boolean
             recursion is not performed if traversing up the tree after reconf.
-
-        Returns
-        -------
-        {'input': [str, ...], 'output': [str, ...]}
-            List of absolute names of owned variables existing on current proc.
         """
         # Perform recursion
         if recurse:
