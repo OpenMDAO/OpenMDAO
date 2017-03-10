@@ -264,7 +264,6 @@ class Group(System):
             self._var_abs_names[type_] = []
 
         name_offset = len(self.pathname) + 1 if self.pathname else 0
-        iotypes = ('input', 'output')
         allprocs_abs_names = {'input': [], 'output': []}
 
         # Perform recursion to populate the dict and list bottom-up
@@ -272,7 +271,7 @@ class Group(System):
             subsys_allprocs_abs_names = subsys._setup_variables()
 
             var_maps = subsys._get_maps()
-            for type_ in iotypes:
+            for type_ in ['input', 'output']:
                 # concatenate the allprocs variable names from subsystems on my proc.
                 allprocs_abs_names[type_].extend(subsys_allprocs_abs_names[type_])
 
