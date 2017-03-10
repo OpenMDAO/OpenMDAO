@@ -67,7 +67,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
-        for idx, t in enumerate(abs_tgt_names):
+        for t in system._var_abs_names['input']:
             tmeta = system._var_abs2data_io[t]['metadata']
             idxs = tmeta['src_indices']
             if idxs is None:
@@ -101,7 +101,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
             vals[t] = val
 
-        noconn_srcs = sorted((n for n in abs_src_names
+        noconn_srcs = sorted((n for n in system._var_abs_names['output']
                                 if n not in src2tgts), reverse=True)
         for s in noconn_srcs:
             vals[s] = str(system._outputs[s])
@@ -110,18 +110,18 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     src_systems = set()
     tgt_systems = set()
-    for s in abs_src_names:
+    for s in system._var_abs_names['output']:
         parts = s.split('.')
         for i in range(len(parts)):
             src_systems.add('.'.join(parts[:i]))
 
-    for t in abs_tgt_names:
+    for t in system._var_abs_names['input']:
         parts = t.split('.')
         for i in range(len(parts)):
             tgt_systems.add('.'.join(parts[:i]))
 
     # reverse sort so that "NO CONNECTION" shows up at the bottom
-    src2tgts['NO CONNECTION'] = sorted([t for t in abs_tgt_names
+    src2tgts['NO CONNECTION'] = sorted([t for t in system._var_abs_names['input']
                                     if t not in connections], reverse=True)
 
     src_systems = [{'name':n} for n in sorted(src_systems)]
