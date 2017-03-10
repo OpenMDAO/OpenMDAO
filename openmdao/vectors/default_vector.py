@@ -76,8 +76,8 @@ class DefaultVector(Vector):
         sizes_all = assembler._variable_sizes_all[self._typ]
         sizes = assembler._variable_sizes[self._typ]
 
-        for abs_name in system._varx_abs_names[self._typ]:
-            idx = assembler._varx_allprocs_abs2idx_io[abs_name]
+        for abs_name in system._var_abs_names[self._typ]:
+            idx = assembler._var_allprocs_abs2idx_io[abs_name]
             ivar_set, ivar = assembler._variable_set_indices[self._typ][idx, :]
 
             ivar_all = idx
@@ -101,7 +101,7 @@ class DefaultVector(Vector):
         system = self._system
         assembler = system._assembler
 
-        ind1, ind2 = self._system._varx_allprocs_idx_range[self._typ]
+        ind1, ind2 = self._system._var_allprocs_idx_range[self._typ]
 
         variable_set_indices = assembler._variable_set_indices[self._typ]
         sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
@@ -166,8 +166,8 @@ class DefaultVector(Vector):
 
         ind_offsets = {}
 
-        for abs_name in system._varx_abs_names[self._typ]:
-            idx = assembler._varx_allprocs_abs2idx_io[abs_name]
+        for abs_name in system._var_abs_names[self._typ]:
+            idx = assembler._var_allprocs_abs2idx_io[abs_name]
             iset, ivar = assembler._variable_set_indices[self._typ][idx, :]
             sizes_array = assembler._variable_sizes[self._typ][iset]
             ind1 = np.sum(sizes_array[self._iproc, :ivar])
@@ -179,7 +179,7 @@ class DefaultVector(Vector):
             ind1 -= ind_offsets[iset]
             ind2 -= ind_offsets[iset]
 
-            metadata = system._varx_abs2data_io[abs_name]['metadata']
+            metadata = system._var_abs2data_io[abs_name]['metadata']
 
             views[abs_name] = self._data[iset][ind1:ind2]
             views_flat[abs_name] = self._data[iset][ind1:ind2]

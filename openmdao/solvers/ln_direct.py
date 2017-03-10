@@ -99,7 +99,7 @@ class DirectSolver(LinearSolver):
         x_vec.set_data(in_vec)
 
         # apply linear
-        ind1, ind2 = system._varx_allprocs_idx_range['output']
+        ind1, ind2 = system._var_allprocs_idx_range['output']
         var_inds = [ind1, ind2, ind1, ind2]
         system._apply_linear([vec_name], 'fwd', var_inds)
 

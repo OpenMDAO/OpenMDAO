@@ -280,64 +280,28 @@ class Problem(object):
 
         # Recursive system setup
         model._setup_processors('', comm, {}, assembler, [0, comm.size])
-        model._setup_variables()
+        allprocs_abs_names = model._setup_variables()
         model._setup_variable_indices({'input': 0, 'output': 0})
-        model._setupx_variables_myproc()
-        allprocs_abs_names = model._setupx_variable_allprocs_names()
-        model._setupx_variable_allprocs_indices({'input': 0, 'output': 0})
         model._setup_partials()
         model._setup_connections()
 
-        # [REFACTOR VERIFICATION] for model._varx_allprocs_idx_range
-        for type_ in ['input', 'output']:
-            for ind in range(2):
-                assert model._var_allprocs_range[type_][ind] == \
-                    model._varx_allprocs_idx_range[type_][ind]
-
-        # [REFACTOR VERIFICATION] for model._varx_abs_names, model._varx_abs2data_io
-        for type_ in ['input', 'output']:
-            assert len(model._varx_abs_names[type_]) == len(model._var_myproc_names[type_])
-            for abs_name in model._varx_abs_names[type_]:
-                assert model._varx_abs2data_io[abs_name]['rel'] in model._var_myproc_names[type_]
-
-        # [REFACTOR VERIFICATION] imported here because it's temporary and will be removed soon
-        from six import iteritems
-        # [REFACTOR VERIFICATION] for model._varx_allprocs_prom2abs_list
-        for type_ in ['input', 'output']:
-            count = 0
-            for prom_name, abs_names_list in iteritems(model._varx_allprocs_prom2abs_list[type_]):
-                count += len(abs_names_list)
-                assert prom_name in model._var_allprocs_names[type_]
-                for abs_name in abs_names_list:
-                    assert abs_name in model._var_allprocs_pathnames[type_]
-            assert count == len(model._var_allprocs_pathnames[type_])
-            assert (len(model._varx_allprocs_prom2abs_list[type_])
-                    == len(set(model._var_allprocs_names[type_])))
-
-        assembler._setupx_variables(allprocs_abs_names)
-
         # Assembler setup: variable metadata and indices
-        assembler._setup_variables(model._varx_abs2data_io,
-                                   model._varx_abs_names)
+        assembler._setup_variables(allprocs_abs_names,
+                                   model._var_abs2data_io,
+                                   model._var_abs_names)
 
         # Assembler setup: variable connections
-        assembler._setup_connections(model._var_connections_indices,
-                                     model._varx_allprocs_prom2abs_list,
-                                     model._varx_abs2data_io)
+        assembler._setup_connections(model._var_connections_abs,
+                                     model._var_allprocs_prom2abs_list,
+                                     model._var_abs2data_io)
 
         # Assembler setup: global transfer indices vector
-        assembler._setup_src_indices(model._varx_abs2data_io,
-                                     model._varx_abs_names)
+        assembler._setup_src_indices(model._var_abs2data_io,
+                                     model._var_abs_names)
 
         # Assembler setup: compute data required for units/scaling
-        assembler._setup_src_data(model._varx_abs_names['output'],
-                                  model._varx_abs2data_io)
-
-        # [REFACTOR VERIFICATION] for assembler._varx_allprocs_abs_names
-        assert (model._var_allprocs_pathnames['input']
-                == assembler._varx_allprocs_abs_names['input'])
-        assert (model._var_allprocs_pathnames['output']
-                == assembler._varx_allprocs_abs_names['output'])
+        assembler._setup_src_data(model._var_abs_names['output'],
+                                  model._var_abs2data_io)
 
         # Set up scaling vectors
         model._setup_scaling()
@@ -398,7 +362,7 @@ class Problem(object):
             vectors[key] = vector_class(vec_name, typ, self.model)
 
         # TODO: implement this properly
-        ind1, ind2 = self.model._varx_allprocs_idx_range['output']
+        ind1, ind2 = self.model._var_allprocs_idx_range['output']
         vector_var_ids = np.arange(ind1, ind2)
 
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
@@ -519,16 +483,16 @@ class Problem(object):
                             deriv_value = subjacs.get(abs_key)
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                in_size = np.prod(comp._varx_abs2data_io[wrt]['metadata']['shape'])
-                                out_size = np.prod(comp._varx_abs2data_io[of]['metadata']['shape'])
+                                in_size = np.prod(comp._var_abs2data_io[wrt]['metadata']['shape'])
+                                out_size = np.prod(comp._var_abs2data_io[of]['metadata']['shape'])
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
                                     in_size = np.prod(
-                                        comp._varx_abs2data_io[wrt]['metadata']['shape'])
+                                        comp._var_abs2data_io[wrt]['metadata']['shape'])
                                     out_size = np.prod(
-                                        comp._varx_abs2data_io[of]['metadata']['shape'])
+                                        comp._var_abs2data_io[of]['metadata']['shape'])
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     for i, j, val in zip(jac_i, jac_j, jac_val):
@@ -736,13 +700,13 @@ class Problem(object):
             oldof = of
             of = []
             for names in oldof:
-                of.append(tuple(model._varx_allprocs_prom2abs_list['output'][name][0]
+                of.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                 for name in names))
 
             oldwrt = wrt
             wrt = []
             for names in oldwrt:
-                wrt.append(tuple(model._varx_allprocs_prom2abs_list['output'][name][0]
+                wrt.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                  for name in names))
 
         if mode == 'fwd':

@@ -67,7 +67,7 @@ class System(object):
         list of promoted names of all owned variables, not just on current proc.
     _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
         list of pathnames of all owned variables, not just on current proc.
-    _var_allprocs_range : {'input': [int, int], 'output': [int, int]}
+    _var_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
         index range of owned variables with respect to all problem variables.
     _var_allprocs_indices : {'input': dict, 'output': dict}
         dictionary of global indices keyed by the variable name.
@@ -88,17 +88,17 @@ class System(object):
         (used to calculate _var_maps)
     _var_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
-    _var_connections_indices : [(int, int), ...]
-        _var_connections with variable indices instead of names.  Entries
-        have the form (input_index, output_index).
-    _varx_allprocs_prom2abs_list : {'input': dict, 'output': dict}
+    _var_connections_abs : [(str, str), ...]
+        _var_connections with absolute variable names.  Entries
+        have the form (input, output).
+    _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
-    _varx_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
+    _var_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
         Global index range of owned variables with respect to all model variables.
-    _varx_abs_names : {'input': [str, ...], 'output': [str, ...]}
+    _var_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of owned variables existing on current proc.
-    _varx_abs2data_io : dict
+    _var_abs2data_io : dict
         Dictionary mapping absolute names to dicts with keys (prom, rel, my_idx, type_, metadata).
         The my_idx entry is the index among variables in this system, on this processor.
         The type_ entry is either 'input' or 'output'.
@@ -173,29 +173,16 @@ class System(object):
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
 
-        self._var_allprocs_names = {'input': [], 'output': []}
-        self._var_allprocs_pathnames = {'input': [], 'output': []}
-        self._var_allprocs_range = {'input': [0, 0], 'output': [0, 0]}
-        self._var_allprocs_indices = {'input': {}, 'output': {}}
-
-        self._var_myproc_names = {'input': [], 'output': []}
-        self._var_myproc_metadata = {'input': [], 'output': []}
-        self._var_myproc_indices = {'input': None, 'output': None}
-
-        self._var_pathdict = {}
-        self._var_name2path = {'input': {}, 'output': {}}
-
         self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
 
         self._var_connections = {}
-        self._var_connections_indices = []
+        self._var_connections_abs = []
 
-        # [REFACTOR]
-        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        self._varx_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
-        self._varx_abs_names = {'input': [], 'output': []}
-        self._varx_abs2data_io = {}
+        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._var_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
+        self._var_abs_names = {'input': [], 'output': []}
+        self._var_abs2data_io = {}
 
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._vector_transfers = {}
@@ -285,55 +272,14 @@ class System(object):
                                          sub_global_dict, assembler,
                                          sub_proc_range)
 
-    def _setupx_variables_myproc(self):
-        """
-        Compute variable dict/list for variables on the current processor.
-
-        Sets the following attributes:
-            _varx_abs2data_io
-            _varx_abs_names
-        """
-        pass
-
-    def _setupx_variable_allprocs_names(self):
-        """
-        Get the names for variables on all processors.
-
-        Also, compute allprocs var counts and store in _varx_allprocs_idx_range.
-
-        Sets the following attributes:
-            _varx_allprocs_prom2abs_list
-
-        Returns
-        -------
-        {'input': [str, ...], 'output': [str, ...]}
-            List of absolute names of owned variables existing on current proc.
-        """
-        pass
-
-    def _setupx_variable_allprocs_indices(self, global_index):
-        """
-        Compute the global index range for variables on all processors.
-
-        Computes the following attributes:
-            _varx_allprocs_idx_range
-
-        Parameters
-        ----------
-        global_index : {'input': int, 'output': int}
-            current global variable counter.
-        """
-        pass
-
     def _setup_variables(self, recurse=True):
         """
         Assemble variable metadata and names lists.
 
         Sets the following attributes:
-            _var_allprocs_names
-            _var_allprocs_pathnames
-            _var_myproc_names
-            _var_myproc_metadata
+            _var_abs2data_io
+            _var_abs_names
+            _var_allprocs_prom2abs_list
 
         Parameters
         ----------
@@ -351,20 +297,13 @@ class System(object):
             # majority of components won't need to be configured more than once
 
             # Empty the lists in case this is part of a reconfiguration
-            for typ in ['input', 'output']:
-                self._var_allprocs_names[typ] = []
-                self._var_allprocs_pathnames[typ] = []
-                self._var_myproc_names[typ] = []
-                self._var_myproc_metadata[typ] = []
-
-            # [REFACTOR]
-            self._varx_abs2data_io = {}
+            self._var_abs2data_io = {}
             for type_ in ['input', 'output']:
-                self._varx_abs_names[type_] = []
+                self._var_abs_names[type_] = []
 
                 # Only Components have this:
                 try:
-                    self._varx_rel_names[type_] = []
+                    self._var_rel_names[type_] = []
                 except AttributeError:
                     pass
 
@@ -375,9 +314,7 @@ class System(object):
         Define the variable indices and range.
 
         Sets the following attributes:
-            _var_allprocs_range
-            _var_allprocs_indices
-            _var_myproc_indices
+            _var_allprocs_idx_range
 
         Parameters
         ----------
@@ -386,65 +323,7 @@ class System(object):
         recurse : boolean
             recursion is not performed if traversing up the tree after reconf.
         """
-        # Define the global variable range for the system
-        for typ in ['input', 'output']:
-            size = len(self._var_allprocs_names[typ])
-            self._var_allprocs_range[typ][0] = global_index[typ]
-            self._var_allprocs_range[typ][1] = global_index[typ] + size
-
-        # If group, compute _var_myproc_indices as follows
-        if len(self._subsystems_myproc) > 0:
-            subsys0 = self._subsystems_myproc[0]
-
-            # Pre-recursion: compute 'index' to pass to subsystems
-            # Need offset: number of variables on procs before current proc
-            # Necessary because of multiple global counters on different procs
-            if self.comm.size > 1:
-                for typ in ['input', 'output']:
-                    local_var_size = len(subsys0._var_allprocs_names[typ])
-
-                    # Compute the variable count list; 0 on rank > 0 procs
-                    sub_comm = subsys0.comm
-                    if sub_comm.rank == 0:
-                        nvar_myproc = local_var_size
-                    else:
-                        nvar_myproc = 0
-                    nvar_allprocs = self.comm.allgather(nvar_myproc)
-
-                    # Compute the offset
-                    iproc = self.comm.rank
-                    nvar_myproc = local_var_size
-                    global_index[typ] += \
-                        np.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
-
-            # Perform the recursion
-            if recurse:
-                for subsys in self._subsystems_myproc:
-                    subsys._setup_variable_indices(global_index)
-
-            # Post-recursion: assemble local variable indices from subsystems
-            for typ in ['input', 'output']:
-                raw = [subsys._var_myproc_indices[typ]
-                       for subsys in self._subsystems_myproc]
-                self._var_myproc_indices[typ] = np.concatenate(raw)
-
-        # If component, _var_myproc_indices is simply an arange
-        else:
-            for typ in ['input', 'output']:
-                ind1, ind2 = self._var_allprocs_range[typ]
-                self._var_myproc_indices[typ] = np.arange(ind1, ind2)
-
-        # Reset index dict to the global variable count on all procs
-        # Necessary for younger siblings to have proper index values
-        for typ in ['input', 'output']:
-            global_index[typ] = self._var_allprocs_range[typ][1]
-
-        # Populate the _var_allprocs_indices dictionary
-        for typ in ['input', 'output']:
-            idx = self._var_allprocs_range[typ][0]
-            for name in self._var_allprocs_names[typ]:
-                self._var_allprocs_indices[typ][name] = idx
-                idx += 1
+        pass
 
     def _setup_partials(self):
         """
@@ -520,8 +399,8 @@ class System(object):
         """
         Set up scaling vectors.
         """
-        nvar_in = len(self._var_myproc_metadata['input'])
-        nvar_out = len(self._var_myproc_metadata['output'])
+        nvar_in = len(self._var_abs_names['input'])
+        nvar_out = len(self._var_abs_names['output'])
 
         # Initialize scaling arrays
         for scaling in (self._scaling_to_norm, self._scaling_to_phys):
@@ -547,15 +426,20 @@ class System(object):
         #   b0 = g(a0)
         #   b1 = d0 + d1 a1 - d0
         #   b1 = g(a1) - g(0)
-        for ind, meta in enumerate(self._var_myproc_metadata['input']):
-            global_ind = self._var_myproc_indices['input'][ind]
+        abs2idx = self._assembler._var_allprocs_abs2idx_io
+        abs2data = self._var_abs2data_io
+        for ind, abs_name in enumerate(self._var_abs_names['input']):
+            global_ind = abs2idx[abs_name]
+            meta = abs2data[abs_name]['metadata']
             self._scaling_to_phys['input'][ind, 0] = \
                 convert_units(src_scaling[global_ind, 0], src_units[global_ind], meta['units'])
             self._scaling_to_phys['input'][ind, 1] = \
                 convert_units(src_scaling[global_ind, 1], src_units[global_ind], meta['units']) - \
                 convert_units(0., src_units[global_ind], meta['units'])
 
-        for ind, meta in enumerate(self._var_myproc_metadata['output']):
+        for ind, abs_name in enumerate(self._var_abs_names['output']):
+            meta = abs2data[abs_name]['metadata']
+
             # Compute scaling arrays for outputs; no unit conversion needed
             self._scaling_to_phys['output'][ind, 0] = meta['ref0']
             self._scaling_to_phys['output'][ind, 1] = meta['ref'] - meta['ref0']
@@ -596,8 +480,8 @@ class System(object):
 
         # if this is the top-most group, we will set the values here as well.
         if is_top:
-            for abs_name in self._varx_abs_names['output']:
-                data = self._varx_abs2data_io[abs_name]
+            for abs_name in self._var_abs_names['output']:
+                data = self._var_abs2data_io[abs_name]
                 my_idx = data['my_idx']
                 metadata = data['metadata']
 
@@ -667,7 +551,7 @@ class System(object):
         transfer_class = vectors['output'].TRANSFER
 
         nsub_allprocs = len(self._subsystems_allprocs)
-        var_range = self._var_allprocs_range
+        var_range = self._var_allprocs_idx_range
         subsystems_myproc = self._subsystems_myproc
         subsystems_inds = self._subsystems_myproc_inds
 
@@ -697,54 +581,64 @@ class System(object):
                                                     self.comm)
         return transfers
 
-    def _get_maps(self, typ):
+    def _get_maps(self):
         """
         Define variable maps based on promotes lists.
 
-        Parameters
-        ----------
-        typ : str
-            Either 'input' or 'output'.
-
         Returns
         -------
-        dict of {str:str, ...}
+        dict of {'input': {str:str, ...}, 'output': {str:str, ...}}
             dictionary mapping input/output variable names
             to promoted variable names.
         """
         promotes = self._var_promotes['any']
-        promotes_typ = self._var_promotes[typ]
-        gname = self.name + '.' if self.name else ''
-
-        found = False
         if promotes:
             names = promotes
             patterns = [n for n in names if '*' in n or '?' in n]
-        elif promotes_typ:
-            names = promotes_typ
-            patterns = [n for n in names if '*' in n or '?' in n]
-        else:
-            names = ()
-            patterns = ()
+        gname = self.name + '.' if self.name else ''
 
-        maps = {}
-        for name in self._var_allprocs_names[typ]:
-            if name in names:
-                maps[name] = name
-                found = True
-                continue
+        maps = {'input': {}, 'output': {}}
+        found = False
+        for typ in ('input', 'output'):
+            promotes_typ = self._var_promotes[typ]
 
-            for pattern in patterns:
-                # if name matches, promote that variable to parent
-                if fnmatchcase(name, pattern):
-                    maps[name] = name
-                    found = True
-                    break
+            if promotes:
+                pass
+            elif promotes_typ:
+                names = promotes_typ
+                patterns = [n for n in names if '*' in n or '?' in n]
             else:
-                # Default: prepend the parent system's name
-                maps[name] = gname + name if gname else name
+                names = ()
+                patterns = ()
 
-        return maps, found
+            for name in self._var_allprocs_prom2abs_list[typ]:
+                if name in names:
+                    maps[typ][name] = name
+                    found = True
+                    continue
+
+                for pattern in patterns:
+                    # if name matches, promote that variable to parent
+                    if fnmatchcase(name, pattern):
+                        maps[typ][name] = name
+                        found = True
+                        break
+                else:
+                    # Default: prepend the parent system's name
+                    maps[typ][name] = gname + name if gname else name
+
+        if not found:
+            for io, lst in self._var_promotes.items():
+                if lst:
+                    if io == 'any':
+                        suffix = ''
+                    else:
+                        suffix = '_%ss' % io
+                    raise RuntimeError("%s: no variables were promoted "
+                                       "based on promotes%s=%s" %
+                                       (self.pathname, suffix, list(lst)))
+
+        return maps
 
     @property
     def jacobian(self):
@@ -849,8 +743,8 @@ class System(object):
 
         out_names = []
         res_names = []
-        for out_abs_name in self._varx_abs_names['output']:
-            out_idx = self._assembler._varx_allprocs_abs2idx_io[out_abs_name]
+        for out_abs_name in self._var_abs_names['output']:
+            out_idx = self._assembler._var_allprocs_abs2idx_io[out_abs_name]
             if out_idx in var_ids:
                 res_names.append(out_abs_name)
                 if var_inds is None or (var_inds[0] <= out_idx < var_inds[1] or
@@ -858,9 +752,11 @@ class System(object):
                     out_names.append(out_abs_name)
 
         in_names = []
-        for in_abs_name in self._varx_abs_names['input']:
-            in_idx = self._assembler._varx_allprocs_abs2idx_io[in_abs_name]
-            out_idx = self._assembler._input_src_ids[in_idx]
+        for in_abs_name in self._var_abs_names['input']:
+            out_abs = self._assembler._input_srcs[in_abs_name]
+            if out_abs is None:
+                continue
+            out_idx = self._assembler._var_allprocs_abs2idx_io[out_abs]
             if out_idx in var_ids:
                 if var_inds is None or (var_inds[0] <= out_idx < var_inds[1] or
                                         var_inds[2] <= out_idx < var_inds[3]):
@@ -1401,11 +1297,11 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        pro2abs = self._var_name2path['output']
+        pro2abs = self._var_allprocs_prom2abs_list['output']
 
         # Human readable error message during Driver setup.
         try:
-            out = {pro2abs[name]: data for name, data in iteritems(self._design_vars)}
+            out = {pro2abs[name][0]: data for name, data in iteritems(self._design_vars)}
         except KeyError as err:
             msg = "Output not found for design variable {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
@@ -1418,9 +1314,9 @@ class System(object):
             # vectors might be relative instead of absolute. Lucky we have
             # both.
             if name in vec:
-                out[name]['size'] = vec[name].shape[0]
+                out[name]['size'] = vec[name].size
             else:
-                out[name]['size'] = vec[out[name]['name']].shape[0]
+                out[name]['size'] = vec[out[name]['name']].size
 
         if recurse:
             for subsys in self._subsystems_allprocs:
@@ -1449,32 +1345,25 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        pro2abs = self._var_name2path['output']
+        prom2abs = self._var_allprocs_prom2abs_list['output']
 
         # Human readable error message during Driver setup.
         try:
-            out = {pro2abs[name]: data for name, data in iteritems(self._responses)}
+            out = {prom2abs[name][0]: data for name, data in iteritems(self._responses)}
         except KeyError as err:
             msg = "Output not found for response {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
 
         # Size them all
         vec = self._outputs._views_flat
-        for name, data in iteritems(out):
-
-            # Depending on where the response was added, the name in the
-            # vectors might be relative instead of absolute. Lucky we have
-            # both.
-            if name in vec:
-                out[name]['size'] = vec[name].shape[0]
-            else:
-                out[name]['size'] = vec[out[name]['name']].shape[0]
+        for name in out:
+            out[name]['size'] = vec[name].size
 
         if recurse:
             for subsys in self._subsystems_allprocs:
-                subsys_design_vars = subsys.get_responses(recurse=recurse)
-                for key in subsys_design_vars:
-                    out[key] = subsys_design_vars[key]
+                subsys_responses = subsys.get_responses(recurse=recurse)
+                for key in subsys_responses:
+                    out[key] = subsys_responses[key]
         return out
 
     def get_constraints(self, recurse=True):

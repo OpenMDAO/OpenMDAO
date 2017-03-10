@@ -54,28 +54,21 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     else:
         system = root
 
-    input_src_ids = system._assembler._input_src_ids
-    istart_idx, iend_idx = system._varx_allprocs_idx_range['input']
-    ostart_idx, oend_idx = system._varx_allprocs_idx_range['output']
+    input_srcs = system._assembler._input_srcs
 
-    abs_tgt_names = system._varx_abs_names['input']
-    abs_src_names = system._varx_abs_names['output']
-
-    connections = {}
-    for tgt_idx, src_idx in enumerate(input_src_ids):
-        if src_idx > -1 and (istart_idx <= tgt_idx < iend_idx or
-                             ostart_idx <= src_idx < oend_idx):
-            connections[abs_tgt_names[tgt_idx]] = abs_src_names[src_idx]
+    connections = {
+        tgt: src for tgt, src in iteritems(input_srcs) if src is not None
+    }
 
     src2tgts = {}
     units = {n: data['metadata'].get('units','')
-                for n, data in iteritems(system._varx_abs2data_io)}
+                for n, data in iteritems(system._var_abs2data_io)}
     vals = {}
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
-        for idx, t in enumerate(abs_tgt_names):
-            tmeta = system._varx_abs2data_io[t]['metadata']
+        for t in system._var_abs_names['input']:
+            tmeta = system._var_abs2data_io[t]['metadata']
             idxs = tmeta['src_indices']
             if idxs is None:
                 idxs = np.arange(np.prod(tmeta['shape']), dtype=int)
@@ -108,7 +101,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
             vals[t] = val
 
-        noconn_srcs = sorted((n for n in abs_src_names
+        noconn_srcs = sorted((n for n in system._var_abs_names['output']
                                 if n not in src2tgts), reverse=True)
         for s in noconn_srcs:
             vals[s] = str(system._outputs[s])
@@ -117,18 +110,18 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     src_systems = set()
     tgt_systems = set()
-    for s in abs_src_names:
+    for s in system._var_abs_names['output']:
         parts = s.split('.')
         for i in range(len(parts)):
             src_systems.add('.'.join(parts[:i]))
 
-    for t in abs_tgt_names:
+    for t in system._var_abs_names['input']:
         parts = t.split('.')
         for i in range(len(parts)):
             tgt_systems.add('.'.join(parts[:i]))
 
     # reverse sort so that "NO CONNECTION" shows up at the bottom
-    src2tgts['NO CONNECTION'] = sorted([t for t in abs_tgt_names
+    src2tgts['NO CONNECTION'] = sorted([t for t in system._var_abs_names['input']
                                     if t not in connections], reverse=True)
 
     src_systems = [{'name':n} for n in sorted(src_systems)]
