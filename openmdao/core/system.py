@@ -362,6 +362,12 @@ class System(object):
             for type_ in ['input', 'output']:
                 self._varx_abs_names[type_] = []
 
+                # Only Components have this:
+                try:
+                    self._varx_rel_names[type_] = []
+                except AttributeError:
+                    pass
+
             self.initialize_variables()
 
     def _setup_variable_indices(self, global_index, recurse=True):
@@ -418,9 +424,8 @@ class System(object):
 
             # Post-recursion: assemble local variable indices from subsystems
             for typ in ['input', 'output']:
-                raw = []
-                for subsys in self._subsystems_myproc:
-                    raw.append(subsys._var_myproc_indices[typ])
+                raw = [subsys._var_myproc_indices[typ]
+                       for subsys in self._subsystems_myproc]
                 self._var_myproc_indices[typ] = np.concatenate(raw)
 
         # If component, _var_myproc_indices is simply an arange
