@@ -81,7 +81,6 @@ class TestLinearSystem(unittest.TestCase):
             Ainv = np.array([[3., -2., 1.],
                              [-3., 3., -2.],
                              [1., -1., 1.]])
-            print Ainv - np.linalg.inv(A)
 
             dx_dA = np.outer(Ainv, -x).reshape(3, 9)
             dx_db = Ainv
