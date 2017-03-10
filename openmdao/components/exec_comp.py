@@ -161,7 +161,7 @@ class ExecComp(ExplicitComponent):
 
         # need to exclude any non-pbo outputs (like case_rank in ExecComp4Test)
         # TODO: for now, assume all outputs are non-pbo
-        self._non_pbo_outputs = self._var_myproc_names['output']
+        self._non_pbo_outputs = self._var_rel_names['output']
 
         self._to_colons = {}
         from_colons = self._from_colons = {}
@@ -258,7 +258,7 @@ class ExecComp(ExplicitComponent):
 
         non_pbo_outputs = self._non_pbo_outputs
 
-        for param in inputs._views:
+        for param in inputs:
 
             pwrap = _TmpDict(inputs)
 
@@ -377,9 +377,9 @@ class _IODict(object):
 
     def __getitem__(self, name):
         name = self._to_colons[name]
-        try:
+        if name in self._outputs:
             return self._outputs[name]
-        except KeyError:
+        else:
             return self._inputs[name]
 
     def __setitem__(self, name, value):

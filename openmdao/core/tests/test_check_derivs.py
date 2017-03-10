@@ -6,7 +6,7 @@ from six.moves import cStringIO as StringIO
 
 import numpy as np
 
-from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem
+from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NLRunOnce
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -153,6 +153,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_output('flow:T', val=284., units="degR", desc="Temperature")
                 self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
 
+                self.run_count = 0
+
             def compute_partial_derivs(self, inputs, outputs, partials):
                 partials['flow:T', 'T'] = 1.
                 partials['flow:P', 'P'] = 1.
@@ -160,6 +162,8 @@ class TestProblemCheckPartials(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['flow:T'] = inputs['T']
                 outputs['flow:P'] = inputs['P']
+
+                self.run_count += 1
 
         p = Problem()
         model = p.model = Group()
@@ -170,6 +174,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
+        model.nl_solver = NLRunOnce()
+
         p.setup()
         data = p.check_partial_derivatives(out_stream=None)
 
@@ -179,6 +185,10 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.assertAlmostEqual(abs_error.forward, 0.)
                 self.assertAlmostEqual(abs_error.reverse, 0.)
                 self.assertAlmostEqual(abs_error.forward_reverse, 0.)
+
+        # Make sure we only FD this twice.
+        comp = model.get_subsystem('units')
+        self.assertEqual(comp.run_count, 3)
 
 if __name__ == "__main__":
     unittest.main()

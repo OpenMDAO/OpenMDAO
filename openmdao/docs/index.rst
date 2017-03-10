@@ -72,7 +72,16 @@ Solvers (nonlinear and linear)
 
    features/solvers/set_solvers
    features/solvers/solver_options
-
+   features/solvers/nl_runonce
+   features/solvers/nl_bgs
+   features/solvers/nl_bjac
+   features/solvers/nl_newton
+   features/solvers/ln_runonce
+   features/solvers/ln_direct
+   features/solvers/ln_bgs
+   features/solvers/ln_scipy
+   features/solvers/ln_petscksp
+   features/solvers/ln_bjac
 
 Running your models
 ================================
@@ -99,10 +108,6 @@ Visualization
 
 .. _OpenMDAO Reference Sheets: _srcdocs/index.html
 
-`OpenMDAO Developer Source Documentation`__
-
-.. __: _srcdocs/dev/index.html
-
 `OpenMDAO User Source Documentation`__
 
 .. __: _srcdocs/usr/index.html
@@ -111,3 +116,11 @@ Visualization
    :maxdepth: 1
 
    tags/index
+
+Style for Developers
+====================
+
+.. toctree::
+   :maxdepth: 1
+
+   style_guide/doc_style_guide.rst

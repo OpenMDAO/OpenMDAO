@@ -117,7 +117,7 @@ div.failed pre {
 }
 
 
-/* The following sets up the In/Out blocks for embedded tests */
+/* For In/Out blocks for embedded tests */
 div.input_area {
     border-radius: 1px;
 
@@ -136,4 +136,13 @@ div.output_area pre {
     margin-top: 0px;
     margin-bottom: 0px;
 }
-/* End of In/Out block markup */
+
+div.highlight-python pre{
+  margin-top: 0px;
+  margin-bottom: 0px;
+}
+
+/* Fix the Parameter block width problem */
+table.field-list th {
+    width: 80px;
+  }

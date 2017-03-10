@@ -19,10 +19,12 @@ from openmdao.core.driver import Driver
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
+from openmdao.vectors.default_vector import DefaultVector
 
 from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
 from openmdao.utils.mpi import FakeComm
 from openmdao.vectors.default_vector import DefaultVector
+from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
@@ -91,49 +93,6 @@ class Problem(object):
         self._assembler = assembler_class(comm)
         self._use_ref_vector = use_ref_vector
 
-    def _get_path_data(self, name):
-        """
-        Get absolute pathname and related data.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable in the root system's namespace. May be
-            a promoted name or an unpromoted name.
-
-        Returns
-        -------
-        str, PathData
-            absolute pathname and PathData namedtuple
-        """
-        try:
-            pdata = self.model._var_pathdict[name]
-            pathname = name
-        except KeyError:
-            # name is not an absolute path
-            try:
-                pathname = self.model._var_name2path['output'][name]
-            except KeyError:
-                try:
-                    paths = self.model._var_name2path['input'][name]
-                except KeyError:
-                    raise KeyError("Variable '%s' not found." % name)
-
-                if len(paths) > 1:
-                    raise RuntimeError("Variable name '%s' is not unique and "
-                                       "matches the following: %s. "
-                                       "Use the absolute pathname instead." %
-                                       (name, paths))
-                pathname = paths[0]
-
-            pdata = self.model._var_pathdict[pathname]
-
-        if pdata.myproc_idx is None:
-            raise RuntimeError("Variable '%s' is not found in this process" %
-                               name)
-
-        return pathname, pdata
-
     def __getitem__(self, name):
         """
         Get an output/input variable.
@@ -141,19 +100,20 @@ class Problem(object):
         Parameters
         ----------
         name : str
-            name of the variable in the root system's namespace.
+            Promoted or relative variable name in the root system's namespace.
 
         Returns
         -------
         float or ndarray
             the requested output/input variable.
         """
-        pathname, pdata = self._get_path_data(name)
-
-        if pdata.typ == 'output':
-            return self.model._outputs[pathname]
+        if name in self.model._outputs:
+            return self.model._outputs[name]
+        elif name in self.model._inputs:
+            return self.model._inputs[name]
         else:
-            return self.model._inputs[pathname]
+            msg = 'Variable name "{}" not found.'
+            raise KeyError(msg.format(name))
 
     def __setitem__(self, name, value):
         """
@@ -162,22 +122,17 @@ class Problem(object):
         Parameters
         ----------
         name : str
-            name of the output/input variable in the root system's namespace.
+            Promoted or relative variable name in the root system's namespace.
         value : float or ndarray or list
             value to set this variable to.
         """
-        pathname, pdata = self._get_path_data(name)
-
-        if pdata.typ == 'output':
-            meta = self.model._var_myproc_metadata['output'][pdata.myproc_idx]
-            if 'shape' in meta:
-                value, _ = ensure_compatible(pathname, value, meta['shape'])
-            self.model._outputs[pathname] = value
+        if name in self.model._outputs:
+            self.model._outputs[name] = value
+        elif name in self.model._inputs:
+            self.model._inputs[name] = value
         else:
-            meta = self.model._var_myproc_metadata['input'][pdata.myproc_idx]
-            if 'shape' in meta:
-                value, _ = ensure_compatible(pathname, value, meta['shape'])
-            self.model._inputs[pathname] = value
+            msg = 'Variable name "{}" not found.'
+            raise KeyError(msg.format(name))
 
     @property
     def root(self):
@@ -306,67 +261,29 @@ class Problem(object):
         model._setup_processors('', comm, {}, assembler, [0, comm.size])
         model._setup_variables()
         model._setup_variable_indices({'input': 0, 'output': 0})
-        model._setupx_variables_myproc()
-        allprocs_abs_names = model._setupx_variable_allprocs_names()
+        allprocs_abs_names = model._setupx_variables()
         model._setupx_variable_allprocs_indices({'input': 0, 'output': 0})
+        model._setup_partials()
         model._setup_connections()
-
-        # [REFACTOR VERIFICATION] for model._varx_allprocs_idx_range
-        for type_ in ['input', 'output']:
-            for ind in range(2):
-                assert model._var_allprocs_range[type_][ind] == \
-                    model._varx_allprocs_idx_range[type_][ind]
-
-        # [REFACTOR VERIFICATION] for model._varx_abs_names, model._varx_abs2data_io
-        for type_ in ['input', 'output']:
-            #assert len(model._varx_abs_names[type_]) == len(model._var_myproc_names[type_])
-            for abs_name in model._varx_abs_names[type_]:
-                assert model._varx_abs2data_io[abs_name]['rel'] in model._var_myproc_names[type_]
-
-        # [REFACTOR VERIFICATION] imported here because it's temporary and will be removed soon
-        from six import iteritems
-        # [REFACTOR VERIFICATION] for model._varx_allprocs_prom2abs_list
-        for type_ in ['input', 'output']:
-            count = 0
-            for prom_name, abs_names_list in iteritems(model._varx_allprocs_prom2abs_list[type_]):
-                count += len(abs_names_list)
-                assert prom_name in model._var_allprocs_names[type_]
-                for abs_name in abs_names_list:
-                    assert abs_name in model._var_allprocs_pathnames[type_]
-            assert count == len(model._var_allprocs_pathnames[type_])
-            assert (len(model._varx_allprocs_prom2abs_list[type_])
-                    == len(set(model._var_allprocs_names[type_])))
-
-        # Assembler setup: variable metadata and indices
-        nvars = {typ: len(model._var_allprocs_names[typ])
-                 for typ in ['input', 'output']}
-        assembler._setup_variables(nvars, model._var_myproc_metadata,
-                                   model._var_myproc_indices)
-
-        # Assembler setup: variable connections
-        assembler._setup_connections(model._var_connections_indices,
-                                     model._var_allprocs_names,
-                                     model._var_allprocs_pathnames,
-                                     model._var_pathdict,
-                                     model._var_myproc_metadata)
-
-        # Assembler setup: global transfer indices vector
-        assembler._setup_src_indices(model._var_myproc_metadata,
-                                     model._var_myproc_indices['input'],
-                                     model._var_pathdict,
-                                     model._var_allprocs_pathnames)
-
-        # Assembler setup: compute data required for units/scaling
-        assembler._setup_src_data(model._var_myproc_metadata['output'],
-                                  model._var_myproc_indices['output'])
 
         assembler._setupx_variables(allprocs_abs_names)
 
-        # [REFACTOR VERIFICATION] for assembler._varx_allprocs_abs_names
-        assert (model._var_allprocs_pathnames['input']
-                == assembler._varx_allprocs_abs_names['input'])
-        assert (model._var_allprocs_pathnames['output']
-                == assembler._varx_allprocs_abs_names['output'])
+        # Assembler setup: variable metadata and indices
+        assembler._setup_variables(model._var_abs2data_io,
+                                   model._var_abs_names)
+
+        # Assembler setup: variable connections
+        assembler._setup_connections(model._var_connections_abs,
+                                     model._var_allprocs_prom2abs_list,
+                                     model._var_abs2data_io)
+
+        # Assembler setup: global transfer indices vector
+        assembler._setup_src_indices(model._var_abs2data_io,
+                                     model._var_abs_names)
+
+        # Assembler setup: compute data required for units/scaling
+        assembler._setup_src_data(model._var_abs_names['output'],
+                                  model._var_abs2data_io)
 
         # Set up scaling vectors
         model._setup_scaling()
@@ -427,7 +344,7 @@ class Problem(object):
             vectors[key] = vector_class(vec_name, typ, self.model)
 
         # TODO: implement this properly
-        ind1, ind2 = self.model._var_allprocs_range['output']
+        ind1, ind2 = self.model._var_allprocs_idx_range['output']
         vector_var_ids = np.arange(ind1, ind2)
 
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
@@ -464,14 +381,17 @@ class Problem(object):
         Returns
         -------
         dict of dicts of dicts
-            First key is the component name;
-            Second key is the (output, input) tuple of strings;
-            Third key is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev'];
-            For 'rel error', 'abs error', 'magnitude' the value is:
-                A tuple containing norms for forward - fd, adjoint - fd, forward - adjoint.
-            For 'J_fd', 'J_fwd', 'J_rev' the value is:
-                A numpy array representing the computed Jacobian for the three different methods
-                of computation.
+            First key:
+                is the component name;
+            Second key:
+                is the (output, input) tuple of strings;
+            Third key:
+                is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev'];
+
+            For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
+                forward - fd, adjoint - fd, forward - adjoint.
+            For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
+                Jacobian for the three different methods of computation.
         """
         if not global_options:
             global_options = DEFAULT_FD_OPTIONS.copy()
@@ -533,19 +453,28 @@ class Problem(object):
                         of_pattern, of_matches = of_bundle
                         wrt_pattern, wrt_out, wrt_in = wrt_bundle
 
-                        wrt_matches = chain(wrt_out, wrt_in)
-                        for (of, wrt) in product(of_matches, wrt_matches):
-                            deriv_value = subjacs.get((c_name + '.' + of, c_name + '.' + wrt))
+                        # The only outputs in wrt should be implicit states.
+                        if explicit_comp:
+                            wrt_matches = wrt_in
+                        else:
+                            wrt_matches = chain(wrt_out, wrt_in)
+
+                        for rel_key in product(of_matches, wrt_matches):
+                            abs_key = rel_key2abs_key(comp, rel_key)
+                            of, wrt = abs_key
+                            deriv_value = subjacs.get(abs_key)
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                in_size = np.prod(comp._var2meta[wrt]['shape'])
-                                out_size = np.prod(comp._var2meta[of]['shape'])
+                                in_size = np.prod(comp._var_abs2data_io[wrt]['metadata']['shape'])
+                                out_size = np.prod(comp._var_abs2data_io[of]['metadata']['shape'])
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
-                                    in_size = np.prod(comp._var2meta[wrt]['shape'])
-                                    out_size = np.prod(comp._var2meta[of]['shape'])
+                                    in_size = np.prod(
+                                        comp._var_abs2data_io[wrt]['metadata']['shape'])
+                                    out_size = np.prod(
+                                        comp._var_abs2data_io[of]['metadata']['shape'])
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     for i, j, val in zip(jac_i, jac_j, jac_val):
@@ -555,7 +484,7 @@ class Problem(object):
                                 elif sparse.issparse(deriv_value):
                                     deriv_value = deriv_value.todense()
 
-                            partials_data[c_name][of, wrt][jac_key] = deriv_value
+                            partials_data[c_name][rel_key][jac_key] = deriv_value
 
                     if explicit_comp:
                         comp._negate_jac()
@@ -579,20 +508,31 @@ class Problem(object):
                 of_pattern, of_matches = of_bundle
                 wrt_pattern, wrt_out, wrt_in = wrt_bundle
 
-                wrt_matches = chain(wrt_out, wrt_in)
-                for (of, wrt) in product(of_matches, wrt_matches):
-                    approximation.add_approximation((of, wrt), global_options)
+                # The only outputs in wrt should be implicit states.
+                if explicit_comp:
+                    wrt_matches = wrt_in
+                else:
+                    wrt_matches = chain(wrt_out, wrt_in)
+
+                for rel_key in product(of_matches, wrt_matches):
+                    abs_key = rel_key2abs_key(comp, rel_key)
+                    approximation.add_approximation(abs_key, global_options)
 
             approx_jac = {}
+            approximation._init_approximations()
+
+            # Peform the FD here.
             approximation.compute_approximations(comp, jac=approx_jac)
-            for d_key, partial in iteritems(approx_jac):
+
+            for rel_key, partial in iteritems(approx_jac):
+                abs_key = rel_key2abs_key(comp, rel_key)
                 # Since all partials for outputs for explicit comps are declared, assume anything
                 # missing is an input deriv.
-                if (explicit_comp
-                        and (d_key not in subjac_info or subjac_info[d_key]['type'] == 'input')):
-                    partials_data[c_name][d_key][jac_key] = -partial
+                if (explicit_comp and (abs_key not in subjac_info or
+                                       subjac_info[abs_key]['type'] == 'input')):
+                    partials_data[c_name][rel_key][jac_key] = -partial
                 else:
-                    partials_data[c_name][d_key][jac_key] = partial
+                    partials_data[c_name][rel_key][jac_key] = partial
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
@@ -739,18 +679,16 @@ class Problem(object):
         if global_names:
             oldwrt, oldof = wrt, of
         else:
-            paths = model._var_allprocs_pathnames
-            indices = model._var_allprocs_indices
             oldof = of
             of = []
             for names in oldof:
-                of.append(tuple(paths['output'][indices['output'][name]]
+                of.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                 for name in names))
 
             oldwrt = wrt
             wrt = []
             for names in oldwrt:
-                wrt.append(tuple(paths['output'][indices['output'][name]]
+                wrt.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                  for name in names))
 
         if mode == 'fwd':
@@ -911,10 +849,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         # Sorted keys ensures deterministic ordering
         sorted_keys = sorted(iterkeys(derivatives))
 
-        # Pull out the outputs of explicit components so we can ignore output-output derivatives.
-        if explicit:
-            outputs = {key[0] for key in sorted_keys}
-
         for of, wrt in sorted_keys:
             derivative_info = derivatives[of, wrt]
             forward = derivative_info['J_fwd']
@@ -940,7 +874,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                                                     rev_error / fd_norm,
                                                                     fwd_rev_error / fd_norm)
 
-            if out_stream and (not explicit or wrt not in outputs):
+            if out_stream:
                 if compact_print:
                     out_stream.write(deriv_line.format(
                         _pad_name(of, 13, True),

@@ -5,6 +5,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 from six.moves import range
 
 from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.name_maps import key2abs_key
 
 
 class Jacobian(object):
@@ -17,24 +18,22 @@ class Jacobian(object):
     Attributes
     ----------
     _system : <System>
-        pointer to the system that is currently operating on this Jacobian.
+        Pointer to the system that is currently operating on this Jacobian.
     _subjacs : dict
-        dictionary containing the user-supplied sub-Jacobians.
+        Dictionary of the user-supplied sub-Jacobians keyed by absolute names.
     _subjacs_info : dict
-        Dict of subjacobian metadata keyed on (resid_path, (in/out)_path).
+        Dictionary of the sub-Jacobian metadata keyed by absolute names.
     _int_mtx : <Matrix>
-        global internal Jacobian.
+        Global internal Jacobian.
     _ext_mtx : <Matrix>
-        global external Jacobian.
+        Global external Jacobian.
     _keymap : dict
         Mapping of original (output, input) key to (output, source) in cases
         where the input has src_indices.
-    _iter_list_rel_unprom : [(out_name, in_name), ...]
-        list of output-input pairs to iterate over where the names are relative, unpromoted.
-    _iter_list_pathnames : [(out_name, in_name), ...]
-        list of output-input pairs to iterate over where the names are unique pathnames.
+    _iter_list : [(out_name, in_name), ...]
+        List of output-input pairs to iterate over where the keys are absolute names.
     options : <OptionsDictionary>
-        options dictionary.
+        Options dictionary.
     """
 
     def __init__(self, **kwargs):
@@ -53,23 +52,19 @@ class Jacobian(object):
         self._int_mtx = None
         self._ext_mtx = None
         self._keymap = {}
-        self._iter_list_rel_unprom = None
-        self._iter_list_pathnames = None
+        self._iter_list = None
 
         self.options = OptionsDictionary()
         self.options.update(kwargs)
 
-    def _key2shape(self, key):
+    def _abs_key2shape(self, abs_key):
         """
         Return shape of sub-jacobian for variables making up the key tuple.
 
-        This assumes that no inputs and outputs share the same name,
-        so it should only be called from a Component, never from a Group.
-
         Parameters
         ----------
-        key : (str, str)
-            output name, input name of sub-Jacobian.
+        abs_key : (str, str)
+            Absolute name pair of sub-Jacobian.
 
         Returns
         -------
@@ -78,156 +73,62 @@ class Jacobian(object):
         in_size : int
             local size of the input variable.
         """
-        out_name, in_name = key
-        return (np.prod(self._system._var2meta[out_name]['shape']),
-                np.prod(self._system._var2meta[in_name]['shape']))
+        return (np.prod(self._system._var_abs2data_io[abs_key[0]]['metadata']['shape']),
+                np.prod(self._system._var_abs2data_io[abs_key[1]]['metadata']['shape']))
 
-    def _key2unique(self, key):
-        """
-        Map output-input local name pair to a unique key.
-
-        This should only be called when self._system is a Component or
-        key parts are all outputs.  If the key contains an input name, that
-        may not be unique in a Group context.
-
-        Parameters
-        ----------
-        key : (str, str)
-            output name, input name of sub-Jacobian. Names are local, promoted.
-
-        Returns
-        -------
-        out_path : str
-            pathname of output variable.
-        in_path : str
-            pathname of input variable.
-        """
-        if key[1] in self._system._var_name2path['input']:
-            return (self._system._var_name2path['output'][key[0]],
-                    self._system._var_name2path['input'][key[1]][0])
-        else:
-            return (self._system._var_name2path['output'][key[0]],
-                    self._system._var_name2path['output'][key[1]])
-
-    def _multiply_subjac(self, ukey, val):
+    def _multiply_subjac(self, abs_key, val):
         """
         Multiply this sub-Jacobian by val.
 
         Parameters
         ----------
-        ukey : (str, str)
-            Output name, input name of sub-Jacobian. The names are the full global pathnames.
+        abs_key : (str, str)
+            Absolute name pair of sub-Jacobian.
         val : float
             value to multiply by.
         """
-        jac = self._subjacs[ukey]
+        jac = self._subjacs[abs_key]
 
         if isinstance(jac, np.ndarray):
-            self._subjacs[ukey] = val * jac
+            self._subjacs[abs_key] = val * jac
         elif isinstance(jac, (coo_matrix, csr_matrix)):
-            self._subjacs[ukey].data *= val  # DOK not supported
+            self._subjacs[abs_key].data *= val  # DOK not supported
         elif len(jac) == 3:
-            self._subjacs[ukey][0] *= val
+            self._subjacs[abs_key][0] *= val
 
     def _precompute_iter(self):
         """
-        Cache lists of (output, input) pairs found in the jacobian for the current System.
-
-        The two lists are:
-        1. _iter_list_rel_unprom : list of unpromoted names viewed from this system
-        2. _iter_list_pathnames : list of global, unique pathnames
+        Cache list of absolute name pairs found in the jacobian for the current System.
         """
         system = self._system
-        start = len(system.pathname) + 1 if system.pathname else 0
-        out_paths = system._var_allprocs_pathnames['output']
-        in_paths = system._var_allprocs_pathnames['input']
-        out_offset = system._var_allprocs_range['output'][0]
-        in_offset = system._var_allprocs_range['input'][0]
-        in_indices = system._var_myproc_indices['input']
-        out_indices = system._var_myproc_indices['output']
 
-        iter_list_rel_unprom = []
-        iter_list_pathnames = []
-        for re_ind in out_indices:
-            re_path = out_paths[re_ind - out_offset]
-            re_unprom = re_path[start:]
+        iter_list = []
+        for res_name in system._var_abs_names['output']:
+            for out_name in system._var_abs_names['output']:
+                if (res_name, out_name) in self._subjacs:
+                    iter_list.append((res_name, out_name))
+            for in_name in system._var_abs_names['input']:
+                if (res_name, in_name) in self._subjacs:
+                    iter_list.append((res_name, in_name))
 
-            for out_ind in out_indices:
-                out_path = out_paths[out_ind - out_offset]
-                out_unprom = out_path[start:]
-
-                if (re_path, out_path) in self._subjacs:
-                    iter_list_rel_unprom.append((re_unprom, out_unprom))
-                    iter_list_pathnames.append((re_path, out_path))
-
-            for in_ind in in_indices:
-                in_path = in_paths[in_ind - in_offset]
-                in_unprom = in_path[start:]
-
-                if (re_path, in_path) in self._subjacs:
-                    iter_list_rel_unprom.append((re_unprom, in_unprom))
-                    iter_list_pathnames.append((re_path, in_path))
-
-        self._iter_list_rel_unprom = iter_list_rel_unprom
-        self._iter_list_pathnames = iter_list_pathnames
+        self._iter_list = iter_list
 
     def __contains__(self, key):
         """
-        Map output-input pairs names to indices.
+        Return whether there is a subjac for the given promoted or relative name pair.
 
         Parameters
         ----------
         key : (str, str)
-            output name, input name of sub-Jacobian. Names are promoted names.
+            Promoted or relative name pair of sub-Jacobian.
 
         Returns
         -------
         boolean
             return whether sub-Jacobian has been defined.
         """
-        outname2path = self._system._var_name2path['output']
-        if key[0] in outname2path:
-            if key[1] in self._system._var_name2path['input']:
-                out_path = outname2path[key[0]]
-                for ipath in self._system._var_name2path['input'][key[1]]:
-                    return (out_path, ipath) in self._subjacs
-            elif key[1] in outname2path:
-                return (outname2path[key[0]], outname2path[key[1]]) in self._subjacs
-        return False
-
-    def __setitem__(self, key, jac):
-        """
-        Set sub-Jacobian.
-
-        Parameters
-        ----------
-        key : (str, str)
-            output name, input name of sub-Jacobian. Names are promoted names.
-        jac : int or float or ndarray or sparse matrix
-            sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
-        """
-        ukey = self._key2unique(key)
-
-        if np.isscalar(jac) or isinstance(jac, np.ndarray):
-            shape = self._key2shape(key)
-            jac = np.atleast_2d(jac).reshape(shape)
-            # np.promote_types will choose the smallest dtype that can contain both arguments
-            safe_dtype = np.promote_types(jac.dtype, float)
-            jac = jac.astype(safe_dtype, copy=False)
-        elif isinstance(jac, (coo_matrix, csr_matrix)):
-            pass
-        elif isinstance(jac, (tuple, list)):
-            if len(jac) != 3:
-                raise ValueError("Sub-jacobian of type '%s' for key %s has "
-                                 "the wrong size (%d)." %
-                                 (type(jac).__name__, key, len(jac)))
-            if isinstance(jac, tuple):
-                jac = list(jac)
-        else:
-            raise TypeError("Sub-jacobian of type '%s' for key %s is "
-                            "not supported." % (type(jac).__name__, key))
-
-        self._subjacs[ukey] = jac
+        abs_key = key2abs_key(self._system, key)
+        return abs_key in self._subjacs
 
     def __getitem__(self, key):
         """
@@ -236,40 +137,104 @@ class Jacobian(object):
         Parameters
         ----------
         key : (str, str)
-            output name, input name of sub-Jacobian. Names are promoted names.
+            Promoted or relative name pair of sub-Jacobian.
 
         Returns
         -------
-        jac : ndarray or spmatrix or list[3]
+        ndarray or spmatrix or list[3]
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        ukey = self._key2unique(key)
-        return self._subjacs[ukey]
+        abs_key = key2abs_key(self._system, key)
+        if abs_key in self._subjacs:
+            return self._subjacs[abs_key]
+        else:
+            msg = 'Variable name pair ("{}", "{}") not found.'
+            raise KeyError(msg.format(key[0], key[1]))
 
-    def _iter_pathnames(self):
-        return iter(self._iter_list_pathnames)
+    def __setitem__(self, key, subjac):
+        """
+        Set sub-Jacobian.
 
-    def _iter_rel_unprom(self):
-        return iter(self._iter_list_rel_unprom)
+        Parameters
+        ----------
+        key : (str, str)
+            Promoted or relative name pair of sub-Jacobian.
+        subjac : int or float or ndarray or sparse matrix
+            sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
+        """
+        abs_key = key2abs_key(self._system, key)
+        if abs_key is not None:
+            self._set_abs(abs_key, subjac)
+        else:
+            msg = 'Variable name pair ("{}", "{}") not found.'
+            raise KeyError(msg.format(key[0], key[1]))
 
-    def _scale_subjac(self, ukey, coeffs):
+    def _set_abs(self, abs_key, subjac):
+        """
+        Set sub-Jacobian.
+
+        Parameters
+        ----------
+        abs_key : (str, str)
+            Absolute name pair of sub-Jacobian.
+        subjac : int or float or ndarray or sparse matrix
+            sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
+        """
+        if np.isscalar(subjac) or isinstance(subjac, np.ndarray):
+            shape = self._abs_key2shape(abs_key)
+            subjac = np.atleast_2d(subjac).reshape(shape)
+            # np.promote_types will choose the smallest dtype that can contain both arguments
+            safe_dtype = np.promote_types(subjac.dtype, float)
+            subjac = subjac.astype(safe_dtype, copy=False)
+        elif isinstance(subjac, (coo_matrix, csr_matrix)):
+            pass
+        elif isinstance(subjac, (tuple, list)):
+            if len(subjac) != 3:
+                raise ValueError("Sub-jacobian of type '%s' for key %s has "
+                                 "the wrong size (%d)." %
+                                 (type(subjac).__name__, prom_key, len(subjac)))
+            if isinstance(subjac, tuple):
+                subjac = list(subjac)
+        else:
+            raise TypeError("Sub-jacobian of type '%s' for key %s is "
+                            "not supported." % (type(subjac).__name__, prom_key))
+
+        self._subjacs[abs_key] = subjac
+
+    def _iter_abs_keys(self):
+        """
+        Iterate over subjacs keyed by absolute names.
+
+        This includes only subjacs that have been set and are part of the current system.
+
+        Returns
+        -------
+        iterator
+            Iterator over subjacs keyed by absolute names that have been set on this Jacobian.
+        """
+        return iter(self._iter_list)
+
+    def _scale_subjac(self, abs_key, coeffs):
         """
         Change the scaling state of a single subjac.
 
         Parameters
         ----------
-        ukey : (str, str)
-            Output name, input name of sub-Jacobian. The names are the full global pathnames.
+        abs_key : (str, str)
+            Absolute name pair of sub-Jacobian.
         coeffs : dict of ndarray[nvar_myproc, 2]
             0th and 1st order coefficients for scaling/unscaling.
             The keys are 'input', 'output', and 'residual'
         """
-        ind0 = self._system._var_pathdict[ukey[0]].myproc_idx
-        ind1 = self._system._var_pathdict[ukey[1]].myproc_idx
-        typ = self._system._var_pathdict[ukey[1]].typ
+        data0 = self._system._var_abs2data_io[abs_key[0]]
+        data1 = self._system._var_abs2data_io[abs_key[1]]
 
-        val = coeffs['residual'][ind0, 1] / coeffs[typ][ind1, 1]
-        self._multiply_subjac(ukey, val)
+        ind0 = data0['my_idx']
+        ind1 = data1['my_idx']
+        type_ = data1['type']
+
+        val = coeffs['residual'][ind0, 1] / coeffs[type_][ind1, 1]
+        self._multiply_subjac(abs_key, val)
 
     def _scale(self, coeffs):
         """
@@ -281,8 +246,8 @@ class Jacobian(object):
             0th and 1st order coefficients for scaling/unscaling.
             The keys are 'input', 'output', and 'residual'.
         """
-        for ukey in self._iter_pathnames():
-            self._scale_subjac(ukey, coeffs)
+        for abs_key in self._iter_abs_keys():
+            self._scale_subjac(abs_key, coeffs)
 
     def _initialize(self):
         """
@@ -313,23 +278,23 @@ class Jacobian(object):
         """
         pass
 
-    def _set_partials_meta(self, key, meta, negate=False):
+    def _set_partials_meta(self, abs_key, meta, negate=False):
         """
         Store subjacobian metadata.
 
+        Note: this method MUST be called by a Component because prom_key is otherwise non-unique.
+
         Parameters
         ----------
-        key : (str, str)
-            output name, input name of sub-Jacobian. The names are promoted names.
+        abs_key : (str, str)
+            Absolute name pair of sub-Jacobian.
         meta : dict
             Metadata dictionary for the subjacobian.
         negate : bool
             If True negate the given value, if any.
         """
-        ukey = self._key2unique(key)
-        if ukey is None:
-            raise KeyError("Could not find unique key for %s." % (key,))
-        self._subjacs_info[ukey] = (meta, self._key2shape(key))
+        shape = self._abs_key2shape(abs_key)
+        self._subjacs_info[abs_key] = (meta, shape)
 
         val = meta['value']
         if val is not None:
@@ -337,4 +302,4 @@ class Jacobian(object):
                 val *= -1.
             if meta['rows'] is not None:
                 val = [val, meta['rows'], meta['cols']]
-            self.__setitem__(key, val)
+            self._set_abs(abs_key, val)

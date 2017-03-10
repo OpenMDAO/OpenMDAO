@@ -46,6 +46,12 @@ class TestExplCompSimpleJacVec(TestExplCompSimpleCompute):
 
 class TestExplCompSimple(unittest.TestCase):
 
+    def test_simple(self):
+        comp = TestExplCompSimpleCompute()
+        prob = Problem(model=comp)
+        prob.setup(check=False)
+        prob.run_model()
+
     def test_compute(self):
         group = Group()
         group.add_subsystem('comp1', IndepVarComp([('length', 1.0), ('width', 1.0)]))

@@ -40,14 +40,14 @@ def visit_in_or_out_node(self, node):
 
 def depart_in_or_out_node(self, node):
     """
-    This function creates the formatting that sets up the look of the blocks
+    This function creates the formatting that sets up the look of the blocks.
     The look of the formatting is controlled by _theme/static/style.css
     """
     if not isinstance(self, HTMLTranslator):
         self.body.append("output only available for HTML\n")
         return
     if node["kind"] == "In":
-        html = '<div class="cell border-box-sizing code_cell rendered"><div class="input_area"><pre>{}</pre></div></div>'.format(node["text"])
+        html = '<div class="highlight-python"><div class="highlight"><pre>{}</pre></div></div>'.format(node["text"])
     elif node["kind"] == "Out":
         html = '<div class="cell border-box-sizing code_cell rendered"><div class="output_area"><pre>{}</pre></div></div>'.format(node["text"])
 
@@ -96,7 +96,7 @@ class EmbedTestDirective(Directive):
         if 'no-split' in self.options:
             src, output, skipped, failed = get_unit_test_source_and_run_outputs(method_path)
             # we want the body of test code to be formatted and code highlighted
-            body = in_or_out_node(kind="In", number=n, text=src)
+            body = nodes.literal_block(src, src)
             body['language'] = 'python'
             doc_nodes.append(body)
 
@@ -116,7 +116,8 @@ class EmbedTestDirective(Directive):
 
             if skipped or failed:  # do the old way
                 # we want the body of test code to be formatted and code highlighted
-                body = in_or_out_node(kind="In", number=n, text=src, language="python")
+                body = nodes.literal_block(src, src)
+                body['language'] = 'python'
                 doc_nodes.append(body)
 
                 # we want the output block to also be formatted similarly unless test was skipped
@@ -130,8 +131,7 @@ class EmbedTestDirective(Directive):
 
             else:
                 for input_block, output_block in zip(input_blocks, output_blocks):
-                    input_node = in_or_out_node(kind="In", number=n, text=input_block)
-
+                    input_node = nodes.literal_block(input_block, input_block)
                     input_node['language'] = 'python'
                     doc_nodes.append(input_node)
                     output_node = in_or_out_node(kind="Out", number=n, text=output_block)

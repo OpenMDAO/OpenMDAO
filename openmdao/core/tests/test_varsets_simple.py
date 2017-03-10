@@ -3,6 +3,7 @@ import numpy as np
 import unittest
 
 from openmdao.api import Problem, ExplicitComponent, Group, DefaultVector
+from openmdao.devtools.testutil import assert_rel_error
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -65,16 +66,9 @@ class TestNumpyVec(unittest.TestCase):
         group = GroupG()
         self.p = Problem(group).setup(DefaultVector)
 
-    def assertEqualArrays(self, a, b):
-        self.assertTrue(np.linalg.norm(a-b) < 1e-15)
-
-    def assertList(self, ab_list):
-        for a, b in ab_list:
-            self.assertEqualArrays(a, b)
-
-    def test__var_allprocs_names(self):
+    def test_prom_names(self):
         root = self.p.model
-        names = root._var_allprocs_names['output']
+        names = sorted(root._var_allprocs_prom2abs_list['output'])
         self.assertEqual(names, ['v1', 'v2', 'v3', 'v4'])
 
     def test__variable_set_IDs(self):
@@ -87,7 +81,7 @@ class TestNumpyVec(unittest.TestCase):
     def test__variable_set_indices(self):
         set_indices = self.p._assembler._variable_set_indices['output']
         array = np.array([[0,0],[1,0],[2,0],[3,0]])
-        self.assertEqualArrays(set_indices, array)
+        assert_rel_error(self, set_indices, array)
 
     def test_transfer(self):
         root = self.p.model
@@ -103,51 +97,39 @@ class TestNumpyVec(unittest.TestCase):
             comp3._outputs['v3'] = 6.0
             comp4._outputs['v4'] = 8.0
 
-            self.assertList([
-                [comp1._outputs['v1'], 2.0],
-                [comp1._inputs['v2'],  1.0],
-                [comp1._inputs['v3'],  1.0],
-                [comp1._inputs['v4'],  1.0],
-            ])
+            assert_rel_error(self, comp1._outputs['v1'], 2.0)
+            assert_rel_error(self, comp1._inputs['v2'], 1.0)
+            assert_rel_error(self, comp1._inputs['v3'], 1.0)
+            assert_rel_error(self, comp1._inputs['v4'], 1.0)
 
-            self.assertList([
-                [comp2._inputs['v1'],  1.0],
-                [comp2._outputs['v2'], 4.0],
-                [comp2._inputs['v3'],  1.0],
-                [comp2._inputs['v4'],  1.0],
-            ])
+            assert_rel_error(self, comp2._inputs['v1'], 1.0)
+            assert_rel_error(self, comp2._outputs['v2'], 4.0)
+            assert_rel_error(self, comp2._inputs['v3'], 1.0)
+            assert_rel_error(self, comp2._inputs['v4'], 1.0)
 
             root._vector_transfers['nonlinear']['fwd', 0](root._inputs, root._outputs)
 
-            self.assertList([
-                [comp1._outputs['v1'], 2.0],
-                [comp1._inputs['v2'],  4.0],
-                [comp1._inputs['v3'],  6.0],
-                [comp1._inputs['v4'],  8.0],
-            ])
+            assert_rel_error(self, comp1._outputs['v1'], 2.0)
+            assert_rel_error(self, comp1._inputs['v2'], 4.0)
+            assert_rel_error(self, comp1._inputs['v3'], 6.0)
+            assert_rel_error(self, comp1._inputs['v4'], 8.0)
 
-            self.assertList([
-                [comp2._inputs['v1'],  1.0],
-                [comp2._outputs['v2'], 4.0],
-                [comp2._inputs['v3'],  1.0],
-                [comp2._inputs['v4'],  1.0],
-            ])
+            assert_rel_error(self, comp2._inputs['v1'], 1.0)
+            assert_rel_error(self, comp2._outputs['v2'], 4.0)
+            assert_rel_error(self, comp2._inputs['v3'], 1.0)
+            assert_rel_error(self, comp2._inputs['v4'], 1.0)
 
             root._vector_transfers['nonlinear'][None](root._inputs, root._outputs)
 
-            self.assertList([
-                [comp1._outputs['v1'], 2.0],
-                [comp1._inputs['v2'],  4.0],
-                [comp1._inputs['v3'],  6.0],
-                [comp1._inputs['v4'],  8.0],
-            ])
+            assert_rel_error(self, comp1._outputs['v1'], 2.0)
+            assert_rel_error(self, comp1._inputs['v2'], 4.0)
+            assert_rel_error(self, comp1._inputs['v3'], 6.0)
+            assert_rel_error(self, comp1._inputs['v4'], 8.0)
 
-            self.assertList([
-                [comp2._inputs['v1'],  2.0],
-                [comp2._outputs['v2'], 4.0],
-                [comp2._inputs['v3'],  6.0],
-                [comp2._inputs['v4'],  8.0],
-            ])
+            assert_rel_error(self, comp2._inputs['v1'], 2.0)
+            assert_rel_error(self, comp2._outputs['v2'], 4.0)
+            assert_rel_error(self, comp2._inputs['v3'], 6.0)
+            assert_rel_error(self, comp2._inputs['v4'], 8.0)
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
