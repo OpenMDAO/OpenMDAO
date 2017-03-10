@@ -578,7 +578,7 @@ class Component(System):
         {'input': [str, ...], 'output': [str, ...]}
             List of absolute names of owned variables existing on current proc.
         """
-        # Now that we know the pathname, convert _var_rel_names from names to abs_names.
+        # Now that we know the pathname, create _var_abs_names from _var_rel_names.
         for type_ in ['input', 'output']:
             abs_names = []
             allprocs_prom2abs_list = {}
@@ -589,7 +589,7 @@ class Component(System):
             self._var_abs_names[type_] = abs_names
             self._var_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
 
-        # Now that we know the pathname, convert _var_rel2data_io from names to abs_names.
+        # Now that we know the pathname, create _var_abs2data_io from _var_rel2data_io.
         abs2data_io = {}
         for name, data in iteritems(self._var_rel2data_io):
             abs_name = rel_name2abs_name(self, name)

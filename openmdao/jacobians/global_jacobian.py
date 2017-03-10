@@ -129,10 +129,12 @@ class GlobalJacobian(Jacobian):
 
                     in_idx = assembler._var_allprocs_abs2idx_io[in_abs_name]
                     out_abs_name = assembler._input_srcs[in_abs_name]
-                    if out_abs_name is not None:
-                        out_idx = assembler._var_allprocs_abs2idx_io[out_abs_name]
+                    if out_abs_name is None:  # skip unconnected inputs
+                        continue
 
-                    if out_abs_name is not None and out_start <= out_idx < out_end:
+                    out_idx = assembler._var_allprocs_abs2idx_io[out_abs_name]
+
+                    if out_start <= out_idx < out_end:
                         out_abs_name = assembler._var_allprocs_abs_names['output'][out_idx]
                         out_offset = out_offsets[out_abs_name]
                         src_indices = src_indices_dict[in_abs_name]
@@ -148,7 +150,7 @@ class GlobalJacobian(Jacobian):
                             self._keymap[abs_key] = abs_key2
                             self._int_mtx._add_submat(abs_key2, info, res_offset, out_offset,
                                                       src_indices, shape)
-                    elif out_abs_name is None:  # skip unconnected inputs
+                    else:
                         self._ext_mtx._add_submat(abs_key, info, res_offset, in_offset, None, shape)
 
         iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
@@ -183,13 +185,13 @@ class GlobalJacobian(Jacobian):
                 abs_key = (res_abs_name, in_abs_name)
                 if abs_key in self._subjacs:
                     out_abs_name = assembler._input_srcs[in_abs_name]
-                    if out_abs_name is None:
-                        self._ext_mtx._update_submat(abs_key, self._subjacs[abs_key])
-                    else:
+                    if out_abs_name is not None:
                         out_idx = assembler._var_allprocs_abs2idx_io[out_abs_name]
                         if out_start <= out_idx < out_end:
                             self._int_mtx._update_submat(self._keymap[abs_key],
                                                          self._subjacs[abs_key])
+                        else:
+                            self._ext_mtx._update_submat(abs_key, self._subjacs[abs_key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """
