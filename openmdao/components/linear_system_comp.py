@@ -48,7 +48,9 @@ class LinearSystemComp(ImplicitComponent):
         self.add_output("x", shape=size, val=2.)
 
     def initialize_partials(self):
-
+        """
+        Setup the derivatives according to the user specified mode.
+        """
         partial_type = self.metadata['partial_type']
 
         size = self.metadata['size']
@@ -63,7 +65,7 @@ class LinearSystemComp(ImplicitComponent):
             for i in xrange(size):
                 for j in xrange(size):
                     rows.append(i)
-                    cols.append(i*size+j)
+                    cols.append(i * size + j)
 
             self.dx_da_rows = rows
             self.dx_da_cols = cols
@@ -104,6 +106,9 @@ class LinearSystemComp(ImplicitComponent):
         outputs['x'] = linalg.lu_solve(self._lup, inputs['b'])
 
     def linearize(self, inputs, outputs, J):
+        """
+        Compute the non-constant partial derivatives.
+        """
         partial_type = self.metadata['partial_type']
         if partial_type == "matrix_free":
             return
@@ -113,7 +118,7 @@ class LinearSystemComp(ImplicitComponent):
         if partial_type == "dense":
             dx_dA = np.zeros((size, size**2))
             for i in xrange(size):
-                dx_dA[i, i*size:(i+1)*size] = x
+                dx_dA[i, i * size:(i + 1) * size] = x
             J['x', 'A'] = dx_dA
 
             J['x', 'x'] = inputs['A']
