@@ -564,7 +564,7 @@ class Component(System):
             for name in self._var_abs_names['output']:
                 outputs[abs2data[name]['rel']] = abs2data[name]['metadata']['value']
 
-    def _setupx_variables(self):
+    def _setup_variables(self):
         """
         Compute variable dict/list for variables on the current processor.
 
@@ -578,6 +578,8 @@ class Component(System):
         {'input': [str, ...], 'output': [str, ...]}
             List of absolute names of owned variables existing on current proc.
         """
+        super(Component, self)._setup_variables()
+
         # Now that we know the pathname, create _var_abs_names from _var_rel_names.
         for type_ in ['input', 'output']:
             abs_names = []
@@ -606,7 +608,7 @@ class Component(System):
 
         return self._var_abs_names
 
-    def _setupx_variable_allprocs_indices(self, global_index):
+    def _setup_variable_indices(self, global_index):
         """
         Compute the global index range for variables on all processors.
 

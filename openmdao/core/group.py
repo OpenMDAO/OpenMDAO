@@ -243,7 +243,7 @@ class Group(System):
         """
         pass
 
-    def _setupx_variables(self):
+    def _setup_variables(self):
         """
         Compute variable dict/list for variables on the current processor.
 
@@ -257,20 +257,21 @@ class Group(System):
         {'input': [str, ...], 'output': [str, ...]}
             List of absolute names of owned variables existing on current proc.
         """
+        super(Group, self)._setup_variables()
+
         self._var_abs2data_io = {}
         for type_ in ['input', 'output']:
             self._var_abs_names[type_] = []
 
         name_offset = len(self.pathname) + 1 if self.pathname else 0
-        iotypes = ('input', 'output')
         allprocs_abs_names = {'input': [], 'output': []}
 
         # Perform recursion to populate the dict and list bottom-up
         for isub, subsys in enumerate(self._subsystems_myproc):
-            subsys_allprocs_abs_names = subsys._setupx_variables()
+            subsys_allprocs_abs_names = subsys._setup_variables()
 
             var_maps = subsys._get_maps()
-            for type_ in iotypes:
+            for type_ in ['input', 'output']:
                 # concatenate the allprocs variable names from subsystems on my proc.
                 allprocs_abs_names[type_].extend(subsys_allprocs_abs_names[type_])
 
@@ -332,7 +333,7 @@ class Group(System):
 
         return allprocs_abs_names
 
-    def _setupx_variable_allprocs_indices(self, global_index):
+    def _setup_variable_indices(self, global_index):
         """
         Compute the global index range for variables on all processors.
 
@@ -358,7 +359,7 @@ class Group(System):
             for type_ in ['input', 'output']:
                 # Note: the following is valid because _var_allprocs_idx_range
                 # contains [0, # allprocs vars] at this point because
-                # _setupx_variables has been run but the recursion
+                # _setup_variables has been run but the recursion
                 # for the current method has not been performed yet.
                 local_var_size = subsys0._var_allprocs_idx_range[type_][1]
 
@@ -377,7 +378,7 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            subsys_allprocs_abs_names = subsys._setupx_variable_allprocs_indices(global_index)
+            subsys._setup_variable_indices(global_index)
 
         # Reset index dict to the global variable counter on all procs.
         # Necessary for younger siblings to have proper index values.
