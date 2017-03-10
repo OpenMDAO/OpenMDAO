@@ -117,7 +117,7 @@ class LinearSystemComp(ImplicitComponent):
         size = self.metadata['size']
         if partial_type == "dense":
             dx_dA = np.zeros((size, size**2))
-            for i in xrange(size):
+            for i in range(size):
                 dx_dA[i, i * size:(i + 1) * size] = x
             J['x', 'A'] = dx_dA
 
