@@ -6,7 +6,6 @@ import numpy as np
 
 from openmdao.core.component import Component as BaseComponent
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.name_maps import rel_key2abs_key
 
 
 class Component(BaseComponent):
@@ -239,19 +238,29 @@ class Component(BaseComponent):
             self._inputs._scale(self._scaling_to_norm['input'])
             self._outputs._scale(self._scaling_to_norm['output'])
 
-            pro2abs = self._var_name2path['output']
-            for out_name in self._var_myproc_names['output']:
+            pro2abs = self._var_allprocs_prom2abs_list['output']
+            for out_name in self._var_rel_names['output']:
                 if out_name in self._output_names:
-                    size = len(self._outputs._views_flat[pro2abs[out_name]])
+                    size = len(self._outputs._views_flat[pro2abs[out_name][0]])
                     ones = np.ones(size)
                     arange = np.arange(size)
                     self._jacobian[out_name, out_name] = (ones, arange, arange)
 
-            # re-negate the jacobian
             self._negate_jac()
 
             if self._owns_global_jac:
                 self._jacobian._update()
+
+    def _negate_jac(self):
+        """
+        Negate this component's part of the jacobian.
+        """
+        if self._jacobian._subjacs:
+            for res_name in self._var_abs_names['output']:
+                for in_name in self._var_abs_names['input']:
+                    abs_key = (res_name, in_name)
+                    if abs_key in self._jacobian._subjacs:
+                        self._jacobian._multiply_subjac(abs_key, -1.)
 
     def _setup_partials(self):
         """
@@ -259,36 +268,27 @@ class Component(BaseComponent):
         """
         self.initialize_partials()
 
+        abs2data = self._var_abs2data_io
+
         # Note: These declare calls are outside of initialize_partials so that users do not have to
         # call the super version of initialize_partials. This is still post-initialize_variables.
         other_names = []
-        for i, out_name in enumerate(self._var_myproc_names['output']):
-            meta = self._var_myproc_metadata['output'][i]
+        for out_abs in self._var_abs_names['output']:
+            meta = abs2data[out_abs]['metadata']
+            out_name = abs2data[out_abs]['prom']
             size = np.prod(meta['shape'])
             arange = np.arange(size)
 
             # No need to FD outputs wrt other outputs
-            abs_key = rel_key2abs_key(self, (out_name, out_name))
+            abs_key = (out_abs, out_abs)
             if abs_key in self._subjacs_info:
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
-
             self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
             for other_name in other_names:
                 self.declare_partials(out_name, other_name, dependent=False)
                 self.declare_partials(other_name, out_name, dependent=False)
             other_names.append(out_name)
-
-    def _negate_jac(self):
-        """
-        Negate this component's part of the jacobian.
-        """
-        if self._jacobian._subjacs:
-            for res_name in self._varx_abs_names['output']:
-                for in_name in self._varx_abs_names['input']:
-                    abs_key = (res_name, in_name)
-                    if abs_key in self._jacobian._subjacs:
-                        self._jacobian._multiply_subjac(abs_key, -1.)
 
     def apply_nonlinear(self, params, unknowns, residuals):
         """

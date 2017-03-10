@@ -33,9 +33,10 @@ def _get_tree_dict(system):
 
         children = []
         for typ in ['input', 'output']:
-            for ind in range(len(system._var_myproc_names[typ])):
-                name = system._var_myproc_names[typ][ind]
-                meta = system._var_myproc_metadata[typ][ind]
+            for ind, abs_name in enumerate(system._var_abs_names[typ]):
+                data = system._var_abs2data_io[abs_name]
+                meta = data['metadata']
+                name = data['prom']
 
                 var_dict = OrderedDict()
                 var_dict['name'] = name
@@ -82,10 +83,11 @@ def _get_viewer_data(problem_or_rootgroup):
     else:
         raise TypeError('get_model_viewer_data only accepts Problems or Groups')
 
+    abs2data = root_group._var_abs2data_io
     connections_list = []
-    for in_ind, out_ind in root_group._var_connections_indices:
-        in_name = root_group._var_allprocs_names['input'][in_ind]
-        out_name = root_group._var_allprocs_names['output'][out_ind]
+    for in_abs, out_abs in root_group._var_connections_abs:
+        in_name = abs2data[in_abs]['prom']
+        out_name = abs2data[out_abs]['prom']
 
         dct = OrderedDict()
         dct['src'] = out_name

@@ -261,7 +261,7 @@ class TestGroup(unittest.TestCase):
         G1 = prob.model.add_subsystem('G1', Group())
         G1.add_subsystem("C1", ExecComp("y=2.0*x"), promotes=['y'])
         G1.add_subsystem("C2", ExecComp("y=2.0*x"), promotes=['y'])
-        msg = "Output name 'y' refers to multiple outputs: \['G1.C2.y', 'G1.C1.y'\]."
+        msg = "Output name 'y' refers to multiple outputs: \['G1.C1.y', 'G1.C2.y'\]."
         with assertRaisesRegex(self, Exception, msg):
             prob.setup(check=False)
 

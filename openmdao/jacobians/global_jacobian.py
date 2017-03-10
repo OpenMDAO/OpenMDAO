@@ -58,7 +58,7 @@ class GlobalJacobian(Jacobian):
         """
         sizes_all = self._system._assembler._variable_sizes_all['output']
         iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
-        ivar_all0 = self._system._varx_allprocs_idx_range['output'][0]
+        ivar_all0 = self._system._var_allprocs_idx_range['output'][0]
 
         ind1 = np.sum(sizes_all[iproc, ivar_all0:ivar_all])
         ind2 = np.sum(sizes_all[iproc, ivar_all0:ivar_all + 1])
@@ -72,24 +72,24 @@ class GlobalJacobian(Jacobian):
         # var_indices are the *global* indices for variables on this proc
         system = self._system
         assembler = system._assembler
-        out_start, out_end = system._varx_allprocs_idx_range['output']
-        in_start, in_end = system._varx_allprocs_idx_range['input']
+        out_start, out_end = system._var_allprocs_idx_range['output']
+        in_start, in_end = system._var_allprocs_idx_range['input']
 
         self._int_mtx = self.options['matrix_class'](system.comm)
         self._ext_mtx = self.options['matrix_class'](system.comm)
 
         out_offsets = {}
-        for abs_name in system._varx_abs_names['output']:
-            idx = assembler._varx_allprocs_abs2idx_io[abs_name]
+        for abs_name in system._var_abs_names['output']:
+            idx = assembler._var_allprocs_abs2idx_io[abs_name]
             out_offsets[abs_name] = self._get_var_range(idx, 'output')[0]
 
         in_offsets = {}
         src_indices_dict = {}
-        for abs_name in system._varx_abs_names['input']:
-            idx = assembler._varx_allprocs_abs2idx_io[abs_name]
+        for abs_name in system._var_abs_names['input']:
+            idx = assembler._var_allprocs_abs2idx_io[abs_name]
             in_offsets[abs_name] = self._get_var_range(idx, 'input')[0]
             src_indices_dict[abs_name] = \
-                system._varx_abs2data_io[abs_name]['metadata']['src_indices']
+                system._var_abs2data_io[abs_name]['metadata']['src_indices']
 
         start = len(system.pathname) + 1 if system.pathname else 0
 
@@ -98,10 +98,10 @@ class GlobalJacobian(Jacobian):
         for s in self._system.system_iter(local=True, recurse=True,
                                           include_self=True, typ=Component):
 
-            for res_abs_name in s._varx_abs_names['output']:
+            for res_abs_name in s._var_abs_names['output']:
                 res_offset = out_offsets[res_abs_name]
 
-                for out_abs_name in s._varx_abs_names['output']:
+                for out_abs_name in s._var_abs_names['output']:
                     out_offset = out_offsets[out_abs_name]
 
                     abs_key = (res_abs_name, out_abs_name)
@@ -114,7 +114,7 @@ class GlobalJacobian(Jacobian):
 
                     self._int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
 
-                for in_abs_name in s._varx_abs_names['input']:
+                for in_abs_name in s._var_abs_names['input']:
                     in_offset = in_offsets[in_abs_name]
 
                     abs_key = (res_abs_name, in_abs_name)
@@ -127,11 +127,15 @@ class GlobalJacobian(Jacobian):
 
                     self._keymap[abs_key] = abs_key
 
-                    in_idx = assembler._varx_allprocs_abs2idx_io[in_abs_name]
-                    out_idx = assembler._input_src_ids[in_idx]
+                    in_idx = assembler._var_allprocs_abs2idx_io[in_abs_name]
+                    out_abs_name = assembler._input_srcs[in_abs_name]
+                    if out_abs_name is None:  # skip unconnected inputs
+                        continue
+
+                    out_idx = assembler._var_allprocs_abs2idx_io[out_abs_name]
 
                     if out_start <= out_idx < out_end:
-                        out_abs_name = assembler._varx_allprocs_abs_names['output'][out_idx]
+                        out_abs_name = assembler._var_allprocs_abs_names['output'][out_idx]
                         out_offset = out_offsets[out_abs_name]
                         src_indices = src_indices_dict[in_abs_name]
 
@@ -146,7 +150,7 @@ class GlobalJacobian(Jacobian):
                             self._keymap[abs_key] = abs_key2
                             self._int_mtx._add_submat(abs_key2, info, res_offset, out_offset,
                                                       src_indices, shape)
-                    elif out_idx != -1:  # skip unconnected inputs
+                    else:
                         self._ext_mtx._add_submat(abs_key, info, res_offset, in_offset, None, shape)
 
         iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
@@ -165,27 +169,29 @@ class GlobalJacobian(Jacobian):
         """
         system = self._system
         assembler = system._assembler
-        out_start, out_end = system._varx_allprocs_idx_range['output']
-        in_start, in_end = system._varx_allprocs_idx_range['input']
+        out_start, out_end = system._var_allprocs_idx_range['output']
+        in_start, in_end = system._var_allprocs_idx_range['input']
 
-        for res_abs_name in system._varx_abs_names['output']:
+        for res_abs_name in system._var_abs_names['output']:
 
-            for out_abs_name in system._varx_abs_names['output']:
+            for out_abs_name in system._var_abs_names['output']:
 
                 abs_key = (res_abs_name, out_abs_name)
                 if abs_key in self._subjacs:
                     self._int_mtx._update_submat(abs_key, self._subjacs[abs_key])
 
-            for in_abs_name in system._varx_abs_names['input']:
+            for in_abs_name in system._var_abs_names['input']:
 
                 abs_key = (res_abs_name, in_abs_name)
                 if abs_key in self._subjacs:
-                    in_idx = assembler._varx_allprocs_abs2idx_io[in_abs_name]
-                    out_idx = assembler._input_src_ids[in_idx]
-                    if out_start <= out_idx < out_end:
-                        self._int_mtx._update_submat(self._keymap[abs_key], self._subjacs[abs_key])
-                    elif out_idx != -1:  # skip unconnected inputs
-                        self._ext_mtx._update_submat(abs_key, self._subjacs[abs_key])
+                    out_abs_name = assembler._input_srcs[in_abs_name]
+                    if out_abs_name is not None:
+                        out_idx = assembler._var_allprocs_abs2idx_io[out_abs_name]
+                        if out_start <= out_idx < out_end:
+                            self._int_mtx._update_submat(self._keymap[abs_key],
+                                                         self._subjacs[abs_key])
+                        else:
+                            self._ext_mtx._update_submat(abs_key, self._subjacs[abs_key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """

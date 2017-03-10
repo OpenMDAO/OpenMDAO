@@ -140,7 +140,7 @@ class Vector(object):
         system = self._system
         assembler = system._assembler
 
-        ind1, ind2 = system._varx_allprocs_idx_range[self._typ]
+        ind1, ind2 = system._var_allprocs_idx_range[self._typ]
 
         variable_set_indices = assembler._variable_set_indices[self._typ]
         sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
@@ -163,9 +163,9 @@ class Vector(object):
                 ind1_list.append(0)
 
         # Populate ivar_map by looping over local variables in the system.
-        for abs_name in system._varx_abs_names[self._typ]:
-            idx = assembler._varx_allprocs_abs2idx_io[abs_name]
-            my_idx = system._varx_abs2data_io[abs_name]['my_idx']
+        for abs_name in system._var_abs_names[self._typ]:
+            idx = assembler._var_allprocs_abs2idx_io[abs_name]
+            my_idx = system._var_abs2data_io[abs_name]['my_idx']
             iset, ivar = variable_set_indices[idx, :]
             sizes_array = assembler._variable_sizes[self._typ][iset]
             ind1 = np.sum(sizes_array[self._iproc, :ivar]) - ind1_list[iset]
@@ -190,8 +190,8 @@ class Vector(object):
         """
         if new_array is None:
             total_size = 0
-            for abs_name in self._system._varx_abs_names[self._typ]:
-                idx = self._assembler._varx_allprocs_abs2idx_io[abs_name]
+            for abs_name in self._system._var_abs_names[self._typ]:
+                idx = self._assembler._var_allprocs_abs2idx_io[abs_name]
                 total_size += self._assembler._variable_sizes_all[self._typ][self._iproc, idx]
 
             new_array = np.zeros(total_size)
@@ -251,9 +251,9 @@ class Vector(object):
             iterator over the variable names.
         """
         iter_list = []
-        for abs_name in self._system._varx_abs_names[self._typ]:
+        for abs_name in self._system._var_abs_names[self._typ]:
             if abs_name in self._names:
-                rel_name = self._system._varx_abs2data_io[abs_name]['rel']
+                rel_name = self._system._var_abs2data_io[abs_name]['rel']
                 iter_list.append(rel_name)
         return iter(iter_list)
 

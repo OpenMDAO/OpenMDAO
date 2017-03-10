@@ -69,7 +69,7 @@ class TestNumpyVec(unittest.TestCase):
 
     def test_prom_names(self):
         root = self.p.model
-        names = sorted(root._varx_allprocs_prom2abs_list['output'])
+        names = sorted(root._var_allprocs_prom2abs_list['output'])
         self.assertEqual(names, ['v1', 'v2', 'v3', 'v4'])
 
     def test__variable_set_IDs(self):
