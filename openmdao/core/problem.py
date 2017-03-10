@@ -284,10 +284,9 @@ class Problem(object):
         model._setup_partials()
         model._setup_connections()
 
-        assembler._setupx_variables(allprocs_abs_names)
-
         # Assembler setup: variable metadata and indices
-        assembler._setup_variables(model._var_abs2data_io,
+        assembler._setup_variables(allprocs_abs_names,
+                                   model._var_abs2data_io,
                                    model._var_abs_names)
 
         # Assembler setup: variable connections

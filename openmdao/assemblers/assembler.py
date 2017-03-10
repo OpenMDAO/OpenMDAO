@@ -91,30 +91,13 @@ class Assembler(object):
         self._src_units = []
         self._src_scaling = None
 
-    def _setupx_variables(self, allprocs_abs_names):
+    def _setup_variables(self, allprocs_abs_names, abs2data, abs_names):
         """
         Compute absolute name to/from idx maps for variables on all procs.
 
         Sets the following attributes:
             _var_allprocs_abs_names
             _var_allprocs_abs2idx_io
-
-        Parameters
-        ----------
-        allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
-            List of absolute names of all owned variables, on all procs (maps idx to abs_name).
-        """
-        self._var_allprocs_abs_names = allprocs_abs_names
-        self._var_allprocs_abs2idx_io = {}
-        for type_ in ['input', 'output']:
-            for idx, abs_name in enumerate(allprocs_abs_names[type_]):
-                self._var_allprocs_abs2idx_io[abs_name] = idx
-
-    def _setup_variables(self, abs2data, abs_names):
-        """
-        Compute the variable sets and sizes.
-
-        Sets the following attributes:
             _variable_sizes_all
             _variable_sizes
             _variable_set_IDs
@@ -122,11 +105,19 @@ class Assembler(object):
 
         Parameters
         ----------
+        allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
+            List of absolute names of all owned variables, on all procs (maps idx to abs_name).
         abs2data : {vname1: {'metadata': {}, ...}, ...}
             dict of abs var name to data dict for variables on this proc.
         abs_names : {'input': [str, ...], 'output': [str, ...]}
             lists of absolute names of input and output variables on this proc.
         """
+        self._var_allprocs_abs_names = allprocs_abs_names
+        self._var_allprocs_abs2idx_io = {}
+        for type_ in ['input', 'output']:
+            for idx, abs_name in enumerate(allprocs_abs_names[type_]):
+                self._var_allprocs_abs2idx_io[abs_name] = idx
+
         nproc = self._comm.size
         indices = self._var_allprocs_abs2idx_io
 
