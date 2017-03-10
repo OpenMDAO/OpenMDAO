@@ -40,11 +40,11 @@ class TestLinearSystem(unittest.TestCase):
         assert_rel_error(self, prob['lin.x'], x, .0001)
         assert_rel_error(self, prob.model._residuals.get_norm(), 0.0, 1e-10)
 
-    def test_linear_system_solve_linear_mat_free(self):
+    def test_linear_system_solve_linear(self):
         """Check against solve_linear."""
 
         x = np.array([1, 2, -3])
-        A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
+        A = np.array([[1., 1., 1.], [1., 2., 3.], [0., 1., 3.]])
         b = A.dot(x)
         b_T = A.T.dot(x)
 
@@ -61,7 +61,7 @@ class TestLinearSystem(unittest.TestCase):
             # TODO: using GlobalJacobian breaks this linear solve!
             # from openmdao.api import GlobalJacobian, DenseMatrix
             # lingrp.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
-            lingrp.ln_solver = DirectSolver()
+            # lingrp.ln_solver = DirectSolver()
 
             prob.model.connect('p1.A', 'lin.A')
             prob.model.connect('p2.b', 'lin.b')
@@ -77,7 +77,12 @@ class TestLinearSystem(unittest.TestCase):
             # prob.check_partial_derivatives()
 
             # Compare against calculated derivs
-            Ainv = np.linalg.inv(A)
+            # Ainv = np.linalg.inv(A) # Don't use linalg.inv or a mathematician will die
+            Ainv = np.array([[3., -2., 1.],
+                             [-3., 3., -2.],
+                             [1., -1., 1.]])
+            print Ainv - np.linalg.inv(A)
+
             dx_dA = np.outer(Ainv, -x).reshape(3, 9)
             dx_db = Ainv
 

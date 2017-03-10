@@ -54,7 +54,7 @@ class LinearSystemComp(ImplicitComponent):
         partial_type = self.metadata['partial_type']
 
         size = self.metadata['size']
-        row_col = range(size)
+        row_col = np.arange(size, dtype="int")
 
         if partial_type == 'sparse':
             self.declare_partials('x', 'b', val=-np.ones(size), rows=row_col, cols=row_col)
@@ -62,8 +62,8 @@ class LinearSystemComp(ImplicitComponent):
 
             rows = []
             cols = []
-            for i in xrange(size):
-                for j in xrange(size):
+            for i in range(size):
+                for j in range(size):
                     rows.append(i)
                     cols.append(i * size + j)
 
