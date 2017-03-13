@@ -211,16 +211,19 @@ class ExplicitComponent(Component):
         """
         self.initialize_partials()
 
+        abs2data = self._var_abs2data_io
+
         # Note: These declare calls are outside of initialize_partials so that users do not have to
         # call the super version of initialize_partials. This is still post-initialize_variables.
         other_names = []
-        for i, out_name in enumerate(self._var_myproc_names['output']):
-            meta = self._var_myproc_metadata['output'][i]
+        for out_abs in self._var_abs_names['output']:
+            meta = abs2data[out_abs]['metadata']
+            out_name = abs2data[out_abs]['prom']
             size = np.prod(meta['shape'])
             arange = np.arange(size)
 
             # No need to FD outputs wrt other outputs
-            abs_key = rel_key2abs_key(self, (out_name, out_name))
+            abs_key = (out_abs, out_abs)
             if abs_key in self._subjacs_info:
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
@@ -235,8 +238,8 @@ class ExplicitComponent(Component):
         Negate this component's part of the jacobian.
         """
         if self._jacobian._subjacs:
-            for res_name in self._varx_abs_names['output']:
-                for in_name in self._varx_abs_names['input']:
+            for res_name in self._var_abs_names['output']:
+                for in_name in self._var_abs_names['input']:
                     abs_key = (res_name, in_name)
                     if abs_key in self._jacobian._subjacs:
                         self._jacobian._multiply_subjac(abs_key, -1.)
