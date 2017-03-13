@@ -575,8 +575,6 @@ class GroupTestCase(unittest.TestCase):
         model.connect('C2.y', 'C3.x')
         model.suppress_solver_output = True
 
-        model.nl_solver.options['maxiter'] = 1
-
         self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
                          [s.name for s in model._subsystems_allprocs])
 
