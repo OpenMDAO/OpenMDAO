@@ -138,6 +138,9 @@ class ImplicitComponent(Component):
             if self._owns_global_jac:
                 J._update()
 
+        if self._nl_solver is not None:
+            self._nl_solver._linearize()
+
         if self._ln_solver is not None:
             self._ln_solver._linearize()
 

@@ -104,55 +104,15 @@ class Problem(object):
 
             model = root
 
+        if model is None:
+            model = Group()
+
         self.model = model
         self.comm = comm
         self.driver = Driver()
 
         self._assembler = assembler_class(comm)
         self._use_ref_vector = use_ref_vector
-
-    def _get_path_data(self, name):
-        """
-        Get absolute pathname and related data.
-
-        Parameters
-        ----------
-        name : str
-            name of the variable in the root system's namespace. May be
-            a promoted name or an unpromoted name.
-
-        Returns
-        -------
-        str, PathData
-            absolute pathname and PathData namedtuple
-        """
-        try:
-            pdata = self.model._var_pathdict[name]
-            pathname = name
-        except KeyError:
-            # name is not an absolute path
-            try:
-                pathname = self.model._var_name2path['output'][name]
-            except KeyError:
-                try:
-                    paths = self.model._var_name2path['input'][name]
-                except KeyError:
-                    raise KeyError("Variable '%s' not found." % name)
-
-                if len(paths) > 1:
-                    raise RuntimeError("Variable name '%s' is not unique and "
-                                       "matches the following: %s. "
-                                       "Use the absolute pathname instead." %
-                                       (name, paths))
-                pathname = paths[0]
-
-            pdata = self.model._var_pathdict[pathname]
-
-        if pdata.myproc_idx is None:
-            raise RuntimeError("Variable '%s' is not found in this process" %
-                               name)
-
-        return pathname, pdata
 
     def __getitem__(self, name):
         """
@@ -320,70 +280,28 @@ class Problem(object):
 
         # Recursive system setup
         model._setup_processors('', comm, {}, assembler, [0, comm.size])
-        model._setup_variables()
+        allprocs_abs_names = model._setup_variables()
         model._setup_variable_indices({'input': 0, 'output': 0})
-        model._setupx_variables_myproc()
-        allprocs_abs_names = model._setupx_variable_allprocs_names()
-        model._setupx_variable_allprocs_indices({'input': 0, 'output': 0})
         model._setup_partials()
         model._setup_connections()
 
-        # [REFACTOR VERIFICATION] for model._varx_allprocs_idx_range
-        for type_ in ['input', 'output']:
-            for ind in range(2):
-                assert model._var_allprocs_range[type_][ind] == \
-                    model._varx_allprocs_idx_range[type_][ind]
-
-        # [REFACTOR VERIFICATION] for model._varx_abs_names, model._varx_abs2data_io
-        for type_ in ['input', 'output']:
-            assert len(model._varx_abs_names[type_]) == len(model._var_myproc_names[type_])
-            for abs_name in model._varx_abs_names[type_]:
-                assert model._varx_abs2data_io[abs_name]['rel'] in model._var_myproc_names[type_]
-
-        # [REFACTOR VERIFICATION] imported here because it's temporary and will be removed soon
-        from six import iteritems
-        # [REFACTOR VERIFICATION] for model._varx_allprocs_prom2abs_list
-        for type_ in ['input', 'output']:
-            count = 0
-            for prom_name, abs_names_list in iteritems(model._varx_allprocs_prom2abs_list[type_]):
-                count += len(abs_names_list)
-                assert prom_name in model._var_allprocs_names[type_]
-                for abs_name in abs_names_list:
-                    assert abs_name in model._var_allprocs_pathnames[type_]
-            assert count == len(model._var_allprocs_pathnames[type_])
-            assert (len(model._varx_allprocs_prom2abs_list[type_])
-                    == len(set(model._var_allprocs_names[type_])))
-
         # Assembler setup: variable metadata and indices
-        nvars = {typ: len(model._var_allprocs_names[typ])
-                 for typ in ['input', 'output']}
-        assembler._setup_variables(nvars, model._var_myproc_metadata,
-                                   model._var_myproc_indices)
+        assembler._setup_variables(allprocs_abs_names,
+                                   model._var_abs2data_io,
+                                   model._var_abs_names)
 
         # Assembler setup: variable connections
-        assembler._setup_connections(model._var_connections_indices,
-                                     model._var_allprocs_names,
-                                     model._var_allprocs_pathnames,
-                                     model._var_pathdict,
-                                     model._var_myproc_metadata)
+        assembler._setup_connections(model._var_connections_abs,
+                                     model._var_allprocs_prom2abs_list,
+                                     model._var_abs2data_io)
 
         # Assembler setup: global transfer indices vector
-        assembler._setup_src_indices(model._var_myproc_metadata,
-                                     model._var_myproc_indices['input'],
-                                     model._var_pathdict,
-                                     model._var_allprocs_pathnames)
+        assembler._setup_src_indices(model._var_abs2data_io,
+                                     model._var_abs_names)
 
         # Assembler setup: compute data required for units/scaling
-        assembler._setup_src_data(model._var_myproc_metadata['output'],
-                                  model._var_myproc_indices['output'])
-
-        assembler._setupx_variables(allprocs_abs_names)
-
-        # [REFACTOR VERIFICATION] for assembler._varx_allprocs_abs_names
-        assert (model._var_allprocs_pathnames['input']
-                == assembler._varx_allprocs_abs_names['input'])
-        assert (model._var_allprocs_pathnames['output']
-                == assembler._varx_allprocs_abs_names['output'])
+        assembler._setup_src_data(model._var_abs_names['output'],
+                                  model._var_abs2data_io)
 
         # Set up scaling vectors
         model._setup_scaling()
@@ -444,7 +362,7 @@ class Problem(object):
             vectors[key] = vector_class(vec_name, typ, self.model)
 
         # TODO: implement this properly
-        ind1, ind2 = self.model._var_allprocs_range['output']
+        ind1, ind2 = self.model._var_allprocs_idx_range['output']
         vector_var_ids = np.arange(ind1, ind2)
 
         self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
@@ -565,18 +483,22 @@ class Problem(object):
                             deriv_value = subjacs.get(abs_key)
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                in_size = np.prod(comp._varx_abs2data_io[wrt]['metadata']['shape'])
-                                out_size = np.prod(comp._varx_abs2data_io[of]['metadata']['shape'])
+                                in_size = np.prod(comp._var_abs2data_io[wrt]['metadata']['shape'])
+                                out_size = np.prod(comp._var_abs2data_io[of]['metadata']['shape'])
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
                                     in_size = np.prod(
-                                        comp._varx_abs2data_io[wrt]['metadata']['shape'])
+                                        comp._var_abs2data_io[wrt]['metadata']['shape'])
                                     out_size = np.prod(
-                                        comp._varx_abs2data_io[of]['metadata']['shape'])
+                                        comp._var_abs2data_io[of]['metadata']['shape'])
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
+                                    # if a scalar value is provided (in declare_partials),
+                                    # expand to the correct size array value for zipping
+                                    if jac_val.size == 1:
+                                        jac_val = jac_val * np.ones(jac_i.size)
                                     for i, j, val in zip(jac_i, jac_j, jac_val):
                                         tmp_value[i, j] += val
                                     deriv_value = tmp_value
@@ -779,18 +701,16 @@ class Problem(object):
         if global_names:
             oldwrt, oldof = wrt, of
         else:
-            paths = model._var_allprocs_pathnames
-            indices = model._var_allprocs_indices
             oldof = of
             of = []
             for names in oldof:
-                of.append(tuple(paths['output'][indices['output'][name]]
+                of.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                 for name in names))
 
             oldwrt = wrt
             wrt = []
             for names in oldwrt:
-                wrt.append(tuple(paths['output'][indices['output'][name]]
+                wrt.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                  for name in names))
 
         if mode == 'fwd':

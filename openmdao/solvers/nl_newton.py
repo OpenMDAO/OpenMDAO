@@ -75,8 +75,8 @@ class NewtonSolver(NonlinearSolver):
         """
         Perform any required linearization operations such as matrix factorization.
         """
-        if self.precon is not None:
-            self.precon._linearize()
+        if self.ln_solver is not None:
+            self.ln_solver._linearize()
 
         if self.linesearch is not None:
             self.linesearch._linearize()
