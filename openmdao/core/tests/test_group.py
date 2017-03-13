@@ -39,7 +39,7 @@ class BranchGroup(Group):
         g3.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
 
 
-class GroupTestCase(unittest.TestCase):
+class TestGroup(unittest.TestCase):
 
     def test_same_sys_name(self):
         """Test error checking for the case where we add two subsystems with the same name."""
