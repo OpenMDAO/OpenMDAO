@@ -6,7 +6,7 @@ import warnings
 import numpy as np
 from nose_parameterized import parameterized
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, NLRunOnce
 from openmdao.devtools.testutil import assert_rel_error
 try:
     from openmdao.parallel_api import PETScVector
@@ -565,6 +565,7 @@ class GroupTestCase(unittest.TestCase):
         order_list = []
         prob = Problem()
         model = prob.model
+        model.nl_solver = NLRunOnce()
         model.add_subsystem('indeps', IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))
@@ -582,9 +583,7 @@ class GroupTestCase(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        # must multply expected order by 2 since all comps are executed twice,
-        # even if maxiter == 1
-        self.assertEqual(['C1', 'C2', 'C3']*2, order_list)
+        self.assertEqual(['C1', 'C2', 'C3'], order_list)
 
         order_list[:] = []
 
@@ -593,7 +592,7 @@ class GroupTestCase(unittest.TestCase):
 
         prob.setup(check=False)
         prob.run_model()
-        self.assertEqual(['C2', 'C1', 'C3']*2, order_list)
+        self.assertEqual(['C2', 'C1', 'C3'], order_list)
 
         # Extra
         with self.assertRaises(ValueError) as cm:
