@@ -1,7 +1,7 @@
 """ Testing for Problem.check_partial_derivatives and check_total_derivatives."""
 
 import unittest
-from six import iteritems, StringIO, PY3
+from six import iteritems
 from six.moves import cStringIO as StringIO
 
 import numpy as np
@@ -248,12 +248,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.run_model()
 
         data = p.check_partial_derivatives(out_stream=None)
-        identity = np.array([
-            [ 1.,  0.,  0.,  0.],
-            [ 0.,  1.,  0.,  0.],
-            [ 0.,  0.,  1.,  0.],
-            [ 0.,  0.,  0.,  1.]
-        ])
+        identity = np.eye(4)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fd'], identity, 1e-9)
