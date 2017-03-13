@@ -11,6 +11,7 @@ from openmdao.devtools.testutil import assert_rel_error
 
 
 class TestProblemCheckPartials(unittest.TestCase):
+
     def test_incorrect_jacobian(self):
         class MyComp(ExplicitComponent):
             def initialize_variables(self):
@@ -189,6 +190,68 @@ class TestProblemCheckPartials(unittest.TestCase):
         # Make sure we only FD this twice.
         comp = model.get_subsystem('units')
         self.assertEqual(comp.run_count, 3)
+
+    def test_scalar_val(self):
+        class PassThrough(ExplicitComponent):
+            """
+            Helper component that is needed when variables must be passed
+            directly from input to output
+            """
+
+            def __init__(self, i_var, o_var, val, units=None):
+                super(PassThrough, self).__init__()
+                self.i_var = i_var
+                self.o_var = o_var
+                self.units = units
+                self.val = val
+
+                if isinstance(val, (float, int)) or np.isscalar(val):
+                    size=1
+                else:
+                    size = np.prod(val.shape)
+
+                self.size = size
+
+            def initialize_variables(self):
+                if self.units is None:
+                    self.add_input(self.i_var, self.val)
+                    self.add_output(self.o_var, self.val)
+                else:
+                    self.add_input(self.i_var, self.val, units=self.units)
+                    self.add_output(self.o_var, self.val, units=self.units)
+
+            def initialize_partials(self):
+                row_col = np.arange(self.size)
+                self.declare_partials(of=self.o_var, wrt=self.i_var,
+                                      val=1, rows=row_col, cols=row_col)
+
+            def compute(self, inputs, outputs):
+                outputs[self.o_var] = inputs[self.i_var]
+
+            def linearize(self, inputs, outputs, J):
+                pass
+
+        p = Problem()
+
+        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('foo', val=np.ones(4))
+
+        p.model.add_subsystem('pt', PassThrough("foo", "bar", val=np.ones(4)), promotes=['*'])
+
+        p.setup()
+        p.run_model()
+
+        data = p.check_partial_derivatives(out_stream=None)
+        identity = np.array([
+            [ 1.,  0.,  0.,  0.],
+            [ 0.,  1.,  0.,  0.],
+            [ 0.,  0.,  1.,  0.],
+            [ 0.,  0.,  0.,  1.]
+        ])
+        assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
+        assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
+        assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fd'], identity, 1e-9)
+
 
 if __name__ == "__main__":
     unittest.main()
