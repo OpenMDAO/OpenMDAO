@@ -575,14 +575,6 @@ class TestGroup(unittest.TestCase):
         model.add_subsystem('C2', ReportOrderComp(order_list))
         model.add_subsystem('C3', ReportOrderComp(order_list))
 
-        # note that in this contrived case, we don't really need to connect
-        # our components since our components don't do anything except record
-        # their execution, but doing so prevents warnings about unconnected
-        # inputs.
-        model.connect('indeps.x', 'C1.x')
-        model.connect('C1.y', 'C2.x')
-        model.connect('C2.y', 'C3.x')
-
         model.suppress_solver_output = True
 
         self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
