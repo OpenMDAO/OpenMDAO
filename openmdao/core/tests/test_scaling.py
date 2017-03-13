@@ -236,8 +236,8 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nl_solver.options['maxiter'] = 1
         model.nl_solver = NonlinearBlockGS()
+        model.nl_solver.options['maxiter'] = 1
 
         model._suppress_solver_output = True
 

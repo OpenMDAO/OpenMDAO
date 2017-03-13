@@ -209,8 +209,8 @@ class TestExecComp(unittest.TestCase):
 
     def test_complex_step2(self):
         prob = Problem(Group())
-        comp = prob.model.add_subsystem('comp', ExecComp('y=x*x + x*2.0'))
         prob.model.add_subsystem('p1', IndepVarComp('x', 2.0))
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x*x + x*2.0'))
         prob.model.connect('p1.x', 'comp.x')
         prob.model.suppress_solver_output = True
 
@@ -316,8 +316,8 @@ class TestExecComp(unittest.TestCase):
 
     def test_complex_step2_colons(self):
         prob = Problem(Group())
-        comp = prob.model.add_subsystem('comp', ExecComp('foo:y=foo:x*foo:x + foo:x*2.0'))
         prob.model.add_subsystem('p1', IndepVarComp('x', 2.0))
+        comp = prob.model.add_subsystem('comp', ExecComp('foo:y=foo:x*foo:x + foo:x*2.0'))
         prob.model.connect('p1.x', 'comp.foo:x')
 
         prob.setup(check=False, mode='fwd')
