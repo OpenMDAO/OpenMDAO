@@ -519,4 +519,3 @@ class Group(System):
 
         if self._ln_solver is not None:
             self._ln_solver._linearize()
-
