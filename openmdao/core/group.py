@@ -2,7 +2,7 @@
 from __future__ import division
 
 from six import iteritems, string_types
-from collections import Iterable
+from collections import Iterable, Counter
 
 import numpy as np
 
@@ -167,6 +167,44 @@ class Group(System):
                                "connection from '%s' to '%s'." % (out_name, in_name))
 
         self._var_connections[in_name] = (out_name, src_indices)
+
+    def set_order(self, new_order):
+        """
+        Specify a new execution order for this system.
+
+        Parameters
+        ----------
+        new_order : list of str
+            List of system names in desired new execution order.
+        """
+        # Make sure the new_order is valid. It must contain all subsystems
+        # in this model.
+        newset = set(new_order)
+        olddict = {s.name: s for s in self._subsystems_allprocs}
+        oldset = set(olddict)
+
+        if oldset != newset:
+            msg = []
+
+            missing = oldset - newset
+            if missing:
+                msg.append("%s: %s expected in subsystem order and not found." %
+                           (self.pathname, sorted(missing)))
+
+            extra = newset - oldset
+            if extra:
+                msg.append("%s: subsystem(s) %s found in subsystem order but don't exist." %
+                           (self.pathname, sorted(extra)))
+
+            raise ValueError('\n'.join(msg))
+
+        # Don't allow duplicates either.
+        if len(newset) < len(new_order):
+            dupes = [key for key, val in iteritems(Counter(new_order)) if val > 1]
+            raise ValueError("%s: Duplicate name(s) found in subsystem order list: %s" %
+                             (self.pathname, sorted(dupes)))
+
+        self._subsystems_allprocs = [olddict[name] for name in new_order]
 
     def _setup_connections(self):
         """
