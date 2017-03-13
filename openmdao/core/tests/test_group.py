@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import unittest
 from six import assertRaisesRegex
 import itertools
@@ -37,6 +39,19 @@ class BranchGroup(Group):
         b2 = self.add_subsystem('Branch2', Group())
         g3 = b2.add_subsystem('G3', Group())
         g3.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
+
+
+class ReportOrderComp(ExplicitComponent):
+    def __init__(self, order_list):
+        super(ReportOrderComp, self).__init__()
+        self._order_list = order_list
+
+    def initialize_variables(self):
+        self.add_input('x', 0.0)
+        self.add_output('y', 0.0)
+
+    def compute(self, inputs, outputs):
+        self._order_list.append(self.pathname)
 
 
 class TestGroup(unittest.TestCase):
@@ -548,19 +563,40 @@ class TestGroup(unittest.TestCase):
                          np.array([0., 10., 7., 4.]).reshape(tgt_shape))
         assert_rel_error(self, p['C1.y'], 21.)
 
+    def test_set_order_feature(self):
+
+        # this list will record the execution order of our C1, C2, and C3 components
+        order_list = []
+        prob = Problem()
+        model = prob.model
+        model.nl_solver = NLRunOnce()
+        model.add_subsystem('indeps', IndepVarComp('x', 1.))
+        model.add_subsystem('C1', ReportOrderComp(order_list))
+        model.add_subsystem('C2', ReportOrderComp(order_list))
+        model.add_subsystem('C3', ReportOrderComp(order_list))
+
+        model.suppress_solver_output = True
+
+        self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
+                         [s.name for s in model._subsystems_allprocs])
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        self.assertEqual(['C1', 'C2', 'C3'], order_list)
+
+        # reset the shared order list
+        order_list[:] = []
+
+        # now swap C2 and C1 in the order
+        model.set_order(['indeps', 'C2', 'C1', 'C3'])
+
+        # after changing the order, we must call setup again
+        prob.setup(check=False)
+        prob.run_model()
+        self.assertEqual(['C2', 'C1', 'C3'], order_list)
+
     def test_set_order(self):
-
-        class ReportOrderComp(ExplicitComponent):
-            def __init__(self, order_list):
-                super(ReportOrderComp, self).__init__()
-                self._order_list = order_list
-
-            def initialize_variables(self):
-                self.add_input('x', 0.0)
-                self.add_output('y', 0.0)
-
-            def compute(self, inputs, outputs):
-                self._order_list.append(self.pathname)
 
         order_list = []
         prob = Problem()
