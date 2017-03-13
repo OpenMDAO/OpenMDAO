@@ -45,7 +45,7 @@ class LinearSystemComp(ImplicitComponent):
 
         self.add_input("A", val=np.eye(size))
         self.add_input("b", val=np.ones(size))
-        self.add_output("x", shape=size, val=2.)
+        self.add_output("x", shape=size, val=.1)
 
     def initialize_partials(self):
         """

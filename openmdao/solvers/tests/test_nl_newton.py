@@ -143,7 +143,7 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
-        ## Make sure we aren't iterating like crazy
+        # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nl_solver._iter_count, 8)
 
     def test_sellar_state_connection(self):
@@ -159,7 +159,7 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
-        ## Make sure we aren't iterating like crazy
+        # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nl_solver._iter_count, 8)
 
     def test_sellar_state_connection_fd_system(self):
@@ -173,7 +173,7 @@ class TestNewton(unittest.TestCase):
         prob.model.nl_solver = NewtonSolver()
 
         # TODO - Specify FD for group.
-        #prob.model.deriv_options['type'] = 'fd'
+        # prob.model.deriv_options['type'] = 'fd'
 
         prob.setup(check=False)
         prob.model.suppress_solver_output = True
@@ -182,7 +182,7 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
-        ## Make sure we aren't iterating like crazy
+        # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nl_solver._iter_count, 6)
 
     def test_sellar_specify_linear_solver(self):
@@ -207,10 +207,36 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
-        ## Make sure we aren't iterating like crazy
+        # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nl_solver._iter_count, 8)
         self.assertEqual(prob.model.ln_solver._iter_count, 0)
         self.assertGreater(prob.model.nl_solver.ln_solver._iter_count, 0)
+
+    def test_sellar_specify_linear_direct_solver(self):
+
+        prob = Problem()
+        prob.model = SellarStateConnection()
+        prob.model.nl_solver = NewtonSolver()
+
+        # Use bad settings for this one so that problem doesn't converge.
+        # That way, we test that we are really using Newton's Lin Solver
+        # instead.
+        prob.model.ln_solver = ScipyIterativeSolver()
+        prob.model.ln_solver.options['maxiter'] = 1
+
+        # The good solver
+        prob.model.nl_solver.ln_solver = DirectSolver()
+
+        prob.model.suppress_solver_output = True
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+
+        # Make sure we aren't iterating like crazy
+        self.assertLess(prob.model.nl_solver._iter_count, 8)
+        self.assertEqual(prob.model.ln_solver._iter_count, 0)
 
     def test_implicit_utol(self):
         # We are setup for reach utol termination condition quite quickly.
@@ -245,7 +271,7 @@ class TestNewton(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 """Analytical derivatives."""
 
-                x = inputs['x']
+                # x = inputs['x']
                 z = outputs['z']
 
                 # State equation
