@@ -39,7 +39,7 @@ class BranchGroup(Group):
         g3.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
 
 
-class TestGroup(unittest.TestCase):
+class GroupTestCase(unittest.TestCase):
 
     def test_same_sys_name(self):
         """Test error checking for the case where we add two subsystems with the same name."""
@@ -547,6 +547,82 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C1.x'],
                          np.array([0., 10., 7., 4.]).reshape(tgt_shape))
         assert_rel_error(self, p['C1.y'], 21.)
+
+    def test_set_order(self):
+
+        class ReportOrderComp(ExplicitComponent):
+            def __init__(self, order_list):
+                super(ReportOrderComp, self).__init__()
+                self._order_list = order_list
+
+            def initialize_variables(self):
+                self.add_input('x', 0.0)
+                self.add_output('y', 0.0)
+
+            def compute(self, inputs, outputs):
+                self._order_list.append(self.pathname)
+
+        order_list = []
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('indeps', IndepVarComp('x', 1.))
+        model.add_subsystem('C1', ReportOrderComp(order_list))
+        model.add_subsystem('C2', ReportOrderComp(order_list))
+        model.add_subsystem('C3', ReportOrderComp(order_list))
+        model.connect('indeps.x', 'C1.x')
+        model.connect('C1.y', 'C2.x')
+        model.connect('C2.y', 'C3.x')
+        model.suppress_solver_output = True
+
+        model.nl_solver.options['maxiter'] = 1
+
+        self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
+                         [s.name for s in model._subsystems_allprocs])
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        # must multply expected order by 2 since all comps are executed twice,
+        # even if maxiter == 1
+        self.assertEqual(['C1', 'C2', 'C3']*2, order_list)
+
+        order_list[:] = []
+
+        # Big boy rules
+        model.set_order(['indeps', 'C2', 'C1', 'C3'])
+
+        prob.setup(check=False)
+        prob.run_model()
+        self.assertEqual(['C2', 'C1', 'C3']*2, order_list)
+
+        # Extra
+        with self.assertRaises(ValueError) as cm:
+            model.set_order(['indeps', 'C2', 'junk', 'C1', 'C3'])
+
+        self.assertEqual(str(cm.exception),
+                         ": subsystem(s) ['junk'] found in subsystem order but don't exist.")
+
+        # Missing
+        with self.assertRaises(ValueError) as cm:
+            model.set_order(['indeps', 'C2', 'C3'])
+
+        self.assertEqual(str(cm.exception),
+                         ": ['C1'] expected in subsystem order and not found.")
+
+        # Extra and Missing
+        with self.assertRaises(ValueError) as cm:
+            model.set_order(['indeps', 'C2', 'junk', 'C1', 'junk2'])
+
+        self.assertEqual(str(cm.exception),
+                         ": ['C3'] expected in subsystem order and not found.\n"
+                         ": subsystem(s) ['junk', 'junk2'] found in subsystem order but don't exist.")
+
+        # Dupes
+        with self.assertRaises(ValueError) as cm:
+            model.set_order(['indeps', 'C2', 'C1', 'C3', 'C1'])
+
+        self.assertEqual(str(cm.exception),
+                         ": Duplicate name(s) found in subsystem order list: ['C1']")
 
 
 class TestGroupMPI(unittest.TestCase):
