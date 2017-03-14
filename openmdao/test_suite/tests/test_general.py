@@ -1,5 +1,4 @@
 """General tests to demonstrate the parametric suite"""
-from __future__ import print_function, division
 
 import unittest
 from six import iterkeys
@@ -62,6 +61,7 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
             # Reverse Derivatives Check
             totals = param_instance.compute_totals('rev')
             assert_rel_error(self, totals, expected_totals, 1e-8)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,7 +1,6 @@
 """Define the NewtonSolver class."""
 
 from openmdao.solvers.solver import NonlinearSolver
-from openmdao.utils.general_utils import warn_deprecation
 
 
 class NewtonSolver(NonlinearSolver):
