@@ -2,7 +2,6 @@
 from __future__ import division, print_function
 
 import numpy as np
-import scipy.sparse as sparse
 
 import unittest
 
@@ -162,34 +161,17 @@ class DeprecatedCycleComp(Component):
     def make_jacobian_entry(self, A, pd_type):
         if pd_type == 'array':
             return A
-        if pd_type == 'sparse':
-            return sparse.csr_matrix(A)
-        if pd_type == 'aij':
-            data = []
-            rows = []
-            cols = []
-            A = np.atleast_2d(A)
-            for i in range(A.shape[0]):
-                for j in range(A.shape[1]):
-                    if np.abs(A[i, j]) > 1e-15:
-                        data.append(A[i, j])
-                        rows.append(i)
-                        cols.append(j)
-            return [np.array(data), np.array(rows), np.array(cols)]
 
         raise ValueError('Unknown partial_type: {}'.format(pd_type))
 
     def _array2kwargs(self, arr, pd_type):
         jac = self.make_jacobian_entry(arr, pd_type)
-        if pd_type == 'aij':
-            return {'val': jac[0], 'rows': jac[1], 'cols': jac[2]}
-        else:
-            return {'val': jac}
+        return {'val': jac}
 
     def linearize(self, inputs, outputs, resids):
-        partials = {}
-
         if self.metadata['jacobian_type'] != 'matvec':
+            partials = {}
+
             angle_param = self._cycle_names[self.angle_param]
             angle = inputs[angle_param]
             num_var = self.num_var
@@ -265,9 +247,9 @@ class DeprecatedLastComp(DeprecatedFirstComp):
         outputs[self._cycle_names['theta_out']] = theta / 2 + (self._n * 2 * np.pi - psi) / (2 * k - 2)
 
     def linearize(self, inputs, outputs, resids):
-        partials = {}
-
         if self.metadata['jacobian_type'] != 'matvec':
+            partials = {}
+
             pd_type = self.metadata['partial_type']
             for i in range(self.metadata['num_var']):
                 in_var = self._cycle_names['x'].format(i)
@@ -281,7 +263,7 @@ class DeprecatedLastComp(DeprecatedFirstComp):
             partials[theta_out, self._cycle_names['psi']] = \
                 self.make_jacobian_entry(np.array([-1/(2*k-2)]), pd_type)
 
-        return partials
+            return partials
 
     def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
         if self.metadata['jacobian_type'] == 'matvec':
