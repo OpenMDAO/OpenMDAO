@@ -12,6 +12,10 @@ from six import iteritems
 from openmdao.core.group import Group
 from openmdao.core.component import Component
 
+# when setup is called multiple times, we need this to prevent adding
+# another handler to the config_check logger each time (if logger arg to check_config is None)
+_set_logger = None
+
 
 def check_config(problem, logger=None):
     """
@@ -25,15 +29,20 @@ def check_config(problem, logger=None):
     logger : object
         Logging object.
     """
+    global _set_logger
     if logger is None:
-        logger = logging.getLogger("config_check")
-        console = logging.StreamHandler()
-        # set a format which is simpler for console use
-        formatter = logging.Formatter('%(levelname)s: %(message)s')
-        # tell the handler to use this format
-        console.setFormatter(formatter)
-        console.setLevel(logging.INFO)
-        logger.addHandler(console)
+        if _set_logger is None:
+            logger = logging.getLogger("config_check")
+            _set_logger = logger
+            console = logging.StreamHandler()
+            # set a format which is simpler for console use
+            formatter = logging.Formatter('%(levelname)s: %(message)s')
+            # tell the handler to use this format
+            console.setFormatter(formatter)
+            console.setLevel(logging.INFO)
+            logger.addHandler(console)
+        else:
+            logger = _set_logger
 
     _check_hanging_inputs(problem, logger)
     _check_dataflow(problem.model, logger)
