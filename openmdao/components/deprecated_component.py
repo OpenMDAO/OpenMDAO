@@ -144,36 +144,25 @@ class Component(BaseComponent):
         for vec_name in vec_names:
             with self._matvec_context(vec_name, var_inds, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
+
                 with self.jacobian_context():
                     self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                           mode)
 
-                self._inputs._scale(self._scaling_to_phys['input'])
-                self._outputs._scale(self._scaling_to_phys['output'])
-                d_inputs._scale(self._scaling_to_phys['input'])
-                d_outputs._scale(self._scaling_to_phys['output'])
-                d_residuals._scale(self._scaling_to_phys['residual'])
+                with self._units_scaling_context(inputs=[self._inputs, d_inputs],
+                                                 outputs=[self._outputs, d_outputs],
+                                                 residuals=[d_residuals]):
 
-                for name in d_residuals:
-                    if name in self._output_names:
-                        if name not in self._state_names:
-                            d_outputs[name] = d_residuals[name]
-                            d_residuals[name] *= -1.0
+                    if len(self._state_names) == 0:
+                        for name in d_inputs:
+                            d_inputs[name] *= -1.0
 
-                self.apply_linear(self._inputs, self._outputs,
-                                  d_inputs, d_outputs, d_residuals, mode)
+                    self.apply_linear(self._inputs, self._outputs,
+                                      d_inputs, d_outputs, d_residuals, mode)
 
-                for name in d_residuals:
-                    if name in self._output_names:
-                        if name not in self._state_names:
-                            d_residuals[name] = d_outputs[name]
-                            d_residuals[name] *= -1.0
-
-                self._inputs._scale(self._scaling_to_norm['input'])
-                self._outputs._scale(self._scaling_to_norm['output'])
-                d_inputs._scale(self._scaling_to_norm['input'])
-                d_outputs._scale(self._scaling_to_norm['output'])
-                d_residuals._scale(self._scaling_to_norm['residual'])
+                    if len(self._state_names) == 0:
+                        for name in d_inputs:
+                            d_inputs[name] *= -1.0
 
     def _solve_linear(self, vec_names, mode):
         """
@@ -210,12 +199,15 @@ class Component(BaseComponent):
                               vec_names, mode)
 
             for vec_name in vec_names:
-                for name in d_outputs:
-                    if name in self._output_names:
-                        if mode == 'fwd':
-                            d_outputs[name] = d_residuals[name]
-                        elif mode == 'rev':
-                            d_residuals[name] = d_outputs[name]
+
+                # Only for pure explicit components.
+                if len(self._state_names) > 0:
+                    for name in d_outputs:
+                        if name in self._output_names:
+                            if mode == 'fwd':
+                                d_outputs[name] = d_residuals[name]
+                            elif mode == 'rev':
+                                d_residuals[name] = d_outputs[name]
 
                 d_outputs._scale(self._scaling_to_norm['output'])
                 d_residuals._scale(self._scaling_to_norm['residual'])
@@ -226,41 +218,26 @@ class Component(BaseComponent):
         """
         Compute jacobian / factorization.
         """
-        with self.jacobian_context():
-            self._inputs._scale(self._scaling_to_phys['input'])
-            self._outputs._scale(self._scaling_to_phys['output'])
+        with self.jacobian_context() as J:
+            with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
+                                             residuals=[self._residuals], scale_jac=True):
 
-            J = self.linearize(self._inputs, self._outputs, self._residuals)
-            if J is not None:
-                for k in J:
-                    self._jacobian[k] = J[k]
+                # If we are a purely explicit component, then negate constant subjacs (and others
+                # that will get overwritten) back to normal.
+                if len(self._state_names) == 0:
+                    self._negate_jac()
 
-            self._inputs._scale(self._scaling_to_norm['input'])
-            self._outputs._scale(self._scaling_to_norm['output'])
+                J = self.linearize(self._inputs, self._outputs, self._residuals)
+                if J is not None:
+                    for k in J:
+                        self._jacobian[k] = J[k]
 
-            pro2abs = self._var_allprocs_prom2abs_list['output']
-            for out_name in self._var_rel_names['output']:
-                if out_name in self._output_names:
-                    size = len(self._outputs._views_flat[pro2abs[out_name][0]])
-                    ones = np.ones(size)
-                    arange = np.arange(size)
-                    self._jacobian[out_name, out_name] = (ones, arange, arange)
-
-            self._negate_jac()
+                # Re-negate the jacobian, but only if we are totally explicit.
+                if len(self._state_names) == 0:
+                    self._negate_jac()
 
             if self._owns_global_jac:
-                self._jacobian._update()
-
-    def _negate_jac(self):
-        """
-        Negate this component's part of the jacobian.
-        """
-        if self._jacobian._subjacs:
-            for res_name in self._var_abs_names['output']:
-                for in_name in self._var_abs_names['input']:
-                    abs_key = (res_name, in_name)
-                    if abs_key in self._jacobian._subjacs:
-                        self._jacobian._multiply_subjac(abs_key, -1.)
+                J._update()
 
     def _setup_partials(self):
         """
@@ -274,21 +251,46 @@ class Component(BaseComponent):
         # call the super version of initialize_partials. This is still post-initialize_variables.
         other_names = []
         for out_abs in self._var_abs_names['output']:
+
             meta = abs2data[out_abs]['metadata']
             out_name = abs2data[out_abs]['prom']
             size = np.prod(meta['shape'])
             arange = np.arange(size)
+
+            # Skip all states. The user declares those derivatives.
+            if out_name in self._state_names:
+                continue
 
             # No need to FD outputs wrt other outputs
             abs_key = (out_abs, out_abs)
             if abs_key in self._subjacs_info:
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
-            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
+
+            # If our OpenMDAO Alpha component has any states at all, then even the non-state
+            # outputs need to be flipped.
+            if len(self._state_names) > 0:
+                val = -1.0
+            else:
+                val = 1.0
+
+            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=val)
+
             for other_name in other_names:
                 self.declare_partials(out_name, other_name, dependent=False)
                 self.declare_partials(other_name, out_name, dependent=False)
             other_names.append(out_name)
+
+    def _negate_jac(self):
+        """
+        Negate this component's part of the jacobian.
+        """
+        if self._jacobian._subjacs:
+            for res_name in self._var_abs_names['output']:
+                for in_name in self._var_abs_names['input']:
+                    abs_key = (res_name, in_name)
+                    if abs_key in self._jacobian._subjacs:
+                        self._jacobian._multiply_subjac(abs_key, -1.)
 
     def apply_nonlinear(self, params, unknowns, residuals):
         """

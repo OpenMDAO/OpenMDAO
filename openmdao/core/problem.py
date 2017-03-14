@@ -480,7 +480,10 @@ class Problem(object):
                         for rel_key in product(of_matches, wrt_matches):
                             abs_key = rel_key2abs_key(comp, rel_key)
                             of, wrt = abs_key
+
+                            # No need to calculate partials; they are already stored
                             deriv_value = subjacs.get(abs_key)
+
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
                                 in_size = np.prod(comp._var_abs2data_io[wrt]['metadata']['shape'])

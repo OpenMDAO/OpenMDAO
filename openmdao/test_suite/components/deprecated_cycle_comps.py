@@ -157,27 +157,27 @@ class DeprecatedCycleComp(DeprecatedComponent):
                         dx = d_inputs[x_j].flat[:]
                         for i in range(num_var):
                             y_i = y_name.format(i)
-                            if y_i in d_outputs:
+                            if y_i in d_residuals:
                                 Aij = A[array_idx(i, var_size), array_idx(j, var_size)]
-                                d_outputs[y_i] += Aij.dot(dx).reshape(var_shape)
+                                d_residuals[y_i] += Aij.dot(dx).reshape(var_shape)
 
-                if theta_name in d_inputs and theta_out_name in d_outputs:
+                if theta_name in d_inputs and theta_out_name in d_residuals:
                     dtheta = d_inputs[theta_name]
-                    d_outputs[theta_out_name] += dtheta
+                    d_residuals[theta_out_name] += dtheta
 
                 if angle_param in d_inputs:
                     dangle = d_inputs[angle_param]
                     dy_dangle = (dA.dot(x)) * dangle
                     for i in range(num_var):
                         y_i = y_name.format(i)
-                        if y_i in d_outputs:
-                            d_outputs[y_i] += dy_dangle[array_idx(i, var_size)].reshape(var_shape)
+                        if y_i in d_residuals:
+                            d_residuals[y_i] += dy_dangle[array_idx(i, var_size)].reshape(var_shape)
 
             elif mode == 'rev':
                 for i in range(num_var):
                     y_i = y_name.format(i)
-                    if y_i in d_outputs:
-                        dy_i = d_outputs[y_i].flat[:]
+                    if y_i in d_residuals:
+                        dy_i = d_residuals[y_i].flat[:]
                         for j in range(num_var):
                             x_j = x_name.format(j)
                             if x_j in d_inputs:
@@ -188,8 +188,8 @@ class DeprecatedCycleComp(DeprecatedComponent):
                                 x_j_vec = inputs[x_j].flat[:]
                                 d_inputs[angle_param] += x_j_vec.T.dot(dAij.T.dot(dy_i))
 
-                if theta_out_name in d_outputs and theta_name in d_inputs:
-                    dtheta_out = d_outputs[theta_out_name]
+                if theta_out_name in d_residuals and theta_name in d_inputs:
+                    dtheta_out = d_residuals[theta_out_name]
                     d_inputs[theta_name] += dtheta_out
 
     def make_jacobian_entry(self, A, pd_type):
@@ -285,7 +285,7 @@ class DeprecatedCycleComp(DeprecatedComponent):
             theta = self._cycle_names['theta']
             partials[theta_out, theta] = self.make_jacobian_entry(dtheta, pd_type)
 
-        return partials
+            return partials
 
 
 class DeprecatedFirstComp(DeprecatedCycleComp):
@@ -369,26 +369,26 @@ class DeprecatedLastComp(DeprecatedFirstComp):
             psi = self._cycle_names['psi']
 
             if mode == 'fwd':
-                if theta_out in d_outputs:
+                if theta_out in d_residuals:
                     if theta in d_inputs:
-                        d_outputs[theta_out] += 0.5 * d_inputs[theta]
+                        d_residuals[theta_out] += 0.5 * d_inputs[theta]
                     if psi in d_inputs:
-                        d_outputs[theta_out] += -d_inputs[psi] / (2 * k - 2)
+                        d_residuals[theta_out] += -d_inputs[psi] / (2 * k - 2)
                 for i in range(num_var):
                     in_var = self._cycle_names['x'].format(i)
-                    if in_var in d_inputs and 'x_norm2' in d_outputs:
-                        d_outputs['x_norm2'] += np.dot(inputs[in_var].flat, d_inputs[in_var].flat)
+                    if in_var in d_inputs and 'x_norm2' in d_residuals:
+                        d_residuals['x_norm2'] += np.dot(inputs[in_var].flat, d_inputs[in_var].flat)
 
             elif mode == 'rev':
-                if 'x_norm2' in d_outputs:
-                    dxnorm = d_outputs['x_norm2']
+                if 'x_norm2' in d_residuals:
+                    dxnorm = d_residuals['x_norm2']
                     for i in range(num_var):
                         x_i_name = self._cycle_names['x'].format(i)
                         if x_i_name in d_inputs:
                             d_inputs[x_i_name] += inputs[x_i_name] * dxnorm
 
-                if theta_out in d_outputs:
-                    dtheta_out = d_outputs[theta_out]
+                if theta_out in d_residuals:
+                    dtheta_out = d_residuals[theta_out]
                     if theta in d_inputs:
                         d_inputs[theta] += .5*dtheta_out
                     if psi in d_inputs:

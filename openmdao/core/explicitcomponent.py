@@ -119,7 +119,7 @@ class ExplicitComponent(Component):
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """
-        Compute jac-vec product. The model is yassumed to be in a scaled state.
+        Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------

@@ -87,8 +87,8 @@ class DeprecatedTestCases(unittest.TestCase):
 
     @parametric_suite(vector_class='default',
                       global_jac=True,
-                      # jacobian_type='matvec',
-                      jacobian_type='dense',
+                      jacobian_type='matvec',
+                      # jacobian_type='dense',
                       component_class='deprecated',
                       # component_class='explicit',
                       connection_type='explicit',
@@ -101,11 +101,6 @@ class DeprecatedTestCases(unittest.TestCase):
         param_instance.setup()
         problem = param_instance.problem
         model = problem.model
-
-        for typ in ['input', 'output']:
-            print('======', typ, '======')
-            for name in sorted(model._var_allprocs_names[typ]):
-                print('%16s' % name, '=', problem[name])
 
         # view_model(problem)
 
