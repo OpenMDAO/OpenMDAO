@@ -4,7 +4,9 @@ from __future__ import division, print_function
 import numpy as np
 import scipy.sparse as sparse
 
-from openmdao.components.deprecated_component import Component as DeprecatedComponent
+from openmdao.components.deprecated_component import Component
+from openmdao.test_suite.components.cycle_comps import \
+    _compute_A, _compute_dA, array_idx
 
 
 PSI = 1.
@@ -12,43 +14,7 @@ PSI = 1.
 _vec_terms = {}
 
 
-def _compute_vector_terms(system_size):
-    # Try/Except pattern is much faster than if key in ... if the key is present (which it will be
-    # outside of the first invocation).
-    try:
-        return _vec_terms[system_size]
-    except KeyError:
-        u = np.zeros(system_size)
-        u[[0, -1]] = np.sqrt(2)/2
-
-        v = np.zeros(system_size)
-        v[1:-1] = 1 / np.sqrt(system_size - 2)
-
-        cross_terms = np.outer(v, u) - np.outer(u, v)
-        same_terms = np.outer(u, u) + np.outer(v, v)
-
-        _vec_terms[system_size] = u, v, cross_terms, same_terms
-
-        return u, v, cross_terms, same_terms
-
-
-def _compute_A(system_size, theta):
-    u, v, cross_terms, same_terms = _compute_vector_terms(system_size)
-    return (np.eye(system_size)
-            + np.sin(theta) * cross_terms
-            + (np.cos(theta) - 1) * same_terms)
-
-
-def _compute_dA(system_size, theta):
-    u, v, cross_terms, same_terms = _compute_vector_terms(system_size)
-    return np.cos(theta) * cross_terms - np.sin(theta) * same_terms
-
-
-def array_idx(i, var_size):
-    return slice(i * var_size, (i + 1) * var_size)
-
-
-class DeprecatedCycleComp(DeprecatedComponent):
+class DeprecatedCycleComp(Component):
 
     def _inputs_to_vector(self, inputs):
         var_shape = self.metadata['var_shape']
@@ -94,8 +60,6 @@ class DeprecatedCycleComp(DeprecatedComponent):
             self._cycle_names['theta_out'] = 'theta_out'
             self._cycle_promotes_in = self._cycle_promotes_out = []
 
-        self.initialize_variables()
-
         self.metadata.declare('jacobian_type', value='matvec',
                               values=['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
                               desc='method of assembling derivatives')
@@ -114,7 +78,6 @@ class DeprecatedCycleComp(DeprecatedComponent):
 
         self.angle_param = 'theta'
 
-    def initialize_variables(self):
         self.num_var = self.metadata['num_var']
         self.var_shape = self.metadata['var_shape']
         self.size = self.num_var * np.prod(self.var_shape)
@@ -292,11 +255,11 @@ class DeprecatedFirstComp(DeprecatedCycleComp):
     def __str__(self):
         return 'Deprecated Cycle Component - First'
 
-    def initialize_variables(self):
+    def __init__(self, **kwargs):
+        super(DeprecatedFirstComp, self).__init__(**kwargs)
         self.add_param('psi', val=1.)
         self.angle_param = 'psi'
         self._cycle_names['psi'] = 'psi'
-        super(DeprecatedFirstComp, self).initialize_variables()
 
     def solve_nonlinear(self, inputs, outputs, residuals):
         theta = inputs[self._cycle_names['theta']]
@@ -311,10 +274,10 @@ class DeprecatedLastComp(DeprecatedFirstComp):
     def __str__(self):
         return 'Deprecated Cycle Component - Last'
 
-    def initialize_variables(self):
+    def __init__(self, **kwargs):
+        super(DeprecatedLastComp, self).__init__(**kwargs)
         self.add_output('x_norm2', shape=(1,))
         self._n = 1
-        super(DeprecatedLastComp, self).initialize_variables()
 
     def solve_nonlinear(self, inputs, outputs, residuals):
         theta = inputs[self._cycle_names['theta']]

@@ -1,5 +1,4 @@
 """General tests to demonstrate the parametric suite"""
-from __future__ import print_function, division
 
 import unittest
 from six import iterkeys
@@ -87,8 +86,8 @@ class DeprecatedTestCases(unittest.TestCase):
 
     @parametric_suite(vector_class='default',
                       global_jac=True,
-                      jacobian_type='matvec',
-                      # jacobian_type='dense',
+                      # jacobian_type='matvec',
+                      jacobian_type='dense',
                       component_class='deprecated',
                       # component_class='explicit',
                       connection_type='explicit',
