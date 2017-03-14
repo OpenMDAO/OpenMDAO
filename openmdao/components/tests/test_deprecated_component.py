@@ -122,6 +122,7 @@ class SimpleImplicitComp(Component):
 
     def apply_nonlinear(self, params, unknowns, resids):
         """ Don't solve; just calculate the residual."""
+
         x = params['x']
         z = unknowns['z']
         resids['z'] = x*z + z - 4.0
@@ -141,6 +142,8 @@ class SimpleImplicitComp(Component):
         # State equation
         J[('z', 'z')] = np.array([params['x'] + 1.0])
         J[('z', 'x')] = np.array([unknowns['z']])
+
+        return J
 
 
 class SimpleImplicitCompApply(SimpleImplicitComp):

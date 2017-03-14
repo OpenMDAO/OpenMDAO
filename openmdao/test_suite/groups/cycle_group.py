@@ -32,10 +32,10 @@ import numpy as np
 
 from openmdao.api import IndepVarComp
 from openmdao.test_suite.groups.parametric_group import ParametericTestGroup
-from openmdao.test_suite.components.cycle_comps import PSI, ExplicitCycleComp, ExplicitFirstComp,\
-    ExplicitLastComp
-from openmdao.test_suite.components.deprecated_cycle_comps import DeprecatedCycleComp, DeprecatedFirstComp,\
-    DeprecatedLastComp
+from openmdao.test_suite.components.cycle_comps import PSI, \
+    ExplicitCycleComp, ExplicitFirstComp, ExplicitLastComp
+from openmdao.test_suite.components.deprecated_cycle_comps import \
+    DeprecatedCycleComp, DeprecatedFirstComp, DeprecatedLastComp
 
 
 class CycleGroup(ParametericTestGroup):
