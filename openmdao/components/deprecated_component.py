@@ -30,7 +30,7 @@ class Component(BaseComponent):
 
         warn_deprecation('Components should inherit from ImplicitComponent '
                          'or ExplicitComponent. This class provides '
-                         'backwards compabitibility with OpenMDAO <= 1.x as '
+                         'backwards compatibility with OpenMDAO <= 1.x as '
                          'this Component class is deprecated')
 
     def add_param(self, name, val=1.0, **kwargs):
@@ -243,8 +243,6 @@ class Component(BaseComponent):
         """
         Set up partial derivative sparsity structures and approximation schemes.
         """
-        self.initialize_partials()
-
         abs2data = self._var_abs2data_io
 
         # Note: These declare calls are outside of initialize_partials so that users do not have to

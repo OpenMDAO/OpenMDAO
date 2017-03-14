@@ -203,7 +203,7 @@ class ParameterizedInstance(object):
 
         prob.model.nl_solver = self.solver_class(**self.solver_options)
 
-        # prob.model.suppress_solver_output = True
+        prob.model.suppress_solver_output = True
 
         prob.setup(vec_class, check=check)
 

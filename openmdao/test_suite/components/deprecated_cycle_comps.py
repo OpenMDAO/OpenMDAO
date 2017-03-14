@@ -4,14 +4,12 @@ from __future__ import division, print_function
 import numpy as np
 import scipy.sparse as sparse
 
+import unittest
+
 from openmdao.components.deprecated_component import Component
+
 from openmdao.test_suite.components.cycle_comps import \
     _compute_A, _compute_dA, array_idx
-
-
-PSI = 1.
-
-_vec_terms = {}
 
 
 class DeprecatedCycleComp(Component):
@@ -40,6 +38,12 @@ class DeprecatedCycleComp(Component):
 
     def __init__(self, **kwargs):
         super(DeprecatedCycleComp, self).__init__(**kwargs)
+
+        if self.metadata['jacobian_type'] not in ['matvec', 'dense']:
+            raise unittest.SkipTest('only matvec and dense jacobians are supported')
+        if self.metadata['partial_type'] != 'array':
+            raise unittest.SkipTest('only array partials are supported')
+
         self._cycle_names = {}
 
         if self.metadata['connection_type'] == 'implicit':
@@ -182,36 +186,6 @@ class DeprecatedCycleComp(Component):
         else:
             return {'val': jac}
 
-    def initialize_partials(self):
-        pd_type = self.metadata['partial_type']
-        if self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
-            num_var = self.num_var
-            var_shape = self.var_shape
-            var_size = np.prod(var_shape)
-            A = np.ones((self.size, self.size))
-            dA_x = np.ones((self.size, 1))
-            dtheta = np.array([[1.]])
-            angle_param = self._cycle_names[self.angle_param]
-
-            # if our subjacs are not dense, we must assign values here that
-            # match their type (data values don't matter, only structure).
-            # Otherwise, we assume they are dense and we'll get an error later
-            # when we assign a subjac with a type that doesn't match.
-            for out_idx in range(num_var):
-                out_var = self._cycle_names['y'].format(out_idx)
-                for in_idx in range(num_var):
-                    in_var = self._cycle_names['x'].format(in_idx)
-                    Aij = A[array_idx(out_idx, var_size), array_idx(in_idx, var_size)]
-
-                    self.declare_partials(out_var, in_var,
-                                          **self._array2kwargs(Aij, pd_type))
-                    self.declare_partials(out_var, angle_param,
-                                          **self._array2kwargs(dA_x[array_idx(out_idx, var_size)],
-                                                               pd_type))
-
-            self.declare_partials(self._cycle_names['theta_out'], self._cycle_names['theta'],
-                                  **self._array2kwargs(dtheta, pd_type))
-
     def linearize(self, inputs, outputs, resids):
         partials = {}
 
@@ -289,20 +263,6 @@ class DeprecatedLastComp(DeprecatedFirstComp):
 
         # theta_out has 1/2 the error as theta does to the correct angle.
         outputs[self._cycle_names['theta_out']] = theta / 2 + (self._n * 2 * np.pi - psi) / (2 * k - 2)
-
-    def initialize_partials(self):
-        super(DeprecatedLastComp, self).initialize_partials()
-
-        pd_type = self.metadata['partial_type']
-        if self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
-            x = np.ones(self.var_shape)
-            for i in range(self.metadata['num_var']):
-                in_var = self._cycle_names['x'].format(i)
-                self.declare_partials('x_norm2', in_var,
-                                      **self._array2kwargs(x.flatten(), pd_type))
-
-            self.declare_partials(self._cycle_names['theta_out'], self._cycle_names['psi'],
-                                  **self._array2kwargs(np.array([1.]), pd_type))
 
     def linearize(self, inputs, outputs, resids):
         partials = {}
