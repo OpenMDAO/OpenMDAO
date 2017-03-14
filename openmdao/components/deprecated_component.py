@@ -200,7 +200,7 @@ class Component(BaseComponent):
 
             for vec_name in vec_names:
 
-                # Only for pure explicit components.
+                # skip for pure explicit components.
                 if len(self._state_names) > 0:
                     for name in d_outputs:
                         if name in self._output_names:

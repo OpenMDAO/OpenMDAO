@@ -1,4 +1,4 @@
-"""Components for use in `CycleGroup`. For details, see `CycleGroup`."""
+"""Deprecated Components for use in `CycleGroup`. For details, see `CycleGroup`."""
 from __future__ import division, print_function
 
 import numpy as np
