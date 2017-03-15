@@ -175,8 +175,8 @@ class TestGroup(unittest.TestCase):
                 ('a', 2.0),
                 ('x', 5.0),
             ]),
-            promotes_outputs='x')
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs='x')
+            promotes_outputs=['x'])
+        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
         p.model.suppress_solver_output = True
@@ -184,6 +184,24 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(p['comp1.a'], 2)
         self.assertEqual(p['x'], 5)
+        self.assertEqual(p['comp2.y'], 10)
+
+    def test_group_renames(self):
+        """Renaming a single variable."""
+        p = Problem(model=Group())
+        p.model.add_subsystem('comp1', IndepVarComp([
+                ('a', 2.0),
+                ('x', 5.0),
+            ]),
+            promotes_outputs=[('x', 'foo')])
+        p.model.add_subsystem('comp2', ExecComp('y=2*foo'), promotes_inputs=['foo'])
+        p.setup()
+
+        p.model.suppress_solver_output = True
+        p.run_model()
+
+        self.assertEqual(p['comp1.a'], 2)
+        self.assertEqual(p['foo'], 5)
         self.assertEqual(p['comp2.y'], 10)
 
     def test_group_promotes_multiple(self):
@@ -194,7 +212,7 @@ class TestGroup(unittest.TestCase):
                 ('x', 5.0),
             ]),
             promotes_outputs=['a', 'x'])
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs='x')
+        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
         p.model.suppress_solver_output = True
@@ -211,7 +229,7 @@ class TestGroup(unittest.TestCase):
                 ('a', 2.0),
                 ('x', 5.0),
             ]),
-            promotes_outputs='*')
+            promotes_outputs=['*'])
         p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 

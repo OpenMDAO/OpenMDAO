@@ -101,32 +101,31 @@ class Group(System):
         subsys.name = name
 
         # If we're given a string, turn into a list
-        if isinstance(promotes, string_types):
-            promotes = [promotes]
-        if isinstance(promotes_inputs, string_types):
-            promotes_inputs = [promotes_inputs]
-        if isinstance(promotes_outputs, string_types):
-            promotes_outputs = [promotes_outputs]
-
+        if isinstance(promotes, string_types) or \
+           isinstance(promotes_inputs, string_types) or \
+           isinstance(promotes_outputs, string_types):
+                raise RuntimeError("%s: promotes/promotes_inputs/promotes_outputs"
+                                   " must be an iterator of strings and/or tuples" %
+                                   self.name)
         if promotes:
-            subsys._var_promotes['any'] = set(promotes)
+            subsys._var_promotes['any'] = promotes
         if promotes_inputs:
-            subsys._var_promotes['input'] = set(promotes_inputs)
+            subsys._var_promotes['input'] = promotes_inputs
         if promotes_outputs:
-            subsys._var_promotes['output'] = set(promotes_outputs)
+            subsys._var_promotes['output'] = promotes_outputs
 
         return subsys
 
-    def connect(self, out_name, in_name, src_indices=None):
+    def connect(self, src_name, tgt_name, src_indices=None):
         """
-        Connect output out_name to input in_name in this namespace.
+        Connect source src_name to target tgt_name in this namespace.
 
         Parameters
         ----------
-        out_name : str
-            name of the output (source) variable to connect
-        in_name : str or [str, ... ] or (str, ...)
-            name of the input or inputs (target) variable to connect
+        src_name : str
+            name of the source variable to connect
+        tgt_name : str or [str, ... ] or (str, ...)
+            name of the target variable(s) to connect
         src_indices : collection of int optional
             When an input variable connects to some subset of an array output
             variable, you can specify which indices of the source to be
@@ -134,11 +133,11 @@ class Group(System):
         """
         # if src_indices argument is given, it should be valid
         if isinstance(src_indices, string_types):
-            if isinstance(in_name, string_types):
-                in_name = [in_name]
-            in_name.append(src_indices)
+            if isinstance(tgt_name, string_types):
+                tgt_name = [tgt_name]
+            tgt_name.append(src_indices)
             raise TypeError("src_indices must be an index array, did you mean"
-                            " connect('%s', %s)?" % (out_name, in_name))
+                            " connect('%s', %s)?" % (src_name, tgt_name))
 
         if isinstance(src_indices, Iterable):
             src_indices = np.atleast_1d(src_indices)
@@ -147,26 +146,26 @@ class Group(System):
             if not np.issubdtype(src_indices.dtype, np.integer):
                 raise TypeError("src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
-                                (out_name, in_name, src_indices.dtype.type))
+                                (src_name, tgt_name, src_indices.dtype.type))
 
         # if multiple targets are given, recursively connect to each
-        if isinstance(in_name, (list, tuple)):
-            for name in in_name:
-                self.connect(out_name, name, src_indices)
+        if isinstance(tgt_name, (list, tuple)):
+            for name in tgt_name:
+                self.connect(src_name, name, src_indices)
             return
 
         # target should not already be connected
-        if in_name in self._var_connections:
-            srcname = self._var_connections[in_name][0]
+        if tgt_name in self._var_connections:
+            srcname = self._var_connections[tgt_name][0]
             raise RuntimeError("Input '%s' is already connected to '%s'." %
-                               (in_name, srcname))
+                               (tgt_name, srcname))
 
         # source and target should not be in the same system
-        if out_name.rsplit('.', 1)[0] == in_name.rsplit('.', 1)[0]:
+        if src_name.rsplit('.', 1)[0] == tgt_name.rsplit('.', 1)[0]:
             raise RuntimeError("Output and input are in the same System for " +
-                               "connection from '%s' to '%s'." % (out_name, in_name))
+                               "connection from '%s' to '%s'." % (src_name, tgt_name))
 
-        self._var_connections[in_name] = (out_name, src_indices)
+        self._var_connections[tgt_name] = (src_name, src_indices)
 
     def set_order(self, new_order):
         """

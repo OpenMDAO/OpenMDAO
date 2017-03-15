@@ -172,7 +172,10 @@ class System(object):
         self._subsystems_myproc_inds = []
 
         self._var_maps = {'input': {}, 'output': {}}
-        self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
+        self._var_promotes = {'input': set(),
+                              'output': set(),
+                              'any': set(),
+                              'renames': {}}
 
         self._var_connections = {}
         self._var_connections_abs = []
@@ -595,6 +598,24 @@ class System(object):
             patterns = [n for n in names if '*' in n or '?' in n]
         gname = self.name + '.' if self.name else ''
 
+        def get_renames(lst):
+            """
+            Return any renames found in lst.
+            """
+            renames = {}
+            for entry in lst:
+                if isinstance(entry, string_types):
+                    pass
+                elif isinstance(entry, tuple) and len(entry) == 2:
+                    renames[entry[0]] = entry[1]
+                else:
+                    raise TypeError("when adding subsystem '%s', entry '%s'"
+                                    " is not a string or tuple of size 2" %
+                                    (self.pathname, entry))
+            return renames
+
+        renames = get_renames(promotes)
+
         maps = {'input': {}, 'output': {}}
         found = False
         for typ in ('input', 'output'):
@@ -603,6 +624,7 @@ class System(object):
             if promotes:
                 pass
             elif promotes_typ:
+                renames.update(get_renames(promotes_typ))
                 names = promotes_typ
                 patterns = [n for n in names if '*' in n or '?' in n]
             else:
@@ -613,17 +635,19 @@ class System(object):
                 if name in names:
                     maps[typ][name] = name
                     found = True
-                    continue
-
-                for pattern in patterns:
-                    # if name matches, promote that variable to parent
-                    if fnmatchcase(name, pattern):
-                        maps[typ][name] = name
-                        found = True
-                        break
+                elif name in renames:
+                    maps[typ][name] = renames[name]
+                    found = True
                 else:
-                    # Default: prepend the parent system's name
-                    maps[typ][name] = gname + name if gname else name
+                    for pattern in patterns:
+                        # if name matches, promote that variable to parent
+                        if fnmatchcase(name, pattern):
+                            maps[typ][name] = name
+                            found = True
+                            break
+                    else:
+                        # Default: prepend the parent system's name
+                        maps[typ][name] = gname + name if gname else name
 
         if not found:
             for io, lst in self._var_promotes.items():
