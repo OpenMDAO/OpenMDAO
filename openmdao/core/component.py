@@ -11,7 +11,7 @@ from itertools import product, chain
 from six import string_types, iteritems
 from scipy.sparse import issparse
 from copy import deepcopy
-from collections import OrderedDict
+from collections import OrderedDict, Iterable
 
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, PathData
@@ -66,13 +66,13 @@ class Component(System):
         ----------
         name : str
             name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray
+        val : float or list or tuple or ndarray or Iterable
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
         shape : int or tuple or list or None
             Shape of this variable, only required if src_indices not provided and
             val is not an array. Default is None.
-        src_indices : int or list of ints or tuple of ints or int ndarray or None
+        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
             The indices of the source variable to transfer data from.
             If val is given as an array_like object, the shapes of val and
             src_indices must match. A value of None implies this input depends
@@ -103,14 +103,14 @@ class Component(System):
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
-        if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray)):
-            raise TypeError('The val argument should be a float, list, tuple, or ndarray')
+        if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+            raise TypeError('The val argument should be a float, list, tuple, ndarray or Iterable')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
         if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
-                                                                    np.ndarray)):
+                                                                    np.ndarray, Iterable)):
             raise TypeError('The src_indices argument should be an int, list, '
-                            'tuple, or ndarray')
+                            'tuple, ndarray or Iterable')
         if units is not None and not isinstance(units, str):
             raise TypeError('The units argument should be a str or None')
 
@@ -170,12 +170,12 @@ class Component(System):
             Default is None, which means it has no units.
         desc : str
             description of the variable.
-        lower : float or list or tuple or ndarray or None
+        lower : float or list or tuple or ndarray or Iterable or None
             lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no lower bound.
             Default is None.
-        upper : float or list or tuple or ndarray or None
+        upper : float or list or tuple or ndarray or or Iterable None
             upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no upper bound.
@@ -213,7 +213,7 @@ class Component(System):
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
-        if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray)):
+        if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
             raise TypeError('The val argument should be a float, list, tuple, or ndarray')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
@@ -364,9 +364,9 @@ class Component(System):
             val = val.astype(safe_dtype, copy=False)
 
         if rows is not None:
-            if isinstance(rows, (list, tuple)):
+            if isinstance(rows, (list, tuple, Iterable)):
                 rows = np.array(rows, dtype=int)
-            if isinstance(cols, (list, tuple)):
+            if isinstance(cols, (list, tuple, Iterable)):
                 cols = np.array(cols, dtype=int)
 
             if rows.shape != cols.shape:
