@@ -92,7 +92,7 @@ class TestGroup(unittest.TestCase):
 
         p.setup()
 
-        self.assertEqual(p['comp1.a'], 3.0) # still use unpromoted name
+        self.assertEqual(p['comp1.a'], 3.0)  # still use unpromoted name
         self.assertEqual(p['b'], 6.0)
 
     def test_group_nested(self):
@@ -527,6 +527,7 @@ class TestGroup(unittest.TestCase):
     )
     def test_promote_src_indices_param(self, src_info, tgt_shape):
         src_shape, idxvals = src_info
+
         class MyComp(ExplicitComponent):
             def initialize_variables(self):
                 if len(tgt_shape) == 1:

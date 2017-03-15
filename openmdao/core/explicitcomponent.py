@@ -9,7 +9,6 @@ from six import iteritems, itervalues
 
 from openmdao.core.component import Component
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.name_maps import rel_key2abs_key
 
 
 class ExplicitComponent(Component):
@@ -144,9 +143,8 @@ class ExplicitComponent(Component):
                                                  outputs=[self._outputs],
                                                  residuals=[d_residuals]):
                     d_residuals *= -1.0
-                    self.compute_jacvec_product(
-                        self._inputs, self._outputs,
-                        d_inputs, d_residuals, mode)
+                    self.compute_jacvec_product(self._inputs, self._outputs,
+                                                d_inputs, d_residuals, mode)
                     d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode):

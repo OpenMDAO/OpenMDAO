@@ -225,7 +225,7 @@ class ExecComp(ExplicitComponent):
 
     def compute(self, inputs, outputs):
         """
-        Execute this component's assignment statemens.
+        Execute this component's assignment statements.
 
         Parameters
         ----------
