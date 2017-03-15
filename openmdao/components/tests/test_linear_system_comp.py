@@ -58,11 +58,6 @@ class TestLinearSystem(unittest.TestCase):
             lingrp = prob.model.add_subsystem('lingrp', Group(), promotes=['*'])
             z = lingrp.add_subsystem('lin', lin_sys_comp)
 
-            # TODO: using GlobalJacobian breaks this linear solve!
-            from openmdao.api import GlobalJacobian, DenseMatrix
-            lingrp.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
-            lingrp.ln_solver = DirectSolver()
-
             prob.model.connect('p1.A', 'lin.A')
             prob.model.connect('p2.b', 'lin.b')
 
