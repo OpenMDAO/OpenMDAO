@@ -11,6 +11,7 @@ from six.moves import range
 
 import numpy as np
 
+from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.default_jacobian import DefaultJacobian
 from openmdao.jacobians.global_jacobian import GlobalJacobian
@@ -19,6 +20,7 @@ from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
+from openmdao.utils.mpi import MPI
 
 
 # This is for storing various data mapped to var pathname
@@ -54,8 +56,8 @@ class System(object):
         pointer to the global assembler object.
     _mpi_proc_allocator : <ProcAllocator>
         object that distributes procs among subsystems.
-    _mpi_proc_range : [int, int]
-        indices of procs owned by comm with respect to COMM_WORLD.
+    _mpi_req_procs : (int, int or None)
+        number of min and max procs usable by this system.
     _subsystems_allprocs : [<System>, ...]
         list of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
@@ -167,7 +169,7 @@ class System(object):
         self._assembler = None
 
         self._mpi_proc_allocator = DefaultAllocator()
-        self._mpi_proc_range = [0, 1]
+        self._mpi_req_procs = None
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
@@ -215,8 +217,121 @@ class System(object):
         self._design_vars = {}
         self._responses = {}
 
-    def _setup_processors(self, path, comm, global_dict,
-                          assembler, proc_range):
+    # def _setup_processors(self, path, comm, global_dict,
+    #                       assembler, proc_range):
+    #     """
+    #     Recursively split comms and define local subsystems.
+    #
+    #     Sets the following attributes:
+    #         pathname
+    #         comm
+    #         _assembler
+    #         _mpi_proc_range
+    #         _subsystems_myproc
+    #         _subsystems_myproc_inds
+    #
+    #     Parameters
+    #     ----------
+    #     path : str
+    #         parent names to prepend to name to get the pathname
+    #     comm : MPI.Comm or <FakeComm>
+    #         communicator for this system (already split, if applicable).
+    #     global_dict : dict
+    #         dictionary with kwargs of all parents assembled in it.
+    #     assembler : Assembler
+    #         pointer to the global assembler object to distribute to everyone.
+    #     proc_range : [int, int]
+    #         indices of procs owned by comm with respect to COMM_WORLD.
+    #     """
+    #     # Set attributes
+    #     self.pathname = '.'.join((path, self.name)) if path else self.name
+    #     self.comm = comm
+    #     self._assembler = assembler
+    #     self._mpi_proc_range = proc_range
+    #
+    #     # Add self's kwargs to dictionary of parents' kwargs (already new copy)
+    #     self.metadata._assemble_global_dict(global_dict)
+    #
+    #     # Optional user-defined method
+    #     self.initialize_processors()
+    #
+    #     nsub = len(self._subsystems_allprocs)
+    #
+    #     # If this is a group:
+    #     if nsub > 0:
+    #         # Call the load balancing algorithm
+    #         tmp = self._mpi_proc_allocator(nsub, comm, proc_range)
+    #         sub_inds, sub_comm, sub_proc_range = tmp
+    #
+    #         # Define local subsystems
+    #         self._subsystems_myproc = [self._subsystems_allprocs[ind]
+    #                                    for ind in sub_inds]
+    #         self._subsystems_myproc_inds = sub_inds
+    #
+    #         # Perform recursion
+    #         for subsys in self._subsystems_myproc:
+    #             sub_global_dict = self.metadata._global_dict.copy()
+    #             subsys._setup_processors(self.pathname, sub_comm,
+    #                                      sub_global_dict, assembler,
+    #                                      sub_proc_range)
+
+    def get_req_procs(self):
+        """
+        Return the min and max MPI processes usable by this System.
+
+        This should be overridden by Components that require more than
+        1 process.
+
+        Returns
+        -------
+        tuple : (int, int or None)
+            A tuple of the form (min_procs, max_procs), indicating the min
+            and max processors usable by this `System`.  max_procs can be None,
+            indicating all available procs can be used.
+        """
+        if self._mpi_req_procs is not None:
+            return self._mpi_req_procs
+
+        if self._subsystems_allprocs:
+            if self._mpi_proc_allocator.parallel:
+                # for a parallel group, we add up all of the required procs
+                min_procs, max_procs = 0, 0
+
+                for sub in self._subsystems_allprocs:
+                    sub_min, sub_max = sub._mpi_req_procs = sub.get_req_procs()
+                    if sub_min > min_procs:
+                        min_procs = sub_min
+                    if max_procs is not None:
+                        if sub_max is None:
+                            max_procs = None
+                        else:
+                            max_procs += sub_max
+
+                if min_procs == 0:
+                    min_procs = 1
+
+                if max_procs == 0:
+                    max_procs = 1
+
+                return (min_procs, max_procs)
+            else:
+                # for a serial group, we take the max required procs
+                min_procs, max_procs = 1, 1
+
+                for sub in self._subsystems_allprocs:
+                    sub_min, sub_max = sub._mpi_req_procs = sub.get_req_procs()
+                    min_procs = max(min_procs, sub_min)
+                    if max_procs is not None:
+                        if sub_max is None:
+                            max_procs = None
+                        else:
+                            max_procs = max(max_procs, sub_max)
+
+                return (min_procs, max_procs)
+        else:  # by default, components only require 1 proc
+            return (1, 1)
+
+    def _setup_communicators(self, path, comm, global_dict, assembler):
         """
         Recursively split comms and define local subsystems.
 
@@ -224,7 +339,6 @@ class System(object):
             pathname
             comm
             _assembler
-            _mpi_proc_range
             _subsystems_myproc
             _subsystems_myproc_inds
 
@@ -238,14 +352,10 @@ class System(object):
             dictionary with kwargs of all parents assembled in it.
         assembler : Assembler
             pointer to the global assembler object to distribute to everyone.
-        proc_range : [int, int]
-            indices of procs owned by comm with respect to COMM_WORLD.
         """
-        # Set attributes
         self.pathname = '.'.join((path, self.name)) if path else self.name
         self.comm = comm
         self._assembler = assembler
-        self._mpi_proc_range = proc_range
 
         # Add self's kwargs to dictionary of parents' kwargs (already new copy)
         self.metadata._assemble_global_dict(global_dict)
@@ -253,25 +363,33 @@ class System(object):
         # Optional user-defined method
         self.initialize_processors()
 
-        nsub = len(self._subsystems_allprocs)
+        minp, maxp = self._mpi_req_procs
+        if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
+            raise RuntimeError("%s needs %d MPI processes, but was given only %d." %
+                              (self.pathname, minp, comm.size))
 
         # If this is a group:
-        if nsub > 0:
+        if self._subsystems_allprocs:
+            req_procs = [s._mpi_req_procs for s in self._subsystems_allprocs]
             # Call the load balancing algorithm
-            tmp = self._mpi_proc_allocator(nsub, comm, proc_range)
-            sub_inds, sub_comm, sub_proc_range = tmp
+            try:
+                sub_inds, sub_comm = self._mpi_proc_allocator(req_procs, comm)
+            except ProcAllocationError as err:
+                raise RuntimeError("subsystem %s requested %d processes "
+                                   "but got %d" %
+                                   (self._subsystems_allprocs[err.sub_idx].pathname,
+                                    err.requested, err.remaining))
 
             # Define local subsystems
+            self._subsystems_myproc_inds = sub_inds
             self._subsystems_myproc = [self._subsystems_allprocs[ind]
                                        for ind in sub_inds]
-            self._subsystems_myproc_inds = sub_inds
 
             # Perform recursion
             for subsys in self._subsystems_myproc:
                 sub_global_dict = self.metadata._global_dict.copy()
-                subsys._setup_processors(self.pathname, sub_comm,
-                                         sub_global_dict, assembler,
-                                         sub_proc_range)
+                subsys._setup_communicators(self.pathname, sub_comm,
+                                            sub_global_dict, assembler)
 
     def _setup_variables(self, recurse=True):
         """

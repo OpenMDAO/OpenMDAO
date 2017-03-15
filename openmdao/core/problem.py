@@ -25,6 +25,7 @@ from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
 from openmdao.utils.mpi import FakeComm
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
+from openmdao.utils.mpi import MPI
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
@@ -261,7 +262,8 @@ class Problem(object):
         self._mode = mode
 
         # Recursive system setup
-        model._setup_processors('', comm, {}, assembler, [0, comm.size])
+        #model._setup_processors('', comm, {}, assembler, [0, comm.size])
+        self._setup_communicators()
         allprocs_abs_names = model._setup_variables()
         model._setup_variable_indices({'input': 0, 'output': 0})
         model._setup_partials()
@@ -317,6 +319,29 @@ class Problem(object):
         model._scale_vectors_and_jacobians('to phys')
 
         return self
+
+    def _setup_communicators(self):
+        """
+        Set up MPI communicators for the driver and model.
+        """
+        # first determine how many procs that we can possibly use
+        minproc, maxproc = self.driver.get_req_procs(self.model)
+        if MPI:
+            if not (maxproc is None or maxproc >= self.comm.size):
+                # we have more procs than we can use, so just raise an
+                # exception to encourage the user not to waste resources :)
+                raise RuntimeError("This problem was given %d MPI processes, "
+                                   "but it requires between %d and %d." %
+                                   (self.comm.size, minproc, maxproc))
+            elif self.comm.size < minproc:
+                if maxproc is None:
+                    maxproc = '(any)'
+                raise RuntimeError("This problem was given %d MPI processes, "
+                                   "but it requires between %s and %s." %
+                                   (self.comm.size, minproc, maxproc))
+
+        self.driver._setup_communicators(self.model, '', self.comm, {},
+                                         self._assembler)
 
     def setup_vector(self, vec_name, vector_class, use_ref_vector):
         """

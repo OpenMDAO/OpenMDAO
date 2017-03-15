@@ -16,7 +16,7 @@ class FanOut(Group):
     def __init__(self):
         super(FanOut, self).__init__()
 
-        self._mpi_proc_allocator.options['parallel'] = True
+        self._mpi_proc_allocator.parallel = True
 
         self.add_subsystem('p', IndepVarComp('x', 1.0))
         self.add_subsystem('comp1', ExecComp(['y=3.0*x']))

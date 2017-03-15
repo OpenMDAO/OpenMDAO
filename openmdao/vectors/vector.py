@@ -70,7 +70,7 @@ class Vector(object):
         self._assembler = system._assembler
         self._system = system
 
-        self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
+        self._iproc = self._system._assembler._comm.rank
         self._views = {}
         self._views_flat = {}
         self._idxs = {}

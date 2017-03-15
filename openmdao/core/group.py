@@ -344,10 +344,10 @@ class Group(System):
                                    (prom_name, sorted(lst)))
 
         # If we're running in parallel, gather contributions from other procs.
-        if self.comm.size > 1:
+        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             for type_ in ['input', 'output']:
                 sub_comm = self._subsystems_myproc[0].comm
-                if sub_comm.rank == 0:
+                if self.comm.size == sub_comm.size or sub_comm.rank == 0:
                     raw = (allprocs_abs_names[type_], self._var_allprocs_prom2abs_list[type_])
                 else:
                     raw = ([], {})
