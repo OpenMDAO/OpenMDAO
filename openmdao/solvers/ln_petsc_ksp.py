@@ -2,7 +2,8 @@
 
 from __future__ import division, print_function
 import numpy as np
-from six import itervalues
+
+from six.moves import range
 
 try:
     import petsc4py

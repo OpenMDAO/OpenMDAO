@@ -2,8 +2,9 @@
 
 import unittest
 import warnings
+
 from six import iteritems
-from six.moves import cStringIO
+from six.moves import cStringIO, range
 
 import numpy as np
 

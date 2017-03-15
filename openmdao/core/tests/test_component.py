@@ -5,6 +5,7 @@ import numpy as np
 import unittest
 import warnings
 
+from six.moves import range
 from six import assertRaisesRegex
 
 from openmdao.api import Problem, ExplicitComponent, Group

@@ -1,11 +1,12 @@
 """Define the LinearSystemComp class."""
 from __future__ import division, print_function
+
+from six.moves import range
+
 import numpy as np
 from scipy import linalg
 
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.jacobians.global_jacobian import GlobalJacobian
-from openmdao.matrices.dense_matrix import DenseMatrix
 
 
 class LinearSystemComp(ImplicitComponent):
