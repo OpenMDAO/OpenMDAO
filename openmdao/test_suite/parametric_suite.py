@@ -191,6 +191,11 @@ class ParameterizedInstance(object):
         self.problem = prob = Problem(group)
 
         if args['global_jac']:
+            
+            # Deprecated test won't work with GlobalJacobian because it defines an apply_linear.
+            if args['component_class'] == 'deprecated':
+                raise SkipTest('GlobalJacobian not suppported in Deprecated Cycle test.')
+            
             jacobian_type = args['jacobian_type']
             if jacobian_type == 'dense':
                 prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
