@@ -988,7 +988,7 @@ class System(object):
             Upper boundary for the param
         ref : float or ndarray, optional
             Value of design var that scales to 1.0 in the driver.
-        ref0 : upper or ndarray, optional
+        ref0 : float or ndarray, optional
             Value of design var that scales to 0.0 in the driver.
         indices : iter of int, optional
             If a param is an array, these indicate which entries are of
