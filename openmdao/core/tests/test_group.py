@@ -90,13 +90,35 @@ class TestGroup(unittest.TestCase):
 
     def test_group_simple_promoted(self):
         p = Problem(model=Group())
-        p.model.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
-                              promotes_inputs=['a'], promotes_outputs=['b'])
+        p.model.add_subsystem('indep', IndepVarComp('a', 3.0),
+                              promotes_outputs=['a'])
+        p.model.add_subsystem('comp1', ExecComp('b=2.0*a'),
+                              promotes_inputs=['a'])
 
         p.setup()
+        p.run_model()
 
-        self.assertEqual(p['comp1.a'], 3.0)  # still use unpromoted name
-        self.assertEqual(p['b'], 6.0)
+        self.assertEqual(p['a'], 3.0)
+        self.assertEqual(p['comp1.b'], 6.0)
+
+    def test_group_rename_connect(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('aa', 3.0),
+                              promotes=['aa'])
+        p.model.add_subsystem('comp1', ExecComp('b=2.0*aa'),
+                              promotes_inputs=['aa'])
+
+        # here we alias 'a' to 'aa' so that it will be automatically
+        # connected to the independent variable 'aa'.
+        p.model.add_subsystem('comp2', ExecComp('b=3.0*a'),
+                              promotes_inputs=[('a', 'aa')])
+
+        p.setup()
+        p.run_model()
+
+        self.assertEqual(p['comp1.b'], 6.0)
+        self.assertEqual(p['comp2.b'], 9.0)
+
 
     def test_group_nested(self):
         p = Problem(model=Group())
@@ -178,8 +200,8 @@ class TestGroup(unittest.TestCase):
                 ('a', 2.0),
                 ('x', 5.0),
             ]),
-            promotes_outputs='x')
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs='x')
+            promotes_outputs=['x'])
+        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
         p.model.suppress_solver_output = True
@@ -189,6 +211,49 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['x'], 5)
         self.assertEqual(p['comp2.y'], 10)
 
+    def test_group_renames(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
+                              promotes_outputs=[('x', 'foo')])
+        p.model.add_subsystem('comp2', ExecComp('y=2*foo'), promotes_inputs=['foo'])
+        p.setup()
+
+        p.model.suppress_solver_output = True
+        p.run_model()
+
+        self.assertEqual(p['foo'], 5)
+        self.assertEqual(p['comp2.y'], 10)
+
+    def test_group_renames_errors_single_string(self):
+        p = Problem(model=Group())
+        with self.assertRaises(Exception) as err:
+            p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
+                                  promotes_outputs='x')
+        self.assertEqual(str(err.exception),
+                         ": promotes must be an iterator of strings and/or tuples.")
+
+    def test_group_renames_errors_not_found(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
+                              promotes_outputs=[('xx', 'foo')])
+        p.model.add_subsystem('comp2', ExecComp('y=2*foo'), promotes_inputs=['foo'])
+
+        with self.assertRaises(Exception) as err:
+            p.setup(check=False)
+        self.assertEqual(str(err.exception),
+                         "comp1: no variables were promoted based on promotes_outputs=[('xx', 'foo')]")
+
+    def test_group_renames_errors_bad_tuple(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
+                              promotes_outputs=[('x', 'foo', 'bar')])
+        p.model.add_subsystem('comp2', ExecComp('y=2*foo'), promotes_inputs=['foo'])
+
+        with self.assertRaises(Exception) as err:
+            p.setup(check=False)
+        self.assertEqual(str(err.exception),
+                         "when adding subsystem 'comp1', entry '('x', 'foo', 'bar')' is not a string or tuple of size 2")
+
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
         p = Problem(model=Group())
@@ -197,7 +262,7 @@ class TestGroup(unittest.TestCase):
                 ('x', 5.0),
             ]),
             promotes_outputs=['a', 'x'])
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs='x')
+        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
         p.model.suppress_solver_output = True
@@ -214,7 +279,7 @@ class TestGroup(unittest.TestCase):
                 ('a', 2.0),
                 ('x', 5.0),
             ]),
-            promotes_outputs='*')
+            promotes_outputs=['*'])
         p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
