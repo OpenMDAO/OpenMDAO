@@ -9,6 +9,7 @@ import numpy as np
 from numpy import ndarray, imag, complex as npcomplex
 
 from six import string_types
+from six.moves import range
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 
