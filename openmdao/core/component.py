@@ -228,9 +228,9 @@ class Component(System):
         if upper is not None:
             upper = format_as_float_or_array('upper', upper)
 
-        for item in [ref, ref0, res_ref, res_ref]:
-            if not np.isscalar(item):
-                raise TypeError('The %s argument should be a float' % (item.__name__))
+        for item in ['ref', 'ref0', 'res_ref', 'res_ref0']:
+            if not np.isscalar(locals()[item]):
+                raise TypeError('The %s argument should be a float' % (item))
 
         # Check that units are valid
         if units is not None and not valid_units(units):
