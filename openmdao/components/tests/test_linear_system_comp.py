@@ -56,15 +56,13 @@ class TestLinearSystem(unittest.TestCase):
             prob.model.add_subsystem('p2', IndepVarComp('b', b))
 
             lingrp = prob.model.add_subsystem('lingrp', Group(), promotes=['*'])
-            z = lingrp.add_subsystem('lin', lin_sys_comp)
+            lingrp.add_subsystem('lin', lin_sys_comp)
 
             prob.model.connect('p1.A', 'lin.A')
             prob.model.connect('p2.b', 'lin.b')
 
-            prob.setup()
-
-            #prob.setup(check=False)
-            #prob.model.suppress_solver_output = True
+            prob.setup(check=False)
+            prob.model.suppress_solver_output = True
 
             prob.run_model()
             prob.model.run_linearize()
