@@ -107,7 +107,6 @@ class Group(System):
         self._subsystems_allprocs.append(subsys)
         subsys.name = name
 
-        # If we're given a string, turn into a list
         if isinstance(promotes, string_types) or \
            isinstance(promotes_inputs, string_types) or \
            isinstance(promotes_outputs, string_types):
@@ -156,7 +155,7 @@ class Group(System):
                                 (src_name, tgt_name, src_indices.dtype.type))
 
         # if multiple targets are given, recursively connect to each
-        if isinstance(tgt_name, (list, tuple)):
+        if not isinstance(tgt_name, string_types) and isinstance(tgt_name, Iterable):
             for name in tgt_name:
                 self.connect(src_name, name, src_indices)
             return
