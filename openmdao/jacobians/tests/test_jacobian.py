@@ -418,5 +418,43 @@ class TestJacobian(unittest.TestCase):
         with assertRaisesRegex(self, Exception, msg):
             prob.setup()
 
+        # Try a component that is derived from a matrix-free one
+
+        class FurtherDerived(ParaboloidApply):
+            def do_nothing(self):
+                pass
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('p2', IndepVarComp('y', val=1.0))
+        model.add_subsystem('comp', FurtherDerived())
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+
+        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
+        with assertRaisesRegex(self, Exception, msg):
+            prob.setup()
+
+        # Make sure regular comps don't give an error.
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('p2', IndepVarComp('y', val=1.0))
+        model.add_subsystem('comp', Paraboloid())
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+
+        prob.setup()
+
 if __name__ == '__main__':
     unittest.main()
