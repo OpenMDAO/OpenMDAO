@@ -2,6 +2,8 @@
 from __future__ import division
 
 from six import iteritems, string_types
+from six.moves import range
+
 from collections import Iterable, Counter
 
 import numpy as np
