@@ -3,6 +3,8 @@
 import numpy as np
 import unittest
 
+from six.moves import range
+
 from openmdao.api import Problem, Group, IndepVarComp
 from openmdao.solvers.nl_btlinesearch import BacktrackingLineSearch
 from openmdao.solvers.nl_newton import NewtonSolver

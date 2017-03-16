@@ -487,7 +487,10 @@ class Problem(object):
                         for rel_key in product(of_matches, wrt_matches):
                             abs_key = rel_key2abs_key(comp, rel_key)
                             of, wrt = abs_key
+
+                            # No need to calculate partials; they are already stored
                             deriv_value = subjacs.get(abs_key)
+
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
                                 in_size = np.prod(comp._var_abs2data_io[wrt]['metadata']['shape'])
@@ -502,6 +505,10 @@ class Problem(object):
                                         comp._var_abs2data_io[of]['metadata']['shape'])
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
+                                    # if a scalar value is provided (in declare_partials),
+                                    # expand to the correct size array value for zipping
+                                    if jac_val.size == 1:
+                                        jac_val = jac_val * np.ones(jac_i.size)
                                     for i, j, val in zip(jac_i, jac_j, jac_val):
                                         tmp_value[i, j] += val
                                     deriv_value = tmp_value

@@ -1,5 +1,8 @@
 """ Unit tests for the design_variable and response interface to system."""
 from __future__ import print_function
+
+from six.moves import range
+
 import unittest
 
 import numpy as np
@@ -119,6 +122,32 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_design_var('z',
                                   lower=np.array([-100, -20]),
                                   upper=np.array([100, 20]))
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1')
+        prob.model.add_constraint('con2')
+
+        prob.setup(check=False)
+
+        des_vars = prob.model.get_design_vars()
+        obj = prob.model.get_objectives()
+        constraints = prob.model.get_constraints()
+
+        self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
+        self.assertEqual(set(obj.keys()), {'obj_cmp.obj',})
+        self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
+
+    def test_api_iter_on_model(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=range(-101, -99),
+                                       upper=range(99, 101),
+                                       indices=range(2))
+
         prob.model.add_objective('obj')
         prob.model.add_constraint('con1')
         prob.model.add_constraint('con2')
@@ -280,6 +309,7 @@ class TestDesvarOnModel(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             prob.model.add_design_var('x', lower=0.0, upper=['a', 'b'],
                                       ref0=-100.0, ref=100)
+
 
 class TestConstraintOnModel(unittest.TestCase):
 
@@ -460,6 +490,10 @@ class TestConstraintOnModel(unittest.TestCase):
         self.assertEqual(str(context.exception), 'If specified, indices must '
                                                  'be a sequence of integers.')
 
+        # passing an iterator for indices should be valid
+        prob.model.add_constraint('con1', lower=0.0, upper=5.0,
+                                          indices=range(2))
+
 
 class TestObjectiveOnModel(unittest.TestCase):
 
@@ -582,6 +616,9 @@ class TestObjectiveOnModel(unittest.TestCase):
 
         self.assertEqual(str(context.exception), 'If specified, indices must '
                                                  'be a sequence of integers.')
+
+        # passing an iterator for indices should be valid
+        prob.model.add_objective('obj', indices=range(2))
 
 
 if __name__ == '__main__':

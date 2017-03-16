@@ -1,5 +1,7 @@
 import unittest
 
+from six.moves import range
+
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 from openmdao.devtools.testutil import TestLogger
 from openmdao.error_checking.check_config import get_sccs

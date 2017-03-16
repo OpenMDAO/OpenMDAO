@@ -9,7 +9,9 @@ from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseM
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.devtools.testutil import assert_rel_error
 from nose_parameterized import parameterized
+
 from six import assertRaisesRegex
+from six.moves import range
 
 
 class MyExplicitComp(ExplicitComponent):

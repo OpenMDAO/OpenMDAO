@@ -65,8 +65,6 @@ class System(object):
     _subsystems_myproc_inds : [int, ...]
         list of indices of subsystems on this proc among all of this system's
         subsystems (subsystems on all of this system's processors).
-    _var_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
-        list of promoted names of all owned variables, not just on current proc.
     _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
         list of pathnames of all owned variables, not just on current proc.
     _var_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}

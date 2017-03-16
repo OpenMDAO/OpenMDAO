@@ -2,13 +2,15 @@
 from __future__ import division
 
 from six import iteritems, string_types
+from six.moves import range
+
 from collections import Iterable, Counter
 
 import numpy as np
 
 from openmdao.core.system import System, PathData
-from openmdao.solvers.nl_bgs import NonlinearBlockGS
-from openmdao.solvers.ln_bgs import LinearBlockGS
+from openmdao.solvers.nl_runonce import NLRunOnce
+from openmdao.solvers.ln_runonce import LNRunOnce
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
 
@@ -34,9 +36,9 @@ class Group(System):
         # because our lint check thinks that we are defining new attributes
         # called nl_solver and ln_solver without documenting them.
         if not self._nl_solver:
-            self._nl_solver = NonlinearBlockGS()
+            self._nl_solver = NLRunOnce()
         if not self._ln_solver:
-            self._ln_solver = LinearBlockGS()
+            self._ln_solver = LNRunOnce()
 
     def add(self, name, subsys, promotes=None):
         """
