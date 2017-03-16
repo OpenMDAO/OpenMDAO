@@ -1,5 +1,7 @@
 """Test the LinearSystemComp."""
+
 import unittest
+
 import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp

@@ -1,18 +1,20 @@
+""" Test the Jacobian objects."""
 
-import unittest
 import itertools
+import unittest
+from nose_parameterized import parameterized
+
+from six import assertRaisesRegex
+from six.moves import range
+
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
      GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CSRmatrix, COOmatrix, ExecComp
-from openmdao.test_suite.components.sellar import SellarDerivatives
-from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.devtools.testutil import assert_rel_error
-from nose_parameterized import parameterized
-
-from six import assertRaisesRegex
-from six.moves import range
+from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
 class MyExplicitComp(ExplicitComponent):
