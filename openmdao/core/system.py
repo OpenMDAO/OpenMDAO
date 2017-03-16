@@ -618,6 +618,8 @@ class System(object):
 
         maps = {'input': {}, 'output': {}}
         found = False
+        prom2abs = self._var_allprocs_prom2abs_list
+
         for typ in ('input', 'output'):
             promotes_typ = self._var_promotes[typ]
 
@@ -631,11 +633,18 @@ class System(object):
                 names = ()
                 patterns = ()
 
-            for name in self._var_allprocs_prom2abs_list[typ]:
+            for name in prom2abs[typ]:
                 if name in names:
                     maps[typ][name] = name
                     found = True
                 elif name in renames:
+                    if renames[name] in prom2abs['input'] or \
+                            renames[name] in prom2abs['output']:
+                        raise RuntimeError("when adding subsystem '%s', "
+                                           "attempted to rename '%s' to '%s' "
+                                           "but '%s' is already used." %
+                                           (self.pathname, name, renames[name],
+                                            renames[name]))
                     maps[typ][name] = renames[name]
                     found = True
                 else:

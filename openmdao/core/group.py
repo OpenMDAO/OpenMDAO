@@ -74,23 +74,28 @@ class Group(System):
             Name of the subsystem being added
         subsys : <System>
             An instantiated, but not-yet-set up system object.
-        promotes : str, iter of str, optional
-            One or a list of variable names specifying which subsystem variables
-            to 'promote' up to this group. This is for backwards compatibility
-            with older versions of OpenMDAO.
-        promotes_inputs : str, iter of str, optional
-            One or a list of input variable names specifying which subsystem input
-            variables to 'promote' up to this group.
-        promotes_outputs : str, iter of str, optional
-            One or a list of output variable names specifying which subsystem output
-            variables to 'promote' up to this group.
+        promotes : iter of (str or tuple), optional
+            A list of variable names specifying which subsystem variables
+            to 'promote' up to this group. If an entry is a tuple of the
+            form (old_name, new_name), this will rename the variable in
+            the parent group.
+        promotes_inputs : iter of (str or tuple), optional
+            A list of input variable names specifying which subsystem input
+            variables to 'promote' up to this group. If an entry is a tuple of
+            the form (old_name, new_name), this will rename the variable in
+            the parent group.
+        promotes_outputs : iter of (str or tuple), optional
+            A list of output variable names specifying which subsystem output
+            variables to 'promote' up to this group. If an entry is a tuple of
+            the form (old_name, new_name), this will rename the variable in
+            the parent group.
 
         Returns
         -------
         <System>
             the subsystem that was passed in. This is returned to
             enable users to instantiate and add a subsystem at the
-            same time, and get the pointer back.
+            same time, and get the reference back.
         """
         for sub in self._subsystems_allprocs:
             if name == sub.name:
@@ -104,8 +109,8 @@ class Group(System):
         if isinstance(promotes, string_types) or \
            isinstance(promotes_inputs, string_types) or \
            isinstance(promotes_outputs, string_types):
-                raise RuntimeError("%s: promotes/promotes_inputs/promotes_outputs"
-                                   " must be an iterator of strings and/or tuples" %
+                raise RuntimeError("%s: promotes"
+                                   " must be an iterator of strings and/or tuples." %
                                    self.name)
         if promotes:
             subsys._var_promotes['any'] = promotes
