@@ -149,7 +149,6 @@ class TestScaling(unittest.TestCase):
 
         prob = Problem(group)
 
-        # Test linear with invalid vec_name
         with self.assertRaises(Exception) as cm:
             prob.setup(check=False)
         self.assertEqual(str(cm.exception),
