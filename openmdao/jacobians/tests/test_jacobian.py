@@ -7,6 +7,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
      GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CSRmatrix, COOmatrix, ExecComp
 from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.devtools.testutil import assert_rel_error
 from nose_parameterized import parameterized
 
@@ -364,6 +365,56 @@ class TestJacobian(unittest.TestCase):
         msg = "d1: jacobian has changed and setup was not called."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
+
+    def test_global_jacobian_unsupported_cases(self):
+
+        class ParaboloidApply(Paraboloid):
+
+            def linearize(self, inputs, outputs, jacobian):
+                return
+
+            def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals,
+                             mode):
+                d_residuals['x'] += (np.exp(outputs['x']) - 2*inputs['a']**2 * outputs['x'])*d_outputs['x']
+                d_residuals['x'] += (-2 * inputs['a'] * outputs['x']**2)*d_inputs['a']
+
+        # One level deep
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('p2', IndepVarComp('y', val=1.0))
+        model.add_subsystem('comp', ParaboloidApply())
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+
+        msg = "GlobalJacobian not supported if any subsystem is matrix-free."
+        with assertRaisesRegex(self, Exception, msg):
+            prob.setup()
+
+        # Nested
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        sub = model.add_subsystem('sub', Group())
+
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('p2', IndepVarComp('y', val=1.0))
+        sub.add_subsystem('comp', ParaboloidApply())
+
+        model.connect('p1.x', 'sub.comp.x')
+        model.connect('p2.y', 'sub.comp.y')
+
+        model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+
+        msg = "GlobalJacobian not supported if any subsystem is matrix-free."
+        with assertRaisesRegex(self, Exception, msg):
+            prob.setup()
 
 
 if __name__ == '__main__':

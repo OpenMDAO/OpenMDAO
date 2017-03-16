@@ -522,12 +522,13 @@ class System(object):
 
             # At present, we don't support a GlobalJacobian in a group if any subcomponents
             # are matrix-free.
-            for subsys in self._subsystems_allprocs:
+            for subsys in self.system_iter():
                 if overrides_method('apply_linear', subsys, System):
                     msg = "GlobalJacobian not supported if any subsystem is matrix-free."
                     raise RuntimeError(msg)
 
             jacobian = self._jacobian
+
         elif jacobian is not None:
             self._jacobian = jacobian
 
