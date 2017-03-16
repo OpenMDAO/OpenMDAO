@@ -392,7 +392,7 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
 
-        msg = "GlobalJacobian not supported if any subsystem is matrix-free."
+        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.setup()
 
@@ -412,7 +412,7 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
 
-        msg = "GlobalJacobian not supported if any subsystem is matrix-free."
+        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.setup()
 

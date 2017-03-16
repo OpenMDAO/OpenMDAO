@@ -524,7 +524,7 @@ class System(object):
             # are matrix-free.
             for subsys in self.system_iter():
                 if overrides_method('apply_linear', subsys, System):
-                    msg = "GlobalJacobian not supported if any subsystem is matrix-free."
+                    msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
                     raise RuntimeError(msg)
 
             jacobian = self._jacobian
