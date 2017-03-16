@@ -632,13 +632,6 @@ class System(object):
                     maps[typ][name] = name
                     found = True
                 elif name in renames:
-                    if renames[name] in prom2abs['input'] or \
-                            renames[name] in prom2abs['output']:
-                        raise RuntimeError("when adding subsystem '%s', "
-                                           "attempted to rename '%s' to '%s' "
-                                           "but '%s' is already used." %
-                                           (self.pathname, name, renames[name],
-                                            renames[name]))
                     maps[typ][name] = renames[name]
                     found = True
                 else:

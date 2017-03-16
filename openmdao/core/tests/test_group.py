@@ -254,17 +254,6 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(str(err.exception),
                          "when adding subsystem 'comp1', entry '('x', 'foo', 'bar')' is not a string or tuple of size 2")
 
-    def test_group_renames_errors_already_used(self):
-        p = Problem(model=Group())
-        p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
-                              promotes_outputs=['x'])
-        p.model.add_subsystem('comp2', ExecComp('y=2*foo'), promotes_inputs=[('foo', 'y')])
-
-        with self.assertRaises(Exception) as err:
-            p.setup(check=False)
-        self.assertEqual(str(err.exception),
-                         "when adding subsystem 'comp2', attempted to rename 'foo' to 'y' but 'y' is already used.")
-
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
         p = Problem(model=Group())
