@@ -81,9 +81,9 @@ class System(object):
         integer arrays of global indices of variables on this proc.
     _var_maps : {'input': dict, 'output': dict}
         dictionary of variable names and their promoted names.
-    _var_promotes : { 'any': set(), 'input': set(), 'output': set() }
-        dictionary of sets of variable names/wildcards specifying promotion
-        (used to calculate _var_maps)
+    _var_promotes : { 'any': [], 'input': [], 'output': [] }
+        dictionary of lists of variable names/wildcards specifying promotion
+        (used to calculate promoted names)
     _var_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
     _var_connections_abs : [(str, str), ...]
@@ -172,10 +172,7 @@ class System(object):
         self._subsystems_myproc_inds = []
 
         self._var_maps = {'input': {}, 'output': {}}
-        self._var_promotes = {'input': set(),
-                              'output': set(),
-                              'any': set(),
-                              'renames': {}}
+        self._var_promotes = {'input': [], 'output': [], 'any': []}
 
         self._var_connections = {}
         self._var_connections_abs = []
@@ -592,46 +589,43 @@ class System(object):
             dictionary mapping input/output variable names
             to promoted variable names.
         """
-        promotes = self._var_promotes['any']
-        if promotes:
-            names = promotes
-            patterns = [n for n in names if '*' in n or '?' in n]
-        gname = self.name + '.' if self.name else ''
-
-        def get_renames(lst):
+        def split_list(lst):
             """
-            Return any renames found in lst.
+            Return names, patterns, and renames found in lst.
             """
+            names = []
+            patterns = []
             renames = {}
             for entry in lst:
                 if isinstance(entry, string_types):
-                    pass
+                    if '*' in entry or '?' in entry or '[' in entry:
+                        patterns.append(entry)
+                    else:
+                        names.append(entry)
                 elif isinstance(entry, tuple) and len(entry) == 2:
                     renames[entry[0]] = entry[1]
                 else:
                     raise TypeError("when adding subsystem '%s', entry '%s'"
                                     " is not a string or tuple of size 2" %
                                     (self.pathname, entry))
-            return renames
-
-        renames = get_renames(promotes)
+            return names, patterns, renames
 
         maps = {'input': {}, 'output': {}}
-        found = False
+        gname = self.name + '.' if self.name else ''
         prom2abs = self._var_allprocs_prom2abs_list
+        found = False
+
+        promotes = self._var_promotes['any']
+        if promotes:
+            names, patterns, renames = split_list(promotes)
 
         for typ in ('input', 'output'):
-            promotes_typ = self._var_promotes[typ]
-
             if promotes:
                 pass
-            elif promotes_typ:
-                renames.update(get_renames(promotes_typ))
-                names = promotes_typ
-                patterns = [n for n in names if '*' in n or '?' in n]
+            elif self._var_promotes[typ]:
+                names, patterns, renames = split_list(self._var_promotes[typ])
             else:
-                names = ()
-                patterns = ()
+                names = patterns = renames = ()
 
             for name in prom2abs[typ]:
                 if name in names:
