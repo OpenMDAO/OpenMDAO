@@ -20,6 +20,7 @@ from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
      FanOut, FanOutGrouped, ConvergeDivergeFlat, \
      ConvergeDivergeGroups, Diamond, DiamondFlat
 
+
 class TestBGSSolver(unittest.TestCase):
 
     def test_globaljac_err(self):
@@ -43,7 +44,7 @@ class TestBGSSolver(unittest.TestCase):
         wrt = ['length']
 
         with self.assertRaises(RuntimeError) as context:
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
 
         self.assertEqual(str(context.exception),
                          "A block linear solver 'LN: LNBGS' is being used with a GlobalJacobian in system ''")

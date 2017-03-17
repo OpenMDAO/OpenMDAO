@@ -2,12 +2,11 @@
 from __future__ import division
 
 import numpy as np
-import scipy.sparse
-from six.moves import range
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
-from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.matrices.coo_matrix import COOMatrix
+from openmdao.matrices.csr_matrix import CSRMatrix
 
 
 SUBJAC_META_DEFAULTS = {
@@ -91,8 +90,6 @@ class GlobalJacobian(Jacobian):
             src_indices_dict[abs_name] = \
                 system._var_abs2data_io[abs_name]['metadata']['src_indices']
 
-        start = len(system.pathname) + 1 if system.pathname else 0
-
         # avoid circular imports
         from openmdao.core.component import Component
         for s in self._system.system_iter(local=True, recurse=True,
@@ -127,7 +124,6 @@ class GlobalJacobian(Jacobian):
 
                     self._keymap[abs_key] = abs_key
 
-                    in_idx = assembler._var_allprocs_abs2idx_io[in_abs_name]
                     out_abs_name = assembler._input_srcs[in_abs_name]
                     if out_abs_name is None:  # skip unconnected inputs
                         continue
@@ -217,3 +213,57 @@ class GlobalJacobian(Jacobian):
         elif mode == 'rev':
             d_outputs.iadd_data(int_mtx._prod(d_residuals.get_data(), mode))
             d_inputs.iadd_data(ext_mtx._prod(d_residuals.get_data(), mode))
+
+
+class DenseJacobian(GlobalJacobian):
+    """
+    Assemble dense global <Jacobian>.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(DenseJacobian, self, **kwargs).__init__()
+        self.options['matrix_class'] = DenseMatrix
+
+
+class COOJacobian(GlobalJacobian):
+    """
+    Assemble sparse global <Jacobian> in Coordinate list format.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(COOJacobian, self, **kwargs).__init__()
+        self.options['matrix_class'] = COOMatrix
+
+
+class CSRJacobian(GlobalJacobian):
+    """
+    Assemble sparse global <Jacobian> in Compressed Row Storage format.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(CSRJacobian, self, **kwargs).__init__()
+        self.options['matrix_class'] = CSRMatrix

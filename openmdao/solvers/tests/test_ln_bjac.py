@@ -14,7 +14,6 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarStateConnection, SellarDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
-from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
      FanOut, FanOutGrouped, ConvergeDivergeFlat, \
      ConvergeDivergeGroups, Diamond, DiamondFlat
@@ -43,7 +42,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         wrt = ['length']
 
         with self.assertRaises(RuntimeError) as context:
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
 
             self.assertEqual(str(context.exception),
                              "A block linear solver 'LN: LNBJ' is being used with a GlobalJacobian in system ''")
