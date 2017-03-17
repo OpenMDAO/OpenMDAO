@@ -1468,10 +1468,16 @@ class System(object):
                 out[name]['size'] = vec[out[name]['name']].size
 
         if recurse:
-            for subsys in self._subsystems_allprocs:
+            for subsys in self._subsystems_myproc:
                 subsys_design_vars = subsys.get_design_vars(recurse=recurse)
                 for key in subsys_design_vars:
                     out[key] = subsys_design_vars[key]
+            if self.comm.size > 1 and self._subsystems_allprocs:
+                iproc = self.comm.rank
+                for rank, all_out in enumerate(self.comm.allgather(out)):
+                    if rank != iproc:
+                        out.update(all_out)
+
         return out
 
     def get_responses(self, recurse=True):
@@ -1509,10 +1515,17 @@ class System(object):
             out[name]['size'] = vec[name].size
 
         if recurse:
-            for subsys in self._subsystems_allprocs:
+            for subsys in self._subsystems_myproc:
                 subsys_responses = subsys.get_responses(recurse=recurse)
                 for key in subsys_responses:
                     out[key] = subsys_responses[key]
+
+            if self.comm.size > 1 and self._subsystems_allprocs:
+                iproc = self.comm.rank
+                for rank, all_out in enumerate(self.comm.allgather(out)):
+                    if rank != iproc:
+                        out.update(all_out)
+
         return out
 
     def get_constraints(self, recurse=True):

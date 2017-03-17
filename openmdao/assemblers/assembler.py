@@ -175,7 +175,13 @@ class Assembler(object):
                 self._variable_sizes[typ][iset][iproc, ivar_set] = size
                 self._variable_sizes_all[typ][iproc, ivar_all] = size
 
-        # Do an allgather on the sizes arrays
+        abs2meta = {}
+        for abs_name, data in iteritems(abs2data):
+            dmeta = data['metadata']
+            # only copy what we need in all procs
+            abs2meta[abs_name] = { n: dmeta[n] for n in ['units', 'shape']}
+
+        # Do an allgather on the sizes arrays and metadata
         if self._comm.size > 1:
             for typ in ['input', 'output']:
                 nset = len(self._variable_sizes[typ])
@@ -184,6 +190,12 @@ class Assembler(object):
                     self._comm.Allgather(array[iproc, :], array)
                 self._comm.Allgather(self._variable_sizes_all[typ][iproc, :],
                                      self._variable_sizes_all[typ])
+
+            for rank, a2m in enumerate(self._comm.allgather(abs2meta)):
+                if rank != iproc:
+                    abs2meta.update(a2m)
+
+        self._var_allprocs_abs2meta_io = abs2meta
 
     def _setup_connections(self, connections, prom2abs, abs2data):
         """
@@ -276,7 +288,6 @@ class Assembler(object):
             lists of absolute names of input and output variables on this proc.
         """
         abs2idx = self._var_allprocs_abs2idx_io
-        indices = self._var_allprocs_abs2idx_io
         out_all_paths = self._var_allprocs_abs_names['output']
         in_paths = abs_names['input']
 
@@ -291,7 +302,8 @@ class Assembler(object):
 
         # Allocate arrays
         self._src_indices = np.zeros(total_idx_size, int)
-        self._src_indices_range = np.zeros((len(in_paths), 2), int)
+        self._src_indices_range = np.zeros((len(self._var_allprocs_abs_names['input']),
+                                           2), int)
 
         # Populate arrays
         ind1, ind2 = 0, 0
@@ -325,7 +337,7 @@ class Assembler(object):
                         dimidxs = [cols[:, i] for i in range(cols.shape[1])]
                         self._src_indices[ind1:ind2] = np.ravel_multi_index(dimidxs, src_shape)
 
-            self._src_indices_range[indices[abs_in], :] = [ind1, ind2]
+            self._src_indices_range[abs2idx[abs_in], :] = [ind1, ind2]
             ind1 += isize
 
     def _setup_src_data(self, abs_out_names, abs2data):
