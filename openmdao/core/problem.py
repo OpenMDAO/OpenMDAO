@@ -262,7 +262,6 @@ class Problem(object):
         self._mode = mode
 
         # Recursive system setup
-        #model._setup_processors('', comm, {}, assembler, [0, comm.size])
         self._setup_communicators()
         allprocs_abs_names = model._setup_variables()
         model._setup_variable_indices({'input': 0, 'output': 0})

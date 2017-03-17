@@ -608,7 +608,7 @@ class Component(System):
         for type_ in ['input', 'output']:
             self._var_allprocs_idx_range[type_] = [0, len(self._var_abs_names[type_])]
 
-        return self._var_abs_names
+        return self._var_abs_names, self._var_rel_names
 
     def _setup_variable_indices(self, global_index):
         """

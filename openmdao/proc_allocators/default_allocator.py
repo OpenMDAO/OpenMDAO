@@ -37,52 +37,6 @@ class DefaultAllocator(ProcAllocator):
         nproc = comm.size
         nsub = len(req_procs)
 
-
-        # if nproc >= nsub:
-        #     # Next-one-up algorithm to assign procs to subsystems
-        #     num_procs = np.ones(nsub, int)
-        #     pctg_procs = np.zeros(nsub)
-        #     for ind in range(nproc - nsub):
-        #         pctg_procs[:] = 1.0 * num_procs / np.sum(num_procs)
-        #         num_procs[np.argmax(weights - pctg_procs)] += 1
-        #
-        #     # Compute the coloring
-        #     color = np.zeros(nproc, int)
-        #     start, end = 0, 0
-        #     for isub in range(nsub):
-        #         end += num_procs[isub]
-        #         color[start:end] = isub
-        #         start += num_procs[isub]
-        #
-        #     isub = color[iproc]
-        #     iproc1 = proc_range[0] + np.sum(num_procs[:isub])
-        #     iproc2 = proc_range[0] + np.sum(num_procs[:isub + 1])
-        #     # Result
-        #     isubs = [isub]
-        #     sub_comm = comm.Split(isub)
-        #     sub_proc_range = [iproc1, iproc2]
-        # else:
-        #     # TODO: improve this algorithm - maybe Fortran/C
-        #     bool_unused_sub = np.ones(nsub, bool)
-        #     isubs_list = [[] for ind in range(nproc)]
-        #     proc_load = np.zeros(nproc)
-        #     # Assign the slowest subsystem to the most free processor
-        #     for ind in range(nsub):
-        #         iproc = np.argmin(proc_load)
-        #         isub = np.argmax(weights[bool_unused_sub])
-        #
-        #         bool_unused_sub[isub] = False
-        #         isubs_list[iproc].append(isub)
-        #         proc_load[iproc] += weights[isub]
-        #
-        #     iproc1 = proc_range[0] + iproc
-        #     iproc2 = proc_range[0] + iproc + 1
-        #     # Result
-        #     isubs = isubs_list[iproc]
-        #     sub_comm = comm.Split(iproc)
-        #     sub_proc_range = [iproc1, iproc2]
-        #
-
         min_req_procs = [minproc for minproc, _ in req_procs]
         max_req_procs = [maxproc for _, maxproc in req_procs]
 
@@ -102,7 +56,7 @@ class DefaultAllocator(ProcAllocator):
         # first, just use simple round robin assignment of requested procs
         # until everybody has what they asked for or we run out
         if total_req:
-            if nproc >= total_req: # we have enough for all subsystems
+            if nproc >= total_req:  # we have enough for all subsystems
                 while assigned < limit:
                     for i, max_req in enumerate(max_req_procs):
                         if max_req is None or assigned_procs[i] < max_req:
@@ -113,9 +67,9 @@ class DefaultAllocator(ProcAllocator):
 
                 # create buckets (one sub per bucket) to be consistent in how
                 # we split procs below
-                buckets = [(n,[i]) for i, n in enumerate(assigned_procs)]
+                buckets = [(n, [i]) for i, n in enumerate(assigned_procs)]
 
-            else: # we don't have enough, so have to group subsystems
+            else:  # we don't have enough, so have to group subsystems
                 remaining = nproc
                 # sort req procs in descending order
                 tups = sorted([(req[0], i) for i, req in enumerate(req_procs)],
@@ -137,11 +91,11 @@ class DefaultAllocator(ProcAllocator):
                         # the fewest number of subs already in it. In the event
                         # of a tie, take the bucket with the lowest number of
                         # requested procs.
-                        lenlist = sorted([b for b in buckets if b[0]>=req],
+                        lenlist = sorted([b for b in buckets if b[0] >= req],
                                          key=lambda t: len(t[1]))
                         shortest = len(lenlist[0][1])
                         final = sorted(b for b in lenlist
-                                                if len(b[1]) == shortest)
+                                       if len(b[1]) == shortest)
                         final[0][1].append(sub_idx)
 
                 # warnings.warn("Group '%s' requested %d processes to run fully "
@@ -185,6 +139,6 @@ class DefaultAllocator(ProcAllocator):
 
         isubs = [] if sub_comm == MPI.COMM_NULL else buckets[rank_color][1]
 
-        print("comm:",comm.size, "subcomm:", sub_comm.size)
+        print("comm:", comm.size, "subcomm:", sub_comm.size)
 
         return isubs, sub_comm

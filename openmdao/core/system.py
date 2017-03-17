@@ -364,7 +364,7 @@ class System(object):
         minp, maxp = self._mpi_req_procs
         if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
             raise RuntimeError("%s needs %d MPI processes, but was given only %d." %
-                              (self.pathname, minp, comm.size))
+                               (self.pathname, minp, comm.size))
 
         # If this is a group:
         if self._subsystems_allprocs:
@@ -403,11 +403,6 @@ class System(object):
         recurse : boolean
             recursion is not performed if traversing up the tree after reconf.
         """
-        # Perform recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_variables()
-
         if overrides_method('initialize_variables', self, System):
             # TODO: we may want to provide a way for component devs to tell
             # the framework that they don't need to re-configure, since the

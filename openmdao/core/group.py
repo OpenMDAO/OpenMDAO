@@ -283,7 +283,7 @@ class Group(System):
         """
         pass
 
-    def _setup_variables(self):
+    def _setup_variables(self, recurse=True):
         """
         Compute variable dict/list for variables on the current processor.
 
@@ -291,6 +291,11 @@ class Group(System):
             _var_abs2data_io
             _var_abs_names
             _var_allprocs_prom2abs_list
+
+        Parameters
+        ----------
+        recurse : boolean
+            recursion is not performed if traversing up the tree after reconf.
 
         Returns
         -------
@@ -305,15 +310,17 @@ class Group(System):
 
         name_offset = len(self.pathname) + 1 if self.pathname else 0
         allprocs_abs_names = {'input': [], 'output': []}
+        allprocs_prom_names = {'input': [], 'output': []}
 
         # Perform recursion to populate the dict and list bottom-up
         for isub, subsys in enumerate(self._subsystems_myproc):
-            subsys_allprocs_abs_names = subsys._setup_variables()
+            sub_all_abs_names, sub_all_prom_names = subsys._setup_variables()
 
             var_maps = subsys._get_maps()
             for type_ in ['input', 'output']:
                 # concatenate the allprocs variable names from subsystems on my proc.
-                allprocs_abs_names[type_].extend(subsys_allprocs_abs_names[type_])
+                allprocs_abs_names[type_].extend(sub_all_abs_names[type_])
+                allprocs_prom_names[type_].extend(sub_all_prom_names[type_])
 
                 # Assemble _var_abs2data_io and _var_abs_names by concatenating from subsystems.
                 for abs_name in subsys._var_abs_names[type_]:
@@ -328,16 +335,16 @@ class Group(System):
                     }
                     self._var_abs_names[type_].append(abs_name)
 
-        # For _var_allprocs_prom2abs_list, essentially invert the abs2prom map in
-        # _var_abs2data_io to capture at least the local maps.
-        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        for abs_name, data in iteritems(self._var_abs2data_io):
-            type_ = data['type']
-            prom_name = data['prom']
-            if prom_name not in self._var_allprocs_prom2abs_list[type_]:
-                self._var_allprocs_prom2abs_list[type_][prom_name] = [abs_name]
-            else:
-                self._var_allprocs_prom2abs_list[type_][prom_name].append(abs_name)
+        # # For _var_allprocs_prom2abs_list, essentially invert the abs2prom map in
+        # # _var_abs2data_io to capture at least the local maps.
+        # self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        # for abs_name, data in iteritems(self._var_abs2data_io):
+        #     type_ = data['type']
+        #     prom_name = data['prom']
+        #     if prom_name not in self._var_allprocs_prom2abs_list[type_]:
+        #         self._var_allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+        #     else:
+        #         self._var_allprocs_prom2abs_list[type_][prom_name].append(abs_name)
 
         for prom_name, lst in iteritems(self._var_allprocs_prom2abs_list['output']):
             if len(lst) > 1:
@@ -349,29 +356,39 @@ class Group(System):
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             for type_ in ['input', 'output']:
                 sub_comm = self._subsystems_myproc[0].comm
-                if self.comm.size == sub_comm.size or sub_comm.rank == 0:
-                    raw = (allprocs_abs_names[type_], self._var_allprocs_prom2abs_list[type_])
+                if sub_comm.rank == 0:
+                    raw = (allprocs_abs_names[type_], allprocs_prom_names[type_])
                 else:
                     raw = ([], {})
 
                 allprocs_abs_names[type_] = []
-                allprocs_prom2abs_list = {}
-                for abs_names, prom2abs_list in self.comm.allgather(raw):
+                allprocs_prom_names[type_] = []
+                for abs_names, prom_names in self.comm.allgather(raw):
                     allprocs_abs_names[type_].extend(abs_names)
-                    for prom_name, abs_names_list in iteritems(prom2abs_list):
-                        if prom_name not in allprocs_prom2abs_list:
-                            allprocs_prom2abs_list[prom_name] = abs_names_list
-                        else:
-                            allprocs_prom2abs_list[prom_name].extend(abs_names_list)
-
-                self._var_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
+                    allprocs_prom_names[type_].extend(prom_names)
 
         # We use allprocs_abs_names to count the total number of allprocs variables
         # and put it in _var_allprocs_idx_range.
         for type_ in ['input', 'output']:
             self._var_allprocs_idx_range[type_] = [0, len(allprocs_abs_names[type_])]
 
-        return allprocs_abs_names
+            all_abs = allprocs_abs_names[type_]
+            allprocs_prom2abs_list = {}
+            for i, prom_name in enumerate(allprocs_prom_names[type_]):
+                if prom_name not in allprocs_prom2abs_list:
+                    allprocs_prom2abs_list[prom_name] = [all_abs[i]]
+                else:
+                    allprocs_prom2abs_list[prom_name].append(all_abs[i])
+
+            self._var_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
+
+            print("name: '%s',  type=%s" % (self.pathname, type_))
+            print("    rank: %d" % self.comm.rank)
+            print("    abs names: %s" % allprocs_abs_names[type_])
+            print("    prom2abs: %s" % list(self._var_allprocs_prom2abs_list[type_].keys()))
+        print("    abs2data: %s" % list(self._var_abs2data_io.keys()))
+
+        return allprocs_abs_names, allprocs_prom_names
 
     def _setup_variable_indices(self, global_index):
         """

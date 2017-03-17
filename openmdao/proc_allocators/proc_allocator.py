@@ -5,8 +5,34 @@ from six.moves import range
 
 from openmdao.utils.generalized_dict import OptionsDictionary
 
+
 class ProcAllocationError(Exception):
+    """
+    Exception raised when processor allocation fails.
+
+    Attributes
+    ----------
+    sub_idx : int
+        Index into the parent's _subsystems_allprocs list.
+    requested : int
+        Number of processes requested by the indexed subsystem.
+    remaining : int
+        Number of processes available to the indexed subsystem.
+    """
+
     def __init__(self, sub_idx, requested, remaining):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        sub_idx : int
+            Index into the parent's _subsystems_allprocs list.
+        requested : int
+            Number of processes requested by the indexed subsystem.
+        remaining : int
+            Number of processes available to the indexed subsystem.
+        """
         super(ProcAllocationError, self).__init__('')
         self.sub_idx = sub_idx
         self.requested = requested
