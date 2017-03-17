@@ -54,3 +54,21 @@ class TestImplCompArraySparse(TestImplCompArray):
         jacobian['x', 'x'] = (self.metadata['mtx'].flatten(),
                               np.arange(4), np.arange(4))
         jacobian['x', 'rhs'] = (-ones, inds, inds)
+
+
+class TestImplCompArrayMatVec(TestImplCompArray):
+
+    def linearize(self, inputs, outputs, jacobian):
+        pass
+
+    def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals,
+                     mode):
+        if mode == 'fwd':
+
+            d_residuals['x'] += self.metadata['mtx'].dot(d_outputs['x'])
+            d_residuals['x'] += -d_inputs['rhs']
+
+        else:
+
+            d_outputs['x'] += self.metadata['mtx'].dot(d_residuals['x'])
+            d_inputs['rhs'] += -d_residuals['x']
