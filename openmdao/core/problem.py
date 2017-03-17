@@ -604,6 +604,7 @@ class Problem(object):
 
             subjac_info = comp._subjacs_info
             explicit = isinstance(comp, ExplicitComponent)
+            deprecated = isinstance(comp, DepComponent)
             approximation = scheme()
 
             of = comp._var_allprocs_prom2abs_list['output'].keys()
