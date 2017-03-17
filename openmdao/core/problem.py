@@ -463,7 +463,7 @@ class Problem(object):
                 matrix_free = comp._matrix_free
                 c_name = comp.pathname
 
-                # TODO: Check deprecated deriv_options
+                # TODO: Check deprecated deriv_options.
 
                 with comp._units_scaling_context(scale_jac=True):
                     subjacs = comp._jacobian._subjacs
