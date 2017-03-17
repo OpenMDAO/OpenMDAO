@@ -1,4 +1,34 @@
-"""General tests to demonstrate the parametric suite"""
+"""General tests to demonstrate the parametric suite. Possible arguments are given below (defaults).
+To test more than one option, pass in an Iterable of requested options.
+
+All Parametric Groups
+---------------------
+'group_type': Controls which type of ParametricGroups to test. Will test all groups if not specified
+'vector_class': One of ['default', 'petsc'], which vector class to use for the problem. ('default')
+'global_jac': bool. If a global jacobian should be used. (True)
+'jacobian_type': One of ['matvec', 'dense', 'sparse-coo', 'sparse-csr']. How the Jacobians are used.
+                 Controls the type of GlobalJacobian. ('matvec')
+                    - 'matvec': Uses compute_jacvec_product.
+                    - 'dense': Uses an ndarray.
+                    - 'sparse-coo': Uses a COOrdinate format sparse matrix.
+                    - 'sparse-csr': Uses a Compressed Sparse Row sparse format.
+
+CycleGroup ('group_type': 'cycle')
+----------------------------------
+'component_class': One of ['explicit', 'deprecated']. Controlls the class of Component to use to
+                   build the group. ('explicit')
+'connection_type': One of ['implicit', 'explicit']. If connections are done explicitly or through
+                   promotions ('implicit').
+'partial_type': One of ['array', 'sparse', 'aij']. How the component partial derivatives are
+                specified ('array').
+                    - 'array': Uses an ndarray.
+                    - 'sparse': Uses the Scipy CSR sparse format.
+                    - 'aij': Uses the [values, rows, cols] format.
+'finite_difference': bool. If derivatives should be approximated with finite differences.
+'num_comp': int. Number of components to use. Must be at least 2. (2)
+'num_var': int. Number of variables to use per component. Must be at least 1. (3)
+'var_shape': tuple(int). Shape to use for each variable. (2, 3).
+"""
 
 import unittest
 from six import iterkeys

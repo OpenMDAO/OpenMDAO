@@ -118,7 +118,7 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
     ----------
     ref : float or ndarray, optional
         Value of response variable that scales to 1.0 in the driver.
-    ref0 : upper or ndarray, optional
+    ref0 : float or ndarray, optional
         Value of response variable that scales to 0.0 in the driver.
     adder : float or ndarray, optional
         Value to add to the model value to get the scaled value. Adder
