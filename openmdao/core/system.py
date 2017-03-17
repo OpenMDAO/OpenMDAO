@@ -702,9 +702,14 @@ class System(object):
                                                     self.comm)
         return transfers
 
-    def _get_maps(self):
+    def _get_maps(self, prom_names):
         """
         Define variable maps based on promotes lists.
+
+        Parameters
+        ----------
+        prom_names : {'input': [], 'output': []}
+            Lists of promoted input and output names.
 
         Returns
         -------
@@ -735,7 +740,6 @@ class System(object):
 
         maps = {'input': {}, 'output': {}}
         gname = self.name + '.' if self.name else ''
-        prom2abs = self._var_allprocs_prom2abs_list
         found = False
 
         promotes = self._var_promotes['any']
@@ -743,6 +747,8 @@ class System(object):
             names, patterns, renames = split_list(promotes)
 
         for typ in ('input', 'output'):
+            pmap = maps[typ]
+
             if promotes:
                 pass
             elif self._var_promotes[typ]:
@@ -750,23 +756,25 @@ class System(object):
             else:
                 names = patterns = renames = ()
 
-            for name in prom2abs[typ]:
-                if name in names:
-                    maps[typ][name] = name
+            for name in prom_names[typ]:
+                if name in pmap:
+                    pass
+                elif name in names:
+                    pmap[name] = name
                     found = True
                 elif name in renames:
-                    maps[typ][name] = renames[name]
+                    pmap[name] = renames[name]
                     found = True
                 else:
                     for pattern in patterns:
                         # if name matches, promote that variable to parent
                         if fnmatchcase(name, pattern):
-                            maps[typ][name] = name
+                            pmap[name] = name
                             found = True
                             break
                     else:
                         # Default: prepend the parent system's name
-                        maps[typ][name] = gname + name if gname else name
+                        pmap[name] = gname + name if gname else name
 
         if not found:
             for io, lst in self._var_promotes.items():

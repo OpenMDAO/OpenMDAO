@@ -263,7 +263,7 @@ class Problem(object):
 
         # Recursive system setup
         self._setup_communicators()
-        allprocs_abs_names = model._setup_variables()
+        allprocs_abs_names, allprocs_prom_names = model._setup_variables()
         model._setup_variable_indices({'input': 0, 'output': 0})
         model._setup_partials()
         model._setup_connections()

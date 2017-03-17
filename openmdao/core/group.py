@@ -319,11 +319,12 @@ class Group(System):
         for isub, subsys in enumerate(self._subsystems_myproc):
             sub_all_abs_names, sub_all_prom_names = subsys._setup_variables()
 
-            var_maps = subsys._get_maps()
+            var_maps = subsys._get_maps(sub_all_prom_names)
             for type_ in ['input', 'output']:
                 # concatenate the allprocs variable names from subsystems on my proc.
                 allprocs_abs_names[type_].extend(sub_all_abs_names[type_])
-                allprocs_prom_names[type_].extend(sub_all_prom_names[type_])
+                allprocs_prom_names[type_].extend(var_maps[type_][p]
+                                                  for p in sub_all_prom_names[type_])
 
                 # Assemble _var_abs2data_io and _var_abs_names by concatenating from subsystems.
                 for abs_name in subsys._var_abs_names[type_]:
@@ -349,11 +350,6 @@ class Group(System):
         #     else:
         #         self._var_allprocs_prom2abs_list[type_][prom_name].append(abs_name)
 
-        for prom_name, lst in iteritems(self._var_allprocs_prom2abs_list['output']):
-            if len(lst) > 1:
-                raise RuntimeError("Output name '%s' refers to "
-                                   "multiple outputs: %s." %
-                                   (prom_name, sorted(lst)))
 
         # If we're running in parallel, gather contributions from other procs.
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
@@ -362,7 +358,7 @@ class Group(System):
                 if sub_comm.rank == 0:
                     raw = (allprocs_abs_names[type_], allprocs_prom_names[type_])
                 else:
-                    raw = ([], {})
+                    raw = ([], [])
 
                 allprocs_abs_names[type_] = []
                 allprocs_prom_names[type_] = []
@@ -373,9 +369,9 @@ class Group(System):
         # We use allprocs_abs_names to count the total number of allprocs variables
         # and put it in _var_allprocs_idx_range.
         for type_ in ['input', 'output']:
-            self._var_allprocs_idx_range[type_] = [0, len(allprocs_abs_names[type_])]
-
             all_abs = allprocs_abs_names[type_]
+            self._var_allprocs_idx_range[type_] = [0, len(all_abs)]
+
             allprocs_prom2abs_list = {}
             for i, prom_name in enumerate(allprocs_prom_names[type_]):
                 if prom_name not in allprocs_prom2abs_list:
@@ -390,6 +386,12 @@ class Group(System):
             print("    abs names: %s" % allprocs_abs_names[type_])
             print("    prom2abs: %s" % list(self._var_allprocs_prom2abs_list[type_].keys()))
         print("    abs2data: %s" % list(self._var_abs2data_io.keys()))
+
+        for prom_name, lst in iteritems(self._var_allprocs_prom2abs_list['output']):
+            if len(lst) > 1:
+                raise RuntimeError("Output name '%s' refers to "
+                                   "multiple outputs: %s." %
+                                   (prom_name, sorted(lst)))
 
         return allprocs_abs_names, allprocs_prom_names
 
