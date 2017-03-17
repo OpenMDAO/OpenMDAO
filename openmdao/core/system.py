@@ -12,7 +12,7 @@ from six.moves import range
 import numpy as np
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
-from openmdao.jacobians.default_jacobian import DefaultJacobian
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.global_jacobian import GlobalJacobian
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.generalized_dict import GeneralizedDictionary
@@ -199,7 +199,7 @@ class System(object):
         self._residuals = None
         self._transfers = None
 
-        self._jacobian = DefaultJacobian()
+        self._jacobian = DictionaryJacobian()
         self._jacobian._system = self
         self._jacobian_changed = True
         self._owns_global_jac = False
