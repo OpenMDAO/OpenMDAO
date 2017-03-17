@@ -470,8 +470,8 @@ class Problem(object):
                     if explicit:
                         comp._negate_jac()
 
-                    of_list = comp._var_allprocs_prom2abs_list['output'].keys()
-                    wrt_list = comp._var_allprocs_prom2abs_list['input'].keys()
+                    of_list = list(comp._var_allprocs_prom2abs_list['output'].keys())
+                    wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
 
                     # The only outputs in wrt should be implicit states.
                     if deprecated:
@@ -607,8 +607,8 @@ class Problem(object):
             deprecated = isinstance(comp, DepComponent)
             approximation = scheme()
 
-            of = comp._var_allprocs_prom2abs_list['output'].keys()
-            wrt = comp._var_allprocs_prom2abs_list['input'].keys()
+            of = list(comp._var_allprocs_prom2abs_list['output'].keys())
+            wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
 
             # The only outputs in wrt should be implicit states.
             if deprecated:
