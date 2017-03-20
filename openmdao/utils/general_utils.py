@@ -37,7 +37,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
     ----------
     name : str
         The name of the value.
-    value : float or list or tuple or ndarray
+    value : float or list or tuple or ndarray or Iterable
         The value of a variable.
     shape : int or tuple or list or None
         The expected or desired shape of the value.
@@ -58,6 +58,9 @@ def ensure_compatible(name, value, shape=None, indices=None):
         If value cannot be made to conform to shape or if shape and indices
         are incompatible.
     """
+    if isinstance(value, Iterable):
+        value = np.asarray(value)
+
     if indices is not None:
         indices = np.atleast_1d(indices)
         ind_shape = indices.shape
@@ -115,7 +118,7 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
     ----------
     ref : float or ndarray, optional
         Value of response variable that scales to 1.0 in the driver.
-    ref0 : upper or ndarray, optional
+    ref0 : float or ndarray, optional
         Value of response variable that scales to 0.0 in the driver.
     adder : float or ndarray, optional
         Value to add to the model value to get the scaled value. Adder
@@ -198,14 +201,14 @@ def set_pyoptsparse_opt(optname):
         try:
             OPT(optname)
             OPTIMIZER = optname
-        except Exception as exc:
+        except Exception:
             if optname != 'SLSQP':
                 try:
                     OPT('SLSQP')
                     OPTIMIZER = 'SLSQP'
-                except Exception as exc:
+                except Exception:
                     pass
-    except Exception as exc:
+    except Exception:
         pass
 
     return OPT, OPTIMIZER

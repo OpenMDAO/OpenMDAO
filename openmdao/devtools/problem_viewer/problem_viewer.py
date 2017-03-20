@@ -107,10 +107,10 @@ def _get_viewer_data(problem_or_rootgroup):
 
     abs2data = root_group._var_abs2data_io
     connections_list = []
-    G = compute_sys_graph(root_group, root_group._assembler._input_srcs, comps_only=True)
+    G = compute_sys_graph(root_group, root_group._assembler._abs_input2src, comps_only=True)
     scc = nx.strongly_connected_components(G)
     scc_list = [s for s in scc if len(s)>1] #list(scc)
-    for in_abs, out_abs in iteritems(root_group._assembler._input_srcs):
+    for in_abs, out_abs in iteritems(root_group._assembler._abs_input2src):
         src_subsystem = out_abs.rsplit('.', 1)[0]
         tgt_subsystem = in_abs.rsplit('.', 1)[0]
         count = 0
@@ -143,8 +143,6 @@ def _get_viewer_data(problem_or_rootgroup):
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs), ('cycle_arrows', edges_list)]))
         else:
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs)]))
-
-
 
 
     data_dict['connections_list'] = connections_list

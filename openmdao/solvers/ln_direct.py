@@ -2,6 +2,8 @@
 
 from __future__ import division, print_function
 
+from six.moves import range
+
 import numpy as np
 import scipy.linalg
 import scipy.sparse.linalg

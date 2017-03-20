@@ -63,8 +63,6 @@ class System(object):
     _subsystems_myproc_inds : [int, ...]
         list of indices of subsystems on this proc among all of this system's
         subsystems (subsystems on all of this system's processors).
-    _var_allprocs_names : {'input': [str, ...], 'output': [str, ...]}
-        list of promoted names of all owned variables, not just on current proc.
     _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
         list of pathnames of all owned variables, not just on current proc.
     _var_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
@@ -83,13 +81,13 @@ class System(object):
         integer arrays of global indices of variables on this proc.
     _var_maps : {'input': dict, 'output': dict}
         dictionary of variable names and their promoted names.
-    _var_promotes : { 'any': set(), 'input': set(), 'output': set() }
-        dictionary of sets of variable names/wildcards specifying promotion
-        (used to calculate _var_maps)
-    _var_connections : dict
+    _var_promotes : { 'any': [], 'input': [], 'output': [] }
+        dictionary of lists of variable names/wildcards specifying promotion
+        (used to calculate promoted names)
+    _manual_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
-    _var_connections_abs : [(str, str), ...]
-        _var_connections with absolute variable names.  Entries
+    _manual_connections_abs : [(str, str), ...]
+        _manual_connections with absolute variable names.  Entries
         have the form (input, output).
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
@@ -174,10 +172,10 @@ class System(object):
         self._subsystems_myproc_inds = []
 
         self._var_maps = {'input': {}, 'output': {}}
-        self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
+        self._var_promotes = {'input': [], 'output': [], 'any': []}
 
-        self._var_connections = {}
-        self._var_connections_abs = []
+        self._manual_connections = {}
+        self._manual_connections_abs = []
 
         self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         self._var_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
@@ -521,7 +519,16 @@ class System(object):
         self._jacobian_changed = False
 
         if self._owns_global_jac:
+
+            # At present, we don't support a GlobalJacobian in a group if any subcomponents
+            # are matrix-free.
+            for subsys in self.system_iter():
+                if overrides_method('apply_linear', subsys, System):
+                    msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
+                    raise RuntimeError(msg)
+
             jacobian = self._jacobian
+
         elif jacobian is not None:
             self._jacobian = jacobian
 
@@ -591,41 +598,61 @@ class System(object):
             dictionary mapping input/output variable names
             to promoted variable names.
         """
-        promotes = self._var_promotes['any']
-        if promotes:
-            names = promotes
-            patterns = [n for n in names if '*' in n or '?' in n]
-        gname = self.name + '.' if self.name else ''
+        def split_list(lst):
+            """
+            Return names, patterns, and renames found in lst.
+            """
+            names = []
+            patterns = []
+            renames = {}
+            for entry in lst:
+                if isinstance(entry, string_types):
+                    if '*' in entry or '?' in entry or '[' in entry:
+                        patterns.append(entry)
+                    else:
+                        names.append(entry)
+                elif isinstance(entry, tuple) and len(entry) == 2:
+                    renames[entry[0]] = entry[1]
+                else:
+                    raise TypeError("when adding subsystem '%s', entry '%s'"
+                                    " is not a string or tuple of size 2" %
+                                    (self.pathname, entry))
+            return names, patterns, renames
 
         maps = {'input': {}, 'output': {}}
+        gname = self.name + '.' if self.name else ''
+        prom2abs = self._var_allprocs_prom2abs_list
         found = False
-        for typ in ('input', 'output'):
-            promotes_typ = self._var_promotes[typ]
 
+        promotes = self._var_promotes['any']
+        if promotes:
+            names, patterns, renames = split_list(promotes)
+
+        for typ in ('input', 'output'):
             if promotes:
                 pass
-            elif promotes_typ:
-                names = promotes_typ
-                patterns = [n for n in names if '*' in n or '?' in n]
+            elif self._var_promotes[typ]:
+                names, patterns, renames = split_list(self._var_promotes[typ])
             else:
-                names = ()
-                patterns = ()
+                names = patterns = renames = ()
 
-            for name in self._var_allprocs_prom2abs_list[typ]:
+            for name in prom2abs[typ]:
                 if name in names:
                     maps[typ][name] = name
                     found = True
-                    continue
-
-                for pattern in patterns:
-                    # if name matches, promote that variable to parent
-                    if fnmatchcase(name, pattern):
-                        maps[typ][name] = name
-                        found = True
-                        break
+                elif name in renames:
+                    maps[typ][name] = renames[name]
+                    found = True
                 else:
-                    # Default: prepend the parent system's name
-                    maps[typ][name] = gname + name if gname else name
+                    for pattern in patterns:
+                        # if name matches, promote that variable to parent
+                        if fnmatchcase(name, pattern):
+                            maps[typ][name] = name
+                            found = True
+                            break
+                    else:
+                        # Default: prepend the parent system's name
+                        maps[typ][name] = gname + name if gname else name
 
         if not found:
             for io, lst in self._var_promotes.items():
@@ -753,7 +780,7 @@ class System(object):
 
         in_names = []
         for in_abs_name in self._var_abs_names['input']:
-            out_abs = self._assembler._input_srcs[in_abs_name]
+            out_abs = self._assembler._abs_input2src[in_abs_name]
             if out_abs is None:
                 continue
             out_idx = self._assembler._var_allprocs_abs2idx_io[out_abs]
@@ -981,7 +1008,7 @@ class System(object):
             Upper boundary for the param
         ref : float or ndarray, optional
             Value of design var that scales to 1.0 in the driver.
-        ref0 : upper or ndarray, optional
+        ref0 : float or ndarray, optional
             Value of design var that scales to 0.0 in the driver.
         indices : iter of int, optional
             If a param is an array, these indicate which entries are of

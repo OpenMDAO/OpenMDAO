@@ -63,12 +63,12 @@ class TestGetSetVariables(unittest.TestCase):
         c3 = ExecComp('z=3*x')
 
         g = Group()
-        g.add_subsystem('c1', c1, promotes='*')
-        g.add_subsystem('c2', c2, promotes='*')
-        g.add_subsystem('c3', c3, promotes='*')
+        g.add_subsystem('c1', c1, promotes=['*'])
+        g.add_subsystem('c2', c2, promotes=['*'])
+        g.add_subsystem('c3', c3, promotes=['*'])
 
         model = Group()
-        model.add_subsystem('g', g, promotes='*')
+        model.add_subsystem('g', g, promotes=['*'])
 
         p = Problem(model=model)
         p.setup(check=False)
@@ -195,12 +195,12 @@ class TestGetSetVariables(unittest.TestCase):
         c3 = ExecComp('z=3*x')
 
         g = Group()
-        g.add_subsystem('c1', c1, promotes='*')
-        g.add_subsystem('c2', c2, promotes='*')
-        g.add_subsystem('c3', c3, promotes='*')
+        g.add_subsystem('c1', c1, promotes=['*'])
+        g.add_subsystem('c2', c2, promotes=['*'])
+        g.add_subsystem('c3', c3, promotes=['*'])
 
         root = Group()
-        root.add_subsystem('g', g, promotes='*')
+        root.add_subsystem('g', g, promotes=['*'])
 
         p = Problem(model=root)
         p.setup(check=False)

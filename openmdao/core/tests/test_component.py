@@ -5,6 +5,7 @@ import numpy as np
 import unittest
 import warnings
 
+from six.moves import range
 from six import assertRaisesRegex
 
 from openmdao.api import Problem, ExplicitComponent, Group
@@ -109,6 +110,7 @@ class TestExplicitComponent(unittest.TestCase):
         self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
         self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
 
+
 class TestImplicitComponent(unittest.TestCase):
 
     def test___init___simple(self):
@@ -131,6 +133,56 @@ class TestImplicitComponent(unittest.TestCase):
         prob['rhs'] = np.ones(2)
         prob.run_model()
         assert_rel_error(self, prob['x'], np.ones(2))
+
+
+class TestRangePartials(unittest.TestCase):
+
+    def test_range_partials(self):
+        class RangePartialsComp(ExplicitComponent):
+            def __init__(self, size=4):
+                super(RangePartialsComp, self).__init__()
+                self.size = size
+
+            def initialize_variables(self):
+                # verify that both iterable and array types are valid
+                # for val and src_indices arguments to add_input
+                self.add_input('v1', val=range(self.size),
+                                     src_indices=range(self.size))
+
+                self.add_input('v2', val=2*np.ones(self.size),
+                                     src_indices=np.array(range(self.size)))
+
+                # verify that both iterable and array types are valid
+                # for val, upper and lower arguments to add_output
+                self.add_output('vSum', val=range(self.size),
+                                        lower=np.zeros(self.size),
+                                        upper=range(self.size))
+
+                self.add_output('vProd', val=np.zeros(self.size),
+                                         lower=range(self.size),
+                                         upper=np.ones(self.size))
+
+            def initialize_partials(self):
+                # verify that both iterable and list types are valid
+                # for rows and cols arguments to declare_partials
+                rows = range(self.size)
+                cols = list(range(self.size))
+                self.declare_partials(of='vProd', wrt='v1',
+                                      val=np.ones(self.size),
+                                      rows=rows, cols=cols)
+
+            def compute(self, inputs, outputs):
+                outputs['vSum'] = inputs['v1'] + inputs['v2']
+                outputs['vProd'] = inputs['v1'] * inputs['v2']
+
+        comp = RangePartialsComp()
+
+        prob = Problem(model=comp)
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['vSum'], np.array([2.,3.,4.,5.]), 0.00001)
+        assert_rel_error(self, prob['vProd'], np.array([0.,2.,4.,6.]), 0.00001)
 
 
 if __name__ == '__main__':

@@ -2,14 +2,10 @@
 from __future__ import division, print_function
 
 import numpy as np
-import scipy.sparse
 import unittest
 
-from six import iteritems
-from six.moves import range
-
 from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp
-from openmdao.api import NewtonSolver, ScipyIterativeSolver
+from openmdao.api import NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
 
 from openmdao.devtools.testutil import assert_rel_error
 
@@ -26,6 +22,24 @@ class PassThroughLength(ExplicitComponent):
         length_m = length_cm * 1e-2
         length_km = length_m * 1e-3
         outputs['new_length'] = length_km
+
+
+class PassThroughLengths(ExplicitComponent):
+    """
+    Units/scaling test component taking an array of lengths in cm and
+    passing them through in km.
+    Currently raises an error for passing array value as 'ref'.
+    """
+
+    def initialize_variables(self):
+        self.add_input('old_lengths', val=np.ones(4), units='cm')
+        self.add_output('new_lengths', val=np.ones(4), units='km', ref=0.1*np.ones(4))
+
+    def compute(self, inputs, outputs):
+        lengths_cm = inputs['old_lengths']
+        lengths_m = lengths_cm * 1e-2
+        lengths_km = lengths_m * 1e-3
+        outputs['new_lengths'] = lengths_km
 
 
 class SpeedComputationWithUnits(ExplicitComponent):
@@ -124,6 +138,21 @@ class TestScaling(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['sys2.new_length'], 3.e-1)
         assert_rel_error(self, prob.model._outputs['sys2.new_length'], 3.e-1)
+
+    def test_pass_through_array(self):
+        group = Group()
+        group.add_subsystem('sys1', IndepVarComp('old_lengths', np.ones(4),
+                                                 units='mm',
+                                                 ref=1e5*np.ones(4)))
+        group.add_subsystem('sys2', PassThroughLengths())
+        group.connect('sys1.old_lengths', 'sys2.old_lengths')
+
+        prob = Problem(group)
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup(check=False)
+        self.assertEqual(str(cm.exception),
+                         "The ref argument should be a float")
 
     def test_speed(self):
         comp = IndepVarComp()
@@ -236,8 +265,10 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model._suppress_solver_output = True
+        model.nl_solver = NonlinearBlockGS()
         model.nl_solver.options['maxiter'] = 1
+
+        model._suppress_solver_output = True
 
         prob.setup(check=False)
         prob.run_model()
@@ -267,8 +298,10 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model._suppress_solver_output = True
+        model.nl_solver = NonlinearBlockGS()
         model.nl_solver.options['maxiter'] = 1
+
+        model._suppress_solver_output = True
 
         prob.setup(check=False)
         prob.run_model()
@@ -295,8 +328,10 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model._suppress_solver_output = True
+        model.nl_solver = NonlinearBlockGS()
         model.nl_solver.options['maxiter'] = 1
+
+        model._suppress_solver_output = True
 
         prob.setup(check=False)
         prob.run_model()
@@ -325,8 +360,10 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model._suppress_solver_output = True
+        model.nl_solver = NonlinearBlockGS()
         model.nl_solver.options['maxiter'] = 1
+
+        model._suppress_solver_output = True
 
         prob.setup(check=False)
         prob.run_model()
