@@ -124,7 +124,7 @@ class GlobalJacobian(Jacobian):
 
                     self._keymap[abs_key] = abs_key
 
-                    out_abs_name = assembler._input_srcs[in_abs_name]
+                    out_abs_name = assembler._abs_input2src[in_abs_name]
                     if out_abs_name is None:  # skip unconnected inputs
                         continue
 
@@ -180,7 +180,7 @@ class GlobalJacobian(Jacobian):
 
                 abs_key = (res_abs_name, in_abs_name)
                 if abs_key in self._subjacs:
-                    out_abs_name = assembler._input_srcs[in_abs_name]
+                    out_abs_name = assembler._abs_input2src[in_abs_name]
                     if out_abs_name is not None:
                         out_idx = assembler._var_allprocs_abs2idx_io[out_abs_name]
                         if out_start <= out_idx < out_end:

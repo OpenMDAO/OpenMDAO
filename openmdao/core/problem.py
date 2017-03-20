@@ -291,7 +291,7 @@ class Problem(object):
                                    model._var_abs_names)
 
         # Assembler setup: variable connections
-        assembler._setup_connections(model._var_connections_abs,
+        assembler._setup_connections(model._manual_connections_abs,
                                      model._var_allprocs_prom2abs_list,
                                      model._var_abs2data_io)
 

@@ -126,7 +126,7 @@ def get_sccs(group, comps_only=False):
     list of sets of str
         A list of strongly connected components in topological order.
     """
-    graph = compute_sys_graph(group, group._assembler._input_srcs,
+    graph = compute_sys_graph(group, group._assembler._abs_input2src,
                               comps_only=comps_only)
 
     # Tarjan's algorithm returns SCCs in reverse topological order, so
@@ -164,7 +164,7 @@ def _check_dataflow(group, logger):
                     cycle_idxs[s] = i
 
         ubcs = _get_out_of_order_subs(system,
-                                      system._assembler._input_srcs)
+                                      system._assembler._abs_input2src)
 
         for tgt_system, src_systems in sorted(ubcs.items()):
             keep_srcs = []
@@ -247,7 +247,7 @@ def _check_hanging_inputs(problem, logger):
     logger : object
         The object that managers logging output.
     """
-    input_srcs = problem._assembler._input_srcs
+    input_srcs = problem._assembler._abs_input2src
 
     hanging = sorted([
         name for name in problem._assembler._var_allprocs_abs_names['input'] if
