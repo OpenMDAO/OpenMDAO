@@ -112,6 +112,8 @@ def _get_viewer_data(problem_or_rootgroup):
     scc = nx.strongly_connected_components(G)
     scc_list = [s for s in scc if len(s)>1] #list(scc)
     for in_abs, out_abs in iteritems(sorted_abs_input2src):
+        if out_abs is None:
+            continue
         src_subsystem = out_abs.rsplit('.', 1)[0]
         tgt_subsystem = in_abs.rsplit('.', 1)[0]
         count = 0
