@@ -9,7 +9,7 @@ from nose_parameterized import parameterized
 from unittest import SkipTest
 
 from openmdao.core.problem import Problem
-from openmdao.jacobians.global_jacobian import DenseJacobian, COOJacobian, CSRJacobian
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, CSRJacobian
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.test_suite.groups.cycle_group import CycleGroup
@@ -189,9 +189,9 @@ class ParameterizedInstance(object):
 
         if args['global_jac']:
 
-            # Deprecated test won't work with GlobalJacobian because it defines an apply_linear.
+            # Deprecated test won't work with AssembledJacobian because it defines an apply_linear.
             if args['component_class'] == 'deprecated':
-                raise SkipTest('GlobalJacobian not suppported in Deprecated Cycle test.')
+                raise SkipTest('AssembledJacobian not suppported in Deprecated Cycle test.')
 
             jacobian_type = args['jacobian_type']
             if jacobian_type == 'dense':

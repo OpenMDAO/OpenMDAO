@@ -200,7 +200,7 @@ class ExplicitComponent(Component):
                 # re-negate the jacobian
                 self._negate_jac()
 
-            if self._owns_global_jac:
+            if self._owns_assembled_jac:
                 J._update()
 
     def _setup_partials(self):

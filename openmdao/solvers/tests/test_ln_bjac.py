@@ -7,7 +7,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp, Problem, LinearBlockJac, GlobalJacobian
+from openmdao.api import Group, IndepVarComp, Problem, LinearBlockJac, AssembledJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
@@ -32,7 +32,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         model.ln_solver = LinearBlockJac()
         model.suppress_solver_output = True
 
-        prob.model.jacobian = GlobalJacobian()
+        prob.model.jacobian = AssembledJacobian()
         prob.setup(check=False, mode='fwd')
 
         prob['width'] = 2.0
@@ -45,7 +45,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
             prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
 
             self.assertEqual(str(context.exception),
-                             "A block linear solver 'LN: LNBJ' is being used with a GlobalJacobian in system ''")
+                             "A block linear solver 'LN: LNBJ' is being used with a AssembledJacobian in system ''")
 
     def test_simple_matvec(self):
         # Tests derivatives on a simple comp that defines compute_jacvec.

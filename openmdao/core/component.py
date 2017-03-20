@@ -17,7 +17,7 @@ from collections import OrderedDict, Iterable
 
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, PathData
-from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation
@@ -55,6 +55,11 @@ class Component(System):
         """
         super(Component, self).__init__(**kwargs)
         self._approx_schemes = OrderedDict()
+
+        # self.jacobian = DenseJacobian()
+        # self._jacobian._system = self
+        # self._jacobian_changed = True
+        # self._owns_assembled_jac = True
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}

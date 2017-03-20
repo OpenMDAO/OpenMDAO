@@ -7,7 +7,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp, Problem, GlobalJacobian
+from openmdao.api import Group, IndepVarComp, Problem, AssembledJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.ln_bgs import LinearBlockGS
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
@@ -34,7 +34,7 @@ class TestBGSSolver(unittest.TestCase):
         model.ln_solver = LinearBlockGS()
         model.suppress_solver_output = True
 
-        prob.model.jacobian = GlobalJacobian()
+        prob.model.jacobian = AssembledJacobian()
         prob.setup(check=False, mode='fwd')
 
         prob['width'] = 2.0
@@ -47,7 +47,7 @@ class TestBGSSolver(unittest.TestCase):
             prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
 
         self.assertEqual(str(context.exception),
-                         "A block linear solver 'LN: LNBGS' is being used with a GlobalJacobian in system ''")
+                         "A block linear solver 'LN: LNBGS' is being used with a AssembledJacobian in system ''")
 
     def test_solve_linear_maxiter(self):
         """Verify that LinearBlockGS abides by the 'maxiter' option."""

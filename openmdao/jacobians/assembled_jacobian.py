@@ -1,4 +1,4 @@
-"""Define the GlobalJacobian class."""
+"""Define the AssembledJacobian class."""
 from __future__ import division
 
 import numpy as np
@@ -18,7 +18,7 @@ SUBJAC_META_DEFAULTS = {
 }
 
 
-class GlobalJacobian(Jacobian):
+class AssembledJacobian(Jacobian):
     """
     Assemble dense global <Jacobian>.
     """
@@ -32,7 +32,7 @@ class GlobalJacobian(Jacobian):
         **kwargs : dict
             options dictionary.
         """
-        super(GlobalJacobian, self).__init__()
+        super(AssembledJacobian, self).__init__()
         self.options.declare('matrix_class', value=DenseMatrix,
                              desc='<Matrix> class to use in this <Jacobian>.')
         self.options.update(kwargs)
@@ -215,7 +215,7 @@ class GlobalJacobian(Jacobian):
             d_inputs.iadd_data(ext_mtx._prod(d_residuals.get_data(), mode))
 
 
-class DenseJacobian(GlobalJacobian):
+class DenseJacobian(AssembledJacobian):
     """
     Assemble dense global <Jacobian>.
     """
@@ -233,7 +233,7 @@ class DenseJacobian(GlobalJacobian):
         self.options['matrix_class'] = DenseMatrix
 
 
-class COOJacobian(GlobalJacobian):
+class COOJacobian(AssembledJacobian):
     """
     Assemble sparse global <Jacobian> in Coordinate list format.
     """
@@ -251,7 +251,7 @@ class COOJacobian(GlobalJacobian):
         self.options['matrix_class'] = COOMatrix
 
 
-class CSRJacobian(GlobalJacobian):
+class CSRJacobian(AssembledJacobian):
     """
     Assemble sparse global <Jacobian> in Compressed Row Storage format.
     """

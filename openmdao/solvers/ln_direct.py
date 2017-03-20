@@ -45,7 +45,7 @@ class DirectSolver(LinearSolver):
         """
         system = self._system
 
-        if system._owns_global_jac:
+        if system._owns_assembled_jac:
             mtx = system._jacobian._int_mtx
             # Perform dense or sparse lu factorization
             if isinstance(mtx, DenseMatrix):
@@ -149,8 +149,8 @@ class DirectSolver(LinearSolver):
                 trans_splu = 'T'
 
             b_data = b_vec.get_data()
-            if system._owns_global_jac and isinstance(system._jacobian._int_mtx,
-                                                      (COOMatrix, CSRMatrix)):
+            if system._owns_assembled_jac and isinstance(system._jacobian._int_mtx,
+                                                         (COOMatrix, CSRMatrix)):
                 x_data = self._lu.solve(b_data, trans_splu)
             else:
                 x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)

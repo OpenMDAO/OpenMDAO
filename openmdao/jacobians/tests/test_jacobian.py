@@ -311,7 +311,7 @@ class TestJacobian(unittest.TestCase):
 
         d1 = prob.model.get_subsystem('d1')
 
-        d1.jacobian = DenseJacobian()
+        # d1.jacobian = DenseJacobian()
         prob.model.suppress_solver_output = True
 
         prob.setup(check=False)
@@ -321,7 +321,7 @@ class TestJacobian(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_global_jac_bad_key(self):
-        # this test fails if GlobalJacobian._update sets in_start with 'output' instead of 'input'
+        # this test fails if AssembledJacobian._update sets in_start with 'output' instead of 'input'
         prob = Problem()
         prob.model = Group()
         prob.model.add_subsystem('indep', IndepVarComp('x', 1.0))
@@ -330,7 +330,7 @@ class TestJacobian(unittest.TestCase):
         c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0'))
 
         prob.model.nl_solver = NewtonSolver()
-        c3.jacobian = DenseJacobian()
+        # c3.jacobian = DenseJacobian()
 
         prob.model.connect('indep.x', 'C1.a')
         prob.model.connect('indep.x', 'C2.a')
@@ -370,7 +370,7 @@ class TestJacobian(unittest.TestCase):
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 
-    def test_global_jacobian_unsupported_cases(self):
+    def test_assembled_jacobian_unsupported_cases(self):
 
         class ParaboloidApply(Paraboloid):
 
@@ -396,7 +396,7 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = DenseJacobian()
 
-        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.setup()
 
@@ -416,7 +416,7 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = DenseJacobian()
 
-        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.setup()
 
@@ -438,7 +438,7 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = DenseJacobian()
 
-        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.setup()
 

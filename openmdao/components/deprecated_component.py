@@ -236,7 +236,7 @@ class Component(BaseComponent):
                 if len(self._state_names) == 0:
                     self._negate_jac()
 
-            if self._owns_global_jac:
+            if self._owns_assembled_jac:
                 J._update()
 
     def _setup_partials(self):

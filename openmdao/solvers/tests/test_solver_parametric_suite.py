@@ -10,7 +10,7 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.jacobians.global_jacobian import DenseJacobian, COOJacobian, CSRJacobian
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, CSRJacobian
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
