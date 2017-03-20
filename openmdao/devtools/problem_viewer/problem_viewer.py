@@ -39,7 +39,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             if "." in var_prom_name:
                 local_prom_dict[var_abs_name] = var_prom_name
         if(len(local_prom_dict) > 0):
-            tree_dict['promotions'] = local_prom_dict
+            tree_dict['promotions'] = OrderedDict(sorted(local_prom_dict.items())) # sort to make deterministic for testing
 
 
     if not isinstance(system, Group):
@@ -107,10 +107,11 @@ def _get_viewer_data(problem_or_rootgroup):
 
     abs2data = root_group._var_abs2data_io
     connections_list = []
-    G = compute_sys_graph(root_group, root_group._assembler._abs_input2src, comps_only=True)
+    sorted_abs_input2src = OrderedDict(sorted(root_group._assembler._abs_input2src.items())) # sort to make deterministic for testing
+    G = compute_sys_graph(root_group, sorted_abs_input2src, comps_only=True)
     scc = nx.strongly_connected_components(G)
     scc_list = [s for s in scc if len(s)>1] #list(scc)
-    for in_abs, out_abs in iteritems(root_group._assembler._abs_input2src):
+    for in_abs, out_abs in iteritems(sorted_abs_input2src):
         src_subsystem = out_abs.rsplit('.', 1)[0]
         tgt_subsystem = in_abs.rsplit('.', 1)[0]
         count = 0
