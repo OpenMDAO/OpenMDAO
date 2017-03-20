@@ -85,7 +85,7 @@ def _get_viewer_data(problem_or_rootgroup):
 
     abs2data = root_group._var_abs2data_io
     connections_list = []
-    for in_abs, out_abs in root_group._var_connections_abs:
+    for in_abs, out_abs in root_group._manual_connections_abs:
         in_name = abs2data[in_abs]['prom']
         out_name = abs2data[out_abs]['prom']
 

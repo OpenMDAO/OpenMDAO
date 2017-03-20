@@ -83,7 +83,7 @@ class DefaultAssembler(Assembler):
         out_ind1, out_ind2 = var_range['output']
         for in_ind in range(in_ind1, in_ind2):
             iabs = self._var_allprocs_abs_names['input'][in_ind]
-            oabs = self._input_srcs[iabs]
+            oabs = self._abs_input2src[iabs]
             if oabs is None:
                 continue
 
