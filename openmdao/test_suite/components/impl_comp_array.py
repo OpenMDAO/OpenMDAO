@@ -1,4 +1,5 @@
 """Define the implicit test component (array)."""
+
 from __future__ import division, print_function
 
 import numpy as np
