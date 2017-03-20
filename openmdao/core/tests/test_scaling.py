@@ -8,6 +8,8 @@ from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, I
 from openmdao.api import NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
 
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
+from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDense
 
 
 class PassThroughLength(ExplicitComponent):
@@ -377,6 +379,29 @@ class TestScaling(unittest.TestCase):
             res1a = model.get_subsystem('p1')._residuals.get_data()[0]
 
             self.assertEqual(res1a, (res1-res_ref0)/(res_ref-res_ref0))
+
+    def test_scale_array(self):
+
+        class ExpCompArrayScale(TestExplCompArrayDense):
+
+            def initialize_variables(self):
+                self.add_input('lengths', val=np.ones((2, 2)))
+                self.add_input('widths', val=np.ones((2, 2)))
+                self.add_output('areas', val=np.ones((2, 2)), ref=np.array([[2.0, 3.0], [5.0, 7.0]]))
+                self.add_output('total_volume', val=1.)
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
+        model.add_subsystem('comp', ExpCompArrayScale())
+        model.connect('p1.x', 'comp.lengths')
+
+        prob.setup(check=False)
+        prob['comp.widths'] = np.ones((2, 2))
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.total_volume'], 4.)
 
 if __name__ == '__main__':
     unittest.main()
