@@ -380,7 +380,31 @@ class TestScaling(unittest.TestCase):
 
             self.assertEqual(res1a, (res1-res_ref0)/(res_ref-res_ref0))
 
-    def test_scale_array(self):
+    def test_scale_array_with_float(self):
+
+        class ExpCompArrayScale(TestExplCompArrayDense):
+
+            def initialize_variables(self):
+                self.add_input('lengths', val=np.ones((2, 2)))
+                self.add_input('widths', val=np.ones((2, 2)))
+                self.add_output('areas', val=np.ones((2, 2)), ref=2.0)
+                self.add_output('stuff', val=np.ones((2, 2)), ref=3.0)
+                self.add_output('total_volume', val=1.)
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
+        model.add_subsystem('comp', ExpCompArrayScale())
+        model.connect('p1.x', 'comp.lengths')
+
+        prob.setup(check=False)
+        prob['comp.widths'] = np.ones((2, 2))
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.total_volume'], 4.)
+
+    def test_scale_array_with_array(self):
 
         class ExpCompArrayScale(TestExplCompArrayDense):
 

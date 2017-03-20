@@ -322,6 +322,7 @@ class DefaultVector(Vector):
         for iset, data in enumerate(self._data):
             idx = self._ivar_map[iset]
             data[:] = coeffs[idx, 0] + coeffs[idx, 1] * data
+            print(idx, iset, coeffs)
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """
