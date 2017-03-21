@@ -50,3 +50,6 @@ except ImportError:
 # System-Building Tools
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.generalized_dict import OptionsDictionary
+
+# Recorders
+from openmdao.recorders.sqlite_recorder import SqliteRecorder

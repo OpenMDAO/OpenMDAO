@@ -3,6 +3,7 @@
 from six import iteritems
 
 from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.recorders.recording_manager import RecordingManager
 
 
 class Driver(object):
@@ -33,6 +34,9 @@ class Driver(object):
         """
         Initialize the driver.
         """
+
+        self.recorders = RecordingManager()
+
         self._problem = None
         self._designvars = None
         self._cons = None
@@ -58,6 +62,22 @@ class Driver(object):
         # self.supports.declare('integer_design_vars', True)
 
         self.fail = False
+
+    def add_recorder(self, recorder):
+        """
+        Adds a recorder to the driver.
+
+        Args
+        ----
+        recorder : BaseRecorder
+           A recorder instance.
+        """
+        self.recorders.append(recorder)
+        return recorder
+
+    def cleanup(self):
+        """ Clean up resources prior to exit. """
+        self.recorders.close()
 
     def _setup_driver(self, problem):
         """
@@ -233,7 +253,18 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        return self._problem.model._solve_nonlinear()
+
+        failure_flag = self._problem.model._solve_nonlinear()
+
+        # TODO_RECORDERS: do the equivalent to this
+        #         self.recorders.record_iteration(system, metadata)
+
+
+        # objective_values = self.get_objective_values()
+
+        self.recorders.record_iteration(self)
+
+        return failure_flag
 
     def _compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict',
                               global_names=True):
