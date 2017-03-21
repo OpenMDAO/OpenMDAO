@@ -4,6 +4,7 @@ import os
 import pickle
 import json
 from six import iteritems
+import networkx as nx
 from collections import OrderedDict
 
 from sqlitedict import SqliteDict
@@ -18,18 +19,33 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.error_checking.check_config import compute_sys_graph
 #from openmdao.util.record_util import is_valid_sqlite3_db
 import base64
 
 
-def _get_tree_dict(system):
+def _get_tree_dict(system, component_execution_orders, component_execution_index):
     """Get a dictionary representation of the system hierarchy."""
     tree_dict = OrderedDict()
     tree_dict['name'] = system.name
     tree_dict['type'] = 'subsystem'
 
+    local_prom_dict = OrderedDict()
+
+    from_prom_name = OrderedDict(system._var_allprocs_prom2abs_list['input'])
+    from_prom_name.update(system._var_allprocs_prom2abs_list['output'])
+    for var_prom_name, var_abs_name_list in iteritems(from_prom_name):
+        for var_abs_name in var_abs_name_list:
+            if "." in var_prom_name:
+                local_prom_dict[var_abs_name] = var_prom_name
+        if(len(local_prom_dict) > 0):
+            tree_dict['promotions'] = OrderedDict(sorted(local_prom_dict.items())) # sort to make deterministic for testing
+
+
     if not isinstance(system, Group):
         tree_dict['subsystem_type'] = 'component'
+        component_execution_orders[system.pathname] = component_execution_index[0]
+        component_execution_index[0] += 1
 
         children = []
         for typ in ['input', 'output']:
@@ -47,11 +63,12 @@ def _get_tree_dict(system):
                     var_dict['type'] = 'unknown'
                     var_dict['implicit'] = isimplicit
 
+                var_dict['dtype'] = type(meta['value']).__name__
                 children.append(var_dict)
     else:
         tree_dict['subsystem_type'] = 'group'
-        children = [_get_tree_dict(system)
-                    for system in system._subsystems_myproc]
+        children = [_get_tree_dict(s, component_execution_orders, component_execution_index)
+                    for s in system._subsystems_myproc]
         if system.comm.size > 1:
             sub_comm = system._subsystems_myproc[0].comm
             if sub_comm.rank != 0:
@@ -83,19 +100,54 @@ def _get_viewer_data(problem_or_rootgroup):
     else:
         raise TypeError('get_model_viewer_data only accepts Problems or Groups')
 
+    data_dict = {}
+    component_execution_idx = [0] #list so pass by ref
+    component_execution_orders = {}
+    data_dict['tree'] = _get_tree_dict(root_group, component_execution_orders, component_execution_idx)
+
     abs2data = root_group._var_abs2data_io
     connections_list = []
-    for in_abs, out_abs in root_group._manual_connections_abs:
-        in_name = abs2data[in_abs]['prom']
-        out_name = abs2data[out_abs]['prom']
+    sorted_abs_input2src = OrderedDict(sorted(root_group._assembler._abs_input2src.items())) # sort to make deterministic for testing
+    G = compute_sys_graph(root_group, sorted_abs_input2src, comps_only=True)
+    scc = nx.strongly_connected_components(G)
+    scc_list = [s for s in scc if len(s)>1] #list(scc)
+    for in_abs, out_abs in iteritems(sorted_abs_input2src):
+        if out_abs is None:
+            continue
+        src_subsystem = out_abs.rsplit('.', 1)[0]
+        tgt_subsystem = in_abs.rsplit('.', 1)[0]
+        count = 0
+        edges_list = []
+        for li in scc_list:
+            if src_subsystem in li and tgt_subsystem in li:
+                count = count+1
+                if(count > 1):
+                    raise ValueError('Count greater than 1')
 
-        dct = OrderedDict()
-        dct['src'] = out_name
-        dct['tgt'] = in_name
-        connections_list.append(dct)
+                exe_tgt = component_execution_orders[tgt_subsystem]
+                exe_src = component_execution_orders[src_subsystem]
+                exe_low = min(exe_tgt,exe_src)
+                exe_high = max(exe_tgt,exe_src)
+                subg = G.subgraph(li)
+                for n in subg.nodes():
+                    exe_order = component_execution_orders[n]
+                    if(exe_order < exe_low or exe_order > exe_high):
+                        subg.remove_node(n)
 
-    data_dict = {}
-    data_dict['tree'] = _get_tree_dict(root_group)
+
+                src_to_tgt_str = src_subsystem + ' ' + tgt_subsystem
+                for tup in subg.edges():
+                    edge_str = tup[0] + ' ' + tup[1]
+                    if edge_str != src_to_tgt_str:
+                        edges_list.append(edge_str)
+
+        if(len(edges_list) > 0):
+            edges_list.sort() # make deterministic so same .html file will be produced each run
+            connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs), ('cycle_arrows', edges_list)]))
+        else:
+            connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs)]))
+
+
     data_dict['connections_list'] = connections_list
 
     return data_dict
