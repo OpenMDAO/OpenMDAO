@@ -6,12 +6,27 @@ import numpy as np
 from six import itervalues
 
 from openmdao.core.component import Component
+from openmdao.utils.class_util import overrides_method
 
 
 class ImplicitComponent(Component):
     """
     Class to inherit from when all output variables are implicit.
     """
+
+    def __init__(self, **kwargs):
+        """
+        Check if we are matrix-free.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            available here and in all descendants of this system.
+        """
+        super(ImplicitComponent, self).__init__(**kwargs)
+
+        if overrides_method('apply_linear', self, ImplicitComponent):
+            self._matrix_free = True
 
     def _apply_nonlinear(self):
         """
