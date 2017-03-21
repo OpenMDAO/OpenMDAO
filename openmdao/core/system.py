@@ -81,9 +81,9 @@ class System(object):
         integer arrays of global indices of variables on this proc.
     _var_maps : {'input': dict, 'output': dict}
         dictionary of variable names and their promoted names.
-    _var_promotes : { 'any': set(), 'input': set(), 'output': set() }
-        dictionary of sets of variable names/wildcards specifying promotion
-        (used to calculate _var_maps)
+    _var_promotes : { 'any': [], 'input': [], 'output': [] }
+        dictionary of lists of variable names/wildcards specifying promotion
+        (used to calculate promoted names)
     _var_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
     _var_connections_abs : [(str, str), ...]
@@ -172,7 +172,7 @@ class System(object):
         self._subsystems_myproc_inds = []
 
         self._var_maps = {'input': {}, 'output': {}}
-        self._var_promotes = {'input': set(), 'output': set(), 'any': set()}
+        self._var_promotes = {'input': [], 'output': [], 'any': []}
 
         self._var_connections = {}
         self._var_connections_abs = []
@@ -523,9 +523,18 @@ class System(object):
             # At present, we don't support a GlobalJacobian in a group if any subcomponents
             # are matrix-free.
             for subsys in self.system_iter():
-                if overrides_method('apply_linear', subsys, System):
-                    msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
-                    raise RuntimeError(msg)
+
+                try:
+                    if subsys._matrix_free:
+                        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
+                        raise RuntimeError(msg)
+
+                # Groups don't have `_matrix_free`
+                # Note, we could put this attribute on Group, but this would be True for a
+                # default Group, and thus we would need an isinstance on Component, which is the
+                # reason for the try block anyway.
+                except AttributeError:
+                    continue
 
             jacobian = self._jacobian
 
@@ -598,41 +607,61 @@ class System(object):
             dictionary mapping input/output variable names
             to promoted variable names.
         """
-        promotes = self._var_promotes['any']
-        if promotes:
-            names = promotes
-            patterns = [n for n in names if '*' in n or '?' in n]
-        gname = self.name + '.' if self.name else ''
+        def split_list(lst):
+            """
+            Return names, patterns, and renames found in lst.
+            """
+            names = []
+            patterns = []
+            renames = {}
+            for entry in lst:
+                if isinstance(entry, string_types):
+                    if '*' in entry or '?' in entry or '[' in entry:
+                        patterns.append(entry)
+                    else:
+                        names.append(entry)
+                elif isinstance(entry, tuple) and len(entry) == 2:
+                    renames[entry[0]] = entry[1]
+                else:
+                    raise TypeError("when adding subsystem '%s', entry '%s'"
+                                    " is not a string or tuple of size 2" %
+                                    (self.pathname, entry))
+            return names, patterns, renames
 
         maps = {'input': {}, 'output': {}}
+        gname = self.name + '.' if self.name else ''
+        prom2abs = self._var_allprocs_prom2abs_list
         found = False
-        for typ in ('input', 'output'):
-            promotes_typ = self._var_promotes[typ]
 
+        promotes = self._var_promotes['any']
+        if promotes:
+            names, patterns, renames = split_list(promotes)
+
+        for typ in ('input', 'output'):
             if promotes:
                 pass
-            elif promotes_typ:
-                names = promotes_typ
-                patterns = [n for n in names if '*' in n or '?' in n]
+            elif self._var_promotes[typ]:
+                names, patterns, renames = split_list(self._var_promotes[typ])
             else:
-                names = ()
-                patterns = ()
+                names = patterns = renames = ()
 
-            for name in self._var_allprocs_prom2abs_list[typ]:
+            for name in prom2abs[typ]:
                 if name in names:
                     maps[typ][name] = name
                     found = True
-                    continue
-
-                for pattern in patterns:
-                    # if name matches, promote that variable to parent
-                    if fnmatchcase(name, pattern):
-                        maps[typ][name] = name
-                        found = True
-                        break
+                elif name in renames:
+                    maps[typ][name] = renames[name]
+                    found = True
                 else:
-                    # Default: prepend the parent system's name
-                    maps[typ][name] = gname + name if gname else name
+                    for pattern in patterns:
+                        # if name matches, promote that variable to parent
+                        if fnmatchcase(name, pattern):
+                            maps[typ][name] = name
+                            found = True
+                            break
+                    else:
+                        # Default: prepend the parent system's name
+                        maps[typ][name] = gname + name if gname else name
 
         if not found:
             for io, lst in self._var_promotes.items():
