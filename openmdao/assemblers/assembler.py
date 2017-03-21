@@ -50,7 +50,7 @@ class Assembler(object):
         Both inputs and outputs are contained in one combined dictionary.
     _var_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of all owned variables, on all procs (maps idx to abs_name).
-    _input_srcs : {str: str}
+    _abs_input2src : {str: str}
         The output absolute name for each input absolute name.  A value of None
         indicates that no output is connected to that input.
     _src_indices : int ndarray[:]
@@ -84,7 +84,7 @@ class Assembler(object):
         self._var_allprocs_abs2meta_io = {}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
 
-        self._input_srcs = None
+        self._abs_input2src = None
         self._src_indices = None
         self._src_indices_range = None
 
@@ -202,7 +202,7 @@ class Assembler(object):
         Identify implicit connections and combine with explicit ones.
 
         Sets the following attributes:
-            _input_srcs
+            _abs_input2src
 
         Parameters
         ----------
@@ -222,7 +222,7 @@ class Assembler(object):
         prom2abs_out = prom2abs['output']
         prom2abs_in = prom2abs['input']
 
-        # Add user defined connections to the _input_srcs vector
+        # Add user defined connections to the _abs_input2src vector
         for ipath, opath in connections:
             input_srcs[ipath] = opath
             output_tgts[opath].append(ipath)
@@ -270,7 +270,7 @@ class Assembler(object):
                                       "connected to output '%s' which has "
                                       "no units." % (ipath, in_units, opath))
 
-        self._input_srcs = input_srcs
+        self._abs_input2src = input_srcs
 
     def _setup_src_indices(self, abs2data, abs_names):
         """
@@ -317,7 +317,7 @@ class Assembler(object):
             elif src_indices.ndim == 1:
                 self._src_indices[ind1:ind2] = src_indices
             else:
-                src = self._input_srcs[abs_in]
+                src = self._abs_input2src[abs_in]
                 if src is None:  # input is not connected
                     self._src_indices[ind1:ind2] = np.arange(isize, dtype=int)
                 else:
@@ -382,11 +382,11 @@ class Assembler(object):
 
         # Now, we can store the units and scaling coefficients by input
         # by referring to the out_* variables via the input-to-src mapping
-        # which is called _input_srcs.
-        nvar_in = len(self._input_srcs)
+        # which is called _abs_input2src.
+        nvar_in = len(self._abs_input2src)
         self._src_units = [None for ind in range(nvar_in)]
         self._src_scaling = np.empty((nvar_in, 2))
-        for in_abs, out_abs in iteritems(self._input_srcs):
+        for in_abs, out_abs in iteritems(self._abs_input2src):
             ivar_in = indices[in_abs]
             if out_abs is None:
                 self._src_units[ivar_in] = None

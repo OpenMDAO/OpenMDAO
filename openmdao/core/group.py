@@ -163,8 +163,8 @@ class Group(System):
             return
 
         # target should not already be connected
-        if tgt_name in self._var_connections:
-            srcname = self._var_connections[tgt_name][0]
+        if tgt_name in self._manual_connections:
+            srcname = self._manual_connections[tgt_name][0]
             raise RuntimeError("Input '%s' is already connected to '%s'." %
                                (tgt_name, srcname))
 
@@ -173,7 +173,7 @@ class Group(System):
             raise RuntimeError("Output and input are in the same System for " +
                                "connection from '%s' to '%s'." % (src_name, tgt_name))
 
-        self._var_connections[tgt_name] = (src_name, src_indices)
+        self._manual_connections[tgt_name] = (src_name, src_indices)
 
     def set_order(self, new_order):
         """
@@ -218,14 +218,14 @@ class Group(System):
         Recursively assemble a list of input-output connections.
 
         Sets the following attributes:
-            _var_connections_abs
+            _manual_connections_abs
         """
         # Perform recursion and assemble pairs from subsystems
         pairs = []
         for subsys in self._subsystems_myproc:
             subsys._setup_connections()
             if subsys.comm.rank == 0:
-                pairs.extend(subsys._var_connections_abs)
+                pairs.extend(subsys._manual_connections_abs)
 
         # Do an allgather to gather from root procs of all subsystems
         if self.comm.size > 1:
@@ -243,7 +243,7 @@ class Group(System):
 
         # Loop through user-defined connections
         for in_name, (out_name, src_indices) \
-                in iteritems(self._var_connections):
+                in iteritems(self._manual_connections):
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
@@ -280,7 +280,7 @@ class Group(System):
 
                 pairs.append((abs_in, abs_out))
 
-        self._var_connections_abs = pairs
+        self._manual_connections_abs = pairs
 
     def initialize_variables(self):
         """

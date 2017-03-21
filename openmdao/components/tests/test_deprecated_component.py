@@ -258,6 +258,18 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'px.x')][0][0], -3.0, 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
+        # Check partials
+        data = prob.check_partial_derivatives(out_stream=None)
+
+        for key1, val1 in iteritems(data):
+            for key2, val2 in iteritems(val1):
+                assert_rel_error(self, val2['abs error'][0], 0.0, 1e-5)
+                assert_rel_error(self, val2['abs error'][1], 0.0, 1e-5)
+                assert_rel_error(self, val2['abs error'][2], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][0], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][1], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][2], 0.0, 1e-5)
+
     def test_simple_implicit(self):
 
         prob = Problem(Group())
@@ -355,8 +367,8 @@ class DepCompTestCase(unittest.TestCase):
 
         prob = Problem()
         prob.model = Group()
-        prob.model.add_subsystem('comp', SimpleImplicitComp(resid_scaler=0.001))
         prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
+        prob.model.add_subsystem('comp', SimpleImplicitComp(resid_scaler=0.001))
 
         prob.model.ln_solver = ScipyGMRES()
         prob.model.nl_solver = NewtonSolver()
@@ -401,8 +413,8 @@ class DepCompTestCase(unittest.TestCase):
     def test_simple_implicit_apply(self):
 
         prob = Problem(Group())
-        prob.model.add_subsystem('comp', SimpleImplicitCompApply())
         prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
+        prob.model.add_subsystem('comp', SimpleImplicitCompApply())
 
         prob.model.ln_solver = ScipyGMRES()
         prob.model.nl_solver = NewtonSolver()
@@ -429,6 +441,18 @@ class DepCompTestCase(unittest.TestCase):
         J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
+
+        # Check partials
+        data = prob.check_partial_derivatives(out_stream=None)
+
+        for key1, val1 in iteritems(data):
+            for key2, val2 in iteritems(val1):
+                assert_rel_error(self, val2['abs error'][0], 0.0, 1e-5)
+                assert_rel_error(self, val2['abs error'][1], 0.0, 1e-5)
+                assert_rel_error(self, val2['abs error'][2], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][0], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][1], 0.0, 1e-5)
+                assert_rel_error(self, val2['rel error'][2], 0.0, 1e-5)
 
 if __name__ == "__main__":
     unittest.main()

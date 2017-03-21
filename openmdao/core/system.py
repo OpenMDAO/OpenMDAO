@@ -86,10 +86,10 @@ class System(object):
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
-    _var_connections : dict
+    _manual_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
-    _var_connections_abs : [(str, str), ...]
-        _var_connections with absolute variable names.  Entries
+    _manual_connections_abs : [(str, str), ...]
+        _manual_connections with absolute variable names.  Entries
         have the form (input, output).
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
@@ -176,8 +176,8 @@ class System(object):
         self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
-        self._var_connections = {}
-        self._var_connections_abs = []
+        self._manual_connections = {}
+        self._manual_connections_abs = []
 
         self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         self._var_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
@@ -573,9 +573,18 @@ class System(object):
             # At present, we don't support a GlobalJacobian in a group if any subcomponents
             # are matrix-free.
             for subsys in self.system_iter():
-                if overrides_method('apply_linear', subsys, System):
-                    msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
-                    raise RuntimeError(msg)
+
+                try:
+                    if subsys._matrix_free:
+                        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
+                        raise RuntimeError(msg)
+
+                # Groups don't have `_matrix_free`
+                # Note, we could put this attribute on Group, but this would be True for a
+                # default Group, and thus we would need an isinstance on Component, which is the
+                # reason for the try block anyway.
+                except AttributeError:
+                    continue
 
             jacobian = self._jacobian
 
@@ -838,7 +847,7 @@ class System(object):
 
         in_names = []
         for in_abs_name in self._var_abs_names['input']:
-            out_abs = self._assembler._input_srcs[in_abs_name]
+            out_abs = self._assembler._abs_input2src[in_abs_name]
             if out_abs is None:
                 continue
             out_idx = self._assembler._var_allprocs_abs2idx_io[out_abs]

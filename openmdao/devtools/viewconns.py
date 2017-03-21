@@ -54,7 +54,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     else:
         system = root
 
-    input_srcs = system._assembler._input_srcs
+    input_srcs = system._assembler._abs_input2src
 
     connections = {
         tgt: src for tgt, src in iteritems(input_srcs) if src is not None

@@ -8,6 +8,8 @@ import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NLRunOnce
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
+from openmdao.test_suite.components.paraboloid import ParaboloidMatVec
 
 
 class TestProblemCheckPartials(unittest.TestCase):
@@ -253,6 +255,66 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fd'], identity, 1e-9)
 
+    def test_matrix_free_explicit(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('comp', ParaboloidMatVec())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.model.suppress_solver_output = True
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partial_derivatives(out_stream=None)
+
+        for comp_name, comp in iteritems(data):
+            for partial_name, partial in iteritems(comp):
+                abs_error = partial['abs error']
+                rel_error = partial['rel error']
+                assert_rel_error(self, abs_error.forward, 0., 1e-5)
+                assert_rel_error(self, abs_error.reverse, 0., 1e-5)
+                assert_rel_error(self, abs_error.forward_reverse, 0., 1e-5)
+                assert_rel_error(self, rel_error.forward, 0., 1e-5)
+                assert_rel_error(self, rel_error.reverse, 0., 1e-5)
+                assert_rel_error(self, rel_error.forward_reverse, 0., 1e-5)
+
+        assert_rel_error(self, data['comp'][('f_xy', 'x')]['J_fwd'][0][0], 5.0, 1e-6)
+        assert_rel_error(self, data['comp'][('f_xy', 'x')]['J_rev'][0][0], 5.0, 1e-6)
+        assert_rel_error(self, data['comp'][('f_xy', 'y')]['J_fwd'][0][0], 21.0, 1e-6)
+        assert_rel_error(self, data['comp'][('f_xy', 'y')]['J_rev'][0][0], 21.0, 1e-6)
+
+    def test_matrix_free_implicit(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('rhs', np.ones((2, ))))
+        prob.model.add_subsystem('comp', TestImplCompArrayMatVec())
+
+        prob.model.connect('p1.rhs', 'comp.rhs')
+
+        prob.model.suppress_solver_output = True
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partial_derivatives(out_stream=None)
+
+        for comp_name, comp in iteritems(data):
+            for partial_name, partial in iteritems(comp):
+                abs_error = partial['abs error']
+                rel_error = partial['rel error']
+                assert_rel_error(self, abs_error.forward, 0., 1e-5)
+                assert_rel_error(self, abs_error.reverse, 0., 1e-5)
+                assert_rel_error(self, abs_error.forward_reverse, 0., 1e-5)
+                assert_rel_error(self, rel_error.forward, 0., 1e-5)
+                assert_rel_error(self, rel_error.reverse, 0., 1e-5)
+                assert_rel_error(self, rel_error.forward_reverse, 0., 1e-5)
 
 if __name__ == "__main__":
     unittest.main()
