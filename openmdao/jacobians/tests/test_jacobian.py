@@ -311,7 +311,7 @@ class TestJacobian(unittest.TestCase):
 
         d1 = prob.model.get_subsystem('d1')
 
-        # d1.jacobian = DenseJacobian()
+        d1.jacobian = DenseJacobian()
         prob.model.suppress_solver_output = True
 
         prob.setup(check=False)
@@ -330,7 +330,7 @@ class TestJacobian(unittest.TestCase):
         c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0'))
 
         prob.model.nl_solver = NewtonSolver()
-        # c3.jacobian = DenseJacobian()
+        c3.jacobian = DenseJacobian()
 
         prob.model.connect('indep.x', 'C1.a')
         prob.model.connect('indep.x', 'C2.a')

@@ -47,7 +47,8 @@ class TestBGSSolver(unittest.TestCase):
             prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
 
         self.assertEqual(str(context.exception),
-                         "A block linear solver 'LN: LNBGS' is being used with a AssembledJacobian in system ''")
+                         "A block linear solver 'LN: LNBGS' is being used with"
+                         " an AssembledJacobian in system ''")
 
     def test_solve_linear_maxiter(self):
         """Verify that LinearBlockGS abides by the 'maxiter' option."""

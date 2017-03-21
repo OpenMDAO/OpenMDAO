@@ -372,6 +372,6 @@ class BlockLinearSolver(LinearSolver):
         """
         if isinstance(self._system._jacobian, AssembledJacobian):
             raise RuntimeError("A block linear solver '%s' is being used with "
-                               "a AssembledJacobian in system '%s'" %
+                               "an AssembledJacobian in system '%s'" %
                                (self.SOLVER, self._system.pathname))
         return super(BlockLinearSolver, self)._iter_initialize()

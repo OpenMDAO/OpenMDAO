@@ -45,7 +45,8 @@ class TestLinearBlockJacSolver(unittest.TestCase):
             prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
 
             self.assertEqual(str(context.exception),
-                             "A block linear solver 'LN: LNBJ' is being used with a AssembledJacobian in system ''")
+                             "A block linear solver 'LN: LNBJ' is being used with"
+                             " an AssembledJacobian in system ''")
 
     def test_simple_matvec(self):
         # Tests derivatives on a simple comp that defines compute_jacvec.

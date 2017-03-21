@@ -56,11 +56,6 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
         self._approx_schemes = OrderedDict()
 
-        # self.jacobian = DenseJacobian()
-        # self._jacobian._system = self
-        # self._jacobian_changed = True
-        # self._owns_assembled_jac = True
-
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
 
