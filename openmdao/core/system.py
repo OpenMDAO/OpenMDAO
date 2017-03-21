@@ -523,9 +523,18 @@ class System(object):
             # At present, we don't support a AssembledJacobian in a group if any subcomponents
             # are matrix-free.
             for subsys in self.system_iter():
-                if overrides_method('apply_linear', subsys, System):
-                    msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
-                    raise RuntimeError(msg)
+
+                try:
+                    if subsys._matrix_free:
+                        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
+                        raise RuntimeError(msg)
+
+                # Groups don't have `_matrix_free`
+                # Note, we could put this attribute on Group, but this would be True for a
+                # default Group, and thus we would need an isinstance on Component, which is the
+                # reason for the try block anyway.
+                except AttributeError:
+                    continue
 
             jacobian = self._jacobian
 

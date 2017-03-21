@@ -190,8 +190,9 @@ class ParameterizedInstance(object):
         if args['global_jac']:
 
             # Deprecated test won't work with AssembledJacobian because it defines an apply_linear.
-            if args['component_class'] == 'deprecated':
-                raise SkipTest('AssembledJacobian not suppported in Deprecated Cycle test.')
+            # Explicit cycle test won't work with AssembledJacobian because it defines a compute_jacvec_product.
+            if args['component_class'] in ['deprecated', 'explicit']:
+                raise SkipTest('AssembledJacobian not suppported in Cycle test.')
 
             jacobian_type = args['jacobian_type']
             if jacobian_type == 'dense':

@@ -11,7 +11,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
 from openmdao.api import IndepVarComp, Group, Problem, \
-                         ExplicitComponent, ExecComp, \
+                         ExplicitComponent, ImplicitComponent, ExecComp, \
                          NewtonSolver, ScipyIterativeSolver, \
                          DenseJacobian, CSRJacobian, COOJacobian
 from openmdao.devtools.testutil import assert_rel_error
@@ -372,7 +372,13 @@ class TestJacobian(unittest.TestCase):
 
     def test_assembled_jacobian_unsupported_cases(self):
 
-        class ParaboloidApply(Paraboloid):
+        class ParaboloidApply(ImplicitComponent):
+
+            def initialize_variables(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
 
             def linearize(self, inputs, outputs, jacobian):
                 return
@@ -457,6 +463,34 @@ class TestJacobian(unittest.TestCase):
         model.jacobian = DenseJacobian()
 
         prob.setup()
+
+        class ParaboloidJacVec(Paraboloid):
+
+            def linearize(self, inputs, outputs, jacobian):
+                return
+
+            def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, d_residuals,
+                                       mode):
+                d_residuals['x'] += (np.exp(outputs['x']) - 2*inputs['a']**2 * outputs['x'])*d_outputs['x']
+                d_residuals['x'] += (-2 * inputs['a'] * outputs['x']**2)*d_inputs['a']
+
+        # One level deep
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('p2', IndepVarComp('y', val=1.0))
+        model.add_subsystem('comp', ParaboloidJacVec())
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        model.jacobian = DenseJacobian()
+
+        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
+        with assertRaisesRegex(self, Exception, msg):
+            prob.setup()
 
 
 if __name__ == '__main__':
