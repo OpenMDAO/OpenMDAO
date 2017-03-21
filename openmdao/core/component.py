@@ -233,10 +233,10 @@ class Component(System):
         if upper is not None:
             upper = format_as_float_or_array('upper', upper)
 
-        ref = format_as_float_or_array('ref', ref)
-        ref0 = format_as_float_or_array('ref0', ref0)
-        res_ref = format_as_float_or_array('res_ref', res_ref)
-        res_ref0 = format_as_float_or_array('res_ref0', res_ref0)
+        ref = format_as_float_or_array('ref', ref, flatten=True)
+        ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
+        res_ref = format_as_float_or_array('res_ref', res_ref, flatten=True)
+        res_ref0 = format_as_float_or_array('res_ref0', res_ref0, flatten=True)
 
         # TODO, delete when ready
         #for item in ['ref', 'ref0', 'res_ref', 'res_ref0']:

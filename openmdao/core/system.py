@@ -368,12 +368,12 @@ class System(object):
 
         if use_ref_vector:
             abs2data = self._var_abs2data_io
-            vectors['input']._compute_ivar_map(abs2data)
-            vectors['output']._compute_ivar_map(abs2data)
+            vectors['input']._compute_ivar_map(abs2data, 'input')
+            vectors['output']._compute_ivar_map(abs2data, 'output')
             
             # TODO - Let's only compute a new one when the output and residual scale lengths are 
             # really different.
-            vectors['residual']._compute_ivar_map(abs2data)
+            vectors['residual']._compute_ivar_map(abs2data, 'residual')
             #vectors['residual']._ivar_map = vectors['output']._ivar_map
 
         # Compute the transfer for this vector set

@@ -391,6 +391,11 @@ class TestScaling(unittest.TestCase):
                 self.add_output('stuff', val=np.ones((2, 2)), ref=3.0)
                 self.add_output('total_volume', val=1.)
 
+            def compute(self, inputs, outputs):
+                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                outputs['stuff'] = inputs['widths'] + inputs['lengths']
+                
+                
         prob = Problem()
         model = prob.model = Group()
 
@@ -403,7 +408,20 @@ class TestScaling(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['comp.total_volume'], 4.)
+        
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['areas']
+            assert_rel_error(self, val[0, 0], 0.5)
+            assert_rel_error(self, val[0, 1], 0.5)
+            assert_rel_error(self, val[1, 0], 0.5)
+            assert_rel_error(self, val[1, 1], 0.5)
 
+            val = model.get_subsystem('comp')._outputs['stuff']
+            assert_rel_error(self, val[0, 0], 2.0/3)
+            assert_rel_error(self, val[0, 1], 2.0/3)
+            assert_rel_error(self, val[1, 0], 2.0/3)
+            assert_rel_error(self, val[1, 1], 2.0/3)
+           
     def test_scale_array_with_array(self):
 
         class ExpCompArrayScale(TestExplCompArrayDense):
@@ -412,7 +430,12 @@ class TestScaling(unittest.TestCase):
                 self.add_input('lengths', val=np.ones((2, 2)))
                 self.add_input('widths', val=np.ones((2, 2)))
                 self.add_output('areas', val=np.ones((2, 2)), ref=np.array([[2.0, 3.0], [5.0, 7.0]]))
+                self.add_output('stuff', val=np.ones((2, 2)), ref=np.array([[11.0, 13.0], [17.0, 19.0]]))
                 self.add_output('total_volume', val=1.)
+
+            def compute(self, inputs, outputs):
+                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = Problem()
         model = prob.model = Group()
@@ -427,5 +450,18 @@ class TestScaling(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.total_volume'], 4.)
 
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['areas']
+            assert_rel_error(self, val[0, 0], 1.0/2)
+            assert_rel_error(self, val[0, 1], 1.0/3)
+            assert_rel_error(self, val[1, 0], 1.0/5)
+            assert_rel_error(self, val[1, 1], 1.0/7)
+
+            val = model.get_subsystem('comp')._outputs['stuff']
+            assert_rel_error(self, val[0, 0], 2.0/11)
+            assert_rel_error(self, val[0, 1], 2.0/13)
+            assert_rel_error(self, val[1, 0], 2.0/17)
+            assert_rel_error(self, val[1, 1], 2.0/19)
+           
 if __name__ == '__main__':
     unittest.main()
