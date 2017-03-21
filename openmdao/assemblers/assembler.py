@@ -118,6 +118,7 @@ class Assembler(object):
             for idx, abs_name in enumerate(allprocs_abs_names[type_]):
                 self._var_allprocs_abs2idx_io[abs_name] = idx
 
+        iproc = self._comm.rank
         nproc = self._comm.size
         indices = self._var_allprocs_abs2idx_io
 
@@ -166,7 +167,6 @@ class Assembler(object):
                 (nproc, np.sum(var_count)), int)
 
         # Populate the sizes arrays
-        iproc = self._comm.rank
         for typ in ['input', 'output']:
             for ivar, absname in enumerate(abs_names[typ]):
                 size = np.prod(abs2data[absname]['metadata']['shape'])
@@ -179,7 +179,7 @@ class Assembler(object):
         for abs_name, data in iteritems(abs2data):
             dmeta = data['metadata']
             # only copy what we need in all procs
-            abs2meta[abs_name] = { n: dmeta[n] for n in ['units', 'shape']}
+            abs2meta[abs_name] = {n: dmeta[n] for n in ('units', 'shape')}
 
         # Do an allgather on the sizes arrays and metadata
         if self._comm.size > 1:

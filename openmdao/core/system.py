@@ -215,64 +215,6 @@ class System(object):
         self._design_vars = {}
         self._responses = {}
 
-    # def _setup_processors(self, path, comm, global_dict,
-    #                       assembler, proc_range):
-    #     """
-    #     Recursively split comms and define local subsystems.
-    #
-    #     Sets the following attributes:
-    #         pathname
-    #         comm
-    #         _assembler
-    #         _mpi_proc_range
-    #         _subsystems_myproc
-    #         _subsystems_myproc_inds
-    #
-    #     Parameters
-    #     ----------
-    #     path : str
-    #         parent names to prepend to name to get the pathname
-    #     comm : MPI.Comm or <FakeComm>
-    #         communicator for this system (already split, if applicable).
-    #     global_dict : dict
-    #         dictionary with kwargs of all parents assembled in it.
-    #     assembler : Assembler
-    #         pointer to the global assembler object to distribute to everyone.
-    #     proc_range : [int, int]
-    #         indices of procs owned by comm with respect to COMM_WORLD.
-    #     """
-    #     # Set attributes
-    #     self.pathname = '.'.join((path, self.name)) if path else self.name
-    #     self.comm = comm
-    #     self._assembler = assembler
-    #     self._mpi_proc_range = proc_range
-    #
-    #     # Add self's kwargs to dictionary of parents' kwargs (already new copy)
-    #     self.metadata._assemble_global_dict(global_dict)
-    #
-    #     # Optional user-defined method
-    #     self.initialize_processors()
-    #
-    #     nsub = len(self._subsystems_allprocs)
-    #
-    #     # If this is a group:
-    #     if nsub > 0:
-    #         # Call the load balancing algorithm
-    #         tmp = self._mpi_proc_allocator(nsub, comm, proc_range)
-    #         sub_inds, sub_comm, sub_proc_range = tmp
-    #
-    #         # Define local subsystems
-    #         self._subsystems_myproc = [self._subsystems_allprocs[ind]
-    #                                    for ind in sub_inds]
-    #         self._subsystems_myproc_inds = sub_inds
-    #
-    #         # Perform recursion
-    #         for subsys in self._subsystems_myproc:
-    #             sub_global_dict = self.metadata._global_dict.copy()
-    #             subsys._setup_processors(self.pathname, sub_comm,
-    #                                      sub_global_dict, assembler,
-    #                                      sub_proc_range)
-
     def get_req_procs(self):
         """
         Return the min and max MPI processes usable by this System.
@@ -329,7 +271,7 @@ class System(object):
         else:  # by default, components only require 1 proc
             return (1, 1)
 
-    def _setup_communicators(self, path, comm, global_dict, assembler):
+    def _setup_processors(self, path, comm, global_dict, assembler):
         """
         Recursively split comms and define local subsystems.
 
@@ -386,8 +328,8 @@ class System(object):
             # Perform recursion
             for subsys in self._subsystems_myproc:
                 sub_global_dict = self.metadata._global_dict.copy()
-                subsys._setup_communicators(self.pathname, sub_comm,
-                                            sub_global_dict, assembler)
+                subsys._setup_processors(self.pathname, sub_comm,
+                                         sub_global_dict, assembler)
 
     def _setup_variables(self, recurse=True):
         """
@@ -421,19 +363,13 @@ class System(object):
 
             self.initialize_variables()
 
-    def _setup_variable_indices(self, global_index, recurse=True):
+    def _setup_variable_indices(self):
         """
         Define the variable indices and range.
 
         Sets the following attributes:
             _var_allprocs_idx_range
 
-        Parameters
-        ----------
-        global_index : {'input': int, 'output': int}
-            current global variable counter.
-        recurse : boolean
-            recursion is not performed if traversing up the tree after reconf.
         """
         pass
 

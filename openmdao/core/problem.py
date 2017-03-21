@@ -262,16 +262,17 @@ class Problem(object):
         self._mode = mode
 
         # Recursive system setup
-        self._setup_communicators()
+        self._setup_processors()
         allprocs_abs_names, allprocs_prom_names = model._setup_variables()
-        model._setup_variable_indices({'input': 0, 'output': 0})
-        model._setup_partials()
-        model._setup_connections()
 
         # Assembler setup: variable metadata and indices
         assembler._setup_variables(allprocs_abs_names,
                                    model._var_abs2data_io,
                                    model._var_abs_names)
+
+        model._setup_variable_indices()
+        model._setup_partials()
+        model._setup_connections()
 
         # Assembler setup: variable connections
         assembler._setup_connections(model._var_connections_abs,
@@ -319,7 +320,7 @@ class Problem(object):
 
         return self
 
-    def _setup_communicators(self):
+    def _setup_processors(self):
         """
         Set up MPI communicators for the driver and model.
         """
@@ -339,8 +340,8 @@ class Problem(object):
                                    "but it requires between %s and %s." %
                                    (self.comm.size, minproc, maxproc))
 
-        self.driver._setup_communicators(self.model, '', self.comm, {},
-                                         self._assembler)
+        self.driver._setup_processors(self.model, self.comm, {},
+                                      self._assembler)
 
     def setup_vector(self, vec_name, vector_class, use_ref_vector):
         """

@@ -294,25 +294,25 @@ class Driver(object):
 
         return derivs
 
-    def _setup_communicators(self, model, path, comm, global_dict, assembler):
+    def _setup_processors(self, model, comm, global_dict, assembler):
         """
         Recursively split comms and define local subsystems.
 
         Parameters
         ----------
-        path : str
-            parent names to prepend to name to get the pathname
+        model : <System>
+            top level system driven by this driver.
         comm : MPI.Comm or <FakeComm>
             communicator for this system (already split, if applicable).
         global_dict : dict
             dictionary with kwargs of all parents assembled in it.
-        assembler : Assembler
+        assembler : <Assembler>
             pointer to the global assembler object to distribute to everyone.
         """
         #  for most drivers this is just a passthrough to the model, but some,
         #  e.g., DOEDriver will override and do their own comm splitting before
         #  passing the comm down to the model.
-        model._setup_communicators(path, comm, global_dict, assembler)
+        model._setup_processors('', comm, global_dict, assembler)
 
     def get_req_procs(self, model):
         """

@@ -79,12 +79,12 @@ class ProcAllocator(object):
         sub_comm : MPI.Comm or <FakeComm>
             communicator to pass to the subsystems.
         """
-        # This is a serial group - all procs get all subsystems
-        if not self.parallel or comm.size == 1:
-            isubs = list(range(len(req_procs)))
-            return isubs, comm
-        else:  # This is a parallel group
+        if self.parallel and comm.size > 1:
+            # This is a parallel group
             return self._divide_procs(req_procs, comm)
+        else:
+            # This is a serial group - all procs get all subsystems
+            return list(range(len(req_procs))), comm
 
     def _divide_procs(self, req_procs, comm):
         """

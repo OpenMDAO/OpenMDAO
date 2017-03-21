@@ -101,12 +101,12 @@ class DefaultVector(Vector):
         system = self._system
         assembler = system._assembler
 
-        ind1, ind2 = self._system._var_allprocs_idx_range[self._typ]
+        sys_start, sys_end = self._system._var_allprocs_idx_range[self._typ]
 
         variable_set_indices = assembler._variable_set_indices[self._typ]
-        sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
+        sub_variable_set_indices = variable_set_indices[sys_start:sys_end, :]
 
-        ind_offset = np.sum(assembler._variable_sizes_all[self._typ][self._iproc, :ind1])
+        ind_offset = np.sum(assembler._variable_sizes_all[self._typ][self._iproc, :sys_start])
 
         data = []
         indices = []

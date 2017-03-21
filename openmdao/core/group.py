@@ -1,6 +1,8 @@
 """Define the Group class."""
 from __future__ import division
 
+import sys
+
 from six import iteritems, string_types
 from six.moves import range
 
@@ -339,18 +341,6 @@ class Group(System):
                     }
                     self._var_abs_names[type_].append(abs_name)
 
-        # # For _var_allprocs_prom2abs_list, essentially invert the abs2prom map in
-        # # _var_abs2data_io to capture at least the local maps.
-        # self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        # for abs_name, data in iteritems(self._var_abs2data_io):
-        #     type_ = data['type']
-        #     prom_name = data['prom']
-        #     if prom_name not in self._var_allprocs_prom2abs_list[type_]:
-        #         self._var_allprocs_prom2abs_list[type_][prom_name] = [abs_name]
-        #     else:
-        #         self._var_allprocs_prom2abs_list[type_][prom_name].append(abs_name)
-
-
         # If we're running in parallel, gather contributions from other procs.
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             for type_ in ['input', 'output']:
@@ -381,71 +371,38 @@ class Group(System):
 
             self._var_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
 
-            print("name: '%s',  type=%s" % (self.pathname, type_))
-            print("    rank: %d" % self.comm.rank)
-            print("    abs names: %s" % allprocs_abs_names[type_])
-            print("    prom2abs: %s" % list(self._var_allprocs_prom2abs_list[type_].keys()))
-        print("    abs2data: %s" % list(self._var_abs2data_io.keys()))
-
         for prom_name, lst in iteritems(self._var_allprocs_prom2abs_list['output']):
             if len(lst) > 1:
                 raise RuntimeError("Output name '%s' refers to "
                                    "multiple outputs: %s." %
                                    (prom_name, sorted(lst)))
 
+        self._var_allprocs_abs_names = allprocs_abs_names
+
         return allprocs_abs_names, allprocs_prom_names
 
-    def _setup_variable_indices(self, global_index):
+    def _setup_variable_indices(self):
         """
         Compute the global index range for variables on all processors.
 
         Computes the following attributes:
             _var_allprocs_idx_range
-
-        Parameters
-        ----------
-        global_index : {'input': int, 'output': int}
-            current global variable counter.
         """
         # At this point, _var_allprocs_idx_range is correct except for an offset.
         # We apply the global_index offset to make _var_allprocs_idx_range correct.
+        abs2idx = self._assembler._var_allprocs_abs2idx_io
         for type_ in ['input', 'output']:
-            for ind in range(2):
-                self._var_allprocs_idx_range[type_][ind] += global_index[type_]
-
-        # Pre-recursion: compute index to pass to subsystems.
-        # This index is the number of variables on procs before current proc
-        # Necessary because of multiple global counters on different procs
-        if self.comm.size > 1:
-            subsys0 = self._subsystems_myproc[0]
-            for type_ in ['input', 'output']:
-                # Note: the following is valid because _var_allprocs_idx_range
-                # contains [0, # allprocs vars] at this point because
-                # _setup_variables has been run but the recursion
-                # for the current method has not been performed yet.
-                local_var_size = subsys0._var_allprocs_idx_range[type_][1]
-
-                # Compute the variable count list; 0 on rank > 0 procs
-                sub_comm = subsys0.comm
-                if sub_comm.rank == 0:
-                    nvar_myproc = local_var_size
-                else:
-                    nvar_myproc = 0
-                nvar_allprocs = self.comm.allgather(nvar_myproc)
-
-                # Compute the offset
-                iproc = self.comm.rank
-                nvar_myproc = local_var_size
-                global_index[type_] += np.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
+            idxs = [abs2idx[name] for name in self._var_allprocs_abs_names[type_]]
+            if idxs:
+                self._var_allprocs_idx_range[type_][0] = np.min(idxs)
+                self._var_allprocs_idx_range[type_][1] = np.max(idxs) + 1
+            else:
+                self._var_allprocs_idx_range[type_][0] = 0
+                self._var_allprocs_idx_range[type_][1] = 0
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            subsys._setup_variable_indices(global_index)
-
-        # Reset index dict to the global variable counter on all procs.
-        # Necessary for younger siblings to have proper index values.
-        for type_ in ['input', 'output']:
-            global_index[type_] = self._var_allprocs_idx_range[type_][1]
+            subsys._setup_variable_indices()
 
     def _setup_partials(self):
         """

@@ -1,3 +1,5 @@
+"""Define the ParallelGroup class."""
+
 from openmdao.core.group import Group
 
 

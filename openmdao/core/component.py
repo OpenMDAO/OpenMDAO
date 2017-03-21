@@ -601,7 +601,6 @@ class Component(System):
         self._var_abs2data_io = abs2data_io
 
         # If this is a component, myproc names = allprocs names
-        # and _var_allprocs_prom2abs_list was already computed in add_input / add_output.
 
         # We use allprocs_abs_names to count the total number of allprocs variables
         # and put it in _var_allprocs_idx_range.
@@ -610,25 +609,19 @@ class Component(System):
 
         return self._var_abs_names, self._var_rel_names
 
-    def _setup_variable_indices(self, global_index):
+    def _setup_variable_indices(self):
         """
         Compute the global index range for variables on all processors.
 
         Computes the following attributes:
             _var_allprocs_idx_range
-
-        Parameters
-        ----------
-        global_index : {'input': int, 'output': int}
-            current global variable counter.
         """
-        # At this point, _var_allprocs_idx_range is correct except for an offset.
-        # We apply the global_index offset to make _var_allprocs_idx_range correct.
+        abs2idx = self._assembler._var_allprocs_abs2idx_io
         for type_ in ['input', 'output']:
-            for ind in range(2):
-                self._var_allprocs_idx_range[type_][ind] += global_index[type_]
-
-        # Reset index dict to the global variable counter on all procs.
-        # Necessary for younger siblings to have proper index values.
-        for type_ in ['input', 'output']:
-            global_index[type_] = self._var_allprocs_idx_range[type_][1]
+            idxs = [abs2idx[name] for name in self._var_abs_names[type_]]
+            if idxs:
+                self._var_allprocs_idx_range[type_][0] = np.min(idxs)
+                self._var_allprocs_idx_range[type_][1] = np.max(idxs) + 1
+            else:
+                self._var_allprocs_idx_range[type_][0] = 0
+                self._var_allprocs_idx_range[type_][1] = 0

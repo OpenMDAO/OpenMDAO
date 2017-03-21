@@ -139,6 +139,4 @@ class DefaultAllocator(ProcAllocator):
 
         isubs = [] if sub_comm == MPI.COMM_NULL else buckets[rank_color][1]
 
-        print("comm:", comm.size, "subcomm:", sub_comm.size)
-
         return isubs, sub_comm

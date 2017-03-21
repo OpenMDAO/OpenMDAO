@@ -4,7 +4,7 @@ from __future__ import division, print_function
 
 import unittest
 
-from openmdao.core.problem import Problem
+from openmdao.api import Problem, Group, ExecComp
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -23,9 +23,7 @@ class TestParallelGroups(unittest.TestCase):
     N_PROCS = 2
 
     def test_fan_out_grouped(self):
-
         prob = Problem(FanOutGrouped())
-        prob.model._mpi_proc_allocator.parallel = True
         prob.setup(vector_class=PETScVector, check=False)
         prob.model.suppress_solver_output = True
         prob.run_model()
@@ -37,7 +35,6 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.model = FanInGrouped()
-        prob.model._mpi_proc_allocator.parallel = True
         prob.setup(vector_class=PETScVector, check=False)
         prob.model.suppress_solver_output = True
         prob.run_model()
@@ -48,7 +45,6 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.model = Diamond()
-        prob.model._mpi_proc_allocator.parallel = True
         prob.setup(vector_class=PETScVector, check=False)
         prob.model.suppress_solver_output = True
         prob.run_model()
@@ -60,7 +56,6 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.model = ConvergeDiverge()
-        prob.model._mpi_proc_allocator.parallel = True
         prob.setup(vector_class=PETScVector, check=False)
         prob.model.suppress_solver_output = True
         prob.run_model()
