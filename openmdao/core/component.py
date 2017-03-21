@@ -233,6 +233,7 @@ class Component(System):
         res_ref = format_as_float_or_array('res_ref', res_ref)
         res_ref0 = format_as_float_or_array('res_ref0', res_ref0)
 
+        # TODO, delete when ready
         #for item in ['ref', 'ref0', 'res_ref', 'res_ref0']:
             #if not np.isscalar(locals()[item]):
                 #raise TypeError('The %s argument should be a float' % (item))

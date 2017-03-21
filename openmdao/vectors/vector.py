@@ -129,7 +129,7 @@ class Vector(object):
             vec._initialize_views()
         return vec
 
-    def _compute_ivar_map(self):
+    def _compute_ivar_map(self, abs2data):
         """
         Compute the ivar_map.
 
