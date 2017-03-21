@@ -598,6 +598,8 @@ class Problem(object):
         jac_key = 'J_fd'
         for comp in comps:
 
+            c_name = comp.pathname
+
             # Skip IndepVarComps
             if isinstance(comp, IndepVarComp):
                 continue
