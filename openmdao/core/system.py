@@ -12,8 +12,8 @@ from six.moves import range
 import numpy as np
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
-from openmdao.jacobians.default_jacobian import DefaultJacobian
-from openmdao.jacobians.global_jacobian import GlobalJacobian
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.units import convert_units
@@ -128,8 +128,8 @@ class System(object):
         <Jacobian> object to be used in apply_linear.
     _jacobian_changed : bool
         If True, the jacobian has changed since the last call to setup.
-    _owns_global_jac : bool
-        If True, we are owners of the GlobalJacobian in self._jacobian.
+    _owns_assembled_jac : bool
+        If True, we are owners of the AssembledJacobian in self._jacobian.
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
@@ -199,10 +199,10 @@ class System(object):
         self._residuals = None
         self._transfers = None
 
-        self._jacobian = DefaultJacobian()
+        self._jacobian = DictionaryJacobian()
         self._jacobian._system = self
         self._jacobian_changed = True
-        self._owns_global_jac = False
+        self._owns_assembled_jac = False
 
         self._subjacs_info = OrderedDict()
 
@@ -513,20 +513,20 @@ class System(object):
 
         Parameters
         ----------
-        jacobian : <GlobalJacobian> or None
+        jacobian : <AssembledJacobian> or None
             The global jacobian to populate for this system.
         """
         self._jacobian_changed = False
 
-        if self._owns_global_jac:
+        if self._owns_assembled_jac:
 
-            # At present, we don't support a GlobalJacobian in a group if any subcomponents
+            # At present, we don't support a AssembledJacobian in a group if any subcomponents
             # are matrix-free.
             for subsys in self.system_iter():
 
                 try:
                     if subsys._matrix_free:
-                        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
+                        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
                         raise RuntimeError(msg)
 
                 # Groups don't have `_matrix_free`
@@ -546,7 +546,7 @@ class System(object):
         for subsys in self._subsystems_myproc:
             subsys._setup_jacobians(jacobian)
 
-        if self._owns_global_jac:
+        if self._owns_assembled_jac:
             self._jacobian._system = self
             self._jacobian._initialize()
 
@@ -688,7 +688,7 @@ class System(object):
         """
         Set the Jacobian.
         """
-        self._owns_global_jac = isinstance(jacobian, GlobalJacobian)
+        self._owns_assembled_jac = isinstance(jacobian, AssembledJacobian)
         self._jacobian = jacobian
         self._jacobian_changed = True
 
@@ -896,7 +896,7 @@ class System(object):
                 vec._scale(scaling[vec_type])
 
         for system in self.system_iter(include_self=True, recurse=True):
-            if system._owns_global_jac:
+            if system._owns_assembled_jac:
                 with system.jacobian_context():
                     system._jacobian._precompute_iter()
                     system._jacobian._scale(scaling)
