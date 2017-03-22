@@ -10,10 +10,7 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.jacobians.global_jacobian import GlobalJacobian
-from openmdao.matrices.coo_matrix import COOmatrix
-from openmdao.matrices.csr_matrix import CSRmatrix
-from openmdao.matrices.dense_matrix import DenseMatrix
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, CSRJacobian
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
@@ -59,11 +56,11 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
             if jac == 'dict':
                 pass
             elif jac == 'coo':
-                prob.model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
+                prob.model.jacobian = COOJacobian()
             elif jac == 'csr':
-                prob.model.jacobian = GlobalJacobian(matrix_class=CSRmatrix)
+                prob.model.jacobian = CSRJacobian()
             elif jac == 'dense':
-                prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+                prob.model.jacobian = DenseJacobian()
 
             prob.setup(check=False)
 

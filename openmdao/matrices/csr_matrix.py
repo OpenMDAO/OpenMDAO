@@ -2,15 +2,13 @@
 from __future__ import division
 
 import numpy as np
-from numpy import ndarray
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import coo_matrix
 from six import iteritems
 
-from openmdao.matrices.matrix import Matrix, _compute_index_map
-from openmdao.matrices.coo_matrix import COOmatrix
+from openmdao.matrices.coo_matrix import COOMatrix
 
 
-class CSRmatrix(COOmatrix):
+class CSRMatrix(COOMatrix):
     """
     Sparse matrix in Compressed Row Storage format.
     """

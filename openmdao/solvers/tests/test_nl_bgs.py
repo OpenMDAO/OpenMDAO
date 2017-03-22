@@ -1,9 +1,6 @@
 """Test the Nonlinear Block Gauss Seidel solver. """
 
-import sys
 import unittest
-
-from six.moves import cStringIO
 
 from openmdao.api import Problem, NonlinearBlockGS, Group, ScipyIterativeSolver
 from openmdao.devtools.testutil import assert_rel_error
@@ -35,7 +32,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
-        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nl_solver = NonlinearBlockGS()
 
         prob.setup()
 

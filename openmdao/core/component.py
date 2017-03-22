@@ -17,7 +17,7 @@ from collections import OrderedDict, Iterable
 
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, PathData
-from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation

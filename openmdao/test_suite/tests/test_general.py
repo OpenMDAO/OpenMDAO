@@ -7,7 +7,7 @@ All Parametric Groups
 'vector_class': One of ['default', 'petsc'], which vector class to use for the problem. ('default')
 'global_jac': bool. If a global jacobian should be used. (True)
 'jacobian_type': One of ['matvec', 'dense', 'sparse-coo', 'sparse-csr']. How the Jacobians are used.
-                 Controls the type of GlobalJacobian. ('matvec')
+                 Controls the type of AssembledJacobian. ('matvec')
                     - 'matvec': Uses compute_jacvec_product.
                     - 'dense': Uses an ndarray.
                     - 'sparse-coo': Uses a COOrdinate format sparse matrix.

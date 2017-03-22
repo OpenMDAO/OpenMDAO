@@ -4,7 +4,7 @@ from __future__ import division, print_function
 import numpy as np
 
 from openmdao.utils.generalized_dict import OptionsDictionary
-from openmdao.jacobians.global_jacobian import GlobalJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 
 
 class Solver(object):
@@ -370,8 +370,8 @@ class BlockLinearSolver(LinearSolver):
         float
             error at the first iteration.
         """
-        if isinstance(self._system._jacobian, GlobalJacobian):
+        if isinstance(self._system._jacobian, AssembledJacobian):
             raise RuntimeError("A block linear solver '%s' is being used with "
-                               "a GlobalJacobian in system '%s'" %
+                               "an AssembledJacobian in system '%s'" %
                                (self.SOLVER, self._system.pathname))
         return super(BlockLinearSolver, self)._iter_initialize()
