@@ -141,21 +141,6 @@ class TestScaling(unittest.TestCase):
         assert_rel_error(self, prob['sys2.new_length'], 3.e-1)
         assert_rel_error(self, prob.model._outputs['sys2.new_length'], 3.e-1)
 
-    def test_pass_through_array(self):
-        group = Group()
-        group.add_subsystem('sys1', IndepVarComp('old_lengths', np.ones(4),
-                                                 units='mm',
-                                                 ref=1e5*np.ones(4)))
-        group.add_subsystem('sys2', PassThroughLengths())
-        group.connect('sys1.old_lengths', 'sys2.old_lengths')
-
-        prob = Problem(group)
-
-        with self.assertRaises(Exception) as cm:
-            prob.setup(check=False)
-        self.assertEqual(str(cm.exception),
-                         "The ref argument should be a float")
-
     def test_speed(self):
         comp = IndepVarComp()
         comp.add_output('distance', 1., units='km')
@@ -394,8 +379,7 @@ class TestScaling(unittest.TestCase):
             def compute(self, inputs, outputs):
                 super(ExpCompArrayScale, self).compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
-                
-                
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -408,7 +392,7 @@ class TestScaling(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['comp.total_volume'], 4.)
-        
+
         with model._scaled_context():
             val = model.get_subsystem('comp')._outputs['areas']
             assert_rel_error(self, val[0, 0], 0.5)
@@ -421,7 +405,7 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val[0, 1], 2.0/3)
             assert_rel_error(self, val[1, 0], 2.0/3)
             assert_rel_error(self, val[1, 1], 2.0/3)
-           
+
     def test_scale_array_with_array(self):
 
         class ExpCompArrayScale(TestExplCompArrayDense):
@@ -462,6 +446,6 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val[0, 1], 2.0/13)
             assert_rel_error(self, val[1, 0], 2.0/17)
             assert_rel_error(self, val[1, 1], 2.0/19)
-           
+
 if __name__ == '__main__':
     unittest.main()

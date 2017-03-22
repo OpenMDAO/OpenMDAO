@@ -370,11 +370,11 @@ class System(object):
             abs2data = self._var_abs2data_io
             vectors['input']._compute_ivar_map(abs2data, 'input')
             vectors['output']._compute_ivar_map(abs2data, 'output')
-            
-            # TODO - Let's only compute a new one when the output and residual scale lengths are 
+
+            # TODO - Let's only compute a new one when the output and residual scale lengths are
             # really different.
             vectors['residual']._compute_ivar_map(abs2data, 'residual')
-            #vectors['residual']._ivar_map = vectors['output']._ivar_map
+            # vectors['residual']._ivar_map = vectors['output']._ivar_map
 
         # Compute the transfer for this vector set
         self._vector_transfers[vec_name] = self._get_transfers(vectors)
@@ -412,19 +412,19 @@ class System(object):
         out_idx = []
         res_idx = []
         for abs_name in self._var_abs_names['output']:
-            meta = abs2data[abs_name]['metadata']        
-            n_out = max(len(np.atleast_1d(meta['ref'])), 
+            meta = abs2data[abs_name]['metadata']
+            n_out = max(len(np.atleast_1d(meta['ref'])),
                         len(np.atleast_1d(meta['ref0'])))
             id0 = nvar_out
             nvar_out += n_out
             out_idx.append((id0, nvar_out))
-            
-            n_res = max(len(np.atleast_1d(meta['res_ref'])), 
-                        len(np.atleast_1d(meta['res_ref0'])))            
+
+            n_res = max(len(np.atleast_1d(meta['res_ref'])),
+                        len(np.atleast_1d(meta['res_ref0'])))
             id0 = nvar_res
             nvar_res += n_res
             res_idx.append((id0, nvar_res))
-            
+
         # Initialize scaling arrays
         for scaling in (self._scaling_to_norm, self._scaling_to_phys):
             scaling['input'] = np.empty((nvar_in, 2))
@@ -449,7 +449,7 @@ class System(object):
         #   b0 = g(a0)
         #   b1 = d0 + d1 a1 - d0
         #   b1 = g(a1) - g(0)
-        
+
         # Inputs have unit conversions.
         for ind, abs_name in enumerate(self._var_abs_names['input']):
             global_ind = abs2idx[abs_name]
