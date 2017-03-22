@@ -424,6 +424,8 @@ class Problem(object):
 
         model = self.model
 
+        # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
+
         all_comps = model.system_iter(typ=Component)
         if comps is None:
             comps = [comp for comp in all_comps]
@@ -442,12 +444,18 @@ class Problem(object):
         # This is a defaultdict of (defaultdict of dicts).
         partials_data = defaultdict(lambda: defaultdict(dict))
 
+        # Caching current point to restore after setups.
+        input_cache = model._inputs._clone()
+        output_cache = model._outputs._clone()
+
         # Analytic Jacobians
         for mode in ('fwd', 'rev'):
             self.setup(mode=mode, check=False)
             model.suppress_solver_output = True
+            model._inputs.set_vec(input_cache)
+            model._outputs.set_vec(output_cache)
             # Make sure we're in a valid state
-            self.run_model()
+            model.run_apply_nonlinear()
             model.run_linearize()
 
             jac_key = 'J_' + mode
@@ -592,7 +600,9 @@ class Problem(object):
                         comp._negate_jac()
 
         self.setup(mode=current_mode)
-        self.run_model()
+        model._inputs.set_vec(input_cache)
+        model._outputs.set_vec(output_cache)
+        model.run_apply_nonlinear()
 
         # Finite Difference (or TODO: Complex Step) to calculate Jacobian
         jac_key = 'J_fd'
