@@ -447,5 +447,49 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val[1, 0], 2.0/17)
             assert_rel_error(self, val[1, 1], 2.0/19)
 
+    def test_scale_and_add_array_with_array(self):
+
+        class ExpCompArrayScale(TestExplCompArrayDense):
+
+            def initialize_variables(self):
+                self.add_input('lengths', val=np.ones((2, 2)))
+                self.add_input('widths', val=np.ones((2, 2)))
+                self.add_output('areas', val=np.ones((2, 2)), ref=np.array([[2.0, 3.0], [5.0, 7.0]]),
+                                ref0=np.array([[0.1, 0.2], [0.3, 0.4]]))
+                self.add_output('stuff', val=np.ones((2, 2)), ref=np.array([[11.0, 13.0], [17.0, 19.0]]),
+                                ref0=np.array([[0.6, 0.7], [0.8, 0.9]]))
+                self.add_output('total_volume', val=1.)
+
+            def compute(self, inputs, outputs):
+                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                outputs['stuff'] = inputs['widths'] + inputs['lengths']
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
+        model.add_subsystem('comp', ExpCompArrayScale())
+        model.connect('p1.x', 'comp.lengths')
+
+        prob.setup(check=False)
+        prob['comp.widths'] = np.ones((2, 2))
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.total_volume'], 4.)
+
+        # (res1-res_ref0)/(res_ref-res_ref0))
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['areas']
+            assert_rel_error(self, val[0, 0], (1.0 - 0.1)/(2 - 0.1))
+            assert_rel_error(self, val[0, 1], (1.0 - 0.2)/(3 - 0.2))
+            assert_rel_error(self, val[1, 0], (1.0 - 0.3)/(5 - 0.3))
+            assert_rel_error(self, val[1, 1], (1.0 - 0.4)/(7 - 0.4))
+
+            val = model.get_subsystem('comp')._outputs['stuff']
+            assert_rel_error(self, val[0, 0], (2.0 - 0.6)/(11 - 0.6))
+            assert_rel_error(self, val[0, 1], (2.0 - 0.7)/(13 - 0.7))
+            assert_rel_error(self, val[1, 0], (2.0 - 0.8)/(17 - 0.8))
+            assert_rel_error(self, val[1, 1], (2.0 - 0.9)/(19 - 0.9))
+
 if __name__ == '__main__':
     unittest.main()
