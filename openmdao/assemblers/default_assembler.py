@@ -84,7 +84,7 @@ class DefaultAssembler(Assembler):
         for in_ind in range(in_ind1, in_ind2):
             iabs = self._var_allprocs_abs_names['input'][in_ind]
             oabs = self._abs_input2src[iabs]
-            if oabs is None:
+            if oabs is None:  # input is not connected
                 continue
 
             out_ind = self._var_allprocs_abs2idx_io[oabs]
@@ -103,7 +103,7 @@ class DefaultAssembler(Assembler):
                     ind1, ind2 = self._src_indices_range[in_ivar_set, :]
                     inds = self._src_indices[ind1:ind2]
 
-                    output_inds = np.zeros(inds.shape[0], int)
+                    output_inds = np.zeros(inds.size, int)
                     ind1, ind2 = 0, 0
                     for iproc in range(self._comm.size):
                         ind2 += out_sizes[iproc, out_ivar_set]

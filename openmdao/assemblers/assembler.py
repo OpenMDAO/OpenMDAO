@@ -112,43 +112,44 @@ class Assembler(object):
         abs_names : {'input': [str, ...], 'output': [str, ...]}
             lists of absolute names of input and output variables on this proc.
         """
-        self._var_allprocs_abs_names = allprocs_abs_names
-        self._var_allprocs_abs2idx_io = {}
-        for type_ in ['input', 'output']:
-            for idx, abs_name in enumerate(allprocs_abs_names[type_]):
-                self._var_allprocs_abs2idx_io[abs_name] = idx
-
         iproc = self._comm.rank
         nproc = self._comm.size
-        indices = self._var_allprocs_abs2idx_io
+
+        self._var_allprocs_abs_names = allprocs_abs_names
+        self._var_allprocs_abs2idx_io = indices = {}
+        for type_ in ['input', 'output']:
+            for idx, abs_name in enumerate(allprocs_abs_names[type_]):
+                indices[abs_name] = idx
+
+        self._var_allprocs_abs2meta_io = abs2meta = {}
+        for abs_name, data in iteritems(abs2data):
+            dmeta = data['metadata']
+            # only copy what we need in all procs
+            abs2meta[abs_name] = {n: dmeta[n] for n in ('units',
+                                                        'shape',
+                                                        'var_set')}
+
+        if nproc > 1:
+            for rank, a2m in enumerate(self._comm.allgather(abs2meta)):
+                if rank != iproc:
+                    abs2meta.update(a2m)
 
         for typ in ['input', 'output']:
-            nvar = len(abs_names[typ])
-            nvar_all = len(self._var_allprocs_abs_names[typ])
+            nvar_all = len(allprocs_abs_names[typ])
 
-            # Locally determine var_set for each var
-            local_set_dict = {}
-            for ivar, absname in enumerate(abs_names[typ]):
-                ivar_all = indices[absname]
-                local_set_dict[ivar_all] = abs2data[absname]['metadata']['var_set']
-
-            # Broadcast ivar_all-iset pairs to all procs
-            if self._comm.size > 1:
-                global_set_dict = {}
-                for local_set_dict in self._comm.allgather(local_set_dict):
-                    global_set_dict.update(local_set_dict)
-            else:
-                global_set_dict = local_set_dict
+            # determine var_set for each var
+            set_dict = {i: abs2meta[n]['var_set']
+                        for i, n in enumerate(allprocs_abs_names[typ])}
 
             # Compute set_name to ID maps
-            for iset, set_name in enumerate(set(global_set_dict.values())):
+            for iset, set_name in enumerate(set(set_dict.values())):
                 self._variable_set_IDs[typ][set_name] = iset
 
             # Compute _variable_set_indices and var_count
             var_count = np.zeros(len(self._variable_set_IDs[typ]), int)
             self._variable_set_indices[typ] = -np.ones((nvar_all, 2), int)
-            for ivar_all in global_set_dict:
-                set_name = global_set_dict[ivar_all]
+            for ivar_all in set_dict:
+                set_name = set_dict[ivar_all]
 
                 iset = self._variable_set_IDs[typ][set_name]
 
@@ -175,14 +176,8 @@ class Assembler(object):
                 self._variable_sizes[typ][iset][iproc, ivar_set] = size
                 self._variable_sizes_all[typ][iproc, ivar_all] = size
 
-        abs2meta = {}
-        for abs_name, data in iteritems(abs2data):
-            dmeta = data['metadata']
-            # only copy what we need in all procs
-            abs2meta[abs_name] = {n: dmeta[n] for n in ('units', 'shape')}
-
         # Do an allgather on the sizes arrays and metadata
-        if self._comm.size > 1:
+        if nproc > 1:
             for typ in ['input', 'output']:
                 nset = len(self._variable_sizes[typ])
                 for iset in range(nset):
@@ -190,12 +185,6 @@ class Assembler(object):
                     self._comm.Allgather(array[iproc, :], array)
                 self._comm.Allgather(self._variable_sizes_all[typ][iproc, :],
                                      self._variable_sizes_all[typ])
-
-            for rank, a2m in enumerate(self._comm.allgather(abs2meta)):
-                if rank != iproc:
-                    abs2meta.update(a2m)
-
-        self._var_allprocs_abs2meta_io = abs2meta
 
     def _setup_connections(self, connections, prom2abs, abs2data):
         """

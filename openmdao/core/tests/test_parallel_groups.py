@@ -4,7 +4,7 @@ from __future__ import division, print_function
 
 import unittest
 
-from openmdao.api import Problem, Group, ExecComp
+from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -24,9 +24,24 @@ class TestParallelGroups(unittest.TestCase):
 
     def test_fan_out_grouped(self):
         prob = Problem(FanOutGrouped())
-        prob.setup(vector_class=PETScVector, check=False)
+
+        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
         prob.model.suppress_solver_output = True
         prob.run_model()
+
+        J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
+
+        print('fwd', J)
+        assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
+
+        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+
+        J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
+        print('rev', J)
+
+        assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
@@ -64,4 +79,40 @@ class TestParallelGroups(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    #unittest.main()
+
+    prob = Problem()
+    model = prob.model
+
+    model.add_subsystem('iv', IndepVarComp('x', 1.0))
+    model.add_subsystem('c1', ExecComp(['y=3.0*x', 'y2=4.0*xx']))
+
+    sub = model.add_subsystem('sub', ParallelGroup())
+    sub.add_subsystem('c2', ExecComp(['y=-2.0*x']))
+    sub.add_subsystem('c3', ExecComp(['y=5.0*x']))
+
+    model.add_subsystem('c2', ExecComp(['y=x']))
+    model.add_subsystem('c3', ExecComp(['y=x']))
+
+    model.connect('iv.x', 'c1.x')
+
+    model.connect('c1.y', 'sub.c2.x')
+    model.connect('c1.y', 'sub.c3.x')
+
+    model.connect('sub.c2.y', 'c2.x')
+    model.connect('sub.c3.y', 'c3.x')
+
+    prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+    prob.model.suppress_solver_output = True
+    prob.run_model()
+
+    import wingdbstub
+    J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
+
+    print('fwd', J)
+
+    prob.setup(vector_class=PETScVector, check=False, mode='rev')
+    prob.run_model()
+
+    J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
+    print('rev', J)
