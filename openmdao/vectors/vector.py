@@ -136,6 +136,12 @@ class Vector(object):
         The ivar_map index vector is the same length as data and indices,
         and it yields the index of the local variable.
 
+        Parameters
+        ----------
+        abs2data : {str: {}, ...}
+            Mapping of absolute pathname to metadata dict.
+        vectype : str
+            Vector type, one of 'input', 'output', 'residual'.
         """
         system = self._system
         assembler = system._assembler
