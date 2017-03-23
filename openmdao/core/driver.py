@@ -259,6 +259,15 @@ class Driver(object):
         # TODO_RECORDERS: do the equivalent to this
         #         self.rec_mgr.record_iteration(system, metadata)
 
+        # need to record these :
+
+        #     design_vars
+        #     response
+        #     objectives
+        #     constraints
+
+        # We would definitely need driver recording (dvs, responses, …), and optionally recording of state values in each optimization iteration
+
 
         # objective_values = self.get_objective_values()
 
