@@ -406,7 +406,10 @@ class System(object):
         abs2data = self._var_abs2data_io
         nvar_in = len(self._var_abs_names['input'])
 
-        # Support for vector scaling requires inpsecting the refs.
+        # Support for vector scaling requires inpsecting all the scale values before we size the
+        # phys_to_norm and norm_to_phys arrays. Note that we could have one of (ref, ref0) as a
+        # scaler and the other as an array. Since we don't want to bookkeep these independently
+        # (or do we), we just allocate for the array.
         nvar_out = 0
         nvar_res = 0
         out_idx = []
