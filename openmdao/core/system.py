@@ -616,15 +616,12 @@ class System(object):
         """
         transfer_class = vectors['output'].TRANSFER
 
-        nsub_allprocs = len(self._subsystems_allprocs)
-        var_range = self._var_allprocs_idx_range
-        subsystems_myproc = self._subsystems_myproc
-        subsystems_inds = self._subsystems_myproc_inds
-
         # Call the assembler's transfer setup routine
         compute_transfers = self._assembler._compute_transfers
-        xfer_indices = compute_transfers(nsub_allprocs, var_range,
-                                         subsystems_myproc, subsystems_inds)
+        xfer_indices = compute_transfers(len(self._subsystems_allprocs),
+                                         self._var_allprocs_idx_range,
+                                         self._subsystems_myproc,
+                                         self._subsystems_myproc_inds)
         (xfer_in_inds, xfer_out_inds,
          fwd_xfer_in_inds, fwd_xfer_out_inds,
          rev_xfer_in_inds, rev_xfer_out_inds) = xfer_indices

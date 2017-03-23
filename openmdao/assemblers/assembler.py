@@ -125,9 +125,16 @@ class Assembler(object):
         for abs_name, data in iteritems(abs2data):
             dmeta = data['metadata']
             # only copy what we need in all procs
-            abs2meta[abs_name] = {n: dmeta[n] for n in ('units',
-                                                        'shape',
-                                                        'var_set')}
+            if data['type'] == 'input':
+                abs2meta[abs_name] = {n: dmeta[n] for n in ('units',
+                                                            'shape',
+                                                            'var_set')}
+            else:  # output
+                abs2meta[abs_name] = {n: dmeta[n] for n in ('units',
+                                                            'shape',
+                                                            'var_set',
+                                                            'ref',
+                                                            'ref0')}
 
         if nproc > 1:
             for rank, a2m in enumerate(self._comm.allgather(abs2meta)):
@@ -277,6 +284,7 @@ class Assembler(object):
             lists of absolute names of input and output variables on this proc.
         """
         abs2idx = self._var_allprocs_abs2idx_io
+        abs2meta = self._var_allprocs_abs2meta_io
         out_all_paths = self._var_allprocs_abs_names['output']
         in_paths = abs_names['input']
 
@@ -285,7 +293,7 @@ class Assembler(object):
         sizes = np.zeros(len(in_paths), dtype=int)
 
         for ind, abs_in in enumerate(in_paths):
-            sizes[ind] = np.prod(abs2data[abs_in]['metadata']['shape'])
+            sizes[ind] = np.prod(abs2meta[abs_in]['shape'])
 
         total_idx_size = np.sum(sizes)
 
@@ -297,10 +305,10 @@ class Assembler(object):
         # Populate arrays
         ind1, ind2 = 0, 0
         for ind, abs_in in enumerate(in_paths):
-            in_meta = abs2data[abs_in]['metadata']
+            in_meta = abs2meta[abs_in]
             isize = sizes[ind]
             ind2 += isize
-            src_indices = in_meta['src_indices']
+            src_indices = abs2data[abs_in]['metadata']['src_indices']
             if src_indices is None:
                 self._src_indices[ind1:ind2] = np.arange(isize, dtype=int)
             elif src_indices.ndim == 1:
@@ -310,12 +318,7 @@ class Assembler(object):
                 if src is None:  # input is not connected
                     self._src_indices[ind1:ind2] = np.arange(isize, dtype=int)
                 else:
-                    # TODO: the src may not be in this processes and we need its shape
-                    if src not in abs2data:
-                        raise NotImplementedError("accessing source metadata from "
-                                                  "another process isn't supported "
-                                                  "yet.")
-                    src_shape = abs2data[src]['metadata']['shape']
+                    src_shape = abs2meta[src]['shape']
                     if len(src_shape) == 1:
                         self._src_indices[ind1:ind2] = src_indices.flat
                     else:
@@ -329,7 +332,7 @@ class Assembler(object):
             self._src_indices_range[abs2idx[abs_in], :] = [ind1, ind2]
             ind1 += isize
 
-    def _setup_src_data(self, abs_out_names, abs2data):
+    def _setup_src_data(self, abs_out_names):
         """
         Compute and store unit/scaling information for inputs.
 
@@ -337,41 +340,19 @@ class Assembler(object):
         ----------
         abs_out_names : list of str
             list of absolute names of outputs for the root system on this proc.
-        abs2data : {str: {}, ...}
-            Mapping of absolute name to data dict for vars on this proc.
         """
         nvar_out = len(abs_out_names)
         indices = self._var_allprocs_abs2idx_io
+        abs2meta = self._var_allprocs_abs2meta_io
 
-        # The out_* variables are lists of units, output indices, and scaling coeffs.
-        # for local outputs. These will initialized, then broadcast to all processors
-        # since not all variables are declared on all processors, then their data will
-        # be put in the _src_units and _src_scaling_0/1 attributes, where they are
-        # ordered by target input, rather than all the outputs in order.
-
-        # dict of units and scaling info of locally declared output variables.
         # physical_unscaled = c0 + c1 * unitless_scaled
-        # where c0 and c1 are the two columns of out_scaling.
+        # where c0 and c1 are the two columns of _src_scaling.
         # Below, ref0 and ref are the values of the variable in the specified
         # units at which the scaled values are 0 and 1, respectively.
-        out_scaling = {
-            name: (abs2data[name]['metadata']['units'],
-                   abs2data[name]['metadata']['ref'],
-                   abs2data[name]['metadata']['ref0'])
-                        for name in abs_out_names
-        }
-
-        # Broadcast to all procs
-        if self._comm.size > 1:
-            out_scaling_raw = self._comm.allgather(out_scaling)
-            iproc = self._comm.rank
-            for rank, scaling in enumerate(out_scaling_raw):
-                if iproc != rank:
-                    out_scaling.update(scaling)
 
         # Now, we can store the units and scaling coefficients by input
-        # by referring to the out_* variables via the input-to-src mapping
-        # which is called _abs_input2src.
+        # by referring to the metadata for source outputs determined using
+        # the input-to-src mapping _abs_input2src.
         nvar_in = len(self._abs_input2src)
         self._src_units = [None for ind in range(nvar_in)]
         self._src_scaling = np.empty((nvar_in, 2))
@@ -381,9 +362,10 @@ class Assembler(object):
                 self._src_units[ivar_in] = None
                 self._src_scaling[ivar_in, :] = [0., 1.]
             else:
-                units, ref, ref0 = out_scaling[out_abs]
-                self._src_units[ivar_in] = units
+                ref = abs2meta[out_abs]['ref']
+                ref0 = abs2meta[out_abs]['ref0']
                 self._src_scaling[ivar_in, :] = (ref0, ref - ref0)
+                self._src_units[ivar_in] = abs2meta[out_abs]['units']
 
     def _compute_transfers(self, nsub_allprocs, var_range,
                            subsystems_myproc, subsystems_inds):

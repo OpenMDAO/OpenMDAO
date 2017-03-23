@@ -285,8 +285,7 @@ class Problem(object):
                                      model._var_abs_names)
 
         # Assembler setup: compute data required for units/scaling
-        assembler._setup_src_data(model._var_abs_names['output'],
-                                  model._var_abs2data_io)
+        assembler._setup_src_data(model._var_abs_names['output'])
 
         # Set up scaling vectors
         model._setup_scaling()
