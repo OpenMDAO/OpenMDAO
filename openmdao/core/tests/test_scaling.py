@@ -81,11 +81,16 @@ class ScalingTestComp(ImplicitComponent):
 
         r1, r2, c1, c2 = self.metadata['coeffs']
 
+        # We need to start at a different initial condition for different problems.
+        init_state = 1.0
+
         # Scale the output based on the column coeff.
         if self.metadata['row'] == 1:
             ref = 1. / c1
+            init_state = 1.0 / c1
         elif self.metadata['row'] == 2:
             ref = 1. / c2
+            init_state = 1.0 / c2
 
         # Scale the output based on the column coeff.
         if self.metadata['row'] == 1:
@@ -99,7 +104,7 @@ class ScalingTestComp(ImplicitComponent):
             res_ref = 1.0
 
         self.add_input('x')
-        self.add_output('y', ref=ref, res_ref=res_ref)
+        self.add_output('y', val = init_state, ref=ref, res_ref=res_ref)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         r1, r2, c1, c2 = self.metadata['coeffs']
@@ -175,6 +180,9 @@ class TestScaling(unittest.TestCase):
             prob.model.connect('row2.y', 'row1.x')
             prob.model.nl_solver = NewtonSolver(maxiter=2, atol=1e-5, rtol=0)
             prob.model.nl_solver.ln_solver = ScipyIterativeSolver(maxiter=1)
+
+            prob.model.suppress_solver_output = True
+
             prob.setup(check=False)
             result = prob.run_model()
 
@@ -490,6 +498,46 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val[0, 1], (2.0 - 0.7)/(13 - 0.7))
             assert_rel_error(self, val[1, 0], (2.0 - 0.8)/(17 - 0.8))
             assert_rel_error(self, val[1, 1], (2.0 - 0.9)/(19 - 0.9))
+
+    def test_implicit_scale(self):
+
+        class ImpCompArrayScale(TestImplCompArrayDense):
+            def initialize_variables(self):
+                self.add_input('rhs', val=np.ones(2))
+                self.add_output('x', val=np.zeros(2), ref=np.array([2.0, 3.0]),
+                                ref0=np.array([4.0, 5.0]),
+                                res_ref = np.array([7.0, 11.0]),
+                                res_ref0 = np.array([13.0, 18.0]))
+                self.add_output('extra', val=np.zeros(2), ref=np.array([12.0, 13.0]),
+                                ref0=np.array([14.0, 15.0]))
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
+                residuals['extra'] = 2.0*self.metadata['mtx'].dot(outputs['x']) - 3.0*inputs['rhs']
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', np.ones(2)))
+        model.add_subsystem('comp', ImpCompArrayScale())
+        model.connect('p1.x', 'comp.rhs')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        base_x = model.get_subsystem('comp')._outputs['x'].copy()
+        base_ex = model.get_subsystem('comp')._outputs['extra'].copy()
+        base_res_x = model.get_subsystem('comp')._residuals['x'].copy()
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['x']
+            assert_rel_error(self, val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
+            assert_rel_error(self, val[1], (base_x[1] - 5.0)/(3.0 - 5.0))
+            val = model.get_subsystem('comp')._outputs['extra']
+            assert_rel_error(self, val[0], (base_ex[0] - 14.0)/(12.0 - 14.0))
+            assert_rel_error(self, val[1], (base_ex[1] - 15.0)/(13.0 - 15.0))
+            val = model.get_subsystem('comp')._residuals['x'].copy()
+            assert_rel_error(self, val[0], (base_res_x[0] - 13.0)/(7.0 - 13.0))
+            assert_rel_error(self, val[1], (base_res_x[1] - 18.0)/(11.0 - 18.0))
 
 if __name__ == '__main__':
     unittest.main()
