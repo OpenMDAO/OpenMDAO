@@ -35,7 +35,7 @@ class Driver(object):
         Initialize the driver.
         """
 
-        self.recorders = RecordingManager()
+        self.rec_mgr = RecordingManager()
 
         self._problem = None
         self._designvars = None
@@ -72,12 +72,12 @@ class Driver(object):
         recorder : BaseRecorder
            A recorder instance.
         """
-        self.recorders.append(recorder)
+        self.rec_mgr.append(recorder)
         return recorder
 
     def cleanup(self):
         """ Clean up resources prior to exit. """
-        self.recorders.close()
+        self.rec_mgr.close()
 
     def _setup_driver(self, problem):
         """
@@ -257,12 +257,12 @@ class Driver(object):
         failure_flag = self._problem.model._solve_nonlinear()
 
         # TODO_RECORDERS: do the equivalent to this
-        #         self.recorders.record_iteration(system, metadata)
+        #         self.rec_mgr.record_iteration(system, metadata)
 
 
         # objective_values = self.get_objective_values()
 
-        self.recorders.record_iteration(self)
+        self.rec_mgr.record_iteration(self)
 
         return failure_flag
 

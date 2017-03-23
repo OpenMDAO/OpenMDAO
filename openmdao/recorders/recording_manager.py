@@ -99,7 +99,7 @@ class RecordingManager(object):
 
             # now localize the lists to only
             # include local vars.  We need to do this after determining
-            # if any mpi procs need to record each of params, unknowns,
+            # if any mpi procs need to record each of inputs, outputs,
             # and resids.  If none of them do, we can skip the mpi gather
             # for that group of vars.
             if MPI:
@@ -141,14 +141,14 @@ class RecordingManager(object):
 
     def _get_local_case_data(self, root):
         """get names and values of all locally owned variables."""
-        params = root.params
-        unknowns = root.unknowns
+        inputs = root.inputs
+        outputs = root.outputs
         resids = root.resids
-        params = [(p, params[p]) for p in self._vars_to_record['pnames']]
-        unknowns = [(u, unknowns[u]) for u in self._vars_to_record['unames']]
+        inputs = [(p, inputs[p]) for p in self._vars_to_record['pnames']]
+        outputs = [(u, outputs[u]) for u in self._vars_to_record['unames']]
         resids = [(r, resids[r]) for r in self._vars_to_record['rnames']]
 
-        return params, unknowns, resids
+        return inputs, outputs, resids
 
     def record_completed_case(self, root, case):
         """Record the variables in the given case."""
@@ -193,8 +193,8 @@ class RecordingManager(object):
         if metadata is not None:
             metadata['timestamp'] = time.time()
 
-        params = root.params
-        unknowns = root.unknowns
+        inputs = root.inputs
+        outputs = root.outputs
         resids = root.resids
 
         cases = None
@@ -212,19 +212,19 @@ class RecordingManager(object):
             rnames = self._vars_to_record['rnames']
 
             # get names and values of all locally owned variables
-            params = {p: params[p] for p in pnames}
-            unknowns = {u: unknowns[u] for u in unames}
+            inputs = {p: inputs[p] for p in pnames}
+            outputs = {u: outputs[u] for u in unames}
             resids = {r: resids[r] for r in rnames}
 
             if self._has_serial_recorders:
-                params = self._gather_vars(root, params) if self._record_p else {}
-                unknowns = self._gather_vars(root, unknowns) if self._record_u else {}
+                inputs = self._gather_vars(root, inputs) if self._record_p else {}
+                outputs = self._gather_vars(root, outputs) if self._record_u else {}
                 resids = self._gather_vars(root, resids) if self._record_r else {}
 
                 if self._casecomm is not None:
                     # our parent driver is running a parallel DOE, so we need to
                     # gather all of the cases to this rank and loop over them
-                    case = (params, unknowns, resids, metadata)
+                    case = (inputs, outputs, resids, metadata)
                     if trace: debug("gathering cases")
                     cases = self._casecomm.gather(case, root=0)
                     if trace: debug("done gathering cases")
@@ -232,16 +232,16 @@ class RecordingManager(object):
                         cases = []
 
         if cases is None:
-            cases = [(params, unknowns, resids, metadata)]
+            cases = [(inputs, outputs, resids, metadata)]
 
         # If the recorder does not support parallel recording
         # we need to make sure we only record on rank 0.
-        for params, unknowns, resids, meta in cases:
-            if params is None: # dummy cases have None in place of params, etc.
+        for inputs, outputs, resids, meta in cases:
+            if inputs is None: # dummy cases have None in place of inputs, etc.
                 continue
             for recorder in self._recorders:
                 if recorder._parallel or MPI is None or self.rank == 0:
-                    recorder.record_iteration(params, unknowns, resids, meta)
+                    recorder.record_iteration(inputs, outputs, resids, meta)
 
     def record_derivatives(self, derivs, metadata):
         """" Records derivatives if requested.

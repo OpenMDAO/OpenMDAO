@@ -5,7 +5,7 @@ import sys
 
 from six import StringIO
 
-# from openmdao.util.options import OptionsDictionary
+from openmdao.utils.generalized_dict import OptionsDictionary
 
 class BaseRecorder(object):
     """ This is a base class for all case recorders and is not a functioning
@@ -15,11 +15,11 @@ class BaseRecorder(object):
     -------
     options['record_metadata'] :  bool(True)
         Tells recorder whether to record variable attribute metadata.
-    options['record_unknowns'] :  bool(True)
-        Tells recorder whether to record the unknowns vector.
-    options['record_params'] :  bool(False)
-        Tells recorder whether to record the params vector.
-    options['record_resids'] :  bool(False)
+    options['record_outputs'] :  bool(True)
+        Tells recorder whether to record the outputs vector.
+    options['record_inputs'] :  bool(False)
+        Tells recorder whether to record the inputs vector.
+    options['record_residuals'] :  bool(False)
         Tells recorder whether to record the ressiduals vector.
     options['record_derivs'] :  bool(True)
         Tells recorder whether to record derivatives that are requested by a `Driver`.
@@ -30,19 +30,19 @@ class BaseRecorder(object):
     """
 
     def __init__(self):
-        # self.options = OptionsDictionary()
-        # self.options.add_option('record_metadata', True)
-        # self.options.add_option('record_unknowns', True)
-        # self.options.add_option('record_params', False)
-        # self.options.add_option('record_resids', False)
-        # self.options.add_option('record_derivs', True,
-        #                         desc='Set to True to record derivatives at the driver level')
-        # self.options.add_option('includes', ['*'],
-        #                         desc='Patterns for variables to include in recording')
-        # self.options.add_option('excludes', [],
-        #                         desc='Patterns for variables to exclude from recording '
-        #                         '(processed after includes)')
-        # self.out = None
+        self.options = OptionsDictionary()
+        self.options.add_option('record_metadata', True)
+        self.options.add_option('record_outputs', True)
+        self.options.add_option('record_inputs', False)
+        self.options.add_option('record_residuals', False)
+        self.options.add_option('record_derivs', True,
+                                 desc='Set to True to record derivatives at the driver level')
+        self.options.add_option('includes', ['*'],
+                                 desc='Patterns for variables to include in recording')
+        self.options.add_option('excludes', [],
+                                 desc='Patterns for variables to exclude from recording '
+                                 '(processed after includes)')
+        self.out = None
 
         # # This is for drivers to determine if a recorder supports
         # # real parallel recording (recording on each process), because
@@ -56,7 +56,7 @@ class BaseRecorder(object):
 
         # self._filtered = {}
         # TODO: System specific includes/excludes
-        pass
+        #pass
 
     def startup(self, group):
         """ Prepare for a new run.
@@ -67,27 +67,27 @@ class BaseRecorder(object):
             Group that owns this recorder.
         """
 
-        # myparams = myunknowns = myresids = set()
+        myinputs = myoutputs = myresiduals = set()
 
-        # check = self._check_path
-        # incl = self.options['includes']
-        # excl = self.options['excludes']
+        check = self._check_path
+        incl = self.options['includes']
+        excl = self.options['excludes']
 
-        # # Compute the inclusion lists for recording
-        # if self.options['record_params']:
-        #     myparams = [n for n in group.params if check(n, incl, excl)]
-        # if self.options['record_unknowns']:
-        #     myunknowns = [n for n in group.unknowns if check(n, incl, excl)]
-        #     if self.options['record_resids']:
-        #         myresids = myunknowns # unknowns and resids have same names
-        # elif self.options['record_resids']:
-        #     myresids = [n for n in group.resids if check(n, incl, excl)]
+        # Compute the inclusion lists for recording
+        if self.options['record_inputs']:
+            myinputs = [n for n in group.inputs if check(n, incl, excl)]
+        if self.options['record_outputs']:
+            myoutputs = [n for n in group.outputs if check(n, incl, excl)]
+            if self.options['record_residuals']:
+                myresiduals = myoutputs # outputs and residuals have same names
+        elif self.options['record_residuals']:
+            myresiduals = [n for n in group.residuals if check(n, incl, excl)]
 
-        # self._filtered[group.pathname] = {
-        #     'p': myparams,
-        #     'u': myunknowns,
-        #     'r': myresids
-        # }
+        self._filtered[group.pathname] = {
+            'p': myinputs,
+            'u': myoutputs,
+            'r': myresiduals
+        }
         pass
 
     def _check_path(self, path, includes, excludes):
@@ -133,19 +133,19 @@ class BaseRecorder(object):
         """
         raise NotImplementedError()
 
-    def record_iteration(self, params, unknowns, resids, metadata):
+    def record_iteration(self, inputs, outputs, residuals, metadata):
         """
         Writes the provided data.
 
         Args
         ----
-        params : dict
+        inputs : dict
             Dictionary containing parameters. (p)
 
-        unknowns : dict
+        outputs : dict
             Dictionary containing outputs and states. (u)
 
-        resids : dict
+        residuals : dict
             Dictionary containing residuals. (r)
 
         metadata : dict, optional
