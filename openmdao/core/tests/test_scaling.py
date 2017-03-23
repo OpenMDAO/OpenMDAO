@@ -1,13 +1,17 @@
 """Define the units/scaling tests."""
 from __future__ import division, print_function
 
-import numpy as np
 import unittest
+from six import assertRaisesRegex
+
+import numpy as np
 
 from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp
 from openmdao.api import NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
 
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
+from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDense
 
 
 class PassThroughLength(ExplicitComponent):
@@ -79,11 +83,16 @@ class ScalingTestComp(ImplicitComponent):
 
         r1, r2, c1, c2 = self.metadata['coeffs']
 
+        # We need to start at a different initial condition for different problems.
+        init_state = 1.0
+
         # Scale the output based on the column coeff.
         if self.metadata['row'] == 1:
             ref = 1. / c1
+            init_state = 1.0 / c1
         elif self.metadata['row'] == 2:
             ref = 1. / c2
+            init_state = 1.0 / c2
 
         # Scale the output based on the column coeff.
         if self.metadata['row'] == 1:
@@ -97,7 +106,7 @@ class ScalingTestComp(ImplicitComponent):
             res_ref = 1.0
 
         self.add_input('x')
-        self.add_output('y', ref=ref, res_ref=res_ref)
+        self.add_output('y', val = init_state, ref=ref, res_ref=res_ref)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         r1, r2, c1, c2 = self.metadata['coeffs']
@@ -120,6 +129,56 @@ class ScalingTestComp(ImplicitComponent):
 
 class TestScaling(unittest.TestCase):
 
+    def test_error_messages(self):
+
+        class EComp(ImplicitComponent):
+            def initialize_variables(self):
+                self.add_output('zz', val=np.ones((4, 2)), ref=np.ones((3, 5)))
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('comp', EComp())
+
+        msg = "The ref argument has the wrong shape"
+        with assertRaisesRegex(self, ValueError, msg):
+            prob.setup(check=False)
+
+        class EComp(ImplicitComponent):
+            def initialize_variables(self):
+                self.add_output('zz', val=np.ones((4, 2)), ref0=np.ones((3, 5)))
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('comp', EComp())
+
+        msg = "The ref0 argument has the wrong shape"
+        with assertRaisesRegex(self, ValueError, msg):
+            prob.setup(check=False)
+
+        class EComp(ImplicitComponent):
+            def initialize_variables(self):
+                self.add_output('zz', val=np.ones((4, 2)), res_ref=np.ones((3, 5)))
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('comp', EComp())
+
+        msg = "The res_ref argument has the wrong shape"
+        with assertRaisesRegex(self, ValueError, msg):
+            prob.setup(check=False)
+
+        class EComp(ImplicitComponent):
+            def initialize_variables(self):
+                self.add_output('zz', val=np.ones((4, 2)), res_ref0=np.ones((3, 5)))
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('comp', EComp())
+
+        msg = "The res_ref0 argument has the wrong shape"
+        with assertRaisesRegex(self, ValueError, msg):
+            prob.setup(check=False)
+
     def test_pass_through(self):
         group = Group()
         group.add_subsystem('sys1', IndepVarComp('old_length', 1.0,
@@ -138,21 +197,6 @@ class TestScaling(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['sys2.new_length'], 3.e-1)
         assert_rel_error(self, prob.model._outputs['sys2.new_length'], 3.e-1)
-
-    def test_pass_through_array(self):
-        group = Group()
-        group.add_subsystem('sys1', IndepVarComp('old_lengths', np.ones(4),
-                                                 units='mm',
-                                                 ref=1e5*np.ones(4)))
-        group.add_subsystem('sys2', PassThroughLengths())
-        group.connect('sys1.old_lengths', 'sys2.old_lengths')
-
-        prob = Problem(group)
-
-        with self.assertRaises(Exception) as cm:
-            prob.setup(check=False)
-        self.assertEqual(str(cm.exception),
-                         "The ref argument should be a float")
 
     def test_speed(self):
         comp = IndepVarComp()
@@ -188,6 +232,9 @@ class TestScaling(unittest.TestCase):
             prob.model.connect('row2.y', 'row1.x')
             prob.model.nl_solver = NewtonSolver(maxiter=2, atol=1e-5, rtol=0)
             prob.model.nl_solver.ln_solver = ScipyIterativeSolver(maxiter=1)
+
+            prob.model.suppress_solver_output = True
+
             prob.setup(check=False)
             result = prob.run_model()
 
@@ -377,6 +424,172 @@ class TestScaling(unittest.TestCase):
             res1a = model.get_subsystem('p1')._residuals.get_data()[0]
 
             self.assertEqual(res1a, (res1-res_ref0)/(res_ref-res_ref0))
+
+    def test_scale_array_with_float(self):
+
+        class ExpCompArrayScale(TestExplCompArrayDense):
+
+            def initialize_variables(self):
+                self.add_input('lengths', val=np.ones((2, 2)))
+                self.add_input('widths', val=np.ones((2, 2)))
+                self.add_output('areas', val=np.ones((2, 2)), ref=2.0)
+                self.add_output('stuff', val=np.ones((2, 2)), ref=3.0)
+                self.add_output('total_volume', val=1.)
+
+            def compute(self, inputs, outputs):
+                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                outputs['stuff'] = inputs['widths'] + inputs['lengths']
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
+        model.add_subsystem('comp', ExpCompArrayScale())
+        model.connect('p1.x', 'comp.lengths')
+
+        prob.setup(check=False)
+        prob['comp.widths'] = np.ones((2, 2))
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.total_volume'], 4.)
+
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['areas']
+            assert_rel_error(self, val[0, 0], 0.5)
+            assert_rel_error(self, val[0, 1], 0.5)
+            assert_rel_error(self, val[1, 0], 0.5)
+            assert_rel_error(self, val[1, 1], 0.5)
+
+            val = model.get_subsystem('comp')._outputs['stuff']
+            assert_rel_error(self, val[0, 0], 2.0/3)
+            assert_rel_error(self, val[0, 1], 2.0/3)
+            assert_rel_error(self, val[1, 0], 2.0/3)
+            assert_rel_error(self, val[1, 1], 2.0/3)
+
+    def test_scale_array_with_array(self):
+
+        class ExpCompArrayScale(TestExplCompArrayDense):
+
+            def initialize_variables(self):
+                self.add_input('lengths', val=np.ones((2, 2)))
+                self.add_input('widths', val=np.ones((2, 2)))
+                self.add_output('areas', val=np.ones((2, 2)), ref=np.array([[2.0, 3.0], [5.0, 7.0]]))
+                self.add_output('stuff', val=np.ones((2, 2)), ref=np.array([[11.0, 13.0], [17.0, 19.0]]))
+                self.add_output('total_volume', val=1.)
+
+            def compute(self, inputs, outputs):
+                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                outputs['stuff'] = inputs['widths'] + inputs['lengths']
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
+        model.add_subsystem('comp', ExpCompArrayScale())
+        model.connect('p1.x', 'comp.lengths')
+
+        prob.setup(check=False)
+        prob['comp.widths'] = np.ones((2, 2))
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.total_volume'], 4.)
+
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['areas']
+            assert_rel_error(self, val[0, 0], 1.0/2)
+            assert_rel_error(self, val[0, 1], 1.0/3)
+            assert_rel_error(self, val[1, 0], 1.0/5)
+            assert_rel_error(self, val[1, 1], 1.0/7)
+
+            val = model.get_subsystem('comp')._outputs['stuff']
+            assert_rel_error(self, val[0, 0], 2.0/11)
+            assert_rel_error(self, val[0, 1], 2.0/13)
+            assert_rel_error(self, val[1, 0], 2.0/17)
+            assert_rel_error(self, val[1, 1], 2.0/19)
+
+    def test_scale_and_add_array_with_array(self):
+
+        class ExpCompArrayScale(TestExplCompArrayDense):
+
+            def initialize_variables(self):
+                self.add_input('lengths', val=np.ones((2, 2)))
+                self.add_input('widths', val=np.ones((2, 2)))
+                self.add_output('areas', val=np.ones((2, 2)), ref=np.array([[2.0, 3.0], [5.0, 7.0]]),
+                                ref0=np.array([[0.1, 0.2], [0.3, 0.4]]))
+                self.add_output('stuff', val=np.ones((2, 2)), ref=np.array([[11.0, 13.0], [17.0, 19.0]]),
+                                ref0=np.array([[0.6, 0.7], [0.8, 0.9]]))
+                self.add_output('total_volume', val=1.)
+
+            def compute(self, inputs, outputs):
+                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                outputs['stuff'] = inputs['widths'] + inputs['lengths']
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
+        model.add_subsystem('comp', ExpCompArrayScale())
+        model.connect('p1.x', 'comp.lengths')
+
+        prob.setup(check=False)
+        prob['comp.widths'] = np.ones((2, 2))
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.total_volume'], 4.)
+
+        # (res1-res_ref0)/(res_ref-res_ref0))
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['areas']
+            assert_rel_error(self, val[0, 0], (1.0 - 0.1)/(2 - 0.1))
+            assert_rel_error(self, val[0, 1], (1.0 - 0.2)/(3 - 0.2))
+            assert_rel_error(self, val[1, 0], (1.0 - 0.3)/(5 - 0.3))
+            assert_rel_error(self, val[1, 1], (1.0 - 0.4)/(7 - 0.4))
+
+            val = model.get_subsystem('comp')._outputs['stuff']
+            assert_rel_error(self, val[0, 0], (2.0 - 0.6)/(11 - 0.6))
+            assert_rel_error(self, val[0, 1], (2.0 - 0.7)/(13 - 0.7))
+            assert_rel_error(self, val[1, 0], (2.0 - 0.8)/(17 - 0.8))
+            assert_rel_error(self, val[1, 1], (2.0 - 0.9)/(19 - 0.9))
+
+    def test_implicit_scale(self):
+
+        class ImpCompArrayScale(TestImplCompArrayDense):
+            def initialize_variables(self):
+                self.add_input('rhs', val=np.ones(2))
+                self.add_output('x', val=np.zeros(2), ref=np.array([2.0, 3.0]),
+                                ref0=np.array([4.0, 5.0]),
+                                res_ref = np.array([7.0, 11.0]),
+                                res_ref0 = np.array([13.0, 18.0]))
+                self.add_output('extra', val=np.zeros(2), ref=np.array([12.0, 13.0]),
+                                ref0=np.array([14.0, 15.0]))
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
+                residuals['extra'] = 2.0*self.metadata['mtx'].dot(outputs['x']) - 3.0*inputs['rhs']
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', np.ones(2)))
+        model.add_subsystem('comp', ImpCompArrayScale())
+        model.connect('p1.x', 'comp.rhs')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        base_x = model.get_subsystem('comp')._outputs['x'].copy()
+        base_ex = model.get_subsystem('comp')._outputs['extra'].copy()
+        base_res_x = model.get_subsystem('comp')._residuals['x'].copy()
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['x']
+            assert_rel_error(self, val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
+            assert_rel_error(self, val[1], (base_x[1] - 5.0)/(3.0 - 5.0))
+            val = model.get_subsystem('comp')._outputs['extra']
+            assert_rel_error(self, val[0], (base_ex[0] - 14.0)/(12.0 - 14.0))
+            assert_rel_error(self, val[1], (base_ex[1] - 15.0)/(13.0 - 15.0))
+            val = model.get_subsystem('comp')._residuals['x'].copy()
+            assert_rel_error(self, val[0], (base_res_x[0] - 13.0)/(7.0 - 13.0))
+            assert_rel_error(self, val[1], (base_res_x[1] - 18.0)/(11.0 - 18.0))
 
 if __name__ == '__main__':
     unittest.main()

@@ -334,8 +334,6 @@ class Problem(object):
         if check:
             check_config(self, logger)
 
-        model._scale_vectors_and_jacobians('to phys')
-
         return self
 
     def setup_vector(self, vec_name, vector_class, use_ref_vector):
