@@ -1,8 +1,10 @@
 """Define the units/scaling tests."""
 from __future__ import division, print_function
 
-import numpy as np
 import unittest
+from six import assertRaisesRegex
+
+import numpy as np
 
 from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp
 from openmdao.api import NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
@@ -126,6 +128,56 @@ class ScalingTestComp(ImplicitComponent):
 
 
 class TestScaling(unittest.TestCase):
+
+    def test_error_messages(self):
+
+        class EComp(ImplicitComponent):
+            def initialize_variables(self):
+                self.add_output('zz', val=np.ones((4, 2)), ref=np.ones((3, 5)))
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('comp', EComp())
+
+        msg = "The ref argument has the wrong shape"
+        with assertRaisesRegex(self, ValueError, msg):
+            prob.setup(check=False)
+
+        class EComp(ImplicitComponent):
+            def initialize_variables(self):
+                self.add_output('zz', val=np.ones((4, 2)), ref0=np.ones((3, 5)))
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('comp', EComp())
+
+        msg = "The ref0 argument has the wrong shape"
+        with assertRaisesRegex(self, ValueError, msg):
+            prob.setup(check=False)
+
+        class EComp(ImplicitComponent):
+            def initialize_variables(self):
+                self.add_output('zz', val=np.ones((4, 2)), res_ref=np.ones((3, 5)))
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('comp', EComp())
+
+        msg = "The res_ref argument has the wrong shape"
+        with assertRaisesRegex(self, ValueError, msg):
+            prob.setup(check=False)
+
+        class EComp(ImplicitComponent):
+            def initialize_variables(self):
+                self.add_output('zz', val=np.ones((4, 2)), res_ref0=np.ones((3, 5)))
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('comp', EComp())
+
+        msg = "The res_ref0 argument has the wrong shape"
+        with assertRaisesRegex(self, ValueError, msg):
+            prob.setup(check=False)
 
     def test_pass_through(self):
         group = Group()

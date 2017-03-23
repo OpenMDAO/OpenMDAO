@@ -233,11 +233,6 @@ class Component(System):
         if upper is not None:
             upper = format_as_float_or_array('upper', upper)
 
-        ref = format_as_float_or_array('ref', ref, flatten=True)
-        ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
-        res_ref = format_as_float_or_array('res_ref', res_ref, flatten=True)
-        res_ref0 = format_as_float_or_array('res_ref0', res_ref0, flatten=True)
-
         # Check that units are valid
         if units is not None and not valid_units(units):
             raise ValueError("The units '%s' are invalid" % units)
@@ -263,6 +258,18 @@ class Component(System):
             raise ValueError('The upper argument has the wrong shape')
         metadata['lower'] = lower
         metadata['upper'] = upper
+
+        # All refs: check the shape if necessary
+        for item, msg in zip([ref, ref0, res_ref, res_ref0],
+                             ['ref', 'ref0', 'res_ref', 'res_ref0']):
+            if not np.isscalar(item) and \
+               np.atleast_1d(item).shape != metadata['shape']:
+                raise ValueError('The %s argument has the wrong shape' % msg)
+
+        ref = format_as_float_or_array('ref', ref, flatten=True)
+        ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
+        res_ref = format_as_float_or_array('res_ref', res_ref, flatten=True)
+        res_ref0 = format_as_float_or_array('res_ref0', res_ref0, flatten=True)
 
         # ref, ref0, res_ref, res_ref0: taken as is
         metadata['ref'] = ref

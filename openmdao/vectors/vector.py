@@ -178,7 +178,7 @@ class Vector(object):
             ind1 = np.sum(sizes_array[self._iproc, :ivar]) - ind1_list[iset]
             ind2 = np.sum(sizes_array[self._iproc, :ivar + 1]) - ind1_list[iset]
 
-            # Support scaling with vectors
+            # Support scaling with arrays
             n_scale = 1
             if vectype == 'output':
                 meta = abs2data[abs_name]['metadata']
