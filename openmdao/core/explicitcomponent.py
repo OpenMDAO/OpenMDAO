@@ -8,6 +8,7 @@ import numpy as np
 from six import iteritems, itervalues
 
 from openmdao.core.component import Component
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation
 
 
@@ -15,6 +16,20 @@ class ExplicitComponent(Component):
     """
     Class to inherit from when all output variables are explicit.
     """
+
+    def __init__(self, **kwargs):
+        """
+        Check if we are matrix-free.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            available here and in all descendants of this system.
+        """
+        super(ExplicitComponent, self).__init__(**kwargs)
+
+        if overrides_method('compute_jacvec_product', self, ExplicitComponent):
+            self._matrix_free = True
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
@@ -200,7 +215,7 @@ class ExplicitComponent(Component):
                 # re-negate the jacobian
                 self._negate_jac()
 
-            if self._owns_global_jac:
+            if self._owns_assembled_jac:
                 J._update()
 
     def _setup_partials(self):

@@ -5,6 +5,7 @@ from __future__ import division
 import numpy as np
 
 from openmdao.core.component import Component as BaseComponent
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation
 
 
@@ -23,10 +24,18 @@ class Component(BaseComponent):
     def __init__(self, **kwargs):
         """
         Add a few more attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            available here and in all descendants of this system.
         """
         super(Component, self).__init__(**kwargs)
         self._state_names = []
         self._output_names = []
+
+        if overrides_method('apply_linear', self, Component):
+            self._matrix_free = True
 
         warn_deprecation('Components should inherit from ImplicitComponent '
                          'or ExplicitComponent. This class provides '
@@ -236,7 +245,7 @@ class Component(BaseComponent):
                 if len(self._state_names) == 0:
                     self._negate_jac()
 
-            if self._owns_global_jac:
+            if self._owns_assembled_jac:
                 J._update()
 
     def _setup_partials(self):

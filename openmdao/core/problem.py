@@ -13,16 +13,18 @@ import scipy.sparse as sparse
 
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.assemblers.default_assembler import DefaultAssembler
+from openmdao.components.deprecated_component import Component as DepComponent
 from openmdao.core.component import Component
-from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.driver import Driver
+from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
 from openmdao.vectors.default_vector import DefaultVector
 
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
-from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
+from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
@@ -427,6 +429,8 @@ class Problem(object):
 
         model = self.model
 
+        # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
+
         all_comps = model.system_iter(typ=Component)
         if comps is None:
             comps = [comp for comp in all_comps]
@@ -445,44 +449,125 @@ class Problem(object):
         # This is a defaultdict of (defaultdict of dicts).
         partials_data = defaultdict(lambda: defaultdict(dict))
 
+        # Caching current point to restore after setups.
+        input_cache = model._inputs._clone()
+        output_cache = model._outputs._clone()
+
         # Analytic Jacobians
         for mode in ('fwd', 'rev'):
             self.setup(mode=mode, check=False)
             model.suppress_solver_output = True
+            model._inputs.set_vec(input_cache)
+            model._outputs.set_vec(output_cache)
             # Make sure we're in a valid state
-            self.run_model()
+            model.run_apply_nonlinear()
             model.run_linearize()
 
             jac_key = 'J_' + mode
 
             for comp in comps:
+
                 # Skip IndepVarComps
                 if isinstance(comp, IndepVarComp):
                     continue
 
-                explicit_comp = isinstance(comp, ExplicitComponent)
-
+                explicit = isinstance(comp, ExplicitComponent)
+                deprecated = isinstance(comp, DepComponent)
+                matrix_free = comp._matrix_free
                 c_name = comp.pathname
 
-                # TODO: Check deprecated deriv_options
+                # TODO: Check deprecated deriv_options.
 
                 with comp._units_scaling_context(scale_jac=True):
                     subjacs = comp._jacobian._subjacs
-                    if explicit_comp:
+                    if explicit:
                         comp._negate_jac()
 
-                    pattern_matches = comp._find_partial_matches('*', '*')
-                    for of_bundle, wrt_bundle in product(*pattern_matches):
-                        of_pattern, of_matches = of_bundle
-                        wrt_pattern, wrt_out, wrt_in = wrt_bundle
+                    of_list = list(comp._var_allprocs_prom2abs_list['output'].keys())
+                    wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
 
-                        # The only outputs in wrt should be implicit states.
-                        if explicit_comp:
-                            wrt_matches = wrt_in
+                    # The only outputs in wrt should be implicit states.
+                    if deprecated:
+                        wrt_list.extend(comp._state_names)
+                    elif not explicit:
+                        wrt_list.extend(of_list)
+
+                    # Matrix-free components need to calculate their Jacobian by matrix-vector
+                    # product.
+                    if matrix_free:
+
+                        dstate = comp._vectors['output']['linear']
+                        if mode == 'fwd':
+                            dinputs = comp._vectors['input']['linear']
+                            doutputs = comp._vectors['residual']['linear']
+                            in_list = wrt_list
+                            out_list = of_list
                         else:
-                            wrt_matches = chain(wrt_out, wrt_in)
+                            dinputs = comp._vectors['residual']['linear']
+                            doutputs = comp._vectors['input']['linear']
+                            in_list = of_list
+                            out_list = wrt_list
 
-                        for rel_key in product(of_matches, wrt_matches):
+                        for inp in in_list:
+                            inp_abs = rel_name2abs_name(comp, inp)
+
+                            try:
+                                flat_view = dinputs._views_flat[inp_abs]
+                            except KeyError:
+                                # Implicit state
+                                flat_view = dstate._views_flat[inp_abs]
+
+                            n_in = len(flat_view)
+                            for idx in range(n_in):
+
+                                dinputs.set_const(0.0)
+                                dstate.set_const(0.0)
+
+                                # TODO - Sort out the minus sign difference.
+                                perturb = 1.0 if (deprecated or not explicit) else -1.0
+
+                                # Dictionary access returns a scaler for 1d input, and we
+                                # need a vector for clean code, so use _views_flat.
+                                flat_view[idx] = perturb
+
+                                # Matrix Vector Product
+                                comp._apply_linear(['linear'], mode)
+
+                                for out in out_list:
+                                    out_abs = rel_name2abs_name(comp, out)
+
+                                    try:
+                                        derivs = doutputs._views_flat[out_abs]
+                                    except KeyError:
+                                        # Implicit state
+                                        derivs = dstate._views_flat[out_abs]
+
+                                    if mode == 'fwd':
+                                        key = out, inp
+                                        deriv = partials_data[c_name][key]
+
+                                        # Allocate first time
+                                        if jac_key not in deriv:
+                                            shape = (len(derivs), n_in)
+                                            deriv[jac_key] = np.zeros(shape)
+
+                                        deriv[jac_key][:, idx] = derivs
+
+                                    else:
+                                        key = inp, out
+                                        deriv = partials_data[c_name][key]
+
+                                        # Allocate first time
+                                        if jac_key not in deriv:
+                                            shape = (n_in, len(derivs))
+                                            deriv[jac_key] = np.zeros(shape)
+
+                                        deriv[jac_key][idx, :] = derivs
+
+                    # These components already have a Jacobian with calculated derivatives.
+                    else:
+
+                        for rel_key in product(of_list, wrt_list):
                             abs_key = rel_key2abs_key(comp, rel_key)
                             of, wrt = abs_key
 
@@ -516,37 +601,41 @@ class Problem(object):
 
                             partials_data[c_name][rel_key][jac_key] = deriv_value
 
-                    if explicit_comp:
+                    if explicit:
                         comp._negate_jac()
 
         self.setup(mode=current_mode)
-        self.run_model()
+        model._inputs.set_vec(input_cache)
+        model._outputs.set_vec(output_cache)
+        model.run_apply_nonlinear()
 
-        # FD Jacobian
+        # Finite Difference (or TODO: Complex Step) to calculate Jacobian
         jac_key = 'J_fd'
         for comp in comps:
+
+            c_name = comp.pathname
+
             # Skip IndepVarComps
             if isinstance(comp, IndepVarComp):
                 continue
 
             subjac_info = comp._subjacs_info
-            explicit_comp = isinstance(comp, ExplicitComponent)
+            explicit = isinstance(comp, ExplicitComponent)
+            deprecated = isinstance(comp, DepComponent)
             approximation = scheme()
 
-            pattern_matches = comp._find_partial_matches('*', '*')
-            for of_bundle, wrt_bundle in product(*pattern_matches):
-                of_pattern, of_matches = of_bundle
-                wrt_pattern, wrt_out, wrt_in = wrt_bundle
+            of = list(comp._var_allprocs_prom2abs_list['output'].keys())
+            wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
 
-                # The only outputs in wrt should be implicit states.
-                if explicit_comp:
-                    wrt_matches = wrt_in
-                else:
-                    wrt_matches = chain(wrt_out, wrt_in)
+            # The only outputs in wrt should be implicit states.
+            if deprecated:
+                wrt.extend(comp._state_names)
+            elif not explicit:
+                wrt.extend(of)
 
-                for rel_key in product(of_matches, wrt_matches):
-                    abs_key = rel_key2abs_key(comp, rel_key)
-                    approximation.add_approximation(abs_key, global_options)
+            for rel_key in product(of, wrt):
+                abs_key = rel_key2abs_key(comp, rel_key)
+                approximation.add_approximation(abs_key, global_options)
 
             approx_jac = {}
             approximation._init_approximations()
@@ -558,8 +647,8 @@ class Problem(object):
                 abs_key = rel_key2abs_key(comp, rel_key)
                 # Since all partials for outputs for explicit comps are declared, assume anything
                 # missing is an input deriv.
-                if (explicit_comp and (abs_key not in subjac_info or
-                                       subjac_info[abs_key]['type'] == 'input')):
+                if (explicit and (abs_key not in subjac_info or
+                                  subjac_info[abs_key]['type'] == 'input')):
                     partials_data[c_name][rel_key][jac_key] = -partial
                 else:
                     partials_data[c_name][rel_key][jac_key] = partial

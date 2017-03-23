@@ -17,7 +17,7 @@ from collections import OrderedDict, Iterable
 
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, PathData
-from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation
@@ -34,6 +34,9 @@ class Component(System):
         A mapping of local variable name to its metadata.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
+    _matrix_free : Bool
+        This is set to True if the component overrides the appropriate function with a user-defined
+        matrix vector product with the Jacobian.
     _var_rel2data_io : dict
         Dictionary mapping rellative names to dicts with keys (prom, rel, my_idx, type_, metadata).
         This is only needed while adding inputs and outputs. During setup, these are used to
@@ -55,6 +58,8 @@ class Component(System):
         """
         super(Component, self).__init__(**kwargs)
         self._approx_schemes = OrderedDict()
+
+        self._matrix_free = False
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}

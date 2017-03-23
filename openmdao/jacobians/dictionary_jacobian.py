@@ -1,13 +1,13 @@
-"""Define the DefaultJacobian class."""
+"""Define the DictionaryJacobian class."""
 from __future__ import division
+
 import numpy as np
 import scipy.sparse
-from six.moves import range
 
 from openmdao.jacobians.jacobian import Jacobian
 
 
-class DefaultJacobian(Jacobian):
+class DictionaryJacobian(Jacobian):
     """
     No global <Jacobian>; use dictionary of user-supplied sub-Jacobians.
     """
