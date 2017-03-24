@@ -241,8 +241,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('foo', val=np.ones(4))
+        indeps.add_output('foo2', val=np.ones(4))
 
         p.model.add_subsystem('pt', PassThrough("foo", "bar", val=np.ones(4)), promotes=['*'])
+        p.model.add_subsystem('pt2', PassThrough("foo2", "bar2", val=np.ones(4)), promotes=['*'])
 
         p.model.suppress_solver_output = True
 
@@ -254,6 +256,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fd'], identity, 1e-9)
+
+        assert_rel_error(self, data['pt2'][('bar2', 'foo2')]['J_fwd'], identity, 1e-15)
+        assert_rel_error(self, data['pt2'][('bar2', 'foo2')]['J_rev'], identity, 1e-15)
+        assert_rel_error(self, data['pt2'][('bar2', 'foo2')]['J_fd'], identity, 1e-9)
 
     def test_matrix_free_explicit(self):
         prob = Problem()
