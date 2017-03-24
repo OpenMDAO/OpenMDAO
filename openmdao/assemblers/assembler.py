@@ -35,6 +35,10 @@ class Assembler(object):
     _var_sizes_by_set : {'input': list of ndarray[nproc, nvar],
                        'output': list of ndarray[nproc, nvar]}
         list of local variable size arrays, num procs x num vars by var_set.
+    _var_offsets_by_set : {'input': list of ndarray[nproc, nvar],
+                           'output': list of ndarray[nproc, nvar]}
+        list of local variable offset arrays, num procs x num vars by var_set.
+        Contains starting global offset for each var in each proc.
     _var_set_IDs : {'input': {}, 'output': {}}
         dictionary mapping var_set names to their IDs.
     _var_set_indices : {'input': ndarray[nvar_all, 2],
@@ -81,6 +85,7 @@ class Assembler(object):
 
         self._var_sizes_all = {'input': None, 'output': None}
         self._var_sizes_by_set = {'input': [], 'output': []}
+        self._var_offsets_by_set = {'input': [], 'output': []}
         self._var_set_IDs = {'input': {}, 'output': {}}
         self._var_set_indices = {'input': None, 'output': None}
 
@@ -181,6 +186,7 @@ class Assembler(object):
 
         # Populate the sizes arrays
         for typ in ['input', 'output']:
+            self._var_offsets_by_set[typ] = []
             for ivar, absname in enumerate(abs_names[typ]):
                 size = np.prod(abs2data[absname]['metadata']['shape'])
                 ivar_all = indices[absname]
@@ -188,15 +194,24 @@ class Assembler(object):
                 self._var_sizes_by_set[typ][iset][iproc, ivar_set] = size
                 self._var_sizes_all[typ][iproc, ivar_all] = size
 
-        # Do an allgather on the sizes arrays and metadata
+        # Do an allgather on the sizes arrays
         if nproc > 1:
             for typ in ['input', 'output']:
                 nset = len(self._var_sizes_by_set[typ])
                 for iset in range(nset):
                     array = self._var_sizes_by_set[typ][iset]
                     self._comm.Allgather(array[iproc, :], array)
+
                 self._comm.Allgather(self._var_sizes_all[typ][iproc, :],
                                      self._var_sizes_all[typ])
+
+        for typ in ['input', 'output']:
+            for iset, sizes in enumerate(self._var_sizes_by_set[typ]):
+                # calculate offsets for all varsets
+                offsets = np.zeros(sizes.size, dtype=int)
+                if offsets.size > 1:
+                    offsets[1:] = np.cumsum(sizes.flat)[:-1]
+                self._var_offsets_by_set[typ].append(offsets.reshape(sizes.shape))
 
     def _setup_connections(self, connections, prom2abs, abs2data):
         """

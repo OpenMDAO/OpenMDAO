@@ -79,14 +79,21 @@ class DefaultAssembler(Assembler):
                 for sub_ind in range(nsub_allprocs):
                     fwd_xfer_in_inds[sub_ind][iset, jset] = []
                     fwd_xfer_out_inds[sub_ind][iset, jset] = []
-                    if rev:
-                        rev_xfer_in_inds[sub_ind][iset, jset] = []
-                        rev_xfer_out_inds[sub_ind][iset, jset] = []
+
+        if rev:
+            for i, idxs in enumerate(fwd_xfer_out_inds):
+                for key in idxs:
+                    rev_xfer_in_inds[i][key] = []
+                    rev_xfer_out_inds[i][key] = []
 
         in_set_indices = self._var_set_indices['input']
         out_set_indices = self._var_set_indices['output']
+        in_abs_vars = self._var_allprocs_abs_names['input']
+
+        rank = self._comm.rank
+
         for in_ind in range(in_ind1, in_ind2):
-            iabs = self._var_allprocs_abs_names['input'][in_ind]
+            iabs = in_abs_vars[in_ind]
             oabs = self._abs_input2src[iabs]
             if oabs is None:  # input is not connected
                 continue
@@ -94,6 +101,7 @@ class DefaultAssembler(Assembler):
             input_inds = None
             out_ind = self._var_allprocs_abs2idx_io[oabs]
             in_isub = in_isub_var[in_ind - in_ind1]
+            has_src_indices = self._var_allprocs_abs2meta_io[iabs]['has_src_indices']
 
             if out_ind1 <= out_ind < out_ind2:
                 out_isub = out_isub_var[out_ind - out_ind1]
@@ -107,38 +115,47 @@ class DefaultAssembler(Assembler):
 
                     in_sizes = self._var_sizes_by_set['input'][in_iset]
                     out_sizes = self._var_sizes_by_set['output'][out_iset]
+                    in_offsets = self._var_offsets_by_set['input'][in_iset]
+                    out_offsets = self._var_offsets_by_set['output'][out_iset]
 
                     ind1, ind2 = self._src_indices_range[in_ind, :]
                     inds = self._src_indices[ind1:ind2]
 
                     output_inds = np.zeros(inds.size, int)
-                    ind1, ind2 = 0, 0
-                    for iproc in range(self._comm.size):
-                        ind2 += out_sizes[iproc, out_ivar_set]
 
-                        on_iproc = np.logical_and(ind1 <= inds, inds < ind2)
-                        offset = -ind1
-                        offset += np.sum(out_sizes[:iproc, :])
-                        offset += np.sum(out_sizes[iproc, :out_ivar_set])
-                        output_inds[on_iproc] = inds[on_iproc] + offset
+                    if has_src_indices:
+                        ind1, ind2 = 0, 0
+                        for iproc in range(self._comm.size):
+                            ind2 += out_sizes[iproc, out_ivar_set]
 
-                        ind1 += out_sizes[iproc, out_ivar_set]
+                            on_iproc = np.logical_and(ind1 <= inds, inds < ind2)
+                            offset = out_offsets[iproc, out_ivar_set]
+                            output_inds[on_iproc] = inds[on_iproc] + offset
 
-                    iproc = self._comm.rank
+                            ind1 += out_sizes[iproc, out_ivar_set]
+                    else:
+                        if out_sizes[rank, out_ivar_set] == 0:
+                            # find lowest rank remote owner of output
+                            iproc = np.nonzero(out_sizes[:, out_ivar_set])[0][0]
+                        else:
+                            iproc = rank
+                        output_inds = inds + out_offsets[iproc, out_ivar_set]
 
-                    ind1 = ind2 = np.sum(in_sizes[:iproc, :])
-                    ind1 += np.sum(in_sizes[iproc, :in_ivar_set])
-                    ind2 += np.sum(in_sizes[iproc, :in_ivar_set + 1])
-                    input_inds = np.arange(ind1, ind2)
+                    if in_sizes[iproc, in_ivar_set] == 0:
+                        input_inds = output_inds = None
+                    else:
+                        ind1 = in_offsets[rank, in_ivar_set]
+                        ind2 = ind1 + in_sizes[rank, in_ivar_set]
+                        input_inds = np.arange(ind1, ind2)
 
                 if input_inds is not None:
 
-                    xfer_in_inds[in_iset, out_iset].append(input_inds)
-                    xfer_out_inds[in_iset, out_iset].append(output_inds)
+                    key = (in_iset, out_iset)
+                    xfer_in_inds[key].append(input_inds)
+                    xfer_out_inds[key].append(output_inds)
 
                     # rev mode wouldn't work for GS with a parallel group
                     if out_isub != -1:
-                        key = (in_iset, out_iset)
                         fwd_xfer_in_inds[in_isub][key].append(input_inds)
                         fwd_xfer_out_inds[in_isub][key].append(output_inds)
 
@@ -184,7 +201,8 @@ class DefaultAssembler(Assembler):
         in_iset = out_iset = 0
 
         iabs = self._var_allprocs_abs_names['input'][in_ind]
-        has_src_indices = self._var_allprocs_abs2meta_io[iabs]['has_src_indices']
+        imeta = self._var_allprocs_abs2meta_io[iabs]
+        has_src_indices = imeta['has_src_indices']
 
         iproc = self._comm.rank
 
@@ -193,17 +211,20 @@ class DefaultAssembler(Assembler):
             out_iset, out_ivar_set = out_set_indices[out_ind, :]
 
             in_sizes = self._var_sizes_by_set['input'][in_iset]
+            in_offsets = self._var_offsets_by_set['input'][in_iset]
             out_sizes = self._var_sizes_by_set['output'][out_iset]
+            out_offsets = self._var_offsets_by_set['output'][out_iset]
 
-            if has_src_indices:
-                ind1, ind2 = self._src_indices_range[in_ind, :]
-                if ind1 == ind2:
-                    # FIXME: this isn't correct.  We need to retrieve src_indices
-                    # from other proc here...
+            ind1, ind2 = self._src_indices_range[in_ind, :]
+            if ind1 == ind2:  # input isn't local
+                if has_src_indices:
+                    # FIXME: In rev mode I think we actually need to retrieve
+                    # src_indices from other proc so we can use them here...
                     return input_inds, output_inds
-                inds = self._src_indices[ind1:ind2]
+                else:
+                    inds = np.arange(np.prod(imeta['shape']))
             else:
-                inds = np.arange(0, np.prod(self._var_allprocs_abs2meta_io[iabs]['shape']))
+                inds = self._src_indices[ind1:ind2]
 
             output_inds = np.zeros(inds.size, int)
 
@@ -213,25 +234,21 @@ class DefaultAssembler(Assembler):
                     ind2 += out_sizes[iproc, out_ivar_set]
 
                     on_iproc = np.logical_and(ind1 <= inds, inds < ind2)
-                    offset = -ind1
-                    offset += np.sum(out_sizes[:iproc, :])
-                    offset += np.sum(out_sizes[iproc, :out_ivar_set])
+                    offset = out_offsets[iproc, out_ivar_set]
                     output_inds[on_iproc] = inds[on_iproc] + offset
 
                     ind1 += out_sizes[iproc, out_ivar_set]
             else:
                 if out_sizes[iproc, out_ivar_set] == 0:
                     return None, None
-                offset = np.sum(out_sizes[:iproc, :]) + np.sum(out_sizes[iproc, :out_ivar_set])
-                output_inds = inds + offset
+                output_inds = inds + out_offsets[iproc, out_ivar_set]
 
             if in_sizes[iproc, in_ivar_set] == 0:
                 # find lowest rank owner of input
                 iproc = np.nonzero(in_sizes[:, in_ivar_set])[0][0]
 
-            ind1 = ind2 = np.sum(in_sizes[:iproc])
-            ind1 += np.sum(in_sizes[iproc, :in_ivar_set])
-            ind2 += np.sum(in_sizes[iproc, :in_ivar_set + 1])
+            ind1 = in_offsets[iproc, in_ivar_set]
+            ind2 = ind1 + in_sizes[iproc, in_ivar_set]
             input_inds = np.arange(ind1, ind2)
 
         return input_inds, output_inds

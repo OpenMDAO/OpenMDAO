@@ -194,7 +194,8 @@ def any_proc_is_true(comm, val):
 
 if MPI:
     def mpirun_tests():
-        """Run individual tests under MPI.
+        """
+        Run individual tests under MPI.
 
         This is used in the "if __name__ == '__main__'" block to run an
         individual test in the file under MPI.  Note that if the test
