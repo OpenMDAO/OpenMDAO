@@ -557,21 +557,29 @@ class TestScaling(unittest.TestCase):
             def initialize_variables(self):
                 self.add_input('rhs', val=np.ones(2))
                 self.add_output('x', val=np.zeros(2), ref=np.array([2.0, 3.0]),
-                                ref0=np.array([4.0, 5.0]),
+                                ref0=np.array([4.0, 9.0]),
                                 res_ref = np.array([7.0, 11.0]),
                                 res_ref0 = np.array([13.0, 18.0]))
                 self.add_output('extra', val=np.zeros(2), ref=np.array([12.0, 13.0]),
-                                ref0=np.array([14.0, 15.0]))
+                                ref0=np.array([14.0, 17.0]))
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
                 residuals['extra'] = 2.0*self.metadata['mtx'].dot(outputs['x']) - 3.0*inputs['rhs']
 
+            def linearize(self, inputs, outputs, jacobian):
+                # These are incorrect derivatives, but we aren't doing any calculations, and it makes
+                # it much easier to check that the scales are correct.
+                jacobian['x', 'x'] = np.ones((2, 2))
+                jacobian['extra', 'x'] = np.ones((2, 2))
+                jacobian['x', 'rhs'] = -np.eye(2)
+
+
         prob = Problem()
         model = prob.model = Group()
 
         model.add_subsystem('p1', IndepVarComp('x', np.ones(2)))
-        model.add_subsystem('comp', ImpCompArrayScale())
+        comp = model.add_subsystem('comp', ImpCompArrayScale())
         model.connect('p1.x', 'comp.rhs')
 
         prob.setup(check=False)
@@ -583,13 +591,23 @@ class TestScaling(unittest.TestCase):
         with model._scaled_context():
             val = model.get_subsystem('comp')._outputs['x']
             assert_rel_error(self, val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
-            assert_rel_error(self, val[1], (base_x[1] - 5.0)/(3.0 - 5.0))
+            assert_rel_error(self, val[1], (base_x[1] - 9.0)/(3.0 - 9.0))
             val = model.get_subsystem('comp')._outputs['extra']
             assert_rel_error(self, val[0], (base_ex[0] - 14.0)/(12.0 - 14.0))
-            assert_rel_error(self, val[1], (base_ex[1] - 15.0)/(13.0 - 15.0))
+            assert_rel_error(self, val[1], (base_ex[1] - 17.0)/(13.0 - 17.0))
             val = model.get_subsystem('comp')._residuals['x'].copy()
             assert_rel_error(self, val[0], (base_res_x[0] - 13.0)/(7.0 - 13.0))
             assert_rel_error(self, val[1], (base_res_x[1] - 18.0)/(11.0 - 18.0))
+
+        model.run_linearize()
+
+        with model._scaled_context():
+            subjacs = comp.jacobian._subjacs
+
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][0], (2.0 - 4.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][0], (2.0 - 4.0)/(11.0 - 18.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][1], (3.0 - 9.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][1], (3.0 - 9.0)/(11.0 - 18.0))
 
 if __name__ == '__main__':
     unittest.main()

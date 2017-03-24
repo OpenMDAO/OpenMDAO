@@ -229,11 +229,23 @@ class Jacobian(object):
         data0 = self._system._var_abs2data_io[abs_key[0]]
         data1 = self._system._var_abs2data_io[abs_key[1]]
 
-        ind0 = data0['my_idx']
-        ind1 = data1['my_idx']
+        try:
+            ind_of0 = data0['resid_scale_idx0']
+            ind_of1 = data0['resid_scale_idx1']
+        except KeyError:
+            ind_of0 = data0['my_idx']
+            ind_of1 = ind_of0 + 1
+
+        try:
+            ind_wrt0 = data1['output_scale_idx0']
+            ind_wrt1 = data1['output_scale_idx1']
+        except KeyError:
+            ind_wrt0 = data1['my_idx']
+            ind_wrt1 = ind_wrt0 + 1
+
         type_ = data1['type']
 
-        val = coeffs['residual'][ind0, 1] / coeffs[type_][ind1, 1]
+        val = coeffs['residual'][ind_of0:ind_of1, 1] / coeffs[type_][ind_wrt0:ind_wrt1, 1]
         self._multiply_subjac(abs_key, val)
 
     def _scale(self, coeffs):

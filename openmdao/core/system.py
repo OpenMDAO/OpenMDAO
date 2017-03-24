@@ -421,12 +421,16 @@ class System(object):
             id0 = nvar_out
             nvar_out += n_out
             out_idx.append((id0, nvar_out))
+            abs2data[abs_name]['output_scale_idx0'] = id0
+            abs2data[abs_name]['output_scale_idx1'] = nvar_out
 
             n_res = max(len(np.atleast_1d(meta['res_ref'])),
                         len(np.atleast_1d(meta['res_ref0'])))
             id0 = nvar_res
             nvar_res += n_res
             res_idx.append((id0, nvar_res))
+            abs2data[abs_name]['resid_scale_idx0'] = id0
+            abs2data[abs_name]['resid_scale_idx1'] = nvar_out
 
         # Initialize scaling arrays
         for scaling in (self._scaling_to_norm, self._scaling_to_phys):
