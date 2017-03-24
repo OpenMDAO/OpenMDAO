@@ -184,7 +184,7 @@ def any_proc_is_true(comm, val):
         debug("Allreduce for any_proc_is_true")
     # some mpi versions don't support Allreduce with boolean types
     # and logical operators, so just use ints and MPI.SUM instead.
-    comm.Allreduce(numpy.array(1 if expr else 0, dtype=int),
+    comm.Allreduce(numpy.array(1 if val else 0, dtype=int),
                    any_true, op=MPI.SUM)
     if trace:
         debug("Allreduce DONE")

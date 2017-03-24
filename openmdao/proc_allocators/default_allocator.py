@@ -98,10 +98,7 @@ class DefaultAllocator(ProcAllocator):
                                        if len(b[1]) == shortest)
                         final[0][1].append(sub_idx)
 
-                # warnings.warn("Group '%s' requested %d processes to run fully "
-                #               "in parallel, but it only got %d" %
-                #               (self.pathname, total_req, nproc))
-                warnings.warn("Group requested %d processes to run fully "
+                warnings.warn("System requested %d processes to run fully "
                               "in parallel, but it only got %d" %
                               (total_req, nproc))
 

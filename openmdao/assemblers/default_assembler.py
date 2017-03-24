@@ -104,8 +104,6 @@ class DefaultAssembler(Assembler):
             has_src_indices = self._var_allprocs_abs2meta_io[iabs]['has_src_indices']
 
             if out_ind1 <= out_ind < out_ind2:
-                out_isub = out_isub_var[out_ind - out_ind1]
-
                 in_isub = in_isub_var[in_ind - in_ind1]
                 out_isub = out_isub_var[out_ind - out_ind1]
 
