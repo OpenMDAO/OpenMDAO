@@ -614,7 +614,7 @@ class Component(System):
 
         return self._var_abs_names, self._var_rel_names
 
-    def _setup_variable_indices(self):
+    def _setup_var_indices(self):
         """
         Compute the global index range for variables on all processors.
 

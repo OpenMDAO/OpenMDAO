@@ -56,7 +56,7 @@ class GlobalJacobian(Jacobian):
         int
             the ending index in the Jacobian.
         """
-        sizes_all = self._system._assembler._variable_sizes_all['output']
+        sizes_all = self._system._assembler._var_sizes_all['output']
         iproc = self._system._assembler._comm.rank
         ivar_all0 = self._system._var_allprocs_idx_range['output'][0]
 
@@ -155,10 +155,10 @@ class GlobalJacobian(Jacobian):
 
         iproc = self._system._assembler._comm.rank
         out_size = np.sum(
-            assembler._variable_sizes_all['output'][iproc, out_start:out_end])
+            assembler._var_sizes_all['output'][iproc, out_start:out_end])
 
         in_size = np.sum(
-            assembler._variable_sizes_all['input'][iproc, in_start:in_end])
+            assembler._var_sizes_all['input'][iproc, in_start:in_end])
 
         self._int_mtx._build(out_size, out_size)
         self._ext_mtx._build(out_size, in_size)

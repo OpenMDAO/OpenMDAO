@@ -5,6 +5,8 @@ import sys
 import io
 from contextlib import contextmanager
 import traceback
+from inspect import getmembers, ismethod
+import unittest
 
 import numpy
 import six
@@ -188,6 +190,41 @@ def any_proc_is_true(comm, val):
         debug("Allreduce DONE")
 
     return any_true > 0
+
+
+if MPI:
+    def mpirun_tests():
+        """Run individual tests under MPI.
+
+        This is used in the "if __name__ == '__main__'" block to run an
+        individual test in the file under MPI.  Note that if the test
+        file has not been run under mpirun, this reverts to running
+        unittest.main().
+        """
+        mod = __import__('__main__')
+
+        tests = [arg for arg in sys.argv[1:] if not arg.startswith('-')]
+
+        if tests:
+            for test in tests:
+                parts = test.split('.', 1)
+                if len(parts) == 2:
+                    tcase_name, method_name = parts
+                    testcase = getattr(mod, tcase_name)(methodName=method_name)
+                    setup = getattr(testcase, 'setUp', None)
+                    if setup is not None:
+                        setup()
+                    getattr(testcase, method_name)()
+                    teardown = getattr(testcase, 'tearDown', None)
+                    if teardown:
+                        teardown()
+                else:
+                    funcname = parts[0]
+                    getattr(mod, funcname)()
+        else:
+            unittest.main()
+else:
+    mpirun_tests = unittest.main
 
 
 if os.environ.get('USE_PROC_FILES'):

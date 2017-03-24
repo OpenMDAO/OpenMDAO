@@ -142,18 +142,18 @@ class Vector(object):
 
         ind1, ind2 = system._var_allprocs_idx_range[self._typ]
 
-        variable_set_indices = assembler._variable_set_indices[self._typ]
-        sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
+        variable_set_indices = assembler._var_set_indices[self._typ]
+        sub_var_set_indices = variable_set_indices[ind1:ind2, :]
 
         # Create the index arrays for each var_set for ivar_map.
         # Also store the starting points in the data/index vector.
         ivar_map = []
         ind1_list = []
-        for iset in range(len(assembler._variable_sizes[self._typ])):
-            bool_vector = sub_variable_set_indices[:, 0] == iset
-            data_inds = sub_variable_set_indices[bool_vector, 1]
+        for iset in range(len(assembler._var_sizes_by_set[self._typ])):
+            bool_vector = sub_var_set_indices[:, 0] == iset
+            data_inds = sub_var_set_indices[bool_vector, 1]
             if len(data_inds) > 0:
-                sizes_array = assembler._variable_sizes[self._typ][iset]
+                sizes_array = assembler._var_sizes_by_set[self._typ][iset]
                 ind1 = np.sum(sizes_array[self._iproc, :data_inds[0]])
                 ind2 = np.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
                 ivar_map.append(np.empty(ind2 - ind1, int))
@@ -167,7 +167,7 @@ class Vector(object):
             idx = assembler._var_allprocs_abs2idx_io[abs_name]
             my_idx = system._var_abs2data_io[abs_name]['my_idx']
             iset, ivar = variable_set_indices[idx, :]
-            sizes_array = assembler._variable_sizes[self._typ][iset]
+            sizes_array = assembler._var_sizes_by_set[self._typ][iset]
             ind1 = np.sum(sizes_array[self._iproc, :ivar]) - ind1_list[iset]
             ind2 = np.sum(sizes_array[self._iproc, :ivar + 1]) - ind1_list[iset]
             ivar_map[iset][ind1:ind2] = my_idx
@@ -192,7 +192,7 @@ class Vector(object):
             total_size = 0
             for abs_name in self._system._var_abs_names[self._typ]:
                 idx = self._assembler._var_allprocs_abs2idx_io[abs_name]
-                total_size += self._assembler._variable_sizes_all[self._typ][self._iproc, idx]
+                total_size += self._assembler._var_sizes_all[self._typ][self._iproc, idx]
 
             new_array = np.zeros(total_size)
 

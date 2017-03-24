@@ -51,7 +51,7 @@ class TestVarSets(unittest.TestCase):
 
             output_novs = d_residuals._data
             expected = np.array([output[i][j]
-                                     for i,j in self.p._assembler._variable_set_indices['output']])
+                                     for i,j in self.p._assembler._var_set_indices['output']])
             assert_rel_error(self, output_novs, expected, 1e-15)
 
         # apply linear, 'rev' with varsets
@@ -72,7 +72,7 @@ class TestVarSets(unittest.TestCase):
 
             output_novs = d_outputs._data
             expected = np.array([output[i][j]
-                                     for i,j in self.p._assembler._variable_set_indices['output']])
+                                     for i,j in self.p._assembler._var_set_indices['output']])
             assert_rel_error(self, output_novs, expected, 1e-15)
 
     def test_solve_linear(self):
@@ -96,7 +96,7 @@ class TestVarSets(unittest.TestCase):
             root.run_solve_linear(['linear'], 'fwd')
             output_novs = d_outputs._data
             expected = np.array([output[i][j]
-                                     for i,j in self.p._assembler._variable_set_indices['output']])
+                                     for i,j in self.p._assembler._var_set_indices['output']])
             assert_rel_error(self, output_novs, expected, 1e-15)
 
         # solve linear, 'rev' with varsets
@@ -119,7 +119,7 @@ class TestVarSets(unittest.TestCase):
 
             output_novs = d_residuals._data
             expected = np.array([output[i][j]
-                                     for i,j in self.p._assembler._variable_set_indices['output']])
+                                     for i,j in self.p._assembler._var_set_indices['output']])
             assert_rel_error(self, output_novs, expected, 1e-15)
 
 

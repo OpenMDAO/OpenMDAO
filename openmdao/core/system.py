@@ -363,7 +363,7 @@ class System(object):
 
             self.initialize_variables()
 
-    def _setup_variable_indices(self):
+    def _setup_var_indices(self):
         """
         Define the variable indices and range.
 

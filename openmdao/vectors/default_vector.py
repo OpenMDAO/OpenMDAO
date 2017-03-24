@@ -32,19 +32,19 @@ class DefaultTransfer(Transfer):
         in_inds = self._in_inds
         out_inds = self._out_inds
         if mode == 'fwd':
-            for in_iset, out_iset in self._in_inds:
-                key = (in_iset, out_iset)
+            for key in self._in_inds:
                 if len(self._in_inds[key]) > 0:
                     in_inds = self._in_inds[key]
                     out_inds = self._out_inds[key]
+                    in_iset, out_iset = key
                     tmp = out_vec._root_vector._data[out_iset][out_inds]
                     in_vec._root_vector._data[in_iset][in_inds] = tmp
         elif mode == 'rev':
-            for in_iset, out_iset in self._in_inds:
-                key = (in_iset, out_iset)
+            for key in self._in_inds:
                 if len(self._in_inds[key]) > 0:
                     in_inds = self._in_inds[key]
                     out_inds = self._out_inds[key]
+                    in_iset, out_iset = key
                     tmp = in_vec._root_vector._data[in_iset][in_inds]
                     np.add.at(out_vec._root_vector._data[out_iset], out_inds, tmp)
 
@@ -66,19 +66,19 @@ class DefaultVector(Vector):
             list of zeros arrays of correct size, one for each var_set.
         """
         data = [np.zeros(np.sum(sizes[self._iproc, :]))
-                for sizes in self._assembler._variable_sizes[self._typ]]
+                for sizes in self._assembler._var_sizes_by_set[self._typ]]
         indices = [np.zeros(np.sum(sizes[self._iproc, :]), int)
-                   for sizes in self._assembler._variable_sizes[self._typ]]
+                   for sizes in self._assembler._var_sizes_by_set[self._typ]]
 
         system = self._system
         assembler = self._assembler
 
-        sizes_all = assembler._variable_sizes_all[self._typ]
-        sizes = assembler._variable_sizes[self._typ]
+        sizes_all = assembler._var_sizes_all[self._typ]
+        sizes = assembler._var_sizes_by_set[self._typ]
 
         for abs_name in system._var_abs_names[self._typ]:
             idx = assembler._var_allprocs_abs2idx_io[abs_name]
-            ivar_set, ivar = assembler._variable_set_indices[self._typ][idx, :]
+            ivar_set, ivar = assembler._var_set_indices[self._typ][idx, :]
 
             ivar_all = idx
             ind1 = np.sum(sizes[ivar_set][self._iproc, :ivar])
@@ -103,18 +103,18 @@ class DefaultVector(Vector):
 
         sys_start, sys_end = self._system._var_allprocs_idx_range[self._typ]
 
-        variable_set_indices = assembler._variable_set_indices[self._typ]
-        sub_variable_set_indices = variable_set_indices[sys_start:sys_end, :]
+        variable_set_indices = assembler._var_set_indices[self._typ]
+        sub_var_set_indices = variable_set_indices[sys_start:sys_end, :]
 
-        ind_offset = np.sum(assembler._variable_sizes_all[self._typ][self._iproc, :sys_start])
+        ind_offset = np.sum(assembler._var_sizes_all[self._typ][self._iproc, :sys_start])
 
         data = []
         indices = []
-        for iset in range(len(assembler._variable_sizes[self._typ])):
-            bool_vector = sub_variable_set_indices[:, 0] == iset
-            data_inds = sub_variable_set_indices[bool_vector, 1]
+        for iset in range(len(assembler._var_sizes_by_set[self._typ])):
+            bool_vector = sub_var_set_indices[:, 0] == iset
+            data_inds = sub_var_set_indices[bool_vector, 1]
             if len(data_inds) > 0:
-                sizes_array = assembler._variable_sizes[self._typ][iset]
+                sizes_array = assembler._var_sizes_by_set[self._typ][iset]
                 ind1 = np.sum(sizes_array[self._iproc, :data_inds[0]])
                 ind2 = np.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
                 data.append(self._root_vector._data[iset][ind1:ind2])
@@ -168,8 +168,8 @@ class DefaultVector(Vector):
 
         for abs_name in system._var_abs_names[self._typ]:
             idx = assembler._var_allprocs_abs2idx_io[abs_name]
-            iset, ivar = assembler._variable_set_indices[self._typ][idx, :]
-            sizes_array = assembler._variable_sizes[self._typ][iset]
+            iset, ivar = assembler._var_set_indices[self._typ][idx, :]
+            sizes_array = assembler._var_sizes_by_set[self._typ][iset]
             ind1 = np.sum(sizes_array[self._iproc, :ivar])
             ind2 = np.sum(sizes_array[self._iproc, :ivar + 1])
 

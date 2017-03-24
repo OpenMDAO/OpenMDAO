@@ -35,7 +35,11 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
+        assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
+        assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
+
         prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.run_model()
 
         J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
         print('rev', J)
@@ -50,9 +54,29 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.model = FanInGrouped()
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
         prob.model.suppress_solver_output = True
         prob.run_model()
+
+        indep_list = ['iv.x1', 'iv.x2']
+        unknown_list = ['c3.y']
+    
+        assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
+
+        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
+        assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
+
+        assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
+
+        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.run_model()
+
+        assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
+
+        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
+        assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
@@ -60,59 +84,58 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.model = Diamond()
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
         prob.model.suppress_solver_output = True
         prob.run_model()
 
         assert_rel_error(self, prob['c4.y1'], 46.0, 1e-6)
         assert_rel_error(self, prob['c4.y2'], -93.0, 1e-6)
 
+        indep_list = ['iv.x']
+        unknown_list = ['c4.y1', 'c4.y2']
+    
+        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
+        assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
+        assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
+
+        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.run_model()
+
+        assert_rel_error(self, prob['c4.y1'], 46.0, 1e-6)
+        assert_rel_error(self, prob['c4.y2'], -93.0, 1e-6)
+
+        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
+        assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
+        assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
+
     def test_converge_diverge(self):
 
         prob = Problem()
         prob.model = ConvergeDiverge()
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
         prob.model.suppress_solver_output = True
         prob.run_model()
 
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
+        indep_list = ['iv.x']
+        unknown_list = ['c7.y1']
+    
+        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
+        assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
+
+        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.run_model()
+
+        assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
+
+        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
+        assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
+
+        assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
 if __name__ == "__main__":
-    #unittest.main()
+    from openmdao.utils.mpi import mpirun_tests
+    mpirun_tests()
 
-    prob = Problem()
-    model = prob.model
 
-    model.add_subsystem('iv', IndepVarComp('x', 1.0))
-    model.add_subsystem('c1', ExecComp(['y=3.0*x', 'y2=4.0*xx']))
-
-    sub = model.add_subsystem('sub', ParallelGroup())
-    sub.add_subsystem('c2', ExecComp(['y=-2.0*x']))
-    sub.add_subsystem('c3', ExecComp(['y=5.0*x']))
-
-    model.add_subsystem('c2', ExecComp(['y=x']))
-    model.add_subsystem('c3', ExecComp(['y=x']))
-
-    model.connect('iv.x', 'c1.x')
-
-    model.connect('c1.y', 'sub.c2.x')
-    model.connect('c1.y', 'sub.c3.x')
-
-    model.connect('sub.c2.y', 'c2.x')
-    model.connect('sub.c3.y', 'c3.x')
-
-    prob.setup(vector_class=PETScVector, check=False, mode='fwd')
-    prob.model.suppress_solver_output = True
-    prob.run_model()
-
-    import wingdbstub
-    J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
-
-    print('fwd', J)
-
-    prob.setup(vector_class=PETScVector, check=False, mode='rev')
-    prob.run_model()
-
-    J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
-    print('rev', J)

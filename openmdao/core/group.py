@@ -381,7 +381,7 @@ class Group(System):
 
         return allprocs_abs_names, allprocs_prom_names
 
-    def _setup_variable_indices(self):
+    def _setup_var_indices(self):
         """
         Compute the global index range for variables on all processors.
 
@@ -402,7 +402,7 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            subsys._setup_variable_indices()
+            subsys._setup_var_indices()
 
     def _setup_partials(self):
         """

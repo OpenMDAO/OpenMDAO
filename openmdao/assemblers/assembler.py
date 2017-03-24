@@ -29,15 +29,15 @@ class Assembler(object):
     ----------
     _comm : MPI.comm or <FakeComm>
         MPI communicator object.
-    _variable_sizes_all : {'input': ndarray[nproc, nvar],
+    _var_sizes_all : {'input': ndarray[nproc, nvar],
                            'output': ndarray[nproc, nvar]}
         local variable size arrays, num procs x num vars.
-    _variable_sizes : {'input': list of ndarray[nproc, nvar],
+    _var_sizes_by_set : {'input': list of ndarray[nproc, nvar],
                        'output': list of ndarray[nproc, nvar]}
         list of local variable size arrays, num procs x num vars by var_set.
-    _variable_set_IDs : {'input': {}, 'output': {}}
+    _var_set_IDs : {'input': {}, 'output': {}}
         dictionary mapping var_set names to their IDs.
-    _variable_set_indices : {'input': ndarray[nvar_all, 2],
+    _var_set_indices : {'input': ndarray[nvar_all, 2],
                              'output': ndarray[nvar_all, 2]}
         the first column is the var_set ID and
         the second column is the variable index within the var_set.
@@ -50,9 +50,11 @@ class Assembler(object):
         Both inputs and outputs are contained in one combined dictionary.
     _var_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of all owned variables, on all procs (maps idx to abs_name).
-    _abs_input2src : {str: str}
+    _abs_input2src : {str: str, ...}
         The output absolute name for each input absolute name.  A value of None
         indicates that no output is connected to that input.
+    _abs_src2inputs : {str: [], ...}
+        A mapping of absolute output name to any inputs that it's connected to.
     _src_indices : int ndarray[:]
         all the input indices vectors concatenated together.
     _src_indices_range : int ndarray[num_input_var_all, 2]
@@ -62,6 +64,8 @@ class Assembler(object):
     _src_scaling : ndarray[nvar_in, 2]
         scaling coefficients such that physical_unscaled = c0 + c1 * unitless_scaled
         and c0, c1 are the two columns of this array.
+    _mode : str, 'fwd' or 'rev'
+        Indicates the direction of derivative data transfer.
     """
 
     def __init__(self, comm):
@@ -75,10 +79,10 @@ class Assembler(object):
         """
         self._comm = comm
 
-        self._variable_sizes_all = {'input': None, 'output': None}
-        self._variable_sizes = {'input': [], 'output': []}
-        self._variable_set_IDs = {'input': {}, 'output': {}}
-        self._variable_set_indices = {'input': None, 'output': None}
+        self._var_sizes_all = {'input': None, 'output': None}
+        self._var_sizes_by_set = {'input': [], 'output': []}
+        self._var_set_IDs = {'input': {}, 'output': {}}
+        self._var_set_indices = {'input': None, 'output': None}
 
         self._var_allprocs_abs2idx_io = {}
         self._var_allprocs_abs2meta_io = {}
@@ -91,6 +95,8 @@ class Assembler(object):
         self._src_units = []
         self._src_scaling = None
 
+        self._mode = 'fwd'
+
     def _setup_variables(self, allprocs_abs_names, abs2data, abs_names):
         """
         Compute absolute name to/from idx maps for variables on all procs.
@@ -98,10 +104,10 @@ class Assembler(object):
         Sets the following attributes:
             _var_allprocs_abs_names
             _var_allprocs_abs2idx_io
-            _variable_sizes_all
-            _variable_sizes
-            _variable_set_IDs
-            _variable_set_indices
+            _var_sizes_all
+            _var_sizes_by_set
+            _var_set_IDs
+            _var_set_indices
 
         Parameters
         ----------
@@ -129,6 +135,7 @@ class Assembler(object):
                 abs2meta[abs_name] = {n: dmeta[n] for n in ('units',
                                                             'shape',
                                                             'var_set')}
+                abs2meta[abs_name]['has_src_indices'] = dmeta['src_indices'] is not None
             else:  # output
                 abs2meta[abs_name] = {n: dmeta[n] for n in ('units',
                                                             'shape',
@@ -145,33 +152,31 @@ class Assembler(object):
             nvar_all = len(allprocs_abs_names[typ])
 
             # determine var_set for each var
-            set_dict = {i: abs2meta[n]['var_set']
-                        for i, n in enumerate(allprocs_abs_names[typ])}
+            set_names = [abs2meta[n]['var_set']
+                         for n in allprocs_abs_names[typ]]
 
             # Compute set_name to ID maps
-            for iset, set_name in enumerate(set(set_dict.values())):
-                self._variable_set_IDs[typ][set_name] = iset
+            for iset, set_name in enumerate(set(set_names)):
+                self._var_set_IDs[typ][set_name] = iset
 
-            # Compute _variable_set_indices and var_count
-            var_count = np.zeros(len(self._variable_set_IDs[typ]), int)
-            self._variable_set_indices[typ] = -np.ones((nvar_all, 2), int)
-            for ivar_all in set_dict:
-                set_name = set_dict[ivar_all]
+            # Compute _var_set_indices and var_count
+            var_count = np.zeros(len(self._var_set_IDs[typ]), int)
+            self._var_set_indices[typ] = -np.ones((nvar_all, 2), int)
+            for ivar_all, set_name in enumerate(set_names):
+                iset = self._var_set_IDs[typ][set_name]
 
-                iset = self._variable_set_IDs[typ][set_name]
-
-                self._variable_set_indices[typ][ivar_all, 0] = iset
-                self._variable_set_indices[typ][ivar_all, 1] = var_count[iset]
+                self._var_set_indices[typ][ivar_all, 0] = iset
+                self._var_set_indices[typ][ivar_all, 1] = var_count[iset]
 
                 var_count[iset] += 1
 
             # Allocate the size arrays using var_count
-            self._variable_sizes[typ] = []
-            for iset in range(len(self._variable_set_IDs[typ])):
-                self._variable_sizes[typ].append(
+            self._var_sizes_by_set[typ] = []
+            for iset in range(len(self._var_set_IDs[typ])):
+                self._var_sizes_by_set[typ].append(
                     np.zeros((nproc, var_count[iset]), int))
 
-            self._variable_sizes_all[typ] = np.zeros(
+            self._var_sizes_all[typ] = np.zeros(
                 (nproc, np.sum(var_count)), int)
 
         # Populate the sizes arrays
@@ -179,19 +184,19 @@ class Assembler(object):
             for ivar, absname in enumerate(abs_names[typ]):
                 size = np.prod(abs2data[absname]['metadata']['shape'])
                 ivar_all = indices[absname]
-                iset, ivar_set = self._variable_set_indices[typ][ivar_all, :]
-                self._variable_sizes[typ][iset][iproc, ivar_set] = size
-                self._variable_sizes_all[typ][iproc, ivar_all] = size
+                iset, ivar_set = self._var_set_indices[typ][ivar_all, :]
+                self._var_sizes_by_set[typ][iset][iproc, ivar_set] = size
+                self._var_sizes_all[typ][iproc, ivar_all] = size
 
         # Do an allgather on the sizes arrays and metadata
         if nproc > 1:
             for typ in ['input', 'output']:
-                nset = len(self._variable_sizes[typ])
+                nset = len(self._var_sizes_by_set[typ])
                 for iset in range(nset):
-                    array = self._variable_sizes[typ][iset]
+                    array = self._var_sizes_by_set[typ][iset]
                     self._comm.Allgather(array[iproc, :], array)
-                self._comm.Allgather(self._variable_sizes_all[typ][iproc, :],
-                                     self._variable_sizes_all[typ])
+                self._comm.Allgather(self._var_sizes_all[typ][iproc, :],
+                                     self._var_sizes_all[typ])
 
     def _setup_connections(self, connections, prom2abs, abs2data):
         """
@@ -267,6 +272,7 @@ class Assembler(object):
                                       "no units." % (ipath, in_units, opath))
 
         self._abs_input2src = input_srcs
+        self._abs_src2inputs = output_tgts
 
     def _setup_src_indices(self, abs2data, abs_names):
         """
@@ -285,7 +291,6 @@ class Assembler(object):
         """
         abs2idx = self._var_allprocs_abs2idx_io
         abs2meta = self._var_allprocs_abs2meta_io
-        out_all_paths = self._var_allprocs_abs_names['output']
         in_paths = abs_names['input']
 
         # Compute total size of indices vector

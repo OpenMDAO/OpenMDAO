@@ -260,7 +260,7 @@ class Problem(object):
         # TODO: Support automatic determination of mode
         if mode == 'auto':
             mode = 'rev'
-        self._mode = mode
+        self._mode = assembler._mode = mode
 
         # Recursive system setup
         self._setup_processors()
@@ -271,7 +271,7 @@ class Problem(object):
                                    model._var_abs2data_io,
                                    model._var_abs_names)
 
-        model._setup_variable_indices()
+        model._setup_var_indices()
         model._setup_partials()
         model._setup_connections()
 
