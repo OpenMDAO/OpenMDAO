@@ -15,6 +15,26 @@ class DefaultTransfer(Transfer):
     Default NumPy transfer.
     """
 
+    def _initialize_transfer(self):
+        """
+        Set up the transfer; do any necessary pre-computation.
+
+        Optionally implemented by the subclass.
+        """
+        outs = {}
+        ins = {}
+        in_inds = self._in_inds
+        out_inds = self._out_inds
+
+        # filter out any empty transfers
+        for key in in_inds:
+            if len(in_inds[key]) > 0:
+                ins[key] = in_inds[key]
+                outs[key] = out_inds[key]
+
+        self._in_inds = ins
+        self._out_inds = outs
+
     def __call__(self, in_vec, out_vec, mode='fwd'):
         """
         Perform transfer.
@@ -31,22 +51,17 @@ class DefaultTransfer(Transfer):
         """
         in_inds = self._in_inds
         out_inds = self._out_inds
+
         if mode == 'fwd':
-            for key in self._in_inds:
-                if len(self._in_inds[key]) > 0:
-                    in_inds = self._in_inds[key]
-                    out_inds = self._out_inds[key]
-                    in_iset, out_iset = key
-                    tmp = out_vec._root_vector._data[out_iset][out_inds]
-                    in_vec._root_vector._data[in_iset][in_inds] = tmp
+            for key in in_inds:
+                in_iset, out_iset = key
+                in_vec._root_vector._data[in_iset][in_inds[key]] = \
+                    out_vec._root_vector._data[out_iset][out_inds[key]]
         elif mode == 'rev':
-            for key in self._in_inds:
-                if len(self._in_inds[key]) > 0:
-                    in_inds = self._in_inds[key]
-                    out_inds = self._out_inds[key]
-                    in_iset, out_iset = key
-                    tmp = in_vec._root_vector._data[in_iset][in_inds]
-                    np.add.at(out_vec._root_vector._data[out_iset], out_inds, tmp)
+            for key in in_inds:
+                in_iset, out_iset = key
+                np.add.at(out_vec._root_vector._data[out_iset], out_inds[key],
+                          in_vec._root_vector._data[in_iset][in_inds[key]])
 
 
 class DefaultVector(Vector):
