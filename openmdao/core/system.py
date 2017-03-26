@@ -430,7 +430,7 @@ class System(object):
             nvar_res += n_res
             res_idx.append((id0, nvar_res))
             abs2data[abs_name]['resid_scale_idx0'] = id0
-            abs2data[abs_name]['resid_scale_idx1'] = nvar_out
+            abs2data[abs_name]['resid_scale_idx1'] = nvar_res
 
         # Initialize scaling arrays
         for scaling in (self._scaling_to_norm, self._scaling_to_phys):

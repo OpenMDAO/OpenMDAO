@@ -96,6 +96,31 @@ class Jacobian(object):
         elif len(jac) == 3:
             self._subjacs[abs_key][0] *= val
 
+    def _pre_and_post_multiply_subjac(self, abs_key, left_vec, right_vec):
+        """
+        Multiply this sub-Jacobian by val.
+
+        Parameters
+        ----------
+        abs_key : (str, str)
+            Absolute name pair of sub-Jacobian.
+        left_vec : ndarray
+            value to pre-multiply by.
+        right_vec : ndarray
+            value to post-multiply by.
+        """
+        jac = self._subjacs[abs_key]
+        left_vec = np.atleast_2d(left_vec).T
+
+        if isinstance(jac, np.ndarray):
+            self._subjacs[abs_key] = left_vec * jac / right_vec
+        elif isinstance(jac, (coo_matrix, csr_matrix)):
+            # DOK not supported
+            self._subjacs[abs_key].data = left_vec * self._subjacs[abs_key].data / right_vec
+        else:
+            # This should never be scalar
+            raise ValueError("Scalar Jacobian should never have a vector scaler.")
+
     def _precompute_iter(self):
         """
         Cache list of absolute name pairs found in the jacobian for the current System.
@@ -245,8 +270,12 @@ class Jacobian(object):
 
         type_ = data1['type']
 
-        val = coeffs['residual'][ind_of0:ind_of1, 1] / coeffs[type_][ind_wrt0:ind_wrt1, 1]
-        self._multiply_subjac(abs_key, val)
+        if (ind_of1 - ind_of0) > 1 or (ind_wrt1 - ind_wrt0) > 1:
+            self._pre_and_post_multiply_subjac(abs_key, coeffs['residual'][ind_of0:ind_of1, 1],
+                                               coeffs[type_][ind_wrt0:ind_wrt1, 1])
+        else:
+            val = coeffs['residual'][ind_of0:ind_of1, 1] / coeffs[type_][ind_wrt0:ind_wrt1, 1]
+            self._multiply_subjac(abs_key, val)
 
     def _scale(self, coeffs):
         """
