@@ -49,21 +49,19 @@ class PETScTransfer(DefaultTransfer):
             'fwd' or 'rev'.
         """
         if mode == 'fwd':
-            for key in self._in_inds:
-                if len(self._in_inds[key]) > 0:
-                    in_iset, out_iset = key
-                    in_petsc = self._in_vec._root_vector._petsc[in_iset]
-                    out_petsc = self._out_vec._root_vector._petsc[out_iset]
-                    self._transfers[key].scatter(out_petsc, in_petsc,
-                                                 addv=False, mode=False)
+            for key in self._transfers:
+                in_iset, out_iset = key
+                in_petsc = self._in_vec._root_vector._petsc[in_iset]
+                out_petsc = self._out_vec._root_vector._petsc[out_iset]
+                self._transfers[key].scatter(out_petsc, in_petsc,
+                                             addv=False, mode=False)
         elif mode == 'rev':
-            for key in self._in_inds:
-                if len(self._in_inds[key]) > 0:
-                    in_iset, out_iset = key
-                    in_petsc = self._in_vec._root_vector._petsc[in_iset]
-                    out_petsc = self._out_vec._root_vector._petsc[out_iset]
-                    self._transfers[key].scatter(in_petsc, out_petsc,
-                                                 addv=True, mode=True)
+            for key in self._transfers:
+                in_iset, out_iset = key
+                in_petsc = self._in_vec._root_vector._petsc[in_iset]
+                out_petsc = self._out_vec._root_vector._petsc[out_iset]
+                self._transfers[key].scatter(in_petsc, out_petsc,
+                                             addv=True, mode=True)
 
 
 class PETScVector(DefaultVector):
