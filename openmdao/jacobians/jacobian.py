@@ -98,7 +98,7 @@ class Jacobian(object):
 
     def _pre_and_post_multiply_subjac(self, abs_key, left_vec, right_vec):
         """
-        Multiply this sub-Jacobian by val.
+        Compute left_vec transposed times this sub-Jacobian times right_vec.
 
         Parameters
         ----------
