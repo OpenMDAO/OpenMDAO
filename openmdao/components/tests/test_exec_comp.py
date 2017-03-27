@@ -31,7 +31,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup(check=False)
         self.assertEqual(str(context.exception),
-                         "C1: the following metadata names were not recognized: ['high', 'low', 'val']")
+                         "C1: the following metadata names were not recognized for variable 'x': ['high', 'low', 'val']")
 
     def test_name_collision_const(self):
         prob = Problem(model=Group())

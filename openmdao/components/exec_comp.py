@@ -147,7 +147,8 @@ class ExecComp(ExplicitComponent):
                 diff = set(val.keys()) - _allowed_meta
                 if diff:
                     raise RuntimeError("%s: the following metadata names were not "
-                                       "recognized: %s" % (self.pathname, sorted(diff)))
+                                       "recognized for variable '%s': %s" %
+                                       (self.pathname, arg, sorted(diff)))
 
                 kwargs2[arg] = val.copy()
                 if 'value' in val:
