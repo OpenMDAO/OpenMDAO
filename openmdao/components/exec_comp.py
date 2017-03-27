@@ -14,7 +14,7 @@ from six.moves import range
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 # regex to check for variable names.
-VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
+VAR_RGX = re.compile('([_a-zA-Z]\w*[ ]*\(?)')
 
 # Names of metadata entries allowed for ExecComp variables.
 _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
@@ -53,7 +53,7 @@ class ExecComp(ExplicitComponent):
     A component defined by an expression string.
     """
 
-    def __init__(self, exprs, inits=None, units=None, **kwargs):
+    def __init__(self, exprs, **kwargs):
         r"""
         Create a <Component> using only an expression string.
 
@@ -62,17 +62,13 @@ class ExecComp(ExplicitComponent):
         appearing on the left-hand side of an assignment are outputs,
         and the rest are inputs.  Each variable is assumed to be of
         type float unless the initial value for that variable is supplied
-        in \*\*kwargs or inits.  Derivatives are calculated using complex step.
+        in \*\*kwargs.  Derivatives are calculated using complex step.
 
         Parameters
         ----------
         exprs : str or list of str
             An assignment statement or iter of them. These express how the
             outputs are calculated based on the inputs.
-
-        inits : dict, optional
-            A mapping of names to initial values, for variables with
-            names that are not valid python names, e.g., a:b:c.
 
         \*\*kwargs : dict of named args
             Initial values of variables can be set by setting a named
@@ -85,8 +81,8 @@ class ExecComp(ExplicitComponent):
         -----
         If a variable has an initial value that is anything other than 0.0,
         either because it has a different type than float or just because its
-        initial value is nonzero, you must use a keyword arg or the 'inits'
-        dict to set the initial value.  For example, let's say we have an
+        initial value is nonzero, you must use a keyword arg
+        to set the initial value.  For example, let's say we have an
         ExecComp that takes an array 'x' as input and outputs a float variable
         'y' which is the sum of the entries in 'x'.
 
@@ -120,11 +116,6 @@ class ExecComp(ExplicitComponent):
 
         self._exprs = exprs[:]
         self._codes = None
-        self._non_pbo_outputs = None
-        self._to_colons = None
-        self._from_colons = None
-        self._colon_names = None
-        self._inits = inits
         self._kwargs = kwargs
 
     def initialize_variables(self):
@@ -134,7 +125,6 @@ class ExecComp(ExplicitComponent):
         outs = set()
         allvars = set()
         exprs = self._exprs
-        inits = self._inits
         kwargs = self._kwargs
 
         # find all of the variables and which ones are outputs
@@ -142,9 +132,6 @@ class ExecComp(ExplicitComponent):
             lhs, _ = expr.split('=', 1)
             outs.update(self._parse_for_out_vars(lhs))
             allvars.update(self._parse_for_vars(expr))
-
-        if inits is not None:
-            kwargs.update(inits)
 
         kwargs2 = {}
         init_vals = {}
@@ -179,30 +166,17 @@ class ExecComp(ExplicitComponent):
             else:
                 self.add_input(var, val, **meta)
 
-        # need to exclude any non-pbo outputs (like case_rank in ExecComp4Test)
-        # TODO: for now, assume all outputs are non-pbo
-        self._non_pbo_outputs = self._var_rel_names['output']
-
-        self._to_colons = {}
-        from_colons = self._from_colons = {}
-        for n in allvars:
-            if ':' in n:
-                no_colon = _valid_name(n, exprs)
-            else:
-                no_colon = n
-            self._to_colons[no_colon] = n
-            from_colons[n] = no_colon
-
-        self._colon_names = {n for n in allvars if ':' in n}
-
         self._codes = self._compile_exprs(self._exprs)
 
     def _compile_exprs(self, exprs):
-        for name in self._colon_names:
-            exprs = [expr.replace(name, self._from_colons[name])
-                     for expr in exprs]
-
-        return [compile(expr, expr, 'exec') for expr in exprs]
+        compiled = []
+        for i, expr in enumerate(exprs):
+            try:
+                compiled.append(compile(expr, expr, 'exec'))
+            except Exception:
+                raise RuntimeError("%s: failed to compile expression '%s'." %
+                                   (self.pathname, exprs[i]))
+        return compiled
 
     def _parse_for_out_vars(self, s):
         vnames = set([x.strip() for x in re.findall(VAR_RGX, s)
@@ -256,7 +230,7 @@ class ExecComp(ExplicitComponent):
             `Vector` containing outputs.
         """
         for expr in self._codes:
-            exec(expr, _expr_dict, _IODict(outputs, inputs, self._to_colons))
+            exec(expr, _expr_dict, _IODict(outputs, inputs))
 
     def compute_partial_derivs(self, inputs, outputs, partials):
         """
@@ -275,8 +249,7 @@ class ExecComp(ExplicitComponent):
         """
         # our complex step
         step = self.complex_stepsize * 1j
-
-        non_pbo_outputs = self._non_pbo_outputs
+        out_names = self._var_rel_names['output']
 
         for param in inputs:
 
@@ -306,7 +279,7 @@ class ExecComp(ExplicitComponent):
                 self._residuals.set_const(0.0)
                 self.compute(pwrap, uwrap)
 
-                for u in non_pbo_outputs:
+                for u in out_names:
                     jval = imag(uwrap[u] / self.complex_stepsize)
                     if (u, param) not in partials:  # create the dict entry
                         partials[(u, param)] = np.zeros((jval.size, psize))
@@ -379,7 +352,7 @@ class _IODict(object):
     and then the inputs.
     """
 
-    def __init__(self, outputs, inputs, to_colons):
+    def __init__(self, outputs, inputs):
         """
         Create the dict wrapper.
 
@@ -393,17 +366,14 @@ class _IODict(object):
         """
         self._outputs = outputs
         self._inputs = inputs
-        self._to_colons = to_colons
 
     def __getitem__(self, name):
-        name = self._to_colons[name]
         if name in self._outputs:
             return self._outputs[name]
         else:
             return self._inputs[name]
 
     def __setitem__(self, name, value):
-        name = self._to_colons[name]
         if name in self._outputs:
             self._outputs[name] = value
         elif name in self._inputs:

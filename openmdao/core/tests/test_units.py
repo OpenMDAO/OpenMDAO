@@ -160,7 +160,7 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_dangling_input_w_units(self):
         prob = Problem(model=Group())
-        prob.model.add_subsystem('C1', ExecComp('y=x', units={'x': 'ft', 'y': 'm'}))
+        prob.model.add_subsystem('C1', ExecComp('y=x', x={'units': 'ft'}, y={'units': 'm'}))
         prob.setup()
         prob.run_model()
         # this test passes as long as it doesn't raise an exception
@@ -368,7 +368,7 @@ class TestUnitConversion(unittest.TestCase):
         prob = Problem(model=Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
         prob.model.add_subsystem('src', SrcComp(), promotes_inputs=['x1'])
-        prob.model.add_subsystem('tgt', ExecComp('yy=xx', xx=0.0, units={'xx': 'unitless'}))
+        prob.model.add_subsystem('tgt', ExecComp('yy=xx', xx={'value': 0.0, 'units': 'unitless'}))
         prob.model.connect('src.x2', 'tgt.xx')
 
         msg = "Output 'src.x2' with units of 'degC' is connected to input 'tgt.xx' which has no units."

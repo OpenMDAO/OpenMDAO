@@ -10,18 +10,24 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitCompone
 
 class TestConnections(unittest.TestCase):
 
-    def setUp(self, c1units=None, c3units=None):
+    def setUp(self, c1meta=None, c3meta=None):
         self.p = Problem(model=Group())
         root = self.p.model
 
+        if c1meta is None:
+            c1meta = {}
+
+        if c3meta is None:
+            c3meta = {}
+
         self.G1 = root.add_subsystem("G1", Group())
         self.G2 = self.G1.add_subsystem("G2", Group())
-        self.C1 = self.G2.add_subsystem("C1", ExecComp('y=x*2.0', units=c1units))
+        self.C1 = self.G2.add_subsystem("C1", ExecComp('y=x*2.0', **c1meta))
         self.C2 = self.G2.add_subsystem("C2", IndepVarComp('x', 1.0))
 
         self.G3 = root.add_subsystem("G3", Group())
         self.G4 = self.G3.add_subsystem("G4", Group())
-        self.C3 = self.G4.add_subsystem("C3", ExecComp('y=x*2.0', units=c3units))
+        self.C3 = self.G4.add_subsystem("C3", ExecComp('y=x*2.0', **c3meta))
         self.C4 = self.G4.add_subsystem("C4", ExecComp('y=x*2.0'))
 
     def test_no_conns(self):
@@ -195,7 +201,7 @@ class TestConnections(unittest.TestCase):
         raise unittest.SkipTest("no compatability checking of connected inputs yet")
 
         # set different but compatible units
-        self.setUp(c1units={'x': 'ft'}, c3units={'x': 'inch'})
+        self.setUp(c1meta={'x': {'units': 'ft'}}, c3meta={'x': {'units': 'inch'}})
 
         # connect two inputs
         self.p.model.connect('G1.G2.C1.x', 'G3.G4.C3.x')
@@ -212,7 +218,7 @@ class TestConnections(unittest.TestCase):
         raise unittest.SkipTest("no compatability checking of connected inputs yet")
 
         # set different but compatible units
-        self.setUp(c1units={'x': 'ft'}, c3units={'x': 'inch'})
+        self.setUp(c1meta={'x': {'units': 'ft'}}, c3meta={'x': {'units': 'inch'}})
 
         # connect two inputs
         self.p.model.connect('G3.G4.C3.x', 'G1.G2.C1.x')
