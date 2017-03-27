@@ -131,7 +131,7 @@ class Assembler(object):
                 indices[abs_name] = idx
 
         in_meta_names = ('units', 'shape', 'var_set')
-        out_meta_names = ('units', 'shape', 'var_set', 'ref', 'rev0')
+        out_meta_names = ('units', 'shape', 'var_set', 'ref', 'ref0')
 
         self._var_allprocs_abs2meta_io = abs2meta = {}
         for abs_name, data in iteritems(abs2data):
