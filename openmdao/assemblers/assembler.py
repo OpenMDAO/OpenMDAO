@@ -130,21 +130,18 @@ class Assembler(object):
             for idx, abs_name in enumerate(allprocs_abs_names[type_]):
                 indices[abs_name] = idx
 
+        in_meta_names = ('units', 'shape', 'var_set')
+        out_meta_names = ('units', 'shape', 'var_set', 'ref', 'rev0')
+
         self._var_allprocs_abs2meta_io = abs2meta = {}
         for abs_name, data in iteritems(abs2data):
             dmeta = data['metadata']
             # only copy what we need in all procs
             if data['type'] == 'input':
-                abs2meta[abs_name] = {n: dmeta[n] for n in ('units',
-                                                            'shape',
-                                                            'var_set')}
+                abs2meta[abs_name] = {n: dmeta[n] for n in in_meta_names}
                 abs2meta[abs_name]['has_src_indices'] = dmeta['src_indices'] is not None
             else:  # output
-                abs2meta[abs_name] = {n: dmeta[n] for n in ('units',
-                                                            'shape',
-                                                            'var_set',
-                                                            'ref',
-                                                            'ref0')}
+                abs2meta[abs_name] = {n: dmeta[n] for n in out_meta_names}
 
         if nproc > 1:
             for rank, a2m in enumerate(self._comm.allgather(abs2meta)):
