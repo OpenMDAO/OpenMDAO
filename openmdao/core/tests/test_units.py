@@ -173,7 +173,7 @@ class TestUnitConversion(unittest.TestCase):
         prob = Problem(model=Group())
         prob.model.add_subsystem('c1', comp)
         prob.model.add_subsystem('c2', SpeedComp())
-        prob.model.add_subsystem('c3', ExecComp('f=speed', units={'speed': 'm/s'}))
+        prob.model.add_subsystem('c3', ExecComp('f=speed',speed={'units': 'm/s'}))
         prob.model.connect('c1.distance', 'c2.distance')
         prob.model.connect('c1.time', 'c2.time')
         prob.model.connect('c2.speed', 'c3.speed')
@@ -352,7 +352,7 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_add_unitless_input(self):
         prob = Problem(model=Group())
-        prob.model.add_subsystem('C1', ExecComp('y=x', units={'x': 'unitless'}))
+        prob.model.add_subsystem('C1', ExecComp('y=x', x={'units': 'unitless'}))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             prob.setup(check=False)

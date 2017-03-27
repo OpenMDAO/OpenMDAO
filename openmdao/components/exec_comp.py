@@ -16,6 +16,11 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 # regex to check for variable names.
 VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
 
+# Names of metadata entries allowed for ExecComp variables.
+_allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
+                 'var_set', 'ref', 'ref0', 'res_ref', 'res_ref0',
+                 'lower', 'upper', 'src_indices'}
+
 
 def array_idx_iter(shape):
     """
@@ -66,15 +71,15 @@ class ExecComp(ExplicitComponent):
             outputs are calculated based on the inputs.
 
         inits : dict, optional
-            A mapping of names to initial values, primarily for variables with
+            A mapping of names to initial values, for variables with
             names that are not valid python names, e.g., a:b:c.
-
-        units : dict, optional
-            A mapping of variable names to their units.
 
         \*\*kwargs : dict of named args
             Initial values of variables can be set by setting a named
-            arg with the var name.
+            arg with the var name.  If the value is a dict it is assumed
+            to contain metadata.  To set the initial value in addition to
+            other metadata, assign the initial value to the 'value' entry
+            of the dict.
 
         Notes
         -----
@@ -87,13 +92,23 @@ class ExecComp(ExplicitComponent):
 
         ::
 
-            import numpy as np
+            import numpy
             from openmdao.api import ExecComp
-            excomp = ExecComp('y=numpy.sum(x)', x=np.ones(10,dtype=float))
+            excomp = ExecComp('y=numpy.sum(x)', x=numpy.ones(10,dtype=float))
 
         In this example, 'y' would be assumed to be the default type of float
         and would be given the default initial value of 0.0, while 'x' would be
         initialized with a size 10 float array of ones.
+
+        If you want to assign certain metadata for 'x' in addition to its
+        initial value, you can do it as follows:
+
+        ::
+
+            excomp = ExecComp('y=numpy.sum(x)',
+                              x={'value': numpy.ones(10,dtype=float),
+                                 'units': 'ft',
+                                 'var_set': 3})
         """
         super(ExecComp, self).__init__()
 
@@ -110,7 +125,6 @@ class ExecComp(ExplicitComponent):
         self._from_colons = None
         self._colon_names = None
         self._inits = inits
-        self._units = units
         self._kwargs = kwargs
 
     def initialize_variables(self):
@@ -121,7 +135,6 @@ class ExecComp(ExplicitComponent):
         allvars = set()
         exprs = self._exprs
         inits = self._inits
-        units = self._units
         kwargs = self._kwargs
 
         # find all of the variables and which ones are outputs
@@ -133,32 +146,38 @@ class ExecComp(ExplicitComponent):
         if inits is not None:
             kwargs.update(inits)
 
+        kwargs2 = {}
+        init_vals = {}
+
         # make sure all kwargs are legit
-        for kwarg in kwargs:
-            if kwarg not in allvars:
+        for arg, val in kwargs.items():
+            if arg not in allvars:
                 raise RuntimeError("%s: arg '%s' in call to ExecComp() "
                                    "does not refer to any variable in the "
                                    "expressions %s" % (self.pathname,
-                                                       kwarg, exprs))
+                                                       arg, exprs))
+            if isinstance(val, dict):
+                diff = set(val.keys()) - _allowed_meta
+                if diff:
+                    raise RuntimeError("%s: the following metadata names were not "
+                                       "recognized: %s" % (self.pathname, sorted(diff)))
 
-        # make sure units are legit
-        units_dict = units if units is not None else {}
-        for unit_var in units_dict:
-            if unit_var not in allvars:
-                raise RuntimeError("{2}: Units specific for variable {0} "
-                                   "in call to ExecComp() but {0} does "
-                                   "not appear in the expression "
-                                   "{1}".format(unit_var, exprs, self.pathname))
+                kwargs2[arg] = val.copy()
+                if 'value' in val:
+                    init_vals[arg] = val['value']
+                    del kwargs2[arg]['value']
+            else:
+                init_vals[arg] = val
 
         for var in sorted(allvars):
             # if user supplied an initial value, use it, otherwise set to 0.0
-            val = kwargs.get(var, 0.0)
-            kwargs2 = {'units': units_dict[var]} if var in units_dict else {}
+            val = init_vals.get(var, 0.0)
+            meta = kwargs2.get(var, {})
 
             if var in outs:
-                self.add_output(var, val, **kwargs2)
+                self.add_output(var, val, **meta)
             else:
-                self.add_input(var, val, **kwargs2)
+                self.add_input(var, val, **meta)
 
         # need to exclude any non-pbo outputs (like case_rank in ExecComp4Test)
         # TODO: for now, assume all outputs are non-pbo
