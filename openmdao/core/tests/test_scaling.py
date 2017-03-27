@@ -515,9 +515,11 @@ class TestScaling(unittest.TestCase):
                 self.add_input('lengths', val=np.ones((2, 2)))
                 self.add_input('widths', val=np.ones((2, 2)))
                 self.add_output('areas', val=np.ones((2, 2)), ref=np.array([[2.0, 3.0], [5.0, 7.0]]),
-                                ref0=np.array([[0.1, 0.2], [0.3, 0.4]]))
+                                ref0=np.array([[0.1, 0.2], [0.3, 0.4]]), lower=-1000.0, upper=1000.0)
                 self.add_output('stuff', val=np.ones((2, 2)), ref=np.array([[11.0, 13.0], [17.0, 19.0]]),
-                                ref0=np.array([[0.6, 0.7], [0.8, 0.9]]))
+                                ref0=np.array([[0.6, 0.7], [0.8, 0.9]]),
+                                lower=np.array([[-5000.0, -4000.0], [-3000.0, -2000.0]]),
+                                upper=np.array([[5000.0, 4000.0], [3000.0, 2000.0]]))
                 self.add_output('total_volume', val=1.)
 
             def compute(self, inputs, outputs):
@@ -551,6 +553,30 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val[1, 0], (2.0 - 0.8)/(17 - 0.8))
             assert_rel_error(self, val[1, 1], (2.0 - 0.9)/(19 - 0.9))
 
+            lb = model.get_subsystem('comp')._lower_bounds['areas']
+            assert_rel_error(self, lb[0, 0], (-1000.0 - 0.1)/(2 - 0.1))
+            assert_rel_error(self, lb[0, 1], (-1000.0 - 0.2)/(3 - 0.2))
+            assert_rel_error(self, lb[1, 0], (-1000.0 - 0.3)/(5 - 0.3))
+            assert_rel_error(self, lb[1, 1], (-1000.0 - 0.4)/(7 - 0.4))
+
+            ub = model.get_subsystem('comp')._upper_bounds['areas']
+            assert_rel_error(self, ub[0, 0], (1000.0 - 0.1)/(2 - 0.1))
+            assert_rel_error(self, ub[0, 1], (1000.0 - 0.2)/(3 - 0.2))
+            assert_rel_error(self, ub[1, 0], (1000.0 - 0.3)/(5 - 0.3))
+            assert_rel_error(self, ub[1, 1], (1000.0 - 0.4)/(7 - 0.4))
+
+            lb = model.get_subsystem('comp')._lower_bounds['stuff']
+            assert_rel_error(self, lb[0, 0], (-5000.0 - 0.6)/(11 - 0.6))
+            assert_rel_error(self, lb[0, 1], (-4000.0 - 0.7)/(13 - 0.7))
+            assert_rel_error(self, lb[1, 0], (-3000.0 - 0.8)/(17 - 0.8))
+            assert_rel_error(self, lb[1, 1], (-2000.0 - 0.9)/(19 - 0.9))
+
+            ub = model.get_subsystem('comp')._upper_bounds['stuff']
+            assert_rel_error(self, ub[0, 0], (5000.0 - 0.6)/(11 - 0.6))
+            assert_rel_error(self, ub[0, 1], (4000.0 - 0.7)/(13 - 0.7))
+            assert_rel_error(self, ub[1, 0], (3000.0 - 0.8)/(17 - 0.8))
+            assert_rel_error(self, ub[1, 1], (2000.0 - 0.9)/(19 - 0.9))
+
     def test_implicit_scale(self):
 
         class ImpCompArrayScale(TestImplCompArrayDense):
@@ -571,6 +597,7 @@ class TestScaling(unittest.TestCase):
                 # These are incorrect derivatives, but we aren't doing any calculations, and it makes
                 # it much easier to check that the scales are correct.
                 jacobian['x', 'x'] = np.ones((2, 2))
+                jacobian['x', 'extra'] = np.ones((2, 2))
                 jacobian['extra', 'x'] = np.ones((2, 2))
                 jacobian['x', 'rhs'] = -np.eye(2)
 
@@ -608,6 +635,17 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][0], (2.0 - 4.0)/(11.0 - 18.0))
             assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][1], (3.0 - 9.0)/(7.0 - 13.0))
             assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][1], (3.0 - 9.0)/(11.0 - 18.0))
+
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][0][0], (12.0 - 14.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][1][0], (12.0 - 14.0)/(11.0 - 18.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][0][1], (13.0 - 17.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][1][1], (13.0 - 17.0)/(11.0 - 18.0))
+
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][0], -1.0/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][0], 0.0)
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][1], 0.0)
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][1], -1.0/(11.0 - 18.0))
+
 
 if __name__ == '__main__':
     unittest.main()
