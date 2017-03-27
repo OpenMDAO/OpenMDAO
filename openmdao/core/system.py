@@ -19,6 +19,7 @@ from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
+from openmdao.recorders.recording_manager import RecordingManager
 
 
 # This is for storing various data mapped to var pathname
@@ -212,6 +213,8 @@ class System(object):
 
         self._design_vars = {}
         self._responses = {}
+
+        self.rec_mgr = RecordingManager()
 
     def _setup_processors(self, path, comm, global_dict,
                           assembler, proc_range):
@@ -1457,11 +1460,9 @@ class System(object):
         with self._scaled_context():
             self._apply_nonlinear()
 
-        # TODO_RECORDERS
-        #   Systems, no matter the type, should be able to save inputs, outputs, and 
-        #       residuals (System._vectors[‘inputs’][‘nonlinear’], etc.) after _apply_nonlinear and _solve_nonlinear calls
-
-        # component-level solve_nonlinear and solve_linear recording (wouldn’t hurt to also make it work generally with any type of system at this point). 
+        #   Systems, no matter the type, should be able to save inputs, outputs, and
+        #   component-level solve_nonlinear and solve_linear recording
+        # (wouldnt hurt to also make it work generally with any type of system at this point).
 
     def run_solve_nonlinear(self):
         """
@@ -1482,9 +1483,9 @@ class System(object):
             result = self._solve_nonlinear()
 
         # TODO_RECORDERS
-        #   Systems, no matter the type, should be able to save inputs, outputs, and 
-        #       residuals (System._vectors[‘inputs’][‘nonlinear’], etc.) after _apply_nonlinear and _solve_nonlinear calls
-        # component-level solve_nonlinear and solve_linear recording (wouldn’t hurt to also make it work generally with any type of system at this point). 
+        #   Systems, no matter the type, should be able to save inputs, outputs, and
+        #       residuals (System._vectors['inputs']['nonlinear'], etc.) after _apply_nonlinear and _solve_nonlinear calls
+        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point).
 
         return result
 
@@ -1508,11 +1509,11 @@ class System(object):
             self._apply_linear(vec_names, mode, var_inds)
 
         # TODO_RECORDERS
-        #  The _apply_linear and _solve_linear methods work with d_inputs, d_outputs, and d_residuals, 
-        #       each one is associated with a vecname. 
-        #  These would be (System._vectors[‘inputs’][vec_name], etc.). In terms of the list of vec_names, 
-        #     there is always a ‘linear’, and depending on the problem, there may be others.
-        # component-level solve_nonlinear and solve_linear recording (wouldn’t hurt to also make it work generally with any type of system at this point). 
+        #  The _apply_linear and _solve_linear methods work with d_inputs, d_outputs, and d_residuals,
+        #       each one is associated with a vecname.
+        #  These would be (System._vectors['inputs'][vec_name], etc.). In terms of the list of vec_names,
+        #     there is always a 'linear', and depending on the problem, there may be others.
+        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point).
 
     def run_solve_linear(self, vec_names, mode):
         """
@@ -1540,12 +1541,12 @@ class System(object):
             result = self._solve_linear(vec_names, mode)
 
         # TODO_RECORDERS
-        #  The _apply_linear and _solve_linear methods work with d_inputs, d_outputs, and d_residuals, 
-        #       each one is associated with a vecname. 
-        #  These would be (System._vectors[‘inputs’][vec_name], etc.). In terms of the list of vec_names, 
-        #     there is always a ‘linear’, and depending on the problem, there may be others.
-        # component-level solve_nonlinear and solve_linear recording (wouldn’t hurt to also make it work generally with any type of system at this point). 
-        
+        #  The _apply_linear and _solve_linear methods work with d_inputs, d_outputs, and d_residuals,
+        #       each one is associated with a vecname.
+        #  These would be (System._vectors['inputs'][vec_name], etc.). In terms of the list of vec_names,
+        #     there is always a 'linear', and depending on the problem, there may be others.
+        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point).
+
         return result
 
     def run_linearize(self):
@@ -1658,3 +1659,16 @@ class System(object):
             variable names
         """
         pass
+
+    def add_recorder(self, recorder):
+        """
+        Adds a recorder to the driver.
+
+        Args
+        ----
+        recorder : BaseRecorder
+           A recorder instance.
+        """
+        recorder._owners.append(self)
+        self.rec_mgr.append(recorder)
+        return recorder

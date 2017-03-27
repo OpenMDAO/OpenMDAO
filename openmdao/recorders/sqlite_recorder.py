@@ -125,30 +125,30 @@ class SqliteRecorder(BaseRecorder):
         return
 
         # TODO_RECORDERS: Clean up the stuff below as needed
-
-        if MPI and MPI.COMM_WORLD.rank > 0 :
-            raise RuntimeError("not rank 0")
-
-        data = OrderedDict()
-        iteration_coordinate = metadata['coord']
-        timestamp = metadata['timestamp']
-
-        group_name = format_iteration_coordinate(iteration_coordinate)
-
-        data['timestamp'] = timestamp
-        data['success'] = metadata['success']
-        data['msg'] = metadata['msg']
-
-        if self.options['record_params']:
-            data['Parameters'] = self._filter_vector(params, 'p', iteration_coordinate)
-
-        if self.options['record_unknowns']:
-            data['Unknowns'] = self._filter_vector(unknowns, 'u', iteration_coordinate)
-
-        if self.options['record_resids']:
-            data['Residuals'] = self._filter_vector(resids, 'r', iteration_coordinate)
-
-        self.out_iterations[group_name] = data
+        #
+        # if MPI and MPI.COMM_WORLD.rank > 0 :
+        #     raise RuntimeError("not rank 0")
+        #
+        # data = OrderedDict()
+        # iteration_coordinate = metadata['coord']
+        # timestamp = metadata['timestamp']
+        #
+        # group_name = format_iteration_coordinate(iteration_coordinate)
+        #
+        # data['timestamp'] = timestamp
+        # data['success'] = metadata['success']
+        # data['msg'] = metadata['msg']
+        #
+        # if self.options['record_params']:
+        #     data['Parameters'] = self._filter_vector(params, 'p', iteration_coordinate)
+        #
+        # if self.options['record_unknowns']:
+        #     data['Unknowns'] = self._filter_vector(unknowns, 'u', iteration_coordinate)
+        #
+        # if self.options['record_resids']:
+        #     data['Residuals'] = self._filter_vector(resids, 'r', iteration_coordinate)
+        #
+        # self.out_iterations[group_name] = data
 
     def record_derivatives(self, derivs, metadata):
         """Writes the derivatives that were calculated for the driver.

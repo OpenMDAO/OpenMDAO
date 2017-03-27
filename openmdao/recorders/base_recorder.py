@@ -31,17 +31,48 @@ class BaseRecorder(object):
 
     def __init__(self):
         self.options = OptionsDictionary()
-        self.options.add_option('record_metadata', True)
-        self.options.add_option('record_outputs', True)
-        self.options.add_option('record_inputs', False)
-        self.options.add_option('record_residuals', False)
-        self.options.add_option('record_derivs', True,
-                                 desc='Set to True to record derivatives at the driver level')
-        self.options.add_option('includes', ['*'],
-                                 desc='Patterns for variables to include in recording')
-        self.options.add_option('excludes', [],
-                                 desc='Patterns for variables to exclude from recording '
-                                 '(processed after includes)')
+        self.options.declare('record_metadata', True)
+        self.options.declare('includes', ['*'],
+                                desc='Patterns for variables to include in recording')
+        self.options.declare('excludes', [],
+                                desc='Patterns for variables to exclude from recording '
+                                '(processed after includes)')
+
+        # Old options that will be deprecated
+        self.options.declare('record_unknowns', False)
+        self.options.declare('record_params', False)
+        self.options.declare('record_resids', False)
+        self.options.declare('record_derivs', False)
+
+        # System options
+        self.options.declare('record_outputs', False,
+                                desc='Set to True to record responses at the driver level')
+        self.options.declare('record_inputs', False)
+        self.options.declare('record_residuals', False)
+        self.options.declare('record_derivs', False,
+                                 desc='Set to True to record derivatives at the system level')
+
+        # Driver options
+        self.options.declare('record_desvars', False,
+                                 desc='Set to True to record design variables at the driver level')
+        self.options.declare('record_responses', False,
+                                 desc='Set to True to record responses at the driver level')
+        self.options.declare('record_objectives', False,
+                                 desc='Set to True to record objectives at the driver level')
+        self.options.declare('record_constraints', False,
+                                 desc='Set to True to record constraints at the driver level')
+
+        # Solver options
+        self.options.declare('record_abs_error', False,
+                                desc='Set to True to record absolute error at the solver level')
+        self.options.declare('record_rel_error', False,
+                                desc='Set to True to record relative error at the solver level')
+        self.options.declare('record_output', False,
+                                desc='Set to True to record output at the solver level')
+        self.options.declare('record_solver_residuals', False,
+                                desc='Set to True to record residuals at the solver level')
+
+        self._owners = []
         self.out = None
 
         # # This is for drivers to determine if a recorder supports
@@ -72,6 +103,9 @@ class BaseRecorder(object):
         check = self._check_path
         incl = self.options['includes']
         excl = self.options['excludes']
+
+        # Deprecated options here?
+
 
         # Compute the inclusion lists for recording
         if self.options['record_inputs']:

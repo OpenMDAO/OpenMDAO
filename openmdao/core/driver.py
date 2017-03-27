@@ -72,6 +72,8 @@ class Driver(object):
         recorder : BaseRecorder
            A recorder instance.
         """
+        recorder._owners.append(self)
+
         self.rec_mgr.append(recorder)
         return recorder
 
@@ -266,7 +268,7 @@ class Driver(object):
         #     objectives
         #     constraints
 
-        # We would definitely need driver recording (dvs, responses, …), and optionally recording of state values in each optimization iteration
+        # We would definitely need driver recording (dvs, responses, ...), and optionally recording of state values in each optimization iteration
 
 
         # objective_values = self.get_objective_values()

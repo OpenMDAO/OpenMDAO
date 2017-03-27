@@ -5,6 +5,7 @@ import numpy as np
 
 from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.recorders.recording_manager import RecordingManager
 
 
 class Solver(object):
@@ -59,6 +60,22 @@ class Solver(object):
 
         self._declare_options()
         self.options.update(kwargs)
+
+        self.rec_mgr = RecordingManager()
+
+
+    def add_recorder(self, recorder):
+        """
+        Adds a recorder to the driver.
+
+        Args
+        ----
+        recorder : BaseRecorder
+           A recorder instance.
+        """
+        recorder._owners.append(self)
+        self.rec_mgr.append(recorder)
+        return recorder
 
     def _declare_options(self):
         """
@@ -146,10 +163,11 @@ class Solver(object):
             norm = self._iter_get_norm()
 
             # TODO_RECORDER I think we write to the recorder here
-            # Right, it would depend on the mode and whether it’s linear or nonlinear. The most basic mode would store 
+            # Right, it would depend on the mode and whether it's linear or nonlinear. The most basic mode would store
             #  just the absolute error and relative error. A second mode would store the full outputs and residuals.
 
             # The full solver residual/output recording and apply_nonlinear/apply_linear recording probably falls last in terms of priority
+            # self.rec_mgr.record_iteration(self)
 
 
             self._iter_count += 1
