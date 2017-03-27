@@ -15,6 +15,7 @@ from openmdao.solvers.nl_runonce import NLRunOnce
 from openmdao.solvers.ln_runonce import LNRunOnce
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
+from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 
 
 class Group(System):
@@ -213,6 +214,106 @@ class Group(System):
 
         self._subsystems_allprocs = [olddict[name] for name in new_order]
 
+    def _setup_processors(self, path, comm, global_dict, assembler):
+        """
+        Recursively split comms and define local subsystems.
+
+        Sets the following attributes:
+            pathname
+            comm
+            _assembler
+            _subsystems_myproc
+            _subsystems_myproc_inds
+
+        Parameters
+        ----------
+        path : str
+            parent names to prepend to name to get the pathname
+        comm : MPI.Comm or <FakeComm>
+            communicator for this system (already split, if applicable).
+        global_dict : dict
+            dictionary with kwargs of all parents assembled in it.
+        assembler : Assembler
+            pointer to the global assembler object to distribute to everyone.
+        """
+        super(Group, self)._setup_processors(path, comm, global_dict, assembler)
+
+        if self._subsystems_allprocs:
+            req_procs = [s._mpi_req_procs for s in self._subsystems_allprocs]
+            # Call the load balancing algorithm
+            try:
+                sub_inds, sub_comm = self._mpi_proc_allocator(req_procs, comm)
+            except ProcAllocationError as err:
+                raise RuntimeError("subsystem %s requested %d processes "
+                                   "but got %d" %
+                                   (self._subsystems_allprocs[err.sub_idx].pathname,
+                                    err.requested, err.remaining))
+
+            # Define local subsystems
+            self._subsystems_myproc_inds = sub_inds
+            self._subsystems_myproc = [self._subsystems_allprocs[ind]
+                                       for ind in sub_inds]
+
+            # Perform recursion
+            for subsys in self._subsystems_myproc:
+                sub_global_dict = self.metadata._global_dict.copy()
+                subsys._setup_processors(self.pathname, sub_comm,
+                                         sub_global_dict, assembler)
+
+    def get_req_procs(self):
+        """
+        Return the min and max MPI processes usable by this Group.
+
+        Returns
+        -------
+        tuple : (int, int or None)
+            A tuple of the form (min_procs, max_procs), indicating the min
+            and max processors usable by this <Group>.  max_procs can be None,
+            indicating all available procs can be used.
+        """
+        if self._subsystems_allprocs:
+            if self._mpi_proc_allocator.parallel:
+                # for a parallel group, we add up all of the required procs
+                min_procs, max_procs = 0, 0
+
+                for sub in self._subsystems_allprocs:
+                    if sub._mpi_req_procs is None:
+                        sub._mpi_req_procs = sub.get_req_procs()
+                    sub_min, sub_max = sub._mpi_req_procs
+                    if sub_min > min_procs:
+                        min_procs = sub_min
+                    if max_procs is not None:
+                        if sub_max is None:
+                            max_procs = None
+                        else:
+                            max_procs += sub_max
+
+                if min_procs == 0:
+                    min_procs = 1
+
+                if max_procs == 0:
+                    max_procs = 1
+
+                return (min_procs, max_procs)
+            else:
+                # for a serial group, we take the max required procs
+                min_procs, max_procs = 1, 1
+
+                for sub in self._subsystems_allprocs:
+                    if sub._mpi_req_procs is None:
+                        sub._mpi_req_procs = sub.get_req_procs()
+                    sub_min, sub_max = sub._mpi_req_procs
+                    min_procs = max(min_procs, sub_min)
+                    if max_procs is not None:
+                        if sub_max is None:
+                            max_procs = None
+                        else:
+                            max_procs = max(max_procs, sub_max)
+
+                return (min_procs, max_procs)
+        else:
+            return super(Group, self).get_req_procs()
+
     def _setup_connections(self):
         """
         Recursively assemble a list of input-output connections.
@@ -321,11 +422,12 @@ class Group(System):
         for isub, subsys in enumerate(self._subsystems_myproc):
             sub_all_abs_names, sub_all_prom_names = subsys._setup_variables()
 
-            var_maps = subsys._get_maps(sub_all_prom_names)
+            var_maps_inout = subsys._get_maps(sub_all_prom_names)
             for type_ in ['input', 'output']:
+                var_maps = var_maps_inout[type_]
                 # concatenate the allprocs variable names from subsystems on my proc.
                 allprocs_abs_names[type_].extend(sub_all_abs_names[type_])
-                allprocs_prom_names[type_].extend(var_maps[type_][p]
+                allprocs_prom_names[type_].extend(var_maps[p]
                                                   for p in sub_all_prom_names[type_])
 
                 # Assemble _var_abs2data_io and _var_abs_names by concatenating from subsystems.
@@ -333,7 +435,7 @@ class Group(System):
                     sub_data = subsys._var_abs2data_io[abs_name]
 
                     self._var_abs2data_io[abs_name] = {
-                        'prom': var_maps[type_][sub_data['prom']],
+                        'prom': var_maps[sub_data['prom']],
                         'rel': abs_name[name_offset:] if name_offset > 0 else abs_name,
                         'my_idx': len(self._var_abs_names[type_]),
                         'type': type_,
@@ -388,8 +490,6 @@ class Group(System):
         Computes the following attributes:
             _var_allprocs_idx_range
         """
-        # At this point, _var_allprocs_idx_range is correct except for an offset.
-        # We apply the global_index offset to make _var_allprocs_idx_range correct.
         abs2idx = self._assembler._var_allprocs_abs2idx_io
         for type_ in ['input', 'output']:
             idxs = [abs2idx[name] for name in self._var_allprocs_abs_names[type_]]
@@ -397,8 +497,7 @@ class Group(System):
                 self._var_allprocs_idx_range[type_][0] = np.min(idxs)
                 self._var_allprocs_idx_range[type_][1] = np.max(idxs) + 1
             else:
-                self._var_allprocs_idx_range[type_][0] = 0
-                self._var_allprocs_idx_range[type_][1] = 0
+                self._var_allprocs_idx_range[type_][:] = [0, 0]
 
         # Perform recursion
         for subsys in self._subsystems_myproc:

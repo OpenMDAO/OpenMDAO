@@ -11,7 +11,6 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
@@ -229,47 +228,8 @@ class System(object):
             and max processors usable by this `System`.  max_procs can be None,
             indicating all available procs can be used.
         """
-        if self._mpi_req_procs is not None:
-            return self._mpi_req_procs
-
-        if self._subsystems_allprocs:
-            if self._mpi_proc_allocator.parallel:
-                # for a parallel group, we add up all of the required procs
-                min_procs, max_procs = 0, 0
-
-                for sub in self._subsystems_allprocs:
-                    sub_min, sub_max = sub._mpi_req_procs = sub.get_req_procs()
-                    if sub_min > min_procs:
-                        min_procs = sub_min
-                    if max_procs is not None:
-                        if sub_max is None:
-                            max_procs = None
-                        else:
-                            max_procs += sub_max
-
-                if min_procs == 0:
-                    min_procs = 1
-
-                if max_procs == 0:
-                    max_procs = 1
-
-                return (min_procs, max_procs)
-            else:
-                # for a serial group, we take the max required procs
-                min_procs, max_procs = 1, 1
-
-                for sub in self._subsystems_allprocs:
-                    sub_min, sub_max = sub._mpi_req_procs = sub.get_req_procs()
-                    min_procs = max(min_procs, sub_min)
-                    if max_procs is not None:
-                        if sub_max is None:
-                            max_procs = None
-                        else:
-                            max_procs = max(max_procs, sub_max)
-
-                return (min_procs, max_procs)
-        else:  # by default, components only require 1 proc
-            return (1, 1)
+        # by default, systems only require 1 proc
+        return (1, 1)
 
     def _setup_processors(self, path, comm, global_dict, assembler):
         """
@@ -307,29 +267,6 @@ class System(object):
         if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
             raise RuntimeError("%s needs %d MPI processes, but was given only %d." %
                                (self.pathname, minp, comm.size))
-
-        # If this is a group:
-        if self._subsystems_allprocs:
-            req_procs = [s._mpi_req_procs for s in self._subsystems_allprocs]
-            # Call the load balancing algorithm
-            try:
-                sub_inds, sub_comm = self._mpi_proc_allocator(req_procs, comm)
-            except ProcAllocationError as err:
-                raise RuntimeError("subsystem %s requested %d processes "
-                                   "but got %d" %
-                                   (self._subsystems_allprocs[err.sub_idx].pathname,
-                                    err.requested, err.remaining))
-
-            # Define local subsystems
-            self._subsystems_myproc_inds = sub_inds
-            self._subsystems_myproc = [self._subsystems_allprocs[ind]
-                                       for ind in sub_inds]
-
-            # Perform recursion
-            for subsys in self._subsystems_myproc:
-                sub_global_dict = self.metadata._global_dict.copy()
-                subsys._setup_processors(self.pathname, sub_comm,
-                                         sub_global_dict, assembler)
 
     def _setup_variables(self, recurse=True):
         """

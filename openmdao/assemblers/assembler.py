@@ -57,8 +57,6 @@ class Assembler(object):
     _abs_input2src : {str: str, ...}
         The output absolute name for each input absolute name.  A value of None
         indicates that no output is connected to that input.
-    _abs_src2inputs : {str: [], ...}
-        A mapping of absolute output name to any inputs that it's connected to.
     _src_indices : int ndarray[:]
         all the input indices vectors concatenated together.
     _src_indices_range : int ndarray[num_input_var_all, 2]
@@ -287,7 +285,6 @@ class Assembler(object):
                                       "no units." % (ipath, in_units, opath))
 
         self._abs_input2src = input_srcs
-        self._abs_src2inputs = output_tgts
 
     def _setup_src_indices(self, abs2data, abs_names):
         """

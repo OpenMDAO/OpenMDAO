@@ -89,6 +89,7 @@ class DefaultAssembler(Assembler):
         for in_ind in range(in_start, in_end):
             in_isub = in_isub_var[in_ind - in_start]
             if in_isub == -1:
+                # input subsystem is not contained witin the current group
                 continue
 
             iabs = in_abs_vars[in_ind]
@@ -104,6 +105,10 @@ class DefaultAssembler(Assembler):
             if out_start <= out_ind < out_end:
                 out_isub = out_isub_var[out_ind - out_start]
                 if out_isub == -1 or out_isub == in_isub:
+                    # output susystem is either not contained within the
+                    # current group or both input and output subsystems are
+                    # contained within the same subgroup (so the transfer will
+                    # be performed in the subgroup)
                     continue
                 in_iset, in_ivar_set = in_set_indices[in_ind, :]
                 out_iset, out_ivar_set = out_set_indices[out_ind, :]
@@ -126,7 +131,8 @@ class DefaultAssembler(Assembler):
                         start += out_sizes[iproc, out_ivar_set]
                 else:
                     if out_sizes[rank, out_ivar_set] == 0:
-                        # find lowest rank remote owner of output
+                        # output is not local, so find lowest rank remote owner
+                        # of the output
                         iproc = np.nonzero(out_sizes[:, out_ivar_set])[0][0]
                     else:
                         iproc = rank
@@ -226,7 +232,7 @@ class DefaultAssembler(Assembler):
         in_sizes = self._var_sizes_by_set['input'][in_iset]
         in_offsets = self._var_offsets_by_set['input'][in_iset]
         if in_sizes[rank, in_ivar_set] == 0:
-            # find lowest rank owner of input
+            # input is not local, so find lowest rank owner of the input
             iproc = np.nonzero(in_sizes[:, in_ivar_set])[0][0]
         else:
             iproc = rank
