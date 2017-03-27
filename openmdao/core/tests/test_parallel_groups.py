@@ -31,7 +31,6 @@ class TestParallelGroups(unittest.TestCase):
 
         J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
 
-        print('fwd', J)
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
@@ -42,7 +41,6 @@ class TestParallelGroups(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
-        print('rev', J)
 
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
@@ -60,7 +58,7 @@ class TestParallelGroups(unittest.TestCase):
 
         indep_list = ['iv.x1', 'iv.x2']
         unknown_list = ['c3.y']
-    
+
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
         J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
@@ -93,7 +91,7 @@ class TestParallelGroups(unittest.TestCase):
 
         indep_list = ['iv.x']
         unknown_list = ['c4.y1', 'c4.y2']
-    
+
         J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
         assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
         assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
@@ -120,7 +118,7 @@ class TestParallelGroups(unittest.TestCase):
 
         indep_list = ['iv.x']
         unknown_list = ['c7.y1']
-    
+
         J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
         assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
@@ -137,5 +135,3 @@ class TestParallelGroups(unittest.TestCase):
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()
-
-

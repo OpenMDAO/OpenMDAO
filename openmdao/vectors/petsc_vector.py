@@ -35,6 +35,9 @@ class PETScTransfer(DefaultTransfer):
                                                   in_petsc, in_indexset)
                 self._transfers[key] = transfer
 
+        # save some memory
+        self._in_inds = self._out_inds = None
+
     def __call__(self, in_vec, out_vec, mode='fwd'):
         """
         Perform transfer.

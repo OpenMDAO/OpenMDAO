@@ -87,67 +87,69 @@ class DefaultAssembler(Assembler):
         rank = self._comm.rank
 
         for in_ind in range(in_start, in_end):
+            in_isub = in_isub_var[in_ind - in_start]
+            if in_isub == -1:
+                continue
+
             iabs = in_abs_vars[in_ind]
             oabs = self._abs_input2src[iabs]
             if oabs is None:  # input is not connected
                 continue
 
-            input_inds = None
             out_ind = self._var_allprocs_abs2idx_io[oabs]
+
+            input_inds = None
             has_src_indices = self._var_allprocs_abs2meta_io[iabs]['has_src_indices']
 
             if out_start <= out_ind < out_end:
-                in_isub = in_isub_var[in_ind - in_start]
                 out_isub = out_isub_var[out_ind - out_start]
+                if out_isub == -1 or out_isub == in_isub:
+                    continue
+                in_iset, in_ivar_set = in_set_indices[in_ind, :]
+                out_iset, out_ivar_set = out_set_indices[out_ind, :]
 
-                if in_isub != -1 and in_isub != out_isub:
-                    in_iset, in_ivar_set = in_set_indices[in_ind, :]
-                    out_iset, out_ivar_set = out_set_indices[out_ind, :]
+                start, end = self._src_indices_range[in_ind, :]
+                inds = self._src_indices[start:end]
 
-                    start, end = self._src_indices_range[in_ind, :]
-                    inds = self._src_indices[start:end]
+                out_sizes = self._var_sizes_by_set['output'][out_iset]
+                out_offsets = self._var_offsets_by_set['output'][out_iset]
+                if has_src_indices:
+                    output_inds = np.zeros(inds.size, int)
+                    start, end = 0, 0
+                    for iproc in range(self._comm.size):
+                        end += out_sizes[iproc, out_ivar_set]
 
-                    out_sizes = self._var_sizes_by_set['output'][out_iset]
-                    out_offsets = self._var_offsets_by_set['output'][out_iset]
-                    if has_src_indices:
-                        output_inds = np.zeros(inds.size, int)
-                        start, end = 0, 0
-                        for iproc in range(self._comm.size):
-                            end += out_sizes[iproc, out_ivar_set]
+                        on_iproc = np.logical_and(start <= inds, inds < end)
+                        offset = out_offsets[iproc, out_ivar_set]
+                        output_inds[on_iproc] = inds[on_iproc] + offset
 
-                            on_iproc = np.logical_and(start <= inds, inds < end)
-                            offset = out_offsets[iproc, out_ivar_set]
-                            output_inds[on_iproc] = inds[on_iproc] + offset
-
-                            start += out_sizes[iproc, out_ivar_set]
+                        start += out_sizes[iproc, out_ivar_set]
+                else:
+                    if out_sizes[rank, out_ivar_set] == 0:
+                        # find lowest rank remote owner of output
+                        iproc = np.nonzero(out_sizes[:, out_ivar_set])[0][0]
                     else:
-                        if out_sizes[rank, out_ivar_set] == 0:
-                            # find lowest rank remote owner of output
-                            iproc = np.nonzero(out_sizes[:, out_ivar_set])[0][0]
-                        else:
-                            iproc = rank
-                        output_inds = inds + out_offsets[iproc, out_ivar_set]
+                        iproc = rank
+                    output_inds = inds + out_offsets[iproc, out_ivar_set]
 
-                    in_sizes = self._var_sizes_by_set['input'][in_iset]
-                    if in_sizes[iproc, in_ivar_set] == 0:
-                        input_inds = output_inds = None
-                    else:
-                        in_offsets = self._var_offsets_by_set['input'][in_iset]
-                        start = in_offsets[rank, in_ivar_set]
-                        end = start + in_sizes[rank, in_ivar_set]
-                        input_inds = np.arange(start, end)
+                in_sizes = self._var_sizes_by_set['input'][in_iset]
+                if in_sizes[iproc, in_ivar_set] == 0:
+                    input_inds = output_inds = None
+                else:
+                    in_offsets = self._var_offsets_by_set['input'][in_iset]
+                    start = in_offsets[rank, in_ivar_set]
+                    end = start + in_sizes[rank, in_ivar_set]
+                    input_inds = np.arange(start, end)
 
                 if input_inds is not None:
                     key = (in_iset, out_iset)
                     xfer_in_inds[key].append(input_inds)
                     xfer_out_inds[key].append(output_inds)
 
-                    # rev mode wouldn't work for GS with a parallel group
-                    if out_isub != -1:
-                        fwd_xfer_in_inds[in_isub][key].append(input_inds)
-                        fwd_xfer_out_inds[in_isub][key].append(output_inds)
+                    fwd_xfer_in_inds[in_isub][key].append(input_inds)
+                    fwd_xfer_out_inds[in_isub][key].append(output_inds)
 
-                if rev and out_isub != -1 and in_isub != out_isub:
+                if rev:
                     input_inds, output_inds = self._get_rev_idxs(in_ind, out_ind,
                                                                  in_set_indices,
                                                                  out_set_indices)
