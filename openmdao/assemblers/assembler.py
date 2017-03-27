@@ -265,7 +265,6 @@ class Assembler(object):
                     # but for now, if any input is out-of-process, skip all of
                     # the units checks
                     if ipath not in abs2data:
-                        in_unit_list = []
                         break
                     in_units = abs2data[ipath]['metadata']['units']
                     if out_units:

@@ -22,10 +22,6 @@ from openmdao.utils.general_utils import \
 from openmdao.utils.mpi import MPI
 
 
-# This is for storing various data mapped to var pathname
-PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
-
-
 class System(object):
     """
     Base class for all systems in OpenMDAO.
@@ -80,8 +76,6 @@ class System(object):
         maps local var name to full pathname.
     _var_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
         integer arrays of global indices of variables on this proc.
-    _var_maps : {'input': dict, 'output': dict}
-        dictionary of variable names and their promoted names.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -172,7 +166,6 @@ class System(object):
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
 
-        self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
         self._manual_connections = {}

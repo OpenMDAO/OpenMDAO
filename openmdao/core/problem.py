@@ -6,7 +6,7 @@ import sys
 
 from six import string_types, iteritems, iterkeys
 from six.moves import range
-from itertools import product, chain
+from itertools import product
 
 import numpy as np
 import scipy.sparse as sparse

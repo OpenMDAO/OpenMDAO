@@ -10,7 +10,7 @@ from collections import Iterable, Counter
 
 import numpy as np
 
-from openmdao.core.system import System, PathData
+from openmdao.core.system import System
 from openmdao.solvers.nl_runonce import NLRunOnce
 from openmdao.solvers.ln_runonce import LNRunOnce
 from openmdao.utils.general_utils import warn_deprecation

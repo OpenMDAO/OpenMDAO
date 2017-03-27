@@ -9,14 +9,14 @@ import inspect
 
 from fnmatch import fnmatchcase
 import numpy as np
-from itertools import product, chain
+from itertools import product
 from six import string_types, iteritems
 from scipy.sparse import issparse
 from copy import deepcopy
 from collections import OrderedDict, Iterable
 
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.core.system import System, PathData
+from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \

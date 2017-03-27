@@ -138,7 +138,7 @@ class TestPetscVec(TestNumpyVec):
     def setUp(self):
         group = GroupG()
         self.p = Problem(group).setup(PETScVector)
-        self.p.model._mpi_proc_allocator.parallel = True
+        self.p.model.proc_allocator.parallel = True
 
 
 if __name__ == '__main__':
