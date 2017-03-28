@@ -33,7 +33,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.tablename_iterations = 'iterations'
         # self.tablename_derivs = 'derivs'
         self.recorder = SqliteRecorder(self.filename)
-        print(self.filename)
+        #print(self.filename)
         # self.eps = 1e-5
 
     def tearDown(self):

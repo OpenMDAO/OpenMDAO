@@ -44,9 +44,7 @@ class GeneralizedDictionary(object):
             the value of the entry to be put in _dict or _global_dict.
         """
         type_ = self._declared_entries[name]['type']
-        print ("TYPE:", type_)
         values = self._declared_entries[name]['values']
-        print ("VALUES:", values)
 
         # (1) Check the type
         if type_ is not None and not isinstance(value, type_):

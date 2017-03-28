@@ -106,7 +106,6 @@ class BaseRecorder(object):
         check = self._check_path
         incl = self.options['includes']
         excl = self.options['excludes']
-
         # Deprecated options here?
         if self.options['record_params']:
             warnings.simplefilter('always', DeprecationWarning)
