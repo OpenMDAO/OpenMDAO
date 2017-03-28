@@ -548,6 +548,10 @@ class System(object):
             The global jacobian to populate for this system.
         """
         self._jacobian_changed = False
+        if jacobian is not None:
+            self._owns_assembled_jac = False
+            # TODO: add checks to see if we have lower level solvers requiring derivs
+            #    and raise an exception if we do
 
         if self._owns_assembled_jac:
 
