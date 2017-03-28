@@ -107,7 +107,7 @@ class Jacobian(object):
         left_vec : ndarray
             Array to pre-multiply by.
         right_vec : ndarray
-            Arrayv to post-multiply by.
+            Array to post-multiply by.
         """
         jac = self._subjacs[abs_key]
         left_vec = np.atleast_2d(left_vec).T
