@@ -766,6 +766,7 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][0], 0.0)
             assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][1], 0.0)
             assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][1], -1.0/(11.0 - 18.0))
+
     def test_feature1(self):
 
         prob = Problem()

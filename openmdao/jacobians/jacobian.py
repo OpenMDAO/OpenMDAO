@@ -105,9 +105,9 @@ class Jacobian(object):
         abs_key : (str, str)
             Absolute name pair of sub-Jacobian.
         left_vec : ndarray
-            value to pre-multiply by.
+            Array to pre-multiply by.
         right_vec : ndarray
-            value to post-multiply by.
+            Arrayv to post-multiply by.
         """
         jac = self._subjacs[abs_key]
         left_vec = np.atleast_2d(left_vec).T
