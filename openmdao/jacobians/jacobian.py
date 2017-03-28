@@ -118,7 +118,9 @@ class Jacobian(object):
             # DOK not supported
             self._subjacs[abs_key].data = left_vec * self._subjacs[abs_key].data / right_vec
         else:
-            # This should never be scalar
+            # TODO: This is currently untested because support for scaler specification of a
+            # subjac larger than 1x1 is not implemented.
+            self._subjacs[abs_key] = left_vec * self._subjacs[abs_key][0] / right_vec
             raise ValueError("Scalar Jacobian should never have a vector scaler.")
 
     def _precompute_iter(self):

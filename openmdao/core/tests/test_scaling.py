@@ -635,8 +635,8 @@ class TestScaling(unittest.TestCase):
                 self.add_input('rhs', val=np.ones(2))
                 self.add_output('x', val=np.zeros(2), ref=np.array([2.0, 3.0]),
                                 ref0=np.array([4.0, 9.0]),
-                                res_ref = np.array([7.0, 11.0]),
-                                res_ref0 = np.array([13.0, 18.0]))
+                                res_ref=np.array([7.0, 11.0]),
+                                res_ref0=np.array([13.0, 18.0]))
                 self.add_output('extra', val=np.zeros(2), ref=np.array([12.0, 13.0]),
                                 ref0=np.array([14.0, 17.0]))
 
@@ -697,6 +697,75 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][1], 0.0)
             assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][1], -1.0/(11.0 - 18.0))
 
+    def test_implicit_scale_with_scalar_jac(self):
+        raise unittest.SkipTest('Cannot specify an n by m subjac with a scalar yet.')
+
+        class ImpCompArrayScale(TestImplCompArrayDense):
+            def initialize_variables(self):
+                self.add_input('rhs', val=np.ones(2))
+                self.add_output('x', val=np.zeros(2), ref=np.array([2.0, 3.0]),
+                                ref0=np.array([4.0, 9.0]),
+                                res_ref=np.array([7.0, 11.0]),
+                                res_ref0=np.array([13.0, 18.0]))
+                self.add_output('extra', val=np.zeros(2), ref=np.array([12.0, 13.0]),
+                                ref0=np.array([14.0, 17.0]))
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
+                residuals['extra'] = 2.0*self.metadata['mtx'].dot(outputs['x']) - 3.0*inputs['rhs']
+
+            def linearize(self, inputs, outputs, jacobian):
+                # These are incorrect derivatives, but we aren't doing any calculations, and it makes
+                # it much easier to check that the scales are correct.
+                jacobian['x', 'x'][:] = 1.0
+                jacobian['x', 'extra'][:] = 1.0
+                jacobian['extra', 'x'][:] = 1.0
+                jacobian['x', 'rhs'] = -np.eye(2)
+
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', np.ones(2)))
+        comp = model.add_subsystem('comp', ImpCompArrayScale())
+        model.connect('p1.x', 'comp.rhs')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        base_x = model.get_subsystem('comp')._outputs['x'].copy()
+        base_ex = model.get_subsystem('comp')._outputs['extra'].copy()
+        base_res_x = model.get_subsystem('comp')._residuals['x'].copy()
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['x']
+            assert_rel_error(self, val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
+            assert_rel_error(self, val[1], (base_x[1] - 9.0)/(3.0 - 9.0))
+            val = model.get_subsystem('comp')._outputs['extra']
+            assert_rel_error(self, val[0], (base_ex[0] - 14.0)/(12.0 - 14.0))
+            assert_rel_error(self, val[1], (base_ex[1] - 17.0)/(13.0 - 17.0))
+            val = model.get_subsystem('comp')._residuals['x'].copy()
+            assert_rel_error(self, val[0], (base_res_x[0] - 13.0)/(7.0 - 13.0))
+            assert_rel_error(self, val[1], (base_res_x[1] - 18.0)/(11.0 - 18.0))
+
+        model.run_linearize()
+
+        with model._scaled_context():
+            subjacs = comp.jacobian._subjacs
+
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][0], (2.0 - 4.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][0], (2.0 - 4.0)/(11.0 - 18.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][1], (3.0 - 9.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][1], (3.0 - 9.0)/(11.0 - 18.0))
+
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][0][0], (12.0 - 14.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][1][0], (12.0 - 14.0)/(11.0 - 18.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][0][1], (13.0 - 17.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][1][1], (13.0 - 17.0)/(11.0 - 18.0))
+
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][0], -1.0/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][0], 0.0)
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][1], 0.0)
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][1], -1.0/(11.0 - 18.0))
     def test_feature1(self):
 
         prob = Problem()

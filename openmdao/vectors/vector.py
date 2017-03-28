@@ -181,7 +181,6 @@ class Vector(object):
             # Support scaling with arrays
             n_scale = 1
             data = abs2data[abs_name]
-            meta = data['metadata']
             if vectype == 'output':
                 n_scale = data['output_scale_idx1'] - data['output_scale_idx0']
                 if n_scale > 1:
