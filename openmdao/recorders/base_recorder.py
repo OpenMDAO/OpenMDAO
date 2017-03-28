@@ -7,6 +7,9 @@ from six import StringIO
 
 from openmdao.utils.generalized_dict import OptionsDictionary
 
+import warnings
+
+
 class BaseRecorder(object):
     """ This is a base class for all case recorders and is not a functioning
     case recorder on its own.
@@ -31,46 +34,46 @@ class BaseRecorder(object):
 
     def __init__(self):
         self.options = OptionsDictionary()
-        self.options.declare('record_metadata', True)
-        self.options.declare('includes', ['*'],
-                                desc='Patterns for variables to include in recording')
-        self.options.declare('excludes', [],
-                                desc='Patterns for variables to exclude from recording '
-                                '(processed after includes)')
+        # Options common to all objects
+        self.options.declare('record_metadata', bool, 'Record metadata', value=True)
+        self.options.declare('includes', list, 'Patterns for variables to include in recording',
+                                value=['*'])
+        self.options.declare('excludes', list, 'Patterns for variables to exclude in recording (processed after includes)',
+                             value=[])
 
         # Old options that will be deprecated
-        self.options.declare('record_unknowns', False)
-        self.options.declare('record_params', False)
-        self.options.declare('record_resids', False)
-        self.options.declare('record_derivs', False)
+        self.options.declare('record_unknowns', bool, 'Deprecated option to record unknowns.', False)
+        self.options.declare('record_params', bool, 'Deprecated option to record params.', False)
+        self.options.declare('record_resids', bool, 'Deprecated option to record residuals.', False)
+        self.options.declare('record_derivs', bool, 'Deprecated option to record derivatives.', False)
 
         # System options
-        self.options.declare('record_outputs', False,
-                                desc='Set to True to record responses at the driver level')
-        self.options.declare('record_inputs', False)
-        self.options.declare('record_residuals', False)
-        self.options.declare('record_derivs', False,
-                                 desc='Set to True to record derivatives at the system level')
+        self.options.declare('record_outputs', bool,
+                             'Set to True to record outputs at the system level', False)
+        self.options.declare('record_inputs', bool,
+                             'Set to True to record inputs at the system level', False)
+        self.options.declare('record_residuals', bool,
+                             'Set to True to record residuals at the system level', False)
+        self.options.declare('record_derivatives', bool,
+                             'Set to True to record derivatives at the system level', False)
 
         # Driver options
-        self.options.declare('record_desvars', False,
-                                 desc='Set to True to record design variables at the driver level')
-        self.options.declare('record_responses', False,
-                                 desc='Set to True to record responses at the driver level')
-        self.options.declare('record_objectives', False,
-                                 desc='Set to True to record objectives at the driver level')
-        self.options.declare('record_constraints', False,
-                                 desc='Set to True to record constraints at the driver level')
+        self.options.declare('record_desvars', bool, 'Set to True to record design variables at the driver level',
+                                False)
+        self.options.declare('record_responses', bool, 'Set to True to record responses at the driver level',
+                             False)
+        self.options.declare('record_objectives', bool, 'Set to True to record objectives at the driver level',
+                             False)
+        self.options.declare('record_constraints', bool, 'Set to True to record constraints at the driver level',
+                             False)
+
 
         # Solver options
-        self.options.declare('record_abs_error', False,
-                                desc='Set to True to record absolute error at the solver level')
-        self.options.declare('record_rel_error', False,
-                                desc='Set to True to record relative error at the solver level')
-        self.options.declare('record_output', False,
-                                desc='Set to True to record output at the solver level')
-        self.options.declare('record_solver_residuals', False,
-                                desc='Set to True to record residuals at the solver level')
+        self.options.declare('record_abs_error', bool, 'Set to True to record absolute error at the solver level', False)
+        self.options.declare('record_rel_error', bool, 'Set to True to record relative error at the solver level', False)
+        self.options.declare('record_output', bool, 'Set to True to record output at the solver level', False)
+        self.options.declare('record_solver_residuals', bool, 'Set to True to record residuals at the solver level', False)
+
 
         self._owners = []
         self.out = None
@@ -105,7 +108,27 @@ class BaseRecorder(object):
         excl = self.options['excludes']
 
         # Deprecated options here?
+        if self.options['record_params']:
+            warnings.simplefilter('always', DeprecationWarning)
+            warnings.warn("record_params is deprecated, please use record_inputs.",
+                          DeprecationWarning, stacklevel=2)
+            warnings.simplefilter('ignore', DeprecationWarning)
+            self.options['record_inputs'] = True
 
+
+        if self.options['record_unknowns']:
+            warnings.simplefilter('always', DeprecationWarning)
+            warnings.warn("record_unknowns is deprecated, please use record_outputs.",
+                          DeprecationWarning, stacklevel=2)
+            warnings.simplefilter('ignore', DeprecationWarning)
+            self.options['record_outputs'] = True
+
+        if self.options['record_resids']:
+            warnings.simplefilter('always', DeprecationWarning)
+            warnings.warn("record_resids is deprecated, please use record_residuals.",
+                          DeprecationWarning, stacklevel=2)
+            warnings.simplefilter('ignore', DeprecationWarning)
+            self.options['record_residuals'] = True
 
         # Compute the inclusion lists for recording
         if self.options['record_inputs']:
@@ -122,7 +145,8 @@ class BaseRecorder(object):
             'u': myoutputs,
             'r': myresiduals
         }
-        pass
+
+
 
     def _check_path(self, path, includes, excludes):
         """ Return True if `path` should be recorded. """

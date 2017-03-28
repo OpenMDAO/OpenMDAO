@@ -34,7 +34,6 @@ class TestSqliteRecorder(unittest.TestCase):
         # self.tablename_derivs = 'derivs'
         self.recorder = SqliteRecorder(self.filename)
         print(self.filename)
-        # self.recorder.options['record_metadata'] = True
         # self.eps = 1e-5
 
     def tearDown(self):
@@ -52,8 +51,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
 
         prob.driver.add_recorder(self.recorder)
-        # self.recorder.options['record_params'] = True
-        # self.recorder.options['record_resids'] = True
+        self.recorder.options['record_inputs'] = True
+        self.recorder.options['record_params'] = True
 
         model.add_design_var('z')
         model.add_objective('obj')
