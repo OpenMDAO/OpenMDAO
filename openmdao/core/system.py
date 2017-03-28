@@ -371,11 +371,13 @@ class System(object):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-
+            print(subsys.pathname); sys.stdout.flush()
             sub_vectors = {}
             for key in ('input', 'output', 'residual'):
+                print(key, '_create_subvector'); sys.stdout.flush()
                 sub_vectors[key] = vectors[key]._create_subvector(subsys)
 
+            print(subsys.pathname, '_setup_vector'); sys.stdout.flush()
             subsys._setup_vector(sub_vectors, vector_var_ids, use_ref_vector)
 
     def _setup_scaling(self):
@@ -575,6 +577,7 @@ class System(object):
         dict of <Transfer>
             dictionary of full and partial Transfer objects.
         """
+        print("%s._get_transfers() - compute_transfers" % self.pathname); sys.stdout.flush()
         transfer_class = vectors['output'].TRANSFER
 
         # Call the assembler's transfer setup routine
@@ -587,22 +590,29 @@ class System(object):
          fwd_xfer_in_inds, fwd_xfer_out_inds,
          rev_xfer_in_inds, rev_xfer_out_inds) = xfer_indices
 
+        import pprint
+        pprint.pprint(xfer_indices); sys.stdout.flush()
         # Create Transfer objects from the raw indices
         transfers = {}
+        print("creating None transfer object"); sys.stdout.flush()
         transfers[None] = transfer_class(vectors['input'], vectors['output'],
                                          xfer_in_inds, xfer_out_inds, self.comm)
         for isub in range(len(fwd_xfer_in_inds)):
+            print("creating fwd, %d transfer object" % isub); sys.stdout.flush()
             transfers['fwd', isub] = transfer_class(vectors['input'],
                                                     vectors['output'],
                                                     fwd_xfer_in_inds[isub],
                                                     fwd_xfer_out_inds[isub],
                                                     self.comm)
+            print("DONE creating fwd, %d transfer object" % isub); sys.stdout.flush()
         for isub in range(len(rev_xfer_in_inds)):
+            print("creating rev, %d transfer object" % isub); sys.stdout.flush()
             transfers['rev', isub] = transfer_class(vectors['input'],
                                                     vectors['output'],
                                                     rev_xfer_in_inds[isub],
                                                     rev_xfer_out_inds[isub],
                                                     self.comm)
+            print("DONE creating ref, %d transfer object" % isub); sys.stdout.flush()
         return transfers
 
     def _get_maps(self, prom_names):

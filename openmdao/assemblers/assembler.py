@@ -201,12 +201,15 @@ class Assembler(object):
                                      self._var_sizes_all[typ])
 
         for typ in ['input', 'output']:
+            total = 0
             for iset, sizes in enumerate(self._var_sizes_by_set[typ]):
                 # calculate offsets for all varsets
                 offsets = np.zeros(sizes.size, dtype=int)
                 if offsets.size > 1:
                     offsets[1:] = np.cumsum(sizes.flat)[:-1]
+                offsets += total
                 self._var_offsets_by_set[typ].append(offsets.reshape(sizes.shape))
+                total += offsets[-1]
 
     def _setup_connections(self, connections, prom2abs, abs2data):
         """
