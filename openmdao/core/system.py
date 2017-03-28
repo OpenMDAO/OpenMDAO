@@ -523,6 +523,7 @@ class System(object):
                     a = self._scaling_to_norm['output'][idx0:idx1, 0]
                     b = self._scaling_to_norm['output'][idx0:idx1, 1]
                 else:
+                    # Scalar multiplication
                     a, b = self._scaling_to_norm['output'][idx0, :]
 
                 # We have to convert from physical, unscaled to scaled, dimensionless.
@@ -534,6 +535,7 @@ class System(object):
                     shape = self._lower_bounds._views[abs_name].shape
                     value = ensure_compatible(abs_name, metadata['lower'], shape)[0]
                     if idx1 - idx0 > 1:
+                        # Note, bounds are stored flattened for scale/unscale ease
                         a = a.reshape(value.shape)
                         b = b.reshape(value.shape)
                     self._lower_bounds._views[abs_name][:] = a + b * value
@@ -544,6 +546,7 @@ class System(object):
                     shape = self._upper_bounds._views[abs_name].shape
                     value = ensure_compatible(abs_name, metadata['upper'], shape)[0]
                     if idx1 - idx0 > 1:
+                        # Note, bounds are stored flattened for scale/unscale ease
                         a = a.reshape(value.shape)
                         b = b.reshape(value.shape)
                     self._upper_bounds._views[abs_name][:] = a + b * value

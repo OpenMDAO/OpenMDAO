@@ -28,22 +28,73 @@ class PassThroughLength(ExplicitComponent):
         outputs['new_length'] = length_km
 
 
-class PassThroughLengths(ExplicitComponent):
-    """
-    Units/scaling test component taking an array of lengths in cm and
-    passing them through in km.
-    Currently raises an error for passing array value as 'ref'.
-    """
+class ScalingExample1(ImplicitComponent):
 
     def initialize_variables(self):
-        self.add_input('old_lengths', val=np.ones(4), units='cm')
-        self.add_output('new_lengths', val=np.ones(4), units='km', ref=0.1*np.ones(4))
+        self.add_input('x1', val=1.0)
+        self.add_input('x2', val=1.0)
+        self.add_output('y1', val=1e6, ref=1e6)
+        self.add_output('y2', val=1e-6, ref=1e-6)
 
-    def compute(self, inputs, outputs):
-        lengths_cm = inputs['old_lengths']
-        lengths_m = lengths_cm * 1e-2
-        lengths_km = lengths_m * 1e-3
-        outputs['new_lengths'] = lengths_km
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x1 = inputs['x1']
+        x2 = inputs['x2']
+        y1 = outputs['y1']
+        y2 = outputs['y2']
+
+        residuals['y1'] = 1e5 * (x1 - 2*y1/1e6)
+        residuals['y2'] = 1e-5 * (x2 - 2*y2/1e-6)
+
+
+class ScalingExample2(ImplicitComponent):
+
+    def initialize_variables(self):
+        self.add_input('x1', val=1.0)
+        self.add_input('x2', val=1.0)
+        self.add_output('y1', val=1e6, ref=1e6, ref0=1e5)
+        self.add_output('y2', val=1e-6, ref=1e-6, ref0=1e-7)
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x1 = inputs['x1']
+        x2 = inputs['x2']
+        y1 = outputs['y1']
+        y2 = outputs['y2']
+
+        residuals['y1'] = 1e5 * (x1 - 2*y1/1e6)
+        residuals['y2'] = 1e-5 * (x2 - 2*y2/1e-6)
+
+
+class ScalingExample3(ImplicitComponent):
+
+    def initialize_variables(self):
+        self.add_input('x1', val=1.0)
+        self.add_input('x2', val=1.0)
+        self.add_output('y1', val=1e6, res_ref=1e5)
+        self.add_output('y2', val=1e-6, res_ref=1e-5)
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x1 = inputs['x1']
+        x2 = inputs['x2']
+        y1 = outputs['y1']
+        y2 = outputs['y2']
+
+        residuals['y1'] = 1e5 * (x1 - 2*y1/1e6)
+        residuals['y2'] = 1e-5 * (x2 - 2*y2/1e-6)
+
+
+class ScalingExampleVector(ImplicitComponent):
+
+    def initialize_variables(self):
+        self.add_input('x', val=np.ones((2)))
+        self.add_output('y', val=np.array([1e6, 1e-6]), ref=np.array([1e6, 1e-6]),
+                        res_ref=np.array([1e5, 1e-5]))
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x = inputs['x']
+        y = outputs['y']
+
+        residuals['y'][0] = 1e5 * (x[0] - 2*y[0]/1e6)
+        residuals['y'][1] = 1e-5 * (x[1] - 2*y[1]/1e-6)
 
 
 class SpeedComputationWithUnits(ExplicitComponent):
@@ -646,6 +697,93 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][1], 0.0)
             assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][1], -1.0/(11.0 - 18.0))
 
+    def test_feature1(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x1', 1.0))
+        model.add_subsystem('p2', IndepVarComp('x2', 1.0))
+        comp = model.add_subsystem('comp', ScalingExample1())
+        model.connect('p1.x1', 'comp.x1')
+        model.connect('p2.x2', 'comp.x2')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        model.run_apply_nonlinear()
+
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['y1']
+            assert_rel_error(self, val, 1.0)
+            val = model.get_subsystem('comp')._outputs['y2']
+            assert_rel_error(self, val, 1.0)
+
+    def test_feature2(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x1', 1.0))
+        model.add_subsystem('p2', IndepVarComp('x2', 1.0))
+        comp = model.add_subsystem('comp', ScalingExample2())
+        model.connect('p1.x1', 'comp.x1')
+        model.connect('p2.x2', 'comp.x2')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        model.run_apply_nonlinear()
+
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['y1']
+            assert_rel_error(self, val, 1.0)
+            val = model.get_subsystem('comp')._outputs['y2']
+            assert_rel_error(self, val, 1.0)
+
+    def test_feature3(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x1', 1.0))
+        model.add_subsystem('p2', IndepVarComp('x2', 1.0))
+        comp = model.add_subsystem('comp', ScalingExample3())
+        model.connect('p1.x1', 'comp.x1')
+        model.connect('p2.x2', 'comp.x2')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        model.run_apply_nonlinear()
+
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._residuals['y1']
+            assert_rel_error(self, val, -1.0)
+            val = model.get_subsystem('comp')._residuals['y2']
+            assert_rel_error(self, val, -1.0)
+
+    def test_feature_vector(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p', IndepVarComp('x', np.ones((2))))
+        comp = model.add_subsystem('comp', ScalingExampleVector())
+        model.connect('p.x', 'comp.x')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        model.run_apply_nonlinear()
+
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._residuals['y']
+            assert_rel_error(self, val[0], -1.0)
+            assert_rel_error(self, val[1], -1.0)
+            val = model.get_subsystem('comp')._outputs['y']
+            assert_rel_error(self, val[0], 1.0)
+            assert_rel_error(self, val[1], 1.0)
 
 if __name__ == '__main__':
     unittest.main()
