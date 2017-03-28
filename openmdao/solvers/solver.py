@@ -61,7 +61,7 @@ class Solver(object):
         self._declare_options()
         self.options.update(kwargs)
 
-        self.rec_mgr = RecordingManager()
+        self._rec_mgr = RecordingManager()
 
 
     def add_recorder(self, recorder):
@@ -74,7 +74,7 @@ class Solver(object):
            A recorder instance.
         """
         recorder._owners.append(self)
-        self.rec_mgr.append(recorder)
+        self._rec_mgr.append(recorder)
         return recorder
 
     def _declare_options(self):
@@ -98,6 +98,7 @@ class Solver(object):
         """
         self._system = system
         self._depth = depth
+        self._rec_mgr.startup()
 
     def _mpi_print(self, iteration, abs_res, rel_res):
         """

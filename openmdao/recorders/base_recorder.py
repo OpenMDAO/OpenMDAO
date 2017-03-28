@@ -35,10 +35,9 @@ class BaseRecorder(object):
     def __init__(self):
         self.options = OptionsDictionary()
         # Options common to all objects
-        self.options.declare('record_metadata', bool, 'Record metadata', value=True)
-        self.options.declare('includes', list, 'Patterns for variables to include in recording',
-                                value=['*'])
-        self.options.declare('excludes', list, 'Patterns for variables to exclude in recording (processed after includes)',
+        self.options.declare('record_metadata', bool, 'Record metadata', True)
+        self.options.declare('includes', list, 'Patterns for variables to include in recording', ['*'])
+        self.options.declare('excludes', list, 'Patterns for vars to exclude in recording (processed post-includes)',
                              value=[])
 
         # Old options that will be deprecated
@@ -49,11 +48,11 @@ class BaseRecorder(object):
 
         # System options
         self.options.declare('record_outputs', bool,
-                             'Set to True to record outputs at the system level', False)
+                             'Set to True to record outputs at the system level', True)
         self.options.declare('record_inputs', bool,
-                             'Set to True to record inputs at the system level', False)
+                             'Set to True to record inputs at the system level', True)
         self.options.declare('record_residuals', bool,
-                             'Set to True to record residuals at the system level', False)
+                             'Set to True to record residuals at the system level', True)
         self.options.declare('record_derivatives', bool,
                              'Set to True to record derivatives at the system level', False)
 
@@ -69,8 +68,8 @@ class BaseRecorder(object):
 
 
         # Solver options
-        self.options.declare('record_abs_error', bool, 'Set to True to record absolute error at the solver level', False)
-        self.options.declare('record_rel_error', bool, 'Set to True to record relative error at the solver level', False)
+        self.options.declare('record_abs_error', bool, 'Set to True to record absolute error at the solver level', True)
+        self.options.declare('record_rel_error', bool, 'Set to True to record relative error at the solver level', True)
         self.options.declare('record_output', bool, 'Set to True to record output at the solver level', False)
         self.options.declare('record_solver_residuals', bool, 'Set to True to record residuals at the solver level', False)
 
@@ -92,7 +91,7 @@ class BaseRecorder(object):
         # TODO: System specific includes/excludes
         #pass
 
-    def startup(self, group):
+    def startup(self):
         """ Prepare for a new run.
 
         Args
@@ -100,18 +99,20 @@ class BaseRecorder(object):
         group : `Group`
             Group that owns this recorder.
         """
-
         myinputs = myoutputs = myresiduals = set()
 
         check = self._check_path
         incl = self.options['includes']
         excl = self.options['excludes']
+
         # Deprecated options here?
         if self.options['record_params']:
             warnings.simplefilter('always', DeprecationWarning)
             warnings.warn("record_params is deprecated, please use record_inputs.",
                           DeprecationWarning, stacklevel=2)
-            warnings.simplefilter('ignore', DeprecationWarning)
+            #warnings.simplefilter('always', DeprecationWarning)
+
+            # warnings.simplefilter('ignore', DeprecationWarning)
             self.options['record_inputs'] = True
 
 
@@ -130,20 +131,20 @@ class BaseRecorder(object):
             self.options['record_residuals'] = True
 
         # Compute the inclusion lists for recording
-        if self.options['record_inputs']:
-            myinputs = [n for n in group.inputs if check(n, incl, excl)]
-        if self.options['record_outputs']:
-            myoutputs = [n for n in group.outputs if check(n, incl, excl)]
-            if self.options['record_residuals']:
-                myresiduals = myoutputs # outputs and residuals have same names
-        elif self.options['record_residuals']:
-            myresiduals = [n for n in group.residuals if check(n, incl, excl)]
-
-        self._filtered[group.pathname] = {
-            'p': myinputs,
-            'u': myoutputs,
-            'r': myresiduals
-        }
+        # if self.options['record_inputs']:
+        #     myinputs = [n for n in group.inputs if check(n, incl, excl)]
+        # if self.options['record_outputs']:
+        #     myoutputs = [n for n in group.outputs if check(n, incl, excl)]
+        #     if self.options['record_residuals']:
+        #         myresiduals = myoutputs # outputs and residuals have same names
+        # elif self.options['record_residuals']:
+        #     myresiduals = [n for n in group.residuals if check(n, incl, excl)]
+        #
+        # self._filtered[group.pathname] = {
+        #     'p': myinputs,
+        #     'u': myoutputs,
+        #     'r': myresiduals
+        # }
 
 
 

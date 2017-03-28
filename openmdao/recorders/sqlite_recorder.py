@@ -64,8 +64,8 @@ class SqliteRecorder(BaseRecorder):
             self.out_iterations = None
             self.out_derivs = None
 
-    def startup(self, group):
-        super(SqliteRecorder, self).startup(group)
+    def startup(self):
+        super(SqliteRecorder, self).startup()
 
         # Need this for use when recording the metadata
         # Can't do this in the record_metadata method because it only gets

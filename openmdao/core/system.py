@@ -214,7 +214,7 @@ class System(object):
         self._design_vars = {}
         self._responses = {}
 
-        self.rec_mgr = RecordingManager()
+        self._rec_mgr = RecordingManager()
 
     def _setup_processors(self, path, comm, global_dict,
                           assembler, proc_range):
@@ -309,6 +309,7 @@ class System(object):
                     pass
 
             self.initialize_variables()
+            self._rec_mgr.startup()
 
     def _setup_variable_indices(self, global_index, recurse=True):
         """
@@ -1670,5 +1671,5 @@ class System(object):
            A recorder instance.
         """
         recorder._owners.append(self)
-        self.rec_mgr.append(recorder)
+        self._rec_mgr.append(recorder)
         return recorder

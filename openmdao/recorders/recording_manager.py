@@ -16,15 +16,15 @@ class RecordingManager(object):
     """ Object that routes function calls to all attached recorders. """
 
     def __init__(self):
-        self._vars_to_record = {
-            'pnames': set(),
-            'unames': set(),
-            'rnames': set(),
-            }
+        # self._vars_to_record = {
+        #     'inames': set(),
+        #     'onames': set(),
+        #     'rnames': set(),
+        #     }
 
         self._recorders = []
-        self._has_serial_recorders = False
-        self._casecomm = None  # comm used to gather parallel DOE cases
+        # self._has_serial_recorders = False
+        # self._casecomm = None  # comm used to gather parallel DOE cases
 
         # if MPI:
         #     self.rank = MPI.COMM_WORLD.rank
@@ -48,6 +48,10 @@ class RecordingManager(object):
     def __iter__(self):
         return iter(self._recorders)
 
+    # def _start_recorders(self):
+    #     for recorder in self._recorders:
+    #         recorder.startup()
+
     def _gather_vars(self, root, local_vars):
         """Gathers and returns only variables listed in
         `local_vars` from the `root` System.
@@ -65,7 +69,7 @@ class RecordingManager(object):
                 dct.update(d)
             return dct
 
-    def startup(self, root):
+    def startup(self):
         """ Initialization during setup.
 
         Args
@@ -73,50 +77,50 @@ class RecordingManager(object):
         root : `System`
            System containing variables.
         """
-        pathname = root.pathname
-        if MPI and root.is_active():
-            rrank = root.comm.rank
-            rowned = root._owning_ranks
-
-        self._record_p = self._record_u = self._record_r = False
+        # pathname = root.pathname
+        # if MPI and root.is_active():
+        #     rrank = root.comm.rank
+        #     rowned = root._owning_ranks
+        #
+        # self._record_p = self._record_u = self._record_r = False
 
         for recorder in self._recorders:
-            recorder.startup(root)
+            recorder.startup()
 
-            if not recorder._parallel:
-                self._has_serial_recorders = True
-
-            pnames = recorder._filtered[pathname]['p']
-            unames = recorder._filtered[pathname]['u']
-            rnames = recorder._filtered[pathname]['r']
-
-            if pnames:
-                self._record_p = True
-            if unames:
-                self._record_u = True
-            if rnames:
-                self._record_r = True
+            # if not recorder._parallel:
+            #     self._has_serial_recorders = True
+            #
+            # pnames = recorder._filtered[pathname]['p']
+            # unames = recorder._filtered[pathname]['u']
+            # rnames = recorder._filtered[pathname]['r']
+            #
+            # if pnames:
+            #     self._record_p = True
+            # if unames:
+            #     self._record_u = True
+            # if rnames:
+            #     self._record_r = True
 
             # now localize the lists to only
             # include local vars.  We need to do this after determining
             # if any mpi procs need to record each of inputs, outputs,
             # and resids.  If none of them do, we can skip the mpi gather
             # for that group of vars.
-            if MPI:
-                pnames = [n for n in pnames if rrank==rowned[n]]
-                unames = [n for n in unames if rrank==rowned[n]]
-                rnames = [n for n in rnames if rrank==rowned[n]]
-
-                # reduce the filter set for any parallel recorders to only
-                # those variables that are owned by that rank
-                if recorder._parallel:
-                    recorder._filtered[pathname]['p'] = pnames
-                    recorder._filtered[pathname]['u'] = unames
-                    recorder._filtered[pathname]['r'] = rnames
-
-            self._vars_to_record['pnames'].update(pnames)
-            self._vars_to_record['unames'].update(unames)
-            self._vars_to_record['rnames'].update(rnames)
+            # if MPI:
+            #     pnames = [n for n in pnames if rrank==rowned[n]]
+            #     unames = [n for n in unames if rrank==rowned[n]]
+            #     rnames = [n for n in rnames if rrank==rowned[n]]
+            #
+            #     # reduce the filter set for any parallel recorders to only
+            #     # those variables that are owned by that rank
+            #     if recorder._parallel:
+            #         recorder._filtered[pathname]['p'] = pnames
+            #         recorder._filtered[pathname]['u'] = unames
+            #         recorder._filtered[pathname]['r'] = rnames
+            #
+            # self._vars_to_record['pnames'].update(pnames)
+            # self._vars_to_record['unames'].update(unames)
+            # self._vars_to_record['rnames'].update(rnames)
 
     def close(self):
         """ Close all recorders. """

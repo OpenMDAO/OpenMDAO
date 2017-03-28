@@ -35,7 +35,7 @@ class Driver(object):
         Initialize the driver.
         """
 
-        self.rec_mgr = RecordingManager()
+        self._rec_mgr = RecordingManager()
 
         self._problem = None
         self._designvars = None
@@ -74,12 +74,12 @@ class Driver(object):
         """
         recorder._owners.append(self)
 
-        self.rec_mgr.append(recorder)
+        self._rec_mgr.append(recorder)
         return recorder
 
     def cleanup(self):
         """ Clean up resources prior to exit. """
-        self.rec_mgr.close()
+        self._rec_mgr.close()
 
     def _setup_driver(self, problem):
         """
@@ -101,6 +101,8 @@ class Driver(object):
         self._responses = model.get_responses(recurse=True)
         self._objs = model.get_objectives(recurse=True)
         self._cons = model.get_constraints(recurse=True)
+        self._rec_mgr.startup()
+
 
     def get_design_var_values(self):
         """
@@ -273,7 +275,7 @@ class Driver(object):
 
         # objective_values = self.get_objective_values()
 
-        self.rec_mgr.record_iteration(self)
+        self._rec_mgr.record_iteration(self)
 
         return failure_flag
 
