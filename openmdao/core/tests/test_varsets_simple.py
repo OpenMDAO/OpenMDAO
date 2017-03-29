@@ -64,7 +64,7 @@ class TestNumpyVec(unittest.TestCase):
 
     def setUp(self):
         group = GroupG()
-        self.p = Problem(group).setup(DefaultVector)
+        self.p = Problem(group).setup(DefaultVector, check=False)
         self.p.model._mpi_proc_allocator.parallel = True
 
     def test_prom_names(self):
@@ -138,7 +138,7 @@ class TestPetscVec(TestNumpyVec):
 
     def setUp(self):
         group = GroupG()
-        self.p = Problem(group).setup(PETScVector)
+        self.p = Problem(group).setup(PETScVector, check=False)
         self.p.model._mpi_proc_allocator.parallel = True
 
 

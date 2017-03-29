@@ -14,7 +14,12 @@ from six.moves import range
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 # regex to check for variable names.
-VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
+VAR_RGX = re.compile('([_a-zA-Z]\w*[ ]*\(?)')
+
+# Names of metadata entries allowed for ExecComp variables.
+_allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
+                 'var_set', 'ref', 'ref0', 'res_ref', 'res_ref0',
+                 'lower', 'upper', 'src_indices'}
 
 
 def array_idx_iter(shape):
@@ -48,7 +53,7 @@ class ExecComp(ExplicitComponent):
     A component defined by an expression string.
     """
 
-    def __init__(self, exprs, inits=None, units=None, **kwargs):
+    def __init__(self, exprs, **kwargs):
         r"""
         Create a <Component> using only an expression string.
 
@@ -57,7 +62,7 @@ class ExecComp(ExplicitComponent):
         appearing on the left-hand side of an assignment are outputs,
         and the rest are inputs.  Each variable is assumed to be of
         type float unless the initial value for that variable is supplied
-        in \*\*kwargs or inits.  Derivatives are calculated using complex step.
+        in \*\*kwargs.  Derivatives are calculated using complex step.
 
         Parameters
         ----------
@@ -65,35 +70,41 @@ class ExecComp(ExplicitComponent):
             An assignment statement or iter of them. These express how the
             outputs are calculated based on the inputs.
 
-        inits : dict, optional
-            A mapping of names to initial values, primarily for variables with
-            names that are not valid python names, e.g., a:b:c.
-
-        units : dict, optional
-            A mapping of variable names to their units.
-
         \*\*kwargs : dict of named args
             Initial values of variables can be set by setting a named
-            arg with the var name.
+            arg with the var name.  If the value is a dict it is assumed
+            to contain metadata.  To set the initial value in addition to
+            other metadata, assign the initial value to the 'value' entry
+            of the dict.
 
         Notes
         -----
         If a variable has an initial value that is anything other than 0.0,
         either because it has a different type than float or just because its
-        initial value is nonzero, you must use a keyword arg or the 'inits'
-        dict to set the initial value.  For example, let's say we have an
+        initial value is nonzero, you must use a keyword arg
+        to set the initial value.  For example, let's say we have an
         ExecComp that takes an array 'x' as input and outputs a float variable
         'y' which is the sum of the entries in 'x'.
 
         ::
 
-            import numpy as np
+            import numpy
             from openmdao.api import ExecComp
-            excomp = ExecComp('y=numpy.sum(x)', x=np.ones(10,dtype=float))
+            excomp = ExecComp('y=numpy.sum(x)', x=numpy.ones(10,dtype=float))
 
         In this example, 'y' would be assumed to be the default type of float
         and would be given the default initial value of 0.0, while 'x' would be
         initialized with a size 10 float array of ones.
+
+        If you want to assign certain metadata for 'x' in addition to its
+        initial value, you can do it as follows:
+
+        ::
+
+            excomp = ExecComp('y=numpy.sum(x)',
+                              x={'value': numpy.ones(10,dtype=float),
+                                 'units': 'ft',
+                                 'var_set': 3})
         """
         super(ExecComp, self).__init__()
 
@@ -105,12 +116,6 @@ class ExecComp(ExplicitComponent):
 
         self._exprs = exprs[:]
         self._codes = None
-        self._non_pbo_outputs = None
-        self._to_colons = None
-        self._from_colons = None
-        self._colon_names = None
-        self._inits = inits
-        self._units = units
         self._kwargs = kwargs
 
     def initialize_variables(self):
@@ -120,8 +125,6 @@ class ExecComp(ExplicitComponent):
         outs = set()
         allvars = set()
         exprs = self._exprs
-        inits = self._inits
-        units = self._units
         kwargs = self._kwargs
 
         # find all of the variables and which ones are outputs
@@ -130,60 +133,51 @@ class ExecComp(ExplicitComponent):
             outs.update(self._parse_for_out_vars(lhs))
             allvars.update(self._parse_for_vars(expr))
 
-        if inits is not None:
-            kwargs.update(inits)
+        kwargs2 = {}
+        init_vals = {}
 
         # make sure all kwargs are legit
-        for kwarg in kwargs:
-            if kwarg not in allvars:
+        for arg, val in kwargs.items():
+            if arg not in allvars:
                 raise RuntimeError("%s: arg '%s' in call to ExecComp() "
                                    "does not refer to any variable in the "
                                    "expressions %s" % (self.pathname,
-                                                       kwarg, exprs))
+                                                       arg, exprs))
+            if isinstance(val, dict):
+                diff = set(val.keys()) - _allowed_meta
+                if diff:
+                    raise RuntimeError("%s: the following metadata names were not "
+                                       "recognized for variable '%s': %s" %
+                                       (self.pathname, arg, sorted(diff)))
 
-        # make sure units are legit
-        units_dict = units if units is not None else {}
-        for unit_var in units_dict:
-            if unit_var not in allvars:
-                raise RuntimeError("{2}: Units specific for variable {0} "
-                                   "in call to ExecComp() but {0} does "
-                                   "not appear in the expression "
-                                   "{1}".format(unit_var, exprs, self.pathname))
+                kwargs2[arg] = val.copy()
+                if 'value' in val:
+                    init_vals[arg] = val['value']
+                    del kwargs2[arg]['value']
+            else:
+                init_vals[arg] = val
 
         for var in sorted(allvars):
             # if user supplied an initial value, use it, otherwise set to 0.0
-            val = kwargs.get(var, 0.0)
-            kwargs2 = {'units': units_dict[var]} if var in units_dict else {}
+            val = init_vals.get(var, 0.0)
+            meta = kwargs2.get(var, {})
 
             if var in outs:
-                self.add_output(var, val, **kwargs2)
+                self.add_output(var, val, **meta)
             else:
-                self.add_input(var, val, **kwargs2)
-
-        # need to exclude any non-pbo outputs (like case_rank in ExecComp4Test)
-        # TODO: for now, assume all outputs are non-pbo
-        self._non_pbo_outputs = self._var_rel_names['output']
-
-        self._to_colons = {}
-        from_colons = self._from_colons = {}
-        for n in allvars:
-            if ':' in n:
-                no_colon = _valid_name(n, exprs)
-            else:
-                no_colon = n
-            self._to_colons[no_colon] = n
-            from_colons[n] = no_colon
-
-        self._colon_names = {n for n in allvars if ':' in n}
+                self.add_input(var, val, **meta)
 
         self._codes = self._compile_exprs(self._exprs)
 
     def _compile_exprs(self, exprs):
-        for name in self._colon_names:
-            exprs = [expr.replace(name, self._from_colons[name])
-                     for expr in exprs]
-
-        return [compile(expr, expr, 'exec') for expr in exprs]
+        compiled = []
+        for i, expr in enumerate(exprs):
+            try:
+                compiled.append(compile(expr, expr, 'exec'))
+            except Exception:
+                raise RuntimeError("%s: failed to compile expression '%s'." %
+                                   (self.pathname, exprs[i]))
+        return compiled
 
     def _parse_for_out_vars(self, s):
         vnames = set([x.strip() for x in re.findall(VAR_RGX, s)
@@ -237,7 +231,7 @@ class ExecComp(ExplicitComponent):
             `Vector` containing outputs.
         """
         for expr in self._codes:
-            exec(expr, _expr_dict, _IODict(outputs, inputs, self._to_colons))
+            exec(expr, _expr_dict, _IODict(outputs, inputs))
 
     def compute_partial_derivs(self, inputs, outputs, partials):
         """
@@ -256,8 +250,7 @@ class ExecComp(ExplicitComponent):
         """
         # our complex step
         step = self.complex_stepsize * 1j
-
-        non_pbo_outputs = self._non_pbo_outputs
+        out_names = self._var_rel_names['output']
 
         for param in inputs:
 
@@ -287,7 +280,7 @@ class ExecComp(ExplicitComponent):
                 self._residuals.set_const(0.0)
                 self.compute(pwrap, uwrap)
 
-                for u in non_pbo_outputs:
+                for u in out_names:
                     jval = imag(uwrap[u] / self.complex_stepsize)
                     if (u, param) not in partials:  # create the dict entry
                         partials[(u, param)] = np.zeros((jval.size, psize))
@@ -360,7 +353,7 @@ class _IODict(object):
     and then the inputs.
     """
 
-    def __init__(self, outputs, inputs, to_colons):
+    def __init__(self, outputs, inputs):
         """
         Create the dict wrapper.
 
@@ -374,17 +367,14 @@ class _IODict(object):
         """
         self._outputs = outputs
         self._inputs = inputs
-        self._to_colons = to_colons
 
     def __getitem__(self, name):
-        name = self._to_colons[name]
         if name in self._outputs:
             return self._outputs[name]
         else:
             return self._inputs[name]
 
     def __setitem__(self, name, value):
-        name = self._to_colons[name]
         if name in self._outputs:
             self._outputs[name] = value
         elif name in self._inputs:

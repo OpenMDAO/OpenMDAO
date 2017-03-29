@@ -9,6 +9,14 @@ from openmdao.devtools.testutil import assert_rel_error
 
 class TestExecComp(unittest.TestCase):
 
+    def test_colon_vars(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('C1', ExecComp('y=foo:bar+1.'))
+        with self.assertRaises(Exception) as context:
+            prob.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "C1: failed to compile expression 'y=foo:bar+1.'.")
+
     def test_bad_kwargs(self):
         prob = Problem(model=Group())
         prob.model.add_subsystem('C1', ExecComp('y=x+1.', xx=2.0))
@@ -16,6 +24,14 @@ class TestExecComp(unittest.TestCase):
             prob.setup(check=False)
         self.assertEqual(str(context.exception),
                          "C1: arg 'xx' in call to ExecComp() does not refer to any variable in the expressions ['y=x+1.']")
+
+    def test_bad_kwargs_meta(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('C1', ExecComp('y=x+1.', x={'val': 2.0, 'low': 0.0, 'high': 10.0, 'units': 'ft'}))
+        with self.assertRaises(Exception) as context:
+            prob.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "C1: the following metadata names were not recognized for variable 'x': ['high', 'low', 'val']")
 
     def test_name_collision_const(self):
         prob = Problem(model=Group())
@@ -88,8 +104,9 @@ class TestExecComp(unittest.TestCase):
         prob = Problem(model=Group())
         prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
         C1 = prob.model.add_subsystem('C1', ExecComp('y=x+z+1.',
-                                                     x=2.0, z=2.0,
-                                                     units={'x':'m','y':'m'}))
+                                                     x={'value': 2.0, 'units': 'm'},
+                                                     y={'units': 'm'},
+                                                     z=2.0))
         prob.model.connect('indep.x', 'C1.x')
 
         prob.setup(check=False)
@@ -148,11 +165,10 @@ class TestExecComp(unittest.TestCase):
     def test_simple_array_model(self):
         prob = Problem()
         prob.model = Group()
+        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
         prob.model.add_subsystem('comp', ExecComp(['y[0]=2.0*x[0]+7.0*x[1]',
                                                    'y[1]=5.0*x[0]-3.0*x[1]'],
                                                   x=np.zeros([2]), y=np.zeros([2])))
-
-        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
 
         prob.model.connect('p1.x', 'comp.x')
 
@@ -160,7 +176,6 @@ class TestExecComp(unittest.TestCase):
         prob.model.suppress_solver_output = True
         prob.run_model()
 
-        raise unittest.SkipTest("no check_partial_derivatives function")
         data = prob.check_partial_derivatives(out_stream=None)
 
         assert_rel_error(self, data['comp'][('y','x')]['abs error'][0], 0.0, 1e-5)
@@ -173,11 +188,10 @@ class TestExecComp(unittest.TestCase):
     def test_simple_array_model2(self):
         prob = Problem()
         prob.model = Group()
+        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
         prob.model.add_subsystem('comp', ExecComp('y = mat.dot(x)',
                                                   x=np.zeros((2,)), y=np.zeros((2,)),
                                                   mat=np.array([[2.,7.],[5.,-3.]])))
-
-        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
 
         prob.model.connect('p1.x', 'comp.x')
 
@@ -185,7 +199,6 @@ class TestExecComp(unittest.TestCase):
         prob.model.suppress_solver_output = True
         prob.run_model()
 
-        raise unittest.SkipTest("no check_partial_derivatives function")
         data = prob.check_partial_derivatives(out_stream=None)
 
         assert_rel_error(self, data['comp'][('y','x')]['abs error'][0], 0.0, 1e-5)
@@ -288,83 +301,6 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1.jacobian['y','x'], expect, 0.00001)
 
-    def test_colon_names(self):
-        prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp('a:y=a:x+1.+b',
-                                                     inits={'a:x':2.0}, b=0.5))
-        prob.setup(check=False)
-
-        self.assertTrue('a:x' in C1._inputs)
-        self.assertTrue('a:y' in C1._outputs)
-
-        prob.model.suppress_solver_output = True
-        prob.run_model()
-
-        assert_rel_error(self, C1._outputs['a:y'], 3.5, 0.00001)
-
-    def test_complex_step_colons(self):
-        prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp(['foo:y=2.0*foo:bar:x+1.'], inits={'foo:bar:x':2.0}))
-
-        prob.setup(check=False)
-
-        self.assertTrue('foo:bar:x' in C1._inputs)
-        self.assertTrue('foo:y' in C1._outputs)
-
-        prob.model.suppress_solver_output = True
-        prob.run_model()
-
-        assert_rel_error(self, C1._outputs['foo:y'], 5.0, 0.00001)
-
-        C1._linearize()
-
-        assert_rel_error(self, C1.jacobian['foo:y','foo:bar:x'], -2.0, 0.00001)
-
-    def test_complex_step2_colons(self):
-        prob = Problem(Group())
-        prob.model.add_subsystem('p1', IndepVarComp('x', 2.0))
-        prob.model.add_subsystem('comp', ExecComp('foo:y=foo:x*foo:x + foo:x*2.0'))
-        prob.model.connect('p1.x', 'comp.foo:x')
-
-        prob.setup(check=False, mode='fwd')
-        prob.model.suppress_solver_output = True
-        prob.run_model()
-
-        J = prob.compute_total_derivs(['comp.foo:y'], ['p1.x'], return_format='flat_dict')
-        assert_rel_error(self, J['comp.foo:y', 'p1.x'], np.array([6.0]), 0.00001)
-
-        prob.setup(check=False, mode='rev')
-        prob.model.suppress_solver_output = True
-        prob.run_model()
-
-        J = prob.compute_total_derivs(['comp.foo:y'], ['p1.x'], return_format='flat_dict')
-        assert_rel_error(self, J['comp.foo:y', 'p1.x'], np.array([6.0]), 0.00001)
-
-    def test_simple_array_model2_colons(self):
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('comp', ExecComp('foo:y = foo:mat.dot(x)',
-                                                  inits={'foo:y':np.zeros((2,)),
-                                                         'foo:mat':np.array([[2.,7.],[5.,-3.]])},
-                                                  x=np.zeros((2,))))
-
-        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
-
-        prob.model.connect('p1.x', 'comp.x')
-
-        prob.setup(check=False)
-        prob.model.suppress_solver_output = True
-        prob.run_model()
-
-        raise unittest.SkipTest("no check_partial_derivatives function")
-        data = prob.check_partial_derivatives(out_stream=None)
-
-        assert_rel_error(self, data['comp'][('foo:y','x')]['abs error'][0], 0.0, 1e-5)
-        assert_rel_error(self, data['comp'][('foo:y','x')]['abs error'][1], 0.0, 1e-5)
-        assert_rel_error(self, data['comp'][('foo:y','x')]['abs error'][2], 0.0, 1e-5)
-        assert_rel_error(self, data['comp'][('foo:y','x')]['rel error'][0], 0.0, 1e-5)
-        assert_rel_error(self, data['comp'][('foo:y','x')]['rel error'][1], 0.0, 1e-5)
-        assert_rel_error(self, data['comp'][('foo:y','x')]['rel error'][2], 0.0, 1e-5)
 
 if __name__ == "__main__":
     unittest.main()
