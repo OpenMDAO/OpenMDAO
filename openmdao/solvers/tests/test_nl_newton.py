@@ -8,6 +8,7 @@ from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
     NewtonSolver, ExecComp, ScipyIterativeSolver, ImplicitComponent, \
     DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarNoDerivatives, SellarDerivatives, \
      SellarStateConnection
@@ -296,6 +297,66 @@ class TestNewton(unittest.TestCase):
         self.assertLessEqual(prob.model.nl_solver._iter_count, 4,
                              msg='Should get there pretty quick because of utol.')
 
+    def test_solve_subsystems_basic(self):
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+        # each SubSellar group converges itself
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()  # used for derivatives
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
+    def test_solve_subsystems_options(self):
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+
+
+        # each SubSellar group converges itself
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()  # used for derivatives
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['maxiter'] = 1
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 1
+
+        prob.setup()
+        prob.run_model()
+
+        # Verifying subsolvers ran
+        self.assertEqual(g1.nl_solver._iter_count, 2)
+        self.assertEqual(g2.nl_solver._iter_count, 2)
 
 class TestNewtonFeatures(unittest.TestCase):
 
