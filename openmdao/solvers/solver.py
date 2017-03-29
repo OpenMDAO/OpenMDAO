@@ -137,8 +137,8 @@ class Solver(object):
         atol = self.options['atol']
         rtol = self.options['rtol']
 
-        norm0, norm = self._iter_initialize()
         self._iter_count = 0
+        norm0, norm = self._iter_initialize()
         self._mpi_print(self._iter_count, norm, norm / norm0)
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
