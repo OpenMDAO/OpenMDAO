@@ -49,6 +49,12 @@ class NewtonSolver(NonlinearSolver):
         # Slot for linesearch
         self.linesearch = None
 
+    def _declare_options(self):
+        """
+        Set options/supports specific to this solver.
+        """
+        self.supports['gradients'] = True
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.

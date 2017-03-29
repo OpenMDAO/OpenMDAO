@@ -57,6 +57,10 @@ class Solver(object):
         self.options.declare('iprint', type_=int, value=1,
                              desc='whether to print output')
 
+        # What the solver supports.
+        self.supports = OptionsDictionary()
+        self.supports.declare('gradients', type_=bool, value=False)
+
         self._declare_options()
         self.options.update(kwargs)
 
