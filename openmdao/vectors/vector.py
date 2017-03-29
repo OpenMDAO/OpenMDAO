@@ -148,8 +148,8 @@ class Vector(object):
 
         ind1, ind2 = system._var_allprocs_idx_range[self._typ]
 
-        variable_set_indices = assembler._var_set_indices[self._typ]
-        sub_var_set_indices = variable_set_indices[ind1:ind2, :]
+        var_set_indices = assembler._var_set_indices[self._typ]
+        sub_var_set_indices = var_set_indices[ind1:ind2, :]
 
         # Create the index arrays for each var_set for ivar_map.
         # Also store the starting points in the data/index vector.
@@ -173,7 +173,7 @@ class Vector(object):
         for abs_name in system._var_abs_names[self._typ]:
             idx = assembler._var_allprocs_abs2idx_io[abs_name]
             my_idx = system._var_abs2data_io[abs_name]['my_idx']
-            iset, ivar = variable_set_indices[idx, :]
+            iset, ivar = var_set_indices[idx, :]
             sizes_array = assembler._var_sizes_by_set[self._typ][iset]
             ind1 = np.sum(sizes_array[self._iproc, :ivar]) - ind1_list[iset]
             ind2 = np.sum(sizes_array[self._iproc, :ivar + 1]) - ind1_list[iset]

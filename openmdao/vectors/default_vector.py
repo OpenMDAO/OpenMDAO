@@ -118,8 +118,8 @@ class DefaultVector(Vector):
 
         sys_start, sys_end = self._system._var_allprocs_idx_range[self._typ]
 
-        variable_set_indices = assembler._var_set_indices[self._typ]
-        sub_var_set_indices = variable_set_indices[sys_start:sys_end, :]
+        var_set_indices = assembler._var_set_indices[self._typ]
+        sub_var_set_indices = var_set_indices[sys_start:sys_end, :]
 
         ind_offset = np.sum(assembler._var_sizes_all[self._typ][self._iproc, :sys_start])
 
