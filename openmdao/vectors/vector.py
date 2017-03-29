@@ -180,16 +180,13 @@ class Vector(object):
 
             # Support scaling with arrays
             n_scale = 1
+            data = abs2data[abs_name]
             if vectype == 'output':
-                meta = abs2data[abs_name]['metadata']
-                n_scale = max(len(np.atleast_1d(meta['ref'])),
-                              len(np.atleast_1d(meta['ref0'])))
+                n_scale = data['output_scale_idx'][1] - data['output_scale_idx'][0]
                 if n_scale > 1:
                     my_idx = np.array(range(my_idx, my_idx + n_scale))
             elif vectype == 'residual':
-                meta = abs2data[abs_name]['metadata']
-                n_scale = max(len(np.atleast_1d(meta['res_ref'])),
-                              len(np.atleast_1d(meta['res_ref0'])))
+                n_scale = data['resid_scale_idx'][1] - data['resid_scale_idx'][0]
                 if n_scale > 1:
                     my_idx = np.array(range(my_idx, my_idx + n_scale))
 
