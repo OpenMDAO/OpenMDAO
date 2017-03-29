@@ -125,7 +125,7 @@ class DefaultAssembler(Assembler):
                         end += out_sizes[iproc, out_ivar_set]
 
                         on_iproc = np.logical_and(start <= inds, inds < end)
-                        offset = out_offsets[iproc, out_ivar_set]
+                        offset = out_offsets[iproc, out_ivar_set]  # - start
                         output_inds[on_iproc] = inds[on_iproc] + offset
 
                         start += out_sizes[iproc, out_ivar_set]
@@ -136,7 +136,8 @@ class DefaultAssembler(Assembler):
                         iproc = np.nonzero(out_sizes[:, out_ivar_set])[0][0]
                     else:
                         iproc = rank
-                    output_inds = inds + out_offsets[iproc, out_ivar_set]
+                    start = np.sum(out_sizes[:iproc, out_ivar_set])
+                    output_inds = inds + out_offsets[iproc, out_ivar_set]  # - start
 
                 in_sizes = self._var_sizes_by_set['input'][in_iset]
                 if in_sizes[iproc, in_ivar_set] == 0:

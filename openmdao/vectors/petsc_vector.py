@@ -21,22 +21,19 @@ class PETScTransfer(DefaultTransfer):
         """
         self._transfers = {}
         for key in self._in_inds:
-            #if len(self._in_inds[key]) > 0:
-            in_iset, out_iset = key
-            in_inds = np.array(self._in_inds[key], 'i')
-            out_inds = np.array(self._out_inds[key], 'i')
-            in_indexset = PETSc.IS().createGeneral(in_inds,
-                                                   comm=self._comm)
-            out_indexset = PETSc.IS().createGeneral(out_inds,
-                                                    comm=self._comm)
-            in_petsc = self._in_vec._root_vector._petsc[in_iset]
-            out_petsc = self._out_vec._root_vector._petsc[out_iset]
-            transfer = PETSc.Scatter().create(out_petsc, out_indexset,
-                                              in_petsc, in_indexset)
-            self._transfers[key] = transfer
-
-        # save some memory
-        self._in_inds = self._out_inds = None
+            if len(self._in_inds[key]) > 0:
+                in_iset, out_iset = key
+                in_inds = np.array(self._in_inds[key], 'i')
+                out_inds = np.array(self._out_inds[key], 'i')
+                in_indexset = PETSc.IS().createGeneral(in_inds,
+                                                       comm=self._comm)
+                out_indexset = PETSc.IS().createGeneral(out_inds,
+                                                        comm=self._comm)
+                in_petsc = self._in_vec._root_vector._petsc[in_iset]
+                out_petsc = self._out_vec._root_vector._petsc[out_iset]
+                transfer = PETSc.Scatter().create(out_petsc, out_indexset,
+                                                  in_petsc, in_indexset)
+                self._transfers[key] = transfer
 
     def __call__(self, in_vec, out_vec, mode='fwd'):
         """
