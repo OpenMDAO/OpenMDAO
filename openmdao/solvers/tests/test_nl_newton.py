@@ -301,18 +301,16 @@ class TestNewton(unittest.TestCase):
         prob = Problem()
         model = prob.model = DoubleSellar()
 
-        # each SubSellar group converges itself
         g1 = model.get_subsystem('g1')
         g1.nl_solver = NewtonSolver()
         g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()  # used for derivatives
+        g1.ln_solver = DirectSolver()
 
         g2 = model.get_subsystem('g2')
         g2.nl_solver = NewtonSolver()
         g2.nl_solver.options['rtol'] = 1.0e-5
         g2.ln_solver = DirectSolver()
 
-        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         model.nl_solver = NewtonSolver()
         model.ln_solver = ScipyIterativeSolver()
 
@@ -356,6 +354,8 @@ class TestNewton(unittest.TestCase):
         model.nl_solver = NewtonSolver()
         model.ln_solver = ScipyIterativeSolver()
 
+        # Enfore behavior: max_sub_solves = 0 means we run once during init
+
         model.nl_solver.options['maxiter'] = 5
         model.nl_solver.options['solve_subsystems'] = True
         model.nl_solver.options['max_sub_solves'] = 0
@@ -386,6 +386,8 @@ class TestNewton(unittest.TestCase):
         model.nl_solver = NewtonSolver()
         model.ln_solver = ScipyIterativeSolver()
 
+        # Enforce Behavior: baseline
+
         model.nl_solver.options['maxiter'] = 5
         model.nl_solver.options['solve_subsystems'] = True
         model.nl_solver.options['max_sub_solves'] = 5
@@ -415,6 +417,8 @@ class TestNewton(unittest.TestCase):
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         model.nl_solver = NewtonSolver()
         model.ln_solver = ScipyIterativeSolver()
+
+        # Enfore behavior: max_sub_solves = 1 means we run during init and first iteration of iter_execute
 
         model.nl_solver.options['maxiter'] = 5
         model.nl_solver.options['solve_subsystems'] = True
@@ -502,6 +506,29 @@ class TestNewtonFeatures(unittest.TestCase):
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_feature_max_sub_solves(self):
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 0
+
+        prob.setup()
+        prob.run_model()
 
 if __name__ == "__main__":
     unittest.main()
