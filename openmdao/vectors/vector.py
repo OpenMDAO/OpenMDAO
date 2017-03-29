@@ -129,13 +129,19 @@ class Vector(object):
             vec._initialize_views()
         return vec
 
-    def _compute_ivar_map(self):
+    def _compute_ivar_map(self, abs2data, vectype):
         """
         Compute the ivar_map.
 
         The ivar_map index vector is the same length as data and indices,
         and it yields the index of the local variable.
 
+        Parameters
+        ----------
+        abs2data : {str: {}, ...}
+            Mapping of absolute pathname to metadata dict.
+        vectype : str
+            Vector type, one of 'input', 'output', 'residual'.
         """
         system = self._system
         assembler = system._assembler
@@ -163,6 +169,7 @@ class Vector(object):
                 ind1_list.append(0)
 
         # Populate ivar_map by looping over local variables in the system.
+        offset = 0
         for abs_name in system._var_abs_names[self._typ]:
             idx = assembler._var_allprocs_abs2idx_io[abs_name]
             my_idx = system._var_abs2data_io[abs_name]['my_idx']
@@ -170,7 +177,26 @@ class Vector(object):
             sizes_array = assembler._variable_sizes[self._typ][iset]
             ind1 = np.sum(sizes_array[self._iproc, :ivar]) - ind1_list[iset]
             ind2 = np.sum(sizes_array[self._iproc, :ivar + 1]) - ind1_list[iset]
-            ivar_map[iset][ind1:ind2] = my_idx
+
+            # Support scaling with arrays
+            n_scale = 1
+            if vectype == 'output':
+                meta = abs2data[abs_name]['metadata']
+                n_scale = max(len(np.atleast_1d(meta['ref'])),
+                              len(np.atleast_1d(meta['ref0'])))
+                if n_scale > 1:
+                    my_idx = np.array(range(my_idx, my_idx + n_scale))
+            elif vectype == 'residual':
+                meta = abs2data[abs_name]['metadata']
+                n_scale = max(len(np.atleast_1d(meta['res_ref'])),
+                              len(np.atleast_1d(meta['res_ref0'])))
+                if n_scale > 1:
+                    my_idx = np.array(range(my_idx, my_idx + n_scale))
+
+            ivar_map[iset][ind1:ind2] = my_idx + offset
+
+            if n_scale > 1:
+                offset += n_scale - 1
 
         self._ivar_map = ivar_map
 
