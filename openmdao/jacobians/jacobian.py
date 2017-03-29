@@ -255,13 +255,11 @@ class Jacobian(object):
         data0 = self._system._var_abs2data_io[abs_key[0]]
         data1 = self._system._var_abs2data_io[abs_key[1]]
 
-        ind_of0 = data0['resid_scale_idx0']
-        ind_of1 = data0['resid_scale_idx1']
+        ind_of0, ind_of1 = data0['resid_scale_idx']
 
         # Implicit states are the only wrt that will have this
         try:
-            ind_wrt0 = data1['output_scale_idx0']
-            ind_wrt1 = data1['output_scale_idx1']
+            ind_wrt0, ind_wrt1 = data1['output_scale_idx']
         except KeyError:
             ind_wrt0 = data1['my_idx']
             ind_wrt1 = ind_wrt0 + 1

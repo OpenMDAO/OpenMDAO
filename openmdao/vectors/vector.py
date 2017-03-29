@@ -182,11 +182,11 @@ class Vector(object):
             n_scale = 1
             data = abs2data[abs_name]
             if vectype == 'output':
-                n_scale = data['output_scale_idx1'] - data['output_scale_idx0']
+                n_scale = data['output_scale_idx'][1] - data['output_scale_idx'][0]
                 if n_scale > 1:
                     my_idx = np.array(range(my_idx, my_idx + n_scale))
             elif vectype == 'residual':
-                n_scale = data['resid_scale_idx1'] - data['resid_scale_idx0']
+                n_scale = data['resid_scale_idx'][1] - data['resid_scale_idx'][0]
                 if n_scale > 1:
                     my_idx = np.array(range(my_idx, my_idx + n_scale))
 
