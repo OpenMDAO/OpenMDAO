@@ -15,7 +15,7 @@ class DefaultAssembler(Assembler):
     def _compute_transfers(self, nsub_allprocs, var_range,
                            subsystems_myproc, subsystems_inds):
         """
-        Compute the transfer indices.
+        Compute the fwd and rev transfer indices.
 
         Parameters
         ----------
@@ -188,6 +188,29 @@ class DefaultAssembler(Assembler):
                 rev_xfer_in_inds, rev_xfer_out_inds)
 
     def _get_rev_idxs(self, in_ind, out_ind, in_set_indices, out_set_indices):
+        """
+        Compute the fwd and rev transfer indices.
+
+        Parameters
+        ----------
+        in_ind : int
+            Index of input var among all vars in the current system on all procs.
+        out_ind : int
+            Index of output var among all vars in the current system on all procs.
+        in_set_indices : ???
+            ???
+        out_set_indices : ???
+            ???
+
+        Returns
+        -------
+        input_inds : index array
+            indices of input variable entries involved across all procs for the
+            given input and output vars.
+        output_inds : index array
+            indices of output variable entries involved across all procs for the
+            given input and output vars.
+        """
         input_inds = output_inds = None
         in_iset = out_iset = 0
 
