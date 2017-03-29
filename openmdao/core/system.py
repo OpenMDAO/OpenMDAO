@@ -549,6 +549,14 @@ class System(object):
         """
         self._jacobian_changed = False
         if jacobian is not None:
+            # this means that somewhere above us is an AssembledJacobian. If
+            # we have a nonlinear solver that uses derivatives, this is
+            # currently an error.
+            if self._nl_solver is not None and self._nl_solver.supports['gradients']:
+                raise RuntimeError("System '%s' has a solver of type '%s'"
+                                   "but an AssembledJacobian has been set in a "
+                                   "higher level system." % (self.pathname,
+                                                             self._nl_solver.__class__.__name__))
             self._owns_assembled_jac = False
             # TODO: add checks to see if we have lower level solvers requiring derivs
             #    and raise an exception if we do

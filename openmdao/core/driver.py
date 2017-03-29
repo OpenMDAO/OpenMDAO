@@ -52,7 +52,7 @@ class Driver(object):
         self.supports.declare('active_set', type_=bool, value=False)
 
         # TODO, support these in Openmdao blue
-        self.supports.declare('integer_design_vars', False)
+        self.supports.declare('integer_design_vars', type_=bool, value=False)
 
         self.fail = False
 

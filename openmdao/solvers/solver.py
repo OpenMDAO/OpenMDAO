@@ -28,6 +28,9 @@ class Solver(object):
         number of iterations for the current invocation of the solver.
     options : <OptionsDictionary>
         options dictionary.
+    supports : <OptionsDictionary>
+        options dictionary describing what features are supported by this
+        solver.
     """
 
     SOLVER = 'base_solver'
