@@ -327,19 +327,28 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_options(self):
+        class CountNewton(NewtonSolver):
+            """ This version of Newton also counts how many times it runs in total."""
+
+            def __init__(self, **kwargs):
+                super(CountNewton, self).__init__(**kwargs)
+                self.total_count = 0
+
+            def _iter_execute(self):
+                super(CountNewton, self)._iter_execute()
+                self.total_count += 1
+
         prob = Problem()
         model = prob.model = DoubleSellar()
 
-
-
         # each SubSellar group converges itself
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
+        g1.nl_solver = CountNewton()
         g1.nl_solver.options['rtol'] = 1.0e-5
         g1.ln_solver = DirectSolver()  # used for derivatives
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
+        g2.nl_solver = CountNewton()
         g2.nl_solver.options['rtol'] = 1.0e-5
         g2.ln_solver = DirectSolver()
 
@@ -347,16 +356,78 @@ class TestNewton(unittest.TestCase):
         model.nl_solver = NewtonSolver()
         model.ln_solver = ScipyIterativeSolver()
 
-        model.nl_solver.options['maxiter'] = 1
+        model.nl_solver.options['maxiter'] = 5
         model.nl_solver.options['solve_subsystems'] = True
-        model.nl_solver.options['max_sub_solves'] = 1
+        model.nl_solver.options['max_sub_solves'] = 0
+        prob.model.suppress_solver_output = True
 
         prob.setup()
         prob.run_model()
 
         # Verifying subsolvers ran
-        self.assertEqual(g1.nl_solver._iter_count, 2)
-        self.assertEqual(g2.nl_solver._iter_count, 2)
+        self.assertEqual(g1.nl_solver.total_count, 2)
+        self.assertEqual(g2.nl_solver.total_count, 2)
+
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+        # each SubSellar group converges itself
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = CountNewton()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()  # used for derivatives
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = CountNewton()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['maxiter'] = 5
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 5
+        prob.model.suppress_solver_output = True
+
+        prob.setup()
+        prob.run_model()
+
+        # Verifying subsolvers ran
+        self.assertEqual(g1.nl_solver.total_count, 5)
+        self.assertEqual(g2.nl_solver.total_count, 5)
+
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+        # each SubSellar group converges itself
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = CountNewton()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()  # used for derivatives
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = CountNewton()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['maxiter'] = 5
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 1
+        prob.model.suppress_solver_output = True
+
+        prob.setup()
+        prob.run_model()
+
+        # Verifying subsolvers ran
+        self.assertEqual(g1.nl_solver.total_count, 4)
+        self.assertEqual(g2.nl_solver.total_count, 4)
+
 
 class TestNewtonFeatures(unittest.TestCase):
 

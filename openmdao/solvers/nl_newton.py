@@ -91,7 +91,7 @@ class NewtonSolver(NonlinearSolver):
         system = self._system
 
         # Hybrid newton support.
-        if self.options['solve_subsystems'] and self._iter_count < self.options['max_sub_solves']:
+        if self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']:
             for isub, subsys in enumerate(system._subsystems_allprocs):
                 system._transfers['fwd', isub](system._inputs,
                                                system._outputs, 'fwd')
