@@ -90,7 +90,9 @@ class BaseRecorder(object):
 
         # self._filtered = {}
         # TODO: System specific includes/excludes
-        #pass
+
+        self._owners = []
+
 
     def startup(self):
         """ Prepare for a new run.

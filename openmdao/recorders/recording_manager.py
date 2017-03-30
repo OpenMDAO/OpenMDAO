@@ -161,7 +161,7 @@ class RecordingManager(object):
             recorder.record_iteration(case['p'], case['u'], case['r'], case['meta'])
 
     # def record_iteration(self, root, metadata, dummy=False):
-    def record_iteration(self, driver):
+    def record_iteration(self, object_requesting_recording):
         """ Gathers variables for non-parallel case recorders and calls
         record for all recorders.
 
@@ -181,9 +181,8 @@ class RecordingManager(object):
             return
 
 
-        objective_values = driver.get_objective_values()
         for recorder in self._recorders:
-            recorder.record_iteration(objective_values)
+            recorder.record_iteration(object_requesting_recording)
 
 
         return
