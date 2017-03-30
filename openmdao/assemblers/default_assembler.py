@@ -197,10 +197,12 @@ class DefaultAssembler(Assembler):
             Index of input var among all vars in the current system on all procs.
         out_ind : int
             Index of output var among all vars in the current system on all procs.
-        in_set_indices : ???
-            ???
-        out_set_indices : ???
-            ???
+        in_set_indices : ndarray[nvar_all, 2]
+            the first column is the var_set ID and
+            the second column is the variable index within the var_set.
+        out_set_indices : ndarray[nvar_all, 2]
+            the first column is the var_set ID and
+            the second column is the variable index within the var_set.
 
         Returns
         -------
