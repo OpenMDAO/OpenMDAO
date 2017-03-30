@@ -65,7 +65,7 @@ class ScipyIterativeSolver(LinearSolver):
         if self.precon is not None:
             self.precon._setup_solvers(self._system, self._depth + 1)
 
-    def _need_child_linearize(self):
+    def _linearize_children(self):
         """
         Return a flag indicating if you would like your child solvers to get a linearization or not.
 
@@ -74,9 +74,8 @@ class ScipyIterativeSolver(LinearSolver):
         boolean
             flag for indicating child linerization
         """
-        if self.precon is not None:
-            return self.precon._need_child_linearize()
-        return False
+        precon = self.precon
+        return (precon is not None) and (precon._linearize_children())
 
     def _linearize(self):
         """

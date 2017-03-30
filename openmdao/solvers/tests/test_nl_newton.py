@@ -324,7 +324,10 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
-    def test_solve_subsystems_options(self):
+    def test_solve_subsystems_internals(self):
+        # Here we test that this feature is doing what it should do by counting the
+        # number of calls in various places.
+
         class CountNewton(NewtonSolver):
             """ This version of Newton also counts how many times it runs in total."""
 
@@ -336,6 +339,17 @@ class TestNewton(unittest.TestCase):
                 super(CountNewton, self)._iter_execute()
                 self.total_count += 1
 
+        class CountDS(DirectSolver):
+            """ This version of Newton also counts how many times it linearizes"""
+
+            def __init__(self, **kwargs):
+                super(DirectSolver, self).__init__(**kwargs)
+                self.lin_count = 0
+
+            def _linearize(self):
+                super(CountDS, self)._linearize()
+                self.lin_count += 1
+
         prob = Problem()
         model = prob.model = DoubleSellar()
 
@@ -343,7 +357,7 @@ class TestNewton(unittest.TestCase):
         g1 = model.get_subsystem('g1')
         g1.nl_solver = CountNewton()
         g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()  # used for derivatives
+        g1.ln_solver = CountDS()  # used for derivatives
 
         g2 = model.get_subsystem('g2')
         g2.nl_solver = CountNewton()
@@ -367,6 +381,7 @@ class TestNewton(unittest.TestCase):
         # Verifying subsolvers ran
         self.assertEqual(g1.nl_solver.total_count, 2)
         self.assertEqual(g2.nl_solver.total_count, 2)
+        self.assertEqual(g1.ln_solver.lin_count, 3)
 
         prob = Problem()
         model = prob.model = DoubleSellar()
@@ -375,7 +390,7 @@ class TestNewton(unittest.TestCase):
         g1 = model.get_subsystem('g1')
         g1.nl_solver = CountNewton()
         g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()  # used for derivatives
+        g1.ln_solver = CountDS()  # used for derivatives
 
         g2 = model.get_subsystem('g2')
         g2.nl_solver = CountNewton()
@@ -399,6 +414,7 @@ class TestNewton(unittest.TestCase):
         # Verifying subsolvers ran
         self.assertEqual(g1.nl_solver.total_count, 5)
         self.assertEqual(g2.nl_solver.total_count, 5)
+        self.assertEqual(g1.ln_solver.lin_count, 8)
 
         prob = Problem()
         model = prob.model = DoubleSellar()
@@ -407,7 +423,7 @@ class TestNewton(unittest.TestCase):
         g1 = model.get_subsystem('g1')
         g1.nl_solver = CountNewton()
         g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()  # used for derivatives
+        g1.ln_solver = CountDS()  # used for derivatives
 
         g2 = model.get_subsystem('g2')
         g2.nl_solver = CountNewton()
@@ -431,6 +447,7 @@ class TestNewton(unittest.TestCase):
         # Verifying subsolvers ran
         self.assertEqual(g1.nl_solver.total_count, 4)
         self.assertEqual(g2.nl_solver.total_count, 4)
+        self.assertEqual(g1.ln_solver.lin_count, 6)
 
 
 class TestNewtonFeatures(unittest.TestCase):

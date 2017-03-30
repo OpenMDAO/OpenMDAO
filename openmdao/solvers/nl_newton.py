@@ -27,7 +27,9 @@ class NewtonSolver(NonlinearSolver):
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
-        number of iterations for the current invocation of the solver.
+        Number of iterations for the current invocation of the solver.
+    _ln_solver_from_parent : bool
+        This is set to True if we are using the parent system's linear solver.
     """
 
     SOLVER = 'NL: Newton'
@@ -48,6 +50,9 @@ class NewtonSolver(NonlinearSolver):
 
         # Slot for linesearch
         self.linesearch = None
+
+        # We only need to call linearize on the ln_solver if its not shared with the parent group.
+        self._ln_solver_from_parent = True
 
     def _declare_options(self):
         """
@@ -70,9 +75,6 @@ class NewtonSolver(NonlinearSolver):
             depth of the current system (already incremented).
         """
         super(NewtonSolver, self)._setup_solvers(system, depth)
-
-        # we only need to call linearize on th ln_solver if its not shared with the parent group
-        self._ln_solver_from_parent = True
 
         if self.ln_solver is not None:
             self.ln_solver._setup_solvers(self._system, self._depth + 1)
@@ -106,7 +108,7 @@ class NewtonSolver(NonlinearSolver):
         system._apply_nonlinear()
         return system._residuals.get_norm()
 
-    def _need_child_linearize(self):
+    def _linearize_children(self):
         """
         Return a flag indicating if you would like your child solvers to get a linearization or not.
 

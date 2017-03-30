@@ -269,18 +269,17 @@ class PetscKSP(LinearSolver):
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
 
-    def _need_child_linearize(self):
+    def _linearize_children(self):
         """
-        Return a flag indicating if you would like your child solvers to get a linearization or not.
+        Return a flag that is True when child solvers need to be linearized.
 
         Returns
         -------
         boolean
-            flag for indicating child linerization
+            Flag for indicating child linerization
         """
-        if self.precon is not None:
-            return self.precon._need_child_linearize()
-        return False
+        precon = self.precon
+        return (precon is not None) and (precon._linearize_children())
 
     def _linearize(self):
         """

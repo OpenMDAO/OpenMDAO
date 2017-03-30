@@ -552,21 +552,17 @@ class Group(System):
         Parameters
         ----------
         do_nl : boolean
-            flag indicating if the nonlinear solver should be linearized.
+            Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
-            flag indicating if the linear solver should be linearized.
+            Flag indicating if the linear solver should be linearized.
         """
         with self.jacobian_context() as J:
+
+            sub_do_nl = (self._nl_solver is not None) and (self._nl_solver._linearize_children())
+            sub_do_ln = (self._ln_solver is not None) and (self._ln_solver._linearize_children())
+
             for subsys in self._subsystems_myproc:
-                sub_do_nl = False
-                if self._nl_solver is not None and self._nl_solver._need_child_linearize():
-                    sub_do_nl = True
-
-                sub_do_ln = False
-                if self._ln_solver is not None and self._ln_solver._need_child_linearize():
-                    sub_do_nl = True
-
-                subsys._linearize(sub_do_nl, sub_do_ln)
+                subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
 
             # Update jacobian
             if self._owns_assembled_jac:

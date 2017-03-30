@@ -1579,9 +1579,9 @@ class System(object):
         Parameters
         ----------
         do_nl : boolean
-            flag indicating if the nonlinear solver should be linearized.
+            Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
-            flag indicating if the linear solver should be linearized.
+            Flag indicating if the linear solver should be linearized.
 
         """
         with self._scaled_context():
@@ -1653,9 +1653,9 @@ class System(object):
         Parameters
         ----------
         do_nl : boolean
-            flag indicating if the nonlinear solver should be linearized.
+            Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
-            flag indicating if the linear solver should be linearized.
+            Flag indicating if the linear solver should be linearized.
         """
         pass
 
