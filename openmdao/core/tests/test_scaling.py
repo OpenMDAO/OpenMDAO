@@ -31,10 +31,10 @@ class PassThroughLength(ExplicitComponent):
 class ScalingExample1(ImplicitComponent):
 
     def initialize_variables(self):
-        self.add_input('x1', val=1.0)
-        self.add_input('x2', val=1.0)
-        self.add_output('y1', val=1e6, ref=1e6)
-        self.add_output('y2', val=1e-6, ref=1e-6)
+        self.add_input('x1', val=100.0)
+        self.add_input('x2', val=5000.0)
+        self.add_output('y1', val=200., ref=1e2)
+        self.add_output('y2', val=6000., ref=1e3)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         x1 = inputs['x1']
@@ -42,17 +42,17 @@ class ScalingExample1(ImplicitComponent):
         y1 = outputs['y1']
         y2 = outputs['y2']
 
-        residuals['y1'] = 1e5 * (x1 - 2*y1/1e6)
-        residuals['y2'] = 1e-5 * (x2 - 2*y2/1e-6)
+        residuals['y1'] = 1e5 * (x1 - y1)/y1
+        residuals['y2'] = 1e-5 * (x2 - y2)/y2
 
 
 class ScalingExample2(ImplicitComponent):
 
     def initialize_variables(self):
-        self.add_input('x1', val=1.0)
-        self.add_input('x2', val=1.0)
-        self.add_output('y1', val=1e6, ref=1e6, ref0=1e5)
-        self.add_output('y2', val=1e-6, ref=1e-6, ref0=1e-7)
+        self.add_input('x1', val=100.0)
+        self.add_input('x2', val=5000.0)
+        self.add_output('y1', val=200., res_ref=1e5)
+        self.add_output('y2', val=6000., res_ref=1e-5)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         x1 = inputs['x1']
@@ -60,17 +60,16 @@ class ScalingExample2(ImplicitComponent):
         y1 = outputs['y1']
         y2 = outputs['y2']
 
-        residuals['y1'] = 1e5 * (x1 - 2*y1/1e6)
-        residuals['y2'] = 1e-5 * (x2 - 2*y2/1e-6)
-
+        residuals['y1'] = 1e5 * (x1 - y1)/y1
+        residuals['y2'] = 1e-5 * (x2 - y2)/y2
 
 class ScalingExample3(ImplicitComponent):
 
     def initialize_variables(self):
-        self.add_input('x1', val=1.0)
-        self.add_input('x2', val=1.0)
-        self.add_output('y1', val=1e6, res_ref=1e5)
-        self.add_output('y2', val=1e-6, res_ref=1e-5)
+        self.add_input('x1', val=100.0)
+        self.add_input('x2', val=5000.0)
+        self.add_output('y1', val=200., ref=1e2, res_ref=1e5)
+        self.add_output('y2', val=6000., ref=1e3, res_ref=1e-5)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         x1 = inputs['x1']
@@ -78,23 +77,23 @@ class ScalingExample3(ImplicitComponent):
         y1 = outputs['y1']
         y2 = outputs['y2']
 
-        residuals['y1'] = 1e5 * (x1 - 2*y1/1e6)
-        residuals['y2'] = 1e-5 * (x2 - 2*y2/1e-6)
-
+        residuals['y1'] = 1e5 * (x1 - y1)/y1
+        residuals['y2'] = 1e-5 * (x2 - y2)/y2
 
 class ScalingExampleVector(ImplicitComponent):
 
     def initialize_variables(self):
-        self.add_input('x', val=np.ones((2)))
-        self.add_output('y', val=np.array([1e6, 1e-6]), ref=np.array([1e6, 1e-6]),
+        self.add_input('x', val=np.array([100., 5000.]))
+        self.add_output('y', val=np.array([200., 6000.]),
+                        ref=np.array([1e2, 1e3]),
                         res_ref=np.array([1e5, 1e-5]))
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         x = inputs['x']
         y = outputs['y']
 
-        residuals['y'][0] = 1e5 * (x[0] - 2*y[0]/1e6)
-        residuals['y'][1] = 1e-5 * (x[1] - 2*y[1]/1e-6)
+        residuals['y'][0] = 1e5 * (x[0] - y[0])/y[0]
+        residuals['y'][1] = 1e-5 * (x[1] - y[1])/y[1]
 
 
 class SpeedComputationWithUnits(ExplicitComponent):
@@ -785,9 +784,9 @@ class TestScaling(unittest.TestCase):
 
         with model._scaled_context():
             val = model.get_subsystem('comp')._outputs['y1']
-            assert_rel_error(self, val, 1.0)
+            assert_rel_error(self, val, 2.0)
             val = model.get_subsystem('comp')._outputs['y2']
-            assert_rel_error(self, val, 1.0)
+            assert_rel_error(self, val, 6.0)
 
     def test_feature2(self):
 
@@ -807,9 +806,9 @@ class TestScaling(unittest.TestCase):
 
         with model._scaled_context():
             val = model.get_subsystem('comp')._outputs['y1']
-            assert_rel_error(self, val, 1.0)
+            assert_rel_error(self, val, 200.0)
             val = model.get_subsystem('comp')._outputs['y2']
-            assert_rel_error(self, val, 1.0)
+            assert_rel_error(self, val, 6000.0)
 
     def test_feature3(self):
 
@@ -829,9 +828,9 @@ class TestScaling(unittest.TestCase):
 
         with model._scaled_context():
             val = model.get_subsystem('comp')._residuals['y1']
-            assert_rel_error(self, val, -1.0)
+            assert_rel_error(self, val, -.995)
             val = model.get_subsystem('comp')._residuals['y2']
-            assert_rel_error(self, val, -1.0)
+            assert_rel_error(self, val, (1-6000.)/6000.)
 
     def test_feature_vector(self):
 
@@ -849,11 +848,11 @@ class TestScaling(unittest.TestCase):
 
         with model._scaled_context():
             val = model.get_subsystem('comp')._residuals['y']
-            assert_rel_error(self, val[0], -1.0)
-            assert_rel_error(self, val[1], -1.0)
+            assert_rel_error(self, val[0], (1-200.)/200.)
+            assert_rel_error(self, val[1], (1-6000.)/6000.)
             val = model.get_subsystem('comp')._outputs['y']
-            assert_rel_error(self, val[0], 1.0)
-            assert_rel_error(self, val[1], 1.0)
+            assert_rel_error(self, val[0], 2.0)
+            assert_rel_error(self, val[1], 6.0)
 
 if __name__ == '__main__':
     unittest.main()
