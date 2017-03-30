@@ -62,8 +62,12 @@ class NewtonSolver(NonlinearSolver):
         """
         super(NewtonSolver, self)._setup_solvers(system, depth)
 
+        # we only need to call linearize on th ln_solver if its not shared with the parent group
+        self._ln_solver_from_parent = True
+
         if self.ln_solver is not None:
             self.ln_solver._setup_solvers(self._system, self._depth + 1)
+            self._ln_solver_from_parent = False
         else:
             self.ln_solver = system.ln_solver
 
@@ -74,7 +78,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Perform any required linearization operations such as matrix factorization.
         """
-        if self.ln_solver is not None:
+        if self.ln_solver is not None and not self._ln_solver_from_parent:
             self.ln_solver._linearize()
 
         if self.linesearch is not None:

@@ -39,12 +39,16 @@ class DirectSolver(LinearSolver):
 
         self._print_name = 'Direct'
 
+        self.foo = 0
+
     def _linearize(self):
         """
         Perform factorization.
         """
         system = self._system
 
+        print("linearizing ln_direct", system.pathname, self.foo)
+        self.foo += 1
         if system._owns_assembled_jac:
             mtx = system._jacobian._int_mtx
             # Perform dense or sparse lu factorization
