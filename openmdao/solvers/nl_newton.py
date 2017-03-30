@@ -108,15 +108,15 @@ class NewtonSolver(NonlinearSolver):
 
     def _need_child_linearize(self):
         """
-        Return a flag indicating if you would like your child solvers to get a linearization or not
+        Return a flag indicating if you would like your child solvers to get a linearization or not.
 
         Returns
         -------
-        bool 
+        boolean
             flag for indicating child linerization
         """
-
-        return self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']
+        return (self.options['solve_subsystems']
+                and self._iter_count <= self.options['max_sub_solves'])
 
     def _linearize(self):
         """

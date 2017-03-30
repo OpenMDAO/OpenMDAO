@@ -548,12 +548,12 @@ class Group(System):
     def _linearize(self, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
-        
+
         Parameters
         ----------
-        do_nl : bool
-            flag indicating if the nonlinear solver should be linearized. 
-        do_ln : bool
+        do_nl : boolean
+            flag indicating if the nonlinear solver should be linearized.
+        do_ln : boolean
             flag indicating if the linear solver should be linearized.
         """
         with self.jacobian_context() as J:
