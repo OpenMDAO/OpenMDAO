@@ -49,6 +49,15 @@ class NewtonSolver(NonlinearSolver):
         # Slot for linesearch
         self.linesearch = None
 
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('solve_subsystems', type_=bool, value=False,
+                             desc='Set to True to turn on sub-solvers (Hybrid Newton).')
+        self.options.declare('max_sub_solves', type_=int, value=10,
+                             desc='Maximum number of subsystem solves.')
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.
@@ -73,6 +82,29 @@ class NewtonSolver(NonlinearSolver):
 
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system, self._depth + 1)
+
+    def _iter_get_norm(self):
+        """
+        Return the norm of the residual.
+
+        Returns
+        -------
+        float
+            norm.
+        """
+        system = self._system
+
+        # Hybrid newton support.
+        if self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']:
+            for isub, subsys in enumerate(system._subsystems_allprocs):
+                system._transfers['fwd', isub](system._inputs,
+                                               system._outputs, 'fwd')
+
+                if subsys in system._subsystems_myproc:
+                    subsys._solve_nonlinear()
+
+        system._apply_nonlinear()
+        return system._residuals.get_norm()
 
     def _linearize(self):
         """

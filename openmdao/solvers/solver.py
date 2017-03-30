@@ -137,14 +137,14 @@ class Solver(object):
         atol = self.options['atol']
         rtol = self.options['rtol']
 
-        norm0, norm = self._iter_initialize()
         self._iter_count = 0
+        norm0, norm = self._iter_initialize()
         self._mpi_print(self._iter_count, norm, norm / norm0)
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
             self._iter_execute()
-            norm = self._iter_get_norm()
             self._iter_count += 1
+            norm = self._iter_get_norm()
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
