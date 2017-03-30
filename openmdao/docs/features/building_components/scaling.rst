@@ -74,3 +74,45 @@ For instance, if :code:`ref=10001.` and :code:`units='Pa'`, then a scaled value 
   --              --            --            100000 Pa       0.0
   --              --            --            100100 Pa       0.1
   ==============  ============  ============  ==============  ================
+
+Specifying a scaler on an output
+--------------------------------
+
+This example shows how to specify a scaler on outputs 'y1' and 'y2'. The scaling used here
+assures that the outputs (which are states in this implicit component) are in the same order
+of magnitude when the solver interacts with them.  Note that whenver a user function is called
+(like `apply_nonlinear` here), all outputs and residuals are reverted to unscaled dimensiional
+form.
+
+  .. embed-code::
+      openmdao.core.tests.test_scaling.ScalingExample1
+
+Specifying a scaler and offset on an output
+-------------------------------------------
+
+This example shows how to specify a scaler and an offset on outputs 'y1' and 'y2'.
+
+  .. embed-code::
+      openmdao.core.tests.test_scaling.ScalingExample2
+
+Specifying a scaler on a residual
+---------------------------------
+
+This example shows how to specify a scaler on the residuals for variables 'y1' and 'y2'.
+This choice of scaler values assures that the residuals are of the same order of magnitude when
+the solver interacts with them.
+
+  .. embed-code::
+      openmdao.core.tests.test_scaling.ScalingExample3
+
+Specifying a vector of scalers
+------------------------------
+
+When you have a vector output, you can also specify a vector scaling factor with individually
+selected elements.  For this, the `ref`, `ref0` or `res_ref` must have the same shape as the
+variable value.
+
+  .. embed-code::
+      openmdao.core.tests.test_scaling.ScalingExampleVector
+
+.. tags:: Scaling, Outputs
