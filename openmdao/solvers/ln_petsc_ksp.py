@@ -271,7 +271,7 @@ class PetscKSP(LinearSolver):
 
     def _linearize_children(self):
         """
-        Return a flag that is True when child solvers need to be linearized.
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.
 
         Returns
         -------

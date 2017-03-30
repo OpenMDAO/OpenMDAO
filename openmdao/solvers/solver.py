@@ -188,12 +188,12 @@ class Solver(object):
 
     def _linearize_children(self):
         """
-        Return a flag indicating if you would like your child solvers to get a linearization or not.
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.t.
 
         Returns
         -------
         boolean
-            flag for indicating child linerization
+            Flag for indicating child linerization
         """
         return True
 

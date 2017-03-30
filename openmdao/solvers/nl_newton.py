@@ -115,7 +115,7 @@ class NewtonSolver(NonlinearSolver):
         Returns
         -------
         boolean
-            flag for indicating child linerization
+            Flag for indicating child linerization
         """
         return (self.options['solve_subsystems']
                 and self._iter_count <= self.options['max_sub_solves'])
