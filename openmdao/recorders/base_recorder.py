@@ -6,6 +6,7 @@ import sys
 from six import StringIO
 
 from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.general_utils import warn_deprecation
 
 import warnings
 
@@ -24,7 +25,7 @@ class BaseRecorder(object):
         Tells recorder whether to record the inputs vector.
     options['record_residuals'] :  bool(False)
         Tells recorder whether to record the ressiduals vector.
-    options['record_derivs'] :  bool(True)
+    options['record_derivatives'] :  bool(True)
         Tells recorder whether to record derivatives that are requested by a `Driver`.
     options['includes'] :  list of strings
         Patterns for variables to include in recording.
@@ -107,27 +108,18 @@ class BaseRecorder(object):
 
         # Deprecated options here?
         if self.options['record_params']:
-            warnings.simplefilter('always', DeprecationWarning)
-            warnings.warn("record_params is deprecated, please use record_inputs.",
-                          DeprecationWarning, stacklevel=2)
-            #warnings.simplefilter('always', DeprecationWarning)
-
-            # warnings.simplefilter('ignore', DeprecationWarning)
+            warn_deprecation("record_params is deprecated, please use record_inputs.")
+            # set option to what the user intended.
             self.options['record_inputs'] = True
 
-
         if self.options['record_unknowns']:
-            warnings.simplefilter('always', DeprecationWarning)
-            warnings.warn("record_unknowns is deprecated, please use record_outputs.",
-                          DeprecationWarning, stacklevel=2)
-            warnings.simplefilter('ignore', DeprecationWarning)
+            warn_deprecation("record_ is deprecated, please use record_inputs.")
+            # set option to what the user intended.
             self.options['record_outputs'] = True
 
         if self.options['record_resids']:
-            warnings.simplefilter('always', DeprecationWarning)
-            warnings.warn("record_resids is deprecated, please use record_residuals.",
-                          DeprecationWarning, stacklevel=2)
-            warnings.simplefilter('ignore', DeprecationWarning)
+            warn_deprecation("record_params is deprecated, please use record_inputs.")
+            # set option to what the user intended.
             self.options['record_residuals'] = True
 
         # Compute the inclusion lists for recording

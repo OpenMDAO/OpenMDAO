@@ -22,7 +22,7 @@ from openmdao.api import Problem, SqliteRecorder
 from openmdao.recorders.sqlite_recorder import format_version
 
 from openmdao.test_suite.components.sellar import SellarDerivatives
-
+import warnings
 
 
 class TestSqliteRecorder(unittest.TestCase):
@@ -64,6 +64,16 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
 
+    def test_deprecation(self):
+        msg = "Junk."
 
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        rec = prob.driver.add_recorder(self.recorder)
 
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            rec.options['record_params'] = True
+            print (w)
+            #self.assertEqual(str(w[-1].message), msg)
 

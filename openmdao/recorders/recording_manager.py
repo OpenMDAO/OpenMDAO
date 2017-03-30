@@ -48,10 +48,6 @@ class RecordingManager(object):
     def __iter__(self):
         return iter(self._recorders)
 
-    # def _start_recorders(self):
-    #     for recorder in self._recorders:
-    #         recorder.startup()
-
     def _gather_vars(self, root, local_vars):
         """Gathers and returns only variables listed in
         `local_vars` from the `root` System.
