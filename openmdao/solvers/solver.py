@@ -146,7 +146,7 @@ class Solver(object):
             norm = self._iter_get_norm()
 
             # TODO_RECORDER I think we write to the recorder here
-            # Right, it would depend on the mode and whether it’s linear or nonlinear. The most basic mode would store 
+            # Right, it would depend on the mode and whether it's linear or nonlinear. The most basic mode would store 
             #  just the absolute error and relative error. A second mode would store the full outputs and residuals.
 
             # The full solver residual/output recording and apply_nonlinear/apply_linear recording probably falls last in terms of priority

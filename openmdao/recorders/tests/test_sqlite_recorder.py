@@ -40,7 +40,8 @@ class TestSqliteRecorder(unittest.TestCase):
     def tearDown(self):
         return
         try:
-            rmtree(self.dir)
+            # rmtree(self.dir)
+            pass
         except OSError as e:
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):

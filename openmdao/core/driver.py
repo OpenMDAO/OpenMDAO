@@ -5,6 +5,7 @@ from six import iteritems
 from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.recorders.recording_manager import RecordingManager
 
+import numpy as np
 
 class Driver(object):
     """
@@ -72,6 +73,7 @@ class Driver(object):
         recorder : BaseRecorder
            A recorder instance.
         """
+        recorder._owners.append(self)
         self.recorders.append(recorder)
         return recorder
 
@@ -266,7 +268,7 @@ class Driver(object):
         #     objectives
         #     constraints
 
-        # We would definitely need driver recording (dvs, responses, …), and optionally recording of state values in each optimization iteration
+        # We would definitely need driver recording (dvs, responses,), and optionally recording of state values in each optimization iteration
 
 
         # objective_values = self.get_objective_values()
