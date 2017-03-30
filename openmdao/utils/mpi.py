@@ -132,36 +132,6 @@ class FakeComm(object):
         self.size = 1
 
 
-@contextmanager
-def MultiProcFailCheck(comm):
-    """
-    Cause a global failure if any process raises an exception.
-
-    Wrap this around code that you want to fail globally if it fails
-    on any MPI process in comm.  If not running under MPI, don't
-    handle any exceptions.
-
-    Parameters
-    ----------
-    comm : MPI communicator
-        All processes in the given communicator will check for an exception.
-    """
-    if MPI is None:
-        yield
-    else:
-        try:
-            yield
-        except Exception:
-            fails = comm.allgather(traceback.format_exc())
-        else:
-            fails = comm.allgather('')
-
-        for i, f in enumerate(fails):
-            if f:
-                raise RuntimeError("a test failed in (at least) rank %d: "
-                                   "traceback follows\n%s" % (i, f))
-
-
 def any_proc_is_true(comm, val):
     """
     Return True if val is True in any proc in the given comm.

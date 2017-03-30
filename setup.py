@@ -56,7 +56,7 @@ setup(name='openmdao',
         'sqlitedict',
         'pycodestyle', 'pydocstyle',
         'testflo',
-        'nose-parameterized',
+        'parameterized',
         'networkx',
       ],
       #scripts=['bin/om-pylint.sh']

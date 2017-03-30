@@ -5,7 +5,7 @@ from six.moves import zip
 from six import iteritems, iterkeys, itervalues, string_types
 import collections
 
-from nose_parameterized import parameterized
+from parameterized import parameterized
 from unittest import SkipTest
 
 from openmdao.core.problem import Problem
