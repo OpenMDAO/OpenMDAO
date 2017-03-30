@@ -223,9 +223,16 @@ class Component(BaseComponent):
 
             return False, 0., 0.
 
-    def _linearize(self):
+    def _linearize(self, do_nl=False, do_ln=False):
         """
         Compute jacobian / factorization.
+
+        Parameters
+        ----------
+        do_nl : boolean
+            flag indicating if the nonlinear solver should be linearized.
+        do_ln : boolean
+            flag indicating if the linear solver should be linearized.
         """
         with self.jacobian_context() as J:
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],

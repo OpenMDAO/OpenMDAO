@@ -269,6 +269,19 @@ class PetscKSP(LinearSolver):
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
 
+    def _need_child_linearize(self):
+        """
+        Return a flag indicating if you would like your child solvers to get a linearization or not.
+
+        Returns
+        -------
+        boolean
+            flag for indicating child linerization
+        """
+        if self.precon is not None:
+            return self.precon._need_child_linearize()
+        return False
+
     def _linearize(self):
         """
         Perform any required linearization operations such as matrix factorization.
