@@ -1570,14 +1570,21 @@ class System(object):
 
         return result
 
-    def run_linearize(self):
+    def run_linearize(self, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization.
+        
+        Parameters
+        ----------
+        do_nl : bool
+            flag indicating if the nonlinear solver should be linearized. 
+        do_ln : bool
+            flag indicating if the linear solver should be linearized.
 
         This calls _linearize, but with the model assumed to be in an unscaled state.
         """
         with self._scaled_context():
-            self._linearize()
+            self._linearize(do_nl, do_ln)
 
     def _apply_nonlinear(self):
         """
@@ -1638,9 +1645,16 @@ class System(object):
         """
         pass
 
-    def _linearize(self):
+    def _linearize(self, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
+        
+        Parameters
+        ----------
+        do_nl : bool
+            flag indicating if the nonlinear solver should be linearized. 
+        do_ln : bool
+            flag indicating if the linear solver should be linearized.
         """
         pass
 

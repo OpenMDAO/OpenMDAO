@@ -186,6 +186,18 @@ class Solver(object):
         """
         pass
 
+    def _need_child_linearize(self):
+        """
+        Return a flag indicating if you would like your child solvers to get a linearization or not
+        
+        Returns
+        -------
+        bool 
+            flag for indicating child linerization
+        """
+
+        return True
+
     def solve(self):
         """
         Run the solver.

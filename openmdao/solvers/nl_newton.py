@@ -106,11 +106,23 @@ class NewtonSolver(NonlinearSolver):
         system._apply_nonlinear()
         return system._residuals.get_norm()
 
+    def _need_child_linearize(self):
+        """
+        Return a flag indicating if you would like your child solvers to get a linearization or not
+
+        Returns
+        -------
+        bool 
+            flag for indicating child linerization
+        """
+
+        return self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']
+
     def _linearize(self):
         """
         Perform any required linearization operations such as matrix factorization.
         """
-        if self.ln_solver is not None and not self._ln_solver_from_parent:
+        if not self._ln_solver_from_parent:
             self.ln_solver._linearize()
 
         if self.linesearch is not None:
