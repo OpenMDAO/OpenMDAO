@@ -89,7 +89,7 @@ class DefaultAssembler(Assembler):
         for in_ind in range(in_start, in_end):
             in_isub = in_isub_var[in_ind - in_start]
             if in_isub == -1:
-                # input subsystem is not contained witin the current group
+                # input subsystem does not exist on the current process
                 continue
 
             iabs = in_abs_vars[in_ind]
@@ -105,8 +105,8 @@ class DefaultAssembler(Assembler):
             if out_start <= out_ind < out_end:
                 out_isub = out_isub_var[out_ind - out_start]
                 if out_isub == -1 or out_isub == in_isub:
-                    # output susystem is either not contained within the
-                    # current group or both input and output subsystems are
+                    # output subsystem either does not exist in the current
+                    # process or both input and output subsystems are
                     # contained within the same subgroup (so the transfer will
                     # be performed in the subgroup)
                     continue

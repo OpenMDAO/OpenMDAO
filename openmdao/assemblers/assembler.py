@@ -358,6 +358,12 @@ class Assembler(object):
         indices = self._var_allprocs_abs2idx_io
         abs2meta = self._var_allprocs_abs2meta_io
 
+        # The units and scaling coefficients are initialized locally, then
+        # broadcast to all processors along with other metadata since not all
+        # variables are declared on all processors. Then their data is
+        # put in the _src_units and _src_scaling_0/1 attributes, where they are
+        # ordered by target input, rather than all the outputs in order.
+
         # physical_unscaled = c0 + c1 * unitless_scaled
         # where c0 and c1 are the two columns of _src_scaling.
         # Below, ref0 and ref are the values of the variable in the specified
