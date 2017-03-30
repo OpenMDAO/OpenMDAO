@@ -100,29 +100,31 @@ class SqliteRecorder(BaseRecorder):
 
         self._open_close_sqlitedict = True
 
-        self.con = None # sqlite connection
+        # self.con = None # sqlite connection
 
-        if self._open_close_sqlitedict:
-            sqlite_dict_args.setdefault('autocommit', True)
-            # self.out_metadata = SqliteDict(filename=out, flag='n', tablename='metadata', **sqlite_dict_args)
-            # self.out_metadata['format_version'] = format_version
+        # might have to do autocommit. Need to investigate
+        self.con = sqlite3.connect(out, detect_types=sqlite3.PARSE_DECLTYPES)
+        # Create the table for iterations for a driver
+        # The primary key gets filled in automatically. It can be our "counter" that John wants. It gets incremented by 1
+        #   for each write of a record to this table
+        self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT, driver_values array)")
+
+        # if self._open_close_sqlitedict:
+        #     sqlite_dict_args.setdefault('autocommit', True)
+        #     # self.out_metadata = SqliteDict(filename=out, flag='n', tablename='metadata', **sqlite_dict_args)
+        #     # self.out_metadata['format_version'] = format_version
             
-            self.con = sqlite3.connect(out, detect_types=sqlite3.PARSE_DECLTYPES)
-            # Create the table for iterations for a driver
-            # The primary key gets filled in automatically. It can be our "counter" that John wants. It gets incremented by 1
-            #   for each write of a record to this table
-            self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT, driver_values array)")
-            #self.con.close()
+        #     #self.con.close()
 
-            # self.out_iterations = SqliteDict(filename=out, flag='w', tablename='system_iterations', **sqlite_dict_args)
-            # self.out_driver_iterations = SqliteDict(filename=out, flag='w', tablename='driver_iterations', **sqlite_dict_args)
-            # self.out_iterations = SqliteDict(filename=out, flag='w', tablename='solver_iterations', **sqlite_dict_args)
-            # self.out_derivs = SqliteDict(filename=out, flag='w', tablename='derivs', **sqlite_dict_args)
+        #     # self.out_iterations = SqliteDict(filename=out, flag='w', tablename='system_iterations', **sqlite_dict_args)
+        #     # self.out_driver_iterations = SqliteDict(filename=out, flag='w', tablename='driver_iterations', **sqlite_dict_args)
+        #     # self.out_iterations = SqliteDict(filename=out, flag='w', tablename='solver_iterations', **sqlite_dict_args)
+        #     # self.out_derivs = SqliteDict(filename=out, flag='w', tablename='derivs', **sqlite_dict_args)
 
-        else:
-            self.out_metadata = None
-            self.out_iterations = None
-            self.out_derivs = None
+        # else:
+        #     self.out_metadata = None
+        #     self.out_iterations = None
+        #     self.out_derivs = None
 
     def startup(self, group):
         super(SqliteRecorder, self).startup(group)
@@ -343,13 +345,16 @@ class SqliteRecorder(BaseRecorder):
     def close(self):
         """Closes `out`"""
 
-        if self._open_close_sqlitedict:
-            # if self.out_metadata is not None:
-            #     self.out_metadata.close()
-            #     self.out_metadata = None
-            if self.out_driver_iterations is not None:
-                self.out_driver_iterations.close()
-                self.out_driver_iterations = None
+
+        self.con.close() # Not completely sure if it is this simple.
+
+        # if self._open_close_sqlitedict:
+        #     # if self.out_metadata is not None:
+        #     #     self.out_metadata.close()
+        #     #     self.out_metadata = None
+        #     if self.out_driver_iterations is not None:
+        #         self.out_driver_iterations.close()
+        #         self.out_driver_iterations = None
         #     # if self.out_derivs is not None:
         #     #     self.out_derivs.close()
         #     #     self.out_derivs = None
