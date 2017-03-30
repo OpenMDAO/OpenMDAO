@@ -12,8 +12,8 @@ from six.moves import range
 import numpy as np
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
-from openmdao.jacobians.default_jacobian import DefaultJacobian
-from openmdao.jacobians.global_jacobian import GlobalJacobian
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.units import convert_units
@@ -84,10 +84,10 @@ class System(object):
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
-    _var_connections : dict
+    _manual_connections : dict
         dictionary of input_name: (output_name, src_indices) connections.
-    _var_connections_abs : [(str, str), ...]
-        _var_connections with absolute variable names.  Entries
+    _manual_connections_abs : [(str, str), ...]
+        _manual_connections with absolute variable names.  Entries
         have the form (input, output).
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
@@ -128,8 +128,8 @@ class System(object):
         <Jacobian> object to be used in apply_linear.
     _jacobian_changed : bool
         If True, the jacobian has changed since the last call to setup.
-    _owns_global_jac : bool
-        If True, we are owners of the GlobalJacobian in self._jacobian.
+    _owns_assembled_jac : bool
+        If True, we are owners of the AssembledJacobian in self._jacobian.
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
@@ -174,8 +174,8 @@ class System(object):
         self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
-        self._var_connections = {}
-        self._var_connections_abs = []
+        self._manual_connections = {}
+        self._manual_connections_abs = []
 
         self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         self._var_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
@@ -199,10 +199,10 @@ class System(object):
         self._residuals = None
         self._transfers = None
 
-        self._jacobian = DefaultJacobian()
+        self._jacobian = DictionaryJacobian()
         self._jacobian._system = self
         self._jacobian_changed = True
-        self._owns_global_jac = False
+        self._owns_assembled_jac = False
 
         self._subjacs_info = OrderedDict()
 
@@ -367,9 +367,14 @@ class System(object):
             self._vectors[key][vec_name] = vectors[key]
 
         if use_ref_vector:
-            vectors['input']._compute_ivar_map()
-            vectors['output']._compute_ivar_map()
-            vectors['residual']._ivar_map = vectors['output']._ivar_map
+            abs2data = self._var_abs2data_io
+            vectors['input']._compute_ivar_map(abs2data, 'input')
+            vectors['output']._compute_ivar_map(abs2data, 'output')
+
+            # TODO - Let's only compute a new one when the output and residual scale lengths are
+            # really different.
+            vectors['residual']._compute_ivar_map(abs2data, 'residual')
+            # vectors['residual']._ivar_map = vectors['output']._ivar_map
 
         # Compute the transfer for this vector set
         self._vector_transfers[vec_name] = self._get_transfers(vectors)
@@ -397,14 +402,37 @@ class System(object):
         """
         Set up scaling vectors.
         """
+        abs2idx = self._assembler._var_allprocs_abs2idx_io
+        abs2data = self._var_abs2data_io
         nvar_in = len(self._var_abs_names['input'])
-        nvar_out = len(self._var_abs_names['output'])
+
+        # Support for vector scaling requires inpsecting all the scale values before we size the
+        # phys_to_norm and norm_to_phys arrays. Note that we could have one of (ref, ref0) as a
+        # scaler and the other as an array. Since we don't want to bookkeep these independently
+        # (or do we), we just allocate for the array.
+        nvar_out = 0
+        nvar_res = 0
+        out_idx = []
+        res_idx = []
+        for abs_name in self._var_abs_names['output']:
+            meta = abs2data[abs_name]['metadata']
+            n_out = max(len(np.atleast_1d(meta['ref'])),
+                        len(np.atleast_1d(meta['ref0'])))
+            id0 = nvar_out
+            nvar_out += n_out
+            out_idx.append((id0, nvar_out))
+
+            n_res = max(len(np.atleast_1d(meta['res_ref'])),
+                        len(np.atleast_1d(meta['res_ref0'])))
+            id0 = nvar_res
+            nvar_res += n_res
+            res_idx.append((id0, nvar_res))
 
         # Initialize scaling arrays
         for scaling in (self._scaling_to_norm, self._scaling_to_phys):
             scaling['input'] = np.empty((nvar_in, 2))
             scaling['output'] = np.empty((nvar_out, 2))
-            scaling['residual'] = np.empty((nvar_out, 2))
+            scaling['residual'] = np.empty((nvar_res, 2))
 
         # ref0 and ref are the values of the variable in the specified
         # units at which the scaled values are 0 and 1, respectively
@@ -424,8 +452,8 @@ class System(object):
         #   b0 = g(a0)
         #   b1 = d0 + d1 a1 - d0
         #   b1 = g(a1) - g(0)
-        abs2idx = self._assembler._var_allprocs_abs2idx_io
-        abs2data = self._var_abs2data_io
+
+        # Inputs have unit conversions.
         for ind, abs_name in enumerate(self._var_abs_names['input']):
             global_ind = abs2idx[abs_name]
             meta = abs2data[abs_name]['metadata']
@@ -435,16 +463,19 @@ class System(object):
                 convert_units(src_scaling[global_ind, 1], src_units[global_ind], meta['units']) - \
                 convert_units(0., src_units[global_ind], meta['units'])
 
+        # Outputs and residuals have scaling.
         for ind, abs_name in enumerate(self._var_abs_names['output']):
             meta = abs2data[abs_name]['metadata']
 
             # Compute scaling arrays for outputs; no unit conversion needed
-            self._scaling_to_phys['output'][ind, 0] = meta['ref0']
-            self._scaling_to_phys['output'][ind, 1] = meta['ref'] - meta['ref0']
+            ind1, ind2 = out_idx[ind]
+            self._scaling_to_phys['output'][ind1:ind2, 0] = meta['ref0']
+            self._scaling_to_phys['output'][ind1:ind2, 1] = meta['ref'] - meta['ref0']
 
             # Compute scaling arrays for residuals; convert units
-            self._scaling_to_phys['residual'][ind, 0] = meta['res_ref0']
-            self._scaling_to_phys['residual'][ind, 1] = meta['res_ref'] - meta['res_ref0']
+            ind1, ind2 = res_idx[ind]
+            self._scaling_to_phys['residual'][ind1:ind2, 0] = meta['res_ref0']
+            self._scaling_to_phys['residual'][ind1:ind2, 1] = meta['res_ref'] - meta['res_ref0']
 
         # Compute inverse scaling arrays
         for key in ['input', 'output', 'residual']:
@@ -513,20 +544,20 @@ class System(object):
 
         Parameters
         ----------
-        jacobian : <GlobalJacobian> or None
+        jacobian : <AssembledJacobian> or None
             The global jacobian to populate for this system.
         """
         self._jacobian_changed = False
 
-        if self._owns_global_jac:
+        if self._owns_assembled_jac:
 
-            # At present, we don't support a GlobalJacobian in a group if any subcomponents
+            # At present, we don't support a AssembledJacobian in a group if any subcomponents
             # are matrix-free.
             for subsys in self.system_iter():
 
                 try:
                     if subsys._matrix_free:
-                        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
+                        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
                         raise RuntimeError(msg)
 
                 # Groups don't have `_matrix_free`
@@ -546,7 +577,7 @@ class System(object):
         for subsys in self._subsystems_myproc:
             subsys._setup_jacobians(jacobian)
 
-        if self._owns_global_jac:
+        if self._owns_assembled_jac:
             self._jacobian._system = self
             self._jacobian._initialize()
 
@@ -688,7 +719,7 @@ class System(object):
         """
         Set the Jacobian.
         """
-        self._owns_global_jac = isinstance(jacobian, GlobalJacobian)
+        self._owns_assembled_jac = isinstance(jacobian, AssembledJacobian)
         self._jacobian = jacobian
         self._jacobian_changed = True
 
@@ -789,7 +820,7 @@ class System(object):
 
         in_names = []
         for in_abs_name in self._var_abs_names['input']:
-            out_abs = self._assembler._input_srcs[in_abs_name]
+            out_abs = self._assembler._abs_input2src[in_abs_name]
             if out_abs is None:
                 continue
             out_idx = self._assembler._var_allprocs_abs2idx_io[out_abs]
@@ -896,7 +927,7 @@ class System(object):
                 vec._scale(scaling[vec_type])
 
         for system in self.system_iter(include_self=True, recurse=True):
-            if system._owns_global_jac:
+            if system._owns_assembled_jac:
                 with system.jacobian_context():
                     system._jacobian._precompute_iter()
                     system._jacobian._scale(scaling)

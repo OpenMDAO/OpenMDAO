@@ -4,7 +4,7 @@ from __future__ import division, print_function
 import numpy as np
 
 from openmdao.utils.generalized_dict import OptionsDictionary
-from openmdao.jacobians.global_jacobian import GlobalJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 
 
 class Solver(object):
@@ -137,14 +137,14 @@ class Solver(object):
         atol = self.options['atol']
         rtol = self.options['rtol']
 
-        norm0, norm = self._iter_initialize()
         self._iter_count = 0
+        norm0, norm = self._iter_initialize()
         self._mpi_print(self._iter_count, norm, norm / norm0)
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
             self._iter_execute()
-            norm = self._iter_get_norm()
             self._iter_count += 1
+            norm = self._iter_get_norm()
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
@@ -370,8 +370,8 @@ class BlockLinearSolver(LinearSolver):
         float
             error at the first iteration.
         """
-        if isinstance(self._system._jacobian, GlobalJacobian):
+        if isinstance(self._system._jacobian, AssembledJacobian):
             raise RuntimeError("A block linear solver '%s' is being used with "
-                               "a GlobalJacobian in system '%s'" %
+                               "an AssembledJacobian in system '%s'" %
                                (self.SOLVER, self._system.pathname))
         return super(BlockLinearSolver, self)._iter_initialize()
