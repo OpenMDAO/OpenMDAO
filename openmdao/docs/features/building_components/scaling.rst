@@ -1,24 +1,35 @@
 :orphan:
 
-.. _scaling:
+.. _scale_outputs_and_resids:
 
 Scaling variables
 =================
 
 As we saw in <Section declaring_variables>, we can specify scaling parameters for outputs and residuals.
-Scaling can be important for the efficiency of some linear solvers.
-Knowing when and how to use scaling can be tricky, but in general, it is a good idea to scale outputs and residuals so that both have values that are :math:`\mathcal{O}(1)`.
+Scaling can be important for the efficiency of some linear solvers and can have an impact on some gradient free
+non-linear solvers such as Broyden. Knowing when and how to use scaling can be tricky, but in general, it is a good
+idea to scale outputs and residuals so that both have values that are :math:`\mathcal{O}(1)` and so that they have
+roughly the same range of variation in your design space.
 
-Note: residual scaling is separate and independent of output scaling in implicit components.
-In explicit components, the requested output scaling is applied to the residuals as well, by default.
-However, the user has the option to override this behavior and specify their own residual scaling in their explicit component.
+For example, consider a value that is expected to have a value around 2500. Then you might scale it by dividing
+by 1000. However, if the value was going to have an expected range between 2400 and 2500, then you might want to subtract out
+2400 then divide by 100.
+
+OpenMDAO supports this kind of linear scaling of both output and residual values through a set of user defined reference
+values specified when the variables are defined. These are described below.
+
+.. note::
+
+    When you apply scaling to your variables, it does not affect the inputs and outputs you work with in your components.
+    These are still worked with in physical, dimensional quantities. The scaling is only applied internally when values
+    are given to solvers.
 
 Basics
 ------
 
 For outputs, scaling can be specified using the :code:`ref` argument to :code:`add_output`.
-This argument is named as such because it represents the reference value.
-As the examples below show, scaling can be useful when the output value is very small or very large.
+This argument is named as such because it represents the reference physical value that will be scaled to 1.
+The table below shows some example physical values and their scaled values for the a given :code:`ref`.
 
   ============  ==============  ================
   :code:`ref`   Physical value  Normalized value
@@ -32,9 +43,6 @@ As the examples below show, scaling can be useful when the output value is very 
   ============  ==============  ================
 
 For residuals, scaling works the same way, except that the argument to :code:`add_output` is :code:`res_ref`.
-Note: :code:`ref` scales only the outputs and :code:`res_ref` scales only the residuals.
-As mentioned previously, residual scaling defaults to the output scaling in explicit components.
-In other words, :code:`res_ref` is set to :code:`ref` by default.
 
 Scaling with an offset
 ----------------------
@@ -42,7 +50,7 @@ Scaling with an offset
 It can be desirable to scale with an offset when the variable values are very large but they only vary by a small amount.
 In these situations, we can specify a second argument, :code:`ref0`, to :code:`add_output`.
 This argument is named as such because :code:`ref0` represents the physical value when the scaled value is 0.
-On the other hand, :code:`ref` represents the physical value when the scaled value is 1.
+
 
   ============  ============  ==============  ================
   :code:`ref`   :code:`ref0`  Physical value  Normalized value
@@ -74,6 +82,13 @@ For instance, if :code:`ref=10001.` and :code:`units='Pa'`, then a scaled value 
   --              --            --            100000 Pa       0.0
   --              --            --            100100 Pa       0.1
   ==============  ============  ============  ==============  ================
+
+
+.. note::
+
+      residual scaling is separate and independent of output scaling in implicit components.
+      In explicit components, the requested output scaling is applied to the residuals as well
+      unless :code:`res_ref` and :code:`res_ref0` are also specified.
 
 Specifying a scaler on an output
 --------------------------------

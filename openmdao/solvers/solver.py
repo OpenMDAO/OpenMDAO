@@ -186,6 +186,17 @@ class Solver(object):
         """
         pass
 
+    def _linearize_children(self):
+        """
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.t.
+
+        Returns
+        -------
+        boolean
+            Flag for indicating child linerization
+        """
+        return True
+
     def solve(self):
         """
         Run the solver.
