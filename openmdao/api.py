@@ -19,8 +19,10 @@ from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.solvers.ln_petsc_ksp import PetscKSP
 from openmdao.solvers.ln_runonce import LNRunOnce
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
+from openmdao.solvers.ls_backtracking import ArmijoGoldstein
+from openmdao.solvers.ls_backtracking import BacktrackingLineSearch
+from openmdao.solvers.ls_backtracking import BoundsCheck
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
-from openmdao.solvers.nl_btlinesearch import BacktrackingLineSearch
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.solvers.nl_runonce import NLRunOnce
 
