@@ -824,20 +824,32 @@ class Problem(object):
         dinputs = input_vec[vecname]
         doutputs = output_vec[vecname]
 
+        ranges = self._assembler._var_dist_ranges['output']
+
         # If Forward mode, solve linear system for each 'wrt'
         # If Adjoint mode, solve linear system for each 'of'
         for icount, input_names in enumerate(input_list):
             for iname_count, input_name in enumerate(input_names):
                 flat_view = dinputs._views_flat[input_name]
-                n_in = len(flat_view)
+                start, end, n_in = ranges[input_name]
                 for idx in range(n_in):
+                    loc_idx = idx - start
+
                     # Maybe we don't need to clean up so much at the beginning,
                     # since we clean this every time.
                     dinputs.set_const(0.0)
 
                     # Dictionary access returns a scaler for 1d input, and we
                     # need a vector for clean code, so use _views_flat.
-                    flat_view[idx] = 1.0
+
+                    # TODO: currently we're looping over the full distributed
+                    # variable even if the variable belongs to a non-distributed
+                    # component that is duplicated in multiple procs.
+                    if idx < start or idx >= end:
+                        model._solve_linear([vecname], mode)
+                        continue
+
+                    flat_view[loc_idx] = 1.0
 
                     # The root system solves here.
                     model._solve_linear([vecname], mode)
@@ -855,8 +867,8 @@ class Problem(object):
                                            old_input_list[icount][iname_count])
 
                                     if totals[key] is None:
-                                        totals[key] = np.empty((len_val, n_in))
-                                    totals[key][:, idx] = deriv_val
+                                        totals[key] = np.empty((len_val, end - start))
+                                    totals[key][:, loc_idx] = deriv_val
 
                                 else:
 
@@ -864,8 +876,8 @@ class Problem(object):
                                            old_output_list[ocount][oname_count])
 
                                     if totals[key] is None:
-                                        totals[key] = np.empty((n_in, len_val))
-                                    totals[key][idx, :] = deriv_val
+                                        totals[key] = np.empty((end - start, len_val))
+                                    totals[key][loc_idx, :] = deriv_val
 
                             elif return_format == 'dict':
                                 if mode == 'fwd':
@@ -874,8 +886,8 @@ class Problem(object):
                                     ikey = old_input_list[icount][iname_count]
 
                                     if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.empty((len_val, n_in))
-                                    totals[okey][ikey][:, idx] = deriv_val
+                                        totals[okey][ikey] = np.empty((len_val, end - start))
+                                    totals[okey][ikey][:, loc_idx] = deriv_val
 
                                 else:
 
@@ -883,8 +895,8 @@ class Problem(object):
                                     ikey = old_output_list[ocount][oname_count]
 
                                     if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.empty((n_in, len_val))
-                                    totals[okey][ikey][idx, :] = deriv_val
+                                        totals[okey][ikey] = np.empty((end - start, len_val))
+                                    totals[okey][ikey][loc_idx, :] = deriv_val
 
         return totals
 

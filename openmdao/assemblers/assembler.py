@@ -32,6 +32,9 @@ class Assembler(object):
     _var_sizes_all : {'input': ndarray[nproc, nvar],
                            'output': ndarray[nproc, nvar]}
         local variable size arrays, num procs x num vars.
+    _var_dist_ranges : {'input': {}, 'output': {}}
+        (start, end, total) tuples of indices into and size of the full
+        distributed variable for each variable local to this proc.
     _var_sizes_by_set : {'input': list of ndarray[nproc, nvar],
                        'output': list of ndarray[nproc, nvar]}
         list of local variable size arrays, num procs x num vars by var_set.
@@ -84,6 +87,7 @@ class Assembler(object):
         self._var_sizes_all = {'input': None, 'output': None}
         self._var_sizes_by_set = {'input': [], 'output': []}
         self._var_offsets_by_set = {'input': [], 'output': []}
+        self._var_dist_ranges = {'input': None, 'output': None}
         self._var_set_IDs = {'input': {}, 'output': {}}
         self._var_set_indices = {'input': None, 'output': None}
 
@@ -207,6 +211,17 @@ class Assembler(object):
                 if offsets.size > 1:
                     offsets[1:] = np.cumsum(sizes.flat)[:-1]
                 self._var_offsets_by_set[typ].append(offsets.reshape(sizes.shape))
+
+            # TODO: not sure if we actually need these for inputs, but go ahead
+            # and do them for now.
+            sizes = self._var_sizes_all[typ]
+            self._var_dist_ranges[typ] = ranges = {}
+            for abs_name in abs_names[typ]:
+                ivar_all = indices[abs_name]
+                start = np.sum(sizes[:iproc, ivar_all])
+                end = start + sizes[iproc, ivar_all]
+                total = np.sum(sizes[:, ivar_all])
+                ranges[abs_name] = (start, end, total)
 
     def _setup_connections(self, connections, prom2abs, abs2data):
         """
