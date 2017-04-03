@@ -59,14 +59,13 @@ class BaseRecorder(object):
 
         # Driver options
         self.options.declare('record_desvars', bool, 'Set to True to record design variables at the driver level',
-                                False)
+                                True)
         self.options.declare('record_responses', bool, 'Set to True to record responses at the driver level',
                              False)
         self.options.declare('record_objectives', bool, 'Set to True to record objectives at the driver level',
                              False)
         self.options.declare('record_constraints', bool, 'Set to True to record constraints at the driver level',
                              False)
-
 
         # Solver options
         self.options.declare('record_abs_error', bool, 'Set to True to record absolute error at the solver level', True)

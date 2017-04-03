@@ -168,7 +168,7 @@ class Solver(object):
             #  just the absolute error and relative error. A second mode would store the full outputs and residuals.
 
             # The full solver residual/output recording and apply_nonlinear/apply_linear recording probably falls last in terms of priority
-            # self.rec_mgr.record_iteration(self)
+            self.rec_mgr.record_iteration(self)
 
 
             self._iter_count += 1
