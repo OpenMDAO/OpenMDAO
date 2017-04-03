@@ -98,7 +98,7 @@ class BacktrackingLineSearch(NonlinearSolver):
                  "as a whole. If this is set to 'wall', only the violating entries are set " +
                  "to the bound, and then the backtracking follows the wall - i.e., the " +
                  "violating entries do not change during the line search.")
-        opt.declare('rho', value=0.5, desc="Backtracking multiplier.")
+        opt.declare('rho', value=0.5, lower=0.0, upper=1.0, desc="Backtracking multiplier.")
         opt.declare('alpha', value=1.0, desc="Initial line search step.")
 
     def _iter_initialize(self):

@@ -31,7 +31,7 @@ The following examples use a Newton solver on a component `ImplCompTwoStates` wi
 (which in this case is the `BacktrackingLineSearch`.):
 
 .. embed-test::
-    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_backtrack_basic
+    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_boundscheck_basic
 
 Bound Enforcement
 -----------------
@@ -41,8 +41,30 @@ All of the backtracking subsolvers include the `bound_enforcement` option in the
 1. Behavior of the the non-bounded variables when the bounded ones are capped.
 2. Direction of the further backtracking.
 
-Options
--------
+There are three difference bounds enforcement schemes available in this option.
+
+With "vector" bounds enforcement, the solution in the output vector is pulled back to a point where none of the
+variables violate any upper or lower bounds. Further backtracking continues along this vector back towards the
+initial point.
+
+.. image:: BT1.jpg
+
+With "scalar" bounds enforcement, only the variables that violate their bounds are pulled back to feasible values; the
+remaining values are kept at the Newton-stepped point. This changes the direction of the backtracking vector so that
+it still moves in the direction of the initial point.
+
+.. image:: BT2.jpg
+
+With "wall" bounds enforcement, only the variables that violate their bounds are pulled back to feasible values; the
+remaining values are kept at the Newton-stepped point. Further backtracking only occurs in the direction of the non-violating
+variables, so that it will move along the wall.
+
+Note: when using the `BoundsCheck` line search, the `scalar` and `wall` methods are exactly the same because no further
+backtracking is performed.
+
+.. image:: BT3.jpg
+
+Here are a few examples of this option:
 
 - bound_enforcement: vector
 
@@ -52,7 +74,7 @@ Options
   computed gradient.
 
 .. embed-test::
-    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_backtrack_vector
+    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_boundscheck_vector
 
 - bound_enforcement: scalar
 
@@ -61,7 +83,7 @@ Options
   are the ones that violate their upper or lower bounds. The backtracking continues along the modified gradient.
 
 .. embed-test::
-    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_backtrack_scalar
+    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_boundscheck_scalar
 
 - bound_enforcement: wall
 
@@ -71,6 +93,36 @@ Options
   direction that follows the boundary of the violated output bounds.
 
 .. embed-test::
-    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_backtrack_wall
+    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_boundscheck_wall
 
-.. tags:: Linesearch
+Control Options
+---------------
+
+- maxiter
+
+  The "maxiter" option is a termination criteria that specifies the maximum number of backtracking steps to allow.
+
+- rtol
+
+  The "rtol" option is a termination criterion used by only the `BacktrackingLineSearch`. It specifies the residual
+  norm (with respect to the residual at the initial point) that is used to terminate backtracking. Note that you
+  probably don't want a very small value here, as backtracking is not capable of solving your whle nonlinear problem; it
+  is meant to get around problem iterations.
+
+- alpha
+
+  The "alpha" option is used to specify the initial length of the Newton step. Since Newton's method assumes a
+  stepsize of 1.0, this value usually shouldn't be changed.
+
+- rho
+
+  The "rho" option controls how far to backtrack in each successive backtracking step. It is applied as a multiplier to
+  the step, so a higher value (approaching 1.0) is a very small step, while a low value takes you close to the initial
+  point. The default value is 0.5.
+
+- c
+
+  In the `ArmijoGoldstein`, the "c" option is a multiplier on the slope check. Setting it to a smaller value means a more
+  gentle slope will satisfy the condition and terminate.
+
+.. tags:: linesearch, backtracking
