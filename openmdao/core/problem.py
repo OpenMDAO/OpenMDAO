@@ -833,7 +833,6 @@ class Problem(object):
                 flat_view = dinputs._views_flat[input_name]
                 start, end, n_in = ranges[input_name]
                 for idx in range(n_in):
-                    loc_idx = idx - start
 
                     # Maybe we don't need to clean up so much at the beginning,
                     # since we clean this every time.
@@ -849,6 +848,7 @@ class Problem(object):
                         model._solve_linear([vecname], mode)
                         continue
 
+                    loc_idx = idx - start
                     flat_view[loc_idx] = 1.0
 
                     # The root system solves here.

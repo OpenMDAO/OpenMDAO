@@ -75,6 +75,7 @@ class TestVarSets(unittest.TestCase):
                                      for i,j in self.p._assembler._var_set_indices['output']])
             assert_rel_error(self, output_novs, expected, 1e-15)
 
+
     def test_solve_linear(self):
         # solve linear, 'fwd' with varsets
         root = self.p.model
