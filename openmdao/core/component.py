@@ -128,6 +128,7 @@ class Component(System):
         super(Component, self)._setupx_varsets(set2iset)
 
         allprocs_set2abs_names = self._varx_allprocs_set2abs_names
+
         set2iset = self._varx_set2iset
 
         # Compute _varx_allprocs_set2abs_names
@@ -151,14 +152,16 @@ class Component(System):
         set_indices = self._varx_set_indices
 
         set2iset = self._varx_set2iset
+        abs2data_io = self._varx_abs2data_io
 
         # Compute _varx_allprocs_idx_range by simply getting the length of the variable list
         for type_ in ['input', 'output']:
             counter = len(self._varx_abs_names[type_])
 
-            allprocs_idx_range[type_] = [0, 0]
-            allprocs_idx_range[type_][0] = global_idx_counter[type_]
-            allprocs_idx_range[type_][1] = global_idx_counter[type_] + counter
+            allprocs_idx_range[type_] = [
+                global_idx_counter[type_],
+                global_idx_counter[type_] + counter,
+            ]
 
         # Compute _varx_allprocs_vst_idx_ranges by first counting the variables for each var_set
         for type_ in ['input', 'output']:
@@ -184,7 +187,7 @@ class Component(System):
             nvar = len(self._varx_abs_names[type_])
             set_indices[type_] = np.zeros((nvar, 2), int)
             for ind, abs_name in enumerate(self._varx_abs_names[type_]):
-                data = self._varx_abs2data_io[abs_name]
+                data = abs2data_io[abs_name]
                 set_name = data['metadata']['var_set']
                 iset = set2iset[type_][set_name]
                 set_indices[type_][ind, 0] = iset
@@ -197,6 +200,9 @@ class Component(System):
         sizes = self._varx_sizes
         set2sizes = self._varx_set2sizes
         set2iset = self._varx_set2iset
+
+        set_indices = self._varx_set_indices
+        allprocs_vst_idx_ranges = self._varx_allprocs_vst_idx_ranges
 
         iproc = self.comm.rank
         nproc = self.comm.size
@@ -216,12 +222,19 @@ class Component(System):
             type_ = data['type']
             set_name = data['metadata']['var_set']
             iset = set2iset[type_][set_name]
-            vst_idx = self._varx_set_indices[type_][my_idx, 1]
-            my_vst_idx = vst_idx - self._varx_allprocs_vst_idx_ranges[type_][iset, 0]
+            vst_idx = set_indices[type_][my_idx, 1]
+            my_vst_idx = vst_idx - allprocs_vst_idx_ranges[type_][iset, 0]
             size = np.prod(data['metadata']['shape'])
 
             sizes[type_][iproc, my_idx] = size
             set2sizes[type_][set_name][iproc, my_vst_idx] = size
+
+        if self.comm.size > 1:
+            for type_ in ['input', 'output']:
+                self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                for set_name in self._varx_set2iset[type_]:
+                    self.comm.Allgather(
+                        set2sizes[type_][set_name][iproc, :], set2sizes[type_][set_name])
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------

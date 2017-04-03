@@ -389,6 +389,9 @@ class Problem(object):
         if check:
             check_config(self, logger)
 
+        for system in model.system_iter(recurse=True, typ=DepComponent):
+            system._first_setup = True
+
         self.setupx()
 
         return self

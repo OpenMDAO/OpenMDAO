@@ -139,13 +139,13 @@ class Group(System):
                 raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta_io)
             else:
                 raw = ({'input': [], 'output': []}, {'input': {}, 'output': {}}, {})
+            gathered = self.comm.allgather(raw)
 
-            allprocs_abs2meta_io = {}
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_] = []
                 allprocs_prom2abs_list[type_] = {}
 
-            for abs_names, prom2abs_list, abs2meta_io in self.comm.allgather(raw):
+            for abs_names, prom2abs_list, abs2meta_io in gathered:
 
                 allprocs_abs2meta_io.update(abs2meta_io)
 
@@ -190,14 +190,14 @@ class Group(System):
                 raw = allprocs_set2abs_names
             else:
                 raw = {
-                    'input': {set_name: [] for set_name in set2iset[type_]},
-                    'output': {set_name: [] for set_name in set2iset[type_]},
-                }
+                    type_: {set_name: [] for set_name in set2iset[type_]}
+                    for type_ in ['input', 'output']}
+            gathered = self.comm.allgather(raw)
 
             for type_ in ['input', 'output']:
                 allprocs_set2abs_names[type_] = {set_name: [] for set_name in set2iset[type_]}
 
-            for set2abs_names in self.comm.allgather(raw):
+            for set2abs_names in gathered:
                 for type_ in ['input', 'output']:
                     for set_name in set2iset[type_]:
                         allprocs_set2abs_names[type_][set_name].extend(
@@ -217,11 +217,11 @@ class Group(System):
 
         # Here, we first count the number of variables (total and by varset) in each subsystem.
         # We do this so that we can compute the offset when we recurse into each subsystem.
-        allprocs_counters = {'input': None, 'output': None}
-        allprocs_vst_counters = {'input': None, 'output': None}
-        for type_ in ['input', 'output']:
-            allprocs_counters[type_] = np.zeros(nsub_allprocs, int)
-            allprocs_vst_counters[type_] = np.zeros((nsub_allprocs, len(set2iset[type_])), int)
+        allprocs_counters = {
+            type_: np.zeros(nsub_allprocs, int) for type_ in ['input', 'output']}
+        allprocs_vst_counters = {
+            type_: np.zeros((nsub_allprocs, len(set2iset[type_])), int)
+            for type_ in ['input', 'output']}
 
         # First compute these on one processor for each subsystem
         for type_ in ['input', 'output']:
@@ -235,12 +235,15 @@ class Group(System):
 
         if self.comm.size > 1:
             raw = (allprocs_counters, allprocs_vst_counters)
+            gathered = self.comm.allgather(raw)
 
-            for type_ in ['input', 'output']:
-                allprocs_counters[type_] = np.zeros(nsub_allprocs, int)
-                allprocs_vst_counters[type_] = np.zeros((nsub_allprocs, len(set2iset[type_])), int)
+            allprocs_counters = {
+                type_: np.zeros(nsub_allprocs, int) for type_ in ['input', 'output']}
+            allprocs_vst_counters = {
+                type_: np.zeros((nsub_allprocs, len(set2iset[type_])), int)
+                for type_ in ['input', 'output']}
 
-            for counters, vst_counters in self.comm.allgather(raw):
+            for counters, vst_counters in gathered:
                 for type_ in ['input', 'output']:
                     allprocs_counters[type_] += counters[type_]
                     allprocs_vst_counters[type_] += vst_counters[type_]
@@ -288,9 +291,8 @@ class Group(System):
                     raw = set_indices[type_]
                 else:
                     raw = np.zeros((0, 2), int)
-
-                set_indices[type_] = np.zeros((len(self._varx_allprocs_abs_names[type_]), 2), int)
-                self.comm.Allgather(raw, set_indices[type_])
+                gathered = self.comm.allgather(raw)
+                set_indices[type_] = np.vstack(gathered)
 
     def _setupx_var_sizes(self):
         super(Group, self)._setupx_var_sizes()
@@ -343,7 +345,8 @@ class Group(System):
                     raw = sizes[type_][iproc1:iproc2, :]
                 else:
                     raw = np.zeros((0, len(self._varx_allprocs_abs_names[type_])), int)
-                self.comm.Allgather(raw, sizes[type_])
+                gathered = self.comm.allgather(raw)
+                sizes[type_] = np.vstack(gathered)
 
                 for set_name in self._varx_set2iset[type_]:
                     if sub_comm.rank == 0:
@@ -351,7 +354,8 @@ class Group(System):
                     else:
                         raw = np.zeros(
                             (0, len(self._varx_allprocs_set2abs_names[type_][set_name])), int)
-                    self.comm.Allgather(raw, set2sizes[type_][set_name])
+                    gathered = self.comm.allgather(raw)
+                    set2sizes[type_][set_name] = np.vstack(gathered)
 
     def _setupx_connections(self):
         super(Group, self)._setupx_connections()
