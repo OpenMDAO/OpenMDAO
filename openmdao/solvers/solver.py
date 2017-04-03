@@ -137,14 +137,14 @@ class Solver(object):
         atol = self.options['atol']
         rtol = self.options['rtol']
 
-        norm0, norm = self._iter_initialize()
         self._iter_count = 0
+        norm0, norm = self._iter_initialize()
         self._mpi_print(self._iter_count, norm, norm / norm0)
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
             self._iter_execute()
-            norm = self._iter_get_norm()
             self._iter_count += 1
+            norm = self._iter_get_norm()
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
@@ -185,6 +185,17 @@ class Solver(object):
         Perform any required linearization operations such as matrix factorization.
         """
         pass
+
+    def _linearize_children(self):
+        """
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.t.
+
+        Returns
+        -------
+        boolean
+            Flag for indicating child linerization
+        """
+        return True
 
     def solve(self):
         """
