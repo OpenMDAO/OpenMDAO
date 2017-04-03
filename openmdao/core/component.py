@@ -19,6 +19,7 @@ from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, PathData
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation
 from openmdao.utils.name_maps import rel_name2abs_name, rel_key2abs_key, abs_key2rel_key
@@ -37,6 +38,9 @@ class Component(System):
     _matrix_free : Bool
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian.
+    _first_setup : bool
+        If True, this is the first time we are setting up, so we should not clear the
+        _var_rel2data_io and _var_rel_names attributes prior to setup.
     _var_rel2data_io : dict
         Dictionary mapping rellative names to dicts with keys (prom, rel, my_idx, type_, metadata).
         This is only needed while adding inputs and outputs. During setup, these are used to
@@ -61,8 +65,168 @@ class Component(System):
 
         self._matrix_free = False
 
+        self._first_setup = True
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
+
+    #
+    #
+    # -------------------------------------------------------------------------------------
+    # Start of reconfigurability changes
+
+    def _setupx_variables(self):
+        super(Component, self)._setupx_variables()
+
+        abs_names = self._varx_abs_names
+        allprocs_abs_names = self._varx_allprocs_abs_names
+        allprocs_prom2abs_list = self._varx_allprocs_prom2abs_list
+        abs2data_io = self._varx_abs2data_io
+        allprocs_abs2meta_io = self._varx_allprocs_abs2meta_io
+
+        # Only necessary to clear the rel_* data structures if we are not on the first setup
+        if self._first_setup:
+            self._first_setup = False
+        else:
+            self._var_rel_names = {'input': [], 'output': []}
+            self._var_rel2data_io = {}
+
+        self.initialize_variables()
+
+        # Compute the prefix for turning rel/prom names into abs names
+        if self.pathname is not '':
+            prefix = self.pathname + '.'
+        else:
+            prefix = ''
+
+        # Compute _varx_abs_names, _varx_allprocs_abs_names, _varx_allprocs_prom2abs_list
+        for type_ in ['input', 'output']:
+            for prom_name in self._var_rel_names[type_]:
+                abs_name = prefix + prom_name
+
+                abs_names[type_].append(abs_name)
+                allprocs_abs_names[type_].append(abs_name)
+                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+
+        meta_names = {
+            'input': ('units', 'shape', 'var_set'),
+            'output': ('units', 'shape', 'var_set', 'ref', 'ref0'),
+        }
+
+        # Compute _varx_abs2data_io and _varx_allprocs_abs2meta_io
+        for prom_name, data in iteritems(self._var_rel2data_io):
+            abs_name = prefix + prom_name
+
+            abs2data_io[abs_name] = data
+
+            meta = data['metadata']
+            allprocs_abs2meta_io[abs_name] = {
+                meta_name: meta[meta_name]
+                for meta_name in meta_names[data['type']]
+            }
+
+    def _setupx_varsets(self, set2iset=None):
+        super(Component, self)._setupx_varsets(set2iset)
+
+        allprocs_set2abs_names = self._varx_allprocs_set2abs_names
+        set2iset = self._varx_set2iset
+
+        # Compute _varx_allprocs_set2abs_names
+        for type_ in ['input', 'output']:
+
+            # Initialize empty lists
+            allprocs_set2abs_names[type_] = {set_name: [] for set_name in set2iset[type_]}
+
+            # Populate the lists
+            for abs_name in self._varx_abs_names[type_]:
+                data = self._varx_abs2data_io[abs_name]
+                set_name = data['metadata']['var_set']
+                allprocs_set2abs_names[type_][set_name].append(abs_name)
+
+    def _setupx_variable_indices(self, global_idx_counter, global_vst_idx_counters):
+        super(Component, self)._setupx_variable_indices(global_idx_counter, global_vst_idx_counters)
+
+        allprocs_idx_range = self._varx_allprocs_idx_range
+        allprocs_vst_idx_ranges = self._varx_allprocs_vst_idx_ranges
+        allprocs_abs2idx_io = self._varx_allprocs_abs2idx_io
+        set_indices = self._varx_set_indices
+
+        set2iset = self._varx_set2iset
+
+        # Compute _varx_allprocs_idx_range by simply getting the length of the variable list
+        for type_ in ['input', 'output']:
+            counter = len(self._varx_abs_names[type_])
+
+            allprocs_idx_range[type_] = [0, 0]
+            allprocs_idx_range[type_][0] = global_idx_counter[type_]
+            allprocs_idx_range[type_][1] = global_idx_counter[type_] + counter
+
+        # Compute _varx_allprocs_vst_idx_ranges by first counting the variables for each var_set
+        for type_ in ['input', 'output']:
+            nset = len(set2iset[type_])
+
+            counters = np.zeros(nset, int)
+            for set_name, abs_names in iteritems(self._varx_allprocs_set2abs_names[type_]):
+                iset = set2iset[type_][set_name]
+                counters[iset] = len(abs_names)
+
+            allprocs_vst_idx_ranges[type_] = np.zeros((nset, 2), int)
+            allprocs_vst_idx_ranges[type_][:, 0] = global_vst_idx_counters[type_]
+            allprocs_vst_idx_ranges[type_][:, 1] = global_vst_idx_counters[type_] + counters
+
+        # Compute _varx_allprocs_abs2idx_io
+        for type_ in ['input', 'output']:
+            for abs_name in self._varx_abs_names[type_]:
+                allprocs_abs2idx_io[abs_name] = global_idx_counter[type_]
+                global_idx_counter[type_] += 1
+
+        # Compute _varx_set_indices
+        for type_ in ['input', 'output']:
+            nvar = len(self._varx_abs_names[type_])
+            set_indices[type_] = np.zeros((nvar, 2), int)
+            for ind, abs_name in enumerate(self._varx_abs_names[type_]):
+                data = self._varx_abs2data_io[abs_name]
+                set_name = data['metadata']['var_set']
+                iset = set2iset[type_][set_name]
+                set_indices[type_][ind, 0] = iset
+                set_indices[type_][ind, 1] = global_vst_idx_counters[type_][iset]
+                global_vst_idx_counters[type_][iset] += 1
+
+    def _setupx_var_sizes(self):
+        super(Component, self)._setupx_var_sizes()
+
+        sizes = self._varx_sizes
+        set2sizes = self._varx_set2sizes
+        set2iset = self._varx_set2iset
+
+        iproc = self.comm.rank
+        nproc = self.comm.size
+
+        # Initialize empty arrays
+        for type_ in ['input', 'output']:
+            sizes[type_] = np.zeros((nproc, len(self._varx_allprocs_abs_names[type_])), int)
+
+            set2sizes[type_] = {}
+            for set_name in self._varx_set2iset[type_]:
+                set2sizes[type_][set_name] = np.zeros(
+                    (nproc, len(self._varx_allprocs_set2abs_names[type_][set_name])), int)
+
+        # Compute _varx_sizes and _varx_set2sizes
+        for abs_name, data in iteritems(self._varx_abs2data_io):
+            my_idx = data['my_idx']
+            type_ = data['type']
+            set_name = data['metadata']['var_set']
+            iset = set2iset[type_][set_name]
+            vst_idx = self._varx_set_indices[type_][my_idx, 1]
+            my_vst_idx = vst_idx - self._varx_allprocs_vst_idx_ranges[type_][iset, 0]
+            size = np.prod(data['metadata']['shape'])
+
+            sizes[type_][iproc, my_idx] = size
+            set2sizes[type_][set_name][iproc, my_vst_idx] = size
+
+    # End of reconfigurability changes
+    # -------------------------------------------------------------------------------------
+    #
+    #
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
                   desc='', var_set=0):
@@ -152,7 +316,6 @@ class Component(System):
                                        'my_idx': len(self._var_rel_names['input']),
                                        'type': 'input', 'metadata': metadata}
         self._var_rel_names['input'].append(name)
-        self._var_allprocs_prom2abs_list['input'][name] = [name]
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
@@ -285,7 +448,6 @@ class Component(System):
                                        'my_idx': len(self._var_rel_names['output']),
                                        'type': 'output', 'metadata': metadata}
         self._var_rel_names['output'].append(name)
-        self._var_allprocs_prom2abs_list['output'][name] = [name]
 
     def approx_partials(self, of, wrt, method='fd', **kwargs):
         """
@@ -593,7 +755,13 @@ class Component(System):
         {'input': [str, ...], 'output': [str, ...]}
             List of absolute names of owned variables existing on current proc.
         """
-        super(Component, self)._setup_variables()
+        if self._first_setup:
+            self._first_setup = False
+        else:
+            self._var_rel_names = {'input': [], 'output': []}
+            self._var_rel2data_io = {}
+
+        self.initialize_variables()
 
         # Now that we know the pathname, create _var_abs_names from _var_rel_names.
         for type_ in ['input', 'output']:

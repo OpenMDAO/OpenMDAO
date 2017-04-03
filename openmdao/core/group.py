@@ -7,6 +7,7 @@ from six.moves import range
 from collections import Iterable, Counter
 
 import numpy as np
+import warnings
 
 from openmdao.core.system import System, PathData
 from openmdao.solvers.nl_runonce import NLRunOnce
@@ -39,6 +40,397 @@ class Group(System):
             self._nl_solver = NLRunOnce()
         if not self._ln_solver:
             self._ln_solver = LNRunOnce()
+
+    #
+    #
+    # -------------------------------------------------------------------------------------
+    # Start of reconfigurability changes
+
+    def initialize_subsystems(self):
+        """
+        Add subsystems to this group.
+        """
+        pass
+
+    def _setupx_processors(self, pathname, comm, proc_range):
+        super(Group, self)._setupx_processors(pathname, comm, proc_range)
+
+        self.initialize_subsystems()
+
+        nsub = len(self._subsystems_allprocs)
+        # If this is a group:
+        if nsub > 0:
+            # Call the load balancing algorithm
+            tmp = self._mpi_proc_allocator(nsub, comm, proc_range)
+            sub_inds, sub_comm, sub_proc_range = tmp
+
+            # Define local subsystems
+            self._subsystems_myproc = [self._subsystems_allprocs[ind]
+                                       for ind in sub_inds]
+            self._subsystems_myproc_inds = sub_inds
+
+            # Perform recursion
+            for subsys in self._subsystems_myproc:
+                if self.pathname is not '':
+                    sub_pathname = '.'.join((self.pathname, subsys.name))
+                else:
+                    sub_pathname = subsys.name
+
+                subsys._setupx_processors(sub_pathname, sub_comm, sub_proc_range)
+
+    def _setupx_variables(self):
+        super(Group, self)._setupx_variables()
+
+        abs_names = self._varx_abs_names
+        allprocs_abs_names = self._varx_allprocs_abs_names
+        allprocs_prom2abs_list = self._varx_allprocs_prom2abs_list
+        abs2data_io = self._varx_abs2data_io
+        allprocs_abs2meta_io = self._varx_allprocs_abs2meta_io
+
+        # Recursion
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_variables()
+
+        # Populate the dicts and lists bottom-up
+        name_offset = len(self.pathname) + 1 if self.pathname else 0
+        for subsys in self._subsystems_myproc:
+            var_maps = subsys._get_maps()
+            for type_ in ['input', 'output']:
+
+                # Assemble _varx_abs_names and _varx_allprocs_abs_names
+                abs_names[type_].extend(subsys._varx_abs_names[type_])
+                allprocs_abs_names[type_].extend(subsys._varx_allprocs_abs_names[type_])
+
+                # Assembler _varx_allprocs_abs2meta_io
+                allprocs_abs2meta_io.update(subsys._varx_allprocs_abs2meta_io)
+
+                my_idx = 0
+                for abs_name in subsys._varx_abs_names[type_]:
+                    sub_data = subsys._varx_abs2data_io[abs_name]
+
+                    # Populate _varx_abs2data_io
+                    prom_name = var_maps[type_][sub_data['prom']]
+                    rel_name = abs_name[name_offset:] if name_offset > 0 else abs_name
+                    abs2data_io[abs_name] = {
+                        'prom': prom_name,
+                        'rel': rel_name,
+                        'my_idx': my_idx,
+                        'type': type_,
+                        'metadata': sub_data['metadata']
+                    }
+                    my_idx += 1
+
+                    # Populate _varx_allprocs_prom2abs_list
+                    if prom_name not in allprocs_prom2abs_list[type_]:
+                        allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+                    else:
+                        allprocs_prom2abs_list[type_][prom_name].append(abs_name)
+
+        for prom_name, abs_list in iteritems(allprocs_prom2abs_list['output']):
+            if len(abs_list) > 1:
+                raise RuntimeError("Output name '%s' refers to "
+                                   "multiple outputs: %s." %
+                                   (prom_name, sorted(abs_list)))
+
+        # If running in parallel, allgather _varx_allprocs_abs_names, _varx_allprocs_prom2abs_list
+        if self.comm.size > 1:
+            sub_comm = self._subsystems_myproc[0].comm
+            if sub_comm.rank == 0:
+                raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta_io)
+            else:
+                raw = ({'input': [], 'output': []}, {'input': {}, 'output': {}}, {})
+
+            allprocs_abs2meta_io = {}
+            for type_ in ['input', 'output']:
+                allprocs_abs_names[type_] = []
+                allprocs_prom2abs_list[type_] = {}
+
+            for abs_names, prom2abs_list, abs2meta_io in self.comm.allgather(raw):
+
+                allprocs_abs2meta_io.update(abs2meta_io)
+
+                for type_ in ['input', 'output']:
+
+                    # _varx_allprocs_abs_names
+                    allprocs_abs_names[type_].extend(abs_names[type_])
+
+                    # _varx_allprocs_prom2abs_list
+                    for prom_name, abs_names_list in iteritems(prom2abs_list[type_]):
+                        if prom_name not in allprocs_prom2abs_list[type_]:
+                            allprocs_prom2abs_list[type_][prom_name] = abs_names_list
+                        else:
+                            allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
+
+    def _setupx_varsets(self, set2iset=None):
+        super(Group, self)._setupx_varsets(set2iset)
+
+        allprocs_set2abs_names = self._varx_allprocs_set2abs_names
+
+        set2iset = self._varx_set2iset
+
+        # Recursion
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_varsets(set2iset)
+
+        # Initialize empty lists
+        for type_ in ['input', 'output']:
+            allprocs_set2abs_names[type_] = {set_name: [] for set_name in set2iset[type_]}
+
+        # First assemble from subsystems
+        for type_ in ['input', 'output']:
+            for subsys in self._subsystems_myproc:
+                for set_name in set2iset[type_]:
+                    allprocs_set2abs_names[type_][set_name].extend(
+                        subsys._varx_allprocs_set2abs_names[type_][set_name])
+
+        # If running in parallel, allgather
+        if self.comm.size > 1:
+            sub_comm = self._subsystems_myproc[0].comm
+            if sub_comm.rank == 0:
+                raw = allprocs_set2abs_names
+            else:
+                raw = {
+                    'input': {set_name: [] for set_name in set2iset[type_]},
+                    'output': {set_name: [] for set_name in set2iset[type_]},
+                }
+
+            for type_ in ['input', 'output']:
+                allprocs_set2abs_names[type_] = {set_name: [] for set_name in set2iset[type_]}
+
+            for set2abs_names in self.comm.allgather(raw):
+                for type_ in ['input', 'output']:
+                    for set_name in set2iset[type_]:
+                        allprocs_set2abs_names[type_][set_name].extend(
+                            set2abs_names[type_][set_name])
+
+    def _setupx_variable_indices(self, global_idx_counter, global_vst_idx_counters):
+        super(Group, self)._setupx_variable_indices(global_idx_counter, global_vst_idx_counters)
+
+        allprocs_idx_range = self._varx_allprocs_idx_range
+        allprocs_vst_idx_ranges = self._varx_allprocs_vst_idx_ranges
+        allprocs_abs2idx_io = self._varx_allprocs_abs2idx_io
+        set_indices = self._varx_set_indices
+
+        iproc = self.comm.rank
+        set2iset = self._varx_set2iset
+        nsub_allprocs = len(self._subsystems_allprocs)
+
+        # Here, we first count the number of variables (total and by varset) in each subsystem.
+        # We do this so that we can compute the offset when we recurse into each subsystem.
+        allprocs_counters = {'input': None, 'output': None}
+        allprocs_vst_counters = {'input': None, 'output': None}
+        for type_ in ['input', 'output']:
+            allprocs_counters[type_] = np.zeros(nsub_allprocs, int)
+            allprocs_vst_counters[type_] = np.zeros((nsub_allprocs, len(set2iset[type_])), int)
+
+        # First compute these on one processor for each subsystem
+        for type_ in ['input', 'output']:
+            for ind, subsys in enumerate(self._subsystems_myproc):
+                isub = self._subsystems_myproc_inds[ind]
+                if subsys.comm.rank == 0:
+                    allprocs_counters[type_][isub] = len(subsys._varx_allprocs_abs_names[type_])
+                    for set_name, iset in iteritems(set2iset[type_]):
+                        allprocs_vst_counters[type_][isub, iset] = \
+                            len(subsys._varx_allprocs_set2abs_names[type_][set_name])
+
+        if self.comm.size > 1:
+            raw = (allprocs_counters, allprocs_vst_counters)
+
+            for type_ in ['input', 'output']:
+                allprocs_counters[type_] = np.zeros(nsub_allprocs, int)
+                allprocs_vst_counters[type_] = np.zeros((nsub_allprocs, len(set2iset[type_])), int)
+
+            for counters, vst_counters in self.comm.allgather(raw):
+                for type_ in ['input', 'output']:
+                    allprocs_counters[type_] += counters[type_]
+                    allprocs_vst_counters[type_] += vst_counters[type_]
+
+        # Recursion
+        sub_global_idx_counter = {'input': 0, 'output': 0}
+        sub_global_vst_idx_counter = {'input': None, 'output': None}
+        for ind, subsys in enumerate(self._subsystems_myproc):
+            isub = self._subsystems_myproc_inds[ind]
+            for type_ in ['input', 'output']:
+                sub_global_idx_counter[type_] = global_idx_counter[type_] \
+                    + np.sum(allprocs_counters[type_][:isub])
+                sub_global_vst_idx_counter[type_] = global_vst_idx_counters[type_] \
+                    + np.sum(allprocs_vst_counters[type_][:isub, :], axis=0)
+
+            subsys._setupx_variable_indices(sub_global_idx_counter, sub_global_vst_idx_counter)
+
+        # Compute _varx_allprocs_idx_range and _varx_allprocs_vst_idx_ranges
+        for type_ in ['input', 'output']:
+            allprocs_idx_range[type_] = [0, 0]
+            allprocs_idx_range[type_][0] = global_idx_counter[type_]
+            allprocs_idx_range[type_][1] = global_idx_counter[type_] \
+                + np.sum(allprocs_counters[type_])
+
+            allprocs_vst_idx_ranges[type_] = np.zeros((len(set2iset[type_]), 2), int)
+            allprocs_vst_idx_ranges[type_][:, 0] = global_vst_idx_counters[type_]
+            allprocs_vst_idx_ranges[type_][:, 1] = global_vst_idx_counters[type_] \
+                + np.sum(allprocs_vst_counters[type_], axis=0)
+
+        # Compute _varx_allprocs_abs2idx_io
+        for type_ in ['input', 'output']:
+            for ind, abs_name in enumerate(self._varx_allprocs_abs_names[type_]):
+                allprocs_abs2idx_io[abs_name] = global_idx_counter[type_] + ind
+
+        # Compute _varx_set_indices
+        for type_ in ['input', 'output']:
+            set_indices[type_] = np.vstack([
+                subsys._varx_set_indices[type_] for subsys in self._subsystems_myproc
+            ])
+
+            # Allgather
+            if self.comm.size > 1:
+                sub_comm = self._subsystems_myproc[0].comm
+                if sub_comm.rank == 0:
+                    raw = set_indices[type_]
+                else:
+                    raw = np.zeros((0, 2), int)
+
+                set_indices[type_] = np.zeros((len(self._varx_allprocs_abs_names[type_]), 2), int)
+                self.comm.Allgather(raw, set_indices[type_])
+
+    def _setupx_var_sizes(self):
+        super(Group, self)._setupx_var_sizes()
+
+        sizes = self._varx_sizes
+        set2sizes = self._varx_set2sizes
+
+        iproc = self.comm.rank
+        nproc = self.comm.size
+
+        # Recursion
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_var_sizes()
+
+        # Compute _varx_sizes
+        for type_ in ['input', 'output']:
+            iproc1, iproc2 = self._mpi_proc_range
+            ivar1, ivar2 = self._varx_allprocs_idx_range[type_]
+
+            sizes[type_] = np.zeros((nproc, len(self._varx_allprocs_abs_names[type_])), int)
+            for set_name in self._varx_set2iset[type_]:
+                set2sizes[type_][set_name] = np.zeros(
+                    (nproc, len(self._varx_allprocs_set2abs_names[type_][set_name])), int)
+
+            for subsys in self._subsystems_myproc:
+                sub_iproc1, sub_iproc2 = subsys._mpi_proc_range
+                sub_ivar1, sub_ivar2 = subsys._varx_allprocs_idx_range[type_]
+
+                proc_slice = slice(sub_iproc1 - iproc1, sub_iproc2 - iproc1)
+                var_slice = slice(sub_ivar1 - ivar1, sub_ivar2 - ivar1)
+                sizes[type_][proc_slice, var_slice] = subsys._varx_sizes[type_]
+
+                for set_name in self._varx_set2iset[type_]:
+                    iset = self._varx_set2iset[type_][set_name]
+
+                    isvar1, isvar2 = self._varx_allprocs_vst_idx_ranges[type_][iset, :]
+                    sub_isvar1, sub_isvar2 = subsys._varx_allprocs_vst_idx_ranges[type_][iset, :]
+
+                    proc_slice = slice(sub_iproc1 - iproc1, sub_iproc2 - iproc1)
+                    var_slice = slice(sub_isvar1 - isvar1, sub_isvar2 - isvar1)
+                    set2sizes[type_][set_name][proc_slice, var_slice] = \
+                        subsys._varx_set2sizes[type_][set_name]
+
+        if self.comm.size > 1:
+            iproc1, iproc2 = self._mpi_proc_range
+
+            sub_comm = self._subsystems_myproc[0].comm
+            for type_ in ['input', 'output']:
+                if sub_comm.rank == 0:
+                    raw = sizes[type_][iproc1:iproc2, :]
+                else:
+                    raw = np.zeros((0, len(self._varx_allprocs_abs_names[type_])), int)
+                self.comm.Allgather(raw, sizes[type_])
+
+                for set_name in self._varx_set2iset[type_]:
+                    if sub_comm.rank == 0:
+                        raw = set2sizes[type_][set_name][iproc1:iproc2, :]
+                    else:
+                        raw = np.zeros(
+                            (0, len(self._varx_allprocs_set2abs_names[type_][set_name])), int)
+                    self.comm.Allgather(raw, set2sizes[type_][set_name])
+
+    def _setupx_connections(self):
+        super(Group, self)._setupx_connections()
+
+        input2src_abs = self._conn_input2src_abs
+
+        allprocs_prom2abs_list_in = self._varx_allprocs_prom2abs_list['input']
+        allprocs_prom2abs_list_out = self._varx_allprocs_prom2abs_list['output']
+
+        # Add implicit connections
+        for prom_name in allprocs_prom2abs_list_out:
+            if prom_name in allprocs_prom2abs_list_in:
+                abs_out = allprocs_prom2abs_list_out[prom_name][0]
+                for abs_in in allprocs_prom2abs_list_in[prom_name]:
+                    input2src_abs[abs_in] = abs_out
+
+        # Add explicit connections
+        for prom_in, (prom_out, src_indices) in iteritems(self._manual_connections):
+
+            # throw an exception if either output or input doesn't exist
+            # (not traceable to a connect statement, so provide context)
+            if prom_out not in allprocs_prom2abs_list_out:
+                raise NameError(
+                    "Output '%s' does not exist for connection in '%s' from '%s' to '%s'." %
+                    (prom_out, self.pathname, prom_out, prom_in))
+
+            if prom_in not in allprocs_prom2abs_list_in:
+                raise NameError(
+                    "Input '%s' does not exist for connection in '%s' from '%s' to '%s'." %
+                    (prom_in, self.pathname, prom_out, prom_in))
+
+            abs_out = allprocs_prom2abs_list_out[prom_out][0]
+            out_subsys = abs_out.rsplit('.', 1)[0]
+            for abs_in in allprocs_prom2abs_list_in[prom_in]:
+
+                # throw an exception if output and input are in the same system
+                # (not traceable to a connect statement, so provide context)
+                in_subsys = abs_in.rsplit('.', 1)[0]
+                if out_subsys == in_subsys:
+                    raise RuntimeError("Output and input are in the same System " +
+                                       "for connection in '%s' from '%s' to '%s'." %
+                                       (self.pathname, prom_out, prom_in))
+
+                if src_indices is not None:
+                    meta = self._varx_abs2data_io[abs_in]['metadata']
+                    if meta['src_indices'] is not None:
+                        raise RuntimeError("%s: src_indices has been defined "
+                                           "in both connect('%s', '%s') "
+                                           "and add_input('%s', ...)." %
+                                           (self.pathname, prom_out,
+                                            prom_in, prom_in))
+                    meta['src_indices'] = np.atleast_1d(src_indices)
+
+                input2src_abs[abs_in] = abs_out
+
+        # Now that both implicit & explicit connections have been added, check unit compatibility
+        for abs_in, abs_out in iteritems(input2src_abs):
+            out_units = self._varx_allprocs_abs2meta_io[abs_out]['units']
+            in_units = self._varx_allprocs_abs2meta_io[abs_in]['units']
+
+            if out_units:
+                if not in_units:
+                    warnings.warn("Output '%s' with units of '%s' is "
+                                  "connected to input '%s' which has no"
+                                  " units." % (abs_out, out_units, abs_in))
+                elif not is_compatible(in_units, out_units):
+                    raise RuntimeError("Output units of '%s' for '%s' are"
+                                       " incompatible with input units of "
+                                       "'%s' for '%s'." %
+                                       (out_units, abs_out, in_units, abs_in))
+            elif in_units is not None:
+                warnings.warn("Input '%s' with units of '%s' is "
+                              "connected to output '%s' which has "
+                              "no units." % (abs_in, in_units, abs_out))
+
+    # End of reconfigurability changes
+    # -------------------------------------------------------------------------------------
+    #
+    #
 
     def add(self, name, subsys, promotes=None):
         """
@@ -300,8 +692,6 @@ class Group(System):
         {'input': [str, ...], 'output': [str, ...]}
             List of absolute names of owned variables existing on current proc.
         """
-        super(Group, self)._setup_variables()
-
         self._var_abs2data_io = {}
         for type_ in ['input', 'output']:
             self._var_abs_names[type_] = []

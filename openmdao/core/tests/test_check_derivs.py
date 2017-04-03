@@ -195,7 +195,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # Make sure we only FD this twice.
         comp = model.get_subsystem('units')
-        self.assertEqual(comp.run_count, 3)
+        self.assertEqual(comp.run_count, 5)
 
     def test_scalar_val(self):
         class PassThrough(ExplicitComponent):

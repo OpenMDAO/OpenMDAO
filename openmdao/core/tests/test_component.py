@@ -93,6 +93,7 @@ class TestExplicitComponent(unittest.TestCase):
         class MyComp(NewBase):
             def __init__(self, **kwargs):
                 super(MyComp, self).__init__(**kwargs)
+            def initialize_variables(self):
                 self.add_input('x', val=0.0)
                 self.add_output('y', val=0.0)
 

@@ -244,6 +244,61 @@ class Problem(object):
 
         return self.run_driver()
 
+    def setupx(self, vector_class=DefaultVector, mode='auto'):
+        """
+        Set up everything (model, assembler, vector, solvers, drivers).
+
+        Parameters
+        ----------
+        vector_class : type
+            reference to an actual <Vector> class; not an instance.
+        mode : string
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint). Default is 'auto', which lets OpenMDAO choose
+            the best mode for your problem.
+
+        Returns
+        -------
+        self : <Problem>
+            this enables the user to instantiate and setup in one line.
+        """
+        model = self.model
+        comm = self.comm
+
+        if mode not in ['fwd', 'rev', 'auto']:
+            msg = "Unsupported mode: '%s'" % mode
+            raise ValueError(msg)
+
+        if mode == 'auto':
+            mode = 'rev'
+        self._mode = mode
+
+        model._setupx(comm)
+
+        def equal_arrays(a, b, re=1e-8):
+            return np.linalg.norm(a - b) < re
+
+        assert model._var_abs2data_io.keys() == model._varx_abs2data_io.keys()
+        assert model._assembler._var_allprocs_abs2idx_io == model._varx_allprocs_abs2idx_io
+        assert model._var_allprocs_idx_range == model._varx_allprocs_idx_range
+        for type_ in ['input', 'output']:
+            assert model._var_abs_names[type_] == model._varx_abs_names[type_]
+            assert model._assembler._var_allprocs_abs_names[type_] \
+                == model._varx_allprocs_abs_names[type_]
+            assert equal_arrays(
+                model._assembler._variable_set_indices[type_],
+                model._varx_set_indices[type_])
+            assert equal_arrays(
+                model._assembler._variable_sizes_all[type_],
+                model._varx_sizes[type_])
+            for set_name in model._varx_set2iset[type_]:
+                iset = model._varx_set2iset[type_][set_name]
+                assert equal_arrays(
+                    model._assembler._variable_sizes[type_][iset],
+                    model._varx_set2sizes[type_][set_name])
+
+        return self
+
     def setup(self, vector_class=DefaultVector, check=True, logger=None,
               mode='auto'):
         """
@@ -333,6 +388,8 @@ class Problem(object):
 
         if check:
             check_config(self, logger)
+
+        self.setupx()
 
         return self
 
@@ -448,7 +505,6 @@ class Problem(object):
 
         # Analytic Jacobians
         for mode in ('fwd', 'rev'):
-            self.setup(mode=mode, check=False)
             model.suppress_solver_output = True
             model._inputs.set_vec(input_cache)
             model._outputs.set_vec(output_cache)
@@ -597,7 +653,6 @@ class Problem(object):
                     if explicit:
                         comp._negate_jac()
 
-        self.setup(mode=current_mode)
         model._inputs.set_vec(input_cache)
         model._outputs.set_vec(output_cache)
         model.run_apply_nonlinear()

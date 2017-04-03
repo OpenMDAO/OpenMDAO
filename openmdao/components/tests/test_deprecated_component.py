@@ -187,17 +187,21 @@ class SimpleImplicitCompApply(SimpleImplicitComp):
 class DepCompTestCase(unittest.TestCase):
 
     def test_simple_explicit(self):
-        prob = Problem(Group())
+        def get_prob():
+            prob = Problem(Group())
 
-        prob.model.add_subsystem('px', IndepVarComp('x', 1.0))
-        prob.model.add_subsystem('py', IndepVarComp('y', 1.0))
-        prob.model.add_subsystem('comp', Paraboloid())
+            prob.model.add_subsystem('px', IndepVarComp('x', 1.0))
+            prob.model.add_subsystem('py', IndepVarComp('y', 1.0))
+            prob.model.add_subsystem('comp', Paraboloid())
 
-        prob.model.connect('px.x', 'comp.x')
-        prob.model.connect('py.y', 'comp.y')
-        prob.model.ln_solver = ScipyGMRES()
-        prob.model.suppress_solver_output = True
+            prob.model.connect('px.x', 'comp.x')
+            prob.model.connect('py.y', 'comp.y')
+            prob.model.ln_solver = ScipyGMRES()
+            prob.model.suppress_solver_output = True
 
+            return prob
+
+        prob = get_prob()
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
@@ -207,6 +211,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'px.x')][0][0], -3.0, 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
+        prob = get_prob()
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
@@ -229,17 +234,21 @@ class DepCompTestCase(unittest.TestCase):
                 assert_rel_error(self, val2['rel error'][2], 0.0, 1e-5)
 
     def test_simple_explicit_apply(self):
-        prob = Problem(Group())
+        def get_prob():
+            prob = Problem(Group())
 
-        prob.model.add_subsystem('px', IndepVarComp('x', 1.0))
-        prob.model.add_subsystem('py', IndepVarComp('y', 1.0))
-        prob.model.add_subsystem('comp', ParaboloidApply())
+            prob.model.add_subsystem('px', IndepVarComp('x', 1.0))
+            prob.model.add_subsystem('py', IndepVarComp('y', 1.0))
+            prob.model.add_subsystem('comp', ParaboloidApply())
 
-        prob.model.connect('px.x', 'comp.x')
-        prob.model.connect('py.y', 'comp.y')
-        prob.model.ln_solver = ScipyGMRES()
-        prob.model.suppress_solver_output = True
+            prob.model.connect('px.x', 'comp.x')
+            prob.model.connect('py.y', 'comp.y')
+            prob.model.ln_solver = ScipyGMRES()
+            prob.model.suppress_solver_output = True
 
+            return prob
+
+        prob = get_prob()
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
@@ -249,6 +258,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'px.x')][0][0], -3.0, 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
+        prob = get_prob()
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
@@ -271,17 +281,20 @@ class DepCompTestCase(unittest.TestCase):
                 assert_rel_error(self, val2['rel error'][2], 0.0, 1e-5)
 
     def test_simple_implicit(self):
+        def get_prob():
+            prob = Problem(Group())
+            prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
+            prob.model.add_subsystem('comp', SimpleImplicitComp())
 
-        prob = Problem(Group())
-        prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
-        prob.model.add_subsystem('comp', SimpleImplicitComp())
+            prob.model.ln_solver = ScipyGMRES()
+            prob.model.nl_solver = NewtonSolver()
+            prob.model.suppress_solver_output = True
 
-        prob.model.ln_solver = ScipyGMRES()
-        prob.model.nl_solver = NewtonSolver()
-        prob.model.suppress_solver_output = True
+            prob.model.connect('p1.x', 'comp.x')
 
-        prob.model.connect('p1.x', 'comp.x')
+            return prob
 
+        prob = get_prob()
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
@@ -292,6 +305,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
+        prob = get_prob()
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
@@ -317,18 +331,21 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, data['comp'][('z', 'z')]['J_fwd'][0][0], 1.5, 1e-6)
 
     def test_simple_implicit_self_solve(self):
+        def get_prob():
+            prob = Problem(Group())
+            prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
+            comp = prob.model.add_subsystem('comp', SimpleImplicitComp())
+            comp.self_solve = True
 
-        prob = Problem(Group())
-        prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
-        comp = prob.model.add_subsystem('comp', SimpleImplicitComp())
-        comp.self_solve = True
+            prob.model.ln_solver = ScipyGMRES()
+            prob.model.nl_solver = NLRunOnce()
+            prob.model.suppress_solver_output = True
 
-        prob.model.ln_solver = ScipyGMRES()
-        prob.model.nl_solver = NLRunOnce()
-        prob.model.suppress_solver_output = True
+            prob.model.connect('p1.x', 'comp.x')
 
-        prob.model.connect('p1.x', 'comp.x')
+            return prob
 
+        prob = get_prob()
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
@@ -339,6 +356,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
+        prob = get_prob()
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
@@ -364,18 +382,21 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, data['comp'][('z', 'z')]['J_fwd'][0][0], 1.5, 1e-6)
 
     def test_simple_implicit_resid(self):
+        def get_prob():
+            prob = Problem()
+            prob.model = Group()
+            prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
+            prob.model.add_subsystem('comp', SimpleImplicitComp(resid_scaler=0.001))
 
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
-        prob.model.add_subsystem('comp', SimpleImplicitComp(resid_scaler=0.001))
+            prob.model.ln_solver = ScipyGMRES()
+            prob.model.nl_solver = NewtonSolver()
+            prob.model.suppress_solver_output = True
 
-        prob.model.ln_solver = ScipyGMRES()
-        prob.model.nl_solver = NewtonSolver()
-        prob.model.suppress_solver_output = True
+            prob.model.connect('p1.x', 'comp.x')
 
-        prob.model.connect('p1.x', 'comp.x')
+            return prob
 
+        prob = get_prob()
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
@@ -386,6 +407,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
+        prob = get_prob()
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
@@ -411,17 +433,20 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, data['comp'][('z', 'z')]['J_fwd'][0][0], 1.50, 1e-6)
 
     def test_simple_implicit_apply(self):
+        def get_prob():
+            prob = Problem(Group())
+            prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
+            prob.model.add_subsystem('comp', SimpleImplicitCompApply())
 
-        prob = Problem(Group())
-        prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
-        prob.model.add_subsystem('comp', SimpleImplicitCompApply())
+            prob.model.ln_solver = ScipyGMRES()
+            prob.model.nl_solver = NewtonSolver()
+            prob.model.suppress_solver_output = True
 
-        prob.model.ln_solver = ScipyGMRES()
-        prob.model.nl_solver = NewtonSolver()
-        prob.model.suppress_solver_output = True
+            prob.model.connect('p1.x', 'comp.x')
 
-        prob.model.connect('p1.x', 'comp.x')
+            return prob
 
+        prob = get_prob()
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
@@ -432,6 +457,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
+        prob = get_prob()
         prob.setup(check=False, mode='rev')
         prob.run_model()
 

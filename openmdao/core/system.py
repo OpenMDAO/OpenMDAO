@@ -14,9 +14,9 @@ import numpy as np
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
-from openmdao.utils.class_util import overrides_method
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.units import convert_units
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
 
@@ -63,22 +63,6 @@ class System(object):
     _subsystems_myproc_inds : [int, ...]
         list of indices of subsystems on this proc among all of this system's
         subsystems (subsystems on all of this system's processors).
-    _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
-        list of pathnames of all owned variables, not just on current proc.
-    _var_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
-        index range of owned variables with respect to all problem variables.
-    _var_allprocs_indices : {'input': dict, 'output': dict}
-        dictionary of global indices keyed by the variable name.
-    _var_myproc_names : {'input': [str, ...], 'output': [str, ...]}
-        list of unpromoted names of owned variables on current proc.
-    _var_myproc_metadata : {'input': list, 'output': list}
-        list of metadata dictionaries of variables that exist on this proc.
-    _var_pathdict : dict
-        maps full variable pathname to local name, index and I/O type
-    _var_name2path : dict
-        maps local var name to full pathname.
-    _var_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
-        integer arrays of global indices of variables on this proc.
     _var_maps : {'input': dict, 'output': dict}
         dictionary of variable names and their promoted names.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
@@ -213,6 +197,87 @@ class System(object):
         self._design_vars = {}
         self._responses = {}
 
+    #
+    #
+    # -------------------------------------------------------------------------------------
+    # Start of reconfigurability changes
+
+    def _setupx(self, comm):
+        self._setupx_processors('', comm, [0, comm.size])
+        self._setupx_variables()
+        self._setupx_varsets()
+        self._setupx_variable_indices(
+            {type_: 0 for type_ in ['input', 'output']},
+            {type_: np.zeros(len(self._varx_set2iset[type_]), int)
+                for type_ in ['input', 'output']}
+        )
+        self._setupx_var_sizes()
+        self._setupx_connections()
+
+    def _setupx_processors(self, pathname, comm, proc_range):
+        self.pathname = pathname
+        self.comm = comm
+        self._mpi_proc_range = proc_range
+
+    def _setupx_variables(self):
+        self._varx_abs_names = {'input': [], 'output': []}
+        self._varx_allprocs_abs_names = {'input': [], 'output': []}
+        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._varx_abs2data_io = {}
+        self._varx_allprocs_abs2meta_io = {}
+
+    def _setupx_varsets(self, set2iset=None):
+        self._varx_allprocs_set2abs_names = {'input': {}, 'output': {}}
+
+        if set2iset is not None:
+            self._varx_set2iset = set2iset
+        else:
+            self._varx_set2iset = set2iset = {'input': {}, 'output': {}}
+
+            for type_ in ['input', 'output']:
+
+                # Compute set_names, first as a list of set names for variables on myproc
+                set_names = []
+                for abs_name in self._varx_abs_names[type_]:
+                    set_names.append(self._varx_abs2data_io[abs_name]['metadata']['var_set'])
+
+                # Make set_names unique
+                set_names = list(set(set_names))
+
+                # If we're running in parallel, allgather set_names from all procs.
+                # Overlap between contributions from different procs is OK because idx is unique
+                if self.comm.size > 1:
+                    raw = set_names
+
+                    set_names = []
+                    for local_set_names in self.comm.allgather(raw):
+                        set_names.extend(local_set_names)
+
+                    # Make set_names unique
+                    set_names = list(set(set_names))
+
+                # Compute _varx_set2iset
+                for iset, set_name in enumerate(set_names):
+                    set2iset[type_][set_name] = iset
+
+    def _setupx_variable_indices(self, global_idx_counter, global_vst_idx_counters):
+        self._varx_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
+        self._varx_allprocs_vst_idx_ranges = {'input': None, 'output': None}
+        self._varx_allprocs_abs2idx_io = {}
+        self._varx_set_indices = {'input': None, 'output': None}
+
+    def _setupx_var_sizes(self):
+        self._varx_sizes = {'input': None, 'output': None}
+        self._varx_set2sizes = {'input': {}, 'output': {}}
+
+    def _setupx_connections(self):
+        self._conn_input2src_abs = {}
+
+    # End of reconfigurability changes
+    # -------------------------------------------------------------------------------------
+    #
+    #
+
     def _setup_processors(self, path, comm, global_dict,
                           assembler, proc_range):
         """
@@ -269,43 +334,6 @@ class System(object):
                 subsys._setup_processors(self.pathname, sub_comm,
                                          sub_global_dict, assembler,
                                          sub_proc_range)
-
-    def _setup_variables(self, recurse=True):
-        """
-        Assemble variable metadata and names lists.
-
-        Sets the following attributes:
-            _var_abs2data_io
-            _var_abs_names
-            _var_allprocs_prom2abs_list
-
-        Parameters
-        ----------
-        recurse : boolean
-            recursion is not performed if traversing up the tree after reconf.
-        """
-        # Perform recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_variables()
-
-        if overrides_method('initialize_variables', self, System):
-            # TODO: we may want to provide a way for component devs to tell
-            # the framework that they don't need to re-configure, since the
-            # majority of components won't need to be configured more than once
-
-            # Empty the lists in case this is part of a reconfiguration
-            self._var_abs2data_io = {}
-            for type_ in ['input', 'output']:
-                self._var_abs_names[type_] = []
-
-                # Only Components have this:
-                try:
-                    self._var_rel_names[type_] = []
-                except AttributeError:
-                    pass
-
-            self.initialize_variables()
 
     def _setup_variable_indices(self, global_index, recurse=True):
         """

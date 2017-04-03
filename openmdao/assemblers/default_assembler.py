@@ -46,16 +46,24 @@ class DefaultAssembler(Assembler):
         in_set_indices = self._variable_set_indices['input']
         out_set_indices = self._variable_set_indices['output']
 
+        # Input and output variable allproc index ranges
         in_ind1, in_ind2 = var_range['input']
         out_ind1, out_ind2 = var_range['output']
+
+        # Subsystem index for each allproc input and output
         in_isub_var = -np.ones(in_ind2 - in_ind1, int)
         out_isub_var = -np.ones(out_ind2 - out_ind1, int)
+
+        # Loop over local subsystems to populate in_isub_var, out_isub_var
         for ind, subsys in enumerate(subsystems_myproc):
             isub = subsystems_inds[ind]
 
+            # Input and output variable allproc index ranges for subsystem
             sub_var_range = subsys._var_allprocs_idx_range
             sub_in_ind1, sub_in_ind2 = sub_var_range['input']
             sub_out_ind1, sub_out_ind2 = sub_var_range['output']
+
+            # For each allproc var, determine which subsystem it belongs to
             for in_ind in range(in_ind1, in_ind2):
                 if sub_in_ind1 <= in_ind < sub_in_ind2:
                     in_isub_var[in_ind - in_ind1] = isub
@@ -63,6 +71,7 @@ class DefaultAssembler(Assembler):
                 if sub_out_ind1 <= out_ind < sub_out_ind2:
                     out_isub_var[out_ind - out_ind1] = isub
 
+        # Simply initialize empty dictionaries
         xfer_in_inds = {}
         xfer_out_inds = {}
         fwd_xfer_in_inds = [{} for sub_ind in range(nsub_allprocs)]
@@ -79,36 +88,66 @@ class DefaultAssembler(Assembler):
                     rev_xfer_in_inds[sub_ind][iset, jset] = []
                     rev_xfer_out_inds[sub_ind][iset, jset] = []
 
+        # Input and output variable allproc index ranges
         in_ind1, in_ind2 = var_range['input']
         out_ind1, out_ind2 = var_range['output']
+
+        # Loop over allprocs inputs
         for in_ind in range(in_ind1, in_ind2):
+            # For each input, get the input and source output names (abs names)
             iabs = self._var_allprocs_abs_names['input'][in_ind]
             oabs = self._abs_input2src[iabs]
+
+            # This means hanging input
             if oabs is None:
                 continue
 
+            # Get the global index of the source output
             out_ind = self._var_allprocs_abs2idx_io[oabs]
+
+            # Only continue if the source output is owned by the current system
             if out_ind1 <= out_ind < out_ind2:
 
+                # Get the subsystem owning the input and source output
                 in_isub = in_isub_var[in_ind - in_ind1]
                 out_isub = out_isub_var[out_ind - out_ind1]
 
+                # Only continue if the input and output are in different subsystems
                 if in_isub != -1 and in_isub != out_isub:
+
+                    # Get varset info
                     in_iset, in_ivar_set = in_set_indices[in_ind, :]
                     out_iset, out_ivar_set = out_set_indices[out_ind, :]
 
+                    # Get the sizes array for the correct varset
                     in_sizes = self._variable_sizes['input'][in_iset]
                     out_sizes = self._variable_sizes['output'][out_iset]
 
+                    # Get the src_indices for the input
                     ind1, ind2 = self._src_indices_range[in_ivar_set, :]
                     inds = self._src_indices[ind1:ind2]
 
+                    # We need to figure out the indices of the src output
                     output_inds = np.zeros(inds.shape[0], int)
+
+                    # Loop over all procs because the src can come from any or all procs
                     ind1, ind2 = 0, 0
                     for iproc in range(self._comm.size):
+                        # ind1 = np.sum(out_sizes[:iproc, out_ivar_set])
+                        # ind2 = np.sum(out_sizes[:iproc+1, out_ivar_set])
                         ind2 += out_sizes[iproc, out_ivar_set]
 
+                        # The part of src on iproc
                         on_iproc = np.logical_and(ind1 <= inds, inds < ind2)
+
+                        # This converts from iproc-then-ivar to ivar-then-iproc ordering
+                        # Subtract off part of previous procs
+                        # Then add all variables on previous procs
+                        # Then all previous variables on this proc
+                        # - np.sum(out_sizes[:iproc, out_ivar_set])
+                        # + np.sum(out_sizes[:iproc, :])
+                        # + np.sum(out_sizes[iproc, :out_ivar_set])
+                        # + inds
                         offset = -ind1
                         offset += np.sum(out_sizes[:iproc, :])
                         offset += np.sum(out_sizes[iproc, :out_ivar_set])
@@ -116,8 +155,8 @@ class DefaultAssembler(Assembler):
 
                         ind1 += out_sizes[iproc, out_ivar_set]
 
+                    # Now compute input indices in ivar-then-iproc ordering as before
                     iproc = self._comm.rank
-
                     ind1 = ind2 = np.sum(in_sizes[:iproc, :])
                     ind1 += np.sum(in_sizes[iproc, :in_ivar_set])
                     ind2 += np.sum(in_sizes[iproc, :in_ivar_set + 1])
