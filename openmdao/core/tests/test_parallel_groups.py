@@ -26,7 +26,7 @@ class TestParallelGroups(unittest.TestCase):
     def test_fan_out_grouped(self):
         prob = Problem(FanOutGrouped())
 
-        import wingdbstub
+        #import wingdbstub
         prob.setup(vector_class=PETScVector, check=False, mode='fwd')
         prob.model.suppress_solver_output = True
         prob.run_model()
@@ -35,6 +35,8 @@ class TestParallelGroups(unittest.TestCase):
         dump_dist_idxs(prob)
 
         J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
+        
+        print(J)
 
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)

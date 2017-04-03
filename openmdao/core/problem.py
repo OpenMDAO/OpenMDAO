@@ -766,10 +766,8 @@ class Problem(object):
 
         # Create data structures (and possibly allocate space) for the total
         # derivatives that we will return.
+        totals = OrderedDict()
         if return_format == 'flat_dict':
-
-            totals = OrderedDict()
-
             for okeys in of:
                 for okey in okeys:
                     for ikeys in wrt:
@@ -777,16 +775,12 @@ class Problem(object):
                             totals[(okey, ikey)] = None
 
         elif return_format == 'dict':
-
-            totals = OrderedDict()
-
             for okeys in of:
                 for okey in okeys:
                     totals[okey] = OrderedDict()
                     for ikeys in wrt:
                         for ikey in ikeys:
                             totals[okey][ikey] = None
-
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
@@ -831,8 +825,9 @@ class Problem(object):
         for icount, input_names in enumerate(input_list):
             for iname_count, input_name in enumerate(input_names):
                 flat_view = dinputs._views_flat[input_name]
-                start, end, n_in = ranges[input_name]
-                for idx in range(n_in):
+                start, end, total_size = ranges[input_name]
+                #for idx in range(total_size):
+                for idx in range(total_size):
 
                     # Maybe we don't need to clean up so much at the beginning,
                     # since we clean this every time.
@@ -844,15 +839,15 @@ class Problem(object):
                     # TODO: currently we're looping over the full distributed
                     # variable even if the variable belongs to a non-distributed
                     # component that is duplicated in multiple procs.
-                    if idx < start or idx >= end:
+                    loc_idx = idx - start
+                    if start <= idx < end:
+                        flat_view[loc_idx] = 1.0
+
+                        # The root system solves here.
+                        model._solve_linear([vecname], mode)
+                    else:
                         model._solve_linear([vecname], mode)
                         continue
-
-                    loc_idx = idx - start
-                    flat_view[loc_idx] = 1.0
-
-                    # The root system solves here.
-                    model._solve_linear([vecname], mode)
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_names in enumerate(output_list):
@@ -897,6 +892,8 @@ class Problem(object):
                                     if totals[okey][ikey] is None:
                                         totals[okey][ikey] = np.empty((end - start, len_val))
                                     totals[okey][ikey][loc_idx, :] = deriv_val
+                            else:
+                                raise RuntimeError("unsupported return format")
 
         return totals
 

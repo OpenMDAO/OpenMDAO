@@ -357,6 +357,9 @@ class System(object):
             # vectors['residual']._ivar_map = vectors['output']._ivar_map
 
         # Compute the transfer for this vector set
+        # if vec_name == 'linear':
+        #     self._vector_transfers[vec_name] = self._vector_transfers['nonlinear']
+        # else:
         self._vector_transfers[vec_name] = self._get_transfers(vectors)
 
         # Assign relevant variables IDs array
@@ -595,6 +598,7 @@ class System(object):
 
         # Call the assembler's transfer setup routine
         compute_transfers = self._assembler._compute_transfers
+        print("************ transfers for %s" % self.pathname)
         xfer_indices = compute_transfers(len(self._subsystems_allprocs),
                                          self._var_allprocs_idx_range,
                                          self._subsystems_myproc,
