@@ -26,9 +26,13 @@ class TestParallelGroups(unittest.TestCase):
     def test_fan_out_grouped(self):
         prob = Problem(FanOutGrouped())
 
+        import wingdbstub
         prob.setup(vector_class=PETScVector, check=False, mode='fwd')
         prob.model.suppress_solver_output = True
         prob.run_model()
+
+        from openmdao.devtools.debug import dump_dist_idxs
+        dump_dist_idxs(prob)
 
         J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
 
