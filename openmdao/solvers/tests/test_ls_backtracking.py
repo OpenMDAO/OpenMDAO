@@ -510,17 +510,7 @@ class TestFeatureBacktrackingLineSearch(unittest.TestCase):
         assert_rel_error(self, top['comp.z'][1], 1.5, 1e-8)
         assert_rel_error(self, top['comp.z'][2], 1.5, 1e-8)
 
-        # Test upper bounds: should go to the minimum upper bound and stall
-        top['px.x'] = 0.5
-        top['comp.y'] = 0.
-        top['comp.z'] = 2.4
-        top.run_model()
-
-        assert_rel_error(self, top['comp.z'][0], 2.5, 1e-8)
-        assert_rel_error(self, top['comp.z'][1], 2.5, 1e-8)
-        assert_rel_error(self, top['comp.z'][2], 2.5, 1e-8)
-
-    def test_feature_boundscheck_array(self):
+    def test_feature_boundscheck_vector(self):
         top = Problem()
         top.model = Group()
         top.model.add_subsystem('px', IndepVarComp('x', np.ones((3,1))))
@@ -546,15 +536,6 @@ class TestFeatureBacktrackingLineSearch(unittest.TestCase):
         assert_rel_error(self, top['comp.z'][1], 1.5, 1e-8)
         assert_rel_error(self, top['comp.z'][2], 1.5, 1e-8)
 
-        # Test upper bounds: should go to the minimum upper bound and stall
-        top['px.x'] = 0.5
-        top['comp.y'] = 0.
-        top['comp.z'] = 2.4
-        top.run_model()
-
-        assert_rel_error(self, top['comp.z'][0], 2.5, 1e-8)
-        assert_rel_error(self, top['comp.z'][1], 2.5, 1e-8)
-        assert_rel_error(self, top['comp.z'][2], 2.5, 1e-8)
 
     def test_feature_boundscheck_wall(self):
         top = Problem()
@@ -571,16 +552,6 @@ class TestFeatureBacktrackingLineSearch(unittest.TestCase):
         ls.options['bound_enforcement'] = 'wall'
 
         top.setup(check=False)
-
-        # Test lower bounds: should go to the lower bound and stall
-        top['px.x'] = 2.0
-        top['comp.y'] = 0.
-        top['comp.z'] = 1.6
-        top.run_model()
-
-        assert_rel_error(self, top['comp.z'][0], 1.5, 1e-8)
-        assert_rel_error(self, top['comp.z'][1], 1.5, 1e-8)
-        assert_rel_error(self, top['comp.z'][2], 1.5, 1e-8)
 
         # Test upper bounds: should go to the upper bound and stall
         top['px.x'] = 0.5
@@ -607,25 +578,115 @@ class TestFeatureBacktrackingLineSearch(unittest.TestCase):
         ls.options['bound_enforcement'] = 'scalar'
 
         top.setup(check=False)
-
-        ub = np.array([2.6, 2.5, 2.65])
+        top.run_model()
 
         # Test lower bounds: should stop just short of the lower bound
         top['px.x'] = 2.0
         top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
-        for ind in range(3):
-            self.assertTrue(1.5 <= top['comp.z'][ind] <= 1.6)
 
-        # Test upper bounds: should stop just short of the minimum upper bound
+        print(top['comp.z'][0])
+        print(top['comp.z'][1])
+        print(top['comp.z'][2])
+
+    def test_feature_backtrack_basic(self):
+        top = Problem()
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3,1))))
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
+        top.model.connect('px.x', 'comp.x')
+
+        top.model.nl_solver = NewtonSolver()
+        top.model.nl_solver.options['maxiter'] = 10
+        top.model.ln_solver = ScipyIterativeSolver()
+
+        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch()
+
+        top.setup(check=False)
+
+        # Test lower bounds: should go to the lower bound and stall
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.
+        top['comp.z'] = 1.6
+        top.run_model()
+
+        assert_rel_error(self, top['comp.z'][0], 1.5, 1e-8)
+        assert_rel_error(self, top['comp.z'][1], 1.5, 1e-8)
+        assert_rel_error(self, top['comp.z'][2], 1.5, 1e-8)
+
+    def test_feature_backtrack_vector(self):
+        top = Problem()
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3,1))))
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
+        top.model.connect('px.x', 'comp.x')
+
+        top.model.nl_solver = NewtonSolver()
+        top.model.nl_solver.options['rtol'] = 0.9
+        top.model.ln_solver = ScipyIterativeSolver()
+
+        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch()
+        ls.options['bound_enforcement'] = 'vector'
+
+        top.setup(check=False)
+
+        # Test lower bounds: should go to the lower bound and stall
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.
+        top['comp.z'] = 1.6
+        top.run_model()
+
+        assert_rel_error(self, top['comp.z'][0], 1.5, 1e-8)
+        assert_rel_error(self, top['comp.z'][1], 1.5, 1e-8)
+        assert_rel_error(self, top['comp.z'][2], 1.5, 1e-8)
+
+    def test_feature_backtrack_wall(self):
+        top = Problem()
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3,1))))
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
+        top.model.connect('px.x', 'comp.x')
+
+        top.model.nl_solver = NewtonSolver()
+        top.model.nl_solver.options['maxiter'] = 10
+        top.model.ln_solver = ScipyIterativeSolver()
+
+        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch()
+        ls.options['bound_enforcement'] = 'wall'
+
+        top.setup(check=False)
+
+        # Test upper bounds: should go to the upper bound and stall
         top['px.x'] = 0.5
         top['comp.y'] = 0.
         top['comp.z'] = 2.4
         top.run_model()
-        for ind in range(3):
-            self.assertTrue(2.4 <= top['comp.z'][ind] <= ub[ind])
 
+        assert_rel_error(self, top['comp.z'][0], 2.6, 1e-8)
+        assert_rel_error(self, top['comp.z'][1], 2.5, 1e-8)
+        assert_rel_error(self, top['comp.z'][2], 2.65, 1e-8)
+
+    def test_feature_backtrack_scalar(self):
+        top = Problem()
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3,1))))
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
+        top.model.connect('px.x', 'comp.x')
+
+        top.model.nl_solver = NewtonSolver()
+        top.model.nl_solver.options['maxiter'] = 10
+        top.model.ln_solver = ScipyIterativeSolver()
+
+        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch()
+        ls.options['bound_enforcement'] = 'scalar'
+
+        top.setup(check=False)
+        top.run_model()
+
+        print(top['comp.z'][0])
+        print(top['comp.z'][1])
+        print(top['comp.z'][2])
 
 if __name__ == "__main__":
     unittest.main()

@@ -20,17 +20,27 @@ The following examples use a Newton solver on a component `ImplCompTwoStates` wi
 Options
 -------
 
-- bound_enforcement: array
+- bound_enforcement: vector
+
+  The `bound_enforcement` option in the options dictionary is used to specify how the output bounds
+  are enforced. When this is set to "vector", the output vector is rolled back along the computed gradient until
+  it reaches a point where the earliest bound violation occured.
 
 .. embed-test::
-    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_boundscheck_array
+    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_boundscheck_vector
 
 - bound_enforcement: scalar
+
+  The `bound_enforcement` option in the options dictionary is used to specify how the output bounds
+  are enforced. When this is set to "scaler", then the only indices in the output vector that are rolled back
+  are the ones that violate their upper or lower bounds.
 
 .. embed-test::
     openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_boundscheck_scalar
 
 - bound_enforcement: wall
+
+  Setting `bound_enforement`` to "wall" is equivalent to setting it to "scaler".
 
 .. embed-test::
     openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_boundscheck_wall

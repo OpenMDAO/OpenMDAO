@@ -32,12 +32,10 @@ class BoundsCheck(NonlinearSolver):
         opt = self.options
         opt.declare(
             'bound_enforcement', value='vector', values=['vector', 'scalar', 'wall'],
-            desc="If this is set to 'vector', the entire vector is backtracked together " +
-                 "when a bound is violated. If this is set to 'scalar', only the violating " +
-                 "entries are set to the bound and then the backtracking occurs on the vector " +
-                 "as a whole. If this is set to 'wall', only the violating entries are set " +
-                 "to the bound, and then the backtracking follows the wall - i.e., the " +
-                 "violating entries do not change during the line search.")
+            desc="If this is set to 'vector', then the the output vector is backtracked to the first point "
+            "where violation occured. If it is set to 'scalar' or 'wall', then only the violated variables "
+            "are backtracked to their point of violation.")
+
 
     def _run_iterator(self):
         """
