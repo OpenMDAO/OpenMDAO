@@ -159,7 +159,7 @@ class SqliteRecorder(BaseRecorder):
             pass
 
 
-    def record_iteration(self, object_requesting_recording ):
+    def record_iteration(self, object_requesting_recording, metadata ):
         """
         Stores the provided data in the sqlite file using the iteration
         coordinate for the key.
@@ -181,66 +181,66 @@ class SqliteRecorder(BaseRecorder):
             print ("YOU CAN'T ATTACH A RECORDER TO THIS OBJECT")
 
 
-    def record_iteration_driver(self, object_requesting_recording):
-            dtype_tuples = []
+    def record_iteration_driver(self, object_requesting_recording, metadata):
+        dtype_tuples = []
 
-            #We will go through the recording options of Driver to construct the entry to be inserted.
-            if self.options['record_desvars']:
-                # Just an example of the syntax for creating a numpy structured array
-                # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
+        #We will go through the recording options of Driver to construct the entry to be inserted.
+        if self.options['record_desvars']:
+            # Just an example of the syntax for creating a numpy structured array
+            # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
 
-                design_vars = object_requesting_recording.get_design_var_values()
-                # This returns a dict of names and values. Use this to build up the tuples of
-                #   used for the dtypes in the creation of the numpy structured array we want to write to sqlite
-                for name, value in iteritems(design_vars):
-                    tple = ('design_var.' + name, '({},)f8'.format(len(value)) )
-                    dtype_tuples.append(tple)
+            design_vars = object_requesting_recording.get_design_var_values()
+            # This returns a dict of names and values. Use this to build up the tuples of
+            #   used for the dtypes in the creation of the numpy structured array we want to write to sqlite
+            for name, value in iteritems(design_vars):
+                tple = ('design_var.' + name, '({},)f8'.format(len(value)) )
+                dtype_tuples.append(tple)
 
-            if self.options['record_responses']:
-                responses = object_requesting_recording.get_response_values()
+        if self.options['record_responses']:
+            responses = object_requesting_recording.get_response_values()
 
-                for name, value in iteritems(responses):
-                    tple = ('response.' + name, '({},)f8'.format(len(value)))
-                    dtype_tuples.append(tple)
+            for name, value in iteritems(responses):
+                tple = ('response.' + name, '({},)f8'.format(len(value)))
+                dtype_tuples.append(tple)
 
-            if self.options['record_objectives']:
-                objectives = object_requesting_recording.get_objective_values()
+        if self.options['record_objectives']:
+            objectives = object_requesting_recording.get_objective_values()
 
-                for name, value in iteritems(objectives):
-                    tple = ('objective.' + name, '({},)f8'.format(len(value)))
-                    dtype_tuples.append(tple)
+            for name, value in iteritems(objectives):
+                tple = ('objective.' + name, '({},)f8'.format(len(value)))
+                dtype_tuples.append(tple)
 
-            if self.options['record_constraints']:
-                constraints = object_requesting_recording.get_constraint_values()
+        if self.options['record_constraints']:
+            constraints = object_requesting_recording.get_constraint_values()
 
-                for name, value in iteritems(constraints):
-                    tple = ('constraint.' + name, '({},)f8'.format(len(value)))
-                    dtype_tuples.append(tple)
+            for name, value in iteritems(constraints):
+                tple = ('constraint.' + name, '({},)f8'.format(len(value)))
+                dtype_tuples.append(tple)
 
-            print("DTYPE_TUPLES: ", dtype_tuples)
+        print("DTYPE_TUPLES: ", dtype_tuples)
 
-            driver_values = np.zeros((1,), dtype=dtype_tuples)
+        driver_values = np.zeros((1,), dtype=dtype_tuples)
 
-            # Write the actual values to this array
-            if self.options['record_desvars']:
-                for name, value in iteritems(design_vars):
-                    driver_values['design_var.' + name] = value
-            if self.options['record_responses']:
-                for name, value in iteritems(responses):
-                    driver_values['response.' + name] = value
-            if self.options['record_objectives']:
-                for name, value in iteritems(objectives):
-                    driver_values['objective.' + name] = value
-            if self.options['record_constraints']:
-                for name, value in iteritems(constraints):
-                    driver_values['constraint.' + name] = value
+        # Write the actual values to this array
+        if self.options['record_desvars']:
+            for name, value in iteritems(design_vars):
+                driver_values['design_var.' + name] = value
+        if self.options['record_responses']:
+            for name, value in iteritems(responses):
+                driver_values['response.' + name] = value
+        if self.options['record_objectives']:
+            for name, value in iteritems(objectives):
+                driver_values['objective.' + name] = value
+        if self.options['record_constraints']:
+            for name, value in iteritems(constraints):
+                driver_values['constraint.' + name] = value
 
-            print("DRIVER VALUES:", driver_values)
-            # Write this mega array to the database
-            self.con.execute("INSERT INTO driver_iterations(iteration_coordinate,driver_values) VALUES(?,?)",
-                 ("foobar1/1", driver_values))
+        print("DRIVER VALUES:", driver_values)
+        # Write this mega array to the database
+        self.con.execute("INSERT INTO driver_iterations(iteration_coordinate,driver_values) VALUES(?,?)",
+             ("foobar1/1", driver_values))
 
-    def record_iteration_system(self, object_requesting_recording):
+    def record_iteration_system(self, object_requesting_recording, metadata):
         # Record an iteration from a System
         if isinstance(object_requesting_recording, System):
             dtype_tuples = []
@@ -296,7 +296,7 @@ class SqliteRecorder(BaseRecorder):
             self.con.execute("INSERT INTO system_iterations(iteration_coordinate,driver_values) VALUES(?,?)",
                              ("foobar1/1", system_values))
 
-    def record_iteration_solver(self, object_requesting_recording):
+    def record_iteration_solver(self, object_requesting_recording, metadata):
             dtype_tuples = []
 
             # We will go through the recording options of Driver to construct the entry to be inserted.
@@ -332,7 +332,7 @@ class SqliteRecorder(BaseRecorder):
 
             # Create the mega array that we will write to the database
             # All of this needs to be looked into to be optimized !!
-            driver_values = np.zeros((1,), dtype=dtype_tuples)
+            solver_values = np.zeros((1,), dtype=dtype_tuples)
 
             # Write the actual values to this array
             # Wish we didn't have to loop through this twice

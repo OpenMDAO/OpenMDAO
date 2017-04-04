@@ -73,7 +73,6 @@ class Solver(object):
         recorder : BaseRecorder
            A recorder instance.
         """
-        recorder._owners.append(self)
         self._rec_mgr.append(recorder)
         return recorder
 
