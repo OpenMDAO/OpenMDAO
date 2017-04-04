@@ -204,15 +204,16 @@ class Group(System):
 
         for subsys in self._subsystems_myproc:
             var_maps = subsys._get_maps()
+
+            # Assemble allprocs_abs2meta_io and abs2meta_io
+            allprocs_abs2meta_io.update(subsys._varx_allprocs_abs2meta_io)
+            abs2meta_io.update(subsys._varx_abs2meta_io)
+
             for type_ in ['input', 'output']:
 
                 # Assemble abs_names and allprocs_abs_names
                 allprocs_abs_names[type_].extend(subsys._varx_allprocs_abs_names[type_])
                 abs_names[type_].extend(subsys._varx_abs_names[type_])
-
-                # Assemble allprocs_abs2meta_io and abs2meta_io
-                allprocs_abs2meta_io.update(subsys._varx_allprocs_abs2meta_io)
-                abs2meta_io.update(subsys._varx_abs2meta_io)
 
                 for abs_name in subsys._varx_abs_names[type_]:
                     sub_prom_name = subsys._varx_abs2prom[type_][abs_name]
