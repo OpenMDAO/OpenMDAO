@@ -104,14 +104,14 @@ class Component(System):
             else:
                 num_var_byset[type_][set_name] = 1
 
-    def _setupx_var_data(self, glob):
-        super(Component, self)._setupx_var_data(glob)
-        allprocs_abs_names = self._glob._allprocs_abs_names
-        abs_names = self._glob._abs_names
-        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
-        abs2prom = self._var_abs2prom
-        allprocs_meta = self._glob._allprocs_meta
-        meta = self._glob._meta
+    def _setupx_var_data(self):
+        super(Component, self)._setupx_var_data()
+        allprocs_abs_names = self._varx_allprocs_abs_names
+        abs_names = self._varx_abs_names
+        allprocs_prom2abs_list = self._varx_allprocs_prom2abs_list
+        abs2prom = self._varx_abs2prom
+        allprocs_abs2meta_io = self._varx_allprocs_abs2meta_io
+        abs2meta_io = self._varx_abs2meta_io
 
         # Compute the prefix for turning rel/prom names into abs names
         if self.pathname is not '':
@@ -127,29 +127,26 @@ class Component(System):
         for type_ in ['input', 'output']:
             for ind, prom_name in enumerate(self._var_rel_names[type_]):
                 abs_name = prefix + prom_name
-                idx = self._num_var[type_] + ind
-                idx_local = self._num_var_local[type_] + ind
-
                 data = self._var_rel2data_io[prom_name]
                 metadata = data['metadata']
 
                 # Compute allprocs_abs_names, abs_names
-                allprocs_abs_names[type_][idx] = abs_name
-                abs_names[type_][idx_local] = abs_name
+                allprocs_abs_names[type_].append(abs_name)
+                abs_names[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[type_][prom_name] = [abs_name]
                 abs2prom[type_][abs_name] = prom_name
 
-                # Compute allprocs_meta
+                # Compute allprocs_abs2meta_io
                 allprocs_metadata = {
                     meta_name: metadata[meta_name]
                     for meta_name in meta_names[type_]
                 }
-                allprocs_meta[type_][idx] = allprocs_metadata
+                allprocs_abs2meta_io[abs_name] = allprocs_metadata
 
-                # Compute meta
-                meta[type_][idx_local] = metadata
+                # Compute abs2meta_io
+                abs2meta_io[abs_name] = metadata
 
     # -------------------------------------------------------------------------------------
 

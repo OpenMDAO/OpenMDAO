@@ -117,10 +117,10 @@ class Group(System):
                 num_var_byset[type_] = {}
 
             # Process the gathered data and update the dictionaries
-            for local_num_var, local_num_var_byset in gathered:
+            for myproc_num_var, myproc_num_var_byset in gathered:
                 for type_ in ['input', 'output']:
-                    num_var[type_] += local_num_var[type_]
-                    for set_name, num in iteritems(local_num_var_byset[type_]):
+                    num_var[type_] += myproc_num_var[type_]
+                    for set_name, num in iteritems(myproc_num_var_byset[type_]):
                         if set_name in num_var_byset[type_]:
                             num_var_byset[type_][set_name] += num
                         else:
@@ -189,14 +189,78 @@ class Group(System):
 
             subsys._setupx_var_indices(set2iset, sub_counter, sub_counter_local, sub_counter_byset)
 
-    def _setupx_var_data(self, glob):
-        super(Component, self)._setupx_var_data(glob)
-        allprocs_abs_names = self._glob._allprocs_abs_names
-        abs_names = self._glob._abs_names
-        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
-        abs2prom = self._var_abs2prom
-        allprocs_meta = self._glob._allprocs_meta
-        meta = self._glob._meta
+    def _setupx_var_data(self):
+        super(Group, self)._setupx_var_data()
+        allprocs_abs_names = self._varx_allprocs_abs_names
+        abs_names = self._varx_abs_names
+        allprocs_prom2abs_list = self._varx_allprocs_prom2abs_list
+        abs2prom = self._varx_abs2prom
+        allprocs_abs2meta_io = self._varx_allprocs_abs2meta_io
+        abs2meta_io = self._varx_abs2meta_io
+
+        # Recursion
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_var_data()
+
+        for subsys in self._subsystems_myproc:
+            var_maps = subsys._get_maps()
+            for type_ in ['input', 'output']:
+
+                # Assemble abs_names and allprocs_abs_names
+                allprocs_abs_names[type_].extend(subsys._varx_allprocs_abs_names[type_])
+                abs_names[type_].extend(subsys._varx_abs_names[type_])
+
+                # Assemble allprocs_abs2meta_io and abs2meta_io
+                allprocs_abs2meta_io.update(subsys._varx_allprocs_abs2meta_io)
+                abs2meta_io.update(subsys._varx_abs2meta_io)
+
+                for abs_name in subsys._varx_abs_names[type_]:
+                    sub_prom_name = subsys._varx_abs2prom[type_][abs_name]
+                    prom_name = var_maps[type_][sub_prom_name]
+
+                    # Assemble abs2prom
+                    abs2prom[type_][abs_name] = prom_name
+
+                    # Assemble allprocs_prom2abs_list
+                    if prom_name not in allprocs_prom2abs_list[type_]:
+                        allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+                    else:
+                        allprocs_prom2abs_list[type_][prom_name].append(abs_name)
+
+        for prom_name, abs_list in iteritems(allprocs_prom2abs_list['output']):
+            if len(abs_list) > 1:
+                raise RuntimeError("Output name '%s' refers to "
+                                   "multiple outputs: %s." %
+                                   (prom_name, sorted(abs_list)))
+
+        # If running in parallel, allgather
+        if self.comm.size > 1:
+            if self._subsystems_myproc[0].comm.rank == 0:
+                raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta_io)
+            else:
+                raw = ({'input': [], 'output': []}, {'input': {}, 'output': {}}, {})
+            gathered = self.comm.allgather(raw)
+
+            for type_ in ['input', 'output']:
+                allprocs_abs_names[type_] = []
+                allprocs_prom2abs_list[type_] = {}
+
+            for myproc_abs_names, myproc_prom2abs_list, myproc_abs2meta_io in gathered:
+
+                # Assemble in parallel allprocs_abs2meta_io
+                allprocs_abs2meta_io.update(myproc_abs2meta_io)
+
+                for type_ in ['input', 'output']:
+
+                    # Assemble in parallel allprocs_abs_names
+                    allprocs_abs_names[type_].extend(myproc_abs_names[type_])
+
+                    # Assemble in parallel allprocs_prom2abs_list
+                    for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
+                        if prom_name not in allprocs_prom2abs_list[type_]:
+                            allprocs_prom2abs_list[type_][prom_name] = abs_names_list
+                        else:
+                            allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
     # -------------------------------------------------------------------------------------
 
