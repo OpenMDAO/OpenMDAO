@@ -48,22 +48,22 @@ class RecordingManager(object):
     def __iter__(self):
         return iter(self._recorders)
 
-    def _gather_vars(self, root, local_vars):
-        """Gathers and returns only variables listed in
-        `local_vars` from the `root` System.
-        """
-
-        if trace:
-            debug("gathering vars for recording in %s" % root.pathname)
-        all_vars = root.comm.gather(local_vars, root=0)
-        if trace:
-            debug("DONE gathering rec vars for %s" % root.pathname)
-
-        if root.comm.rank == 0:
-            dct = all_vars[-1]
-            for d in all_vars[:-1]:
-                dct.update(d)
-            return dct
+    # def _gather_vars(self, root, local_vars):
+    #     """Gathers and returns only variables listed in
+    #     `local_vars` from the `root` System.
+    #     """
+    #
+    #     if trace:
+    #         debug("gathering vars for recording in %s" % root.pathname)
+    #     all_vars = root.comm.gather(local_vars, root=0)
+    #     if trace:
+    #         debug("DONE gathering rec vars for %s" % root.pathname)
+    #
+    #     if root.comm.rank == 0:
+    #         dct = all_vars[-1]
+    #         for d in all_vars[:-1]:
+    #             dct.update(d)
+    #         return dct
 
     def startup(self):
         """ Initialization during setup.
@@ -139,16 +139,16 @@ class RecordingManager(object):
                 if recorder.options['record_metadata']:
                     recorder.record_metadata(root)
 
-    def _get_local_case_data(self, root):
-        """get names and values of all locally owned variables."""
-        inputs = root.inputs
-        outputs = root.outputs
-        resids = root.resids
-        inputs = [(p, inputs[p]) for p in self._vars_to_record['pnames']]
-        outputs = [(u, outputs[u]) for u in self._vars_to_record['unames']]
-        resids = [(r, resids[r]) for r in self._vars_to_record['rnames']]
-
-        return inputs, outputs, resids
+    # def _get_local_case_data(self, root):
+    #     """get names and values of all locally owned variables."""
+    #     inputs = root.inputs
+    #     outputs = root.outputs
+    #     resids = root.resids
+    #     inputs = [(p, inputs[p]) for p in self._vars_to_record['pnames']]
+    #     outputs = [(u, outputs[u]) for u in self._vars_to_record['unames']]
+    #     resids = [(r, resids[r]) for r in self._vars_to_record['rnames']]
+    #
+    #     return inputs, outputs, resids
 
     def record_completed_case(self, root, case):
         """Record the variables in the given case."""
@@ -161,7 +161,7 @@ class RecordingManager(object):
             recorder.record_iteration(case['p'], case['u'], case['r'], case['meta'])
 
     # def record_iteration(self, root, metadata, dummy=False):
-    def record_iteration(self, object_requesting_recording):
+    def record_iteration(self, object_requesting_recording, metadata):
         """ Gathers variables for non-parallel case recorders and calls
         record for all recorders.
 
@@ -182,7 +182,7 @@ class RecordingManager(object):
 
 
         for recorder in self._recorders:
-            recorder.record_iteration(object_requesting_recording)
+            recorder.record_iteration(object_requesting_recording, metadata)
 
 
         return
@@ -242,22 +242,22 @@ class RecordingManager(object):
                 if recorder._parallel or MPI is None or self.rank == 0:
                     recorder.record_iteration(inputs, outputs, resids, meta)
 
-    def record_derivatives(self, derivs, metadata):
-        """" Records derivatives if requested.
-
-        Args
-        ----
-        derivs : dict
-            Dictionary containing derivatives
-        metadata : dict
-            Metadata for iteration coordinate
-        """
-
-        metadata['timestamp'] = time.time()
-
-        # If the recorder does not support parallel recording
-        # we need to make sure we only record on rank 0.
-        for recorder in self._recorders:
-            if recorder.options['record_derivs']:
-                if recorder._parallel or self.rank == 0:
-                    recorder.record_derivatives(derivs, metadata)
+    # def record_derivatives(self, derivs, metadata):
+    #     """" Records derivatives if requested.
+    #
+    #     Args
+    #     ----
+    #     derivs : dict
+    #         Dictionary containing derivatives
+    #     metadata : dict
+    #         Metadata for iteration coordinate
+    #     """
+    #
+    #     metadata['timestamp'] = time.time()
+    #
+    #     # If the recorder does not support parallel recording
+    #     # we need to make sure we only record on rank 0.
+    #     for recorder in self._recorders:
+    #         if recorder.options['record_derivs']:
+    #             if recorder._parallel or self.rank == 0:
+    #                 recorder.record_derivatives(derivs, metadata)

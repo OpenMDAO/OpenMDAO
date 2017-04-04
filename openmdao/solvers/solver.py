@@ -169,8 +169,8 @@ class Solver(object):
             #  just the absolute error and relative error. A second mode would store the full outputs and residuals.
 
             # The full solver residual/output recording and apply_nonlinear/apply_linear recording probably falls last in terms of priority
-
-            self._rec_mgr.record_iteration(self)
+            metadata = None #TODO_RECORDERS put actual metadata here
+            self._rec_mgr.record_iteration(self, metadata)
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or

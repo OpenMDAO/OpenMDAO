@@ -75,6 +75,9 @@ class BaseRecorder(object):
 
         self.out = None
 
+        #global counter that is used in iteration coordinate
+        self._counter = 0
+
         # # This is for drivers to determine if a recorder supports
         # # real parallel recording (recording on each process), because
         # # if it doesn't, the driver figures out what variables must
@@ -180,7 +183,8 @@ class BaseRecorder(object):
         """
         raise NotImplementedError()
 
-    def record_iteration(self, inputs, outputs, residuals, metadata):
+    # TODO_RECORDER: change the signature to match what we decided to do with sqlite, hdf5,...
+    def record_iteration(self, object_requesting_recording, metadata):
         """
         Writes the provided data.
 
@@ -198,7 +202,9 @@ class BaseRecorder(object):
         metadata : dict, optional
             Dictionary containing execution metadata (e.g. iteration coordinate).
         """
-        raise NotImplementedError()
+        self._counter += 1
+
+        #raise NotImplementedError()
 
     def record_derivatives(self, derivs, metadata):
         """Writes the metadata of the given group

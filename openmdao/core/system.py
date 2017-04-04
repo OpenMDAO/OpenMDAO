@@ -21,6 +21,8 @@ from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
 from openmdao.recorders.recording_manager import RecordingManager
 
+from openmdao.recorders.recording_manager import RecordingManager
+
 
 # This is for storing various data mapped to var pathname
 PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
@@ -162,6 +164,8 @@ class System(object):
         self.comm = None
         self.metadata = GeneralizedDictionary()
         self.metadata.update(kwargs)
+
+        self.rec_mgr = RecordingManager()
 
         self._assembler = None
 
@@ -1514,8 +1518,9 @@ class System(object):
 
         # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
 
-
-        self._rec_mgr.record_iteration(self)
+        # TODO_RECORDERS
+        metadata = None # ??? Is this correct?
+        self._rec_mgr.record_iteration(self, metadata)
             
     def run_solve_nonlinear(self):
         """
@@ -1539,6 +1544,10 @@ class System(object):
         #   Systems, no matter the type, should be able to save inputs, outputs, and 
         #       residuals (System._vectors['inputs']['nonlinear'], etc.) after _apply_nonlinear and _solve_nonlinear calls
         # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
+
+        # TODO_RECORDERS
+        metadata = None # ??? Is this correct?
+        self._rec_mgr.record_iteration(self, metadata)
 
         return result
 
@@ -1567,6 +1576,10 @@ class System(object):
         #  These would be (System._vectors['inputs'][vec_name], etc.). In terms of the list of vec_names, 
         #     there is always a 'linear', and depending on the problem, there may be others.
         # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
+ 
+        # TODO_RECORDERS
+        metadata = None # ??? Is this correct?
+        self._rec_mgr.record_iteration(self, metadata)
 
 
     def run_solve_linear(self, vec_names, mode):
@@ -1600,6 +1613,10 @@ class System(object):
         #  These would be (System._vectors['inputs'][vec_name], etc.). In terms of the list of vec_names, 
         #     there is always a 'linear', and depending on the problem, there may be others.
         # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
+
+        # TODO_RECORDERS
+        metadata = None # ??? Is this correct?
+        self._rec_mgr.record_iteration(self, metadata)
         
         return result
 

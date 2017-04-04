@@ -3,7 +3,9 @@
 from six import iteritems
 
 from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.record_util import create_local_meta, update_local_meta
 from openmdao.recorders.recording_manager import RecordingManager
+
 
 import numpy as np
 
@@ -58,6 +60,9 @@ class Driver(object):
         self.supports.declare('integer_design_vars', type_=bool, value=True)
         self.supports.declare('gradients', type_=bool, value=True)
         self.supports.declare('active_set', type_=bool, value=True)
+
+        self.iter_count = 0
+        self.metadata = None
 
         # TODO, support these in Openmdao blue
         # self.supports.declare('integer_design_vars', True)
@@ -257,6 +262,13 @@ class Driver(object):
             Failure flag; True if failed to converge, False is successful.
         """
 
+        # Metadata Setup
+        self.iter_count += 1
+        metadata = self.metadata = create_local_meta(None, 'Driver')
+        # system.ln_solver.local_meta = metadata  # TODO_RECORDER - is this needed?
+        update_local_meta(metadata, (self.iter_count,))
+
+
         failure_flag = self._problem.model._solve_nonlinear()
 
         # TODO_RECORDERS: do the equivalent to this
@@ -271,9 +283,7 @@ class Driver(object):
 
         # We would definitely need driver recording (dvs, responses, ...), and optionally recording of state values in each optimization iteration
 
-        # objective_values = self.get_objective_values()
-
-        self._rec_mgr.record_iteration(self)
+        self._rec_mgr.record_iteration(self, metadata)
 
         return failure_flag
 

@@ -102,9 +102,12 @@ class SqliteRecorder(BaseRecorder):
         # Create the table for iterations for a driver
         # The primary key gets filled in automatically. It can be our "counter" that John wants. It gets incremented by 1
         #   for each write of a record to this table
-        self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT, driver_values array)")
-        self.con.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT, system_values array)")
-        self.con.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT, solver_values array)")
+        self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT, \
+                         timestamp REAL, success INT, msg TEXT, driver_values array)")
+        self.con.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT,  \
+                         timestamp REAL, success INT, msg TEXT, system_values array)")
+        self.con.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT,  \
+                         timestamp REAL, success INT, msg TEXT, solver_values array)")
 
         # if self._open_close_sqlitedict:
         #     sqlite_dict_args.setdefault('autocommit', True)
@@ -159,23 +162,22 @@ class SqliteRecorder(BaseRecorder):
             pass
 
 
-    def record_iteration(self, object_requesting_recording, metadata ):
+    def record_iteration(self, object_requesting_recording, metadata):
         """
         Stores the provided data in the sqlite file using the iteration
         coordinate for the key.
         """
-
-        #self._counter += 1 # I don't think we need this because we can use the primary key feature of sqlite
+        super(SqliteRecorder, self).record_iteration(self, object_requesting_recording, metadata)
 
         # Record an iteration from a Driver
-        if isinstance(object_requesting_recording,Driver):
-            self.record_iteration_driver(object_requesting_recording)
+        if isinstance(object_requesting_recording, Driver):
+            self.record_iteration_driver(object_requesting_recording, metadata)
 
         elif isinstance(object_requesting_recording, System):
-            self.record_iteration_system(object_requesting_recording)
+            self.record_iteration_system(object_requesting_recording, metadata)
 
         elif isinstance(object_requesting_recording, Solver):
-            self.record_iteration_solver(object_requesting_recording)
+            self.record_iteration_solver(object_requesting_recording, metadata)
 
         else:
             print ("YOU CAN'T ATTACH A RECORDER TO THIS OBJECT")
@@ -237,8 +239,8 @@ class SqliteRecorder(BaseRecorder):
 
         print("DRIVER VALUES:", driver_values)
         # Write this mega array to the database
-        self.con.execute("INSERT INTO driver_iterations(iteration_coordinate,driver_values) VALUES(?,?)",
-             ("foobar1/1", driver_values))
+        self.con.execute("INSERT INTO driver_iterations(iteration_coordinate, timestamp, success, msg, driver_values) VALUES(?,?,?,?,?)",
+             (metadata['coord'], metadata['timestamp'], metadata['success'], metadata['msg'], driver_values))
 
     def record_iteration_system(self, object_requesting_recording, metadata):
         # Record an iteration from a System
@@ -293,8 +295,12 @@ class SqliteRecorder(BaseRecorder):
 
             print("SYSTEM VALUES:", system_values)
             # Write this mega array to the database
-            self.con.execute("INSERT INTO system_iterations(iteration_coordinate,driver_values) VALUES(?,?)",
-                             ("foobar1/1", system_values))
+            # self.con.execute("INSERT INTO system_iterations(iteration_coordinate,driver_values) VALUES(?,?)",
+            #                  ("foobar1/1", system_values))
+
+            self.con.execute("INSERT INTO system_iterations(iteration_coordinate, timestamp, success, msg, system_values) \
+                VALUES(?,?,?,?,?)", (metadata['coord'], metadata['timestamp'], metadata['success'], metadata['msg'],
+                system_values))
 
     def record_iteration_solver(self, object_requesting_recording, metadata):
             dtype_tuples = []
@@ -349,11 +355,22 @@ class SqliteRecorder(BaseRecorder):
                 for name, value in iteritems(residuals):
                     solver_values['residual.' + name] = value
 
-            print("SOLVER VALUES:", driver_values)
-            # Write this mega array to the database
-            self.con.execute("INSERT INTO solver_iterations(iteration_coordinate,solver_values) VALUES(?,?)",
-                             ("foobar1/1", solver_values))
 
+            if self.options['record_solver_residuals']:
+                residuals = object_requesting_recording.get_residuals()
+
+                for name, value in iteritems(residuals):
+                    tple = ('residual.' + name, '({},)f8'.format(len(value)))
+                    dtype_tuples.append(tple)
+                solver_values = np.zeros((1,), dtype=dtype_tuples)
+                for name, value in iteritems(residuals):
+                    solver_values['residual.' + name] = value
+
+            print("SOLVER VALUES:", solver_values)
+            # Write this mega array to the database
+            self.con.execute("INSERT INTO solver_iterations(iteration_coordinate, timestamp, success, msg, solver_values) "
+                "VALUES(?,?,?,?,?)", (metadata['coord'], metadata['timestamp'], metadata['success'], metadata['msg'],
+                                      solver_values))
 
 
     # def record_derivatives(self, derivs, metadata):
