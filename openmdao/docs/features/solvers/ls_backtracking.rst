@@ -106,12 +106,12 @@ Control Options
 
   The "rtol" option is a termination criterion used by only the `BacktrackingLineSearch`. It specifies the residual
   norm (with respect to the residual at the initial point) that is used to terminate backtracking. Note that you
-  probably don't want a very small value here, as backtracking is not capable of solving your while nonlinear problem; it
+  probably don't want a very small value here, as backtracking is not capable of solving your whole nonlinear problem; it
   is meant to get around problem iterations.
 
 - alpha
 
-  The "alpha" option is used to specify the initial length of the Newton step. Since Newton's method assumes a
+  The "alpha" option is used to specify the initial length of the Newton step. Since NewtonSolver assumes a
   stepsize of 1.0, this value usually shouldn't be changed.
 
 - rho
