@@ -352,8 +352,8 @@ class TestGroup(unittest.TestCase):
         p = Problem(model=Group())
         indep = p.model.add_subsystem('indep', IndepVarComp())
         indep.add_output('x', np.ones(5), units='ft')
-        p.model.add_subsystem('C1', ExecComp('y=sum(x)', x=np.zeros(5),
-                                             units={'x': 'inch', 'y': 'inch'}))
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)', x={'value': np.zeros(5), 'units': 'inch'}, 
+                                             y={'units': 'inch'}))
         p.model.connect('indep.x', 'C1.x')
         p.model.suppress_solver_output = True
         p.setup()
@@ -856,8 +856,8 @@ class TestConnect(unittest.TestCase):
     def test_connect_units_with_unitless(self):
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
-        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', units={'x2': 'degC'}))
-        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', units={'x': 'unitless'}))
+        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', x2={'units': 'degC'}))
+        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', x={'units': 'unitless'}))
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
@@ -873,8 +873,8 @@ class TestConnect(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
-        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', units={'x2': 'degC'}))
-        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', units={'x': 'm'}))
+        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', x2={'units': 'degC'}))
+        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', x={'units': 'm'}))
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
@@ -886,7 +886,7 @@ class TestConnect(unittest.TestCase):
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
         prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1'))
-        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', units={'x': 'degC'}))
+        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', x={'units': 'degC'}))
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
@@ -908,7 +908,7 @@ class TestConnect(unittest.TestCase):
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x', 100.0), promotes_outputs=['x'])
         prob.model.add_subsystem('src', ExecComp('y = 2 * x'), promotes=['x', 'y'])
-        prob.model.add_subsystem('tgt', ExecComp('z = 3 * y', units={'y': 'degC'}), promotes=['y'])
+        prob.model.add_subsystem('tgt', ExecComp('z = 3 * y', y={'units': 'degC'}), promotes=['y'])
 
         prob.model.suppress_solver_output = True
 

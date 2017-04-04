@@ -12,13 +12,14 @@ from six.moves import range
 import numpy as np
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
-from openmdao.jacobians.default_jacobian import DefaultJacobian
-from openmdao.jacobians.global_jacobian import GlobalJacobian
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
+from openmdao.recorders.recording_manager import RecordingManager
 
 from openmdao.recorders.recording_manager import RecordingManager
 
@@ -130,8 +131,8 @@ class System(object):
         <Jacobian> object to be used in apply_linear.
     _jacobian_changed : bool
         If True, the jacobian has changed since the last call to setup.
-    _owns_global_jac : bool
-        If True, we are owners of the GlobalJacobian in self._jacobian.
+    _owns_assembled_jac : bool
+        If True, we are owners of the AssembledJacobian in self._jacobian.
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
@@ -203,10 +204,10 @@ class System(object):
         self._residuals = None
         self._transfers = None
 
-        self._jacobian = DefaultJacobian()
+        self._jacobian = DictionaryJacobian()
         self._jacobian._system = self
         self._jacobian_changed = True
-        self._owns_global_jac = False
+        self._owns_assembled_jac = False
 
         self._subjacs_info = OrderedDict()
 
@@ -216,6 +217,8 @@ class System(object):
 
         self._design_vars = {}
         self._responses = {}
+
+        self._rec_mgr = RecordingManager()
 
     def _setup_processors(self, path, comm, global_dict,
                           assembler, proc_range):
@@ -310,6 +313,7 @@ class System(object):
                     pass
 
             self.initialize_variables()
+            self._rec_mgr.startup()
 
     def _setup_variable_indices(self, global_index, recurse=True):
         """
@@ -371,9 +375,14 @@ class System(object):
             self._vectors[key][vec_name] = vectors[key]
 
         if use_ref_vector:
-            vectors['input']._compute_ivar_map()
-            vectors['output']._compute_ivar_map()
-            vectors['residual']._ivar_map = vectors['output']._ivar_map
+            abs2data = self._var_abs2data_io
+            vectors['input']._compute_ivar_map(abs2data, 'input')
+            vectors['output']._compute_ivar_map(abs2data, 'output')
+
+            # TODO - Let's only compute a new one when the output and residual scale lengths are
+            # really different.
+            vectors['residual']._compute_ivar_map(abs2data, 'residual')
+            # vectors['residual']._ivar_map = vectors['output']._ivar_map
 
         # Compute the transfer for this vector set
         self._vector_transfers[vec_name] = self._get_transfers(vectors)
@@ -401,14 +410,39 @@ class System(object):
         """
         Set up scaling vectors.
         """
+        abs2idx = self._assembler._var_allprocs_abs2idx_io
+        abs2data = self._var_abs2data_io
         nvar_in = len(self._var_abs_names['input'])
-        nvar_out = len(self._var_abs_names['output'])
+
+        # Support for vector scaling requires inpsecting all the scale values before we size the
+        # phys_to_norm and norm_to_phys arrays. Note that we could have one of (ref, ref0) as a
+        # scaler and the other as an array. Since we don't want to bookkeep these independently
+        # (or do we), we just allocate for the array.
+        nvar_out = 0
+        nvar_res = 0
+        out_idx = []
+        res_idx = []
+        for abs_name in self._var_abs_names['output']:
+            meta = abs2data[abs_name]['metadata']
+            n_out = max(len(np.atleast_1d(meta['ref'])),
+                        len(np.atleast_1d(meta['ref0'])))
+            id0 = nvar_out
+            nvar_out += n_out
+            out_idx.append((id0, nvar_out))
+            abs2data[abs_name]['output_scale_idx'] = (id0, nvar_out)
+
+            n_res = max(len(np.atleast_1d(meta['res_ref'])),
+                        len(np.atleast_1d(meta['res_ref0'])))
+            id0 = nvar_res
+            nvar_res += n_res
+            res_idx.append((id0, nvar_res))
+            abs2data[abs_name]['resid_scale_idx'] = (id0, nvar_res)
 
         # Initialize scaling arrays
         for scaling in (self._scaling_to_norm, self._scaling_to_phys):
             scaling['input'] = np.empty((nvar_in, 2))
             scaling['output'] = np.empty((nvar_out, 2))
-            scaling['residual'] = np.empty((nvar_out, 2))
+            scaling['residual'] = np.empty((nvar_res, 2))
 
         # ref0 and ref are the values of the variable in the specified
         # units at which the scaled values are 0 and 1, respectively
@@ -428,8 +462,8 @@ class System(object):
         #   b0 = g(a0)
         #   b1 = d0 + d1 a1 - d0
         #   b1 = g(a1) - g(0)
-        abs2idx = self._assembler._var_allprocs_abs2idx_io
-        abs2data = self._var_abs2data_io
+
+        # Inputs have unit conversions.
         for ind, abs_name in enumerate(self._var_abs_names['input']):
             global_ind = abs2idx[abs_name]
             meta = abs2data[abs_name]['metadata']
@@ -439,16 +473,19 @@ class System(object):
                 convert_units(src_scaling[global_ind, 1], src_units[global_ind], meta['units']) - \
                 convert_units(0., src_units[global_ind], meta['units'])
 
+        # Outputs and residuals have scaling.
         for ind, abs_name in enumerate(self._var_abs_names['output']):
             meta = abs2data[abs_name]['metadata']
 
             # Compute scaling arrays for outputs; no unit conversion needed
-            self._scaling_to_phys['output'][ind, 0] = meta['ref0']
-            self._scaling_to_phys['output'][ind, 1] = meta['ref'] - meta['ref0']
+            ind1, ind2 = out_idx[ind]
+            self._scaling_to_phys['output'][ind1:ind2, 0] = meta['ref0']
+            self._scaling_to_phys['output'][ind1:ind2, 1] = meta['ref'] - meta['ref0']
 
             # Compute scaling arrays for residuals; convert units
-            self._scaling_to_phys['residual'][ind, 0] = meta['res_ref0']
-            self._scaling_to_phys['residual'][ind, 1] = meta['res_ref'] - meta['res_ref0']
+            ind1, ind2 = res_idx[ind]
+            self._scaling_to_phys['residual'][ind1:ind2, 0] = meta['res_ref0']
+            self._scaling_to_phys['residual'][ind1:ind2, 1] = meta['res_ref'] - meta['res_ref0']
 
         # Compute inverse scaling arrays
         for key in ['input', 'output', 'residual']:
@@ -484,10 +521,15 @@ class System(object):
         if is_top:
             for abs_name in self._var_abs_names['output']:
                 data = self._var_abs2data_io[abs_name]
-                my_idx = data['my_idx']
+                idx0, idx1 = data['output_scale_idx']
                 metadata = data['metadata']
 
-                a, b = self._scaling_to_norm['output'][my_idx, :]
+                if idx1 - idx0 > 1:
+                    a = self._scaling_to_norm['output'][idx0:idx1, 0]
+                    b = self._scaling_to_norm['output'][idx0:idx1, 1]
+                else:
+                    # Scalar multiplication
+                    a, b = self._scaling_to_norm['output'][idx0, :]
 
                 # We have to convert from physical, unscaled to scaled, dimensionless.
                 # We set into the bounds vector first and then apply a and b because
@@ -497,12 +539,21 @@ class System(object):
                 else:
                     shape = self._lower_bounds._views[abs_name].shape
                     value = ensure_compatible(abs_name, metadata['lower'], shape)[0]
+                    if idx1 - idx0 > 1:
+                        # Note, bounds are stored flattened for scale/unscale ease
+                        a = a.reshape(value.shape)
+                        b = b.reshape(value.shape)
                     self._lower_bounds._views[abs_name][:] = a + b * value
+
                 if metadata['upper'] is None:
                     self._upper_bounds._views[abs_name][:] = np.inf
                 else:
                     shape = self._upper_bounds._views[abs_name].shape
                     value = ensure_compatible(abs_name, metadata['upper'], shape)[0]
+                    if idx1 - idx0 > 1:
+                        # Note, bounds are stored flattened for scale/unscale ease
+                        a = a.reshape(value.shape)
+                        b = b.reshape(value.shape)
                     self._upper_bounds._views[abs_name][:] = a + b * value
 
         # Perform recursion
@@ -517,19 +568,28 @@ class System(object):
 
         Parameters
         ----------
-        jacobian : <GlobalJacobian> or None
+        jacobian : <AssembledJacobian> or None
             The global jacobian to populate for this system.
         """
         self._jacobian_changed = False
 
-        if self._owns_global_jac:
+        if self._owns_assembled_jac:
 
-            # At present, we don't support a GlobalJacobian in a group if any subcomponents
+            # At present, we don't support a AssembledJacobian in a group if any subcomponents
             # are matrix-free.
             for subsys in self.system_iter():
-                if overrides_method('apply_linear', subsys, System):
-                    msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
-                    raise RuntimeError(msg)
+
+                try:
+                    if subsys._matrix_free:
+                        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
+                        raise RuntimeError(msg)
+
+                # Groups don't have `_matrix_free`
+                # Note, we could put this attribute on Group, but this would be True for a
+                # default Group, and thus we would need an isinstance on Component, which is the
+                # reason for the try block anyway.
+                except AttributeError:
+                    continue
 
             jacobian = self._jacobian
 
@@ -541,7 +601,7 @@ class System(object):
         for subsys in self._subsystems_myproc:
             subsys._setup_jacobians(jacobian)
 
-        if self._owns_global_jac:
+        if self._owns_assembled_jac:
             self._jacobian._system = self
             self._jacobian._initialize()
 
@@ -683,7 +743,7 @@ class System(object):
         """
         Set the Jacobian.
         """
-        self._owns_global_jac = isinstance(jacobian, GlobalJacobian)
+        self._owns_assembled_jac = isinstance(jacobian, AssembledJacobian)
         self._jacobian = jacobian
         self._jacobian_changed = True
 
@@ -891,7 +951,7 @@ class System(object):
                 vec._scale(scaling[vec_type])
 
         for system in self.system_iter(include_self=True, recurse=True):
-            if system._owns_global_jac:
+            if system._owns_assembled_jac:
                 with system.jacobian_context():
                     system._jacobian._precompute_iter()
                     system._jacobian._scale(scaling)
@@ -1459,8 +1519,8 @@ class System(object):
         # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
 
         # TODO_RECORDERS
-        metadata = None
-        self.rec_mgr.record_iteration(self,metadata)
+        metadata = None # ??? Is this correct?
+        self._rec_mgr.record_iteration(self, metadata)
             
     def run_solve_nonlinear(self):
         """
@@ -1484,6 +1544,10 @@ class System(object):
         #   Systems, no matter the type, should be able to save inputs, outputs, and 
         #       residuals (System._vectors['inputs']['nonlinear'], etc.) after _apply_nonlinear and _solve_nonlinear calls
         # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
+
+        # TODO_RECORDERS
+        metadata = None # ??? Is this correct?
+        self._rec_mgr.record_iteration(self, metadata)
 
         return result
 
@@ -1512,6 +1576,11 @@ class System(object):
         #  These would be (System._vectors['inputs'][vec_name], etc.). In terms of the list of vec_names, 
         #     there is always a 'linear', and depending on the problem, there may be others.
         # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
+ 
+        # TODO_RECORDERS
+        metadata = None # ??? Is this correct?
+        self._rec_mgr.record_iteration(self, metadata)
+
 
     def run_solve_linear(self, vec_names, mode):
         """
@@ -1539,22 +1608,34 @@ class System(object):
             result = self._solve_linear(vec_names, mode)
 
         # TODO_RECORDERS
-        #  The _apply_linear and _solve_linear methods work with d_inputs, d_outputs, and d_residuals, 
+        #  The _apply_linear and _solve_linear methods work with d_inputs, d_outputs, and d_residuals,
         #       each one is associated with a vecname. 
         #  These would be (System._vectors['inputs'][vec_name], etc.). In terms of the list of vec_names, 
         #     there is always a 'linear', and depending on the problem, there may be others.
         # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
+
+        # TODO_RECORDERS
+        metadata = None # ??? Is this correct?
+        self._rec_mgr.record_iteration(self, metadata)
         
         return result
 
-    def run_linearize(self):
+    def run_linearize(self, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization.
 
         This calls _linearize, but with the model assumed to be in an unscaled state.
+
+        Parameters
+        ----------
+        do_nl : boolean
+            Flag indicating if the nonlinear solver should be linearized.
+        do_ln : boolean
+            Flag indicating if the linear solver should be linearized.
+
         """
         with self._scaled_context():
-            self._linearize()
+            self._linearize(do_nl, do_ln)
 
     def _apply_nonlinear(self):
         """
@@ -1615,9 +1696,16 @@ class System(object):
         """
         pass
 
-    def _linearize(self):
+    def _linearize(self, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
+
+        Parameters
+        ----------
+        do_nl : boolean
+            Flag indicating if the nonlinear solver should be linearized.
+        do_ln : boolean
+            Flag indicating if the linear solver should be linearized.
         """
         pass
 
@@ -1657,3 +1745,25 @@ class System(object):
             variable names
         """
         pass
+
+    def add_recorder(self, recorder):
+        """
+        Adds a recorder to the driver.
+
+        Args
+        ----
+        recorder : BaseRecorder
+           A recorder instance.
+        """
+        recorder._owners.append(self)
+        self._rec_mgr.append(recorder)
+        return recorder
+
+    def get_inputs(self):
+        return self._inputs
+
+    def get_outputs(self):
+        return self._outputs
+
+    def get_residuals(self):
+        return self._residuals

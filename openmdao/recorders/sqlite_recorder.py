@@ -9,6 +9,8 @@ import numpy as np
 from openmdao.recorders.base_recorder import BaseRecorder
 
 from openmdao.core.driver import Driver
+from openmdao.core.system import System
+from openmdao.solvers.solver import Solver
 
 # from openmdao.util.record_util import format_iteration_coordinate
 
@@ -45,13 +47,6 @@ sqlite3.register_adapter(np.ndarray, adapt_array)
 
 # Converts TEXT to np.array when selecting
 sqlite3.register_converter("array", convert_array)
-
-
-
-
-
-
-
 
 
 # from openmdao.core.mpi_wrap import MPI
@@ -108,6 +103,8 @@ class SqliteRecorder(BaseRecorder):
         # The primary key gets filled in automatically. It can be our "counter" that John wants. It gets incremented by 1
         #   for each write of a record to this table
         self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT, driver_values array)")
+        self.con.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT, system_values array)")
+        self.con.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT, solver_values array)")
 
         # if self._open_close_sqlitedict:
         #     sqlite_dict_args.setdefault('autocommit', True)
@@ -126,8 +123,8 @@ class SqliteRecorder(BaseRecorder):
         #     self.out_iterations = None
         #     self.out_derivs = None
 
-    def startup(self, group):
-        super(SqliteRecorder, self).startup(group)
+    def startup(self):
+        super(SqliteRecorder, self).startup()
 
         # Need this for use when recording the metadata
         # Can't do this in the record_metadata method because it only gets
@@ -152,195 +149,252 @@ class SqliteRecorder(BaseRecorder):
         if MPI and MPI.COMM_WORLD.rank > 0 :
             raise RuntimeError("not rank 0")
         else:
-            params = group.params.iteritems()
-            #resids = group.resids.iteritems()
-            unknowns = group.unknowns.iteritems()
-            self.out_metadata['Parameters'] = dict(params)
-            self.out_metadata['Unknowns'] = dict(unknowns)
-            self.out_metadata['system_metadata'] = group.metadata
-            self.out_metadata['model_viewer_data'] = self.model_viewer_data
+            # params = group.params.iteritems()
+            # #resids = group.resids.iteritems()
+            # unknowns = group.unknowns.iteritems()
+            # self.out_metadata['Parameters'] = dict(params)
+            # self.out_metadata['Unknowns'] = dict(unknowns)
+            # self.out_metadata['system_metadata'] = group.metadata
+            # self.out_metadata['model_viewer_data'] = self.model_viewer_data
+            pass
 
 
-
-    # def record_iteration_the_blue_edition(self):
-    #         # for recording Drivers
-    #         design_vars=[], 
-    #         response=[], 
-    #         objectives=[], 
-    #         constraints=[], 
-
-    #         # For recording Systems
-    #         inputs=[], 
-    #         outputs=[], 
-    #         residuals=[], 
-
-    #         # For recording Solvers
-    #         absolute_error=[], 
-    #         relative_error=[], 
-    #         full_outputs=[], 
-    #         residuals=[], 
-
-            # metadata
-
-        # Not sure if we want to use the OrderDict method of aggregating 
-        #   the data that we are going to stuff into sqlite
-        data = OrderedDict()
-
-        # This is just what we did in clippy. Need to re-think all this
-        iteration_coordinate = metadata['coord']
-        group_name = format_iteration_coordinate(iteration_coordinate)
-
-        data['timestamp'] = metadata['timestamp']
-        data['success'] = metadata['success']
-        data['msg'] = metadata['msg']
-
-        if design_vars and self.options['record_design_vars']:
-            data['design_vars'] = design_vars
-
-        if response and self.options['record_response']:
-            data['response'] = response
-
-        if objectives and self.options['record_objectives']:
-            data['objectives'] = objectives
-
-        # ... and so on for the rest of the possible
-
-        self.out_iterations[group_name] = data
-
-
-
-
-
-
-    # def record_iteration(self, params, unknowns, resids, metadata):
-    def record_iteration(self, object_requesting_recording, metadata ):  ###### this is the one to look at Keith!
+    def record_iteration(self, object_requesting_recording, metadata ):
         """
         Stores the provided data in the sqlite file using the iteration
         coordinate for the key.
-
-        Args
-        ----
-        params : dict
-            Dictionary containing parameters. (p)
-
-        unknowns : dict
-            Dictionary containing outputs and states. (u)
-
-        resids : dict
-            Dictionary containing residuals. (r)
-
-        metadata : dict, optional
-            Dictionary containing execution metadata (e.g. iteration coordinate).
         """
 
-        self._counter += 1 # I don't think we need this because we can use the primary key feature of sqlite
-        if isinstance(object_requesting_recording,Driver):
+        #self._counter += 1 # I don't think we need this because we can use the primary key feature of sqlite
 
+        # Record an iteration from a Driver
+        if isinstance(object_requesting_recording,Driver):
+            self.record_iteration_driver(object_requesting_recording, metadata)
+
+        elif isinstance(object_requesting_recording, System):
+            self.record_iteration_system(object_requesting_recording, metadata)
+
+        elif isinstance(object_requesting_recording, Solver):
+            self.record_iteration_solver(object_requesting_recording, metadata)
+
+        else:
+            print ("YOU CAN'T ATTACH A RECORDER TO THIS OBJECT")
+
+
+    def record_iteration_driver(self, object_requesting_recording, metadata):
+{            dtype_tuples = []
+
+        #We will go through the recording options of Driver to construct the entry to be inserted.
+        if self.options['record_desvars']:
             # Just an example of the syntax for creating a numpy structured array
             # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
 
             design_vars = object_requesting_recording.get_design_var_values()
-            # This returns a dict of names and values. Use this to build up the tuples of 
+            # This returns a dict of names and values. Use this to build up the tuples of
             #   used for the dtypes in the creation of the numpy structured array we want to write to sqlite
-            dtype_tuples = []
             for name, value in iteritems(design_vars):
                 tple = ('design_var.' + name, '({},)f8'.format(len(value)) )
                 dtype_tuples.append(tple)
 
-            # Do the same thing for response, objective and constraint using 
-            #     get_response_values  -- even though Driver does not really support this!
-            #     get_objective_values
-            #     get_constraint_values
-            # Just keep adding to the same dtype_tuples but you have to change the prepended string
-            #     to indicate where the data came from, e.g. 'design_var.'
+        if self.options['record_responses']:
+            responses = object_requesting_recording.get_response_values()
 
+            for name, value in iteritems(responses):
+                tple = ('response.' + name, '({},)f8'.format(len(value)))
+                dtype_tuples.append(tple)
+
+        if self.options['record_objectives']:
+            objectives = object_requesting_recording.get_objective_values()
+
+            for name, value in iteritems(objectives):
+                tple = ('objective.' + name, '({},)f8'.format(len(value)))
+                dtype_tuples.append(tple)
+
+        if self.options['record_constraints']:
+            constraints = object_requesting_recording.get_constraint_values()
+
+            for name, value in iteritems(constraints):
+                tple = ('constraint.' + name, '({},)f8'.format(len(value)))
+                dtype_tuples.append(tple)
+
+        print("DTYPE_TUPLES: ", dtype_tuples)
+
+        driver_values = np.zeros((1,), dtype=dtype_tuples)
+
+        # Write the actual values to this array
+        if self.options['record_desvars']:
+            for name, value in iteritems(design_vars):
+                driver_values['design_var.' + name] = value
+        if self.options['record_responses']:
+            for name, value in iteritems(responses):
+                driver_values['response.' + name] = value
+        if self.options['record_objectives']:
+            for name, value in iteritems(objectives):
+                driver_values['objective.' + name] = value
+        if self.options['record_constraints']:
+            for name, value in iteritems(constraints):
+                driver_values['constraint.' + name] = value
+
+        print("DRIVER VALUES:", driver_values)
+        # Write this mega array to the database
+        self.con.execute("INSERT INTO driver_iterations(iteration_coordinate,driver_values) VALUES(?,?)",
+             ("foobar1/1", driver_values))
+}
+    def record_iteration_system(self, object_requesting_recording, metadata):
+        # Record an iteration from a System
+        if isinstance(object_requesting_recording, System):
+            dtype_tuples = []
+
+            # We will go through the recording options of Driver to construct the entry to be inserted.
+            if self.options['record_inputs']:
+                inputs = object_requesting_recording.get_inputs()
+                for name, value in iteritems(design_vars):
+                    tple = ('input.' + name, '({},)f8'.format(len(value)))
+                    dtype_tuples.append(tple)
+
+            if self.options['record_outputs']:
+                outputs = object_requesting_recording.get_outputs()
+                for name, value in iteritems(ouputs):
+                    tple = ('output.' + name, '({},)f8'.format(len(value)))
+                    dtype_tuples.append(tple)
+
+            if self.options['record_residuals']:
+                residuals = object_requesting_recording.get_residuals()
+                for name, value in iteritems(residuals):
+                    tple = ('residual.' + name, '({},)f8'.format(len(value)))
+                    dtype_tuples.append(tple)
+
+            if self.options['record_derivatives']:
+                derivatives = object_requesting_recording.get_derivatives()
+                for name, value in iteritems(derivatives):
+                    tple = ('derivative.' + name, '({},)f8'.format(len(value)))
+                    dtype_tuples.append(tple)
+
+            print("DTYPE_TUPLES: ", dtype_tuples)
 
             # Create the mega array that we will write to the database
-            # All of this needs to be looked into to be optimized !! 
-            driver_values = np.zeros((1,), dtype=dtype_tuples)
+            # All of this needs to be looked into to be optimized !!
+            system_values = np.zeros((1,), dtype=dtype_tuples)
 
             # Write the actual values to this array
             # Wish we didn't have to loop through this twice
-            for name, value in iteritems(design_vars):
-                driver_values['design_var.' + name] = value
-            # Repeat for response, objective and constraint
+            if self.options['record_inputs']:
+                for name, value in iteritems(inputs):
+                    system_values['input.' + name] = value
+            if self.options['record_outputs']:
+                for name, value in iteritems(outputs):
+                    system_values['output.' + name] = value
+            if self.options['record_residuals']:
+                for name, value in iteritems(residuals):
+                    system_values['residual.' + name] = value
+            if self.options['record_derivatives']:
+                for name, value in iteritems(derivatives):
+                    system_values['derivative.' + name] = value
 
+            print("SYSTEM VALUES:", system_values)
             # Write this mega array to the database
-            self.con.execute("INSERT INTO driver_iterations(iteration_coordinate,driver_values) VALUES(?,?)",
-                 ("foobar1/1", driver_values))
+            self.con.execute("INSERT INTO system_iterations(iteration_coordinate,driver_values) VALUES(?,?)",
+                             ("foobar1/1", system_values))
+
+    def record_iteration_solver(self, object_requesting_recording, metadata):
+            dtype_tuples = []
+
+            # We will go through the recording options of Driver to construct the entry to be inserted.
+            if self.options['record_abs_error']:
+                abs_errors = object_requesting_recording.get_abs_error()
+
+                for name, value in iteritems(abs_errors):
+                    tple = ('abs_error.' + name, '({},)f8'.format(len(value)))
+                    dtype_tuples.append(tple)
+
+            if self.options['record_rel_error']:
+                rel_errors = object_requesting_recording.get_rel_error()
+
+                for name, value in iteritems(rel_errors):
+                    tple = ('rel_error.' + name, '({},)f8'.format(len(value)))
+                    dtype_tuples.append(tple)
+
+            if self.options['record_output']:
+                outputs = object_requesting_recording.get_output()
+
+                for name, value in iteritems(outputs):
+                    tple = ('output.' + name, '({},)f8'.format(len(value)))
+                    dtype_tuples.append(tple)
+
+            if self.options['record_solver_residuals']:
+                residuals = object_requesting_recording.get_residuals()
+
+                for name, value in iteritems(residuals):
+                    tple = ('residual.' + name, '({},)f8'.format(len(value)))
+                    dtype_tuples.append(tple)
+
+            print("DTYPE_TUPLES: ", dtype_tuples)
+
+            # Create the mega array that we will write to the database
+            # All of this needs to be looked into to be optimized !!
+            solver_values = np.zeros((1,), dtype=dtype_tuples)
+
+            # Write the actual values to this array
+            # Wish we didn't have to loop through this twice
+            if self.options['record_abs_error']:
+                for name, value in iteritems(abs_errors):
+                    solver_values['abs_error.' + name] = value
+            if self.options['record_rel_error']:
+                for name, value in iteritems(rel_errors):
+                    solver_values['rel_error.' + name] = value
+            if self.options['record_output']:
+                for name, value in iteritems(outputs):
+                    solver_values['output.' + name] = value
+            if self.options['record_solver_residuals']:
+                for name, value in iteritems(residuals):
+                    solver_values['residual.' + name] = value
 
 
-        return ####### NOTICE THIS ########
+            if self.options['record_solver_residuals']:
+                residuals = object_requesting_recording.get_residuals()
 
-        # # TODO_RECORDERS: Clean up the stuff below as needed
-
-        # if MPI and MPI.COMM_WORLD.rank > 0 :
-        #     raise RuntimeError("not rank 0")
-
-        # data = OrderedDict()
-        # iteration_coordinate = metadata['coord']
-        # timestamp = metadata['timestamp']
-
-        # group_name = format_iteration_coordinate(iteration_coordinate)
-
-        # data['timestamp'] = timestamp
-        # data['success'] = metadata['success']
-        # data['msg'] = metadata['msg']
-
-        # if self.options['record_params']:
-        #     data['Parameters'] = self._filter_vector(params, 'p', iteration_coordinate)
-
-        # if self.options['record_unknowns']:
-        #     data['Unknowns'] = self._filter_vector(unknowns, 'u', iteration_coordinate)
-
-        # if self.options['record_resids']:
-        #     data['Residuals'] = self._filter_vector(resids, 'r', iteration_coordinate)
-
-        # self.out_iterations[group_name] = data
+                for name, value in iteritems(residuals):
+                    tple = ('residual.' + name, '({},)f8'.format(len(value)))
+                    dtype_tuples.append(tple)
+                solver_values = np.zeros((1,), dtype=dtype_tuples)
+                for name, value in iteritems(residuals):
+                    solver_values['residual.' + name] = value
 
 
 
-    def record_iteration_drayton_nethod(self, object_requesting_recording, **kwargs):
-
-        if isinstance(object_requesting_recording,System):
-            self.record_system_iteration(kwargs['inputs'], kwargs['outputs'],kwargs['residuals'])
-
-        if isinstance(object_requesting_recording,Driver):
-            self.record_driver_iteration(kwargs['inputs'], kwargs['outputs'],kwargs['residuals'])
 
 
-    def record_system_iteration(self, inputs, outputs, residuals):
-            # blah, blah
-            pass
+            print("SOLVER VALUES:", driver_values)
+            # Write this mega array to the database
+            self.con.execute("INSERT INTO solver_iterations(iteration_coordinate,solver_values) VALUES(?,?)",
+                             ("foobar1/1", solver_values))
 
-    def record_driver_iteration(self, something):
-            # blah, blah
-            pass
 
-    def record_derivatives(self, derivs, metadata):
-        """Writes the derivatives that were calculated for the driver.
 
-        Args
-        ----
-        derivs : dict or ndarray depending on the optimizer
-            Dictionary containing derivatives
-
-        metadata : dict, optional
-            Dictionary containing execution metadata (e.g. iteration coordinate).
-        """
-
-        data = OrderedDict()
-        iteration_coordinate = metadata['coord']
-        timestamp = metadata['timestamp']
-
-        group_name = format_iteration_coordinate(iteration_coordinate)
-
-        data['timestamp'] = timestamp
-        data['success'] = metadata['success']
-        data['msg'] = metadata['msg']
-        data['Derivatives'] = derivs
-
-        self.out_derivs[group_name] = data
+    # def record_derivatives(self, derivs, metadata):
+    #     """Writes the derivatives that were calculated for the driver.
+    #
+    #     Args
+    #     ----
+    #     derivs : dict or ndarray depending on the optimizer
+    #         Dictionary containing derivatives
+    #
+    #     metadata : dict, optional
+    #         Dictionary containing execution metadata (e.g. iteration coordinate).
+    #     """
+    #
+    #     data = OrderedDict()
+    #     iteration_coordinate = metadata['coord']
+    #     timestamp = metadata['timestamp']
+    #
+    #     group_name = format_iteration_coordinate(iteration_coordinate)
+    #
+    #     data['timestamp'] = timestamp
+    #     data['success'] = metadata['success']
+    #     data['msg'] = metadata['msg']
+    #     data['Derivatives'] = derivs
+    #
+    #     self.out_derivs[group_name] = data
 
     def close(self):
         """Closes `out`"""

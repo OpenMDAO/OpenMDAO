@@ -38,7 +38,7 @@ class Driver(object):
         Initialize the driver.
         """
 
-        self.recorders = RecordingManager()
+        self._rec_mgr = RecordingManager()
 
         self._problem = None
         self._designvars = None
@@ -79,12 +79,12 @@ class Driver(object):
            A recorder instance.
         """
         recorder._owners.append(self)
-        self.recorders.append(recorder)
+        self._rec_mgr.append(recorder)
         return recorder
 
     def cleanup(self):
         """ Clean up resources prior to exit. """
-        self.recorders.close()
+        self._rec_mgr.close()
 
     def _setup_driver(self, problem):
         """
@@ -106,6 +106,8 @@ class Driver(object):
         self._responses = model.get_responses(recurse=True)
         self._objs = model.get_objectives(recurse=True)
         self._cons = model.get_constraints(recurse=True)
+        self._rec_mgr.startup()
+
 
     def get_design_var_values(self):
         """
@@ -271,7 +273,7 @@ class Driver(object):
         failure_flag = self._problem.model._solve_nonlinear()
 
         # TODO_RECORDERS: do the equivalent to this
-        #         self.recorders.record_iteration(system, metadata)
+        #         self.rec_mgr.record_iteration(system, metadata)
 
         # need to record these :
 
@@ -280,11 +282,9 @@ class Driver(object):
         #     objectives
         #     constraints
 
-        # We would definitely need driver recording (dvs, responses,), and optionally recording of state values in each optimization iteration
+        # We would definitely need driver recording (dvs, responses, ...), and optionally recording of state values in each optimization iteration
 
-
-        # This is just a hack to do some recording of something
-        self.recorders.record_iteration(self, metadata)
+        self._rec_mgr.record_iteration(self, metadata)
 
         return failure_flag
 

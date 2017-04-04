@@ -6,12 +6,27 @@ import numpy as np
 from six import itervalues
 
 from openmdao.core.component import Component
+from openmdao.utils.class_util import overrides_method
 
 
 class ImplicitComponent(Component):
     """
     Class to inherit from when all output variables are implicit.
     """
+
+    def __init__(self, **kwargs):
+        """
+        Check if we are matrix-free.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            available here and in all descendants of this system.
+        """
+        super(ImplicitComponent, self).__init__(**kwargs)
+
+        if overrides_method('apply_linear', self, ImplicitComponent):
+            self._matrix_free = True
 
     def _apply_nonlinear(self):
         """
@@ -122,9 +137,16 @@ class ImplicitComponent(Component):
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
-    def _linearize(self):
+    def _linearize(self, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
+
+        Parameters
+        ----------
+        do_nl : boolean
+            Flag indicating if the nonlinear solver should be linearized.
+        do_ln : boolean
+            Flag indicating if the linear solver should be linearized.
         """
         with self.jacobian_context() as J:
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
@@ -135,13 +157,13 @@ class ImplicitComponent(Component):
                     approximation.compute_approximations(self, jac=J)
                 self.linearize(self._inputs, self._outputs, J)
 
-            if self._owns_global_jac:
+            if self._owns_assembled_jac:
                 J._update()
 
-        if self._nl_solver is not None:
+        if self._nl_solver is not None and do_nl:
             self._nl_solver._linearize()
 
-        if self._ln_solver is not None:
+        if self._ln_solver is not None and do_ln:
             self._ln_solver._linearize()
 
     def apply_nonlinear(self, inputs, outputs, residuals):

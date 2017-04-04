@@ -5,7 +5,11 @@ import sys
 
 from six import StringIO
 
-# from openmdao.util.options import OptionsDictionary
+from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.general_utils import warn_deprecation
+
+import warnings
+
 
 class BaseRecorder(object):
     """ This is a base class for all case recorders and is not a functioning
@@ -15,13 +19,13 @@ class BaseRecorder(object):
     -------
     options['record_metadata'] :  bool(True)
         Tells recorder whether to record variable attribute metadata.
-    options['record_unknowns'] :  bool(True)
-        Tells recorder whether to record the unknowns vector.
-    options['record_params'] :  bool(False)
-        Tells recorder whether to record the params vector.
-    options['record_resids'] :  bool(False)
+    options['record_outputs'] :  bool(True)
+        Tells recorder whether to record the outputs vector.
+    options['record_inputs'] :  bool(False)
+        Tells recorder whether to record the inputs vector.
+    options['record_residuals'] :  bool(False)
         Tells recorder whether to record the ressiduals vector.
-    options['record_derivs'] :  bool(True)
+    options['record_derivatives'] :  bool(True)
         Tells recorder whether to record derivatives that are requested by a `Driver`.
     options['includes'] :  list of strings
         Patterns for variables to include in recording.
@@ -30,19 +34,48 @@ class BaseRecorder(object):
     """
 
     def __init__(self):
-        # self.options = OptionsDictionary()
-        # self.options.add_option('record_metadata', True)
-        # self.options.add_option('record_unknowns', True)
-        # self.options.add_option('record_params', False)
-        # self.options.add_option('record_resids', False)
-        # self.options.add_option('record_derivs', True,
-        #                         desc='Set to True to record derivatives at the driver level')
-        # self.options.add_option('includes', ['*'],
-        #                         desc='Patterns for variables to include in recording')
-        # self.options.add_option('excludes', [],
-        #                         desc='Patterns for variables to exclude from recording '
-        #                         '(processed after includes)')
-        # self.out = None
+        self.options = OptionsDictionary()
+        # Options common to all objects
+        self.options.declare('record_metadata', bool, 'Record metadata', True)
+        self.options.declare('includes', list, 'Patterns for variables to include in recording', ['*'])
+        self.options.declare('excludes', list, 'Patterns for vars to exclude in recording (processed post-includes)',
+                             value=[])
+
+        # Old options that will be deprecated
+        self.options.declare('record_unknowns', bool, 'Deprecated option to record unknowns.', False)
+        self.options.declare('record_params', bool, 'Deprecated option to record params.', False)
+        self.options.declare('record_resids', bool, 'Deprecated option to record residuals.', False)
+        self.options.declare('record_derivs', bool, 'Deprecated option to record derivatives.', False)
+
+        # System options
+        self.options.declare('record_outputs', bool,
+                             'Set to True to record outputs at the system level', True)
+        self.options.declare('record_inputs', bool,
+                             'Set to True to record inputs at the system level', True)
+        self.options.declare('record_residuals', bool,
+                             'Set to True to record residuals at the system level', True)
+        self.options.declare('record_derivatives', bool,
+                             'Set to True to record derivatives at the system level', False)
+
+        # Driver options
+        self.options.declare('record_desvars', bool, 'Set to True to record design variables at the driver level',
+                                True)
+        self.options.declare('record_responses', bool, 'Set to True to record responses at the driver level',
+                             False)
+        self.options.declare('record_objectives', bool, 'Set to True to record objectives at the driver level',
+                             False)
+        self.options.declare('record_constraints', bool, 'Set to True to record constraints at the driver level',
+                             False)
+
+        # Solver options
+        self.options.declare('record_abs_error', bool, 'Set to True to record absolute error at the solver level', True)
+        self.options.declare('record_rel_error', bool, 'Set to True to record relative error at the solver level', True)
+        self.options.declare('record_output', bool, 'Set to True to record output at the solver level', False)
+        self.options.declare('record_solver_residuals', bool, 'Set to True to record residuals at the solver level', False)
+
+
+        self._owners = []
+        self.out = None
 
         # # This is for drivers to determine if a recorder supports
         # # real parallel recording (recording on each process), because
@@ -60,7 +93,7 @@ class BaseRecorder(object):
         self._owners = []
 
 
-    def startup(self, group):
+    def startup(self):
         """ Prepare for a new run.
 
         Args
@@ -68,29 +101,45 @@ class BaseRecorder(object):
         group : `Group`
             Group that owns this recorder.
         """
+        myinputs = myoutputs = myresiduals = set()
 
-        # myparams = myunknowns = myresids = set()
+        check = self._check_path
+        incl = self.options['includes']
+        excl = self.options['excludes']
 
-        # check = self._check_path
-        # incl = self.options['includes']
-        # excl = self.options['excludes']
+        # Deprecated options here?
+        if self.options['record_params']:
+            warn_deprecation("record_params is deprecated, please use record_inputs.")
+            # set option to what the user intended.
+            self.options['record_inputs'] = True
 
-        # # Compute the inclusion lists for recording
-        # if self.options['record_params']:
-        #     myparams = [n for n in group.params if check(n, incl, excl)]
-        # if self.options['record_unknowns']:
-        #     myunknowns = [n for n in group.unknowns if check(n, incl, excl)]
-        #     if self.options['record_resids']:
-        #         myresids = myunknowns # unknowns and resids have same names
-        # elif self.options['record_resids']:
-        #     myresids = [n for n in group.resids if check(n, incl, excl)]
+        if self.options['record_unknowns']:
+            warn_deprecation("record_ is deprecated, please use record_inputs.")
+            # set option to what the user intended.
+            self.options['record_outputs'] = True
 
+        if self.options['record_resids']:
+            warn_deprecation("record_params is deprecated, please use record_inputs.")
+            # set option to what the user intended.
+            self.options['record_residuals'] = True
+
+        # Compute the inclusion lists for recording
+        # if self.options['record_inputs']:
+        #     myinputs = [n for n in group.inputs if check(n, incl, excl)]
+        # if self.options['record_outputs']:
+        #     myoutputs = [n for n in group.outputs if check(n, incl, excl)]
+        #     if self.options['record_residuals']:
+        #         myresiduals = myoutputs # outputs and residuals have same names
+        # elif self.options['record_residuals']:
+        #     myresiduals = [n for n in group.residuals if check(n, incl, excl)]
+        #
         # self._filtered[group.pathname] = {
-        #     'p': myparams,
-        #     'u': myunknowns,
-        #     'r': myresids
+        #     'p': myinputs,
+        #     'u': myoutputs,
+        #     'r': myresiduals
         # }
-        pass
+
+
 
     def _check_path(self, path, includes, excludes):
         """ Return True if `path` should be recorded. """
@@ -136,19 +185,19 @@ class BaseRecorder(object):
         raise NotImplementedError()
 
     # TODO_RECORDER: change the signature to match what we decided to do with sqlite, hdf5,...
-    def record_iteration(self, params, unknowns, resids, metadata):
+    def record_iteration(self, object_requesting_recording, metadata):
         """
         Writes the provided data.
 
         Args
         ----
-        params : dict
+        inputs : dict
             Dictionary containing parameters. (p)
 
-        unknowns : dict
+        outputs : dict
             Dictionary containing outputs and states. (u)
 
-        resids : dict
+        residuals : dict
             Dictionary containing residuals. (r)
 
         metadata : dict, optional

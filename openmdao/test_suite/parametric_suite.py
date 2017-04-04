@@ -9,10 +9,7 @@ from nose_parameterized import parameterized
 from unittest import SkipTest
 
 from openmdao.core.problem import Problem
-from openmdao.jacobians.global_jacobian import GlobalJacobian
-from openmdao.matrices.coo_matrix import COOmatrix
-from openmdao.matrices.csr_matrix import CSRmatrix
-from openmdao.matrices.dense_matrix import DenseMatrix
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, CSRJacobian
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.test_suite.groups.cycle_group import CycleGroup
@@ -191,18 +188,19 @@ class ParameterizedInstance(object):
         self.problem = prob = Problem(group)
 
         if args['global_jac']:
-            
-            # Deprecated test won't work with GlobalJacobian because it defines an apply_linear.
-            if args['component_class'] == 'deprecated':
-                raise SkipTest('GlobalJacobian not suppported in Deprecated Cycle test.')
-            
+
+            # Deprecated test won't work with AssembledJacobian because it defines an apply_linear.
+            # Explicit cycle test won't work with AssembledJacobian because it defines a compute_jacvec_product.
+            if args['component_class'] in ['deprecated', 'explicit']:
+                raise SkipTest('AssembledJacobian not suppported in Cycle test.')
+
             jacobian_type = args['jacobian_type']
             if jacobian_type == 'dense':
-                prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+                prob.model.jacobian = DenseJacobian()
             elif jacobian_type == 'sparse-coo':
-                prob.model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
+                prob.model.jacobian = COOJacobian()
             elif jacobian_type == 'sparse-csr':
-                prob.model.jacobian = GlobalJacobian(matrix_class=CSRmatrix)
+                prob.model.jacobian = CSRJacobian()
 
         prob.model.ln_solver = self.linear_solver_class(**self.linear_solver_options)
 

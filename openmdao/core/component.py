@@ -17,7 +17,7 @@ from collections import OrderedDict, Iterable
 
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, PathData
-from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation
@@ -34,6 +34,9 @@ class Component(System):
         A mapping of local variable name to its metadata.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
+    _matrix_free : Bool
+        This is set to True if the component overrides the appropriate function with a user-defined
+        matrix vector product with the Jacobian.
     _var_rel2data_io : dict
         Dictionary mapping rellative names to dicts with keys (prom, rel, my_idx, type_, metadata).
         This is only needed while adding inputs and outputs. During setup, these are used to
@@ -55,6 +58,8 @@ class Component(System):
         """
         super(Component, self).__init__(**kwargs)
         self._approx_schemes = OrderedDict()
+
+        self._matrix_free = False
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
@@ -228,10 +233,6 @@ class Component(System):
         if upper is not None:
             upper = format_as_float_or_array('upper', upper)
 
-        for item in ['ref', 'ref0', 'res_ref', 'res_ref0']:
-            if not np.isscalar(locals()[item]):
-                raise TypeError('The %s argument should be a float' % (item))
-
         # Check that units are valid
         if units is not None and not valid_units(units):
             raise ValueError("The units '%s' are invalid" % units)
@@ -257,6 +258,18 @@ class Component(System):
             raise ValueError('The upper argument has the wrong shape')
         metadata['lower'] = lower
         metadata['upper'] = upper
+
+        # All refs: check the shape if necessary
+        for item, msg in zip([ref, ref0, res_ref, res_ref0],
+                             ['ref', 'ref0', 'res_ref', 'res_ref0']):
+            if not np.isscalar(item) and \
+               np.atleast_1d(item).shape != metadata['shape']:
+                raise ValueError('The %s argument has the wrong shape' % msg)
+
+        ref = format_as_float_or_array('ref', ref, flatten=True)
+        ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
+        res_ref = format_as_float_or_array('res_ref', res_ref, flatten=True)
+        res_ref0 = format_as_float_or_array('res_ref0', res_ref0, flatten=True)
 
         # ref, ref0, res_ref, res_ref0: taken as is
         metadata['ref'] = ref

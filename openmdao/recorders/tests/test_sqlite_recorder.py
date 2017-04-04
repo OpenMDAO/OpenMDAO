@@ -22,7 +22,7 @@ from openmdao.api import Problem, SqliteRecorder
 from openmdao.recorders.sqlite_recorder import format_version
 
 from openmdao.test_suite.components.sellar import SellarDerivatives
-
+import warnings
 
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
@@ -48,8 +48,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.tablename_iterations = 'iterations'
         # self.tablename_derivs = 'derivs'
         self.recorder = SqliteRecorder(self.filename)
-        print(self.filename)
-        # self.recorder.options['record_metadata'] = True
+        #print(self.filename)
         # self.eps = 1e-5
 
     def tearDown(self):
@@ -68,8 +67,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
 
         prob.driver.add_recorder(self.recorder)
-        # self.recorder.options['record_params'] = True
-        # self.recorder.options['record_resids'] = True
+        self.recorder.options['record_inputs'] = True
+        self.recorder.options['record_params'] = True
 
         model.add_design_var('z')
         model.add_objective('obj')

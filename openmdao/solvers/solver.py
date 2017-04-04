@@ -4,7 +4,8 @@ from __future__ import division, print_function
 import numpy as np
 
 from openmdao.utils.generalized_dict import OptionsDictionary
-from openmdao.jacobians.global_jacobian import GlobalJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.recorders.recording_manager import RecordingManager
 
 
 class Solver(object):
@@ -60,6 +61,22 @@ class Solver(object):
         self._declare_options()
         self.options.update(kwargs)
 
+        self._rec_mgr = RecordingManager()
+
+
+    def add_recorder(self, recorder):
+        """
+        Adds a recorder to the driver.
+
+        Args
+        ----
+        recorder : BaseRecorder
+           A recorder instance.
+        """
+        recorder._owners.append(self)
+        self._rec_mgr.append(recorder)
+        return recorder
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -81,6 +98,7 @@ class Solver(object):
         """
         self._system = system
         self._depth = depth
+        self._rec_mgr.startup()
 
     def _mpi_print(self, iteration, abs_res, rel_res):
         """
@@ -137,22 +155,24 @@ class Solver(object):
         atol = self.options['atol']
         rtol = self.options['rtol']
 
-        norm0, norm = self._iter_initialize()
         self._iter_count = 0
+        norm0, norm = self._iter_initialize()
         self._mpi_print(self._iter_count, norm, norm / norm0)
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
             self._iter_execute()
             norm = self._iter_get_norm()
+            self._iter_count += 1
+            norm = self._iter_get_norm()
 
             # TODO_RECORDER I think we write to the recorder here
-            # Right, it would depend on the mode and whether it's linear or nonlinear. The most basic mode would store 
+            # Right, it would depend on the mode and whether it's linear or nonlinear. The most basic mode would store
             #  just the absolute error and relative error. A second mode would store the full outputs and residuals.
 
             # The full solver residual/output recording and apply_nonlinear/apply_linear recording probably falls last in terms of priority
 
+            self._rec_mgr.record_iteration(self)
 
-            self._iter_count += 1
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
@@ -193,6 +213,17 @@ class Solver(object):
         Perform any required linearization operations such as matrix factorization.
         """
         pass
+
+    def _linearize_children(self):
+        """
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.t.
+
+        Returns
+        -------
+        boolean
+            Flag for indicating child linerization
+        """
+        return True
 
     def solve(self):
         """
@@ -378,8 +409,8 @@ class BlockLinearSolver(LinearSolver):
         float
             error at the first iteration.
         """
-        if isinstance(self._system._jacobian, GlobalJacobian):
+        if isinstance(self._system._jacobian, AssembledJacobian):
             raise RuntimeError("A block linear solver '%s' is being used with "
-                               "a GlobalJacobian in system '%s'" %
+                               "an AssembledJacobian in system '%s'" %
                                (self.SOLVER, self._system.pathname))
         return super(BlockLinearSolver, self)._iter_initialize()

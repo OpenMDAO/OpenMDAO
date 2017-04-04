@@ -53,6 +53,31 @@ Options
   .. embed-test::
       openmdao.solvers.tests.test_nl_newton.TestNewtonFeatures.test_feature_rtol
 
+- solve_subsystems
+
+  If you set this option to True, the NewtonSolver will call `solve_nonlinear` on all of its subsystems. You can
+  use this to solve difficult multi-level problems by attaching solvers to subsystems. This assures that those
+  subsystems will already be in an internally solved state when the Newton solver goes to solve it.
+
+  This example shows two instances of the Sellar model which we have connected together to form a larger cycle.
+  We specify a Newton solver in each Sellar sub-group as well as a top level Newton solver which we tell to solve
+  its subsystems.
+
+  .. embed-test::
+      openmdao.solvers.tests.test_nl_newton.TestNewton.test_solve_subsystems_basic
+
+- max_sub_solves
+
+  This option is used in conjuction with the "solve_subsystems" option. It controls the number of iterations for which
+  the NewtonSolver will allow subsystems to solve themselves. When the iteration count exceeds `max_sub_solves`,  Newton
+  returns to its default behavior.
+
+  For example, if you set `max_sub_solves` to zero, then the solvers on subsystems are executed during the initial
+  evaluation, but not during any subsequent iteration.
+
+  .. embed-test::
+      openmdao.solvers.tests.test_nl_newton.TestNewtonFeatures.test_feature_max_sub_solves
+
 Specifying a Linear Solver
 --------------------------
 

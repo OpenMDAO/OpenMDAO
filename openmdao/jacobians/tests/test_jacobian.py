@@ -10,8 +10,10 @@ from six.moves import range
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
-from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
-     GlobalJacobian, NewtonSolver, ScipyIterativeSolver, CSRmatrix, COOmatrix, ExecComp
+from openmdao.api import IndepVarComp, Group, Problem, \
+                         ExplicitComponent, ImplicitComponent, ExecComp, \
+                         NewtonSolver, ScipyIterativeSolver, \
+                         DenseJacobian, CSRJacobian, COOJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -172,15 +174,15 @@ def _test_func_name(func, num, param):
 class TestJacobian(unittest.TestCase):
 
     @parameterized.expand(itertools.product(
-        [DenseMatrix, CSRmatrix, COOmatrix],
+        [DenseJacobian, CSRJacobian, COOJacobian],
         [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist],
         [False, True],  # not nested, nested
         [0, 1],  # extra calls to linearize
         ), testcase_func_name=_test_func_name
     )
-    def test_src_indices(self, matrix_class, comp_jac_class, nested, lincalls):
+    def test_src_indices(self, jacobian_class, comp_jac_class, nested, lincalls):
 
-        self._setup_model(matrix_class, comp_jac_class, nested, lincalls)
+        self._setup_model(jacobian_class, comp_jac_class, nested, lincalls)
 
         # if we multiply our jacobian (at x,y = ones) by our work vec of 1's,
         # we get fwd_check
@@ -197,7 +199,7 @@ class TestJacobian(unittest.TestCase):
         self._check_fwd(self.prob, fwd_check)
         self._check_rev(self.prob, rev_check)
 
-    def _setup_model(self, mat_class, comp_jac_class, nested, lincalls):
+    def _setup_model(self, jac_class, comp_jac_class, nested, lincalls):
         self.prob = prob = Problem(model=Group())
         if nested:
             top = prob.model.add_subsystem('G1', Group())
@@ -215,7 +217,7 @@ class TestJacobian(unittest.TestCase):
         top.connect('indep.a', 'C2.w', src_indices=[0,2,1])
         top.connect('C1.f', 'C2.z', src_indices=[1])
 
-        top.jacobian = GlobalJacobian(matrix_class=mat_class)
+        top.jacobian = jac_class()
         top.nl_solver = NewtonSolver()
         top.nl_solver.ln_solver = ScipyIterativeSolver(maxiter=100)
         top.ln_solver = ScipyIterativeSolver(
@@ -309,7 +311,7 @@ class TestJacobian(unittest.TestCase):
 
         d1 = prob.model.get_subsystem('d1')
 
-        d1.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        d1.jacobian = DenseJacobian()
         prob.model.suppress_solver_output = True
 
         prob.setup(check=False)
@@ -319,7 +321,7 @@ class TestJacobian(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_global_jac_bad_key(self):
-        # this test fails if GlobalJacobian._update sets in_start with 'output' instead of 'input'
+        # this test fails if AssembledJacobian._update sets in_start with 'output' instead of 'input'
         prob = Problem()
         prob.model = Group()
         prob.model.add_subsystem('indep', IndepVarComp('x', 1.0))
@@ -328,7 +330,7 @@ class TestJacobian(unittest.TestCase):
         c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0'))
 
         prob.model.nl_solver = NewtonSolver()
-        c3.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        c3.jacobian = DenseJacobian()
 
         prob.model.connect('indep.x', 'C1.a')
         prob.model.connect('indep.x', 'C2.a')
@@ -344,11 +346,11 @@ class TestJacobian(unittest.TestCase):
         prob.model = SellarDerivatives()
         prob.model.nl_solver = NewtonSolver()
 
-        prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        prob.model.jacobian = DenseJacobian()
 
         prob.setup(check=False)
 
-        prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        prob.model.jacobian = DenseJacobian()
 
         msg = ": jacobian has changed and setup was not called."
         with assertRaisesRegex(self, Exception, msg):
@@ -362,15 +364,21 @@ class TestJacobian(unittest.TestCase):
         prob.setup(check=False)
 
         d1 = prob.model.get_subsystem('d1')
-        d1.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        d1.jacobian = DenseJacobian()
 
         msg = "d1: jacobian has changed and setup was not called."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 
-    def test_global_jacobian_unsupported_cases(self):
+    def test_assembled_jacobian_unsupported_cases(self):
 
-        class ParaboloidApply(Paraboloid):
+        class ParaboloidApply(ImplicitComponent):
+
+            def initialize_variables(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
 
             def linearize(self, inputs, outputs, jacobian):
                 return
@@ -392,9 +400,9 @@ class TestJacobian(unittest.TestCase):
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
-        model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        model.jacobian = DenseJacobian()
 
-        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.setup()
 
@@ -412,9 +420,9 @@ class TestJacobian(unittest.TestCase):
         model.connect('p1.x', 'sub.comp.x')
         model.connect('p2.y', 'sub.comp.y')
 
-        model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        model.jacobian = DenseJacobian()
 
-        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.setup()
 
@@ -434,9 +442,9 @@ class TestJacobian(unittest.TestCase):
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
-        model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        model.jacobian = DenseJacobian()
 
-        msg = "GlobalJacobian not supported if any subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.setup()
 
@@ -452,9 +460,38 @@ class TestJacobian(unittest.TestCase):
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
-        model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+        model.jacobian = DenseJacobian()
 
         prob.setup()
+
+        class ParaboloidJacVec(Paraboloid):
+
+            def linearize(self, inputs, outputs, jacobian):
+                return
+
+            def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, d_residuals,
+                                       mode):
+                d_residuals['x'] += (np.exp(outputs['x']) - 2*inputs['a']**2 * outputs['x'])*d_outputs['x']
+                d_residuals['x'] += (-2 * inputs['a'] * outputs['x']**2)*d_inputs['a']
+
+        # One level deep
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('p2', IndepVarComp('y', val=1.0))
+        model.add_subsystem('comp', ParaboloidJacVec())
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        model.jacobian = DenseJacobian()
+
+        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
+        with assertRaisesRegex(self, Exception, msg):
+            prob.setup()
+
 
 if __name__ == '__main__':
     unittest.main()
