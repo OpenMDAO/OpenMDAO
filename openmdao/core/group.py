@@ -360,7 +360,7 @@ class Group(System):
     def _setupx_connections(self):
         super(Group, self)._setupx_connections()
 
-        input2src_abs = self._conn_input2src_abs
+        input2src_abs = self._conn_abs_input2src
 
         allprocs_prom2abs_list_in = self._varx_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._varx_allprocs_prom2abs_list['output']
@@ -430,6 +430,10 @@ class Group(System):
                 warnings.warn("Input '%s' with units of '%s' is "
                               "connected to output '%s' which has "
                               "no units." % (abs_in, in_units, abs_out))
+
+    def _setupx_partials(self):
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_partials()
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------

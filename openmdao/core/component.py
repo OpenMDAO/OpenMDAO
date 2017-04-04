@@ -236,6 +236,11 @@ class Component(System):
                     self.comm.Allgather(
                         set2sizes[type_][set_name][iproc, :], set2sizes[type_][set_name])
 
+    def _setupx_partials(self):
+        super(Component, self)._setupx_partials()
+
+        self.initialize_partials()
+
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------
     #

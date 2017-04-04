@@ -188,7 +188,7 @@ class System(object):
         self._jacobian_changed = True
         self._owns_assembled_jac = False
 
-        self._subjacs_info = OrderedDict()
+        self._subjacs_info = {}
 
         self._nl_solver = None
         self._ln_solver = None
@@ -196,6 +196,33 @@ class System(object):
 
         self._design_vars = {}
         self._responses = {}
+
+        # # Reconfigurability attributes
+        #
+        # self.pathname = ''
+        # self.comm = None
+        # self._mpi_proc_range = [0, 1]
+        #
+        # self._varx_abs_names = {'input': [], 'output': []}
+        # self._varx_allprocs_abs_names = {'input': [], 'output': []}
+        # self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        # self._varx_abs2data_io = {}
+        # self._varx_allprocs_abs2meta_io = {}
+        #
+        # self._varx_allprocs_set2abs_names = {'input': {}, 'output': {}}
+        # self._varx_set2iset = None
+        #
+        # self._varx_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
+        # self._varx_allprocs_vst_idx_ranges = {'input': None, 'output': None}
+        # self._varx_allprocs_abs2idx_io = {}
+        # self._varx_set_indices = {'input': None, 'output': None}
+        #
+        # self._varx_sizes = {'input': None, 'output': None}
+        # self._varx_set2sizes = {'input': {}, 'output': {}}
+        #
+        # self._conn_abs_input2src = {}
+        #
+        # self._partials_info = {}
 
     #
     #
@@ -213,6 +240,7 @@ class System(object):
         )
         self._setupx_var_sizes()
         self._setupx_connections()
+        self._setupx_partials()
 
     def _setupx_processors(self, pathname, comm, proc_range):
         self.pathname = pathname
@@ -271,7 +299,10 @@ class System(object):
         self._varx_set2sizes = {'input': {}, 'output': {}}
 
     def _setupx_connections(self):
-        self._conn_input2src_abs = {}
+        self._conn_abs_input2src = {}
+
+    def _setupx_partials(self):
+        self._subjacs_info = {}
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------
