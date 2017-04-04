@@ -160,7 +160,6 @@ class RecordingManager(object):
         for recorder in self._recorders:
             recorder.record_iteration(case['p'], case['u'], case['r'], case['meta'])
 
-    # def record_iteration(self, root, metadata, dummy=False):
     def record_iteration(self, object_requesting_recording, metadata):
         """ Gathers variables for non-parallel case recorders and calls
         record for all recorders.
@@ -180,6 +179,8 @@ class RecordingManager(object):
         if not self._recorders:
             return
 
+        if metadata is not None:
+            metadata['timestamp'] = time.time()
 
         for recorder in self._recorders:
             recorder.record_iteration(object_requesting_recording, metadata)
@@ -189,58 +190,56 @@ class RecordingManager(object):
 
         # TODO_RECORDERS: get rid of the rest of this as needed
 
-        if metadata is not None:
-            metadata['timestamp'] = time.time()
-
-        inputs = root.inputs
-        outputs = root.outputs
-        resids = root.resids
-
-        cases = None
-
-        if MPI:
-            if dummy and self._casecomm is not None:
-                case = (None, None, None, None)
-                if trace: debug("DUMMY gathering cases")
-                cases = self._casecomm.gather(case, root=0)
-                if trace: debug("DUMMY done gathering cases:")
-                return
-
-            pnames = self._vars_to_record['pnames']
-            unames = self._vars_to_record['unames']
-            rnames = self._vars_to_record['rnames']
-
-            # get names and values of all locally owned variables
-            inputs = {p: inputs[p] for p in pnames}
-            outputs = {u: outputs[u] for u in unames}
-            resids = {r: resids[r] for r in rnames}
-
-            if self._has_serial_recorders:
-                inputs = self._gather_vars(root, inputs) if self._record_p else {}
-                outputs = self._gather_vars(root, outputs) if self._record_u else {}
-                resids = self._gather_vars(root, resids) if self._record_r else {}
-
-                if self._casecomm is not None:
-                    # our parent driver is running a parallel DOE, so we need to
-                    # gather all of the cases to this rank and loop over them
-                    case = (inputs, outputs, resids, metadata)
-                    if trace: debug("gathering cases")
-                    cases = self._casecomm.gather(case, root=0)
-                    if trace: debug("done gathering cases")
-                    if cases is None:
-                        cases = []
-
-        if cases is None:
-            cases = [(inputs, outputs, resids, metadata)]
-
-        # If the recorder does not support parallel recording
-        # we need to make sure we only record on rank 0.
-        for inputs, outputs, resids, meta in cases:
-            if inputs is None: # dummy cases have None in place of inputs, etc.
-                continue
-            for recorder in self._recorders:
-                if recorder._parallel or MPI is None or self.rank == 0:
-                    recorder.record_iteration(inputs, outputs, resids, meta)
+        #
+        # inputs = root.inputs
+        # outputs = root.outputs
+        # resids = root.resids
+        #
+        # cases = None
+        #
+        # if MPI:
+        #     if dummy and self._casecomm is not None:
+        #         case = (None, None, None, None)
+        #         if trace: debug("DUMMY gathering cases")
+        #         cases = self._casecomm.gather(case, root=0)
+        #         if trace: debug("DUMMY done gathering cases:")
+        #         return
+        #
+        #     pnames = self._vars_to_record['pnames']
+        #     unames = self._vars_to_record['unames']
+        #     rnames = self._vars_to_record['rnames']
+        #
+        #     # get names and values of all locally owned variables
+        #     inputs = {p: inputs[p] for p in pnames}
+        #     outputs = {u: outputs[u] for u in unames}
+        #     resids = {r: resids[r] for r in rnames}
+        #
+        #     if self._has_serial_recorders:
+        #         inputs = self._gather_vars(root, inputs) if self._record_p else {}
+        #         outputs = self._gather_vars(root, outputs) if self._record_u else {}
+        #         resids = self._gather_vars(root, resids) if self._record_r else {}
+        #
+        #         if self._casecomm is not None:
+        #             # our parent driver is running a parallel DOE, so we need to
+        #             # gather all of the cases to this rank and loop over them
+        #             case = (inputs, outputs, resids, metadata)
+        #             if trace: debug("gathering cases")
+        #             cases = self._casecomm.gather(case, root=0)
+        #             if trace: debug("done gathering cases")
+        #             if cases is None:
+        #                 cases = []
+        #
+        # if cases is None:
+        #     cases = [(inputs, outputs, resids, metadata)]
+        #
+        # # If the recorder does not support parallel recording
+        # # we need to make sure we only record on rank 0.
+        # for inputs, outputs, resids, meta in cases:
+        #     if inputs is None: # dummy cases have None in place of inputs, etc.
+        #         continue
+        #     for recorder in self._recorders:
+        #         if recorder._parallel or MPI is None or self.rank == 0:
+        #             recorder.record_iteration(inputs, outputs, resids, meta)
 
     # def record_derivatives(self, derivs, metadata):
     #     """" Records derivatives if requested.
