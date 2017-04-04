@@ -250,7 +250,7 @@ class System(object):
         set2iset, counter, counter_local, counter_byset = self._setupx_get_initial()
         self._setupx_var_indices(set2iset, counter, counter_local, counter_byset)
         self._setupx_var_data()
-        # self._setupx_var_index_maps()
+        self._setupx_var_index_maps()
 
     def _setupx_procs(self, pathname, comm, proc_range):
         self.pathname = pathname
@@ -294,7 +294,7 @@ class System(object):
         self._varx_abs2meta = {'input': {}, 'output': {}}
 
     def _setupx_var_index_maps(self):
-        self._varx_allprocs_abs2idx = {}
+        self._varx_allprocs_abs2idx = {'input': {}, 'output': {}}
         self._varx_set_indices = {'input': None, 'output': None}
 
     # -------------------------------------------------------------------------------------

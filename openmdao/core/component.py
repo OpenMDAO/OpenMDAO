@@ -148,6 +148,34 @@ class Component(System):
                 # Compute abs2meta
                 abs2meta[type_][abs_name] = metadata
 
+    def _setupx_var_index_maps(self):
+        super(Component, self)._setupx_var_index_maps()
+        allprocs_abs2idx = self._varx_allprocs_abs2idx
+        set_indices = self._varx_set_indices
+
+        abs2meta = self._varx_abs2meta
+        set2iset = self._set2iset
+
+        # Compute _varx_allprocs_abs2idx
+        for type_ in ['input', 'output']:
+            offset = self._varx_range[type_][0]
+            for ind, abs_name in enumerate(self._varx_allprocs_abs_names[type_]):
+                allprocs_abs2idx[type_][abs_name] = offset + ind
+
+        # Compute _varx_set_indices
+        for type_ in ['input', 'output']:
+            nvar = len(self._varx_abs_names[type_])
+            counter = {set_name: 0 for set_name in set2iset[type_]}
+
+            set_indices[type_] = np.zeros((nvar, 2), int)
+            for ind, abs_name in enumerate(self._varx_abs_names[type_]):
+                set_name = abs2meta[type_][abs_name]['var_set']
+                offset = self._varx_range_byset[type_][set_name][0]
+                iset = set2iset[type_][set_name]
+                set_indices[type_][ind, 0] = iset
+                set_indices[type_][ind, 1] = offset + counter[set_name]
+                counter[set_name] += 1
+
     # -------------------------------------------------------------------------------------
 
     def _setupx_variables(self):

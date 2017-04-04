@@ -269,14 +269,18 @@ class Group(System):
 
     def _setupx_var_index_maps(self):
         super(Group, self)._setupx_var_index_maps()
-        allprocs_abs2idx_io = self._varx_allprocs_abs2idx_io
+        allprocs_abs2idx = self._varx_allprocs_abs2idx
         set_indices = self._varx_set_indices
 
-        # Compute allprocs_abs2idx_io
+        # Recursion
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_var_index_maps()
+
+        # Compute allprocs_abs2idx
         for type_ in ['input', 'output']:
             offset = self._varx_range[type_][0]
             for ind, abs_name in enumerate(self._varx_allprocs_abs_names[type_]):
-                allprocs_abs2idx_io[abs_name] = offset + ind
+                allprocs_abs2idx[type_][abs_name] = offset + ind
 
         # Compute set_indices
         for type_ in ['input', 'output']:
