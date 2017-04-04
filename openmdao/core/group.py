@@ -46,11 +46,159 @@ class Group(System):
     # -------------------------------------------------------------------------------------
     # Start of reconfigurability changes
 
+    def _setupx_procs(self, pathname, comm, proc_range):
+        super(Group, self)._setupx_procs(pathname, comm, proc_range)
+
+        self.initialize_subsystems()
+
+        nsub = len(self._subsystems_allprocs)
+        # If this is a group:
+        if nsub > 0:
+            # Call the load balancing algorithm
+            tmp = self._mpi_proc_allocator(nsub, comm, proc_range)
+            sub_inds, sub_comm, sub_proc_range = tmp
+
+            # Define local subsystems
+            self._subsystems_myproc = [self._subsystems_allprocs[ind]
+                                       for ind in sub_inds]
+            self._subsystems_myproc_inds = sub_inds
+
+            # Perform recursion
+            for subsys in self._subsystems_myproc:
+                if self.pathname is not '':
+                    sub_pathname = '.'.join((self.pathname, subsys.name))
+                else:
+                    sub_pathname = subsys.name
+
+                subsys._setupx_procs(sub_pathname, sub_comm, sub_proc_range)
+
     def initialize_subsystems(self):
         """
         Add subsystems to this group.
         """
         pass
+
+    def _setupx_vars(self):
+        super(Group, self)._setupx_vars()
+        num_var = self._num_var
+        num_var_local = self._num_var_local
+        num_var_byset = self._num_var_byset
+
+        # Recursion
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_vars()
+
+        # Compute num_var, num_var_local, num_var_byset, at least locally
+        for type_ in ['input', 'output']:
+            num_var[type_] = np.sum(
+                [subsys._num_var[type_] for subsys in self._subsystems_myproc])
+            num_var_local[type_] = np.sum(
+                [subsys._num_var_local[type_] for subsys in self._subsystems_myproc])
+
+            for subsys in self._subsystems_myproc:
+                for set_name, num in iteritems(subsys._num_var_byset[type_]):
+                    if set_name in num_var_byset[type_]:
+                        num_var_byset[type_][set_name] += num
+                    else:
+                        num_var_byset[type_][set_name] = num
+
+        # If running in parallel, allgather
+        if self.comm.size > 1:
+            # Perform a single allgather
+            if self._subsystems_myproc[0].comm.rank == 0:
+                raw = (num_var, num_var_byset)
+            else:
+                raw = ({'input': 0, 'output': 0}, {'input': {}, 'output': {}})
+            gathered = self.comm.allgather(raw)
+
+            # Empty the dictionaries
+            for type_ in ['input', 'output']:
+                num_var[type_] = 0
+                num_var_byset[type_] = {}
+
+            # Process the gathered data and update the dictionaries
+            for local_num_var, local_num_var_byset in gathered:
+                for type_ in ['input', 'output']:
+                    num_var[type_] += local_num_var[type_]
+                    for set_name, num in iteritems(local_num_var_byset[type_]):
+                        if set_name in num_var_byset[type_]:
+                            num_var_byset[type_][set_name] += num
+                        else:
+                            num_var_byset[type_][set_name] = num
+
+    def _setupx_var_indices(self, set2iset, counter, counter_local, counter_byset):
+        super(Group, self)._setupx_var_indices(set2iset, counter, counter_local, counter_byset)
+
+        nsub_allprocs = len(self._subsystems_allprocs)
+        num_var = self._num_var
+        num_var_byset = self._num_var_byset
+
+        # Here, we count the number of variables (total and by varset) in each subsystem.
+        # We do this so that we can compute the offset when we recurse into each subsystem.
+        allprocs_counters = {
+            type_: np.zeros(nsub_allprocs, int) for type_ in ['input', 'output']}
+        allprocs_counters_local = {
+            type_: np.zeros(nsub_allprocs, int) for type_ in ['input', 'output']}
+        allprocs_counters_byset = {
+            type_: np.zeros((nsub_allprocs, len(set2iset[type_])), int)
+            for type_ in ['input', 'output']}
+
+        # First compute these on one processor for each subsystem
+        for type_ in ['input', 'output']:
+            for ind, subsys in enumerate(self._subsystems_myproc):
+                isub = self._subsystems_myproc_inds[ind]
+                allprocs_counters_local[type_][isub] = num_var[type_]
+                if subsys.comm.rank == 0:
+                    allprocs_counters[type_][isub] = num_var[type_]
+                    for set_name, iset in iteritems(set2iset[type_]):
+                        allprocs_counters_byset[type_][isub, iset] = \
+                            num_var_byset[type_][set_name]
+
+        # If running in parallel, allgather
+        if self.comm.size > 1:
+            raw = (allprocs_counters, allprocs_counters_byset)
+            gathered = self.comm.allgather(raw)
+
+            allprocs_counters = {
+                type_: np.zeros(nsub_allprocs, int) for type_ in ['input', 'output']}
+            allprocs_counters_byset = {
+                type_: np.zeros((nsub_allprocs, len(set2iset[type_])), int)
+                for type_ in ['input', 'output']}
+
+            for myproc_counters, myproc_counters_byset in gathered:
+                for type_ in ['input', 'output']:
+                    allprocs_counters[type_] += myproc_counters[type_]
+                    allprocs_counters_byset[type_] += myproc_counters_byset[type_]
+
+        # Recursion
+        sub_counter = {'input': 0, 'output': 0}
+        sub_counter_local = {'input': 0, 'output': 0}
+        sub_counter_byset = {
+            'input': {set_name: 0 for set_name in set2iset['input']},
+            'output': {set_name: 0 for set_name in set2iset['output']},
+        }
+        for ind, subsys in enumerate(self._subsystems_myproc):
+            isub = self._subsystems_myproc_inds[ind]
+            for type_ in ['input', 'output']:
+                sub_counter[type_] = counter[type_] + np.sum(allprocs_counters[type_][:isub])
+                sub_counter_local[type_] = counter_local[type_] \
+                    + np.sum(allprocs_counters_local[type_][:isub])
+                for set_name, iset in iteritems(set2iset[type_]):
+                    sub_counter_byset[type_][set_name] = counter_byset[type_][set_name] \
+                        + np.sum(allprocs_counters_byset[type_][:isub, iset], axis=0)
+
+            subsys._setupx_var_indices(set2iset, sub_counter, sub_counter_local, sub_counter_byset)
+
+    def _setupx_var_data(self, glob):
+        super(Component, self)._setupx_var_data(glob)
+        allprocs_abs_names = self._glob._allprocs_abs_names
+        abs_names = self._glob._abs_names
+        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
+        abs2prom = self._var_abs2prom
+        allprocs_meta = self._glob._allprocs_meta
+        meta = self._glob._meta
+
+    # -------------------------------------------------------------------------------------
 
     def _setupx_processors(self, pathname, comm, proc_range):
         super(Group, self)._setupx_processors(pathname, comm, proc_range)

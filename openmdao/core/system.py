@@ -22,7 +22,7 @@ from openmdao.utils.general_utils import \
 
 
 # This is for storing various data mapped to var pathname
-PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
+PathData = namedtuple('PathData', ['name', 'idx', 'myproc_idx', 'typ'])
 
 
 class System(object):
@@ -229,18 +229,115 @@ class System(object):
     # -------------------------------------------------------------------------------------
     # Start of reconfigurability changes
 
+    def _setupx_get_initial(self):
+        set2iset = {}
+        for type_ in ['input', 'output']:
+            set2iset[type_] = {
+                set_name: iset for iset, set_name in enumerate(self._num_var_byset[type_])}
+
+        counter = {'input': 0, 'output': 0}
+        counter_local = {'input': 0, 'output': 0}
+        counter_byset = {
+            'input': {set_name: 0 for set_name in set2iset['input']},
+            'output': {set_name: 0 for set_name in set2iset['output']},
+        }
+
+        class GlobalData(object): pass
+
+        glob = GlobalData()
+
+        glob._allprocs_abs_names = {
+            type_: [None] * self._num_var[type_]
+            for type_ in ['input', 'output']}
+        glob._abs_names = {
+            type_: [None] * self._num_var_local[type_]
+            for type_ in ['input', 'output']}
+
+        glob._allprocs_meta = {
+            type_: [None] * self._num_var[type_]
+            for type_ in ['input', 'output']}
+        glob._meta = {
+            type_: [None] * self._num_var_local[type_]
+            for type_ in ['input', 'output']}
+
+        glob._allprocs_abs2idx_io = {}
+        glob._abs2idx_local_io = {}
+        glob._allprocs_abs2idx_byset_io = {
+            'input': {set_name: 0 for set_name in set2iset['input']},
+            'output': {set_name: 0 for set_name in set2iset['output']},
+        }
+
+        nproc = self.comm.size
+        glob._sizes = {
+            type_: np.zeros((nproc, self._num_var[type_]), int
+            for type_ in ['input', 'output']}
+        glob._set2sizes = {
+            type_: {
+                set_name: np.zeros((nproc, self._num_var_byset[type_][set_name]), int)
+                for set_name in set2iset[type_]}
+            for type_ in ['input', 'output']}
+
+        return set2iset, counter, counter_local, counter_byset, glob
+
     def _setupx(self, comm):
-        self._setupx_processors('', comm, [0, comm.size])
-        self._setupx_variables()
-        self._setupx_varsets()
-        self._setupx_variable_indices(
-            {type_: 0 for type_ in ['input', 'output']},
-            {type_: np.zeros(len(self._varx_set2iset[type_]), int)
-                for type_ in ['input', 'output']}
-        )
-        self._setupx_var_sizes()
-        self._setupx_connections()
-        self._setupx_partials()
+        self._setupx_procs('', comm, [0, comm.size])
+        self._setupx_vars()
+        set2iset, counter, counter_local, counter_byset, glob = self._setupx_get_initial()
+        self._setupx_var_indices(set2iset, counter, counter_local, counter_byset)
+        self._setupx_var_data(glob)
+
+    def _setupx_procs(self, pathname, comm, proc_range):
+        self.pathname = pathname
+        self.comm = comm
+        self._mpi_proc_range = proc_range
+
+    def _setupx_vars(self):
+        self._num_var = {'input': 0, 'output': 0}
+        self._num_var_local = {'input': 0, 'output': 0}
+        self._num_var_byset = {'input': {}, 'output': {}}
+
+    def _setupx_var_indices(self, set2iset, counter, counter_local, counter_byset):
+        self._set2iset = set2iset
+        self._var_range = {'input': [0, 0], 'output': [0, 0]}
+        self._var_range_local = {'input': [0, 0], 'output': [0, 0]}
+        self._var_range_byset = {
+            'input': {set_name: [0, 0] for set_name in set2iset['input']},
+            'output': {set_name: [0, 0] for set_name in set2iset['output']},
+        }
+
+        for type_ in ['input', 'output']:
+            self._var_range[type_][0] = counter[type_]
+            self._var_range[type_][1] = counter[type_] + self._num_var[type_]
+
+            self._var_range_local[type_][0] = counter_local[type_]
+            self._var_range_local[type_][1] = counter_local[type_] + self._num_var_local[type_]
+
+            for set_name, iset in iteritems(set2iset[type_]):
+                self._var_range_byset[type_][set_name][0] = counter_byset[type_][set_name]
+                self._var_range_byset[type_][set_name][1] = counter_byset[type_][set_name]
+                if set_name in self._num_var_byset[type_]:
+                    self._var_range_byset[type_][set_name][1] += \
+                        self._num_var_byset[type_][set_name]
+
+    def _setupx_var_data(self, glob):
+        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._var_abs2prom = {'input': {}, 'output': {}}
+        self._glob = glob
+
+    # -------------------------------------------------------------------------------------
+
+    # def _setupx(self, comm):
+    #     self._setupx_processors('', comm, [0, comm.size])
+    #     self._setupx_variables()
+    #     self._setupx_varsets()
+    #     self._setupx_variable_indices(
+    #         {type_: 0 for type_ in ['input', 'output']},
+    #         {type_: np.zeros(len(self._varx_set2iset[type_]), int)
+    #             for type_ in ['input', 'output']}
+    #     )
+    #     self._setupx_var_sizes()
+    #     self._setupx_connections()
+    #     self._setupx_partials()
 
     def _setupx_processors(self, pathname, comm, proc_range):
         self.pathname = pathname

@@ -10,7 +10,7 @@ import inspect
 from fnmatch import fnmatchcase
 import numpy as np
 from itertools import product, chain
-from six import string_types, iteritems
+from six import string_types, iteritems, itervalues
 from scipy.sparse import issparse
 from copy import deepcopy
 from collections import OrderedDict, Iterable
@@ -73,6 +73,85 @@ class Component(System):
     #
     # -------------------------------------------------------------------------------------
     # Start of reconfigurability changes
+
+    def _setupx_vars(self):
+        super(Component, self)._setupx_vars()
+        num_var = self._num_var
+        num_var_local = self._num_var_local
+        num_var_byset = self._num_var_byset
+
+        # Only necessary to clear the rel_* data structures if we are not on the first setup
+        if self._first_setup:
+            self._first_setup = False
+        else:
+            self._var_rel_names = {'input': [], 'output': []}
+            self._var_rel2data_io = {}
+
+        self.initialize_variables()
+
+        # Compute num_var, num_var_local
+        for type_ in ['input', 'output']:
+            num_var[type_] = len(self._var_rel_names[type_])
+            num_var_local[type_] = len(self._var_rel_names[type_])
+
+        # Compute num_var_byset
+        for data in itervalues(self._var_rel2data_io):
+            type_ = data['type']
+            metadata = data['metadata']
+            set_name = metadata['var_set']
+            if set_name in num_var_byset[type_]:
+                num_var_byset[type_][set_name] += 1
+            else:
+                num_var_byset[type_][set_name] = 1
+
+    def _setupx_var_data(self, glob):
+        super(Component, self)._setupx_var_data(glob)
+        allprocs_abs_names = self._glob._allprocs_abs_names
+        abs_names = self._glob._abs_names
+        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
+        abs2prom = self._var_abs2prom
+        allprocs_meta = self._glob._allprocs_meta
+        meta = self._glob._meta
+
+        # Compute the prefix for turning rel/prom names into abs names
+        if self.pathname is not '':
+            prefix = self.pathname + '.'
+        else:
+            prefix = ''
+
+        meta_names = {
+            'input': ('units', 'shape', 'var_set'),
+            'output': ('units', 'shape', 'var_set', 'ref', 'ref0'),
+        }
+
+        for type_ in ['input', 'output']:
+            for ind, prom_name in enumerate(self._var_rel_names[type_]):
+                abs_name = prefix + prom_name
+                idx = self._num_var[type_] + ind
+                idx_local = self._num_var_local[type_] + ind
+
+                data = self._var_rel2data_io[prom_name]
+                metadata = data['metadata']
+
+                # Compute allprocs_abs_names, abs_names
+                allprocs_abs_names[type_][idx] = abs_name
+                abs_names[type_][idx_local] = abs_name
+
+                # Compute allprocs_prom2abs_list, abs2prom
+                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+                abs2prom[type_][abs_name] = prom_name
+
+                # Compute allprocs_meta
+                allprocs_metadata = {
+                    meta_name: metadata[meta_name]
+                    for meta_name in meta_names[type_]
+                }
+                allprocs_meta[type_][idx] = allprocs_metadata
+
+                # Compute meta
+                meta[type_][idx_local] = metadata
+
+    # -------------------------------------------------------------------------------------
 
     def _setupx_variables(self):
         super(Component, self)._setupx_variables()
@@ -329,6 +408,8 @@ class Component(System):
         # var_set: taken as is
         metadata['var_set'] = var_set
 
+        metadata['type'] = 'input'
+
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         self._var_rel2data_io[name] = {'prom': name, 'rel': name,
                                        'my_idx': len(self._var_rel_names['input']),
@@ -460,6 +541,8 @@ class Component(System):
 
         # var_set: taken as is
         metadata['var_set'] = var_set
+
+        metadata['type'] = 'output'
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         self._var_rel2data_io[name] = {'prom': name, 'rel': name,
