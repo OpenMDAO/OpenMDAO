@@ -110,8 +110,8 @@ class Component(System):
         abs_names = self._varx_abs_names
         allprocs_prom2abs_list = self._varx_allprocs_prom2abs_list
         abs2prom = self._varx_abs2prom
-        allprocs_abs2meta_io = self._varx_allprocs_abs2meta_io
-        abs2meta_io = self._varx_abs2meta_io
+        allprocs_abs2meta = self._varx_allprocs_abs2meta
+        abs2meta = self._varx_abs2meta
 
         # Compute the prefix for turning rel/prom names into abs names
         if self.pathname is not '':
@@ -138,15 +138,15 @@ class Component(System):
                 allprocs_prom2abs_list[type_][prom_name] = [abs_name]
                 abs2prom[type_][abs_name] = prom_name
 
-                # Compute allprocs_abs2meta_io
+                # Compute allprocs_abs2meta
                 allprocs_metadata = {
                     meta_name: metadata[meta_name]
                     for meta_name in meta_names[type_]
                 }
-                allprocs_abs2meta_io[abs_name] = allprocs_metadata
+                allprocs_abs2meta[type_][abs_name] = allprocs_metadata
 
-                # Compute abs2meta_io
-                abs2meta_io[abs_name] = metadata
+                # Compute abs2meta
+                abs2meta[type_][abs_name] = metadata
 
     # -------------------------------------------------------------------------------------
 
@@ -405,8 +405,6 @@ class Component(System):
         # var_set: taken as is
         metadata['var_set'] = var_set
 
-        metadata['type'] = 'input'
-
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         self._var_rel2data_io[name] = {'prom': name, 'rel': name,
                                        'my_idx': len(self._var_rel_names['input']),
@@ -538,8 +536,6 @@ class Component(System):
 
         # var_set: taken as is
         metadata['var_set'] = var_set
-
-        metadata['type'] = 'output'
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         self._var_rel2data_io[name] = {'prom': name, 'rel': name,

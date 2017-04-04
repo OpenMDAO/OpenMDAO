@@ -282,7 +282,8 @@ class Problem(object):
             assert model._num_var[type_] == model._var_allprocs_idx_range[type_][1]
             assert model._num_var_local[type_] == len(model._var_abs_names[type_])
 
-        assert set(model._var_abs2data_io.keys()) == set(model._varx_abs2meta_io.keys())
+        assert set(model._var_abs2data_io.keys()) \
+            == set(model._varx_abs2meta['input'].keys() + model._varx_abs2meta['output'].keys())
         # assert model._assembler._var_allprocs_abs2idx_io == model._varx_allprocs_abs2idx_io
         assert model._var_allprocs_idx_range == model._varx_range
         for type_ in ['input', 'output']:

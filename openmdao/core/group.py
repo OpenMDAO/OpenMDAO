@@ -150,7 +150,8 @@ class Group(System):
                 allprocs_counters_local[type_][isub] = num_var[type_]
                 if subsys.comm.rank == 0:
                     allprocs_counters[type_][isub] = num_var[type_]
-                    for set_name, iset in iteritems(set2iset[type_]):
+                    for set_name in num_var_byset[type_]:
+                        iset = set2iset[type_][set_name]
                         allprocs_counters_byset[type_][isub, iset] = \
                             num_var_byset[type_][set_name]
 
@@ -195,8 +196,8 @@ class Group(System):
         abs_names = self._varx_abs_names
         allprocs_prom2abs_list = self._varx_allprocs_prom2abs_list
         abs2prom = self._varx_abs2prom
-        allprocs_abs2meta_io = self._varx_allprocs_abs2meta_io
-        abs2meta_io = self._varx_abs2meta_io
+        allprocs_abs2meta = self._varx_allprocs_abs2meta
+        abs2meta = self._varx_abs2meta
 
         # Recursion
         for subsys in self._subsystems_myproc:
@@ -205,15 +206,15 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             var_maps = subsys._get_maps()
 
-            # Assemble allprocs_abs2meta_io and abs2meta_io
-            allprocs_abs2meta_io.update(subsys._varx_allprocs_abs2meta_io)
-            abs2meta_io.update(subsys._varx_abs2meta_io)
-
             for type_ in ['input', 'output']:
 
                 # Assemble abs_names and allprocs_abs_names
                 allprocs_abs_names[type_].extend(subsys._varx_allprocs_abs_names[type_])
                 abs_names[type_].extend(subsys._varx_abs_names[type_])
+
+                # Assemble allprocs_abs2meta and abs2meta
+                allprocs_abs2meta[type_].update(subsys._varx_allprocs_abs2meta[type_])
+                abs2meta[type_].update(subsys._varx_abs2meta[type_])
 
                 for abs_name in subsys._varx_abs_names[type_]:
                     sub_prom_name = subsys._varx_abs2prom[type_][abs_name]
@@ -237,19 +238,22 @@ class Group(System):
         # If running in parallel, allgather
         if self.comm.size > 1:
             if self._subsystems_myproc[0].comm.rank == 0:
-                raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta_io)
+                raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta)
             else:
-                raw = ({'input': [], 'output': []}, {'input': {}, 'output': {}}, {})
+                raw = (
+                    {'input': [], 'output': []},
+                    {'input': {}, 'output': {}},
+                    {'input': {}, 'output': {}})
             gathered = self.comm.allgather(raw)
 
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_] = []
                 allprocs_prom2abs_list[type_] = {}
 
-            for myproc_abs_names, myproc_prom2abs_list, myproc_abs2meta_io in gathered:
+            for myproc_abs_names, myproc_prom2abs_list, myproc_abs2meta in gathered:
 
-                # Assemble in parallel allprocs_abs2meta_io
-                allprocs_abs2meta_io.update(myproc_abs2meta_io)
+                # Assemble in parallel allprocs_abs2meta
+                allprocs_abs2meta[type_].update(myproc_abs2meta[type_])
 
                 for type_ in ['input', 'output']:
 
@@ -262,6 +266,33 @@ class Group(System):
                             allprocs_prom2abs_list[type_][prom_name] = abs_names_list
                         else:
                             allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
+
+    def _setupx_var_index_maps(self):
+        super(Group, self)._setupx_var_index_maps()
+        allprocs_abs2idx_io = self._varx_allprocs_abs2idx_io
+        set_indices = self._varx_set_indices
+
+        # Compute allprocs_abs2idx_io
+        for type_ in ['input', 'output']:
+            offset = self._varx_range[type_][0]
+            for ind, abs_name in enumerate(self._varx_allprocs_abs_names[type_]):
+                allprocs_abs2idx_io[abs_name] = offset + ind
+
+        # Compute set_indices
+        for type_ in ['input', 'output']:
+            set_indices[type_] = np.vstack([
+                subsys._varx_set_indices[type_] for subsys in self._subsystems_myproc
+            ])
+
+            # Allgather
+            if self.comm.size > 1:
+                sub_comm = self._subsystems_myproc[0].comm
+                if sub_comm.rank == 0:
+                    raw = set_indices[type_]
+                else:
+                    raw = np.zeros((0, 2), int)
+                gathered = self.comm.allgather(raw)
+                set_indices[type_] = np.vstack(gathered)
 
     # -------------------------------------------------------------------------------------
 
