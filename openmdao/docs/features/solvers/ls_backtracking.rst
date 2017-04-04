@@ -19,7 +19,7 @@ BoundsCheck
 
 BacktrackingLineSearch
   Checks bounds and backtracks to point that satisfies them. From there, further backtracking is performed until the termination criteria are satisfied; these
-  criteria include a relative and aboslute tolerance and an iteration maximum.
+  criteria include a relative and absolute tolerance and an iteration maximum.
 
 ArmijoGoldstein
   Checks bounds and backtracks to point that satisfies them. From there, further backtracking is performed until the termination criteria are satisfied.
@@ -70,7 +70,7 @@ Here are a few examples of this option:
 
   The `bound_enforcement` option in the options dictionary is used to specify how the output bounds
   are enforced. When this is set to "vector", the output vector is rolled back along the computed gradient until
-  it reaches a point where the earliest bound violation occured. The backtracking continues along the original
+  it reaches a point where the earliest bound violation occurred. The backtracking continues along the original
   computed gradient.
 
 .. embed-test::
@@ -106,7 +106,7 @@ Control Options
 
   The "rtol" option is a termination criterion used by only the `BacktrackingLineSearch`. It specifies the residual
   norm (with respect to the residual at the initial point) that is used to terminate backtracking. Note that you
-  probably don't want a very small value here, as backtracking is not capable of solving your whle nonlinear problem; it
+  probably don't want a very small value here, as backtracking is not capable of solving your while nonlinear problem; it
   is meant to get around problem iterations.
 
 - alpha
