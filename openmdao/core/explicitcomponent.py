@@ -192,7 +192,6 @@ class ExplicitComponent(Component):
                 elif mode == 'rev':
                     d_residuals.set_vec(d_outputs)
 
-        print("d_resids for %s:" % self.pathname, d_residuals._petsc[0].array)
         return False, 0., 0.
 
     def _linearize(self):

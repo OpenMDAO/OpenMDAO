@@ -716,6 +716,7 @@ class Problem(object):
         vec_dinput = model._vectors['input']
         vec_doutput = model._vectors['output']
         vec_dresid = model._vectors['residual']
+        fwd = mode == 'fwd'
 
         # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:
@@ -802,14 +803,18 @@ class Problem(object):
                 wrt.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                  for name in names))
 
-        if mode == 'fwd':
+        if fwd:
             input_list, output_list = wrt, of
             old_input_list, old_output_list = oldwrt, oldof
             input_vec, output_vec = vec_dresid, vec_doutput
-        else:
+            input_vois = self.driver._designvars
+            output_vois = self.driver._responses
+        else:  # rev
             input_list, output_list = of, wrt
             old_input_list, old_output_list = oldof, oldwrt
             input_vec, output_vec = vec_doutput, vec_dresid
+            input_vois = self.driver._responses
+            output_vois = self.driver._designvars
 
         # TODO : Parallel adjoint setup loop goes here.
         # NOTE : Until we support it, we will just limit ourselves to the
@@ -818,7 +823,7 @@ class Problem(object):
         dinputs = input_vec[vecname]
         doutputs = output_vec[vecname]
 
-        ranges = self._assembler._var_dist_ranges['output']
+        ranges = self._assembler._var_dist_ranges
 
         # If Forward mode, solve linear system for each 'wrt'
         # If Adjoint mode, solve linear system for each 'of'
@@ -826,8 +831,19 @@ class Problem(object):
             for iname_count, input_name in enumerate(input_names):
                 flat_view = dinputs._views_flat[input_name]
                 start, end, total_size = ranges[input_name]
-                #for idx in range(total_size):
-                for idx in range(total_size):
+
+                if input_name in input_vois:
+                    in_idxs = input_vois[input_name]['indices']
+                else:
+                    in_idxs = None
+                if in_idxs is not None:
+                    irange = in_idxs
+                    loc_size = len(in_idxs)
+                else:
+                    irange = range(total_size)
+                    loc_size = end - start
+
+                for idx in irange:
 
                     # Maybe we don't need to clean up so much at the beginning,
                     # since we clean this every time.
@@ -839,59 +855,72 @@ class Problem(object):
                     # TODO: currently we're looping over the full distributed
                     # variable even if the variable belongs to a non-distributed
                     # component that is duplicated in multiple procs.
-                    loc_idx = idx - start
-                    if start <= idx < end:
-                        flat_view[loc_idx] = 1.0
 
-                        # The root system solves here.
-                        model._solve_linear([vecname], mode)
+                    # the 'store' flag is here so that we properly initialize
+                    # totals to zeros instead of None in those cases when none
+                    # of the specified indices are within the range of interest
+                    # for this proc.
+                    if start <= idx < end:
+                        loc_idx = idx - start
+                        flat_view[loc_idx] = 1.0
+                        store = True
                     else:
-                        model._solve_linear([vecname], mode)
-                        continue
+                        store = False
+
+                    model._solve_linear([vecname], mode)
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_names in enumerate(output_list):
                         for oname_count, output_name in enumerate(output_names):
                             deriv_val = doutputs._views_flat[output_name]
+                            if output_name in output_vois:
+                                out_idxs = output_vois[output_name]['indices']
+                            else:
+                                out_idxs = None
+
+                            if out_idxs is not None:
+                                oidxs = np.logical_and(out_idxs >= start,
+                                                       out_idxs < end)
+                                deriv_val = deriv_val[oidxs]
                             len_val = len(deriv_val)
 
                             if return_format == 'flat_dict':
-                                if mode == 'fwd':
-
+                                if fwd:
                                     key = (old_output_list[ocount][oname_count],
                                            old_input_list[icount][iname_count])
 
                                     if totals[key] is None:
-                                        totals[key] = np.empty((len_val, end - start))
-                                    totals[key][:, loc_idx] = deriv_val
+                                        totals[key] = np.zeros((len_val, loc_size))
+                                    if store:
+                                        totals[key][:, loc_idx] = deriv_val
 
                                 else:
-
                                     key = (old_input_list[icount][iname_count],
                                            old_output_list[ocount][oname_count])
 
                                     if totals[key] is None:
-                                        totals[key] = np.empty((end - start, len_val))
-                                    totals[key][loc_idx, :] = deriv_val
+                                        totals[key] = np.zeros((loc_size, len_val))
+                                    if store:
+                                        totals[key][loc_idx, :] = deriv_val
 
                             elif return_format == 'dict':
-                                if mode == 'fwd':
-
+                                if fwd:
                                     okey = old_output_list[ocount][oname_count]
                                     ikey = old_input_list[icount][iname_count]
 
                                     if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.empty((len_val, end - start))
-                                    totals[okey][ikey][:, loc_idx] = deriv_val
+                                        totals[okey][ikey] = np.zeros((len_val, loc_size))
+                                    if store:
+                                        totals[okey][ikey][:, loc_idx] = deriv_val
 
                                 else:
-
                                     okey = old_input_list[icount][iname_count]
                                     ikey = old_output_list[ocount][oname_count]
 
                                     if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.empty((end - start, len_val))
-                                    totals[okey][ikey][loc_idx, :] = deriv_val
+                                        totals[okey][ikey] = np.zeros((loc_size, len_val))
+                                    if store:
+                                        totals[okey][ikey][loc_idx, :] = deriv_val
                             else:
                                 raise RuntimeError("unsupported return format")
 

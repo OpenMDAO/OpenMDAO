@@ -413,6 +413,5 @@ class DefaultAssembler(Assembler):
                     rev_xfer_out_inds[sub_ind][iset, jset] = \
                         merge(rev_xfer_out_inds[sub_ind][iset, jset])
 
-        print('fwd_in', fwd_xfer_in_inds, '\nfwd_out', fwd_xfer_out_inds)
         return (xfer_in_inds, xfer_out_inds, fwd_xfer_in_inds, fwd_xfer_out_inds,
                 rev_xfer_in_inds, rev_xfer_out_inds)
