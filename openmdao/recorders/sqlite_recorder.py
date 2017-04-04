@@ -213,7 +213,7 @@ class SqliteRecorder(BaseRecorder):
 
 
     # def record_iteration(self, params, unknowns, resids, metadata):
-    def record_iteration(self, object_requesting_recording ):  ###### this is the one to look at Keith!
+    def record_iteration(self, object_requesting_recording, metadata ):  ###### this is the one to look at Keith!
         """
         Stores the provided data in the sqlite file using the iteration
         coordinate for the key.

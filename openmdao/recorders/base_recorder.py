@@ -135,6 +135,7 @@ class BaseRecorder(object):
         """
         raise NotImplementedError()
 
+    # TODO_RECORDER: change the signature to match what we decided to do with sqlite, hdf5,...
     def record_iteration(self, params, unknowns, resids, metadata):
         """
         Writes the provided data.

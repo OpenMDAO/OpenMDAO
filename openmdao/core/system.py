@@ -20,6 +20,8 @@ from openmdao.utils.units import convert_units
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
 
+from openmdao.recorders.recording_manager import RecordingManager
+
 
 # This is for storing various data mapped to var pathname
 PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
@@ -161,6 +163,8 @@ class System(object):
         self.comm = None
         self.metadata = GeneralizedDictionary()
         self.metadata.update(kwargs)
+
+        self.rec_mgr = RecordingManager()
 
         self._assembler = None
 
@@ -1454,8 +1458,9 @@ class System(object):
 
         # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
 
-
-        self.rec_mgr.record_iteration(self,inputs=something, outputs=something, residuals=something)
+        # TODO_RECORDERS
+        metadata = None
+        self.rec_mgr.record_iteration(self,metadata)
             
     def run_solve_nonlinear(self):
         """
