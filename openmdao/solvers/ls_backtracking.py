@@ -89,7 +89,7 @@ class BacktrackingLineSearch(NonlinearSolver):
         """
         opt = self.options
         opt['maxiter'] = 5
-        opt['rtol'] = 0.9
+        opt['rtol'] = 0.95
         opt.declare(
             'bound_enforcement', value='vector', values=['vector', 'scalar', 'wall'],
             desc="If this is set to 'vector', the entire vector is backtracked together " +
