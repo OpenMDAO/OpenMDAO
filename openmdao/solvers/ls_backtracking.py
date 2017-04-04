@@ -162,7 +162,7 @@ class ArmijoGoldstein(BacktrackingLineSearch):
         opt = self.options
         opt.declare('c', value=0.1, desc="Slope parameter for line of sufficient decrease. The "
                     "larger the step, the more decrease is required to terminate the line search. "
-                    "This parameter is 'c' in: '||res||_k < ||res||_0 (1 - c * alpha)' for the "
+                    "This parameter is 'c' in: '||res_k|| < ||res_0|| (1 - c * alpha)' for the "
                     "termination criterion.")
 
     def _run_iterator(self):
