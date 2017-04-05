@@ -55,25 +55,41 @@ class GeneralizedDictionary(object):
             raise ValueError("Entry '{}'\'s value is not one of {}".format(
                 name, values))
 
-    def declare(self, name, type_=None, desc='',
-                value=None, values=None, required=False):
+        # Check bounds violation
+        upper = self._declared_entries[name]['upper']
+        lower = self._declared_entries[name]['lower']
+        if upper is not None:
+            if value > upper:
+                msg = ("Value of {} exceeds maximum of {} for entry 'x'")
+                raise ValueError(msg.format(value, upper))
+        if lower is not None:
+            if value < lower:
+                msg = ("Value of {} exceeds minimum of {} for entry 'x'")
+                raise ValueError(msg.format(value, lower))
+
+    def declare(self, name, type_=None, desc='', value=None, values=None, required=False,
+                upper=None, lower=None):
         """
         Declare an entry.
 
         Parameters
         ----------
         name : str
-            the name of the entry.
+            The name of the entry.
         type_ : type or None
-            type of the entry in _dict or _global_dict.
+            Type of the entry in _dict or _global_dict.
         desc : str
-            description of the entry.
+            Description of the entry.
         value : -
-            the default value of the entry.
+            The default value of the entry.
         values : [-, ...]
-            the allowed values of the entry.
+            The allowed values of the entry.
         required : boolean
-            if True, this entry must be specified in _dict or _global_dict.
+            If True, this entry must be specified in _dict or _global_dict.
+        upper : float
+            Maximum allowable value.
+        lower : float
+            Minimum allowable value.
         """
         self._declared_entries[name] = {
             'type': type_,
@@ -81,6 +97,8 @@ class GeneralizedDictionary(object):
             'value': value,
             'values': values,
             'required': required,
+            'upper': upper,
+            'lower': lower,
         }
 
         # If the entry has already been set, check if valid:
