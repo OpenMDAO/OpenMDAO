@@ -53,10 +53,8 @@ class PETScTransfer(DefaultTransfer):
                 in_iset, out_iset = key
                 in_petsc = self._in_vec._root_vector._petsc[in_iset]
                 out_petsc = self._out_vec._root_vector._petsc[out_iset]
-                #print("out_vec (before):", out_petsc.array)
                 self._transfers[key].scatter(out_petsc, in_petsc,
                                              addv=False, mode=False)
-                #print("in_vec (after):", in_petsc.array)
         elif mode == 'rev':
             for key in self._transfers:
                 in_iset, out_iset = key
