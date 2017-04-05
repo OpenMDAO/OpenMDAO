@@ -52,6 +52,13 @@ class Group(System):
     def _setupx_procs(self, pathname, comm, proc_range):
         super(Group, self)._setupx_procs(pathname, comm, proc_range)
 
+        # Only necessary to clear _subsystems_allprocs if we are not on the first setup
+        if self._first_setup:
+            self._first_setup = False
+        else:
+            pass
+            # self._subsystems_allprocs = []
+
         self.initialize_subsystems()
 
         nsub = len(self._subsystems_allprocs)
@@ -284,7 +291,7 @@ class Group(System):
     def _setupx_var_index_maps(self):
         super(Group, self)._setupx_var_index_maps()
         allprocs_abs2idx = self._varx_allprocs_abs2idx
-        set_indices = self._varx_set_indices
+        allprocs_abs2idx_byset = self._varx_allprocs_abs2idx_byset
 
         # Recursion
         for subsys in self._subsystems_myproc:
@@ -292,25 +299,23 @@ class Group(System):
 
         # Compute allprocs_abs2idx
         for type_ in ['input', 'output']:
-            offset = self._varx_range[type_][0]
-            for ind, abs_name in enumerate(self._varx_allprocs_abs_names[type_]):
-                allprocs_abs2idx[type_][abs_name] = offset + ind
+            for subsys in self._subsystems_myproc:
+                allprocs_abs2idx[type_].update(subsys._varx_allprocs_abs2idx[type_])
+                allprocs_abs2idx_byset[type_].update(subsys._varx_allprocs_abs2idx_byset[type_])
 
-        # Compute set_indices
-        for type_ in ['input', 'output']:
-            set_indices[type_] = np.vstack([
-                subsys._varx_set_indices[type_] for subsys in self._subsystems_myproc
-            ])
+        # Allgather
+        if self.comm.size > 1:
+            sub_comm = self._subsystems_myproc[0].comm
+            if sub_comm.rank == 0:
+                raw = (allprocs_abs2idx, allprocs_abs2idx_byset)
+            else:
+                raw = ({'input': {}, 'output': {}}, {'input': {}, 'output': {}})
+            gathered = self.comm.allgather(raw)
 
-            # Allgather
-            if self.comm.size > 1:
-                sub_comm = self._subsystems_myproc[0].comm
-                if sub_comm.rank == 0:
-                    raw = set_indices[type_]
-                else:
-                    raw = np.zeros((0, 2), int)
-                gathered = self.comm.allgather(raw)
-                set_indices[type_] = np.vstack(gathered)
+            for myproc_abs2idx, myproc_abs2idx_byset in gathered:
+                for type_ in ['input', 'output']:
+                    allprocs_abs2idx[type_].update(myproc_abs2idx[type_])
+                    allprocs_abs2idx_byset[type_].update(myproc_abs2idx_byset[type_])
 
     def _setupx_var_sizes(self):
         super(Group, self)._setupx_var_sizes()

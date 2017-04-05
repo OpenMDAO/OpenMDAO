@@ -36,9 +36,6 @@ class Component(System):
     _matrix_free : Bool
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian.
-    _first_setup : bool
-        If True, this is the first time we are setting up, so we should not clear the
-        _var_rel2data_io and _var_rel_names attributes prior to setup.
     _var_rel2data_io : dict
         Dictionary mapping rellative names to dicts with keys (prom, rel, my_idx, type_, metadata).
         This is only needed while adding inputs and outputs. During setup, these are used to
@@ -63,7 +60,6 @@ class Component(System):
 
         self._matrix_free = False
 
-        self._first_setup = True
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
 
@@ -149,7 +145,7 @@ class Component(System):
     def _setupx_var_index_maps(self):
         super(Component, self)._setupx_var_index_maps()
         allprocs_abs2idx = self._varx_allprocs_abs2idx
-        set_indices = self._varx_set_indices
+        allprocs_abs2idx_byset = self._varx_allprocs_abs2idx_byset
 
         abs2meta = self._varx_abs2meta
         set2iset = self._varx_set2iset
@@ -160,18 +156,15 @@ class Component(System):
             for ind, abs_name in enumerate(self._varx_allprocs_abs_names[type_]):
                 allprocs_abs2idx[type_][abs_name] = offset + ind
 
-        # Compute _varx_set_indices
+        # Compute _varx_allprocs_abs2idx_byset
         for type_ in ['input', 'output']:
             nvar = self._num_var[type_]
             counter = {set_name: 0 for set_name in set2iset[type_]}
 
-            set_indices[type_] = np.zeros((nvar, 2), int)
             for ind, abs_name in enumerate(self._varx_abs_names[type_]):
                 set_name = abs2meta[type_][abs_name]['var_set']
                 offset = self._varx_range_byset[type_][set_name][0]
-                iset = set2iset[type_][set_name]
-                set_indices[type_][ind, 0] = iset
-                set_indices[type_][ind, 1] = offset + counter[set_name]
+                allprocs_abs2idx_byset[type_][abs_name] = offset + counter[set_name]
                 counter[set_name] += 1
 
     def _setupx_var_sizes(self):
@@ -184,9 +177,9 @@ class Component(System):
         nproc = self.comm.size
 
         set2iset = self._varx_set2iset
-        set_indices = self._varx_set_indices
         abs2meta = self._varx_abs2meta
         var_range_byset = self._varx_range_byset
+        allprocs_abs2idx_byset = self._varx_allprocs_abs2idx_byset
 
         # Initialize empty arrays
         for type_ in ['input', 'output']:
@@ -203,7 +196,7 @@ class Component(System):
                 meta = abs2meta[type_][abs_name]
                 set_name = meta['var_set']
                 size = np.prod(meta['shape'])
-                idx_byset = set_indices[type_][ind, 1]
+                idx_byset = allprocs_abs2idx_byset[type_][abs_name]
 
                 my_idx = ind
                 my_idx_byset = idx_byset - var_range_byset[type_][set_name][0]

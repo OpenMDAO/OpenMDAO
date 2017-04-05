@@ -278,9 +278,10 @@ class Problem(object):
             assert model._var_abs_names[type_] == model._varx_abs_names[type_]
             assert model._assembler._var_allprocs_abs_names[type_] \
                 == model._varx_allprocs_abs_names[type_]
-            assert equal_arrays(
-                model._assembler._var_set_indices[type_],
-                model._varx_set_indices[type_])
+            for ind, abs_name in enumerate(model._varx_allprocs_abs_names[type_]):
+                assert equal_arrays(
+                    model._assembler._var_set_indices[type_][ind, 1],
+                    model._varx_allprocs_abs2idx_byset[type_][abs_name])
             assert equal_arrays(
                 model._assembler._var_sizes_all[type_],
                 model._varx_sizes[type_])

@@ -47,6 +47,9 @@ class System(object):
         MPI communicator object.
     metadata : <GeneralizedDictionary>
         dictionary of user-defined arguments.
+    _first_setup : bool
+        If True, this is the first time we are setting up, so we should not clear the
+        _var_rel2data_io and _var_rel_names attributes prior to setup.
     _assembler : <Assembler>
         pointer to the global assembler object.
     _mpi_proc_allocator : <ProcAllocator>
@@ -144,6 +147,8 @@ class System(object):
         self.comm = None
         self.metadata = GeneralizedDictionary()
         self.metadata.update(kwargs)
+
+        self._first_setup = True
 
         self._assembler = None
 
@@ -307,7 +312,7 @@ class System(object):
 
     def _setupx_var_index_maps(self):
         self._varx_allprocs_abs2idx = {'input': {}, 'output': {}}
-        self._varx_set_indices = {'input': None, 'output': None}
+        self._varx_allprocs_abs2idx_byset = {'input': {}, 'output': {}}
 
     def _setupx_var_sizes(self):
         self._varx_sizes = {'input': None, 'output': None}
