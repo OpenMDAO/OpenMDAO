@@ -251,6 +251,8 @@ class System(object):
         self._setupx_var_indices(set2iset, counter, counter_local, counter_byset)
         self._setupx_var_data()
         self._setupx_var_index_maps()
+        self._setupx_var_sizes()
+        self._setupx_connections()
 
     def _setupx_procs(self, pathname, comm, proc_range):
         self.pathname = pathname
@@ -264,26 +266,31 @@ class System(object):
 
     def _setupx_var_indices(self, set2iset, counter, counter_local, counter_byset):
         self._set2iset = set2iset
-        self._varx_range = {'input': [0, 0], 'output': [0, 0]}
-        self._varx_range_local = {'input': [0, 0], 'output': [0, 0]}
-        self._varx_range_byset = {
+        self._varx_range = var_range = {'input': [0, 0], 'output': [0, 0]}
+        self._varx_range_local = var_range_local = {'input': [0, 0], 'output': [0, 0]}
+        self._varx_range_byset = var_range_byset = {
             'input': {set_name: [0, 0] for set_name in set2iset['input']},
             'output': {set_name: [0, 0] for set_name in set2iset['output']},
         }
 
-        for type_ in ['input', 'output']:
-            self._varx_range[type_][0] = counter[type_]
-            self._varx_range[type_][1] = counter[type_] + self._num_var[type_]
+        num_var_byset = self._num_var_byset
 
-            self._varx_range_local[type_][0] = counter_local[type_]
-            self._varx_range_local[type_][1] = counter_local[type_] + self._num_var_local[type_]
+        for type_ in ['input', 'output']:
+            for set_name in set2iset[type_]:
+                if set_name not in num_var_byset[type_]:
+                    num_var_byset[type_][set_name] = 0
+
+        for type_ in ['input', 'output']:
+            var_range[type_][0] = counter[type_]
+            var_range[type_][1] = counter[type_] + self._num_var[type_]
+
+            var_range_local[type_][0] = counter_local[type_]
+            var_range_local[type_][1] = counter_local[type_] + self._num_var_local[type_]
 
             for set_name, iset in iteritems(set2iset[type_]):
-                self._varx_range_byset[type_][set_name][0] = counter_byset[type_][set_name]
-                self._varx_range_byset[type_][set_name][1] = counter_byset[type_][set_name]
-                if set_name in self._num_var_byset[type_]:
-                    self._varx_range_byset[type_][set_name][1] += \
-                        self._num_var_byset[type_][set_name]
+                var_range_byset[type_][set_name][0] = counter_byset[type_][set_name]
+                var_range_byset[type_][set_name][1] = counter_byset[type_][set_name] \
+                    + num_var_byset[type_][set_name]
 
     def _setupx_var_data(self):
         self._varx_allprocs_abs_names = {'input': [], 'output': []}
@@ -295,73 +302,6 @@ class System(object):
 
     def _setupx_var_index_maps(self):
         self._varx_allprocs_abs2idx = {'input': {}, 'output': {}}
-        self._varx_set_indices = {'input': None, 'output': None}
-
-    # -------------------------------------------------------------------------------------
-
-    # def _setupx(self, comm):
-    #     self._setupx_processors('', comm, [0, comm.size])
-    #     self._setupx_variables()
-    #     self._setupx_varsets()
-    #     self._setupx_variable_indices(
-    #         {type_: 0 for type_ in ['input', 'output']},
-    #         {type_: np.zeros(len(self._varx_set2iset[type_]), int)
-    #             for type_ in ['input', 'output']}
-    #     )
-    #     self._setupx_var_sizes()
-    #     self._setupx_connections()
-    #     self._setupx_partials()
-
-    def _setupx_processors(self, pathname, comm, proc_range):
-        self.pathname = pathname
-        self.comm = comm
-        self._mpi_proc_range = proc_range
-
-    def _setupx_variables(self):
-        self._varx_abs_names = {'input': [], 'output': []}
-        self._varx_allprocs_abs_names = {'input': [], 'output': []}
-        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        self._varx_abs2data_io = {}
-        self._varx_allprocs_abs2meta_io = {}
-
-    def _setupx_varsets(self, set2iset=None):
-        self._varx_allprocs_set2abs_names = {'input': {}, 'output': {}}
-
-        if set2iset is not None:
-            self._varx_set2iset = set2iset
-        else:
-            self._varx_set2iset = set2iset = {'input': {}, 'output': {}}
-
-            for type_ in ['input', 'output']:
-
-                # Compute set_names, first as a list of set names for variables on myproc
-                set_names = []
-                for abs_name in self._varx_abs_names[type_]:
-                    set_names.append(self._varx_abs2data_io[abs_name]['metadata']['var_set'])
-
-                # Make set_names unique
-                set_names = list(set(set_names))
-
-                # If we're running in parallel, allgather set_names from all procs.
-                # Overlap between contributions from different procs is OK because idx is unique
-                if self.comm.size > 1:
-                    raw = set_names
-
-                    set_names = []
-                    for local_set_names in self.comm.allgather(raw):
-                        set_names.extend(local_set_names)
-
-                    # Make set_names unique
-                    set_names = list(set(set_names))
-
-                # Compute _varx_set2iset
-                for iset, set_name in enumerate(set_names):
-                    set2iset[type_][set_name] = iset
-
-    def _setupx_variable_indices(self, global_idx_counter, global_vst_idx_counters):
-        self._varx_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
-        self._varx_allprocs_vst_idx_ranges = {'input': None, 'output': None}
-        self._varx_allprocs_abs2idx_io = {}
         self._varx_set_indices = {'input': None, 'output': None}
 
     def _setupx_var_sizes(self):

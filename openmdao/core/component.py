@@ -176,162 +176,42 @@ class Component(System):
                 set_indices[type_][ind, 1] = offset + counter[set_name]
                 counter[set_name] += 1
 
-    # -------------------------------------------------------------------------------------
-
-    def _setupx_variables(self):
-        super(Component, self)._setupx_variables()
-
-        abs_names = self._varx_abs_names
-        allprocs_abs_names = self._varx_allprocs_abs_names
-        allprocs_prom2abs_list = self._varx_allprocs_prom2abs_list
-        abs2data_io = self._varx_abs2data_io
-        allprocs_abs2meta_io = self._varx_allprocs_abs2meta_io
-
-        # Only necessary to clear the rel_* data structures if we are not on the first setup
-        if self._first_setup:
-            self._first_setup = False
-        else:
-            self._var_rel_names = {'input': [], 'output': []}
-            self._var_rel2data_io = {}
-
-        self.initialize_variables()
-
-        # Compute the prefix for turning rel/prom names into abs names
-        if self.pathname is not '':
-            prefix = self.pathname + '.'
-        else:
-            prefix = ''
-
-        # Compute _varx_abs_names, _varx_allprocs_abs_names, _varx_allprocs_prom2abs_list
-        for type_ in ['input', 'output']:
-            for prom_name in self._var_rel_names[type_]:
-                abs_name = prefix + prom_name
-
-                abs_names[type_].append(abs_name)
-                allprocs_abs_names[type_].append(abs_name)
-                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
-
-        meta_names = {
-            'input': ('units', 'shape', 'var_set'),
-            'output': ('units', 'shape', 'var_set', 'ref', 'ref0'),
-        }
-
-        # Compute _varx_abs2data_io and _varx_allprocs_abs2meta_io
-        for prom_name, data in iteritems(self._var_rel2data_io):
-            abs_name = prefix + prom_name
-
-            abs2data_io[abs_name] = data
-
-            meta = data['metadata']
-            allprocs_abs2meta_io[abs_name] = {
-                meta_name: meta[meta_name]
-                for meta_name in meta_names[data['type']]
-            }
-
-    def _setupx_varsets(self, set2iset=None):
-        super(Component, self)._setupx_varsets(set2iset)
-
-        allprocs_set2abs_names = self._varx_allprocs_set2abs_names
-
-        set2iset = self._varx_set2iset
-
-        # Compute _varx_allprocs_set2abs_names
-        for type_ in ['input', 'output']:
-
-            # Initialize empty lists
-            allprocs_set2abs_names[type_] = {set_name: [] for set_name in set2iset[type_]}
-
-            # Populate the lists
-            for abs_name in self._varx_abs_names[type_]:
-                data = self._varx_abs2data_io[abs_name]
-                set_name = data['metadata']['var_set']
-                allprocs_set2abs_names[type_][set_name].append(abs_name)
-
-    def _setupx_variable_indices(self, global_idx_counter, global_vst_idx_counters):
-        super(Component, self)._setupx_variable_indices(global_idx_counter, global_vst_idx_counters)
-
-        allprocs_idx_range = self._varx_allprocs_idx_range
-        allprocs_vst_idx_ranges = self._varx_allprocs_vst_idx_ranges
-        allprocs_abs2idx_io = self._varx_allprocs_abs2idx_io
-        set_indices = self._varx_set_indices
-
-        set2iset = self._varx_set2iset
-        abs2data_io = self._varx_abs2data_io
-
-        # Compute _varx_allprocs_idx_range by simply getting the length of the variable list
-        for type_ in ['input', 'output']:
-            counter = len(self._varx_abs_names[type_])
-
-            allprocs_idx_range[type_] = [
-                global_idx_counter[type_],
-                global_idx_counter[type_] + counter,
-            ]
-
-        # Compute _varx_allprocs_vst_idx_ranges by first counting the variables for each var_set
-        for type_ in ['input', 'output']:
-            nset = len(set2iset[type_])
-
-            counters = np.zeros(nset, int)
-            for set_name, abs_names in iteritems(self._varx_allprocs_set2abs_names[type_]):
-                iset = set2iset[type_][set_name]
-                counters[iset] = len(abs_names)
-
-            allprocs_vst_idx_ranges[type_] = np.zeros((nset, 2), int)
-            allprocs_vst_idx_ranges[type_][:, 0] = global_vst_idx_counters[type_]
-            allprocs_vst_idx_ranges[type_][:, 1] = global_vst_idx_counters[type_] + counters
-
-        # Compute _varx_allprocs_abs2idx_io
-        for type_ in ['input', 'output']:
-            for abs_name in self._varx_abs_names[type_]:
-                allprocs_abs2idx_io[abs_name] = global_idx_counter[type_]
-                global_idx_counter[type_] += 1
-
-        # Compute _varx_set_indices
-        for type_ in ['input', 'output']:
-            nvar = len(self._varx_abs_names[type_])
-            set_indices[type_] = np.zeros((nvar, 2), int)
-            for ind, abs_name in enumerate(self._varx_abs_names[type_]):
-                data = abs2data_io[abs_name]
-                set_name = data['metadata']['var_set']
-                iset = set2iset[type_][set_name]
-                set_indices[type_][ind, 0] = iset
-                set_indices[type_][ind, 1] = global_vst_idx_counters[type_][iset]
-                global_vst_idx_counters[type_][iset] += 1
-
     def _setupx_var_sizes(self):
         super(Component, self)._setupx_var_sizes()
 
         sizes = self._varx_sizes
         set2sizes = self._varx_set2sizes
-        set2iset = self._varx_set2iset
-
-        set_indices = self._varx_set_indices
-        allprocs_vst_idx_ranges = self._varx_allprocs_vst_idx_ranges
 
         iproc = self.comm.rank
         nproc = self.comm.size
 
+        set2iset = self._set2iset
+        set_indices = self._varx_set_indices
+        abs2meta = self._varx_abs2meta
+        var_range_byset = self._varx_range_byset
+
         # Initialize empty arrays
         for type_ in ['input', 'output']:
-            sizes[type_] = np.zeros((nproc, len(self._varx_allprocs_abs_names[type_])), int)
+            sizes[type_] = np.zeros((nproc, self._num_var[type_]), int)
 
             set2sizes[type_] = {}
-            for set_name in self._varx_set2iset[type_]:
+            for set_name in set2iset[type_]:
                 set2sizes[type_][set_name] = np.zeros(
-                    (nproc, len(self._varx_allprocs_set2abs_names[type_][set_name])), int)
+                    (nproc, self._num_var_byset[type_][set_name]), int)
 
         # Compute _varx_sizes and _varx_set2sizes
-        for abs_name, data in iteritems(self._varx_abs2data_io):
-            my_idx = data['my_idx']
-            type_ = data['type']
-            set_name = data['metadata']['var_set']
-            iset = set2iset[type_][set_name]
-            vst_idx = set_indices[type_][my_idx, 1]
-            my_vst_idx = vst_idx - allprocs_vst_idx_ranges[type_][iset, 0]
-            size = np.prod(data['metadata']['shape'])
+        for type_ in ['input', 'output']:
+            for ind, abs_name in enumerate(self._varx_abs_names[type_]):
+                meta = abs2meta[type_][abs_name]
+                set_name = meta['var_set']
+                size = np.prod(meta['shape'])
+                idx_byset = set_indices[type_][ind, 1]
 
-            sizes[type_][iproc, my_idx] = size
-            set2sizes[type_][set_name][iproc, my_vst_idx] = size
+                my_idx = ind
+                my_idx_byset = idx_byset - var_range_byset[type_][set_name][0]
+
+                sizes[type_][iproc, my_idx] = size
+                set2sizes[type_][set_name][iproc, my_idx_byset] = size
 
         if self.comm.size > 1:
             for type_ in ['input', 'output']:
