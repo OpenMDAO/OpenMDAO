@@ -19,10 +19,7 @@ from openmdao.utils.units import convert_units
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
-
-
-# This is for storing various data mapped to var pathname
-PathData = namedtuple('PathData', ['name', 'idx', 'myproc_idx', 'typ'])
+from openmdao.utils.mpi import MPI
 
 
 class System(object):
@@ -54,8 +51,10 @@ class System(object):
         pointer to the global assembler object.
     _mpi_proc_allocator : <ProcAllocator>
         object that distributes procs among subsystems.
-    _mpi_proc_range : [int, int]
-        indices of procs owned by comm with respect to COMM_WORLD.
+    _mpi_req_procs : (int, int or None)
+        number of min and max procs usable by this system.
+    _mpi_proc_range : (int, int)
+        The range of processors that the comm on this system owns, in the global index space.
     _subsystems_allprocs : [<System>, ...]
         list of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
@@ -63,8 +62,22 @@ class System(object):
     _subsystems_myproc_inds : [int, ...]
         list of indices of subsystems on this proc among all of this system's
         subsystems (subsystems on all of this system's processors).
-    _var_maps : {'input': dict, 'output': dict}
-        dictionary of variable names and their promoted names.
+    _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
+        list of pathnames of all owned variables, not just on current proc.
+    _var_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
+        index range of owned variables with respect to all problem variables.
+    _var_allprocs_indices : {'input': dict, 'output': dict}
+        dictionary of global indices keyed by the variable name.
+    _var_myproc_names : {'input': [str, ...], 'output': [str, ...]}
+        list of unpromoted names of owned variables on current proc.
+    _var_myproc_metadata : {'input': list, 'output': list}
+        list of metadata dictionaries of variables that exist on this proc.
+    _var_pathdict : dict
+        maps full variable pathname to local name, index and I/O type
+    _var_name2path : dict
+        maps local var name to full pathname.
+    _var_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
+        integer arrays of global indices of variables on this proc.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -149,13 +162,13 @@ class System(object):
         self._assembler = None
 
         self._mpi_proc_allocator = DefaultAllocator()
-        self._mpi_proc_range = [0, 1]
+        self._mpi_req_procs = None
+        self._mpi_proc_range = None
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
 
-        self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
         self._manual_connections = {}
@@ -245,7 +258,8 @@ class System(object):
         return set2iset, counter, counter_local, counter_byset
 
     def _setupx(self, comm):
-        self._setupx_procs('', comm, [0, comm.size])
+        self.get_req_procs()
+        self._setupx_procs('', comm, (0, comm.size))
         self._setupx_vars()
         set2iset, counter, counter_local, counter_byset = self._setupx_get_initial()
         self._setupx_var_indices(set2iset, counter, counter_local, counter_byset)
@@ -258,6 +272,11 @@ class System(object):
         self.pathname = pathname
         self.comm = comm
         self._mpi_proc_range = proc_range
+
+        minp, maxp = self._mpi_req_procs
+        if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
+            raise RuntimeError("%s needs %d MPI processes, but was given only %d." %
+                               (self.pathname, minp, comm.size))
 
     def _setupx_vars(self):
         self._num_var = {'input': 0, 'output': 0}
@@ -319,8 +338,24 @@ class System(object):
     #
     #
 
-    def _setup_processors(self, path, comm, global_dict,
-                          assembler, proc_range):
+    def get_req_procs(self):
+        """
+        Return the min and max MPI processes usable by this System.
+
+        This should be overridden by Components that require more than
+        1 process.
+
+        Returns
+        -------
+        tuple : (int, int or None)
+            A tuple of the form (min_procs, max_procs), indicating the min
+            and max processors usable by this `System`.  max_procs can be None,
+            indicating all available procs can be used.
+        """
+        # by default, systems only require 1 proc
+        return (1, 1)
+
+    def _setup_processors(self, path, comm, global_dict, assembler, proc_range):
         """
         Recursively split comms and define local subsystems.
 
@@ -328,9 +363,9 @@ class System(object):
             pathname
             comm
             _assembler
-            _mpi_proc_range
             _subsystems_myproc
             _subsystems_myproc_inds
+            _mpi_proc_range
 
         Parameters
         ----------
@@ -342,10 +377,9 @@ class System(object):
             dictionary with kwargs of all parents assembled in it.
         assembler : Assembler
             pointer to the global assembler object to distribute to everyone.
-        proc_range : [int, int]
-            indices of procs owned by comm with respect to COMM_WORLD.
+        proc_range : (int, int)
+            The range of processors that the comm on this system owns, in the global index space.
         """
-        # Set attributes
         self.pathname = '.'.join((path, self.name)) if path else self.name
         self.comm = comm
         self._assembler = assembler
@@ -357,38 +391,50 @@ class System(object):
         # Optional user-defined method
         self.initialize_processors()
 
-        nsub = len(self._subsystems_allprocs)
-        # If this is a group:
-        if nsub > 0:
-            # Call the load balancing algorithm
-            tmp = self._mpi_proc_allocator(nsub, comm, proc_range)
-            sub_inds, sub_comm, sub_proc_range = tmp
+        minp, maxp = self._mpi_req_procs
+        if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
+            raise RuntimeError("%s needs %d MPI processes, but was given only %d." %
+                               (self.pathname, minp, comm.size))
 
-            # Define local subsystems
-            self._subsystems_myproc = [self._subsystems_allprocs[ind]
-                                       for ind in sub_inds]
-            self._subsystems_myproc_inds = sub_inds
+    def _setup_variables(self, recurse=True):
+        """
+        Assemble variable metadata and names lists.
 
-            # Perform recursion
-            for subsys in self._subsystems_myproc:
-                sub_global_dict = self.metadata._global_dict.copy()
-                subsys._setup_processors(self.pathname, sub_comm,
-                                         sub_global_dict, assembler,
-                                         sub_proc_range)
+        Sets the following attributes:
+            _var_abs2data_io
+            _var_abs_names
+            _var_allprocs_prom2abs_list
 
-    def _setup_variable_indices(self, global_index, recurse=True):
+        Parameters
+        ----------
+        recurse : boolean
+            recursion is not performed if traversing up the tree after reconf.
+        """
+        if overrides_method('initialize_variables', self, System):
+            # TODO: we may want to provide a way for component devs to tell
+            # the framework that they don't need to re-configure, since the
+            # majority of components won't need to be configured more than once
+
+            # Empty the lists in case this is part of a reconfiguration
+            self._var_abs2data_io = {}
+            for type_ in ['input', 'output']:
+                self._var_abs_names[type_] = []
+
+                # Only Components have this:
+                try:
+                    self._var_rel_names[type_] = []
+                except AttributeError:
+                    pass
+
+            self.initialize_variables()
+
+    def _setup_var_indices(self):
         """
         Define the variable indices and range.
 
         Sets the following attributes:
             _var_allprocs_idx_range
 
-        Parameters
-        ----------
-        global_index : {'input': int, 'output': int}
-            current global variable counter.
-        recurse : boolean
-            recursion is not performed if traversing up the tree after reconf.
         """
         pass
 
@@ -446,6 +492,9 @@ class System(object):
             # vectors['residual']._ivar_map = vectors['output']._ivar_map
 
         # Compute the transfer for this vector set
+        # if vec_name == 'linear':
+        #     self._vector_transfers[vec_name] = self._vector_transfers['nonlinear']
+        # else:
         self._vector_transfers[vec_name] = self._get_transfers(vectors)
 
         # Assign relevant variables IDs array
@@ -682,15 +731,12 @@ class System(object):
         """
         transfer_class = vectors['output'].TRANSFER
 
-        nsub_allprocs = len(self._subsystems_allprocs)
-        var_range = self._var_allprocs_idx_range
-        subsystems_myproc = self._subsystems_myproc
-        subsystems_inds = self._subsystems_myproc_inds
-
         # Call the assembler's transfer setup routine
         compute_transfers = self._assembler._compute_transfers
-        xfer_indices = compute_transfers(nsub_allprocs, var_range,
-                                         subsystems_myproc, subsystems_inds)
+        xfer_indices = compute_transfers(len(self._subsystems_allprocs),
+                                         self._var_allprocs_idx_range,
+                                         self._subsystems_myproc,
+                                         self._subsystems_myproc_inds)
         (xfer_in_inds, xfer_out_inds,
          fwd_xfer_in_inds, fwd_xfer_out_inds,
          rev_xfer_in_inds, rev_xfer_out_inds) = xfer_indices
@@ -713,9 +759,14 @@ class System(object):
                                                     self.comm)
         return transfers
 
-    def _get_maps(self):
+    def _get_maps(self, prom_names):
         """
         Define variable maps based on promotes lists.
+
+        Parameters
+        ----------
+        prom_names : {'input': [], 'output': []}
+            Lists of promoted input and output names.
 
         Returns
         -------
@@ -746,7 +797,6 @@ class System(object):
 
         maps = {'input': {}, 'output': {}}
         gname = self.name + '.' if self.name else ''
-        prom2abs = self._var_allprocs_prom2abs_list
         found = False
 
         promotes = self._var_promotes['any']
@@ -754,6 +804,8 @@ class System(object):
             names, patterns, renames = split_list(promotes)
 
         for typ in ('input', 'output'):
+            pmap = maps[typ]
+
             if promotes:
                 pass
             elif self._var_promotes[typ]:
@@ -761,23 +813,25 @@ class System(object):
             else:
                 names = patterns = renames = ()
 
-            for name in prom2abs[typ]:
-                if name in names:
-                    maps[typ][name] = name
+            for name in prom_names[typ]:
+                if name in pmap:
+                    pass
+                elif name in names:
+                    pmap[name] = name
                     found = True
                 elif name in renames:
-                    maps[typ][name] = renames[name]
+                    pmap[name] = renames[name]
                     found = True
                 else:
                     for pattern in patterns:
                         # if name matches, promote that variable to parent
                         if fnmatchcase(name, pattern):
-                            maps[typ][name] = name
+                            pmap[name] = name
                             found = True
                             break
                     else:
                         # Default: prepend the parent system's name
-                        maps[typ][name] = gname + name if gname else name
+                        pmap[name] = gname + name if gname else name
 
         if not found:
             for io, lst in self._var_promotes.items():
@@ -1471,10 +1525,16 @@ class System(object):
                 out[name]['size'] = vec[out[name]['name']].size
 
         if recurse:
-            for subsys in self._subsystems_allprocs:
+            for subsys in self._subsystems_myproc:
                 subsys_design_vars = subsys.get_design_vars(recurse=recurse)
                 for key in subsys_design_vars:
                     out[key] = subsys_design_vars[key]
+            if self.comm.size > 1 and self._subsystems_allprocs:
+                iproc = self.comm.rank
+                for rank, all_out in enumerate(self.comm.allgather(out)):
+                    if rank != iproc:
+                        out.update(all_out)
+
         return out
 
     def get_responses(self, recurse=True):
@@ -1512,10 +1572,17 @@ class System(object):
             out[name]['size'] = vec[name].size
 
         if recurse:
-            for subsys in self._subsystems_allprocs:
+            for subsys in self._subsystems_myproc:
                 subsys_responses = subsys.get_responses(recurse=recurse)
                 for key in subsys_responses:
                     out[key] = subsys_responses[key]
+
+            if self.comm.size > 1 and self._subsystems_allprocs:
+                iproc = self.comm.rank
+                for rank, all_out in enumerate(self.comm.allgather(out)):
+                    if rank != iproc:
+                        out.update(all_out)
+
         return out
 
     def get_constraints(self, recurse=True):

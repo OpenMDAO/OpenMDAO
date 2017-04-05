@@ -420,7 +420,7 @@ class PetscKSP(LinearSolver):
             lsize += np.prod(system._var_abs2data_io[abs_name]['metadata']['shape'])
 
         size = 0
-        global_var_sizes = system._assembler._variable_sizes_all['output']
+        global_var_sizes = system._assembler._var_sizes_all['output']
         idx_start, idx_end = system._var_allprocs_idx_range['output']
         for idx in range(idx_start, idx_end):
             size += sum(global_var_sizes[:, idx])

@@ -3,6 +3,7 @@
 # Core
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group
+from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp

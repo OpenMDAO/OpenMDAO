@@ -43,8 +43,8 @@ class DefaultAssembler(Assembler):
         rev_xfer_out_inds : [dict of int ndarray[:], ...]
             list of output indices of reverse transfers.
         """
-        in_set_indices = self._variable_set_indices['input']
-        out_set_indices = self._variable_set_indices['output']
+        in_set_indices = self._var_set_indices['input']
+        out_set_indices = self._var_set_indices['output']
 
         # Input and output variable allproc index ranges
         in_ind1, in_ind2 = var_range['input']
@@ -78,8 +78,8 @@ class DefaultAssembler(Assembler):
         fwd_xfer_out_inds = [{} for sub_ind in range(nsub_allprocs)]
         rev_xfer_in_inds = [{} for sub_ind in range(nsub_allprocs)]
         rev_xfer_out_inds = [{} for sub_ind in range(nsub_allprocs)]
-        for iset in range(len(self._variable_sizes['input'])):
-            for jset in range(len(self._variable_sizes['output'])):
+        for iset in range(len(self._var_sizes_by_set['input'])):
+            for jset in range(len(self._var_sizes_by_set['output'])):
                 xfer_in_inds[iset, jset] = []
                 xfer_out_inds[iset, jset] = []
                 for sub_ind in range(nsub_allprocs):
@@ -120,8 +120,8 @@ class DefaultAssembler(Assembler):
                     out_iset, out_ivar_set = out_set_indices[out_ind, :]
 
                     # Get the sizes array for the correct varset
-                    in_sizes = self._variable_sizes['input'][in_iset]
-                    out_sizes = self._variable_sizes['output'][out_iset]
+                    in_sizes = self._var_sizes_by_set['input'][in_iset]
+                    out_sizes = self._var_sizes_by_set['output'][out_iset]
 
                     # Get the src_indices for the input
                     ind1, ind2 = self._src_indices_range[in_ivar_set, :]
@@ -179,8 +179,8 @@ class DefaultAssembler(Assembler):
             else:
                 return np.array([], int)
 
-        for iset in range(len(self._variable_sizes['input'])):
-            for jset in range(len(self._variable_sizes['output'])):
+        for iset in range(len(self._var_sizes_by_set['input'])):
+            for jset in range(len(self._var_sizes_by_set['output'])):
                 xfer_in_inds[iset, jset] = merge(xfer_in_inds[iset, jset])
                 xfer_out_inds[iset, jset] = merge(xfer_out_inds[iset, jset])
                 for sub_ind in range(nsub_allprocs):
