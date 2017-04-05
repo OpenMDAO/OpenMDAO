@@ -33,7 +33,6 @@ class NLRunOnce(NonlinearSolver):
         """
         system = self._system
         for isub, subsys in enumerate(system._subsystems_allprocs):
-            print("subsystem:", subsys.pathname)
             system._transfers['fwd', isub](system._inputs,
                                            system._outputs, 'fwd')
 

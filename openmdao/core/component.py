@@ -30,8 +30,6 @@ class Component(System):
 
     Attributes
     ----------
-    _var2meta : dict
-        A mapping of local variable name to its metadata.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
     _matrix_free : Bool
