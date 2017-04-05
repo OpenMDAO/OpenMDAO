@@ -167,6 +167,20 @@ class TestGeneralizedDict(TestOptionsDict):
         self.dict.declare('foobar', value="barfoo")
         self.assertEqual(self.dict['foobar'], "barfoo")
 
+    def test_bounds(self):
+        self.dict.declare('x', value=1.0, lower=0.0, upper=2.0)
+
+        with self.assertRaises(ValueError) as context:
+            self.dict['x'] = 3.0
+
+        expected_msg = ("Value of 3.0 exceeds maximum of 2.0 for entry 'x'")
+        assertRegex(self, str(context.exception), expected_msg)
+
+        with self.assertRaises(ValueError) as context:
+            self.dict['x'] = -3.0
+
+        expected_msg = ("Value of -3.0 exceeds minimum of 0.0 for entry 'x'")
+        assertRegex(self, str(context.exception), expected_msg)
 
 if __name__ == "__main__":
     unittest.main()
