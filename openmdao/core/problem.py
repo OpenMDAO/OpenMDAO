@@ -282,17 +282,23 @@ class Problem(object):
             assert model._num_var[type_] == model._var_allprocs_idx_range[type_][1]
             assert model._num_var_local[type_] == len(model._var_abs_names[type_])
 
-        assert set(model._var_abs2data_io.keys()) \
-            == set(model._varx_abs2meta['input'].keys() + model._varx_abs2meta['output'].keys())
-        # assert model._assembler._var_allprocs_abs2idx_io == model._varx_allprocs_abs2idx_io
+        assert set(model._var_abs2data_io.keys()) == set(
+            model._varx_abs2meta['input'].keys() \
+            + model._varx_abs2meta['output'].keys()
+        )
+        assert set(model._assembler._var_allprocs_abs2idx_io) == set(
+            model._varx_allprocs_abs2idx['input'].keys() \
+            + model._varx_allprocs_abs2idx['output'].keys()
+        )
+
         assert model._var_allprocs_idx_range == model._varx_range
         for type_ in ['input', 'output']:
             assert model._var_abs_names[type_] == model._varx_abs_names[type_]
             assert model._assembler._var_allprocs_abs_names[type_] \
                 == model._varx_allprocs_abs_names[type_]
-        #     assert equal_arrays(
-        #         model._assembler._variable_set_indices[type_],
-        #         model._varx_set_indices[type_])
+            assert equal_arrays(
+                model._assembler._variable_set_indices[type_],
+                model._varx_set_indices[type_])
         #     assert equal_arrays(
         #         model._assembler._variable_sizes_all[type_],
         #         model._varx_sizes[type_])

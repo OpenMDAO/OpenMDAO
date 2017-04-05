@@ -147,13 +147,13 @@ class Group(System):
         for type_ in ['input', 'output']:
             for ind, subsys in enumerate(self._subsystems_myproc):
                 isub = self._subsystems_myproc_inds[ind]
-                allprocs_counters_local[type_][isub] = num_var[type_]
+                allprocs_counters_local[type_][isub] = subsys._num_var_local[type_]
                 if subsys.comm.rank == 0:
-                    allprocs_counters[type_][isub] = num_var[type_]
-                    for set_name in num_var_byset[type_]:
+                    allprocs_counters[type_][isub] = subsys._num_var[type_]
+                    for set_name in subsys._num_var_byset[type_]:
                         iset = set2iset[type_][set_name]
                         allprocs_counters_byset[type_][isub, iset] = \
-                            num_var_byset[type_][set_name]
+                            subsys._num_var_byset[type_][set_name]
 
         # If running in parallel, allgather
         if self.comm.size > 1:

@@ -164,7 +164,7 @@ class Component(System):
 
         # Compute _varx_set_indices
         for type_ in ['input', 'output']:
-            nvar = len(self._varx_abs_names[type_])
+            nvar = self._num_var[type_]
             counter = {set_name: 0 for set_name in set2iset[type_]}
 
             set_indices[type_] = np.zeros((nvar, 2), int)
