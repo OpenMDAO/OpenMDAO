@@ -62,22 +62,8 @@ class System(object):
     _subsystems_myproc_inds : [int, ...]
         list of indices of subsystems on this proc among all of this system's
         subsystems (subsystems on all of this system's processors).
-    _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
-        list of pathnames of all owned variables, not just on current proc.
     _var_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
         index range of owned variables with respect to all problem variables.
-    _var_allprocs_indices : {'input': dict, 'output': dict}
-        dictionary of global indices keyed by the variable name.
-    _var_myproc_names : {'input': [str, ...], 'output': [str, ...]}
-        list of unpromoted names of owned variables on current proc.
-    _var_myproc_metadata : {'input': list, 'output': list}
-        list of metadata dictionaries of variables that exist on this proc.
-    _var_pathdict : dict
-        maps full variable pathname to local name, index and I/O type
-    _var_name2path : dict
-        maps local var name to full pathname.
-    _var_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
-        integer arrays of global indices of variables on this proc.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
