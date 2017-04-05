@@ -1,6 +1,8 @@
 """Define the Group class."""
 from __future__ import division
 
+import sys
+
 from six import iteritems, string_types
 from six.moves import range
 
@@ -8,11 +10,12 @@ from collections import Iterable, Counter
 
 import numpy as np
 
-from openmdao.core.system import System, PathData
+from openmdao.core.system import System
 from openmdao.solvers.nl_runonce import NLRunOnce
 from openmdao.solvers.ln_runonce import LNRunOnce
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
+from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 
 
 class Group(System):
@@ -211,6 +214,106 @@ class Group(System):
 
         self._subsystems_allprocs = [olddict[name] for name in new_order]
 
+    def _setup_processors(self, path, comm, global_dict, assembler):
+        """
+        Recursively split comms and define local subsystems.
+
+        Sets the following attributes:
+            pathname
+            comm
+            _assembler
+            _subsystems_myproc
+            _subsystems_myproc_inds
+
+        Parameters
+        ----------
+        path : str
+            parent names to prepend to name to get the pathname
+        comm : MPI.Comm or <FakeComm>
+            communicator for this system (already split, if applicable).
+        global_dict : dict
+            dictionary with kwargs of all parents assembled in it.
+        assembler : Assembler
+            pointer to the global assembler object to distribute to everyone.
+        """
+        super(Group, self)._setup_processors(path, comm, global_dict, assembler)
+
+        if self._subsystems_allprocs:
+            req_procs = [s._mpi_req_procs for s in self._subsystems_allprocs]
+            # Call the load balancing algorithm
+            try:
+                sub_inds, sub_comm = self._mpi_proc_allocator(req_procs, comm)
+            except ProcAllocationError as err:
+                raise RuntimeError("subsystem %s requested %d processes "
+                                   "but got %d" %
+                                   (self._subsystems_allprocs[err.sub_idx].pathname,
+                                    err.requested, err.remaining))
+
+            # Define local subsystems
+            self._subsystems_myproc_inds = sub_inds
+            self._subsystems_myproc = [self._subsystems_allprocs[ind]
+                                       for ind in sub_inds]
+
+            # Perform recursion
+            for subsys in self._subsystems_myproc:
+                sub_global_dict = self.metadata._global_dict.copy()
+                subsys._setup_processors(self.pathname, sub_comm,
+                                         sub_global_dict, assembler)
+
+    def get_req_procs(self):
+        """
+        Return the min and max MPI processes usable by this Group.
+
+        Returns
+        -------
+        tuple : (int, int or None)
+            A tuple of the form (min_procs, max_procs), indicating the min
+            and max processors usable by this <Group>.  max_procs can be None,
+            indicating all available procs can be used.
+        """
+        if self._subsystems_allprocs:
+            if self._mpi_proc_allocator.parallel:
+                # for a parallel group, we add up all of the required procs
+                min_procs, max_procs = 0, 0
+
+                for sub in self._subsystems_allprocs:
+                    if sub._mpi_req_procs is None:
+                        sub._mpi_req_procs = sub.get_req_procs()
+                    sub_min, sub_max = sub._mpi_req_procs
+                    if sub_min > min_procs:
+                        min_procs = sub_min
+                    if max_procs is not None:
+                        if sub_max is None:
+                            max_procs = None
+                        else:
+                            max_procs += sub_max
+
+                if min_procs == 0:
+                    min_procs = 1
+
+                if max_procs == 0:
+                    max_procs = 1
+
+                return (min_procs, max_procs)
+            else:
+                # for a serial group, we take the max required procs
+                min_procs, max_procs = 1, 1
+
+                for sub in self._subsystems_allprocs:
+                    if sub._mpi_req_procs is None:
+                        sub._mpi_req_procs = sub.get_req_procs()
+                    sub_min, sub_max = sub._mpi_req_procs
+                    min_procs = max(min_procs, sub_min)
+                    if max_procs is not None:
+                        if sub_max is None:
+                            max_procs = None
+                        else:
+                            max_procs = max(max_procs, sub_max)
+
+                return (min_procs, max_procs)
+        else:
+            return super(Group, self).get_req_procs()
+
     def _setup_connections(self):
         """
         Recursively assemble a list of input-output connections.
@@ -286,7 +389,7 @@ class Group(System):
         """
         pass
 
-    def _setup_variables(self):
+    def _setup_variables(self, recurse=True):
         """
         Compute variable dict/list for variables on the current processor.
 
@@ -294,6 +397,11 @@ class Group(System):
             _var_abs2data_io
             _var_abs_names
             _var_allprocs_prom2abs_list
+
+        Parameters
+        ----------
+        recurse : boolean
+            recursion is not performed if traversing up the tree after reconf.
 
         Returns
         -------
@@ -308,22 +416,26 @@ class Group(System):
 
         name_offset = len(self.pathname) + 1 if self.pathname else 0
         allprocs_abs_names = {'input': [], 'output': []}
+        allprocs_prom_names = {'input': [], 'output': []}
 
         # Perform recursion to populate the dict and list bottom-up
         for isub, subsys in enumerate(self._subsystems_myproc):
-            subsys_allprocs_abs_names = subsys._setup_variables()
+            sub_all_abs_names, sub_all_prom_names = subsys._setup_variables()
 
-            var_maps = subsys._get_maps()
+            var_maps_inout = subsys._get_maps(sub_all_prom_names)
             for type_ in ['input', 'output']:
+                var_maps = var_maps_inout[type_]
                 # concatenate the allprocs variable names from subsystems on my proc.
-                allprocs_abs_names[type_].extend(subsys_allprocs_abs_names[type_])
+                allprocs_abs_names[type_].extend(sub_all_abs_names[type_])
+                allprocs_prom_names[type_].extend(var_maps[p]
+                                                  for p in sub_all_prom_names[type_])
 
                 # Assemble _var_abs2data_io and _var_abs_names by concatenating from subsystems.
                 for abs_name in subsys._var_abs_names[type_]:
                     sub_data = subsys._var_abs2data_io[abs_name]
 
                     self._var_abs2data_io[abs_name] = {
-                        'prom': var_maps[type_][sub_data['prom']],
+                        'prom': var_maps[sub_data['prom']],
                         'rel': abs_name[name_offset:] if name_offset > 0 else abs_name,
                         'my_idx': len(self._var_abs_names[type_]),
                         'type': type_,
@@ -331,16 +443,35 @@ class Group(System):
                     }
                     self._var_abs_names[type_].append(abs_name)
 
-        # For _var_allprocs_prom2abs_list, essentially invert the abs2prom map in
-        # _var_abs2data_io to capture at least the local maps.
-        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        for abs_name, data in iteritems(self._var_abs2data_io):
-            type_ = data['type']
-            prom_name = data['prom']
-            if prom_name not in self._var_allprocs_prom2abs_list[type_]:
-                self._var_allprocs_prom2abs_list[type_][prom_name] = [abs_name]
-            else:
-                self._var_allprocs_prom2abs_list[type_][prom_name].append(abs_name)
+        # If we're running in parallel, gather contributions from other procs.
+        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+            for type_ in ['input', 'output']:
+                sub_comm = self._subsystems_myproc[0].comm
+                if sub_comm.rank == 0:
+                    raw = (allprocs_abs_names[type_], allprocs_prom_names[type_])
+                else:
+                    raw = ([], [])
+
+                allprocs_abs_names[type_] = []
+                allprocs_prom_names[type_] = []
+                for abs_names, prom_names in self.comm.allgather(raw):
+                    allprocs_abs_names[type_].extend(abs_names)
+                    allprocs_prom_names[type_].extend(prom_names)
+
+        # We use allprocs_abs_names to count the total number of allprocs variables
+        # and put it in _var_allprocs_idx_range.
+        for type_ in ['input', 'output']:
+            all_abs = allprocs_abs_names[type_]
+            self._var_allprocs_idx_range[type_] = [0, len(all_abs)]
+
+            allprocs_prom2abs_list = {}
+            for i, prom_name in enumerate(allprocs_prom_names[type_]):
+                if prom_name not in allprocs_prom2abs_list:
+                    allprocs_prom2abs_list[prom_name] = [all_abs[i]]
+                else:
+                    allprocs_prom2abs_list[prom_name].append(all_abs[i])
+
+            self._var_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
 
         for prom_name, lst in iteritems(self._var_allprocs_prom2abs_list['output']):
             if len(lst) > 1:
@@ -348,85 +479,29 @@ class Group(System):
                                    "multiple outputs: %s." %
                                    (prom_name, sorted(lst)))
 
-        # If we're running in parallel, gather contributions from other procs.
-        if self.comm.size > 1:
-            for type_ in ['input', 'output']:
-                sub_comm = self._subsystems_myproc[0].comm
-                if sub_comm.rank == 0:
-                    raw = (allprocs_abs_names[type_], self._var_allprocs_prom2abs_list[type_])
-                else:
-                    raw = ([], {})
+        self._var_allprocs_abs_names = allprocs_abs_names
 
-                allprocs_abs_names[type_] = []
-                allprocs_prom2abs_list = {}
-                for abs_names, prom2abs_list in self.comm.allgather(raw):
-                    allprocs_abs_names[type_].extend(abs_names)
-                    for prom_name, abs_names_list in iteritems(prom2abs_list):
-                        if prom_name not in allprocs_prom2abs_list:
-                            allprocs_prom2abs_list[prom_name] = abs_names_list
-                        else:
-                            allprocs_prom2abs_list[prom_name].extend(abs_names_list)
+        return allprocs_abs_names, allprocs_prom_names
 
-                self._var_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
-
-        # We use allprocs_abs_names to count the total number of allprocs variables
-        # and put it in _var_allprocs_idx_range.
-        for type_ in ['input', 'output']:
-            self._var_allprocs_idx_range[type_] = [0, len(allprocs_abs_names[type_])]
-
-        return allprocs_abs_names
-
-    def _setup_variable_indices(self, global_index):
+    def _setup_var_indices(self):
         """
         Compute the global index range for variables on all processors.
 
         Computes the following attributes:
             _var_allprocs_idx_range
-
-        Parameters
-        ----------
-        global_index : {'input': int, 'output': int}
-            current global variable counter.
         """
-        # At this point, _var_allprocs_idx_range is correct except for an offset.
-        # We apply the global_index offset to make _var_allprocs_idx_range correct.
+        abs2idx = self._assembler._var_allprocs_abs2idx_io
         for type_ in ['input', 'output']:
-            for ind in range(2):
-                self._var_allprocs_idx_range[type_][ind] += global_index[type_]
-
-        # Pre-recursion: compute index to pass to subsystems.
-        # This index is the number of variables on procs before current proc
-        # Necessary because of multiple global counters on different procs
-        if self.comm.size > 1:
-            subsys0 = self._subsystems_myproc[0]
-            for type_ in ['input', 'output']:
-                # Note: the following is valid because _var_allprocs_idx_range
-                # contains [0, # allprocs vars] at this point because
-                # _setup_variables has been run but the recursion
-                # for the current method has not been performed yet.
-                local_var_size = subsys0._var_allprocs_idx_range[type_][1]
-
-                # Compute the variable count list; 0 on rank > 0 procs
-                sub_comm = subsys0.comm
-                if sub_comm.rank == 0:
-                    nvar_myproc = local_var_size
-                else:
-                    nvar_myproc = 0
-                nvar_allprocs = self.comm.allgather(nvar_myproc)
-
-                # Compute the offset
-                iproc = self.comm.rank
-                nvar_myproc = local_var_size
-                global_index[type_] += np.sum(nvar_allprocs[:iproc + 1]) - nvar_myproc
+            idxs = [abs2idx[name] for name in self._var_allprocs_abs_names[type_]]
+            if idxs:
+                self._var_allprocs_idx_range[type_][0] = np.min(idxs)
+                self._var_allprocs_idx_range[type_][1] = np.max(idxs) + 1
+            else:
+                self._var_allprocs_idx_range[type_][:] = [0, 0]
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            subsys._setup_variable_indices(global_index)
-
-        # Reset index dict to the global variable counter on all procs.
-        # Necessary for younger siblings to have proper index values.
-        for type_ in ['input', 'output']:
-            global_index[type_] = self._var_allprocs_idx_range[type_][1]
+            subsys._setup_var_indices()
 
     def _setup_partials(self):
         """

@@ -9,7 +9,7 @@ import itertools
 import warnings
 
 import numpy as np
-from nose_parameterized import parameterized
+from parameterized import parameterized
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, NLRunOnce
 from openmdao.devtools.testutil import assert_rel_error

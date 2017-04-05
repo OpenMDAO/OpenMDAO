@@ -69,6 +69,9 @@ class FiniteDifference(ApproximationScheme):
 
     For example, using the 'forward' form with a step size of 'h' will approximate the derivative in
     the following way:
+
+    .. math::
+
         f'(x) = \frac{f(x+h) - f(x)}{h} + O(h).
 
     Attributes
@@ -136,7 +139,7 @@ class FiniteDifference(ApproximationScheme):
 
     def compute_approximations(self, system, jac=None, deriv_type='partial'):
         """
-        Execute the system to compute the approximate (sub)-Jacobians.
+        Execute the system to compute the approximate sub-Jacobians.
 
         Parameters
         ----------

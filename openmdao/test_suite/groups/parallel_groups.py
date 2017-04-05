@@ -3,6 +3,7 @@
 from __future__ import division, print_function
 
 from openmdao.core.group import Group
+from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.components.exec_comp import ExecComp
 
@@ -21,9 +22,9 @@ class FanOut(Group):
         self.add_subsystem('comp2', ExecComp(['y=-2.0*x']))
         self.add_subsystem('comp3', ExecComp(['y=5.0*x']))
 
+        self.connect("p.x", "comp1.x")
         self.connect("comp1.y", "comp2.x")
         self.connect("comp1.y", "comp3.x")
-        self.connect("p.x", "comp1.x")
 
 
 class FanOutGrouped(Group):
@@ -38,12 +39,40 @@ class FanOutGrouped(Group):
         self.add_subsystem('iv', IndepVarComp('x', 1.0))
         self.add_subsystem('c1', ExecComp(['y=3.0*x']))
 
-        self.sub = self.add_subsystem('sub', Group())  # ParallelGroup
+        self.sub = self.add_subsystem('sub', ParallelGroup())
         self.sub.add_subsystem('c2', ExecComp(['y=-2.0*x']))
         self.sub.add_subsystem('c3', ExecComp(['y=5.0*x']))
 
         self.add_subsystem('c2', ExecComp(['y=x']))
         self.add_subsystem('c3', ExecComp(['y=x']))
+
+        self.connect('iv.x', 'c1.x')
+
+        self.connect('c1.y', 'sub.c2.x')
+        self.connect('c1.y', 'sub.c3.x')
+
+        self.connect('sub.c2.y', 'c2.x')
+        self.connect('sub.c3.y', 'c3.x')
+
+
+class FanOutGroupedVarSets(Group):
+    """
+    Topology where one component broadcasts an output to two target
+    components. Variables are in different var sets.
+    """
+
+    def __init__(self):
+        super(FanOutGroupedVarSets, self).__init__()
+
+        self.add_subsystem('iv', IndepVarComp('x', 1.0))
+        self.add_subsystem('c1', ExecComp('y=3.0*x', x={'var_set': 2}))
+
+        self.sub = self.add_subsystem('sub', ParallelGroup())
+        self.sub.add_subsystem('c2', ExecComp('y=-2.0*x', x={'var_set': 2}))
+        self.sub.add_subsystem('c3', ExecComp('y=5.0*x', x={'var_set': 3}))
+
+        self.add_subsystem('c2', ExecComp('y=x', x={'var_set': 2}))
+        self.add_subsystem('c3', ExecComp('y=x', x={'var_set': 3}))
 
         self.connect('iv.x', 'c1.x')
 
@@ -88,7 +117,7 @@ class FanInGrouped(Group):
         iv.add_output('x2', 1.0)
 
 
-        self.sub = self.add_subsystem('sub', Group())  # ParallelGroup
+        self.sub = self.add_subsystem('sub', ParallelGroup())
         self.sub.add_subsystem('c1', ExecComp(['y=-2.0*x']))
         self.sub.add_subsystem('c2', ExecComp(['y=5.0*x']))
 
@@ -148,7 +177,7 @@ class Diamond(Group):
             'y2 = 3.0*x1'
         ]))
 
-        sub = self.add_subsystem('sub', Group())  # ParallelGroup
+        sub = self.add_subsystem('sub', ParallelGroup())
         sub.add_subsystem('c2', ExecComp('y1 = 0.5*x1'))
         sub.add_subsystem('c3', ExecComp('y1 = 3.5*x1'))
 
@@ -228,7 +257,7 @@ class ConvergeDiverge(Group):
             'y2 = 3.0*x1'
         ]))
 
-        g1 = self.add_subsystem('g1', Group())  # ParallelGroup
+        g1 = self.add_subsystem('g1', ParallelGroup())
         g1.add_subsystem('c2', ExecComp('y1 = 0.5*x1'))
         g1.add_subsystem('c3', ExecComp('y1 = 3.5*x1'))
 
@@ -237,7 +266,7 @@ class ConvergeDiverge(Group):
             'y2 = 3.0*x1 - 5.0*x2'
         ]))
 
-        g2 = self.add_subsystem('g2', Group())  # ParallelGroup
+        g2 = self.add_subsystem('g2', ParallelGroup())
         g2.add_subsystem('c5', ExecComp('y1 = 0.8*x1'))
         g2.add_subsystem('c6', ExecComp('y1 = 0.5*x1'))
 
@@ -272,13 +301,13 @@ class ConvergeDivergeGroups(Group):
 
         self.add_subsystem('iv', IndepVarComp('x', 2.0))
 
-        g1 = self.add_subsystem('g1', Group())  # ParallelGroup
+        g1 = self.add_subsystem('g1', ParallelGroup())
         g1.add_subsystem('c1', ExecComp([
             'y1 = 2.0*x1**2',
             'y2 = 3.0*x1'
         ]))
 
-        g2 = g1.add_subsystem('g2', Group())  # ParallelGroup
+        g2 = g1.add_subsystem('g2', ParallelGroup())
         g2.add_subsystem('c2', ExecComp('y1 = 0.5*x1'))
         g2.add_subsystem('c3', ExecComp('y1 = 3.5*x1'))
 
@@ -287,7 +316,7 @@ class ConvergeDivergeGroups(Group):
             'y2 = 3.0*x1 - 5.0*x2'
         ]))
 
-        g3 = self.add_subsystem('g3', Group())  # ParallelGroup
+        g3 = self.add_subsystem('g3', ParallelGroup())
         g3.add_subsystem('c5', ExecComp('y1 = 0.8*x1'))
         g3.add_subsystem('c6', ExecComp('y1 = 0.5*x1'))
 
