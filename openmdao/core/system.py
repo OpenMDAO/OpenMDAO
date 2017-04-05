@@ -265,7 +265,7 @@ class System(object):
         self._num_var_byset = {'input': {}, 'output': {}}
 
     def _setupx_var_indices(self, set2iset, counter, counter_local, counter_byset):
-        self._set2iset = set2iset
+        self._varx_set2iset = set2iset
         self._varx_range = var_range = {'input': [0, 0], 'output': [0, 0]}
         self._varx_range_local = var_range_local = {'input': [0, 0], 'output': [0, 0]}
         self._varx_range_byset = var_range_byset = {

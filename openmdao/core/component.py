@@ -154,7 +154,7 @@ class Component(System):
         set_indices = self._varx_set_indices
 
         abs2meta = self._varx_abs2meta
-        set2iset = self._set2iset
+        set2iset = self._varx_set2iset
 
         # Compute _varx_allprocs_abs2idx
         for type_ in ['input', 'output']:
@@ -185,7 +185,7 @@ class Component(System):
         iproc = self.comm.rank
         nproc = self.comm.size
 
-        set2iset = self._set2iset
+        set2iset = self._varx_set2iset
         set_indices = self._varx_set_indices
         abs2meta = self._varx_abs2meta
         var_range_byset = self._varx_range_byset
@@ -216,7 +216,7 @@ class Component(System):
         if self.comm.size > 1:
             for type_ in ['input', 'output']:
                 self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
-                for set_name in self._set2iset[type_]:
+                for set_name in self._varx_set2iset[type_]:
                     self.comm.Allgather(
                         set2sizes[type_][set_name][iproc, :], set2sizes[type_][set_name])
 

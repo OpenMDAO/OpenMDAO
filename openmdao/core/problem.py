@@ -302,8 +302,8 @@ class Problem(object):
             assert equal_arrays(
                 model._assembler._variable_sizes_all[type_],
                 model._varx_sizes[type_])
-            for set_name in model._set2iset[type_]:
-                iset = model._set2iset[type_][set_name]
+            for set_name in model._varx_set2iset[type_]:
+                iset = model._varx_set2iset[type_][set_name]
                 assert equal_arrays(
                     model._assembler._variable_sizes[type_][iset],
                     model._varx_set2sizes[type_][set_name])

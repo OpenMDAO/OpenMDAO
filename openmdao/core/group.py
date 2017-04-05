@@ -307,7 +307,7 @@ class Group(System):
         iproc = self.comm.rank
         nproc = self.comm.size
 
-        set2iset = self._set2iset
+        set2iset = self._varx_set2iset
         num_var_byset = self._num_var_byset
         var_range_byset = self._varx_range_byset
 
