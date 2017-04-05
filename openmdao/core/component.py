@@ -216,7 +216,7 @@ class Component(System):
         if self.comm.size > 1:
             for type_ in ['input', 'output']:
                 self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
-                for set_name in self._varx_set2iset[type_]:
+                for set_name in self._set2iset[type_]:
                     self.comm.Allgather(
                         set2sizes[type_][set_name][iproc, :], set2sizes[type_][set_name])
 
