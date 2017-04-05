@@ -6,7 +6,7 @@ import sys
 
 from six import string_types, iteritems, iterkeys
 from six.moves import range
-from itertools import product, chain
+from itertools import product
 
 import numpy as np
 import scipy.sparse as sparse
@@ -24,30 +24,12 @@ from openmdao.vectors.default_vector import DefaultVector
 
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
+from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
-
-
-class FakeComm(object):
-    """
-    Fake MPI communicator class used if mpi4py is not installed.
-
-    Attributes
-    ----------
-    rank : int
-        index of current proc; value is 0 because there is only 1 proc.
-    size : int
-        number of procs in the comm; value is 1 since MPI is not available.
-    """
-
-    def __init__(self):
-        """
-        Initialize attributes.
-        """
-        self.rank = 0
-        self.size = 1
 
 
 class Problem(object):
@@ -278,19 +260,20 @@ class Problem(object):
         # TODO: Support automatic determination of mode
         if mode == 'auto':
             mode = 'rev'
-        self._mode = mode
+        self._mode = assembler._mode = mode
 
         # Recursive system setup
-        model._setup_processors('', comm, {}, assembler, [0, comm.size])
-        allprocs_abs_names = model._setup_variables()
-        model._setup_variable_indices({'input': 0, 'output': 0})
-        model._setup_partials()
-        model._setup_connections()
+        self._setup_processors()
+        allprocs_abs_names, allprocs_prom_names = model._setup_variables()
 
         # Assembler setup: variable metadata and indices
         assembler._setup_variables(allprocs_abs_names,
                                    model._var_abs2data_io,
                                    model._var_abs_names)
+
+        model._setup_var_indices()
+        model._setup_partials()
+        model._setup_connections()
 
         # Assembler setup: variable connections
         assembler._setup_connections(model._manual_connections_abs,
@@ -302,8 +285,7 @@ class Problem(object):
                                      model._var_abs_names)
 
         # Assembler setup: compute data required for units/scaling
-        assembler._setup_src_data(model._var_abs_names['output'],
-                                  model._var_abs2data_io)
+        assembler._setup_src_data(model._var_abs_names['output'])
 
         # Set up scaling vectors
         model._setup_scaling()
@@ -335,6 +317,29 @@ class Problem(object):
             check_config(self, logger)
 
         return self
+
+    def _setup_processors(self):
+        """
+        Set up MPI communicators for the driver and model.
+        """
+        # first determine how many procs that we can possibly use
+        minproc, maxproc = self.driver.get_req_procs(self.model)
+        if MPI:
+            if not (maxproc is None or maxproc >= self.comm.size):
+                # we have more procs than we can use, so just raise an
+                # exception to encourage the user not to waste resources :)
+                raise RuntimeError("This problem was given %d MPI processes, "
+                                   "but it requires between %d and %d." %
+                                   (self.comm.size, minproc, maxproc))
+            elif self.comm.size < minproc:
+                if maxproc is None:
+                    maxproc = '(any)'
+                raise RuntimeError("This problem was given %d MPI processes, "
+                                   "but it requires between %s and %s." %
+                                   (self.comm.size, minproc, maxproc))
+
+        self.driver._setup_processors(self.model, self.comm, {},
+                                      self._assembler)
 
     def setup_vector(self, vec_name, vector_class, use_ref_vector):
         """
@@ -711,6 +716,7 @@ class Problem(object):
         vec_dinput = model._vectors['input']
         vec_doutput = model._vectors['output']
         vec_dresid = model._vectors['residual']
+        fwd = mode == 'fwd'
 
         # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:
@@ -761,10 +767,8 @@ class Problem(object):
 
         # Create data structures (and possibly allocate space) for the total
         # derivatives that we will return.
+        totals = OrderedDict()
         if return_format == 'flat_dict':
-
-            totals = OrderedDict()
-
             for okeys in of:
                 for okey in okeys:
                     for ikeys in wrt:
@@ -772,16 +776,12 @@ class Problem(object):
                             totals[(okey, ikey)] = None
 
         elif return_format == 'dict':
-
-            totals = OrderedDict()
-
             for okeys in of:
                 for okey in okeys:
                     totals[okey] = OrderedDict()
                     for ikeys in wrt:
                         for ikey in ikeys:
                             totals[okey][ikey] = None
-
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
@@ -803,14 +803,18 @@ class Problem(object):
                 wrt.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                  for name in names))
 
-        if mode == 'fwd':
+        if fwd:
             input_list, output_list = wrt, of
             old_input_list, old_output_list = oldwrt, oldof
             input_vec, output_vec = vec_dresid, vec_doutput
-        else:
+            input_vois = self.driver._designvars
+            output_vois = self.driver._responses
+        else:  # rev
             input_list, output_list = of, wrt
             old_input_list, old_output_list = oldof, oldwrt
             input_vec, output_vec = vec_doutput, vec_dresid
+            input_vois = self.driver._responses
+            output_vois = self.driver._designvars
 
         # TODO : Parallel adjoint setup loop goes here.
         # NOTE : Until we support it, we will just limit ourselves to the
@@ -819,67 +823,106 @@ class Problem(object):
         dinputs = input_vec[vecname]
         doutputs = output_vec[vecname]
 
+        ranges = self._assembler._var_dist_ranges
+
         # If Forward mode, solve linear system for each 'wrt'
         # If Adjoint mode, solve linear system for each 'of'
         for icount, input_names in enumerate(input_list):
             for iname_count, input_name in enumerate(input_names):
                 flat_view = dinputs._views_flat[input_name]
-                n_in = len(flat_view)
-                for idx in range(n_in):
+                start, end, total_size = ranges[input_name]
+
+                if input_name in input_vois:
+                    in_idxs = input_vois[input_name]['indices']
+                else:
+                    in_idxs = None
+                if in_idxs is not None:
+                    irange = in_idxs
+                    loc_size = len(in_idxs)
+                else:
+                    irange = range(total_size)
+                    loc_size = end - start
+
+                for idx in irange:
+
                     # Maybe we don't need to clean up so much at the beginning,
                     # since we clean this every time.
                     dinputs.set_const(0.0)
 
                     # Dictionary access returns a scaler for 1d input, and we
                     # need a vector for clean code, so use _views_flat.
-                    flat_view[idx] = 1.0
 
-                    # The root system solves here.
+                    # TODO: currently we're looping over the full distributed
+                    # variable even if the variable belongs to a non-distributed
+                    # component that is duplicated in multiple procs.
+
+                    # the 'store' flag is here so that we properly initialize
+                    # totals to zeros instead of None in those cases when none
+                    # of the specified indices are within the range of interest
+                    # for this proc.
+                    if start <= idx < end:
+                        loc_idx = idx - start
+                        flat_view[loc_idx] = 1.0
+                        store = True
+                    else:
+                        store = False
+
                     model._solve_linear([vecname], mode)
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_names in enumerate(output_list):
                         for oname_count, output_name in enumerate(output_names):
                             deriv_val = doutputs._views_flat[output_name]
+                            if output_name in output_vois:
+                                out_idxs = output_vois[output_name]['indices']
+                            else:
+                                out_idxs = None
+
+                            if out_idxs is not None:
+                                oidxs = np.logical_and(out_idxs >= start,
+                                                       out_idxs < end)
+                                deriv_val = deriv_val[oidxs]
                             len_val = len(deriv_val)
 
                             if return_format == 'flat_dict':
-                                if mode == 'fwd':
-
+                                if fwd:
                                     key = (old_output_list[ocount][oname_count],
                                            old_input_list[icount][iname_count])
 
                                     if totals[key] is None:
-                                        totals[key] = np.empty((len_val, n_in))
-                                    totals[key][:, idx] = deriv_val
+                                        totals[key] = np.zeros((len_val, loc_size))
+                                    if store:
+                                        totals[key][:, loc_idx] = deriv_val
 
                                 else:
-
                                     key = (old_input_list[icount][iname_count],
                                            old_output_list[ocount][oname_count])
 
                                     if totals[key] is None:
-                                        totals[key] = np.empty((n_in, len_val))
-                                    totals[key][idx, :] = deriv_val
+                                        totals[key] = np.zeros((loc_size, len_val))
+                                    if store:
+                                        totals[key][loc_idx, :] = deriv_val
 
                             elif return_format == 'dict':
-                                if mode == 'fwd':
-
+                                if fwd:
                                     okey = old_output_list[ocount][oname_count]
                                     ikey = old_input_list[icount][iname_count]
 
                                     if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.empty((len_val, n_in))
-                                    totals[okey][ikey][:, idx] = deriv_val
+                                        totals[okey][ikey] = np.zeros((len_val, loc_size))
+                                    if store:
+                                        totals[okey][ikey][:, loc_idx] = deriv_val
 
                                 else:
-
                                     okey = old_input_list[icount][iname_count]
                                     ikey = old_output_list[ocount][oname_count]
 
                                     if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.empty((n_in, len_val))
-                                    totals[okey][ikey][idx, :] = deriv_val
+                                        totals[okey][ikey] = np.zeros((loc_size, len_val))
+                                    if store:
+                                        totals[okey][ikey][loc_idx, :] = deriv_val
+                            else:
+                                raise RuntimeError("unsupported return format")
 
         return totals
 

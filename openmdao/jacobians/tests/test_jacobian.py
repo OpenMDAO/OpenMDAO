@@ -2,7 +2,7 @@
 
 import itertools
 import unittest
-from nose_parameterized import parameterized
+from parameterized import parameterized
 
 from six import assertRaisesRegex
 from six.moves import range
