@@ -717,6 +717,8 @@ class Problem(object):
         vec_doutput = model._vectors['output']
         vec_dresid = model._vectors['residual']
         fwd = mode == 'fwd'
+        nproc = self.comm.size
+        iproc = self.comm.rank
 
         # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:
@@ -727,22 +729,16 @@ class Problem(object):
         # A number of features will need to be supported here as development
         # goes forward.
         # -------------------------------------------------------------------
-        # TODO: Make sure we can function in parallel when some params or
-        # functions are not local.
         # TODO: Support parallel adjoint and parallel forward derivatives
         #       Aside: how are they specified, and do we have to pick up any
         #       that are missed?
         # TODO: Handle driver scaling.
-        # TODO: Might be some additional adjustments needed to set the 'one'
-        #       into the PETSC vector.
-        # TODO: support parmeter/constraint indices
         # TODO: Support for any other return_format we need.
         # TODO: Support constraint sparsity (i.e., skip in/out that are not
         #       relevant for this constraint) (desvars too?)
         # TODO: Don't calculate for inactive constraints
         # TODO: Support full-model FD. Don't know how this'll work, but we
         #       used to need a separate function for that.
-        # TODO: poi_indices and qoi_indices requires special support
         # -------------------------------------------------------------------
 
         # Prepare model for calculation by cleaning out the derivatives
@@ -824,22 +820,32 @@ class Problem(object):
         doutputs = output_vec[vecname]
 
         ranges = self._assembler._var_dist_ranges
+        owners = self._assembler._var_owned_by['output']
 
         # If Forward mode, solve linear system for each 'wrt'
         # If Adjoint mode, solve linear system for each 'of'
         for icount, input_names in enumerate(input_list):
             for iname_count, input_name in enumerate(input_names):
+                # Dictionary access returns a scaler for 1d input, and we
+                # need a vector for clean code, so use _views_flat.
                 flat_view = dinputs._views_flat[input_name]
                 start, end, total_size = ranges[input_name]
+                in_var_idx = self._assembler._var_allprocs_abs2idx_io[input_name]
 
                 if input_name in input_vois:
                     in_idxs = input_vois[input_name]['indices']
                 else:
                     in_idxs = None
+
+                dup = False
                 if in_idxs is not None:
                     irange = in_idxs
                     loc_size = len(in_idxs)
-                else:
+                elif owners[in_var_idx] != -1:  # var is duplicated
+                    irange = range(end - start)
+                    loc_size = end - start
+                    dup = True
+                else:  # distributed full var
                     irange = range(total_size)
                     loc_size = end - start
 
@@ -849,13 +855,6 @@ class Problem(object):
                     # since we clean this every time.
                     dinputs.set_const(0.0)
 
-                    # Dictionary access returns a scaler for 1d input, and we
-                    # need a vector for clean code, so use _views_flat.
-
-                    # TODO: currently we're looping over the full distributed
-                    # variable even if the variable belongs to a non-distributed
-                    # component that is duplicated in multiple procs.
-
                     # the 'store' flag is here so that we properly initialize
                     # totals to zeros instead of None in those cases when none
                     # of the specified indices are within the range of interest
@@ -863,6 +862,11 @@ class Problem(object):
                     if start <= idx < end:
                         loc_idx = idx - start
                         flat_view[loc_idx] = 1.0
+                        store = True
+                    elif dup:
+                        # var is duplicated so we don't loop over the full
+                        # distributed size
+                        loc_idx = idx
                         store = True
                     else:
                         store = False
@@ -872,6 +876,7 @@ class Problem(object):
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_names in enumerate(output_list):
                         for oname_count, output_name in enumerate(output_names):
+                            out_var_idx = self._assembler._var_allprocs_abs2idx_io[output_name]
                             deriv_val = doutputs._views_flat[output_name]
                             if output_name in output_vois:
                                 out_idxs = output_vois[output_name]['indices']
@@ -883,6 +888,9 @@ class Problem(object):
                                                        out_idxs < end)
                                 deriv_val = deriv_val[oidxs]
                             len_val = len(deriv_val)
+
+                            if nproc > 1 and owners[out_var_idx] != -1:  # var is duplicated
+                                self.comm.Bcast(deriv_val, root=owners[out_var_idx])
 
                             if return_format == 'flat_dict':
                                 if fwd:
