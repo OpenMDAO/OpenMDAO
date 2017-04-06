@@ -363,10 +363,13 @@ class Group(System):
                     set2sizes[type_][set_name][proc_slice, var_slice] = \
                         subsys._varx_set2sizes[type_][set_name]
 
-            sizes[type_] = self.comm.allgather(sizes[type_][iproc, :])
-            for set_name in set2iset[type_]:
-                set2sizes[type_][set_name] = self.comm.allgather(
-                    set2sizes[type_][set_name][iproc, :])
+        # If parallel, all gather
+        if self.comm.size > 1:
+            for type_ in ['input', 'output']:
+                sizes[type_] = self.comm.allgather(sizes[type_][iproc, :])
+                for set_name in set2iset[type_]:
+                    set2sizes[type_][set_name] = self.comm.allgather(
+                        set2sizes[type_][set_name][iproc, :])
 
     def _setupx_connections(self):
         super(Group, self)._setupx_connections()
