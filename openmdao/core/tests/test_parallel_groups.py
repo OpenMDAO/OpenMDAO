@@ -18,8 +18,6 @@ from openmdao.test_suite.groups.parallel_groups import \
 from openmdao.devtools.testutil import assert_rel_error
 
 
-#FIXME: these tests currently don't function properly because duplicated components are not
-# handled correctly in MPI.  As a result, the derivatives are only checked on rank 0
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestParallelGroups(unittest.TestCase):
@@ -28,19 +26,18 @@ class TestParallelGroups(unittest.TestCase):
 
     def test_fan_out_grouped(self):
         prob = Problem(FanOutGrouped())
-        
+
         of=['c2.y', "c3.y"]
         wrt=['iv.x']
-        
+
         prob.setup(vector_class=PETScVector, check=False, mode='fwd')
         prob.model.suppress_solver_output = True
         prob.run_model()
 
         J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
 
-        if prob.comm.rank == 0:
-            assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
-            assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
+        assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
@@ -50,9 +47,8 @@ class TestParallelGroups(unittest.TestCase):
 
         J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
 
-        if prob.comm.rank == 0:
-            assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
-            assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
+        assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
@@ -97,9 +93,8 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
         J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
-        if prob.comm.rank == 0:
-            assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
-            assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
@@ -109,9 +104,8 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
         J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
-        if prob.comm.rank == 0:
-            assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
-            assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
@@ -130,9 +124,8 @@ class TestParallelGroups(unittest.TestCase):
         unknown_list = ['c4.y1', 'c4.y2']
 
         J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
-        if prob.comm.rank == 0:
-            assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
-            assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
+        assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
+        assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
 
         prob.setup(vector_class=PETScVector, check=False, mode='rev')
         prob.run_model()
@@ -141,9 +134,8 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c4.y2'], -93.0, 1e-6)
 
         J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
-        if prob.comm.rank == 0:
-            assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
-            assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
+        assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
+        assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
 
     def test_converge_diverge(self):
 
@@ -159,8 +151,7 @@ class TestParallelGroups(unittest.TestCase):
         unknown_list = ['c7.y1']
 
         J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
-        if prob.comm.rank == 0:
-            assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
+        assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
         prob.setup(vector_class=PETScVector, check=False, mode='rev')
         prob.run_model()
@@ -168,8 +159,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
         J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
-        if prob.comm.rank == 0:
-            assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
+        assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
