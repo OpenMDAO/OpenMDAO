@@ -203,7 +203,6 @@ class BaseRecorder(object):
             Dictionary containing execution metadata (e.g. iteration coordinate).
         """
         self._counter += 1
-
         #raise NotImplementedError()
 
     def record_derivatives(self, derivs, metadata):

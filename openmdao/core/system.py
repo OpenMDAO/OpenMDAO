@@ -1757,12 +1757,3 @@ class System(object):
         """
         self._rec_mgr.append(recorder)
         return recorder
-
-    def get_inputs(self):
-        return self._inputs
-
-    def get_outputs(self):
-        return self._outputs
-
-    def get_residuals(self):
-        return self._residuals

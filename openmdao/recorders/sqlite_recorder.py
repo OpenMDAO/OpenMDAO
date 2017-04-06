@@ -1,8 +1,6 @@
 """Class definition for SqliteRecorder, which provides dictionary backed by SQLite"""
 
 from collections import OrderedDict
-from sqlitedict import SqliteDict
-
 import sqlite3
 import numpy as np
 
@@ -18,6 +16,7 @@ from openmdao.solvers.solver import Solver
 
 from six import iteritems
 
+from openmdao.utils.record_util import format_iteration_coordinate
 
 
 import sqlite3
@@ -93,7 +92,7 @@ class SqliteRecorder(BaseRecorder):
         #     self._open_close_sqlitedict = True
 
 
-        self._open_close_sqlitedict = True
+        #self._open_close_sqlitedict = True
 
         # self.con = None # sqlite connection
 
@@ -167,7 +166,7 @@ class SqliteRecorder(BaseRecorder):
         Stores the provided data in the sqlite file using the iteration
         coordinate for the key.
         """
-        super(SqliteRecorder, self).record_iteration(self, object_requesting_recording, metadata)
+        super(SqliteRecorder, self).record_iteration(object_requesting_recording, metadata)
 
         # Record an iteration from a Driver
         if isinstance(object_requesting_recording, Driver):
@@ -237,10 +236,10 @@ class SqliteRecorder(BaseRecorder):
             for name, value in iteritems(constraints):
                 driver_values['constraint.' + name] = value
 
-        print("DRIVER VALUES:", driver_values)
+        print("INSERT RECORD: DRIVER VALUES:", metadata['coord'], metadata['timestamp'], metadata['success'], metadata['msg'], driver_values)
         # Write this mega array to the database
         self.con.execute("INSERT INTO driver_iterations(iteration_coordinate, timestamp, success, msg, driver_values) VALUES(?,?,?,?,?)",
-             (metadata['coord'], metadata['timestamp'], metadata['success'], metadata['msg'], driver_values))
+              (format_iteration_coordinate(metadata['coord']), metadata['timestamp'], metadata['success'], metadata['msg'], driver_values))
 
     def record_iteration_system(self, object_requesting_recording, metadata):
         # Record an iteration from a System
@@ -249,25 +248,25 @@ class SqliteRecorder(BaseRecorder):
 
             # We will go through the recording options of Driver to construct the entry to be inserted.
             if self.options['record_inputs']:
-                inputs = object_requesting_recording.get_inputs()
+                inputs = object_requesting_recording._inputs
                 for name, value in iteritems(design_vars):
                     tple = ('input.' + name, '({},)f8'.format(len(value)))
                     dtype_tuples.append(tple)
 
             if self.options['record_outputs']:
-                outputs = object_requesting_recording.get_outputs()
+                outputs = object_requesting_recording._outputs
                 for name, value in iteritems(ouputs):
                     tple = ('output.' + name, '({},)f8'.format(len(value)))
                     dtype_tuples.append(tple)
 
             if self.options['record_residuals']:
-                residuals = object_requesting_recording.get_residuals()
+                residuals = object_requesting_recording._residuals
                 for name, value in iteritems(residuals):
                     tple = ('residual.' + name, '({},)f8'.format(len(value)))
                     dtype_tuples.append(tple)
 
             if self.options['record_derivatives']:
-                derivatives = object_requesting_recording.get_derivatives()
+                derivatives = object_requesting_recording._derivatves #TODO_RECORDERS: MAKE THIS EXIST?
                 for name, value in iteritems(derivatives):
                     tple = ('derivative.' + name, '({},)f8'.format(len(value)))
                     dtype_tuples.append(tple)

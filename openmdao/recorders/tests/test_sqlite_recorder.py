@@ -81,11 +81,10 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
 
     def test_simple_paraboloid_upper(self):
-        raise unittest.SkipTest("drivers not implemented yet")
+        #raise unittest.SkipTest("drivers not implemented yet")
         prob = Problem()
         model = prob.model = Group()
 
-        prob.driver.add_recorder(self.recorder)
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -94,15 +93,20 @@ class TestSqliteRecorder(unittest.TestCase):
 
         model.suppress_solver_output = True
 
-        prob.driver = ScipyOpt()
-        prob.driver.options['method'] = 'slsqp'
-
 
         prob.driver = pyOptSparseDriver()
+
+        prob.driver.add_recorder(self.recorder)
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+
+
+
         prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
             prob.driver.opt_settings['ACC'] = 1e-9
-        prob.driver.options['print_results'] = False
+        prob.driver.options['print_results'] = True
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
