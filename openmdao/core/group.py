@@ -97,19 +97,16 @@ class Group(System):
     def _setupx_vars(self):
         super(Group, self)._setupx_vars()
         num_var = self._num_var
-        num_var_local = self._num_var_local
         num_var_byset = self._num_var_byset
 
         # Recursion
         for subsys in self._subsystems_myproc:
             subsys._setupx_vars()
 
-        # Compute num_var, num_var_local, num_var_byset, at least locally
+        # Compute num_var, num_var_byset, at least locally
         for type_ in ['input', 'output']:
             num_var[type_] = np.sum(
                 [subsys._num_var[type_] for subsys in self._subsystems_myproc])
-            num_var_local[type_] = np.sum(
-                [subsys._num_var_local[type_] for subsys in self._subsystems_myproc])
 
             for subsys in self._subsystems_myproc:
                 for set_name, num in iteritems(subsys._num_var_byset[type_]):
@@ -142,8 +139,8 @@ class Group(System):
                         else:
                             num_var_byset[type_][set_name] = num
 
-    def _setupx_var_indices(self, set2iset, counter, counter_local, counter_byset):
-        super(Group, self)._setupx_var_indices(set2iset, counter, counter_local, counter_byset)
+    def _setupx_var_index_ranges(self, set2iset, var_range, var_range_byset):
+        super(Group, self)._setupx_var_index_ranges(set2iset, var_range, var_range_byset)
 
         nsub_allprocs = len(self._subsystems_allprocs)
         num_var = self._num_var
@@ -153,8 +150,6 @@ class Group(System):
         # We do this so that we can compute the offset when we recurse into each subsystem.
         allprocs_counters = {
             type_: np.zeros(nsub_allprocs, int) for type_ in ['input', 'output']}
-        allprocs_counters_local = {
-            type_: np.zeros(nsub_allprocs, int) for type_ in ['input', 'output']}
         allprocs_counters_byset = {
             type_: np.zeros((nsub_allprocs, len(set2iset[type_])), int)
             for type_ in ['input', 'output']}
@@ -163,7 +158,6 @@ class Group(System):
         for type_ in ['input', 'output']:
             for ind, subsys in enumerate(self._subsystems_myproc):
                 isub = self._subsystems_myproc_inds[ind]
-                allprocs_counters_local[type_][isub] = subsys._num_var_local[type_]
                 if subsys.comm.rank == 0:
                     allprocs_counters[type_][isub] = subsys._num_var[type_]
                     for set_name in subsys._num_var_byset[type_]:
@@ -188,23 +182,24 @@ class Group(System):
                     allprocs_counters_byset[type_] += myproc_counters_byset[type_]
 
         # Recursion
-        sub_counter = {'input': 0, 'output': 0}
-        sub_counter_local = {'input': 0, 'output': 0}
-        sub_counter_byset = {
-            'input': {set_name: 0 for set_name in set2iset['input']},
-            'output': {set_name: 0 for set_name in set2iset['output']},
-        }
         for ind, subsys in enumerate(self._subsystems_myproc):
             isub = self._subsystems_myproc_inds[ind]
-            for type_ in ['input', 'output']:
-                sub_counter[type_] = counter[type_] + np.sum(allprocs_counters[type_][:isub])
-                sub_counter_local[type_] = counter_local[type_] \
-                    + np.sum(allprocs_counters_local[type_][:isub])
-                for set_name, iset in iteritems(set2iset[type_]):
-                    sub_counter_byset[type_][set_name] = counter_byset[type_][set_name] \
-                        + np.sum(allprocs_counters_byset[type_][:isub, iset], axis=0)
 
-            subsys._setupx_var_indices(set2iset, sub_counter, sub_counter_local, sub_counter_byset)
+            sub_var_range = {}
+            sub_var_range_byset = {'input': {}, 'output': {}}
+            for type_ in ['input', 'output']:
+                sub_var_range[type_] = (
+                    np.sum(allprocs_counters[type_][:isub]),
+                    np.sum(allprocs_counters[type_][:isub + 1])
+                )
+                for set_name in set2iset[type_]:
+                    iset = set2iset[type_][set_name]
+                    sub_var_range_byset[type_][set_name] = (
+                        np.sum(allprocs_counters_byset[type_][:isub, iset]),
+                        np.sum(allprocs_counters_byset[type_][:isub + 1, iset])
+                    )
+
+            subsys._setupx_var_index_ranges(set2iset, sub_var_range, sub_var_range_byset)
 
     def _setupx_var_data(self):
         super(Group, self)._setupx_var_data()
@@ -290,38 +285,16 @@ class Group(System):
 
     def _setupx_var_index_maps(self):
         super(Group, self)._setupx_var_index_maps()
-        allprocs_abs2idx = self._varx_allprocs_abs2idx
-        allprocs_abs2idx_byset = self._varx_allprocs_abs2idx_byset
 
         # Recursion
         for subsys in self._subsystems_myproc:
             subsys._setupx_var_index_maps()
 
-        # Compute allprocs_abs2idx
-        for type_ in ['input', 'output']:
-            for subsys in self._subsystems_myproc:
-                allprocs_abs2idx[type_].update(subsys._varx_allprocs_abs2idx[type_])
-                allprocs_abs2idx_byset[type_].update(subsys._varx_allprocs_abs2idx_byset[type_])
-
-        # Allgather
-        if self.comm.size > 1:
-            sub_comm = self._subsystems_myproc[0].comm
-            if sub_comm.rank == 0:
-                raw = (allprocs_abs2idx, allprocs_abs2idx_byset)
-            else:
-                raw = ({'input': {}, 'output': {}}, {'input': {}, 'output': {}})
-            gathered = self.comm.allgather(raw)
-
-            for myproc_abs2idx, myproc_abs2idx_byset in gathered:
-                for type_ in ['input', 'output']:
-                    allprocs_abs2idx[type_].update(myproc_abs2idx[type_])
-                    allprocs_abs2idx_byset[type_].update(myproc_abs2idx_byset[type_])
-
     def _setupx_var_sizes(self):
         super(Group, self)._setupx_var_sizes()
 
         sizes = self._varx_sizes
-        set2sizes = self._varx_set2sizes
+        sizes_byset = self._varx_sizes_byset
 
         iproc = self.comm.rank
         nproc = self.comm.size
@@ -336,56 +309,51 @@ class Group(System):
 
         # Compute _varx_sizes
         for type_ in ['input', 'output']:
-            iproc1, iproc2 = self._mpi_proc_range
-            ivar1, ivar2 = self._varx_range[type_]
 
             sizes[type_] = np.zeros((nproc, len(self._varx_allprocs_abs_names[type_])), int)
             for set_name in set2iset[type_]:
-                set2sizes[type_][set_name] = np.zeros(
+                sizes_byset[type_][set_name] = np.zeros(
                     (nproc, num_var_byset[type_][set_name]), int)
 
             for subsys in self._subsystems_myproc:
-                sub_iproc1, sub_iproc2 = subsys._mpi_proc_range
-                sub_ivar1, sub_ivar2 = subsys._varx_range[type_]
-
-                proc_slice = slice(sub_iproc1 - iproc1, sub_iproc2 - iproc1)
-                var_slice = slice(sub_ivar1 - ivar1, sub_ivar2 - ivar1)
+                proc_slice = slice(*subsys._mpi_proc_range)
+                var_slice = slice(*subsys._varx_range[type_])
                 sizes[type_][proc_slice, var_slice] = subsys._varx_sizes[type_]
 
                 for set_name in set2iset[type_]:
-                    iset = set2iset[type_][set_name]
-
-                    isvar1, isvar2 = var_range_byset[type_][set_name]
-                    sub_isvar1, sub_isvar2 = subsys._varx_range_byset[type_][set_name]
-
-                    proc_slice = slice(sub_iproc1 - iproc1, sub_iproc2 - iproc1)
-                    var_slice = slice(sub_isvar1 - isvar1, sub_isvar2 - isvar1)
-                    set2sizes[type_][set_name][proc_slice, var_slice] = \
-                        subsys._varx_set2sizes[type_][set_name]
+                    proc_slice = slice(*subsys._mpi_proc_range)
+                    var_slice = slice(*subsys._varx_range_byset[type_][set_name])
+                    sizes_byset[type_][set_name][proc_slice, var_slice] = \
+                        subsys._varx_sizes_byset[type_][set_name]
 
         # If parallel, all gather
         if self.comm.size > 1:
             for type_ in ['input', 'output']:
                 sizes[type_] = self.comm.allgather(sizes[type_][iproc, :])
                 for set_name in set2iset[type_]:
-                    set2sizes[type_][set_name] = self.comm.allgather(
-                        set2sizes[type_][set_name][iproc, :])
+                    sizes_byset[type_][set_name] = self.comm.allgather(
+                        sizes_byset[type_][set_name][iproc, :])
 
     def _setupx_connections(self):
         super(Group, self)._setupx_connections()
 
-        input2src_abs = self._conn_abs_input2src
+        abs_in2out = self._conn_abs_in2out
+        global_abs_in2out = self._conn_global_abs_in2out
 
         allprocs_prom2abs_list_in = self._varx_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._varx_allprocs_prom2abs_list['output']
         abs2meta_in = self._varx_abs2meta['input']
+
+        # Recursion
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_connections()
 
         # Add implicit connections
         for prom_name in allprocs_prom2abs_list_out:
             if prom_name in allprocs_prom2abs_list_in:
                 abs_out = allprocs_prom2abs_list_out[prom_name][0]
                 for abs_in in allprocs_prom2abs_list_in[prom_name]:
-                    input2src_abs[abs_in] = abs_out
+                    abs_in2out[abs_in] = abs_out
 
         # Add explicit connections
         for prom_in, (prom_out, src_indices) in iteritems(self._manual_connections):
@@ -424,12 +392,12 @@ class Group(System):
                                             prom_in, prom_in))
                     meta['src_indices'] = np.atleast_1d(src_indices)
 
-                input2src_abs[abs_in] = abs_out
+                abs_in2out[abs_in] = abs_out
 
         # Now that both implicit & explicit connections have been added, check unit compatibility
         allprocs_abs2meta_out = self._varx_allprocs_abs2meta['output']
         allprocs_abs2meta_in = self._varx_allprocs_abs2meta['input']
-        for abs_in, abs_out in iteritems(input2src_abs):
+        for abs_in, abs_out in iteritems(abs_in2out):
             out_units = allprocs_abs2meta_out[abs_out]['units']
             in_units = allprocs_abs2meta_in[abs_in]['units']
 
@@ -447,6 +415,22 @@ class Group(System):
                 warnings.warn("Input '%s' with units of '%s' is "
                               "connected to output '%s' which has "
                               "no units." % (abs_in, in_units, abs_out))
+
+        # Compute global_abs_in2out
+        global_abs_in2out.update(abs_in2out)
+        for subsys in self._subsystems_myproc:
+            global_abs_in2out.update(subsys._conn_global_abs_in2out)
+
+        # If running in parallel, allgather
+        if self.comm.size > 1:
+            if self._subsystems_myproc[0].comm.rank == 0:
+                raw = global_abs_in2out
+            else:
+                raw = {}
+            gathered = self.comm.allgather(raw)
+
+            for myproc_global_abs_in2out in gathered:
+                global_abs_in2out.update(myproc_global_abs_in2out)
 
     def _setupx_partials(self):
         for subsys in self._subsystems_myproc:

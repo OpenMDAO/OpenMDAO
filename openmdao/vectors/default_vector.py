@@ -86,7 +86,7 @@ class DefaultVectorX(Vector):
         type_ = self._typ
         iproc = self._iproc
 
-        sizes_byset_t = system._varx_set2sizes[type_]
+        sizes_byset_t = system._varx_sizes_byset[type_]
         sizes_t = system._varx_sizes[type_]
         allprocs_abs2idx_t = system._varx_allprocs_abs2idx[type_]
         allprocs_abs2idx_byset_t = system._varx_allprocs_abs2idx_byset[type_]
@@ -173,7 +173,7 @@ class DefaultVectorX(Vector):
 
         allprocs_abs2idx_t = system._varx_allprocs_abs2idx[type_]
         allprocs_abs2idx_byset_t = system._varx_allprocs_abs2idx_byset[type_]
-        sizes_byset_t = system._varx_set2sizes[type_]
+        sizes_byset_t = system._varx_sizes_byset[type_]
         abs2meta_t = system._varx_abs2meta[type_]
         var_range_byset_t = system._varx_range_byset[type_]
 
@@ -190,6 +190,7 @@ class DefaultVectorX(Vector):
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
             set_name = abs2meta_t[abs_name]['var_set']
 
+            # TODO: offset is wrong
             offset = var_range_byset_t[set_name]
             ind1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset]) - offset
             ind2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1]) - offset

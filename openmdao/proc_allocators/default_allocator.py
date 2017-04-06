@@ -137,9 +137,7 @@ class DefaultAllocator(ProcAllocator):
         # get the one assigned to our color/process
         rank_color = color[iproc]
         sub_comm = comm.Split(rank_color)
-        sub_proc_range = (
-            proc_range[0] + np.sum(comm_sizes[:iproc]),
-            proc_range[0] + np.sum(comm_sizes[:iproc + 1]))
+        sub_proc_range = (np.sum(comm_sizes[:iproc]), np.sum(comm_sizes[:iproc + 1]))
 
         isubs = [] if sub_comm == MPI.COMM_NULL else buckets[rank_color][1]
 

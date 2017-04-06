@@ -71,7 +71,6 @@ class Component(System):
     def _setupx_vars(self):
         super(Component, self)._setupx_vars()
         num_var = self._num_var
-        num_var_local = self._num_var_local
         num_var_byset = self._num_var_byset
 
         # Only necessary to clear the rel_* data structures if we are not on the first setup
@@ -83,10 +82,9 @@ class Component(System):
 
         self.initialize_variables()
 
-        # Compute num_var, num_var_local
+        # Compute num_var
         for type_ in ['input', 'output']:
             num_var[type_] = len(self._var_rel_names[type_])
-            num_var_local[type_] = len(self._var_rel_names[type_])
 
         # Compute num_var_byset
         for data in itervalues(self._var_rel2data_io):
@@ -142,74 +140,45 @@ class Component(System):
                 # Compute abs2meta
                 abs2meta[type_][abs_name] = metadata
 
-    def _setupx_var_index_maps(self):
-        super(Component, self)._setupx_var_index_maps()
-        allprocs_abs2idx = self._varx_allprocs_abs2idx
-        allprocs_abs2idx_byset = self._varx_allprocs_abs2idx_byset
-
-        abs2meta = self._varx_abs2meta
-        set2iset = self._varx_set2iset
-
-        # Compute _varx_allprocs_abs2idx
-        for type_ in ['input', 'output']:
-            offset = self._varx_range[type_][0]
-            for ind, abs_name in enumerate(self._varx_allprocs_abs_names[type_]):
-                allprocs_abs2idx[type_][abs_name] = offset + ind
-
-        # Compute _varx_allprocs_abs2idx_byset
-        for type_ in ['input', 'output']:
-            nvar = self._num_var[type_]
-            counter = {set_name: 0 for set_name in set2iset[type_]}
-
-            for ind, abs_name in enumerate(self._varx_abs_names[type_]):
-                set_name = abs2meta[type_][abs_name]['var_set']
-                offset = self._varx_range_byset[type_][set_name][0]
-                allprocs_abs2idx_byset[type_][abs_name] = offset + counter[set_name]
-                counter[set_name] += 1
-
     def _setupx_var_sizes(self):
         super(Component, self)._setupx_var_sizes()
 
         sizes = self._varx_sizes
-        set2sizes = self._varx_set2sizes
+        sizes_byset = self._varx_sizes_byset
 
         iproc = self.comm.rank
         nproc = self.comm.size
 
         set2iset = self._varx_set2iset
-        abs2meta = self._varx_abs2meta
-        var_range_byset = self._varx_range_byset
-        allprocs_abs2idx_byset = self._varx_allprocs_abs2idx_byset
 
         # Initialize empty arrays
         for type_ in ['input', 'output']:
             sizes[type_] = np.zeros((nproc, self._num_var[type_]), int)
 
-            set2sizes[type_] = {}
+            sizes_byset[type_] = {}
             for set_name in set2iset[type_]:
-                set2sizes[type_][set_name] = np.zeros(
+                sizes_byset[type_][set_name] = np.zeros(
                     (nproc, self._num_var_byset[type_][set_name]), int)
 
-        # Compute _varx_sizes and _varx_set2sizes
+        # Compute _varx_sizes and _varx_sizes_byset
         for type_ in ['input', 'output']:
-            for ind, abs_name in enumerate(self._varx_abs_names[type_]):
-                meta = abs2meta[type_][abs_name]
+            abs2meta_t = self._varx_abs2meta[type_]
+            allprocs_abs2idx_byset_t = self._varx_allprocs_abs2idx_byset[type_]
+            for idx, abs_name in enumerate(self._varx_abs_names[type_]):
+                meta = abs2meta_t[abs_name]
                 set_name = meta['var_set']
                 size = np.prod(meta['shape'])
-                idx_byset = allprocs_abs2idx_byset[type_][abs_name]
+                idx_byset = allprocs_abs2idx_byset_t[abs_name]
 
-                my_idx = ind
-                my_idx_byset = idx_byset - var_range_byset[type_][set_name][0]
-
-                sizes[type_][iproc, my_idx] = size
-                set2sizes[type_][set_name][iproc, my_idx_byset] = size
+                sizes[type_][iproc, idx] = size
+                sizes_byset[type_][set_name][iproc, idx_byset] = size
 
         if self.comm.size > 1:
             for type_ in ['input', 'output']:
                 self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
                 for set_name in self._varx_set2iset[type_]:
                     self.comm.Allgather(
-                        set2sizes[type_][set_name][iproc, :], set2sizes[type_][set_name])
+                        sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
 
     def _setupx_partials(self):
         super(Component, self)._setupx_partials()

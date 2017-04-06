@@ -262,7 +262,6 @@ class Problem(object):
 
         for type_ in ['input', 'output']:
             assert model._num_var[type_] == model._var_allprocs_idx_range[type_][1]
-            assert model._num_var_local[type_] == len(model._var_abs_names[type_])
 
         assert set(model._var_abs2data_io.keys()) == set(
             model._varx_abs2meta['input'].keys()
@@ -273,8 +272,8 @@ class Problem(object):
             + model._varx_allprocs_abs2idx['output'].keys()
         )
 
-        assert model._var_allprocs_idx_range == model._varx_range
         for type_ in ['input', 'output']:
+            assert tuple(model._var_allprocs_idx_range[type_]) == model._varx_range[type_]
             assert model._var_abs_names[type_] == model._varx_abs_names[type_]
             assert model._assembler._var_allprocs_abs_names[type_] \
                 == model._varx_allprocs_abs_names[type_]
@@ -289,7 +288,7 @@ class Problem(object):
                 iset = model._varx_set2iset[type_][set_name]
                 assert equal_arrays(
                     model._assembler._var_sizes_by_set[type_][iset],
-                    model._varx_set2sizes[type_][set_name])
+                    model._varx_sizes_byset[type_][set_name])
 
         return self
 
