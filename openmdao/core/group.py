@@ -292,7 +292,6 @@ class Group(System):
 
     def _setupx_var_sizes(self):
         super(Group, self)._setupx_var_sizes()
-
         sizes = self._varx_sizes
         sizes_byset = self._varx_sizes_byset
 
@@ -300,7 +299,6 @@ class Group(System):
         nproc = self.comm.size
 
         set2iset = self._varx_set2iset
-        num_var_byset = self._num_var_byset
         var_range_byset = self._varx_range_byset
 
         # Recursion
@@ -310,10 +308,10 @@ class Group(System):
         # Compute _varx_sizes
         for type_ in ['input', 'output']:
 
-            sizes[type_] = np.zeros((nproc, len(self._varx_allprocs_abs_names[type_])), int)
+            sizes[type_] = np.zeros((nproc, self._num_var[type_]), int)
             for set_name in set2iset[type_]:
                 sizes_byset[type_][set_name] = np.zeros(
-                    (nproc, num_var_byset[type_][set_name]), int)
+                    (nproc, self._num_var_byset[type_][set_name]), int)
 
             for subsys in self._subsystems_myproc:
                 proc_slice = slice(*subsys._mpi_proc_range)
@@ -329,14 +327,13 @@ class Group(System):
         # If parallel, all gather
         if self.comm.size > 1:
             for type_ in ['input', 'output']:
-                sizes[type_] = self.comm.allgather(sizes[type_][iproc, :])
+                self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
                 for set_name in set2iset[type_]:
-                    sizes_byset[type_][set_name] = self.comm.allgather(
-                        sizes_byset[type_][set_name][iproc, :])
+                    self.comm.Allgather(
+                        sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
 
     def _setupx_connections(self):
         super(Group, self)._setupx_connections()
-
         abs_in2out = self._conn_abs_in2out
         global_abs_in2out = self._conn_global_abs_in2out
 
@@ -433,8 +430,64 @@ class Group(System):
                 global_abs_in2out.update(myproc_global_abs_in2out)
 
     def _setupx_partials(self):
+        super(Group, self)._setupx_partials()
+
         for subsys in self._subsystems_myproc:
             subsys._setupx_partials()
+
+    def _setupx_global(self, ext_num_vars, ext_sizes, ext_num_vars_byset, ext_sizes_byset):
+        super(Group, self)._setupx_global(
+            ext_num_vars, ext_sizes, ext_num_vars_byset, ext_sizes_byset)
+
+        iproc = self.comm.rank
+
+        for subsys in self._subsystems_myproc:
+            sub_ext_num_vars = {}
+            sub_ext_sizes = {}
+            sub_ext_num_vars_byset = {}
+            sub_ext_sizes_byset = {}
+
+            for type_ in ['input', 'output']:
+                num = self._num_var[type_]
+                idx1, idx2 = subsys._varx_range[type_]
+                size1 = np.sum(self._varx_sizes[type_][iproc, :idx1])
+                size2 = np.sum(self._varx_sizes[type_][iproc, idx2:])
+
+                sub_ext_num_vars[type_] = (
+                    ext_num_vars[type_][0] + idx1,
+                    ext_num_vars[type_][1] + num - idx2,
+                )
+                sub_ext_sizes[type_] = (
+                    ext_sizes[type_][0] + size1,
+                    ext_sizes[type_][1] + size2,
+                )
+
+                sub_ext_sizes_byset[type_] = {}
+                sub_ext_num_vars_byset[type_] = {}
+                for set_name in self._varx_set2iset[type_]:
+                    num = self._num_var_byset[type_][set_name]
+                    idx1, idx2 = subsys._varx_range_byset[type_][set_name]
+                    size1 = np.sum(self._varx_sizes_byset[type_][set_name][iproc, :idx1])
+                    size2 = np.sum(self._varx_sizes_byset[type_][set_name][iproc, idx2:])
+
+                    sub_ext_num_vars_byset[type_][set_name] = (
+                        ext_num_vars_byset[type_][set_name][0] + idx1,
+                        ext_num_vars_byset[type_][set_name][1] + num - idx2,
+                    )
+                    sub_ext_sizes_byset[type_][set_name] = (
+                        ext_sizes_byset[type_][set_name][0] + size1,
+                        ext_sizes_byset[type_][set_name][1] + size2,
+                    )
+
+            subsys._setupx_global(
+                sub_ext_num_vars, sub_ext_sizes, sub_ext_num_vars_byset, sub_ext_sizes_byset,
+            )
+
+    def _setupx_vectors(self, vector_class, root_vectors):
+        super(Group, self)._setupx_vectors(vector_class, root_vectors)
+
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_vectors(vector_class, root_vectors)
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------

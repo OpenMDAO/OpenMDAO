@@ -7,11 +7,12 @@ from six import iteritems, itervalues
 from six.moves import range, zip
 
 from openmdao.vectors.vector import Vector, Transfer
+from openmdao.vectors.vector import VectorX, TransferX
 
 real_types = tuple([numbers.Real, np.float32, np.float64])
 
 
-class DefaultTransferX(Transfer):
+class DefaultTransferX(TransferX):
     """
     Default NumPy transfer.
     """
@@ -22,12 +23,12 @@ class DefaultTransferX(Transfer):
 
         Optionally implemented by the subclass.
         """
-        outs = {}
-        ins = {}
         in_inds = self._in_inds
         out_inds = self._out_inds
 
         # filter out any empty transfers
+        outs = {}
+        ins = {}
         for key in in_inds:
             if len(in_inds[key]) > 0:
                 ins[key] = in_inds[key]
@@ -56,17 +57,17 @@ class DefaultTransferX(Transfer):
         if mode == 'fwd':
             for key in in_inds:
                 in_set_name, out_set_name = key
-                in_vec._root_vector._data[in_set_name][in_inds[key]] = \
-                    out_vec._root_vector._data[out_set_name][out_inds[key]]
+                in_vec._data[in_set_name][in_inds[key]] = \
+                    out_vec._data[out_set_name][out_inds[key]]
         elif mode == 'rev':
             for key in in_inds:
                 in_set_name, out_set_name = key
                 np.add.at(
-                    out_vec._root_vector._data[out_set_name], out_inds[key],
-                    in_vec._root_vector._data[in_set_name][in_inds[key]])
+                    out_vec._data[out_set_name], out_inds[key],
+                    in_vec._data[in_set_name][in_inds[key]])
 
 
-class DefaultVectorX(Vector):
+class DefaultVectorX(VectorX):
     """
     Default NumPy vector.
     """
@@ -94,7 +95,7 @@ class DefaultVectorX(Vector):
 
         data = {}
         indices = {}
-        for set_name in system._varx_set2iset:
+        for set_name in system._varx_set2iset[type_]:
             size = np.sum(sizes_byset_t[set_name][iproc, :])
             data[set_name] = np.zeros(size)
             indices[set_name] = np.zeros(size, int)
@@ -102,11 +103,12 @@ class DefaultVectorX(Vector):
         for abs_name in system._varx_abs_names[type_]:
             idx = allprocs_abs2idx_t[abs_name]
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
+            set_name = abs2meta_t[abs_name]['var_set']
 
             ind1 = np.sum(sizes_t[iproc, :idx])
             ind2 = np.sum(sizes_t[iproc, :idx + 1])
-            ind_byset1 = np.sum(sizes_byset_t[iproc, :idx_byset])
-            ind_byset2 = np.sum(sizes_byset_t[iproc, :idx_byset + 1])
+            ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
+            ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
 
             set_name = abs2meta_t[abs_name]['var_set']
             indices[set_name][ind_byset1:ind_byset2] = np.arange(ind1, ind2)
@@ -125,18 +127,19 @@ class DefaultVectorX(Vector):
         system = self._system
         type_ = self._typ
         iproc = self._iproc
+        root_vec = self._root_vector
 
-        idx1, idx2 = system._varx_range[type_]
-        idx_offset = np.sum(system._varx_sizes[type_][iproc, :idx1])
+        offset = system._ext_sizes[type_][0]
 
         data = {}
         indices = {}
-        for set_name in system._varx_set2iset:
-            idx_byset1, idx_byset2 = system._varx_range_byset[type_][set_name]
+        for set_name in system._varx_set2iset[type_]:
+            offset_byset = system._ext_sizes_byset[type_][set_name][0]
+            ind_byset1 = offset_byset
+            ind_byset2 = offset_byset + np.sum(system._varx_sizes_byset[type_][set_name][iproc, :])
 
-            data[set_name] = self._root_vector._data[set_name][idx_byset1:idx_byset2]
-            indices[set_name] = self._root_vector._indices[set_name][idx_byset1:idx_byset2] \
-                - idx_offset
+            data[set_name] = root_vec._data[set_name][ind_byset1:ind_byset2]
+            indices[set_name] = root_vec._indices[set_name][ind_byset1:ind_byset2] - offset
 
         return data, indices
 
@@ -177,32 +180,27 @@ class DefaultVectorX(Vector):
         abs2meta_t = system._varx_abs2meta[type_]
         var_range_byset_t = system._varx_range_byset[type_]
 
-        views = {}
-        views_flat = {}
-
-        # contains a 0 index for floats or a slice(None) for arrays so getitem
+        # idxs contains a 0 index for floats or a slice(None) for arrays so getitem
         # will return either a float or a properly shaped array respectively.
         idxs = {}
-
-        ind_offsets = {}
+        views = {}
+        views_flat = {}
 
         for abs_name in system._varx_abs_names[type_]:
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
             set_name = abs2meta_t[abs_name]['var_set']
 
-            # TODO: offset is wrong
-            offset = var_range_byset_t[set_name]
-            ind1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset]) - offset
-            ind2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1]) - offset
+            ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
+            ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
             shape = abs2meta_t[abs_name]['shape']
 
-            views[abs_name] = self._data[iset][ind1:ind2]
-            views_flat[abs_name] = self._data[iset][ind1:ind2]
-            views[abs_name].shape = metadata['shape']
+            views_flat[abs_name] = self._data[set_name][ind_byset1:ind_byset2]
+            views[abs_name] = self._data[set_name][ind_byset1:ind_byset2]
+            views[abs_name].shape = shape
 
             # The shape entry overrides value's shape, which is why we don't
             # use the shape of val as the reference
-            if np.prod(metadata['shape']) == 1:
+            if np.prod(shape) == 1:
                 idxs[abs_name] = 0
             else:
                 idxs[abs_name] = slice(None)

@@ -251,7 +251,38 @@ class System(object):
 
         return set2iset, var_range, var_range_byset
 
-    def _setupx(self, comm):
+    def _get_initial_global(self):
+        ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
+        ext_sizes = {'input': (0, 0), 'output': (0, 0)}
+        ext_num_vars_byset = {
+            'input': {set_name: (0, 0) for set_name in self._varx_set2iset['input']},
+            'output': {set_name: (0, 0) for set_name in self._varx_set2iset['output']},
+        }
+        ext_sizes_byset = {
+            'input': {set_name: (0, 0) for set_name in self._varx_set2iset['input']},
+            'output': {set_name: (0, 0) for set_name in self._varx_set2iset['output']},
+        }
+        return ext_num_vars, ext_sizes, ext_num_vars_byset, ext_sizes_byset
+
+    def _get_root_vectors(self, vec_names, vector_class):
+        root_vectors = {'input': {}, 'output': {}, 'residual': {}}
+
+        for key in ['input', 'output', 'residual']:
+            type_ = 'output' if key is 'residual' else key
+            for vec_name in vec_names:
+                root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
+
+        return vector_class, root_vectors
+
+    def _setupx(self, comm, vector_class):
+        # TEMPORARY: this is meant to only be here during the transition to reconfigurability
+        from openmdao.vectors.default_vector import DefaultVector, DefaultVectorX
+        from openmdao.vectors.petsc_vector import PETScVector, PETScVectorX
+        if vector_class is DefaultVector:
+            vector_class = DefaultVectorX
+        if vector_class is PETScVector:
+            vector_class = PETScVectorX
+
         self.get_req_procs()
         self._setupx_procs('', comm, (0, comm.size))
         self._setupx_vars()
@@ -260,6 +291,8 @@ class System(object):
         self._setupx_var_index_maps()
         self._setupx_var_sizes()
         self._setupx_connections()
+        self._setupx_global(*self._get_initial_global())
+        self._setupx_vectors(*self._get_root_vectors(['nonlinear', 'linear'], vector_class))
 
     def _setupx_procs(self, pathname, comm, proc_range):
         self.pathname = pathname
@@ -321,6 +354,21 @@ class System(object):
 
     def _setupx_partials(self):
         self._subjacs_info = {}
+
+    def _setupx_global(self, ext_num_vars, ext_sizes, ext_num_vars_byset, ext_sizes_byset):
+        self._ext_num_vars = ext_num_vars
+        self._ext_sizes = ext_sizes
+        self._ext_num_vars_byset = ext_num_vars_byset
+        self._ext_sizes_byset = ext_sizes_byset
+
+    def _setupx_vectors(self, vector_class, root_vectors):
+        self._vecs = vecs = {'input': {}, 'output': {}, 'residual': {}}
+
+        for key in ['input', 'output', 'residual']:
+            type_ = 'output' if key is 'residual' else key
+            for vec_name in root_vectors[key]:
+                vecs[key][vec_name] = vector_class(
+                    vec_name, type_, self, root_vectors[key][vec_name])
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------

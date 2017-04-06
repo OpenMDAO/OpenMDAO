@@ -21,18 +21,22 @@ class PETScTransferX(DefaultTransferX):
 
         Optionally implemented by the subclass.
         """
-        self._transfers = {}
+        self._transfers = transfers = {}
+
+        in_inds = self._in_inds
+        out_inds = self._out_inds
+
         for key in self._in_inds:
             if len(self._in_inds[key]) > 0:
                 in_set_name, out_set_name = key
-                in_inds = np.array(self._in_inds[key], 'i')
-                out_inds = np.array(self._out_inds[key], 'i')
-                in_indexset = PETSc.IS().createGeneral(in_inds, comm=self._comm)
-                out_indexset = PETSc.IS().createGeneral(out_inds, comm=self._comm)
-                in_petsc = self._in_vec._root_vector._petsc[in_set_name]
-                out_petsc = self._out_vec._root_vector._petsc[out_set_name]
+                in_indexset = PETSc.IS().createGeneral(
+                    np.array(in_inds[key], 'i'), comm=self._comm)
+                out_indexset = PETSc.IS().createGeneral(
+                    np.array(out_inds[key], 'i'), comm=self._comm)
+                in_petsc = in_vec._vector._petsc[in_set_name]
+                out_petsc = out_vec._vector._petsc[out_set_name]
                 transfer = PETSc.Scatter().create(out_petsc, out_indexset, in_petsc, in_indexset)
-                self._transfers[key] = transfer
+                transfers[key] = transfer
 
     def __call__(self, in_vec, out_vec, mode='fwd'):
         """
@@ -50,14 +54,14 @@ class PETScTransferX(DefaultTransferX):
         if mode == 'fwd':
             for key in self._transfers:
                 in_set_name, out_set_name = key
-                in_petsc = self._in_vec._root_vector._petsc[in_set_name]
-                out_petsc = self._out_vec._root_vector._petsc[out_set_name]
+                in_petsc = self._in_vec._petsc[in_set_name]
+                out_petsc = self._out_vec._petsc[out_set_name]
                 self._transfers[key].scatter(out_petsc, in_petsc, addv=False, mode=False)
         elif mode == 'rev':
             for key in self._transfers:
                 in_set_name, out_set_name = key
-                in_petsc = self._in_vec._root_vector._petsc[in_set_name]
-                out_petsc = self._out_vec._root_vector._petsc[out_set_name]
+                in_petsc = self._in_vec._petsc[in_set_name]
+                out_petsc = self._out_vec._petsc[out_set_name]
                 self._transfers[key].scatter(in_petsc, out_petsc, addv=True, mode=True)
 
 

@@ -255,7 +255,7 @@ class Problem(object):
             mode = 'rev'
         self._mode = mode
 
-        model._setupx(comm)
+        model._setupx(comm, vector_class)
 
         def equal_arrays(a, b, re=1e-8):
             return np.linalg.norm(a - b) < re

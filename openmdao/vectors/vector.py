@@ -67,7 +67,7 @@ class VectorX(object):
 
         self._system = system
 
-        self._iproc = self._system._assembler._comm.rank
+        self._iproc = system.comm.rank
         self._views = {}
         self._views_flat = {}
         self._idxs = {}
@@ -143,15 +143,8 @@ class VectorX(object):
         system = self._system
         type_ = self._typ
 
-        allprocs_abs2idx_t = system._varx_allprocs_abs2idx[type_]
-        sizes_t = system._varx_sizes[type_]
-
         if new_array is None:
-            total_size = 0
-            for abs_name in system._varx_abs_names[type_]:
-                idx = allprocs_abs2idx_t[abs_name]
-                total_size += sizes_t[self._iproc, idx]
-
+            total_size = np.sum(system._varx_sizes[type_][self._iproc, :])
             new_array = np.zeros(total_size)
 
         for set_name, data in iteritems(self._data):
