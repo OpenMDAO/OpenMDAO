@@ -28,22 +28,72 @@ class PassThroughLength(ExplicitComponent):
         outputs['new_length'] = length_km
 
 
-class PassThroughLengths(ExplicitComponent):
-    """
-    Units/scaling test component taking an array of lengths in cm and
-    passing them through in km.
-    Currently raises an error for passing array value as 'ref'.
-    """
+class ScalingExample1(ImplicitComponent):
 
     def initialize_variables(self):
-        self.add_input('old_lengths', val=np.ones(4), units='cm')
-        self.add_output('new_lengths', val=np.ones(4), units='km', ref=0.1*np.ones(4))
+        self.add_input('x1', val=100.0)
+        self.add_input('x2', val=5000.0)
+        self.add_output('y1', val=200., ref=1e2)
+        self.add_output('y2', val=6000., ref=1e3)
 
-    def compute(self, inputs, outputs):
-        lengths_cm = inputs['old_lengths']
-        lengths_m = lengths_cm * 1e-2
-        lengths_km = lengths_m * 1e-3
-        outputs['new_lengths'] = lengths_km
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x1 = inputs['x1']
+        x2 = inputs['x2']
+        y1 = outputs['y1']
+        y2 = outputs['y2']
+
+        residuals['y1'] = 1e5 * (x1 - y1)/y1
+        residuals['y2'] = 1e-5 * (x2 - y2)/y2
+
+
+class ScalingExample2(ImplicitComponent):
+
+    def initialize_variables(self):
+        self.add_input('x1', val=100.0)
+        self.add_input('x2', val=5000.0)
+        self.add_output('y1', val=200., res_ref=1e5)
+        self.add_output('y2', val=6000., res_ref=1e-5)
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x1 = inputs['x1']
+        x2 = inputs['x2']
+        y1 = outputs['y1']
+        y2 = outputs['y2']
+
+        residuals['y1'] = 1e5 * (x1 - y1)/y1
+        residuals['y2'] = 1e-5 * (x2 - y2)/y2
+
+class ScalingExample3(ImplicitComponent):
+
+    def initialize_variables(self):
+        self.add_input('x1', val=100.0)
+        self.add_input('x2', val=5000.0)
+        self.add_output('y1', val=200., ref=1e2, res_ref=1e5)
+        self.add_output('y2', val=6000., ref=1e3, res_ref=1e-5)
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x1 = inputs['x1']
+        x2 = inputs['x2']
+        y1 = outputs['y1']
+        y2 = outputs['y2']
+
+        residuals['y1'] = 1e5 * (x1 - y1)/y1
+        residuals['y2'] = 1e-5 * (x2 - y2)/y2
+
+class ScalingExampleVector(ImplicitComponent):
+
+    def initialize_variables(self):
+        self.add_input('x', val=np.array([100., 5000.]))
+        self.add_output('y', val=np.array([200., 6000.]),
+                        ref=np.array([1e2, 1e3]),
+                        res_ref=np.array([1e5, 1e-5]))
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x = inputs['x']
+        y = outputs['y']
+
+        residuals['y'][0] = 1e5 * (x[0] - y[0])/y[0]
+        residuals['y'][1] = 1e-5 * (x[1] - y[1])/y[1]
 
 
 class SpeedComputationWithUnits(ExplicitComponent):
@@ -515,9 +565,11 @@ class TestScaling(unittest.TestCase):
                 self.add_input('lengths', val=np.ones((2, 2)))
                 self.add_input('widths', val=np.ones((2, 2)))
                 self.add_output('areas', val=np.ones((2, 2)), ref=np.array([[2.0, 3.0], [5.0, 7.0]]),
-                                ref0=np.array([[0.1, 0.2], [0.3, 0.4]]))
+                                ref0=np.array([[0.1, 0.2], [0.3, 0.4]]), lower=-1000.0, upper=1000.0)
                 self.add_output('stuff', val=np.ones((2, 2)), ref=np.array([[11.0, 13.0], [17.0, 19.0]]),
-                                ref0=np.array([[0.6, 0.7], [0.8, 0.9]]))
+                                ref0=np.array([[0.6, 0.7], [0.8, 0.9]]),
+                                lower=np.array([[-5000.0, -4000.0], [-3000.0, -2000.0]]),
+                                upper=np.array([[5000.0, 4000.0], [3000.0, 2000.0]]))
                 self.add_output('total_volume', val=1.)
 
             def compute(self, inputs, outputs):
@@ -551,27 +603,60 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val[1, 0], (2.0 - 0.8)/(17 - 0.8))
             assert_rel_error(self, val[1, 1], (2.0 - 0.9)/(19 - 0.9))
 
+            lb = model.get_subsystem('comp')._lower_bounds['areas']
+            assert_rel_error(self, lb[0, 0], (-1000.0 - 0.1)/(2 - 0.1))
+            assert_rel_error(self, lb[0, 1], (-1000.0 - 0.2)/(3 - 0.2))
+            assert_rel_error(self, lb[1, 0], (-1000.0 - 0.3)/(5 - 0.3))
+            assert_rel_error(self, lb[1, 1], (-1000.0 - 0.4)/(7 - 0.4))
+
+            ub = model.get_subsystem('comp')._upper_bounds['areas']
+            assert_rel_error(self, ub[0, 0], (1000.0 - 0.1)/(2 - 0.1))
+            assert_rel_error(self, ub[0, 1], (1000.0 - 0.2)/(3 - 0.2))
+            assert_rel_error(self, ub[1, 0], (1000.0 - 0.3)/(5 - 0.3))
+            assert_rel_error(self, ub[1, 1], (1000.0 - 0.4)/(7 - 0.4))
+
+            lb = model.get_subsystem('comp')._lower_bounds['stuff']
+            assert_rel_error(self, lb[0, 0], (-5000.0 - 0.6)/(11 - 0.6))
+            assert_rel_error(self, lb[0, 1], (-4000.0 - 0.7)/(13 - 0.7))
+            assert_rel_error(self, lb[1, 0], (-3000.0 - 0.8)/(17 - 0.8))
+            assert_rel_error(self, lb[1, 1], (-2000.0 - 0.9)/(19 - 0.9))
+
+            ub = model.get_subsystem('comp')._upper_bounds['stuff']
+            assert_rel_error(self, ub[0, 0], (5000.0 - 0.6)/(11 - 0.6))
+            assert_rel_error(self, ub[0, 1], (4000.0 - 0.7)/(13 - 0.7))
+            assert_rel_error(self, ub[1, 0], (3000.0 - 0.8)/(17 - 0.8))
+            assert_rel_error(self, ub[1, 1], (2000.0 - 0.9)/(19 - 0.9))
+
     def test_implicit_scale(self):
 
         class ImpCompArrayScale(TestImplCompArrayDense):
             def initialize_variables(self):
                 self.add_input('rhs', val=np.ones(2))
                 self.add_output('x', val=np.zeros(2), ref=np.array([2.0, 3.0]),
-                                ref0=np.array([4.0, 5.0]),
-                                res_ref = np.array([7.0, 11.0]),
-                                res_ref0 = np.array([13.0, 18.0]))
+                                ref0=np.array([4.0, 9.0]),
+                                res_ref=np.array([7.0, 11.0]),
+                                res_ref0=np.array([13.0, 18.0]))
                 self.add_output('extra', val=np.zeros(2), ref=np.array([12.0, 13.0]),
-                                ref0=np.array([14.0, 15.0]))
+                                ref0=np.array([14.0, 17.0]))
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
                 residuals['extra'] = 2.0*self.metadata['mtx'].dot(outputs['x']) - 3.0*inputs['rhs']
 
+            def linearize(self, inputs, outputs, jacobian):
+                # These are incorrect derivatives, but we aren't doing any calculations, and it makes
+                # it much easier to check that the scales are correct.
+                jacobian['x', 'x'] = np.ones((2, 2))
+                jacobian['x', 'extra'] = np.ones((2, 2))
+                jacobian['extra', 'x'] = np.ones((2, 2))
+                jacobian['x', 'rhs'] = -np.eye(2)
+
+
         prob = Problem()
         model = prob.model = Group()
 
         model.add_subsystem('p1', IndepVarComp('x', np.ones(2)))
-        model.add_subsystem('comp', ImpCompArrayScale())
+        comp = model.add_subsystem('comp', ImpCompArrayScale())
         model.connect('p1.x', 'comp.rhs')
 
         prob.setup(check=False)
@@ -583,13 +668,191 @@ class TestScaling(unittest.TestCase):
         with model._scaled_context():
             val = model.get_subsystem('comp')._outputs['x']
             assert_rel_error(self, val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
-            assert_rel_error(self, val[1], (base_x[1] - 5.0)/(3.0 - 5.0))
+            assert_rel_error(self, val[1], (base_x[1] - 9.0)/(3.0 - 9.0))
             val = model.get_subsystem('comp')._outputs['extra']
             assert_rel_error(self, val[0], (base_ex[0] - 14.0)/(12.0 - 14.0))
-            assert_rel_error(self, val[1], (base_ex[1] - 15.0)/(13.0 - 15.0))
+            assert_rel_error(self, val[1], (base_ex[1] - 17.0)/(13.0 - 17.0))
             val = model.get_subsystem('comp')._residuals['x'].copy()
             assert_rel_error(self, val[0], (base_res_x[0] - 13.0)/(7.0 - 13.0))
             assert_rel_error(self, val[1], (base_res_x[1] - 18.0)/(11.0 - 18.0))
+
+        model.run_linearize()
+
+        with model._scaled_context():
+            subjacs = comp.jacobian._subjacs
+
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][0], (2.0 - 4.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][0], (2.0 - 4.0)/(11.0 - 18.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][1], (3.0 - 9.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][1], (3.0 - 9.0)/(11.0 - 18.0))
+
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][0][0], (12.0 - 14.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][1][0], (12.0 - 14.0)/(11.0 - 18.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][0][1], (13.0 - 17.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][1][1], (13.0 - 17.0)/(11.0 - 18.0))
+
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][0], -1.0/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][0], 0.0)
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][1], 0.0)
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][1], -1.0/(11.0 - 18.0))
+
+    def test_implicit_scale_with_scalar_jac(self):
+        raise unittest.SkipTest('Cannot specify an n by m subjac with a scalar yet.')
+
+        class ImpCompArrayScale(TestImplCompArrayDense):
+            def initialize_variables(self):
+                self.add_input('rhs', val=np.ones(2))
+                self.add_output('x', val=np.zeros(2), ref=np.array([2.0, 3.0]),
+                                ref0=np.array([4.0, 9.0]),
+                                res_ref=np.array([7.0, 11.0]),
+                                res_ref0=np.array([13.0, 18.0]))
+                self.add_output('extra', val=np.zeros(2), ref=np.array([12.0, 13.0]),
+                                ref0=np.array([14.0, 17.0]))
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
+                residuals['extra'] = 2.0*self.metadata['mtx'].dot(outputs['x']) - 3.0*inputs['rhs']
+
+            def linearize(self, inputs, outputs, jacobian):
+                # These are incorrect derivatives, but we aren't doing any calculations, and it makes
+                # it much easier to check that the scales are correct.
+                jacobian['x', 'x'][:] = 1.0
+                jacobian['x', 'extra'][:] = 1.0
+                jacobian['extra', 'x'][:] = 1.0
+                jacobian['x', 'rhs'] = -np.eye(2)
+
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', np.ones(2)))
+        comp = model.add_subsystem('comp', ImpCompArrayScale())
+        model.connect('p1.x', 'comp.rhs')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        base_x = model.get_subsystem('comp')._outputs['x'].copy()
+        base_ex = model.get_subsystem('comp')._outputs['extra'].copy()
+        base_res_x = model.get_subsystem('comp')._residuals['x'].copy()
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['x']
+            assert_rel_error(self, val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
+            assert_rel_error(self, val[1], (base_x[1] - 9.0)/(3.0 - 9.0))
+            val = model.get_subsystem('comp')._outputs['extra']
+            assert_rel_error(self, val[0], (base_ex[0] - 14.0)/(12.0 - 14.0))
+            assert_rel_error(self, val[1], (base_ex[1] - 17.0)/(13.0 - 17.0))
+            val = model.get_subsystem('comp')._residuals['x'].copy()
+            assert_rel_error(self, val[0], (base_res_x[0] - 13.0)/(7.0 - 13.0))
+            assert_rel_error(self, val[1], (base_res_x[1] - 18.0)/(11.0 - 18.0))
+
+        model.run_linearize()
+
+        with model._scaled_context():
+            subjacs = comp.jacobian._subjacs
+
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][0], (2.0 - 4.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][0], (2.0 - 4.0)/(11.0 - 18.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][1], (3.0 - 9.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][1], (3.0 - 9.0)/(11.0 - 18.0))
+
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][0][0], (12.0 - 14.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][1][0], (12.0 - 14.0)/(11.0 - 18.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][0][1], (13.0 - 17.0)/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][1][1], (13.0 - 17.0)/(11.0 - 18.0))
+
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][0], -1.0/(7.0 - 13.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][0], 0.0)
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][1], 0.0)
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][1], -1.0/(11.0 - 18.0))
+
+    def test_feature1(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x1', 1.0))
+        model.add_subsystem('p2', IndepVarComp('x2', 1.0))
+        comp = model.add_subsystem('comp', ScalingExample1())
+        model.connect('p1.x1', 'comp.x1')
+        model.connect('p2.x2', 'comp.x2')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        model.run_apply_nonlinear()
+
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['y1']
+            assert_rel_error(self, val, 2.0)
+            val = model.get_subsystem('comp')._outputs['y2']
+            assert_rel_error(self, val, 6.0)
+
+    def test_feature2(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x1', 1.0))
+        model.add_subsystem('p2', IndepVarComp('x2', 1.0))
+        comp = model.add_subsystem('comp', ScalingExample2())
+        model.connect('p1.x1', 'comp.x1')
+        model.connect('p2.x2', 'comp.x2')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        model.run_apply_nonlinear()
+
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._outputs['y1']
+            assert_rel_error(self, val, 200.0)
+            val = model.get_subsystem('comp')._outputs['y2']
+            assert_rel_error(self, val, 6000.0)
+
+    def test_feature3(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x1', 1.0))
+        model.add_subsystem('p2', IndepVarComp('x2', 1.0))
+        comp = model.add_subsystem('comp', ScalingExample3())
+        model.connect('p1.x1', 'comp.x1')
+        model.connect('p2.x2', 'comp.x2')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        model.run_apply_nonlinear()
+
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._residuals['y1']
+            assert_rel_error(self, val, -.995)
+            val = model.get_subsystem('comp')._residuals['y2']
+            assert_rel_error(self, val, (1-6000.)/6000.)
+
+    def test_feature_vector(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p', IndepVarComp('x', np.ones((2))))
+        comp = model.add_subsystem('comp', ScalingExampleVector())
+        model.connect('p.x', 'comp.x')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        model.run_apply_nonlinear()
+
+        with model._scaled_context():
+            val = model.get_subsystem('comp')._residuals['y']
+            assert_rel_error(self, val[0], (1-200.)/200.)
+            assert_rel_error(self, val[1], (1-6000.)/6000.)
+            val = model.get_subsystem('comp')._outputs['y']
+            assert_rel_error(self, val[0], 2.0)
+            assert_rel_error(self, val[1], 6.0)
 
 if __name__ == '__main__':
     unittest.main()

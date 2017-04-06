@@ -27,7 +27,9 @@ class NewtonSolver(NonlinearSolver):
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
-        number of iterations for the current invocation of the solver.
+        Number of iterations for the current invocation of the solver.
+    _ln_solver_from_parent : bool
+        This is set to True if we are using the parent system's linear solver.
     """
 
     SOLVER = 'NL: Newton'
@@ -49,10 +51,17 @@ class NewtonSolver(NonlinearSolver):
         # Slot for linesearch
         self.linesearch = None
 
+        # We only need to call linearize on the ln_solver if its not shared with the parent group.
+        self._ln_solver_from_parent = True
+
     def _declare_options(self):
         """
-        Set options/supports specific to this solver.
+        Declare options before kwargs are processed in the init method.
         """
+        self.options.declare('solve_subsystems', type_=bool, value=False,
+                             desc='Set to True to turn on sub-solvers (Hybrid Newton).')
+        self.options.declare('max_sub_solves', type_=int, value=10,
+                             desc='Maximum number of subsystem solves.')
         self.supports['gradients'] = True
 
     def _setup_solvers(self, system, depth):
@@ -70,17 +79,53 @@ class NewtonSolver(NonlinearSolver):
 
         if self.ln_solver is not None:
             self.ln_solver._setup_solvers(self._system, self._depth + 1)
+            self._ln_solver_from_parent = False
         else:
             self.ln_solver = system.ln_solver
 
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system, self._depth + 1)
 
+    def _iter_get_norm(self):
+        """
+        Return the norm of the residual.
+
+        Returns
+        -------
+        float
+            norm.
+        """
+        system = self._system
+
+        # Hybrid newton support.
+        if self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']:
+            for isub, subsys in enumerate(system._subsystems_allprocs):
+                system._transfers['fwd', isub](system._inputs,
+                                               system._outputs, 'fwd')
+
+                if subsys in system._subsystems_myproc:
+                    subsys._solve_nonlinear()
+
+        system._apply_nonlinear()
+        return system._residuals.get_norm()
+
+    def _linearize_children(self):
+        """
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.
+
+        Returns
+        -------
+        boolean
+            Flag for indicating child linerization
+        """
+        return (self.options['solve_subsystems']
+                and self._iter_count <= self.options['max_sub_solves'])
+
     def _linearize(self):
         """
         Perform any required linearization operations such as matrix factorization.
         """
-        if self.ln_solver is not None:
+        if not self._ln_solver_from_parent:
             self.ln_solver._linearize()
 
         if self.linesearch is not None:

@@ -6,7 +6,7 @@ import scipy as sp
 import itertools
 
 from six import iteritems
-from nose_parameterized import parameterized
+from parameterized import parameterized
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, \
                          COOJacobian, ScipyIterativeSolver

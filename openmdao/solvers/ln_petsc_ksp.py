@@ -269,6 +269,18 @@ class PetscKSP(LinearSolver):
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
 
+    def _linearize_children(self):
+        """
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.
+
+        Returns
+        -------
+        boolean
+            Flag for indicating child linerization
+        """
+        precon = self.precon
+        return (precon is not None) and (precon._linearize_children())
+
     def _linearize(self):
         """
         Perform any required linearization operations such as matrix factorization.
@@ -408,7 +420,7 @@ class PetscKSP(LinearSolver):
             lsize += np.prod(system._var_abs2data_io[abs_name]['metadata']['shape'])
 
         size = 0
-        global_var_sizes = system._assembler._variable_sizes_all['output']
+        global_var_sizes = system._assembler._var_sizes_all['output']
         idx_start, idx_end = system._var_allprocs_idx_range['output']
         for idx in range(idx_start, idx_end):
             size += sum(global_var_sizes[:, idx])

@@ -20,9 +20,9 @@ class PETScTransfer(DefaultTransfer):
         Optionally implemented by the subclass.
         """
         self._transfers = {}
-        for in_iset, out_iset in self._in_inds:
-            key = (in_iset, out_iset)
+        for key in self._in_inds:
             if len(self._in_inds[key]) > 0:
+                in_iset, out_iset = key
                 in_inds = np.array(self._in_inds[key], 'i')
                 out_inds = np.array(self._out_inds[key], 'i')
                 in_indexset = PETSc.IS().createGeneral(in_inds,
@@ -49,21 +49,19 @@ class PETScTransfer(DefaultTransfer):
             'fwd' or 'rev'.
         """
         if mode == 'fwd':
-            for in_iset, out_iset in self._in_inds:
-                key = (in_iset, out_iset)
-                if len(self._in_inds[key]) > 0:
-                    in_petsc = self._in_vec._root_vector._petsc[in_iset]
-                    out_petsc = self._out_vec._root_vector._petsc[out_iset]
-                    self._transfers[key].scatter(out_petsc, in_petsc,
-                                                 addv=False, mode=False)
+            for key in self._transfers:
+                in_iset, out_iset = key
+                in_petsc = self._in_vec._root_vector._petsc[in_iset]
+                out_petsc = self._out_vec._root_vector._petsc[out_iset]
+                self._transfers[key].scatter(out_petsc, in_petsc,
+                                             addv=False, mode=False)
         elif mode == 'rev':
-            for in_iset, out_iset in self._in_inds:
-                key = (in_iset, out_iset)
-                if len(self._in_inds[key]) > 0:
-                    in_petsc = self._in_vec._root_vector._petsc[in_iset]
-                    out_petsc = self._out_vec._root_vector._petsc[out_iset]
-                    self._transfers[key].scatter(in_petsc, out_petsc,
-                                                 addv=True, mode=True)
+            for key in self._transfers:
+                in_iset, out_iset = key
+                in_petsc = self._in_vec._root_vector._petsc[in_iset]
+                out_petsc = self._out_vec._root_vector._petsc[out_iset]
+                self._transfers[key].scatter(in_petsc, out_petsc,
+                                             addv=True, mode=True)
 
 
 class PETScVector(DefaultVector):
