@@ -499,6 +499,32 @@ class TestBGSSolver(unittest.TestCase):
         for key, val in iteritems(Jbase):
             assert_rel_error(self, J[key], val, .00001)
 
+    def test_implicit_cycle(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+        model.add_subsystem('d1', SellarImplicitDis1())
+        model.add_subsystem('d2', SellarImplicitDis2())
+        model.connect('d1.y1', 'd2.y1')
+        model.connect('d2.y2', 'd1.y2')
+
+        from openmdao.api import DirectSolver
+        model.nl_solver = NewtonSolver()
+        model.nl_solver.options['maxiter'] = 2#5
+        model.ln_solver = DirectSolver()
+        model.ln_solver = LinearBlockGS()
+
+        prob.setup(check=False)
+        prob.model.suppress_solver_output = False
+
+        prob.run_model()
+        res = model._residuals.get_norm()
+        self.assertLess(res, 1.0e-5)
+
 
 class TestBGSSolverFeature(unittest.TestCase):
 
@@ -569,28 +595,5 @@ class TestBGSSolverFeature(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61016296175, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78456955704, .00001)
 
-    def test_implicit_cycle(self):
-
-        prob = Problem()
-        model = prob.model = Group()
-
-        model.add_subsystem('p1', IndepVarComp('x', 1.0))
-        model.add_subsystem('d1', SellarImplicitDis1())
-        model.add_subsystem('d2', SellarImplicitDis2())
-        model.connect('d1.y1', 'd2.y1')
-        model.connect('d2.y2', 'd1.y2')
-
-        from openmdao.api import DirectSolver
-        model.nl_solver = NewtonSolver()
-        model.nl_solver.options['maxiter'] = 2#5
-        model.ln_solver = DirectSolver()
-        model.ln_solver = LinearBlockGS()
-
-        prob.setup(check=False)
-        prob.model.suppress_solver_output = False
-
-        prob.run_model()
-        res = model._residuals.get_norm()
-        self.assertLess(res, 1.0e-5)
 if __name__ == "__main__":
     unittest.main()

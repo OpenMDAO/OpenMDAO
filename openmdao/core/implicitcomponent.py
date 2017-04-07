@@ -135,6 +135,12 @@ class ImplicitComponent(Component):
                 abs_errors.append(result[1])
                 rel_errors.append(result[2])
 
+                #with self._units_scaling_context(outputs=[d_outputs], residuals=[d_residuals]):
+                    #if mode == 'fwd':
+                        #d_outputs.set_vec(d_residuals)
+                    #elif mode == 'rev':
+                        #d_residuals.set_vec(d_outputs)
+
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
     def _linearize(self, do_nl=True, do_ln=True):
