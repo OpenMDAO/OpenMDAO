@@ -73,7 +73,6 @@ class Solver(object):
         recorder : BaseRecorder
            A recorder instance.
         """
-        recorder._owners.append(self)
         self._rec_mgr.append(recorder)
         return recorder
 
@@ -170,8 +169,7 @@ class Solver(object):
             #  just the absolute error and relative error. A second mode would store the full outputs and residuals.
 
             # The full solver residual/output recording and apply_nonlinear/apply_linear recording probably falls last in terms of priority
-
-            metadata = None # TODO_RECORDERS: need to figure out how to do metadata in solvers
+            metadata = None #TODO_RECORDERS put actual metadata here
             self._rec_mgr.record_iteration(self, metadata)
 
             self._mpi_print(self._iter_count, norm, norm / norm0)

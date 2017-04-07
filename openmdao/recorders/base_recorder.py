@@ -73,9 +73,10 @@ class BaseRecorder(object):
         self.options.declare('record_output', bool, 'Set to True to record output at the solver level', False)
         self.options.declare('record_solver_residuals', bool, 'Set to True to record residuals at the solver level', False)
 
-
-        self._owners = []
         self.out = None
+
+        #global counter that is used in iteration coordinate
+        self._counter = 0
 
         # # This is for drivers to determine if a recorder supports
         # # real parallel recording (recording on each process), because
@@ -89,8 +90,6 @@ class BaseRecorder(object):
 
         # self._filtered = {}
         # TODO: System specific includes/excludes
-
-        self._owners = []
 
 
     def startup(self):
@@ -107,7 +106,7 @@ class BaseRecorder(object):
         incl = self.options['includes']
         excl = self.options['excludes']
 
-        # Deprecated options here?
+        # Deprecated options here, but need to preserve backward compatibility if possible.
         if self.options['record_params']:
             warn_deprecation("record_params is deprecated, please use record_inputs.")
             # set option to what the user intended.
@@ -203,7 +202,8 @@ class BaseRecorder(object):
         metadata : dict, optional
             Dictionary containing execution metadata (e.g. iteration coordinate).
         """
-        raise NotImplementedError()
+        self._counter += 1
+        #raise NotImplementedError()
 
     def record_derivatives(self, derivs, metadata):
         """Writes the metadata of the given group
