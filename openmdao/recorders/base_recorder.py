@@ -1,5 +1,6 @@
-""" Class definition for BaseRecorder, the base class for all recorders."""
-
+"""
+Class definition for BaseRecorder, the base class for all recorders.
+"""
 from fnmatch import fnmatchcase
 import sys
 
@@ -12,8 +13,8 @@ import warnings
 
 
 class BaseRecorder(object):
-    """ This is a base class for all case recorders and is not a functioning
-    case recorder on its own.
+    """
+    Base class for all case recorders and is not a functioning case recorder on its own.
 
     Options
     -------
@@ -34,19 +35,25 @@ class BaseRecorder(object):
     """
 
     def __init__(self):
+        """
+        initialize.
+        """
         self.options = OptionsDictionary()
         # Options common to all objects
         self.options.declare('record_metadata', bool, 'Record metadata', True)
-        self.options.declare('includes', list, 'Patterns for variables to include in recording', ['*'])
-        self.options.declare('excludes', list, 'Patterns for vars to exclude in recording (processed post-includes)',
-                             value=[])
+        self.options.declare('includes', list, 'Patterns for variables to include in recording',
+                             ['*'])
+        self.options.declare('excludes', list, 'Patterns for vars to exclude in recording '
+                                               '(processed post-includes)', value=[])
 
         # Old options that will be deprecated
-        self.options.declare('record_unknowns', bool, 'Deprecated option to record unknowns.', False)
+        self.options.declare('record_unknowns', bool, 'Deprecated option to record unknowns.',
+                             False)
         self.options.declare('record_params', bool, 'Deprecated option to record params.', False)
-        self.options.declare('record_resids', bool, 'Deprecated option to record residuals.', False)
-        self.options.declare('record_derivs', bool, 'Deprecated option to record derivatives.', False)
-
+        self.options.declare('record_resids', bool, 'Deprecated option to record residuals.',
+                             False)
+        self.options.declare('record_derivs', bool, 'Deprecated option to record derivatives.',
+                             False)
         # System options
         self.options.declare('record_outputs', bool,
                              'Set to True to record outputs at the system level', True)
@@ -56,44 +63,33 @@ class BaseRecorder(object):
                              'Set to True to record residuals at the system level', True)
         self.options.declare('record_derivatives', bool,
                              'Set to True to record derivatives at the system level', False)
-
         # Driver options
-        self.options.declare('record_desvars', bool, 'Set to True to record design variables at the driver level',
-                                True)
-        self.options.declare('record_responses', bool, 'Set to True to record responses at the driver level',
-                             False)
-        self.options.declare('record_objectives', bool, 'Set to True to record objectives at the driver level',
-                             False)
-        self.options.declare('record_constraints', bool, 'Set to True to record constraints at the driver level',
-                             False)
-
+        self.options.declare('record_desvars', bool, 'Set to True to record design variables at '
+                                                     'the driver level', True)
+        self.options.declare('record_responses', bool, 'Set to True to record responses at the '
+                                                       'driver level', False)
+        self.options.declare('record_objectives', bool, 'Set to True to record objectives at the '
+                                                        'driver level', False)
+        self.options.declare('record_constraints', bool, 'Set to True to record constraints at '
+                                                         'the driver level', False)
         # Solver options
-        self.options.declare('record_abs_error', bool, 'Set to True to record absolute error at the solver level', True)
-        self.options.declare('record_rel_error', bool, 'Set to True to record relative error at the solver level', True)
-        self.options.declare('record_output', bool, 'Set to True to record output at the solver level', False)
-        self.options.declare('record_solver_residuals', bool, 'Set to True to record residuals at the solver level', False)
+        self.options.declare('record_abs_error', bool, 'Set to True to record absolute error at '
+                             'the solver level', True)
+        self.options.declare('record_rel_error', bool, 'Set to True to record relative error at '
+                             'the solver level', True)
+        self.options.declare('record_output', bool, 'Set to True to record output at the '
+                             'solver level', False)
+        self.options.declare('record_solver_residuals', bool, 'Set to True to record residuals '
+                             'at the solver level', False)
 
         self.out = None
 
-        #global counter that is used in iteration coordinate
+        # global counter that is used in iteration coordinate
         self._counter = 0
 
-        # # This is for drivers to determine if a recorder supports
-        # # real parallel recording (recording on each process), because
-        # # if it doesn't, the driver figures out what variables must
-        # # be gathered to rank 0 if running under MPI.
-        # #
-        # # By default, this is False, but it should be set to True
-        # # if the recorder will record data on each process to avoid
-        # # unnecessary gathering.
-        # self._parallel = False
-
-        # self._filtered = {}
-        # TODO: System specific includes/excludes
-
-
     def startup(self):
-        """ Prepare for a new run.
+        """
+        Prepare for a new run.
 
         Args
         ----
@@ -138,11 +134,10 @@ class BaseRecorder(object):
         #     'r': myresiduals
         # }
 
-
-
     def _check_path(self, path, includes, excludes):
-        """ Return True if `path` should be recorded. """
-
+        """
+        Return True if `path` should be recorded.
+        """
         # First see if it's included
         for pattern in includes:
             if fnmatchcase(path, pattern):
@@ -156,57 +151,59 @@ class BaseRecorder(object):
         return False
 
     def _get_pathname(self, iteration_coordinate):
-        '''
-        Converts an iteration coordinate to key to index
-        `_filtered` to retrieve names of variables to be recorded.
-        '''
+        """
+        Convert iteration coord.
+
+        Change coordinate to key to index _filtered to retrieve names of variables to be recorded.
+        """
         return '.'.join(iteration_coordinate[5::2])
 
     def _filter_vector(self, vecwrapper, key, iteration_coordinate):
-        '''
-        Returns a dict that is a subset of the given vecwrapper
-        to be recorded.
-        '''
+        """
+        Return a dict that is a subset of the given vecwrapper to be recorded.
+        """
         if not vecwrapper:
             return vecwrapper
 
         pathname = self._get_pathname(iteration_coordinate)
-        return {n:vecwrapper[n] for n in self._filtered[pathname][key]}
+        return {n: vecwrapper[n] for n in self._filtered[pathname][key]}
 
     def record_metadata(self, group):
-        """Writes the metadata of the given group
+        """
+        Write the metadata of the given group.
 
         Args
         ----
         group : `System`
-            `System` containing vectors
+            `System` containing vectors.
         """
         raise NotImplementedError()
 
     # TODO_RECORDER: change the signature to match what we decided to do with sqlite, hdf5,...
     def record_iteration(self, object_requesting_recording, metadata):
         """
-        Writes the provided data.
+        Write the provided data.
 
         Args
         ----
         inputs : dict
-            Dictionary containing parameters. (p)
+            Dictionary containing inputs.
 
         outputs : dict
-            Dictionary containing outputs and states. (u)
+            Dictionary containing outputs and states.
 
         residuals : dict
-            Dictionary containing residuals. (r)
+            Dictionary containing residuals.
 
         metadata : dict, optional
             Dictionary containing execution metadata (e.g. iteration coordinate).
         """
         self._counter += 1
-        #raise NotImplementedError()
+        # raise NotImplementedError()
 
     def record_derivatives(self, derivs, metadata):
-        """Writes the metadata of the given group
+        """
+        Write the metadata of the given group.
 
         Args
         ----
@@ -219,7 +216,9 @@ class BaseRecorder(object):
         raise NotImplementedError()
 
     def close(self):
-        """Closes `out` unless it's ``sys.stdout``, ``sys.stderr``, or StringIO.
+        """
+        Close `out` unless it's ``sys.stdout``, ``sys.stderr``, or StringIO.
+
         Note that a closed recorder will do nothing in :meth:`record`, and
         closing a closed recorder also does nothing.
         """

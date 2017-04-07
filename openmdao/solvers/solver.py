@@ -27,8 +27,11 @@ class Solver(object):
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
         number of iterations for the current invocation of the solver.
+    _rec_mgr : list of recorders
+        list of recorders that have been added to this system.
     options : <OptionsDictionary>
         options dictionary.
+
     """
 
     SOLVER = 'base_solver'
@@ -63,18 +66,16 @@ class Solver(object):
 
         self._rec_mgr = RecordingManager()
 
-
     def add_recorder(self, recorder):
         """
-        Adds a recorder to the driver.
+        Add a recorder to the driver.
 
-        Args
-        ----
+        Parameters
+        ----------
         recorder : BaseRecorder
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
-        return recorder
 
     def _declare_options(self):
         """
@@ -164,12 +165,11 @@ class Solver(object):
             self._iter_count += 1
             norm = self._iter_get_norm()
 
-            # TODO_RECORDER I think we write to the recorder here
-            # Right, it would depend on the mode and whether it's linear or nonlinear. The most basic mode would store
-            #  just the absolute error and relative error. A second mode would store the full outputs and residuals.
+            #  It would depend on the mode and whether it's linear or nonlinear.
+            #  The most basic mode would store just the absolute error and relative error.
+            #  A second mode would store the full outputs and residuals.
 
-            # The full solver residual/output recording and apply_nonlinear/apply_linear recording probably falls last in terms of priority
-            metadata = None #TODO_RECORDERS put actual metadata here
+            metadata = None  # TODO_RECORDERS put actual metadata here
             self._rec_mgr.record_iteration(self, metadata)
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
