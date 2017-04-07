@@ -268,7 +268,7 @@ class System(object):
             for vec_name in vec_names:
                 root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
 
-        return vector_class, root_vectors
+        return root_vectors
 
     def _setupx(self, comm, vector_class):
         # TEMPORARY: this is meant to only be here during the transition to reconfigurability
@@ -282,6 +282,8 @@ class System(object):
         except:
             pass
 
+        vec_names = ['nonlinear', 'linear']
+
         self.get_req_procs()
         self._setupx_procs('', comm, (0, comm.size))
         self._setupx_vars()
@@ -292,7 +294,7 @@ class System(object):
         self._setupx_global_connections()
         self._setupx_connections()
         self._setupx_global(*self._get_initial_global())
-        self._setupx_vectors(*self._get_root_vectors(['nonlinear', 'linear'], vector_class))
+        self._setupx_vectors(self._get_root_vectors(vec_names, vector_class))
         self._setupx_transfers()
 
     def _setupx_procs(self, pathname, comm, proc_range):
@@ -364,12 +366,14 @@ class System(object):
         self._ext_num_vars_byset = ext_num_vars_byset
         self._ext_sizes_byset = ext_sizes_byset
 
-    def _setupx_vectors(self, vector_class, root_vectors):
+    def _setupx_vectors(self, root_vectors):
         self._vecs = vecs = {'input': {}, 'output': {}, 'residual': {}}
 
         for key in ['input', 'output', 'residual']:
             type_ = 'output' if key is 'residual' else key
             for vec_name in root_vectors[key]:
+                vector_class = root_vectors[key][vec_name].__class__
+
                 vecs[key][vec_name] = vector_class(
                     vec_name, type_, self, root_vectors[key][vec_name])
 

@@ -521,11 +521,11 @@ class Group(System):
                 sub_ext_num_vars, sub_ext_sizes, sub_ext_num_vars_byset, sub_ext_sizes_byset,
             )
 
-    def _setupx_vectors(self, vector_class, root_vectors):
-        super(Group, self)._setupx_vectors(vector_class, root_vectors)
+    def _setupx_vectors(self, root_vectors):
+        super(Group, self)._setupx_vectors(root_vectors)
 
         for subsys in self._subsystems_myproc:
-            subsys._setupx_vectors(vector_class, root_vectors)
+            subsys._setupx_vectors(root_vectors)
 
     def _setupx_transfers(self):
         super(Group, self)._setupx_transfers()
