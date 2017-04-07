@@ -1,9 +1,13 @@
+"""
+CaseReader class definition.
+"""
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.hdf5_reader import HDF5CaseReader
 
 
 def CaseReader(filename):
-    """ A factory function that returns a CaseReader for the given file.
+    """
+    A factory function that returns a CaseReader for the given file.
 
     Parameters
     ----------
@@ -16,7 +20,6 @@ def CaseReader(filename):
     An instance of SqliteCaseReader or HDF5CaseReader, depending on the
     contents of the given file.
     """
-
     try:
         reader = SqliteCaseReader(filename)
         return reader

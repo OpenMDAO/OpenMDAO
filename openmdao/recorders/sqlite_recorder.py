@@ -80,9 +80,9 @@ class SqliteRecorder(BaseRecorder):
 
         self.model_viewer_data = None
 
-        self._counter = 0 
+        self._counter = 0
         # isolation_level=None causes autocommit
-        self.con = sqlite3.connect(out, detect_types=sqlite3.PARSE_DECLTYPES,isolation_level=None)
+        self.con = sqlite3.connect(out, detect_types=sqlite3.PARSE_DECLTYPES, isolation_level=None)
 
         # Create the table for iterations for a driver
         # The primary key gets filled in automatically. It can be our "counter"
@@ -329,25 +329,7 @@ class SqliteRecorder(BaseRecorder):
                                                solver_values))
 
     def close(self):
-<<<<<<< HEAD
-        """Closes `out`"""
-
-        print("closing sqlite_recorder")
-        self.con.close() # Not completely sure if it is this simple.
-
-        # if self._open_close_sqlitedict:
-        #     # if self.out_metadata is not None:
-        #     #     self.out_metadata.close()
-        #     #     self.out_metadata = None
-        #     if self.out_driver_iterations is not None:
-        #         self.out_driver_iterations.close()
-        #         self.out_driver_iterations = None
-        #     # if self.out_derivs is not None:
-        #     #     self.out_derivs.close()
-        #     #     self.out_derivs = None
-=======
         """
         Close `out`.
         """
         self.con.close()  # Not completely sure if it is this simple.
->>>>>>> keithfork/master

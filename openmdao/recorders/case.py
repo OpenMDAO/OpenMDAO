@@ -1,9 +1,14 @@
-class Case(object):
-    """ Case wraps the data from a single iteration/case of a recording
-    to make it more easily accessible to the user.
+"""
+A Case class.
+"""
 
-    Args
-    ----
+
+class Case(object):
+    """
+    Case wraps the data from a single iteration of a recording to make it more easily accessible.
+
+    Parameters
+    ----------
     filename : str
         The filename from which the Case was constructed.
     case_id : str
@@ -40,6 +45,9 @@ class Case(object):
     """
 
     def __init__(self, filename, case_id, case_dict):
+        """
+        Initialize.
+        """
         self.filename = filename
         self.case_id = case_id
 
@@ -53,7 +61,8 @@ class Case(object):
         self.resids = case_dict.get('Residuals', None)
 
     def __getitem__(self, item):
-        """ Access an unknown of the given name.
+        """
+        Access an unknown of the given name.
 
         This is intended to be a convenient shorthand for case.unknowns[item].
         """

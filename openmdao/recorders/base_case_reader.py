@@ -1,11 +1,15 @@
+"""
+Docstring.
+"""
 from abc import ABCMeta, abstractmethod
 
 
 class BaseCaseReader(object):
-    """ The Abstract base class of all CaseReader implementations.
+    """
+    Abstract base class of all CaseReader implementations.
 
-    Args
-    ----
+    Parameters
+    ----------
     filename : str
         The name of the file from which to instantiate the case reader.
 
@@ -21,12 +25,14 @@ class BaseCaseReader(object):
         Unknowns metadata from the cases.
     num_cases : int
         The number of cases contained in the recorded file.
-
     """
 
     __metaclass__ = ABCMeta
 
     def __init__(self, filename):
+        """
+        Initialize.
+        """
         self.format_version = None
         self.filename = filename
         self.parameters = None
@@ -37,6 +43,8 @@ class BaseCaseReader(object):
     @abstractmethod
     def get_case(self, case_id):
         """
+        Get cases.
+
         Parameters
         ----------
         case_id : str or int
@@ -52,7 +60,7 @@ class BaseCaseReader(object):
         pass
 
     def list_cases(self):
-        """ Return a tuple of the case string identifiers available in this
-        instance of the CaseReader.
+        """
+        Return a tuple of the case string identifiers available in this instance of the CaseReader.
         """
         return self._case_keys

@@ -1,6 +1,7 @@
+"""
+Definition of the SqliteCaseReader.
+"""
 from __future__ import print_function, absolute_import
-
-# from sqlitedict import SqliteDict
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
@@ -8,15 +9,21 @@ from openmdao.utils.record_util import is_valid_sqlite3_db
 
 import sqlite3
 
+
 class SqliteCaseReader(BaseCaseReader):
-    """ A CaseReader specific to files created with SqliteRecorder.
+    """
+    A CaseReader specific to files created with SqliteRecorder.
 
     Parameters
     ----------
     filename : str
         The path to the filename containing the recorded data.
     """
+
     def __init__(self, filename):
+        """
+        Initialize.
+        """
         super(SqliteCaseReader, self).__init__(filename)
 
         if filename is not None:
@@ -27,7 +34,6 @@ class SqliteCaseReader(BaseCaseReader):
         # with SqliteDict(self.filename, 'metadata', flag='r') as db:
         #     self.format_version = db.get('format_version', None)
 
-
         # TODO_RECORDERS - need to actually read this in
         self.format_version = 1
 
@@ -36,7 +42,8 @@ class SqliteCaseReader(BaseCaseReader):
         self.num_cases = len(self._case_keys)
 
     def _load(self):
-        """ The initial load of data from the sqlite database file.
+        """
+        The initial load of data from the sqlite database file.
 
         Load the metadata from the sqlite file, populating the
         `format_version`, `parameters`, and `unknowns` attributes of this
@@ -61,14 +68,14 @@ class SqliteCaseReader(BaseCaseReader):
             #     self._case_keys = tuple(db.keys())
 
             con = sqlite3.connect(self.filename, detect_types=sqlite3.PARSE_DECLTYPES)
-            cur = con.cursor()    
+            cur = con.cursor()
             cur.execute("SELECT iteration_coordinate FROM driver_iterations")
             rows = cur.fetchall()
 
-            self._case_keys = [ coord[0] for coord in rows]
+            self._case_keys = [coord[0] for coord in rows]
             print(self._case_keys)
-            # returns this [(u'rank0:SLSQP|1',), (u'rank0:SLSQP|2',), (u'rank0:SLSQP|3',), (u'rank0:SLSQP|4',)]
-
+            # returns this [(u'rank0:SLSQP|1',), (u'rank0:SLSQP|2',),
+            # (u'rank0:SLSQP|3',), (u'rank0:SLSQP|4',)]
 
         else:
             raise ValueError('SQliteCaseReader encountered an unhandled '
@@ -76,6 +83,8 @@ class SqliteCaseReader(BaseCaseReader):
 
     def get_case(self, case_id):
         """
+        Get a case from the database.
+
         Parameters
         ----------
         case_id : int or str
@@ -98,18 +107,13 @@ class SqliteCaseReader(BaseCaseReader):
         with SqliteDict(self.filename, 'iterations', flag='r') as iter_db:
             case = Case(self.filename, _case_id, iter_db[_case_id])
 
-
-
-
         con = sqlite3.connect(self.filename, detect_types=sqlite3.PARSE_DECLTYPES)
         cur = con.cursor()
-        cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": _case_id})        
+        cur.execute("SELECT * FROM driver_iterations WHERE "
+                    "iteration_coordinate=:iteration_coordinate",
+                    {"iteration_coordinate": _case_id})
 
         rows = cur.fetchall()
-
-
-
-
 
         # Set the derivs data for the case if available
         # with SqliteDict(self.filename, 'derivs', flag='r') as derivs_db:
