@@ -223,10 +223,6 @@ class System(object):
         #
         # self._varx_sizes = {'input': None, 'output': None}
         # self._varx_sizes_byset = {'input': {}, 'output': {}}
-        #
-        # self._conn_abs_input2src = {}
-        #
-        # self._partials_info = {}
 
     #
     #
@@ -277,11 +273,14 @@ class System(object):
     def _setupx(self, comm, vector_class):
         # TEMPORARY: this is meant to only be here during the transition to reconfigurability
         from openmdao.vectors.default_vector import DefaultVector, DefaultVectorX
-        from openmdao.vectors.petsc_vector import PETScVector, PETScVectorX
         if vector_class is DefaultVector:
             vector_class = DefaultVectorX
-        if vector_class is PETScVector:
-            vector_class = PETScVectorX
+        try:
+            from openmdao.vectors.petsc_vector import PETScVector, PETScVectorX
+            if vector_class is PETScVector:
+                vector_class = PETScVectorX
+        except:
+            pass
 
         self.get_req_procs()
         self._setupx_procs('', comm, (0, comm.size))
@@ -293,6 +292,7 @@ class System(object):
         self._setupx_connections()
         self._setupx_global(*self._get_initial_global())
         self._setupx_vectors(*self._get_root_vectors(['nonlinear', 'linear'], vector_class))
+        self._setupx_transfers()
 
     def _setupx_procs(self, pathname, comm, proc_range):
         self.pathname = pathname
@@ -369,6 +369,9 @@ class System(object):
             for vec_name in root_vectors[key]:
                 vecs[key][vec_name] = vector_class(
                     vec_name, type_, self, root_vectors[key][vec_name])
+
+    def _setupx_transfers(self):
+        self._xfers = {}
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------

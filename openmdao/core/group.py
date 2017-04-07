@@ -5,7 +5,7 @@ import sys
 
 from six import iteritems, string_types
 from six.moves import range
-
+from itertools import product
 from collections import Iterable, Counter
 
 import numpy as np
@@ -156,8 +156,7 @@ class Group(System):
 
         # First compute these on one processor for each subsystem
         for type_ in ['input', 'output']:
-            for ind, subsys in enumerate(self._subsystems_myproc):
-                isub = self._subsystems_myproc_inds[ind]
+            for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
                 if subsys.comm.rank == 0:
                     allprocs_counters[type_][isub] = subsys._num_var[type_]
                     for set_name in subsys._num_var_byset[type_]:
@@ -182,9 +181,7 @@ class Group(System):
                     allprocs_counters_byset[type_] += myproc_counters_byset[type_]
 
         # Recursion
-        for ind, subsys in enumerate(self._subsystems_myproc):
-            isub = self._subsystems_myproc_inds[ind]
-
+        for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
             sub_var_range = {}
             sub_var_range_byset = {'input': {}, 'output': {}}
             for type_ in ['input', 'output']:
@@ -349,8 +346,11 @@ class Group(System):
         for prom_name in allprocs_prom2abs_list_out:
             if prom_name in allprocs_prom2abs_list_in:
                 abs_out = allprocs_prom2abs_list_out[prom_name][0]
+                out_subsys = abs_out.rsplit('.', 1)[0]
                 for abs_in in allprocs_prom2abs_list_in[prom_name]:
-                    abs_in2out[abs_in] = abs_out
+                    in_subsys = abs_in.rsplit('.', 1)[0]
+                    if out_subsys != in_subsys:
+                        abs_in2out[abs_in] = abs_out
 
         # Add explicit connections
         for prom_in, (prom_out, src_indices) in iteritems(self._manual_connections):
@@ -488,6 +488,166 @@ class Group(System):
 
         for subsys in self._subsystems_myproc:
             subsys._setupx_vectors(vector_class, root_vectors)
+
+    def _setupx_transfers(self):
+        super(Group, self)._setupx_transfers()
+
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_transfers()
+
+        # Pre-compute map from abs_names to the index of the containing subsystem
+        abs2isub = {'input': {}, 'output': {}}
+        for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
+            for type_ in ['input', 'output']:
+                for abs_name in subsys._varx_allprocs_abs_names[type_]:
+                    abs2isub[type_][abs_name] = isub
+
+        # Initialize empty lists for the transfer indices
+        nsub_allprocs = len(self._subsystems_allprocs)
+        xfer_in = {}
+        xfer_out = {}
+        fwd_xfer_in = [{} for i in range(nsub_allprocs)]
+        fwd_xfer_out = [{} for i in range(nsub_allprocs)]
+        rev_xfer_in = [{} for i in range(nsub_allprocs)]
+        rev_xfer_out = [{} for i in range(nsub_allprocs)]
+        for set_name_in in self._varx_set2iset['input']:
+            for set_name_out in self._varx_set2iset['output']:
+                key = (set_name_in, set_name_out)
+                xfer_in[key] = []
+                xfer_out[key] = []
+                for isub in range(nsub_allprocs):
+                    fwd_xfer_in[isub][key] = []
+                    fwd_xfer_out[isub][key] = []
+                    rev_xfer_in[isub][key] = []
+                    rev_xfer_out[isub][key] = []
+
+        abs_names_in = self._varx_abs_names['input']
+        abs2meta_in = self._varx_abs2meta['input']
+        allprocs_abs2meta_out = self._varx_allprocs_abs2meta['output']
+        allprocs_abs2idx_in = self._varx_allprocs_abs2idx['input']
+        allprocs_abs2idx_out = self._varx_allprocs_abs2idx['output']
+        allprocs_abs2idx_byset_in = self._varx_allprocs_abs2idx_byset['input']
+        allprocs_abs2idx_byset_out = self._varx_allprocs_abs2idx_byset['output']
+        sizes_byset_in = self._varx_sizes_byset['input']
+        sizes_byset_out = self._varx_sizes_byset['output']
+        set2iset_in = self._varx_set2iset['input']
+        set2iset_out = self._varx_set2iset['output']
+
+        # Loop through all explicit / implicit connections owned by this system
+        for abs_in, abs_out in iteritems(self._conn_abs_in2out):
+            idx_in = allprocs_abs2idx_in[abs_in]
+            idx_out = allprocs_abs2idx_out[abs_out]
+
+            # Only continue if the input exists on this processor
+            if abs_in in abs_names_in:
+
+                # Get meta
+                meta_in = abs2meta_in[abs_in]
+                meta_out = allprocs_abs2meta_out[abs_out]
+
+                # Get varset info
+                set_name_in = meta_in['var_set']
+                set_name_out = meta_out['var_set']
+                iset_in = set2iset_in[set_name_in]
+                iset_out = set2iset_out[set_name_out]
+                idx_byset_in = allprocs_abs2idx_byset_in[abs_in]
+                idx_byset_out = allprocs_abs2idx_byset_out[abs_out]
+
+                # Get the sizes (byset) array
+                sizes_in = sizes_byset_in[set_name_in]
+                sizes_out = sizes_byset_out[set_name_out]
+
+                # Read in and process src_indices
+                shape_in = meta_in['shape']
+                shape_out = meta_out['shape']
+                src_indices = meta_in['src_indices']
+                if src_indices is None:
+                    src_indices = np.arange(np.prod(shape_in), dtype=int)
+                elif src_indices.ndim != 1:
+                    if len(shape_out) == 1:
+                        src_indices = src_indices.flatten()
+                    else:
+                        entries = [list(range(x)) for x in shape_in]
+                        cols = np.vstack(src_indices[i] for i in product(*entries))
+                        dimidxs = [cols[:, i] for i in range(cols.shape[1])]
+                        src_indices = np.ravel_multi_index(dimidxs, shape_out)
+
+                # 1. Compute the output indices
+                output_inds = np.zeros(src_indices.shape[0], int)
+                ind1 = ind2 = 0
+                for iproc in range(self.comm.size):
+                    ind2 += sizes_out[iproc, idx_byset_out]
+
+                    # The part of src on iproc
+                    on_iproc = np.logical_and(ind1 <= src_indices, src_indices < ind2)
+
+                    # This converts from iproc-then-ivar to ivar-then-iproc ordering
+                    # Subtract off part of previous procs
+                    # Then add all variables on previous procs
+                    # Then all previous variables on this proc
+                    # - np.sum(out_sizes[:iproc, idx_byset_out])
+                    # + np.sum(out_sizes[:iproc, :])
+                    # + np.sum(out_sizes[iproc, :idx_byset_out])
+                    # + inds
+                    offset = -ind1
+                    offset += np.sum(sizes_out[:iproc, :])
+                    offset += np.sum(sizes_out[iproc, :idx_byset_out])
+                    output_inds[on_iproc] = src_indices[on_iproc] + offset
+
+                    ind1 += sizes_out[iproc, idx_byset_out]
+
+                # 2. Compute the input indices
+                iproc = self.comm.rank
+                ind1 = ind2 = np.sum(sizes_in[:iproc, :])
+                ind1 += np.sum(sizes_in[iproc, :idx_byset_in])
+                ind2 += np.sum(sizes_in[iproc, :idx_byset_in + 1])
+                input_inds = np.arange(ind1, ind2)
+
+                # Now the indices are ready - input_inds, output_inds
+                key = (set_name_in, set_name_out)
+                xfer_in[key].append(input_inds)
+                xfer_out[key].append(output_inds)
+                if abs_in in abs2isub['input']:
+                    isub = abs2isub['input'][abs_in]
+                    fwd_xfer_in[isub][key].append(input_inds)
+                    fwd_xfer_out[isub][key].append(output_inds)
+                if abs_out in abs2isub['output']:
+                    isub = abs2isub['output'][abs_out]
+                    rev_xfer_in[isub][key].append(input_inds)
+                    rev_xfer_out[isub][key].append(output_inds)
+
+        def merge(indices_list):
+            if len(indices_list) > 0:
+                return np.concatenate(indices_list)
+            else:
+                return np.array([], int)
+
+        for set_name_in in self._varx_set2iset['input']:
+            for set_name_out in self._varx_set2iset['output']:
+                key = (set_name_in, set_name_out)
+                xfer_in[key] = merge(xfer_in[key])
+                xfer_out[key] = merge(xfer_out[key])
+                for isub in range(nsub_allprocs):
+                    fwd_xfer_in[isub][key] = merge(fwd_xfer_in[isub][key])
+                    fwd_xfer_out[isub][key] = merge(fwd_xfer_out[isub][key])
+                    rev_xfer_in[isub][key] = merge(rev_xfer_in[isub][key])
+                    rev_xfer_out[isub][key] = merge(rev_xfer_out[isub][key])
+
+        xfers = self._xfers
+        vecs = self._vecs
+        for vec_name in vecs['output']:
+            transfer_class = vecs['output'][vec_name].TRANSFER
+
+            xfers[vec_name] = {}
+            xfers[vec_name][None] = transfer_class(
+                vecs['input'], vecs['output'], xfer_in, xfer_out, self.comm)
+            for isub in range(nsub_allprocs):
+                xfers[vec_name]['fwd', isub] = transfer_class(
+                    vecs['input'], vecs['output'],
+                    fwd_xfer_in[isub], fwd_xfer_out[isub], self.comm)
+                xfers[vec_name]['rev', isub] = transfer_class(
+                    vecs['input'], vecs['output'],
+                    rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------
