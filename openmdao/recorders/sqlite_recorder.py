@@ -96,8 +96,8 @@ class SqliteRecorder(BaseRecorder):
 
         # self.con = None # sqlite connection
 
-        # might have to do autocommit. Need to investigate
-        self.con = sqlite3.connect(out, detect_types=sqlite3.PARSE_DECLTYPES)
+        # isolation_level=None causes autocommit
+        self.con = sqlite3.connect(out, detect_types=sqlite3.PARSE_DECLTYPES,isolation_level=None)
         # Create the table for iterations for a driver
         # The primary key gets filled in automatically. It can be our "counter" that John wants. It gets incremented by 1
         #   for each write of a record to this table
@@ -402,7 +402,7 @@ class SqliteRecorder(BaseRecorder):
     def close(self):
         """Closes `out`"""
 
-
+        print("closing sqlite_recorder")
         self.con.close() # Not completely sure if it is this simple.
 
         # if self._open_close_sqlitedict:

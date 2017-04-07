@@ -50,7 +50,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.tablename_iterations = 'iterations'
         # self.tablename_derivs = 'derivs'
         self.recorder = SqliteRecorder(self.filename)
-        #print(self.filename)
+        print(self.filename)
         # self.eps = 1e-5
 
     def tearDown(self):
@@ -119,5 +119,8 @@ class TestSqliteRecorder(unittest.TestCase):
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
         assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+
+        from openmdao.recorders.sqlite_reader import SqliteCaseReader
+        scr = SqliteCaseReader(self.filename)
 
 
