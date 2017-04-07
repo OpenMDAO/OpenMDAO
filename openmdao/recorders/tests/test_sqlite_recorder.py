@@ -32,6 +32,8 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDens
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 
+
+
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -80,11 +82,11 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
 
-    def test_simple_paraboloid_upper(self):
+    def test_simple_driver_recording(self):
+        # raise unittest.SkipTest("drivers not implemented yet")
         prob = Problem()
         model = prob.model = Group()
 
-        prob.driver.add_recorder(self.recorder)
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -93,12 +95,17 @@ class TestSqliteRecorder(unittest.TestCase):
 
         model.suppress_solver_output = True
 
-        prob.driver = ScipyOpt()
-        prob.driver.options['method'] = 'slsqp'
+        # prob.driver = ScipyOpt()
+        # prob.driver.options['method'] = 'slsqp'
 
 
         prob.driver = pyOptSparseDriver()
+
+        prob.driver.add_recorder(self.recorder)
+
         prob.driver.options['optimizer'] = OPTIMIZER
+        # prob.driver.options['optimizer'] = 'SLSQP'
+        # # prob.driver.options['optimizer'] = 'CONMIN'
         if OPTIMIZER == 'SLSQP':
             prob.driver.opt_settings['ACC'] = 1e-9
         prob.driver.options['print_results'] = False

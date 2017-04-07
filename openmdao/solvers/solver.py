@@ -171,7 +171,8 @@ class Solver(object):
 
             # The full solver residual/output recording and apply_nonlinear/apply_linear recording probably falls last in terms of priority
 
-            self._rec_mgr.record_iteration(self)
+            metadata = None # TODO_RECORDERS: need to figure out how to do metadata in solvers
+            self._rec_mgr.record_iteration(self, metadata)
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or

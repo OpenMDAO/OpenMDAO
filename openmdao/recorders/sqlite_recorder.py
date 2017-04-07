@@ -178,11 +178,12 @@ class SqliteRecorder(BaseRecorder):
             self.record_iteration_solver(object_requesting_recording, metadata)
 
         else:
-            print ("YOU CAN'T ATTACH A RECORDER TO THIS OBJECT")
+            print ("YOU CAN'T ATTACH A RECORDER TO THIS OBJECT") #TODO_RECORDER is this the right way to handle this
 
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
-{            dtype_tuples = []
+
+        dtype_tuples = []
 
         #We will go through the recording options of Driver to construct the entry to be inserted.
         if self.options['record_desvars']:
@@ -239,7 +240,7 @@ class SqliteRecorder(BaseRecorder):
         # Write this mega array to the database
         self.con.execute("INSERT INTO driver_iterations(iteration_coordinate,driver_values) VALUES(?,?)",
              ("foobar1/1", driver_values))
-}
+
     def record_iteration_system(self, object_requesting_recording, metadata):
         # Record an iteration from a System
         if isinstance(object_requesting_recording, System):
@@ -270,7 +271,7 @@ class SqliteRecorder(BaseRecorder):
                     tple = ('derivative.' + name, '({},)f8'.format(len(value)))
                     dtype_tuples.append(tple)
 
-            print("DTYPE_TUPLES: ", dtype_tuples)
+            # print("DTYPE_TUPLES: ", dtype_tuples)
 
             # Create the mega array that we will write to the database
             # All of this needs to be looked into to be optimized !!
