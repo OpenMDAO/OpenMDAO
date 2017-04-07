@@ -147,6 +147,8 @@ class System(object):
         dict of all driver design vars added to the system.
     _responses : dict of namedtuple
         dict of all driver responses added to the system.
+    _rec_mgr : list of recorders
+        list of recorders that have been added to this system.
 
     """
 
@@ -164,8 +166,6 @@ class System(object):
         self.comm = None
         self.metadata = GeneralizedDictionary()
         self.metadata.update(kwargs)
-
-        self.rec_mgr = RecordingManager()
 
         self._assembler = None
 
@@ -1513,15 +1513,17 @@ class System(object):
             self._apply_nonlinear()
 
         # TODO_RECORDERS
-        #   Systems, no matter the type, should be able to save inputs, outputs, and 
-        #       residuals (System._vectors['inputs']['nonlinear'], etc.) after _apply_nonlinear and _solve_nonlinear calls
+        #   Systems, no matter the type, should be able to save inputs, outputs, and
+        #       residuals (System._vectors['inputs']['nonlinear'], etc.) after _apply_nonlinear and
+        # _solve_nonlinear calls
 
-        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
+        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also
+        #  make it work generally with any type of system at this point).
 
         # TODO_RECORDERS
-        metadata = None # ??? Is this correct?
+        metadata = None  # ??? Is this correct?
         self._rec_mgr.record_iteration(self, metadata)
-            
+
     def run_solve_nonlinear(self):
         """
         Compute outputs.
@@ -1541,12 +1543,14 @@ class System(object):
             result = self._solve_nonlinear()
 
         # TODO_RECORDERS
-        #   Systems, no matter the type, should be able to save inputs, outputs, and 
-        #       residuals (System._vectors['inputs']['nonlinear'], etc.) after _apply_nonlinear and _solve_nonlinear calls
-        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
+        # Systems, no matter the type, should be able to save inputs, outputs, and
+        # residuals (System._vectors['inputs']['nonlinear'], etc.) after _apply_nonlinear &
+        # solve_nonlinear calls.  component-level solve_nonlinear and solve_linear recording
+        # (wouldn't hurt to also make it work generally with any
+        # type of system at this point).
 
         # TODO_RECORDERS
-        metadata = None # ??? Is this correct?
+        metadata = None  # ??? Is this correct?
         self._rec_mgr.record_iteration(self, metadata)
 
         return result
@@ -1571,16 +1575,16 @@ class System(object):
             self._apply_linear(vec_names, mode, var_inds)
 
         # TODO_RECORDERS
-        #  The _apply_linear and _solve_linear methods work with d_inputs, d_outputs, and d_residuals, 
-        #       each one is associated with a vecname. 
-        #  These would be (System._vectors['inputs'][vec_name], etc.). In terms of the list of vec_names, 
+        #  The _apply_linear and _solve_linear methods work w d_inputs, d_outputs, and d_residuals,
+        #       each one is associated with a vecname.
+        #  These would be (System._vectors['inputs'][vec_name], etc.). In the list of vec_names,
         #     there is always a 'linear', and depending on the problem, there may be others.
-        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
- 
-        # TODO_RECORDERS
-        metadata = None # ??? Is this correct?
-        self._rec_mgr.record_iteration(self, metadata)
+        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to make it work
+        # generally with any type of system at this point).
 
+        # TODO_RECORDERS
+        metadata = None  # ??? Is this correct?
+        self._rec_mgr.record_iteration(self, metadata)
 
     def run_solve_linear(self, vec_names, mode):
         """
@@ -1608,16 +1612,18 @@ class System(object):
             result = self._solve_linear(vec_names, mode)
 
         # TODO_RECORDERS
-        #  The _apply_linear and _solve_linear methods work with d_inputs, d_outputs, and d_residuals,
-        #       each one is associated with a vecname. 
-        #  These would be (System._vectors['inputs'][vec_name], etc.). In terms of the list of vec_names, 
-        #     there is always a 'linear', and depending on the problem, there may be others.
-        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also make it work generally with any type of system at this point). 
+        #  The _apply_linear and _solve_linear methods work with
+        #  d_inputs, d_outputs, and d_residuals,
+        #  each one is associated with a vecname.
+        #  These would be (System._vectors['inputs'][vec_name], etc.). In terms of the list of
+        #  vec_names, there is always a 'linear', and depending on the problem, there may be others
+        # component-level solve_nonlinear and solve_linear recording
+        # (wouldn't hurt to also make it work generally with any type of system at this point).
 
         # TODO_RECORDERS
-        metadata = None # ??? Is this correct?
+        metadata = None  # ??? Is this correct?
         self._rec_mgr.record_iteration(self, metadata)
-        
+
         return result
 
     def run_linearize(self, do_nl=True, do_ln=True):
@@ -1748,12 +1754,11 @@ class System(object):
 
     def add_recorder(self, recorder):
         """
-        Adds a recorder to the driver.
+        Add a recorder to the driver.
 
-        Args
-        ----
+        Parameters
+        ----------
         recorder : BaseRecorder
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
-        return recorder

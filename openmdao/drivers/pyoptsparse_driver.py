@@ -314,21 +314,7 @@ class pyOptSparseDriver(Driver):
             val = dv_dict[name]
             self.set_design_var(name, val)
 
-
-
-
-
-
-
-
         model._solve_nonlinear()
-
-
-
-
-
-
-
 
         # Save the most recent solution.
         self.pyopt_solution = sol
@@ -389,7 +375,6 @@ class pyOptSparseDriver(Driver):
             # Record after getting obj and constraint to assure they have
             # been gathered in MPI.
             self._rec_mgr.record_iteration(self, metadata)
-
 
         except Exception as msg:
             tb = traceback.format_exc()

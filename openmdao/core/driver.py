@@ -6,8 +6,8 @@ from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, update_local_meta
 from openmdao.recorders.recording_manager import RecordingManager
 
-
 import numpy as np
+
 
 class Driver(object):
     """
@@ -31,13 +31,18 @@ class Driver(object):
         Contains all objective info.
     _responses : dict
         Contains all response info.
+    _rec_mgr : list of recorders
+        list of recorders that have been added to this system.
+    iter_count : int
+        keep track of iterations for case recording
+    metadata : list
+        list of metadata
     """
 
     def __init__(self):
         """
         Initialize the driver.
         """
-
         self._rec_mgr = RecordingManager()
 
         self._problem = None
@@ -71,18 +76,19 @@ class Driver(object):
 
     def add_recorder(self, recorder):
         """
-        Adds a recorder to the driver.
+        Add a recorder to the driver.
 
-        Args
-        ----
+        Parameters
+        ----------
         recorder : BaseRecorder
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
-        return recorder
 
     def cleanup(self):
-        """ Clean up resources prior to exit. """
+        """
+        Clean up resources prior to exit.
+        """
         self._rec_mgr.close()
 
     def _setup_driver(self, problem):
@@ -106,7 +112,6 @@ class Driver(object):
         self._objs = model.get_objectives(recurse=True)
         self._cons = model.get_constraints(recurse=True)
         self._rec_mgr.startup()
-
 
     def get_design_var_values(self):
         """
@@ -261,28 +266,13 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-
         # Metadata Setup
         self.iter_count += 1
         metadata = self.metadata = create_local_meta(None, 'Driver')
         # system.ln_solver.local_meta = metadata  # TODO_RECORDER - is this needed?
         update_local_meta(metadata, (self.iter_count,))
 
-
         failure_flag = self._problem.model._solve_nonlinear()
-
-        # TODO_RECORDERS: do the equivalent to this
-        #         self.rec_mgr.record_iteration(system, metadata)
-
-        # need to record these :
-
-        #     design_vars
-        #     response
-        #     objectives
-        #     constraints
-
-        # We would definitely need driver recording (dvs, responses, ...), and optionally recording of state values in each optimization iteration
-
         self._rec_mgr.record_iteration(self, metadata)
 
         return failure_flag

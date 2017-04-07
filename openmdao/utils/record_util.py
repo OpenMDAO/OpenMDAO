@@ -1,31 +1,28 @@
-""" Utility functions related to recording or execution metadata. """
+"""
+Utility functions related to recording or execution metadata.
+"""
 from six.moves import map, zip
-
 import os
 
-# TODO_RECORDER: restore this when doing MPI
-# from openmdao.core.mpi_wrap import MPI
 
 def create_local_meta(metadata, name):
     """
-    Creates the metadata dictionary for this level of execution.
+    Create the metadata dictionary for this level of execution.
 
-    Args
-    ----
+    Parameters
+    ----------
     metadata : dict
         Dictionary containing the metadata passed from the parent level.
 
     name : str
         String to describe the current level of execution.
+
+    Returns
+    -------
+    local_meta : dict
+        Dictionary containing the metadata
     """
-    # TODO_RECORDER: restore this when doing MPI
-    # if MPI:
-    #     rank = MPI.COMM_WORLD.rank
-    # else:
-    #     rank = 0
-
     rank = 0
-
 
     # Create new metadata if parent's isn't available
     if metadata is None:
@@ -47,17 +44,15 @@ def create_local_meta(metadata, name):
 
     return local_meta
 
+
 def update_local_meta(local_meta, iteration):
     """
-    Updates the local metadata dictionary to prepare for a new iteration.
+    Update the local metadata dictionary to prepare for a new iteration.
 
-    Args
-    ----
+    Parameters
+    ----------
     local_meta : dict
         Dictionary containing the execution metadata at the current level.
-
-    parent : list
-        List containing the parent iteration coordinate.
 
     iteration : tuple(int)
         Tuple of integers representing the current iteration and any sub-iterations.
@@ -72,16 +67,21 @@ def update_local_meta(local_meta, iteration):
 
     iter_coord[-1] = iteration
 
+
 def format_iteration_coordinate(coord):
     """
-    Formats the iteration coordinate to a human-readable string.
+    Format the iteration coordinate to a human-readable string.
 
-    Args
-    ----
+    Parameters
+    ----------
     coord : list
         List containing the iteration coordinate.
-    """
 
+    Returns
+    -------
+    str :
+        iteration coordinate converted to a string
+    """
     separator = '|'
     iteration_number_separator = '-'
 
@@ -93,19 +93,21 @@ def format_iteration_coordinate(coord):
         coord_str = iteration_number_separator.join(iter_str)
         iteration_coordinate.append(coord_str)
 
-    return ':'.join(["rank%d"%coord[0], separator.join(iteration_coordinate)])
+    return ':'.join(["rank%d" % coord[0], separator.join(iteration_coordinate)])
+
 
 def is_valid_sqlite3_db(filename):
-    """ Returns true if the given filename
-    contains a valid SQLite3 database file.
+    """
+    Return true if the given filename contains a valid SQLite3 database file.
 
-    Args
+    Parameters
     ----------
     filename : str
         The path to the file to be tested
 
     Returns
     -------
+    bool :
         True if the filename specifies a valid SQlite3 database.
 
     """
@@ -119,4 +121,3 @@ def is_valid_sqlite3_db(filename):
         header = fd.read(100)
 
     return header[:16] == b'SQLite format 3\x00'
-
