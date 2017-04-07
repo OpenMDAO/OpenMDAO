@@ -289,6 +289,7 @@ class System(object):
         self._setupx_var_data()
         self._setupx_var_index_maps()
         self._setupx_var_sizes()
+        self._setupx_global_connections()
         self._setupx_connections()
         self._setupx_global(*self._get_initial_global())
         self._setupx_vectors(*self._get_root_vectors(['nonlinear', 'linear'], vector_class))
@@ -348,9 +349,11 @@ class System(object):
         self._varx_sizes = {'input': None, 'output': None}
         self._varx_sizes_byset = {'input': {}, 'output': {}}
 
+    def _setupx_global_connections(self):
+        self._conn_global_abs_in2out = {}
+
     def _setupx_connections(self):
         self._conn_abs_in2out = {}
-        self._conn_global_abs_in2out = {}
 
     def _setupx_partials(self):
         self._subjacs_info = {}

@@ -329,9 +329,8 @@ class Group(System):
                     self.comm.Allgather(
                         sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
 
-    def _setupx_connections(self):
-        super(Group, self)._setupx_connections()
-        abs_in2out = self._conn_abs_in2out
+    def _setupx_global_connections(self):
+        super(Group, self)._setupx_global_connections()
         global_abs_in2out = self._conn_global_abs_in2out
 
         allprocs_prom2abs_list_in = self._varx_allprocs_prom2abs_list['input']
@@ -340,19 +339,26 @@ class Group(System):
 
         # Recursion
         for subsys in self._subsystems_myproc:
-            subsys._setupx_connections()
+            subsys._setupx_global_connections()
 
-        # Add implicit connections
+        abs_in2out = {}
+
+        if self.pathname == '':
+            path_len = 0
+        else:
+            path_len = len(self.pathname) + 1
+
+        # Add implicit connections (only ones owned by this group)
         for prom_name in allprocs_prom2abs_list_out:
             if prom_name in allprocs_prom2abs_list_in:
                 abs_out = allprocs_prom2abs_list_out[prom_name][0]
-                out_subsys = abs_out.rsplit('.', 1)[0]
+                out_subsys = abs_out[path_len:].split('.', 1)[0]
                 for abs_in in allprocs_prom2abs_list_in[prom_name]:
-                    in_subsys = abs_in.rsplit('.', 1)[0]
+                    in_subsys = abs_in[path_len:].split('.', 1)[0]
                     if out_subsys != in_subsys:
                         abs_in2out[abs_in] = abs_out
 
-        # Add explicit connections
+        # Add explicit connections (only ones declared by this group)
         for prom_in, (prom_out, src_indices) in iteritems(self._manual_connections):
 
             # throw an exception if either output or input doesn't exist
@@ -391,7 +397,10 @@ class Group(System):
 
                 abs_in2out[abs_in] = abs_out
 
-        # Now that both implicit & explicit connections have been added, check unit compatibility
+        # Now that both implicit & explicit connections have been added,
+        # check unit compatibility, but only for connections that are either
+        # owned by (implicit) or declared by (explicit) this Group.
+        # This way, we don't repeat the error checking in multiple groups
         allprocs_abs2meta_out = self._varx_allprocs_abs2meta['output']
         allprocs_abs2meta_in = self._varx_allprocs_abs2meta['input']
         for abs_in, abs_out in iteritems(abs_in2out):
@@ -413,7 +422,8 @@ class Group(System):
                               "connected to output '%s' which has "
                               "no units." % (abs_in, in_units, abs_out))
 
-        # Compute global_abs_in2out
+        # Compute global_abs_in2out by first adding this group's contributions,
+        # then adding contributions from subsystems, then allgathering.
         global_abs_in2out.update(abs_in2out)
         for subsys in self._subsystems_myproc:
             global_abs_in2out.update(subsys._conn_global_abs_in2out)
@@ -428,6 +438,34 @@ class Group(System):
 
             for myproc_global_abs_in2out in gathered:
                 global_abs_in2out.update(myproc_global_abs_in2out)
+
+    def _setupx_connections(self):
+        super(Group, self)._setupx_connections()
+        abs_in2out = self._conn_abs_in2out
+
+        global_abs_in2out = self._conn_global_abs_in2out
+        abs_names_in = self._varx_allprocs_abs_names['input']
+        abs_names_out = self._varx_allprocs_abs_names['output']
+        pathname = self.pathname
+
+        # Recursion
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_connections()
+
+        if pathname == '':
+            path_len = 0
+        else:
+            path_len = len(pathname) + 1
+
+        for abs_in, abs_out in iteritems(global_abs_in2out):
+            # First, check that this system owns both the input and output.
+            if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
+
+                # Second, check that they are in different subsystems of this system.
+                out_subsys = abs_out[path_len:].split('.', 1)[0]
+                in_subsys = abs_in[path_len:].split('.', 1)[0]
+                if out_subsys != in_subsys:
+                    abs_in2out[abs_in] = abs_out
 
     def _setupx_partials(self):
         super(Group, self)._setupx_partials()

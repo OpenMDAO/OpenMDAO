@@ -289,6 +289,28 @@ class Problem(object):
                 assert equal_arrays(
                     model._assembler._var_sizes_by_set[type_][iset],
                     model._varx_sizes_byset[type_][set_name])
+                assert len(model._vectors[type_]['nonlinear']._data[iset]) \
+                    == len(model._vecs[type_]['nonlinear']._data[set_name])
+
+        if len(model._subsystems_allprocs) > 0:
+            transfers = model._vector_transfers['nonlinear'][None]
+            xfers = model._xfers['nonlinear'][None]
+            for set_name_in in model._varx_set2iset['input']:
+                iset_in = model._varx_set2iset['input'][set_name_in]
+
+                for set_name_out in model._varx_set2iset['output']:
+                    iset_out = model._varx_set2iset['output'][set_name_out]
+
+                    key1 = (iset_in, iset_out)
+                    key2 = (set_name_in, set_name_out)
+
+                    if key1 in transfers._in_inds:
+                        assert np.all(
+                            np.sort(transfers._in_inds[key1])
+                            == np.sort(xfers._in_inds[key2]))
+                        assert np.all(
+                            np.sort(transfers._out_inds[key1])
+                            == np.sort(xfers._out_inds[key2]))
 
         return self
 
