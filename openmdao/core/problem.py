@@ -407,7 +407,7 @@ class Problem(object):
         for system in model.system_iter(recurse=True, typ=DepComponent):
             system._first_setup = True
 
-        self.setupx()
+        self.setupx(vector_class, mode)
 
         return self
 

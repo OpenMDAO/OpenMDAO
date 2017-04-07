@@ -678,13 +678,14 @@ class Group(System):
 
             xfers[vec_name] = {}
             xfers[vec_name][None] = transfer_class(
-                vecs['input'], vecs['output'], xfer_in, xfer_out, self.comm)
+                vecs['input'][vec_name], vecs['output'][vec_name],
+                xfer_in, xfer_out, self.comm)
             for isub in range(nsub_allprocs):
                 xfers[vec_name]['fwd', isub] = transfer_class(
-                    vecs['input'], vecs['output'],
+                    vecs['input'][vec_name], vecs['output'][vec_name],
                     fwd_xfer_in[isub], fwd_xfer_out[isub], self.comm)
                 xfers[vec_name]['rev', isub] = transfer_class(
-                    vecs['input'], vecs['output'],
+                    vecs['input'][vec_name], vecs['output'][vec_name],
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
 
     # End of reconfigurability changes

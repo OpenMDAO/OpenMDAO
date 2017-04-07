@@ -26,16 +26,19 @@ class PETScTransferX(DefaultTransferX):
         in_inds = self._in_inds
         out_inds = self._out_inds
 
-        for key in self._in_inds:
-            if len(self._in_inds[key]) > 0:
+        for key in in_inds:
+            if len(in_inds[key]) > 0:
                 in_set_name, out_set_name = key
+
                 in_indexset = PETSc.IS().createGeneral(
                     np.array(in_inds[key], 'i'), comm=self._comm)
                 out_indexset = PETSc.IS().createGeneral(
                     np.array(out_inds[key], 'i'), comm=self._comm)
-                in_petsc = in_vec._vector._petsc[in_set_name]
-                out_petsc = out_vec._vector._petsc[out_set_name]
+
+                in_petsc = self._in_vec._petsc[in_set_name]
+                out_petsc = self._out_vec._petsc[out_set_name]
                 transfer = PETSc.Scatter().create(out_petsc, out_indexset, in_petsc, in_indexset)
+
                 transfers[key] = transfer
 
     def __call__(self, in_vec, out_vec, mode='fwd'):
