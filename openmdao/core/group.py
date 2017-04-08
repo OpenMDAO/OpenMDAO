@@ -702,6 +702,12 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._setupx_scaling(root_vectors)
 
+    def _setupx_solvers(self):
+        super(Group, self)._setupx_solvers()
+
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_solvers()
+
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------
     #

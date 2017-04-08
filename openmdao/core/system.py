@@ -319,6 +319,7 @@ class System(object):
         self._setupx_transfers()
         self._setupx_bounds(*self._get_bounds_root_vectors(vector_class))
         self._setupx_scaling(self._get_scaling_root_vectors(vec_names, vector_class))
+        self._setupx_solvers()
 
     def _setupx_procs(self, pathname, comm, proc_range):
         self.pathname = pathname
@@ -489,6 +490,12 @@ class System(object):
                             dimidxs = [cols[:, i] for i in range(cols.shape[1])]
                             src_indices = np.ravel_multi_index(dimidxs, shape_out)
                             vecs[key][vec_name]._views[abs_in][:] = ref[src_indices]
+
+    def _setupx_solvers(self):
+        if self._nl_solver is not None:
+            self._nl_solver._setup_solvers(self, 0)
+        if self._ln_solver is not None:
+            self._ln_solver._setup_solvers(self, 0)
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------
