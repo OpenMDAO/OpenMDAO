@@ -690,14 +690,17 @@ class Group(System):
                     vecs['input'][vec_name], vecs['output'][vec_name],
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
 
-            # if vec_name is 'nonlinear':
-            #     self._transfers = xfers['nonlinear']
-
     def _setupx_bounds(self, root_lower, root_upper):
         super(Group, self)._setupx_bounds(root_lower, root_upper)
 
         for subsys in self._subsystems_myproc:
             subsys._setupx_bounds(root_lower, root_upper)
+
+    def _setupx_scaling(self, root_vectors):
+        super(Group, self)._setupx_scaling(root_vectors)
+
+        for subsys in self._subsystems_myproc:
+            subsys._setupx_scaling(root_vectors)
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------

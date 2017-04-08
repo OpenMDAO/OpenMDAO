@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from collections import namedtuple, OrderedDict, Iterable
 from fnmatch import fnmatchcase
 import sys
+from itertools import product
 
 from six import iteritems, string_types
 from six.moves import range
@@ -275,6 +276,21 @@ class System(object):
         upper = vector_class('upper', 'output', self)
         return lower, upper
 
+    def _get_scaling_root_vectors(self, vec_names, vector_class):
+        root_vectors = {
+            ('input', 'ref0'): {}, ('input', 'ref'): {},
+            ('output', 'ref0'): {}, ('output', 'ref'): {},
+            ('residual', 'ref'): {}}
+
+        for key in root_vectors:
+            vec_key, ref_key = key
+            type_ = 'output' if vec_key == 'residual' else vec_key
+
+            for vec_name in vec_names:
+                root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
+
+        return root_vectors
+
     def _setupx(self, comm, vector_class):
         # TEMPORARY: this is meant to only be here during the transition to reconfigurability
         from openmdao.vectors.default_vector import DefaultVector, DefaultVectorX
@@ -302,6 +318,7 @@ class System(object):
         self._setupx_vectors(self._get_root_vectors(vec_names, vector_class))
         self._setupx_transfers()
         self._setupx_bounds(*self._get_bounds_root_vectors(vector_class))
+        self._setupx_scaling(self._get_scaling_root_vectors(vec_names, vector_class))
 
     def _setupx_procs(self, pathname, comm, proc_range):
         self.pathname = pathname
@@ -397,10 +414,7 @@ class System(object):
         self._lower_boundsx = lower = vector_class('lower', 'output', self, root_lower)
         self._upper_boundsx = upper = vector_class('upper', 'output', self, root_upper)
 
-        abs2meta_out = self._varx_abs2meta['output']
-
-        for abs_name in self._varx_abs_names['output']:
-            meta = abs2meta_out[abs_name]
+        for abs_name, meta in iteritems(self._varx_abs2meta['output']):
             shape = meta['shape']
             ref0 = meta['ref0']
             ref = meta['ref']
@@ -421,6 +435,60 @@ class System(object):
                 upper._views[abs_name][:] = np.inf
             else:
                 upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
+
+    def _setupx_scaling(self, root_vectors):
+        self._scaling_vecs = vecs = {
+            ('input', 'ref0'): {}, ('input', 'ref'): {},
+            ('output', 'ref0'): {}, ('output', 'ref'): {},
+            ('residual', 'ref'): {}}
+
+        allprocs_abs2meta_out = self._varx_allprocs_abs2meta['output']
+        abs2meta_in = self._varx_abs2meta['input']
+
+        for vec_name in root_vectors['residual', 'ref']:
+            vector_class = root_vectors['residual', 'ref'][vec_name].__class__
+
+            for key in [('output', 'ref0'), ('output', 'ref'), ('residual', 'ref')]:
+                vec_key, ref_key = key
+                type_ = 'output' if vec_key == 'residual' else vec_key
+
+                vecs[key][vec_name] = vector_class(
+                    vec_name, type_, self, root_vectors[key][vec_name])
+
+                for abs_name, meta in iteritems(self._varx_abs2meta['output']):
+                    shape = meta['shape']
+                    ref = meta[ref_key]
+                    if np.isscalar(ref):
+                        vecs[key][vec_name]._views[abs_name][:] = ref
+                    else:
+                        vecs[key][vec_name]._views[abs_name][:] = ref.reshape(shape)
+
+            for ref_key in ['ref0', 'ref']:
+                key = ('input', ref_key)
+
+                vecs[key][vec_name] = vector_class(
+                    vec_name, 'input', self, root_vectors[key][vec_name])
+
+                for abs_in, abs_out in iteritems(self._conn_abs_in2out):
+                    if abs_in in abs2meta_in:
+                        meta_in = abs2meta_in[abs_in]
+                        meta_out = allprocs_abs2meta_out[abs_out]
+
+                        ref = meta_out[ref_key]
+                        shape_out = meta_out['shape']
+                        src_indices = meta_in['src_indices']
+                        shape_in = meta_in['shape']
+
+                        if np.isscalar(ref):
+                            vecs[key][vec_name]._views[abs_in][:] = ref
+                        elif src_indices is None:
+                            vecs[key][vec_name]._views[abs_in][:] = ref.reshape(shape_in)
+                        else:
+                            entries = [list(range(x)) for x in shape_in]
+                            cols = np.vstack(src_indices[i] for i in product(*entries))
+                            dimidxs = [cols[:, i] for i in range(cols.shape[1])]
+                            src_indices = np.ravel_multi_index(dimidxs, shape_out)
+                            vecs[key][vec_name]._views[abs_in][:] = ref[src_indices]
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------
