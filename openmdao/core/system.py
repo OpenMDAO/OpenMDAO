@@ -270,6 +270,11 @@ class System(object):
 
         return root_vectors
 
+    def _get_bounds_root_vectors(self, vector_class):
+        lower = vector_class('lower', 'output', self)
+        upper = vector_class('upper', 'output', self)
+        return lower, upper
+
     def _setupx(self, comm, vector_class):
         # TEMPORARY: this is meant to only be here during the transition to reconfigurability
         from openmdao.vectors.default_vector import DefaultVector, DefaultVectorX
@@ -296,6 +301,7 @@ class System(object):
         self._setupx_global(*self._get_initial_global())
         self._setupx_vectors(self._get_root_vectors(vec_names, vector_class))
         self._setupx_transfers()
+        self._setupx_bounds(*self._get_bounds_root_vectors(vector_class))
 
     def _setupx_procs(self, pathname, comm, proc_range):
         self.pathname = pathname
@@ -369,16 +375,41 @@ class System(object):
     def _setupx_vectors(self, root_vectors):
         self._vecs = vecs = {'input': {}, 'output': {}, 'residual': {}}
 
-        for key in ['input', 'output', 'residual']:
-            type_ = 'output' if key is 'residual' else key
-            for vec_name in root_vectors[key]:
-                vector_class = root_vectors[key][vec_name].__class__
+        for vec_name in root_vectors['output']:
+            vector_class = root_vectors['output'][vec_name].__class__
+
+            for key in ['input', 'output', 'residual']:
+                type_ = 'output' if key is 'residual' else key
 
                 vecs[key][vec_name] = vector_class(
                     vec_name, type_, self, root_vectors[key][vec_name])
 
+            # if vec_name is 'nonlinear':
+            #     self._inputs = vecs['input']['nonlinear']
+            #     self._outputs = vecs['output']['nonlinear']
+            #     self._residuals = vecs['residuals']['nonlinear']
+
     def _setupx_transfers(self):
         self._xfers = {}
+
+    def _setupx_bounds(self, root_vector_lower, root_vector_upper):
+        self._lower_boundsx = None
+        self._upper_boundsx = None
+
+        abs2meta_out = self._varx_abs2meta['output']
+        vector_class = root_vector_lower.__class__
+
+        lower = vector_class('lower', 'output', self, root_vector_lower)
+        upper = vector_class('upper', 'output', self, root_vector_upper)
+
+        for abs_name in self._varx_abs_names['output']:
+            meta = abs2meta_out[abs_name]
+
+            lower._views[abs_name][:] = meta['lower']
+            upper._views[abs_name][:] = meta['upper']
+
+        self._lower_boundsx = lower
+        self._upper_boundsx = upper
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------
