@@ -691,11 +691,11 @@ class Group(System):
             # if vec_name is 'nonlinear':
             #     self._transfers = xfers['nonlinear']
 
-    def _setupx_bounds(self, root_vector_lower, root_vector_upper):
-        super(Group, self)._setupx_bounds(root_vector_lower, root_vector_upper)
+    def _setupx_bounds(self, root_lower, root_upper):
+        super(Group, self)._setupx_bounds(root_lower, root_upper)
 
         for subsys in self._subsystems_myproc:
-            subsys._setupx_bounds(root_vector_lower, root_vector_upper)
+            subsys._setupx_bounds(root_lower, root_upper)
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------

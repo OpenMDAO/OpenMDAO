@@ -392,24 +392,35 @@ class System(object):
     def _setupx_transfers(self):
         self._xfers = {}
 
-    def _setupx_bounds(self, root_vector_lower, root_vector_upper):
-        self._lower_boundsx = None
-        self._upper_boundsx = None
+    def _setupx_bounds(self, root_lower, root_upper):
+        vector_class = root_lower.__class__
+        self._lower_boundsx = lower = vector_class('lower', 'output', self, root_lower)
+        self._upper_boundsx = upper = vector_class('upper', 'output', self, root_upper)
 
         abs2meta_out = self._varx_abs2meta['output']
-        vector_class = root_vector_lower.__class__
-
-        lower = vector_class('lower', 'output', self, root_vector_lower)
-        upper = vector_class('upper', 'output', self, root_vector_upper)
 
         for abs_name in self._varx_abs_names['output']:
             meta = abs2meta_out[abs_name]
+            shape = meta['shape']
+            ref0 = meta['ref0']
+            ref = meta['ref']
+            var_lower = meta['lower']
+            var_upper = meta['upper']
 
-            lower._views[abs_name][:] = meta['lower']
-            upper._views[abs_name][:] = meta['upper']
+            if not np.isscalar(ref0):
+                ref0 = ref0.reshape(shape)
+            if not np.isscalar(ref):
+                ref = ref.reshape(shape)
 
-        self._lower_boundsx = lower
-        self._upper_boundsx = upper
+            if var_lower is None:
+                lower._views[abs_name][:] = -np.inf
+            else:
+                lower._views[abs_name][:] = (var_lower - ref0) / (ref - ref0)
+
+            if var_upper is None:
+                upper._views[abs_name][:] = np.inf
+            else:
+                upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------

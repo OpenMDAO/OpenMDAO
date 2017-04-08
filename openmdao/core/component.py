@@ -347,16 +347,18 @@ class Component(System):
             raise TypeError('The name argument should be a string')
         if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
             raise TypeError('The val argument should be a float, list, tuple, or ndarray')
+        if not np.isscalar(ref) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+            raise TypeError('The ref argument should be a float, list, tuple, or ndarray')
+        if not np.isscalar(ref0) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+            raise TypeError('The ref0 argument should be a float, list, tuple, or ndarray')
+        if not np.isscalar(res_ref) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+            raise TypeError('The res_ref argument should be a float, list, tuple, or ndarray')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
         if units is not None and not isinstance(units, str):
             raise TypeError('The units argument should be a str or None')
         if res_units is not None and not isinstance(res_units, str):
             raise TypeError('The res_units argument should be a str or None')
-        if lower is not None:
-            lower = format_as_float_or_array('lower', lower)
-        if upper is not None:
-            upper = format_as_float_or_array('upper', upper)
 
         # Check that units are valid
         if units is not None and not valid_units(units):
@@ -374,13 +376,11 @@ class Component(System):
         # desc: taken as is
         metadata['desc'] = desc
 
-        # lower, upper: check the shape if necessary
-        if lower is not None and not np.isscalar(lower) and \
-                np.atleast_1d(lower).shape != metadata['shape']:
-            raise ValueError('The lower argument has the wrong shape')
-        if upper is not None and not np.isscalar(upper) and \
-                np.atleast_1d(upper).shape != metadata['shape']:
-            raise ValueError('The upper argument has the wrong shape')
+        if lower is not None:
+            lower = ensure_compatible(name, lower, metadata['shape'])[0]
+        if upper is not None:
+            upper = ensure_compatible(name, upper, metadata['shape'])[0]
+
         metadata['lower'] = lower
         metadata['upper'] = upper
 
