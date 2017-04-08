@@ -293,8 +293,8 @@ class Problem(object):
                     == len(model._vecs[type_]['nonlinear']._data[set_name])
 
         if len(model._subsystems_allprocs) > 0:
-            transfers = model._vector_transfers['nonlinear'][None]
-            xfers = model._xfers['nonlinear'][None]
+            transfers = model._vector_transfers['nonlinear']['fwd', None]
+            xfers = model._xfers['nonlinear']['fwd', None]
             for set_name_in in model._varx_set2iset['input']:
                 iset_in = model._varx_set2iset['input'][set_name_in]
 

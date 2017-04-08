@@ -677,9 +677,11 @@ class Group(System):
             transfer_class = vecs['output'][vec_name].TRANSFER
 
             xfers[vec_name] = {}
-            xfers[vec_name][None] = transfer_class(
+            xfer_all = transfer_class(
                 vecs['input'][vec_name], vecs['output'][vec_name],
                 xfer_in, xfer_out, self.comm)
+            xfers[vec_name]['fwd', None] = xfer_all
+            xfers[vec_name]['rev', None] = xfer_all
             for isub in range(nsub_allprocs):
                 xfers[vec_name]['fwd', isub] = transfer_class(
                     vecs['input'][vec_name], vecs['output'][vec_name],
@@ -1199,7 +1201,7 @@ class Group(System):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        self._transfers[None](self._inputs, self._outputs, 'fwd')
+        self._transfer('nonlinear', 'fwd')
         # Apply recursion
         for subsys in self._subsystems_myproc:
             subsys._apply_nonlinear()
@@ -1244,20 +1246,14 @@ class Group(System):
             else:
                 if mode == 'fwd':
                     for vec_name in vec_names:
-                        d_inputs = self._vectors['input'][vec_name]
-                        d_outputs = self._vectors['output'][vec_name]
-                        self._vector_transfers[vec_name][None](
-                            d_inputs, d_outputs, mode)
+                        self._transfer(vec_name, mode)
 
                 for subsys in self._subsystems_myproc:
                     subsys._apply_linear(vec_names, mode, var_inds)
 
                 if mode == 'rev':
                     for vec_name in vec_names:
-                        d_inputs = self._vectors['input'][vec_name]
-                        d_outputs = self._vectors['output'][vec_name]
-                        self._vector_transfers[vec_name][None](
-                            d_inputs, d_outputs, mode)
+                        self._transfer(vec_name, mode)
 
     def _solve_linear(self, vec_names, mode):
         """

@@ -23,10 +23,7 @@ class LinearBlockGS(BlockLinearSolver):
             for ind, subsys in enumerate(system._subsystems_myproc):
                 isub = system._subsystems_myproc_inds[ind]
                 for vec_name in vec_names:
-                    d_inputs = system._vectors['input'][vec_name]
-                    d_outputs = system._vectors['output'][vec_name]
-                    system._vector_transfers[vec_name][mode, isub](
-                        d_inputs, d_outputs, mode)
+                    system._transfer(vec_name, mode, isub)
                 var_inds = [
                     system._var_allprocs_idx_range['output'][0],
                     subsys._var_allprocs_idx_range['output'][0],
@@ -47,12 +44,9 @@ class LinearBlockGS(BlockLinearSolver):
                 isub = subinds[revidx]
                 subsys = subsystems[isub]
                 for vec_name in vec_names:
-                    d_inputs = system._vectors['input'][vec_name]
-                    d_outputs = system._vectors['output'][vec_name]
                     b_vec = system._vectors['output'][vec_name]
                     b_vec.set_const(0.0)
-                    system._vector_transfers[vec_name][mode, isub](
-                        d_inputs, d_outputs, mode)
+                    system._transfer(vec_name, mode, isub)
                     b_vec *= -1.0
                     b_vec += self._rhs_vecs[vec_name]
                 subsys._solve_linear(vec_names, mode)

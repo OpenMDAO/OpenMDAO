@@ -427,6 +427,24 @@ class System(object):
     #
     #
 
+    def _transfer(self, vec_name, mode, isub=None):
+        """
+        Perform a vector transfer.
+
+        Parameters
+        ----------
+        vec_name : str
+            Name of the vector RHS on which to perform a transfer.
+        mode : str
+            Either 'fwd' or 'rev'
+        isub : None or int
+            If None, perform a full transfer.
+            If int, perform a partial transfer for linear Gauss--Seidel.
+        """
+        vec_inputs = self._vectors['input'][vec_name]
+        vec_outputs = self._vectors['output'][vec_name]
+        self._vector_transfers[vec_name][mode, isub](vec_inputs, vec_outputs, mode)
+
     def get_req_procs(self):
         """
         Return the min and max MPI processes usable by this System.
@@ -594,7 +612,6 @@ class System(object):
             self._inputs = self._vectors['input']['nonlinear']
             self._outputs = self._vectors['output']['nonlinear']
             self._residuals = self._vectors['residual']['nonlinear']
-            self._transfers = self._vector_transfers['nonlinear']
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
@@ -832,8 +849,10 @@ class System(object):
 
         # Create Transfer objects from the raw indices
         transfers = {}
-        transfers[None] = transfer_class(vectors['input'], vectors['output'],
-                                         xfer_in_inds, xfer_out_inds, self.comm)
+        transfer_all = transfer_class(vectors['input'], vectors['output'],
+                                      xfer_in_inds, xfer_out_inds, self.comm)
+        transfers['fwd', None] = transfer_all
+        transfers['rev', None] = transfer_all
         for isub in range(len(fwd_xfer_in_inds)):
             transfers['fwd', isub] = transfer_class(vectors['input'],
                                                     vectors['output'],

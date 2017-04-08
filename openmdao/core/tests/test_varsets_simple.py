@@ -108,7 +108,7 @@ class TestNumpyVec(unittest.TestCase):
             assert_rel_error(self, comp2._inputs['v3'], 1.0)
             assert_rel_error(self, comp2._inputs['v4'], 1.0)
 
-            root._vector_transfers['nonlinear']['fwd', 0](root._inputs, root._outputs)
+            root._transfer('nonlinear', 'fwd', 0)
 
             assert_rel_error(self, comp1._outputs['v1'], 2.0)
             assert_rel_error(self, comp1._inputs['v2'], 4.0)
@@ -120,7 +120,7 @@ class TestNumpyVec(unittest.TestCase):
             assert_rel_error(self, comp2._inputs['v3'], 1.0)
             assert_rel_error(self, comp2._inputs['v4'], 1.0)
 
-            root._vector_transfers['nonlinear'][None](root._inputs, root._outputs)
+            root._transfer('nonlinear', 'fwd', None)
 
             assert_rel_error(self, comp1._outputs['v1'], 2.0)
             assert_rel_error(self, comp1._inputs['v2'], 4.0)
