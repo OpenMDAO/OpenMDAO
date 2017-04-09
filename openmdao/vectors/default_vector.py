@@ -284,6 +284,30 @@ class DefaultVectorX(VectorX):
         for set_name, data in iteritems(self._data):
             data += val * vec._data[set_name]
 
+    def elem_mult(self, vec):
+        """
+        Perform element-wise multiplication and store the result in this vector.
+
+        Parameters
+        ----------
+        vec : <Vector>
+            The vector to perform element-wise multiplication with.
+        """
+        for set_name, data in iteritems(self._data):
+            data[:] *= vec._data[set_name]
+
+    def elem_div(self, vec):
+        """
+        Perform element-wise division and store the result in this vector.
+
+        Parameters
+        ----------
+        vec : <Vector>
+            The vector to perform element-wise division with.
+        """
+        for set_name, data in iteritems(self._data):
+            data[:] /= vec._data[set_name]
+
     def set_vec(self, vec):
         """
         Set the value of this vector to that of the incoming vector.

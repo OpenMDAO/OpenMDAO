@@ -100,15 +100,15 @@ class Component(BaseComponent):
         """
         Compute residuals.
         """
-        self._inputs._scale(self._scaling_to_phys['input'])
-        self._outputs._scale(self._scaling_to_phys['output'])
-        self._residuals._scale(self._scaling_to_phys['residual'])
+        self._scale_vec(self._inputs, 'input', 'phys')
+        self._scale_vec(self._outputs, 'output', 'phys')
+        self._scale_vec(self._residuals, 'residual', 'phys')
 
         self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
-        self._inputs._scale(self._scaling_to_norm['input'])
-        self._outputs._scale(self._scaling_to_norm['output'])
-        self._residuals._scale(self._scaling_to_norm['residual'])
+        self._scale_vec(self._inputs, 'input', 'norm')
+        self._scale_vec(self._outputs, 'output', 'norm')
+        self._scale_vec(self._residuals, 'residual', 'norm')
 
     def _solve_nonlinear(self):
         """
@@ -126,17 +126,17 @@ class Component(BaseComponent):
         if self._nl_solver is not None:
             self._nl_solver.solve()
         else:
-            self._inputs._scale(self._scaling_to_phys['input'])
-            self._outputs._scale(self._scaling_to_phys['output'])
-            self._residuals._scale(self._scaling_to_phys['residual'])
+            self._scale_vec(self._inputs, 'input', 'phys')
+            self._scale_vec(self._outputs, 'output', 'phys')
+            self._scale_vec(self._residuals, 'residual', 'phys')
 
             self.solve_nonlinear(self._inputs, self._outputs, self._residuals)
 
-            self._inputs._scale(self._scaling_to_norm['input'])
-            self._outputs._scale(self._scaling_to_norm['output'])
-            self._residuals._scale(self._scaling_to_norm['residual'])
+            self._scale_vec(self._inputs, 'input', 'norm')
+            self._scale_vec(self._outputs, 'output', 'norm')
+            self._scale_vec(self._residuals, 'residual', 'norm')
 
-    def _apply_linear(self, vec_names, mode, var_inds=None):
+    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product.
 
@@ -146,12 +146,15 @@ class Component(BaseComponent):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
-        var_inds : [int, int, int, int] or None
-            ranges of variable IDs involved in this matrix-vector product.
-            The ordering is [lb1, ub1, lb2, ub2].
+        scope_out : set or None
+            Set of absolute output names in the scope of this mat-vec product.
+            If None, all are in the scope.
+        scope_in : set or None
+            Set of absolute input names in the scope of this mat-vec product.
+            If None, all are in the scope.
         """
         for vec_name in vec_names:
-            with self._matvec_context(vec_name, var_inds, mode) as vecs:
+            with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
                 with self.jacobian_context():
@@ -200,8 +203,8 @@ class Component(BaseComponent):
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
-                d_outputs._scale(self._scaling_to_phys['output'])
-                d_residuals._scale(self._scaling_to_phys['residual'])
+                self._scale_vec(d_outputs, 'output', 'phys')
+                self._scale_vec(d_residuals, 'residual', 'phys')
 
             self.solve_linear(self._vectors['output'],
                               self._vectors['residual'],
@@ -218,8 +221,8 @@ class Component(BaseComponent):
                             elif mode == 'rev':
                                 d_residuals[name] = d_outputs[name]
 
-                d_outputs._scale(self._scaling_to_norm['output'])
-                d_residuals._scale(self._scaling_to_norm['residual'])
+                self._scale_vec(d_outputs, 'output', 'norm')
+                self._scale_vec(d_residuals, 'residual', 'norm')
 
             return False, 0., 0.
 

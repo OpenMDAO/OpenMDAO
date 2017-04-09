@@ -62,7 +62,7 @@ class ImplicitComponent(Component):
             else:
                 return result
 
-    def _apply_linear(self, vec_names, mode, var_inds=None):
+    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -72,12 +72,15 @@ class ImplicitComponent(Component):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
-        var_inds : [int, int, int, int] or None
-            ranges of variable IDs involved in this matrix-vector product.
-            The ordering is [lb1, ub1, lb2, ub2].
+        scope_out : set or None
+            Set of absolute output names in the scope of this mat-vec product.
+            If None, all are in the scope.
+        scope_in : set or None
+            Set of absolute input names in the scope of this mat-vec product.
+            If None, all are in the scope.
         """
         for vec_name in vec_names:
-            with self._matvec_context(vec_name, var_inds, mode) as vecs:
+            with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
                 # Jacobian and vectors are all scaled, unitless

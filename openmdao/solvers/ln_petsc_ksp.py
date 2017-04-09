@@ -262,9 +262,8 @@ class PetscKSP(LinearSolver):
         x_vec.set_data(_get_petsc_vec_array(in_vec))
 
         # apply linear
-        ind1, ind2 = system._var_allprocs_idx_range['output']
-        var_inds = [ind1, ind2, ind1, ind2]
-        system._apply_linear([vec_name], self._mode, var_inds)
+        scope_out, scope_in = system._get_scope()
+        system._apply_linear([vec_name], self._mode, scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)

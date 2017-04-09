@@ -521,11 +521,12 @@ class Group(System):
                 sub_ext_num_vars, sub_ext_sizes, sub_ext_num_vars_byset, sub_ext_sizes_byset,
             )
 
-    def _setupx_vectors(self, root_vectors):
-        super(Group, self)._setupx_vectors(root_vectors)
+    def _setupx_vectors(self, vec_names, root_vectors, rel_out=None, rel_in=None):
+        super(Group, self)._setupx_vectors(vec_names, root_vectors, rel_out, rel_in)
 
         for subsys in self._subsystems_myproc:
-            subsys._setupx_vectors(root_vectors)
+            subsys._setupx_vectors(
+                vec_names, root_vectors, self._relevant_vars_in, self._relevant_vars_out)
 
     def _setupx_transfers(self):
         super(Group, self)._setupx_transfers()
@@ -672,22 +673,22 @@ class Group(System):
                     rev_xfer_out[isub][key] = merge(rev_xfer_out[isub][key])
 
         xfers = self._xfers
-        vecs = self._vecs
-        for vec_name in vecs['output']:
-            transfer_class = vecs['output'][vec_name].TRANSFER
+        vectors = self._vectors
+        for vec_name in self._vec_names:
+            transfer_class = vectors['output'][vec_name].TRANSFER
 
             xfers[vec_name] = {}
             xfer_all = transfer_class(
-                vecs['input'][vec_name], vecs['output'][vec_name],
+                vectors['input'][vec_name], vectors['output'][vec_name],
                 xfer_in, xfer_out, self.comm)
             xfers[vec_name]['fwd', None] = xfer_all
             xfers[vec_name]['rev', None] = xfer_all
             for isub in range(nsub_allprocs):
                 xfers[vec_name]['fwd', isub] = transfer_class(
-                    vecs['input'][vec_name], vecs['output'][vec_name],
+                    vectors['input'][vec_name], vectors['output'][vec_name],
                     fwd_xfer_in[isub], fwd_xfer_out[isub], self.comm)
                 xfers[vec_name]['rev', isub] = transfer_class(
-                    vecs['input'][vec_name], vecs['output'][vec_name],
+                    vectors['input'][vec_name], vectors['output'][vec_name],
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
 
     def _setupx_bounds(self, root_lower, root_upper):
@@ -884,56 +885,6 @@ class Group(System):
 
         self._subsystems_allprocs = [olddict[name] for name in new_order]
 
-    def _setup_processors(self, path, comm, global_dict, assembler, proc_range):
-        """
-        Recursively split comms and define local subsystems.
-
-        Sets the following attributes:
-            pathname
-            comm
-            _assembler
-            _subsystems_myproc
-            _subsystems_myproc_inds
-            _mpi_proc_range
-
-        Parameters
-        ----------
-        path : str
-            parent names to prepend to name to get the pathname
-        comm : MPI.Comm or <FakeComm>
-            communicator for this system (already split, if applicable).
-        global_dict : dict
-            dictionary with kwargs of all parents assembled in it.
-        assembler : Assembler
-            pointer to the global assembler object to distribute to everyone.
-        proc_range : (int, int)
-            The range of processors that the comm on this system owns, in the global index space.
-        """
-        super(Group, self)._setup_processors(path, comm, global_dict, assembler, proc_range)
-
-        if self._subsystems_allprocs:
-            req_procs = [s._mpi_req_procs for s in self._subsystems_allprocs]
-            # Call the load balancing algorithm
-            try:
-                sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
-                    req_procs, comm, proc_range)
-            except ProcAllocationError as err:
-                raise RuntimeError("subsystem %s requested %d processes "
-                                   "but got %d" %
-                                   (self._subsystems_allprocs[err.sub_idx].pathname,
-                                    err.requested, err.remaining))
-
-            # Define local subsystems
-            self._subsystems_myproc_inds = sub_inds
-            self._subsystems_myproc = [self._subsystems_allprocs[ind]
-                                       for ind in sub_inds]
-
-            # Perform recursion
-            for subsys in self._subsystems_myproc:
-                sub_global_dict = self.metadata._global_dict.copy()
-                subsys._setup_processors(
-                    self.pathname, sub_comm, sub_global_dict, assembler, sub_proc_range)
-
     def get_req_procs(self):
         """
         Return the min and max MPI processes usable by this Group.
@@ -988,199 +939,11 @@ class Group(System):
         else:
             return super(Group, self).get_req_procs()
 
-    def _setup_connections(self):
-        """
-        Recursively assemble a list of input-output connections.
-
-        Sets the following attributes:
-            _manual_connections_abs
-        """
-        # Perform recursion and assemble pairs from subsystems
-        pairs = []
-        for subsys in self._subsystems_myproc:
-            subsys._setup_connections()
-            if subsys.comm.rank == 0:
-                pairs.extend(subsys._manual_connections_abs)
-
-        # Do an allgather to gather from root procs of all subsystems
-        if self.comm.size > 1:
-            pairs_raw = self.comm.allgather(pairs)
-            pairs = []
-            for sub_pairs in pairs_raw:
-                pairs.extend(sub_pairs)
-
-        in_offset = self._var_allprocs_idx_range['input'][0]
-        out_offset = self._var_allprocs_idx_range['output'][0]
-
-        abs2data = self._var_abs2data_io
-        prom2abs_in = self._var_allprocs_prom2abs_list['input']
-        prom2abs_out = self._var_allprocs_prom2abs_list['output']
-
-        # Loop through user-defined connections
-        for in_name, (out_name, src_indices) \
-                in iteritems(self._manual_connections):
-
-            # throw an exception if either output or input doesn't exist
-            # (not traceable to a connect statement, so provide context)
-            if out_name not in prom2abs_out:
-                raise NameError("Output '%s' does not exist for connection "
-                                "in '%s' from '%s' to '%s'." %
-                                (out_name, self.pathname, out_name, in_name))
-
-            if in_name not in prom2abs_in:
-                raise NameError("Input '%s' does not exist for connection "
-                                "in '%s' from '%s' to '%s'." %
-                                (in_name, self.pathname, out_name, in_name))
-
-            # throw an exception if output and input are in the same system
-            # (not traceable to a connect statement, so provide context)
-            abs_out = prom2abs_out[out_name][0]
-            out_subsys = abs_out.rsplit('.', 1)[0]
-            for abs_in in prom2abs_in[in_name]:
-                in_subsys = abs_in.rsplit('.', 1)[0]
-                if out_subsys == in_subsys:
-                    raise RuntimeError("Output and input are in the same System " +
-                                       "for connection in '%s' from '%s' to '%s'." %
-                                       (self.pathname, out_name, in_name))
-
-                if src_indices is not None:
-                    meta = abs2data[abs_in]['metadata']
-                    if meta['src_indices'] is not None:
-                        raise RuntimeError("%s: src_indices has been defined "
-                                           "in both connect('%s', '%s') "
-                                           "and add_input('%s', ...)." %
-                                           (self.pathname, out_name,
-                                            in_name, in_name))
-                    meta['src_indices'] = np.atleast_1d(src_indices)
-
-                pairs.append((abs_in, abs_out))
-
-        self._manual_connections_abs = pairs
-
     def initialize_variables(self):
         """
         Set up variable name and metadata lists.
         """
         pass
-
-    def _setup_variables(self, recurse=True):
-        """
-        Compute variable dict/list for variables on the current processor.
-
-        Sets the following attributes:
-            _var_abs2data_io
-            _var_abs_names
-            _var_allprocs_prom2abs_list
-
-        Parameters
-        ----------
-        recurse : boolean
-            recursion is not performed if traversing up the tree after reconf.
-
-        Returns
-        -------
-        {'input': [str, ...], 'output': [str, ...]}
-            List of absolute names of owned variables existing on current proc.
-        """
-        self._var_abs2data_io = {}
-        for type_ in ['input', 'output']:
-            self._var_abs_names[type_] = []
-
-        name_offset = len(self.pathname) + 1 if self.pathname else 0
-        allprocs_abs_names = {'input': [], 'output': []}
-        allprocs_prom_names = {'input': [], 'output': []}
-
-        # Perform recursion to populate the dict and list bottom-up
-        for isub, subsys in enumerate(self._subsystems_myproc):
-            sub_all_abs_names, sub_all_prom_names = subsys._setup_variables()
-
-            var_maps_inout = subsys._get_maps(sub_all_prom_names)
-            for type_ in ['input', 'output']:
-                var_maps = var_maps_inout[type_]
-                # concatenate the allprocs variable names from subsystems on my proc.
-                allprocs_abs_names[type_].extend(sub_all_abs_names[type_])
-                allprocs_prom_names[type_].extend(var_maps[p]
-                                                  for p in sub_all_prom_names[type_])
-
-                # Assemble _var_abs2data_io and _var_abs_names by concatenating from subsystems.
-                for abs_name in subsys._var_abs_names[type_]:
-                    sub_data = subsys._var_abs2data_io[abs_name]
-
-                    self._var_abs2data_io[abs_name] = {
-                        'prom': var_maps[sub_data['prom']],
-                        'rel': abs_name[name_offset:] if name_offset > 0 else abs_name,
-                        'my_idx': len(self._var_abs_names[type_]),
-                        'type': type_,
-                        'metadata': sub_data['metadata']
-                    }
-                    self._var_abs_names[type_].append(abs_name)
-
-        # If we're running in parallel, gather contributions from other procs.
-        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            for type_ in ['input', 'output']:
-                sub_comm = self._subsystems_myproc[0].comm
-                if sub_comm.rank == 0:
-                    raw = (allprocs_abs_names[type_], allprocs_prom_names[type_])
-                else:
-                    raw = ([], [])
-
-                allprocs_abs_names[type_] = []
-                allprocs_prom_names[type_] = []
-                for abs_names, prom_names in self.comm.allgather(raw):
-                    allprocs_abs_names[type_].extend(abs_names)
-                    allprocs_prom_names[type_].extend(prom_names)
-
-        # We use allprocs_abs_names to count the total number of allprocs variables
-        # and put it in _var_allprocs_idx_range.
-        for type_ in ['input', 'output']:
-            all_abs = allprocs_abs_names[type_]
-            self._var_allprocs_idx_range[type_] = [0, len(all_abs)]
-
-            allprocs_prom2abs_list = {}
-            for i, prom_name in enumerate(allprocs_prom_names[type_]):
-                if prom_name not in allprocs_prom2abs_list:
-                    allprocs_prom2abs_list[prom_name] = [all_abs[i]]
-                else:
-                    allprocs_prom2abs_list[prom_name].append(all_abs[i])
-
-            self._var_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
-
-        for prom_name, lst in iteritems(self._var_allprocs_prom2abs_list['output']):
-            if len(lst) > 1:
-                raise RuntimeError("Output name '%s' refers to "
-                                   "multiple outputs: %s." %
-                                   (prom_name, sorted(lst)))
-
-        self._var_allprocs_abs_names = allprocs_abs_names
-
-        return allprocs_abs_names, allprocs_prom_names
-
-    def _setup_var_indices(self):
-        """
-        Compute the global index range for variables on all processors.
-
-        Computes the following attributes:
-            _var_allprocs_idx_range
-        """
-        abs2idx = self._assembler._var_allprocs_abs2idx_io
-        for type_ in ['input', 'output']:
-            idxs = [abs2idx[name] for name in self._var_allprocs_abs_names[type_]]
-            if idxs:
-                self._var_allprocs_idx_range[type_][0] = np.min(idxs)
-                self._var_allprocs_idx_range[type_][1] = np.max(idxs) + 1
-            else:
-                self._var_allprocs_idx_range[type_][:] = [0, 0]
-
-        # Perform recursion
-        for subsys in self._subsystems_myproc:
-            subsys._setup_var_indices()
-
-    def _setup_partials(self):
-        """
-        Set up partial derivative sparsity structures and approximation schemes.
-        """
-        for subsys in self._subsystems_myproc:
-            subsys._setup_partials()
 
     def get_subsystem(self, name):
         """
@@ -1230,7 +993,7 @@ class Group(System):
         """
         return self._nl_solver.solve()
 
-    def _apply_linear(self, vec_names, mode, var_inds=None):
+    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -1240,15 +1003,18 @@ class Group(System):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
-        var_inds : [int, int, int, int] or None
-            ranges of variable IDs involved in this matrix-vector product.
-            The ordering is [lb1, ub1, lb2, ub2].
+        scope_out : set or None
+            Set of absolute output names in the scope of this mat-vec product.
+            If None, all are in the scope.
+        scope_in : set or None
+            Set of absolute input names in the scope of this mat-vec product.
+            If None, all are in the scope.
         """
         with self.jacobian_context() as J:
             # Use global Jacobian
             if self._owns_assembled_jac:
                 for vec_name in vec_names:
-                    with self._matvec_context(vec_name, var_inds, mode) as vecs:
+                    with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                         d_inputs, d_outputs, d_residuals = vecs
                         J._apply(d_inputs, d_outputs, d_residuals, mode)
             # Apply recursion
@@ -1258,7 +1024,7 @@ class Group(System):
                         self._transfer(vec_name, mode)
 
                 for subsys in self._subsystems_myproc:
-                    subsys._apply_linear(vec_names, mode, var_inds)
+                    subsys._apply_linear(vec_names, mode, scope_out, scope_in)
 
                 if mode == 'rev':
                     for vec_name in vec_names:

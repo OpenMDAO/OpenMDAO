@@ -110,13 +110,8 @@ class ScipyIterativeSolver(LinearSolver):
             b_vec = system._vectors['output'][vec_name]
 
         x_vec.set_data(in_vec)
-        var_inds = [
-            system._var_allprocs_idx_range['output'][0],
-            system._var_allprocs_idx_range['output'][1],
-            system._var_allprocs_idx_range['output'][0],
-            system._var_allprocs_idx_range['output'][1],
-        ]
-        system._apply_linear([vec_name], self._mode, var_inds)
+        scope_out, scope_in = system._get_scope()
+        system._apply_linear([vec_name], self._mode, scope_out, scope_in)
 
         # self._mpi_print(b_vec.get_data())
         return b_vec.get_data()

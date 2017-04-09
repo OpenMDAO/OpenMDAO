@@ -226,7 +226,7 @@ class Problem(object):
 
         return self.run_driver()
 
-    def setupx(self, vector_class=DefaultVector, mode='auto'):
+    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto'):
         """
         Set up everything (model, assembler, vector, solvers, drivers).
 
@@ -234,6 +234,10 @@ class Problem(object):
         ----------
         vector_class : type
             reference to an actual <Vector> class; not an instance.
+        check : boolean
+            whether to run error check after setup is complete.
+        logger : object
+            Object for logging config checks if check is True.
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'auto', which lets OpenMDAO choose
@@ -257,64 +261,9 @@ class Problem(object):
 
         model._setupx(comm, vector_class)
 
-        def equal_arrays(a, b, re=1e-8):
-            return np.linalg.norm(a - b) < re
-
-        for type_ in ['input', 'output']:
-            assert model._num_var[type_] == model._var_allprocs_idx_range[type_][1]
-
-        assert set(model._var_abs2data_io.keys()) == set(
-            model._varx_abs2meta['input'].keys()
-            + model._varx_abs2meta['output'].keys()
-        )
-        assert set(model._assembler._var_allprocs_abs2idx_io) == set(
-            model._varx_allprocs_abs2idx['input'].keys()
-            + model._varx_allprocs_abs2idx['output'].keys()
-        )
-
-        for type_ in ['input', 'output']:
-            assert tuple(model._var_allprocs_idx_range[type_]) == model._varx_range[type_]
-            assert model._var_abs_names[type_] == model._varx_abs_names[type_]
-            assert model._assembler._var_allprocs_abs_names[type_] \
-                == model._varx_allprocs_abs_names[type_]
-            for ind, abs_name in enumerate(model._varx_allprocs_abs_names[type_]):
-                assert equal_arrays(
-                    model._assembler._var_set_indices[type_][ind, 1],
-                    model._varx_allprocs_abs2idx_byset[type_][abs_name])
-            assert equal_arrays(
-                model._assembler._var_sizes_all[type_],
-                model._varx_sizes[type_])
-            for set_name in model._varx_set2iset[type_]:
-                iset = model._varx_set2iset[type_][set_name]
-                assert equal_arrays(
-                    model._assembler._var_sizes_by_set[type_][iset],
-                    model._varx_sizes_byset[type_][set_name])
-                assert len(model._vectors[type_]['nonlinear']._data[iset]) \
-                    == len(model._vecs[type_]['nonlinear']._data[set_name])
-
-        if len(model._subsystems_allprocs) > 0:
-            transfers = model._vector_transfers['nonlinear']['fwd', None]
-            xfers = model._xfers['nonlinear']['fwd', None]
-            for set_name_in in model._varx_set2iset['input']:
-                iset_in = model._varx_set2iset['input'][set_name_in]
-
-                for set_name_out in model._varx_set2iset['output']:
-                    iset_out = model._varx_set2iset['output'][set_name_out]
-
-                    key1 = (iset_in, iset_out)
-                    key2 = (set_name_in, set_name_out)
-
-                    if key1 in transfers._in_inds:
-                        assert np.all(
-                            np.sort(transfers._in_inds[key1])
-                            == np.sort(xfers._in_inds[key2]))
-                        assert np.all(
-                            np.sort(transfers._out_inds[key1])
-                            == np.sort(xfers._out_inds[key2]))
-
         return self
 
-    def setup(self, vector_class=DefaultVector, check=True, logger=None,
+    def setup_old(self, vector_class=DefaultVector, check=True, logger=None,
               mode='auto'):
         """
         Set up everything (model, assembler, vector, solvers, drivers).
