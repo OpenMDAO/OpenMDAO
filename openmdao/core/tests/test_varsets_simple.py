@@ -69,20 +69,15 @@ class TestNumpyVec(unittest.TestCase):
 
     def test_prom_names(self):
         root = self.p.model
-        names = sorted(root._var_allprocs_prom2abs_list['output'])
+        names = sorted(root._varx_allprocs_prom2abs_list['output'])
         self.assertEqual(names, ['v1', 'v2', 'v3', 'v4'])
 
     def test__var_set_IDs(self):
-        set_IDs = self.p._assembler._var_set_IDs['output']
+        set_IDs = self.p.model._varx_set2iset['output']
         self.assertEqual(set_IDs[1], 0)
         self.assertEqual(set_IDs[2], 1)
         self.assertEqual(set_IDs[3], 2)
         self.assertEqual(set_IDs[4], 3)
-
-    def test__var_set_indices(self):
-        set_indices = self.p._assembler._var_set_indices['output']
-        array = np.array([[0,0],[1,0],[2,0],[3,0]])
-        assert_rel_error(self, set_indices, array)
 
     def test_transfer(self):
         root = self.p.model

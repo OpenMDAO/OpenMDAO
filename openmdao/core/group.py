@@ -473,9 +473,9 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._setupx_partials()
 
-    def _setupx_global(self, ext_num_vars, ext_sizes, ext_num_vars_byset, ext_sizes_byset):
+    def _setupx_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
         super(Group, self)._setupx_global(
-            ext_num_vars, ext_sizes, ext_num_vars_byset, ext_sizes_byset)
+            ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
 
         iproc = self.comm.rank
 
@@ -518,7 +518,8 @@ class Group(System):
                     )
 
             subsys._setupx_global(
-                sub_ext_num_vars, sub_ext_sizes, sub_ext_num_vars_byset, sub_ext_sizes_byset,
+                sub_ext_num_vars, sub_ext_num_vars_byset,
+                sub_ext_sizes, sub_ext_sizes_byset,
             )
 
     def _setupx_vectors(self, vec_names, root_vectors, rel_out=None, rel_in=None):
@@ -526,7 +527,7 @@ class Group(System):
 
         for subsys in self._subsystems_myproc:
             subsys._setupx_vectors(
-                vec_names, root_vectors, self._relevant_vars_in, self._relevant_vars_out)
+                vec_names, root_vectors, self._relevant_vars_out, self._relevant_vars_in)
 
     def _setupx_transfers(self):
         super(Group, self)._setupx_transfers()

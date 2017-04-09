@@ -100,7 +100,6 @@ class ScipyIterativeSolver(LinearSolver):
         """
         vec_name = self._vec_name
         system = self._system
-        ind1, ind2 = system._var_allprocs_idx_range['output']
 
         if self._mode == 'fwd':
             x_vec = system._vectors['output'][vec_name]

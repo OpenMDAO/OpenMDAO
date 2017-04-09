@@ -3,6 +3,7 @@ from __future__ import division
 import numpy as np
 
 from six.moves import range
+from six import iteritems
 
 from openmdao.utils.general_utils import ensure_compatible
 from openmdao.utils.name_maps import name2abs_name

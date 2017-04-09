@@ -41,76 +41,120 @@ class System(object):
     Attributes
     ----------
     name : str
-        name of the system, must be different from siblings.
+        Name of the system, must be different from siblings.
     pathname : str
-        global name of the system, including the path.
+        Global name of the system, including the path.
     comm : MPI.Comm or <FakeComm>
         MPI communicator object.
     metadata : <GeneralizedDictionary>
-        dictionary of user-defined arguments.
+        Dictionary of user-defined arguments.
     _first_setup : bool
         If True, this is the first time we are setting up, so we should not clear the
         _var_rel2data_io and _var_rel_names attributes prior to setup.
-    _assembler : <Assembler>
-        pointer to the global assembler object.
     _mpi_proc_allocator : <ProcAllocator>
-        object that distributes procs among subsystems.
+        Object that distributes procs among subsystems.
     _mpi_req_procs : (int, int or None)
-        number of min and max procs usable by this system.
+        The number of min and max procs usable by this system.
     _mpi_proc_range : (int, int)
-        The range of processors that the comm on this system owns, in the global index space.
+        The range of procs this system's comm owns, among all of this system's processors.
+        Therefore, if this is not a parallel group, this range is always (0, comm.size).
     _subsystems_allprocs : [<System>, ...]
-        list of all subsystems (children of this system).
+        List of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
-        list of local subsystems that exist on this proc.
+        List of local subsystems that exist on this proc.
     _subsystems_myproc_inds : [int, ...]
-        list of indices of subsystems on this proc among all of this system's
-        subsystems (subsystems on all of this system's processors).
-    _var_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
-        index range of owned variables with respect to all problem variables.
+        List of indices of subsystems on this proc among all of this system's subsystems
+        (i.e. among _subsystems_allprocs).
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
-        dictionary of lists of variable names/wildcards specifying promotion
+        Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
     _manual_connections : dict
-        dictionary of input_name: (output_name, src_indices) connections.
-    _manual_connections_abs : [(str, str), ...]
-        _manual_connections with absolute variable names.  Entries
-        have the form (input, output).
-    _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
+        Dictionary of input_name: (output_name, src_indices) connections.
+    _num_var : {'input': int, 'output': int}
+        Number of allprocs variables owned by this system.
+    _num_var_byset : {'input': dict of int, 'output': dict of int}
+        Same as above, but by var_set name.
+    _varx_set2iset : {'input': dict, 'output': dict}
+        Dictionary mapping the var_set name to the var_set index.
+    _varx_range : {'input': (int, int), 'output': (int, int)}
+        Range of this system's allprocs variables relative to the immediate parent.
+        If this is the root, the range is simply (0, total_num).
+    _varx_range_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
+        Same as above, but by var_set name.
+    _varx_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
+        List of absolute names of this system's variables on all procs.
+    _varx_abs_names : {'input': [str, ...], 'output': [str, ...]}
+        List of absolute names of this system's variables existing on current proc.
+    _varx_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
-    _var_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
-        Global index range of owned variables with respect to all model variables.
-    _var_abs_names : {'input': [str, ...], 'output': [str, ...]}
-        List of absolute names of owned variables existing on current proc.
-    _var_abs2data_io : dict
-        Dictionary mapping absolute names to dicts with keys (prom, rel, my_idx, type_, metadata).
-        The my_idx entry is the index among variables in this system, on this processor.
-        The type_ entry is either 'input' or 'output'.
+    _varx_abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names, on current proc.
+    _varx_allprocs_abs2meta : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
+        The keys are
+        ('units', 'shape', 'var_set') for inputs and
+        ('units', 'shape', 'var_set', 'ref', 'ref0') for outputs.
+    _varx_abs2meta : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to metadata dictionaries for myproc variables.
+    _varx_allprocs_abs2idx : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to their indices
+        among this system's allprocs variables.
+        Therefore, the indices range from 0 to the total number of this system's variables.
+    _varx_allprocs_abs2idx_byset : {'input': dict of dict, 'output': dict of dict}
+        Same as above, but by var_set name.
+    _varx_sizes : {'input': ndarray, 'output': ndarray}
+        Array of local sizes of this system's allprocs variables.
+        The array has size nproc x num_var where nproc is the number of processors
+        owned by this system and num_var is the number of allprocs variables.
+    _varx_sizes_byset : {'input': dict of ndarray, 'output': dict of ndarray}
+        Same as above, but by var_set name.
+    _conn_global_abs_in2out : {'abs_in': 'abs_out'}
+        Dictionary containing all explicit & implicit connections owned by this system
+        or any descendant system. The data is the same across all processors.
+    _conn_abs_in2out : {'abs_in': 'abs_out'}
+        Dictionary containing all explicit & implicit connections owned
+        by this system only. The data is the same across all processors.
+    _subjacs_info : dict of dict
+        Sub-jacobian metadata for each (output, input) pair added using
+        declare_partials. Members of each pair may be glob patterns.
+    _ext_num_vars : {'input': (int, int), 'output': (int, int)}
+        Total number of allprocs variables in system before/after this one.
+    _ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
+        Same as above, but by var_set name.
+    _ext_sizes : {'input': (int, int), 'output': (int, int)}
+        Total size of allprocs variables in system before/after this one.
+    _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
+        Same as above, but by var_set name.
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
-        dict of vector objects. These are the derivatives vectors.
-    _vector_transfers : dict
-        dict of transfer objects.
-    _vector_var_ids : dict
-        dictionary of index arrays of relevant variables for this vector
-    _scaling_to_norm : {'input': ndarray[nvar_in, 2], 'output': ndarray[nvar_out, 2]}
-        coefficients to convert vectors to normalized values.
-        In the integer arrays, nvar_in and nvar_out are counts of variables on myproc.
-    _scaling_to_phys : {'input': ndarray[nvar_in, 2], 'output': ndarray[nvar_out, 2]}
-        coefficients to convert vectors to physical values.
-        In the integer arrays, nvar_in and nvar_out are counts of variables on myproc.
-    _lower_bounds : <Vector>
-        vector of lower bounds, scaled and dimensionless.
-    _upper_bounds : <Vector>
-        vector of upper bounds, scaled and dimensionless.
+        Dictionaries of vectors keyed by vec_name.
+    _relevant_vars_out : dict of set
+        Set of output variable absolute names relevant for each vec_name.
+    _relevant_vars_in : dict of set
+        Set of input variable absolute names relevant for each vec_name.
+    _xfers : dict of dict of Transfers
+        First key is the vec_name, second key is (mode, isub) where
+        mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
+        or isub can be None for the full, simultaneous transfer.
     _inputs : <Vector>
-        inputs vector; points to _vectors['input']['nonlinear'].
+        The inputs vector; points to _vectors['input']['nonlinear'].
     _outputs : <Vector>
-        outputs vector; points to _vectors['output']['nonlinear'].
+        The outputs vector; points to _vectors['output']['nonlinear'].
     _residuals : <Vector>
-        residuals vector; points to _vectors['residual']['nonlinear'].
-    _transfers : dict of <Transfer>
-        transfer object; points to _vector_transfers['nonlinear'].
+        The residuals vector; points to _vectors['residual']['nonlinear'].
+    _lower_bounds : <Vector>
+        Vector of lower bounds, scaled and dimensionless.
+    _upper_bounds : <Vector>
+        Vector of upper bounds, scaled and dimensionless.
+    _scaling_vecs : dict of dict of Vectors
+        First key is indicates vector type and coefficient, second key is vec_name.
+    _nl_solver : <NonlinearSolver>
+        Nonlinear solver to be used for solve_nonlinear.
+    _ln_solver : <LinearSolver>
+        Linear solver to be used for solve_linear; not the Newton system.
+    _suppress_solver_output : boolean
+        Flag that turns off all solver output for this System and all
+        of its descendants if False.
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
     _jacobian_changed : bool
@@ -120,13 +164,6 @@ class System(object):
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
-    _nl_solver : <NonlinearSolver>
-        nonlinear solver to be used for solve_nonlinear.
-    _ln_solver : <LinearSolver>
-        linear solver to be used for solve_linear; not the Newton system.
-    _suppress_solver_output : boolean
-        flag that turns off all solver output for this System and all
-        of its descendants if False.
     _design_vars : dict of namedtuple
         dict of all driver design vars added to the system.
     _responses : dict of namedtuple
@@ -151,8 +188,6 @@ class System(object):
 
         self._first_setup = True
 
-        self._assembler = None
-
         self._mpi_proc_allocator = DefaultAllocator()
         self._mpi_req_procs = None
         self._mpi_proc_range = None
@@ -164,29 +199,61 @@ class System(object):
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
         self._manual_connections = {}
-        self._manual_connections_abs = []
 
-        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        self._var_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
-        self._var_abs_names = {'input': [], 'output': []}
-        self._var_abs2data_io = {}
+        self._num_var = {'input': 0, 'output': 0}
+        self._num_var_byset = {'input': {}, 'output': {}}
+
+        self._varx_set2iset = {'input': {}, 'output': {}}
+        self._varx_range = {'input': (0, 0), 'output': (0, 0)}
+        self._varx_range_byset = {'input': {}, 'output': {}}
+
+        self._varx_allprocs_abs_names = {'input': [], 'output': []}
+        self._varx_abs_names = {'input': [], 'output': []}
+        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._varx_abs2prom = {'input': {}, 'output': {}}
+        self._varx_allprocs_abs2meta = {'input': {}, 'output': {}}
+        self._varx_abs2meta = {'input': {}, 'output': {}}
+
+        self._varx_allprocs_abs2idx = {'input': {}, 'output': {}}
+        self._varx_allprocs_abs2idx_byset = {'input': {}, 'output': {}}
+
+        self._varx_sizes = {'input': None, 'output': None}
+        self._varx_sizes_byset = {'input': {}, 'output': {}}
+
+        self._conn_global_abs_in2out = {}
+        self._conn_abs_in2out = {}
+
+        self._subjacs_info = {}
+
+        self._ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
+        self._ext_num_vars_byset = {'input': {}, 'output': {}}
+        self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
+        self._ext_sizes_byset = {'input': {}, 'output': {}}
 
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
-        self._vector_transfers = {}
-        self._vector_var_ids = {}
+        self._relevant_vars_out = set()
+        self._relevant_vars_in = set()
 
-        self._scaling_to_norm = {
-            'input': None, 'output': None, 'residual': None}
-        self._scaling_to_phys = {
-            'input': None, 'output': None, 'residual': None}
-
-        self._lower_bounds = None
-        self._upper_bounds = None
+        self._xfers = {}
 
         self._inputs = None
         self._outputs = None
         self._residuals = None
-        self._transfers = None
+
+        self._lower_bounds = None
+        self._upper_bounds = None
+
+        self._scaling_vecs = {
+            ('input', 'phys0'): {}, ('input', 'phys1'): {},
+            ('input', 'norm0'): {}, ('input', 'norm1'): {},
+            ('output', 'phys0'): {}, ('output', 'phys1'): {},
+            ('output', 'norm0'): {}, ('output', 'norm1'): {},
+            ('residual', 'phys'): {}, ('residual', 'norm'): {}
+        }
+
+        self._nl_solver = None
+        self._ln_solver = None
+        self._suppress_solver_output = False
 
         self._jacobian = DictionaryJacobian()
         self._jacobian._system = self
@@ -195,42 +262,23 @@ class System(object):
 
         self._subjacs_info = {}
 
-        self._nl_solver = None
-        self._ln_solver = None
-        self._suppress_solver_output = False
-
         self._design_vars = {}
         self._responses = {}
 
-        # # Reconfigurability attributes
-        #
-        # self.pathname = ''
-        # self.comm = None
-        # self._mpi_proc_range = [0, 1]
-        #
-        # self._varx_abs_names = {'input': [], 'output': []}
-        # self._varx_allprocs_abs_names = {'input': [], 'output': []}
-        # self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        # self._varx_abs2data_io = {}
-        # self._varx_allprocs_abs2meta_io = {}
-        #
-        # self._varx_allprocs_set2abs_names = {'input': {}, 'output': {}}
-        # self._varx_set2iset = None
-        #
-        # self._varx_allprocs_idx_range = {'input': [0, 0], 'output': [0, 0]}
-        # self._varx_allprocs_vst_idx_ranges = {'input': None, 'output': None}
-        # self._varx_allprocs_abs2idx_io = {}
-        # self._varx_set_indices = {'input': None, 'output': None}
-        #
-        # self._varx_sizes = {'input': None, 'output': None}
-        # self._varx_sizes_byset = {'input': {}, 'output': {}}
-
-    #
-    #
-    # -------------------------------------------------------------------------------------
-    # Start of reconfigurability changes
-
     def _get_initial_var_indices(self):
+        """
+        Get initial values for _varx_set2iset, _varx_range, _varx_range_byset.
+
+        Returns
+        -------
+        {'input': dict, 'output': dict}
+            Dictionary mapping the var_set name to the var_set index.
+        {'input': (int, int), 'output': (int, int)}
+            Range of this system's allprocs variables relative to the immediate parent.
+            If this is the root, the range is simply (0, total_num).
+        {'input': dict of (int, int), 'output': dict of (int, int)}
+            Same as above, but by var_set name.
+        """
         set2iset = {}
         for type_ in ['input', 'output']:
             set2iset[type_] = {}
@@ -249,6 +297,20 @@ class System(object):
         return set2iset, var_range, var_range_byset
 
     def _get_initial_global(self):
+        """
+        Get initial values for _ext_num_vars, _ext_num_vars_byset, _ext_sizes, _ext_sizes_byset.
+
+        Returns
+        -------
+        _ext_num_vars : {'input': (int, int), 'output': (int, int)}
+            Total number of allprocs variables in system before/after this one.
+        _ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
+            Same as above, but by var_set name.
+        _ext_sizes : {'input': (int, int), 'output': (int, int)}
+            Total size of allprocs variables in system before/after this one.
+        _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
+            Same as above, but by var_set name.
+        """
         ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
         ext_sizes = {'input': (0, 0), 'output': (0, 0)}
         ext_num_vars_byset = {
@@ -259,7 +321,7 @@ class System(object):
             'input': {set_name: (0, 0) for set_name in self._varx_set2iset['input']},
             'output': {set_name: (0, 0) for set_name in self._varx_set2iset['output']},
         }
-        return ext_num_vars, ext_sizes, ext_num_vars_byset, ext_sizes_byset
+        return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
     def _get_root_vectors(self, vec_names, vector_class):
         root_vectors = {'input': {}, 'output': {}, 'residual': {}}
@@ -282,15 +344,19 @@ class System(object):
             ('input', 'norm0'): {}, ('input', 'norm1'): {},
             ('output', 'phys0'): {}, ('output', 'phys1'): {},
             ('output', 'norm0'): {}, ('output', 'norm1'): {},
-            ('residual', 'phys'): {}, ('residual', 'norm'): {}
+            ('residual', 'phys0'): {}, ('residual', 'phys1'): {},
+            ('residual', 'norm0'): {}, ('residual', 'norm1'): {},
         }
 
         for key in root_vectors:
-            vec_key, ref_key = key
+            vec_key, coeff_key = key
             type_ = 'output' if vec_key == 'residual' else vec_key
 
             for vec_name in vec_names:
                 root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
+
+                if coeff_key[-1] != '0':
+                    root_vectors[key][vec_name].set_const(1.0)
 
         return root_vectors
 
@@ -317,12 +383,14 @@ class System(object):
         self._setupx_var_sizes()
         self._setupx_global_connections()
         self._setupx_connections()
+        self._setupx_partials()
         self._setupx_global(*self._get_initial_global())
         self._setupx_vectors(vec_names, self._get_root_vectors(vec_names, vector_class))
         self._setupx_transfers()
         self._setupx_bounds(*self._get_bounds_root_vectors(vector_class))
         self._setupx_scaling(self._get_scaling_root_vectors(vec_names, vector_class))
         self._setupx_solvers()
+        self._setupx_jacobians()
 
     def _setupx_procs(self, pathname, comm, proc_range):
         self.pathname = pathname
@@ -387,10 +455,10 @@ class System(object):
     def _setupx_partials(self):
         self._subjacs_info = {}
 
-    def _setupx_global(self, ext_num_vars, ext_sizes, ext_num_vars_byset, ext_sizes_byset):
+    def _setupx_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
         self._ext_num_vars = ext_num_vars
-        self._ext_sizes = ext_sizes
         self._ext_num_vars_byset = ext_num_vars_byset
+        self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
 
     def _setupx_vectors(self, vec_names, root_vectors, rel_out=None, rel_in=None):
@@ -403,12 +471,12 @@ class System(object):
             self._relevant_vars_out = {}
             for vec_name in vec_names:
                 self._relevant_vars_out[vec_name] = \
-                    set(self._varx_allprocs_abs_names['output'])
+                    set(self._varx_abs_names['output'])
         if rel_in is None:
             self._relevant_vars_in = {}
             for vec_name in vec_names:
                 self._relevant_vars_in[vec_name] = \
-                    set(self._varx_allprocs_abs_names['input'])
+                    set(self._varx_abs_names['input'])
 
         for vec_name in vec_names:
             vector_class = root_vectors['output'][vec_name].__class__
@@ -419,24 +487,23 @@ class System(object):
                 vectors[key][vec_name] = vector_class(
                     vec_name, type_, self, root_vectors[key][vec_name])
 
-            if vec_name is 'nonlinear':
-                self._inputs = vectors['input']['nonlinear']
-                self._outputs = vectors['output']['nonlinear']
-                self._residuals = vectors['residual']['nonlinear']
+        self._inputs = vectors['input']['nonlinear']
+        self._outputs = vectors['output']['nonlinear']
+        self._residuals = vectors['residual']['nonlinear']
 
-                for abs_name, meta in iteritems(self._varx_abs2meta['input']):
-                    self._inputs._views[abs_name][:] = meta['value']
+        for abs_name, meta in iteritems(self._varx_abs2meta['input']):
+            self._inputs._views[abs_name][:] = meta['value']
 
-                for abs_name, meta in iteritems(self._varx_abs2meta['output']):
-                    self._outputs._views[abs_name][:] = meta['value']
+        for abs_name, meta in iteritems(self._varx_abs2meta['output']):
+            self._outputs._views[abs_name][:] = meta['value']
 
     def _setupx_transfers(self):
         self._xfers = {}
 
     def _setupx_bounds(self, root_lower, root_upper):
         vector_class = root_lower.__class__
-        self._lower_boundsx = lower = vector_class('lower', 'output', self, root_lower)
-        self._upper_boundsx = upper = vector_class('upper', 'output', self, root_upper)
+        self._lower_bounds = lower = vector_class('lower', 'output', self, root_lower)
+        self._upper_bounds = upper = vector_class('upper', 'output', self, root_upper)
 
         for abs_name, meta in iteritems(self._varx_abs2meta['output']):
             shape = meta['shape']
@@ -466,14 +533,15 @@ class System(object):
             ('input', 'norm0'): {}, ('input', 'norm1'): {},
             ('output', 'phys0'): {}, ('output', 'phys1'): {},
             ('output', 'norm0'): {}, ('output', 'norm1'): {},
-            ('residual', 'phys'): {}, ('residual', 'norm'): {}
+            ('residual', 'phys0'): {}, ('residual', 'phys1'): {},
+            ('residual', 'norm0'): {}, ('residual', 'norm1'): {},
         }
 
         allprocs_abs2meta_out = self._varx_allprocs_abs2meta['output']
         abs2meta_in = self._varx_abs2meta['input']
 
         for vec_name in self._vec_names:
-            vector_class = root_vectors['residual', 'phys'][vec_name].__class__
+            vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
 
             for key in vecs:
                 type_ = 'output' if key[0] == 'residual' else key[0]
@@ -485,33 +553,47 @@ class System(object):
                 ref = meta['ref']
                 ref0 = meta['ref0']
                 res_ref = meta['res_ref']
+                res_ref0 = meta['res_ref0']
                 if not np.isscalar(ref):
                     ref = ref.reshape(shape)
                 if not np.isscalar(ref0):
                     ref0 = ref0.reshape(shape)
                 if not np.isscalar(res_ref):
                     res_ref = res_ref.reshape(shape)
+                if not np.isscalar(res_ref0):
+                    res_ref0 = res_ref0.reshape(shape)
 
-                vecs['output', 'phys0'][vec_name]._views[abs_name][:] = ref0
-                vecs['output', 'phys1'][vec_name]._views[abs_name][:] = ref - ref0
-                vecs['output', 'norm0'][vec_name]._views[abs_name][:] = -ref0 / (ref - ref0)
-                vecs['output', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / (ref - ref0)
+                a0 = ref0
+                a1 = ref - ref0
+                vecs['output', 'phys0'][vec_name]._views[abs_name][:] = a0
+                vecs['output', 'phys1'][vec_name]._views[abs_name][:] = a1
+                vecs['output', 'norm0'][vec_name]._views[abs_name][:] = -a0 / a1
+                vecs['output', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / a1
 
-                vecs['residual', 'phys'][vec_name]._views[abs_name][:] = res_ref
-                vecs['residual', 'norm'][vec_name]._views[abs_name][:] = 1.0 / res_ref
+                a0 = res_ref0
+                a1 = res_ref - res_ref0
+                vecs['residual', 'phys0'][vec_name]._views[abs_name][:] = a0
+                vecs['residual', 'phys1'][vec_name]._views[abs_name][:] = a1
+                vecs['residual', 'norm0'][vec_name]._views[abs_name][:] = -a0 / a1
+                vecs['residual', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / a1
 
             for abs_in, abs_out in iteritems(self._conn_abs_in2out):
                 if abs_in not in abs2meta_in:
                     continue
 
                 meta_out = allprocs_abs2meta_out[abs_out]
+                meta_in = abs2meta_in[abs_in]
+
                 shape_out = meta_out['shape']
+                units_out = meta_out['units']
+                shape_in = meta_in['shape']
+                units_in = meta_in['units']
+
                 ref = meta_out['ref']
                 ref0 = meta_out['ref0']
 
-                meta_in = abs2meta_in[abs_in]
-                shape_in = meta_in['shape']
                 src_indices = meta_in['src_indices']
+
                 if src_indices is not None:
                     entries = [list(range(x)) for x in shape_in]
                     cols = np.vstack(src_indices[i] for i in product(*entries))
@@ -527,16 +609,61 @@ class System(object):
                     if not np.isscalar(ref0):
                         ref0 = ref0.reshape(shape)
 
-                vecs['input', 'phys0'][vec_name]._views[abs_in][:] = ref0
-                vecs['input', 'phys1'][vec_name]._views[abs_in][:] = ref - ref0
-                vecs['input', 'norm0'][vec_name]._views[abs_in][:] = -ref0 / (ref - ref0)
-                vecs['input', 'norm1'][vec_name]._views[abs_in][:] = 1.0 / (ref - ref0)
+                a0 = convert_units(ref0, units_out, units_in)
+                a1 = convert_units(ref - ref0, units_out, units_in)
+                vecs['input', 'phys0'][vec_name]._views[abs_in][:] = a0
+                vecs['input', 'phys1'][vec_name]._views[abs_in][:] = a1
+                vecs['input', 'norm0'][vec_name]._views[abs_in][:] = -a0 / a1
+                vecs['input', 'norm1'][vec_name]._views[abs_in][:] = 1.0 / a1
 
     def _setupx_solvers(self):
         if self._nl_solver is not None:
             self._nl_solver._setup_solvers(self, 0)
         if self._ln_solver is not None:
             self._ln_solver._setup_solvers(self, 0)
+
+    def _setupx_jacobians(self, jacobian=None):
+        """
+        Set and populate jacobians down through the system tree.
+
+        Parameters
+        ----------
+        jacobian : <AssembledJacobian> or None
+            The global jacobian to populate for this system.
+        """
+        self._jacobian_changed = False
+
+        if self._owns_assembled_jac:
+
+            # At present, we don't support a AssembledJacobian in a group
+            # if any subcomponents are matrix-free.
+            for subsys in self.system_iter():
+
+                try:
+                    if subsys._matrix_free:
+                        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
+                        raise RuntimeError(msg)
+
+                # Groups don't have `_matrix_free`
+                # Note, we could put this attribute on Group, but this would be True for a
+                # default Group, and thus we would need an isinstance on Component, which is the
+                # reason for the try block anyway.
+                except AttributeError:
+                    continue
+
+            jacobian = self._jacobian
+
+        elif jacobian is not None:
+            self._jacobian = jacobian
+
+        self._set_partials_meta()
+
+        for subsys in self._subsystems_myproc:
+            subsys._setup_jacobians(jacobian)
+
+        if self._owns_assembled_jac:
+            self._jacobian._system = self
+            self._jacobian._initialize()
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------
@@ -547,11 +674,8 @@ class System(object):
         scal_vecs = self._scaling_vecs
         vec_name = vec._name
 
-        if key is not 'residual':
-            vec.elem_mult(scal_vecs[key, scale_to + '1'][vec_name])
-            vec += scal_vecs[key, scale_to + '0'][vec_name]
-        else:
-            vec.elem_mult(scal_vecs[key, scale_to][vec_name])
+        vec.elem_mult(scal_vecs[key, scale_to + '1'][vec_name])
+        vec += scal_vecs[key, scale_to + '0'][vec_name]
 
     def _transfer(self, vec_name, mode, isub=None):
         """
@@ -569,7 +693,10 @@ class System(object):
         """
         vec_inputs = self._vectors['input'][vec_name]
         vec_outputs = self._vectors['output'][vec_name]
+
+        self._scale_vec(vec_inputs, 'input', 'norm')
         self._xfers[vec_name][mode, isub](vec_inputs, vec_outputs, mode)
+        self._scale_vec(vec_inputs, 'input', 'phys')
 
     def get_req_procs(self):
         """
@@ -760,7 +887,7 @@ class System(object):
         self._jacobian_changed = True
 
     @contextmanager
-    def _units_scaling_context(self, inputs=[], outputs=[], residuals=[], scale_jac=False):
+    def _units_scaling_context(self, outputs=[], residuals=[]):
         """
         Context manager for units and scaling for vectors and Jacobians.
 
@@ -770,38 +897,24 @@ class System(object):
 
         Parameters
         ----------
-        inputs : list of input <Vector> objects
-            List of input vectors to apply the unit and scaling conversions.
         outputs : list of output <Vector> objects
             List of output vectors to apply the unit and scaling conversions.
         residuals : list of residual <Vector> objects
             List of residual vectors to apply the unit and scaling conversions.
-        scale_jac : bool
-            If True, scale the Jacobian as well.
         """
         scal_vecs = self._scaling_vecs
 
-        for vec in inputs:
-            self._scale_vec(vec, 'input', 'phys')
         for vec in outputs:
             self._scale_vec(vec, 'output', 'phys')
         for vec in residuals:
             self._scale_vec(vec, 'residual', 'phys')
-        if scale_jac:
-            self._jacobian._precompute_iter()
-            self._jacobian._scale(self._scaling_to_phys)
 
         yield
 
-        for vec in inputs:
-            self._scale_vec(vec, 'input', 'norm')
         for vec in outputs:
             self._scale_vec(vec, 'output', 'norm')
         for vec in residuals:
             self._scale_vec(vec, 'residual', 'norm')
-        if scale_jac:
-            self._jacobian._precompute_iter()
-            self._jacobian._scale(self._scaling_to_norm)
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):
@@ -935,33 +1048,13 @@ class System(object):
         """
         Context manager that temporarily puts all vectors and Jacobians in a scaled state.
         """
-        self._scale_vectors_and_jacobians('to norm')
-        yield
-        self._scale_vectors_and_jacobians('to phys')
-
-    def _scale_vectors_and_jacobians(self, direction):
-        """
-        Scale all vectors and Jacobians to or from a scaled state.
-
-        Parameters
-        ----------
-        direction : str
-            'to norm' (to scaled) or 'to phys' (to unscaled).
-        """
-        if direction == 'to norm':
-            scaling = self._scaling_to_norm
-        elif direction == 'to phys':
-            scaling = self._scaling_to_phys
-
-        for vec_type in ['input', 'output', 'residual']:
+        for vec_type in ['output', 'residual']:
             for vec in self._vectors[vec_type].values():
-                self._scale_vec(vec, vec_type, direction[3:])
-
-        for system in self.system_iter(include_self=True, recurse=True):
-            if system._owns_assembled_jac:
-                with system.jacobian_context():
-                    system._jacobian._precompute_iter()
-                    system._jacobian._scale(scaling)
+                self._scale_vec(vec, vec_type, 'norm')
+        yield
+        for vec_type in ['output', 'residual']:
+            for vec in self._vectors[vec_type].values():
+                self._scale_vec(vec, vec_type, 'phys')
 
     @property
     def nl_solver(self):
@@ -1395,7 +1488,7 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        pro2abs = self._var_allprocs_prom2abs_list['output']
+        pro2abs = self._varx_allprocs_prom2abs_list['output']
 
         # Human readable error message during Driver setup.
         try:
@@ -1449,7 +1542,7 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        prom2abs = self._var_allprocs_prom2abs_list['output']
+        prom2abs = self._varx_allprocs_prom2abs_list['output']
 
         # Human readable error message during Driver setup.
         try:
@@ -1572,7 +1665,7 @@ class System(object):
             If None, all are in the scope.
         """
         with self._scaled_context():
-            self._apply_linear(vec_names, mode, scope_out, scope_int)
+            self._apply_linear(vec_names, mode, scope_out, scope_in)
 
     def run_solve_linear(self, vec_names, mode):
         """

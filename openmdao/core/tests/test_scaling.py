@@ -499,6 +499,7 @@ class TestScaling(unittest.TestCase):
 
         prob.setup(check=False)
         prob['comp.widths'] = np.ones((2, 2))
+
         prob.run_model()
 
         assert_rel_error(self, prob['comp.total_volume'], 4.)

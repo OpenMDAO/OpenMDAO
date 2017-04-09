@@ -12,7 +12,6 @@ import numpy as np
 import scipy.sparse as sparse
 
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
-from openmdao.assemblers.default_assembler import DefaultAssembler
 from openmdao.components.deprecated_component import Component as DepComponent
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
@@ -39,33 +38,28 @@ class Problem(object):
     Attributes
     ----------
     model : <System>
-        pointer to the top-level <System> object (root node in the tree).
+        Pointer to the top-level <System> object (root node in the tree).
     comm : MPI.Comm or <FakeComm>
-        the global communicator; the same as that of assembler and model.
+        The global communicator.
     driver : <Driver>
         Slot for the driver. The default driver is `Driver`, which just runs
         the model once.
-    _assembler : <Assembler>
-        pointer to the global <Assembler> object.
     _use_ref_vector : bool
-        if True, allocate vectors to store ref. values.
+        If True, allocate vectors to store ref. values.
     """
 
-    def __init__(self, model=None, comm=None, assembler_class=None,
-                 use_ref_vector=True, root=None):
+    def __init__(self, model=None, comm=None, use_ref_vector=True, root=None):
         """
         Initialize attributes.
 
         Parameters
         ----------
         model : <System> or None
-            pointer to the top-level <System> object (root node in the tree).
+            Pointer to the top-level <System> object (root node in the tree).
         comm : MPI.Comm or <FakeComm> or None
-            the global communicator; the same as that of assembler and model.
-        assembler_class : <Assembler> or None
-            pointer to the global <Assembler> object.
+            The global communicator.
         use_ref_vector : bool
-            if True, allocate vectors to store ref. values.
+            If True, allocate vectors to store ref. values.
         root : <System> or None
             Deprecated kwarg for `model`.
         """
@@ -75,8 +69,6 @@ class Problem(object):
                 comm = MPI.COMM_WORLD
             except ImportError:
                 comm = FakeComm()
-        if assembler_class is None:
-            assembler_class = DefaultAssembler
 
         if root is not None:
             if model is not None:
@@ -95,7 +87,6 @@ class Problem(object):
         self.comm = comm
         self.driver = Driver()
 
-        self._assembler = assembler_class(comm)
         self._use_ref_vector = use_ref_vector
 
     def __getitem__(self, name):
@@ -228,7 +219,7 @@ class Problem(object):
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto'):
         """
-        Set up everything (model, assembler, vector, solvers, drivers).
+        Set up everything.
 
         Parameters
         ----------
@@ -260,103 +251,7 @@ class Problem(object):
         self._mode = mode
 
         model._setupx(comm, vector_class)
-
-        return self
-
-    def setup_old(self, vector_class=DefaultVector, check=True, logger=None,
-              mode='auto'):
-        """
-        Set up everything (model, assembler, vector, solvers, drivers).
-
-        Parameters
-        ----------
-        vector_class : type
-            reference to an actual <Vector> class; not an instance.
-        check : boolean
-            whether to run error check after setup is complete.
-        logger : object
-            Object for logging config checks if check is True.
-        mode : string
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'auto', which lets OpenMDAO choose
-            the best mode for your problem.
-
-        Returns
-        -------
-        self : <Problem>
-            this enables the user to instantiate and setup in one line.
-        """
-        model = self.model
-        comm = self.comm
-        assembler = self._assembler
-
-        if mode not in ['fwd', 'rev', 'auto']:
-            msg = "Unsupported mode: '%s'" % mode
-            raise ValueError(msg)
-
-        # TODO: Support automatic determination of mode
-        if mode == 'auto':
-            mode = 'rev'
-        self._mode = assembler._mode = mode
-
-        # Recursive system setup
-        self._setup_processors()
-        allprocs_abs_names, allprocs_prom_names = model._setup_variables()
-
-        # Assembler setup: variable metadata and indices
-        assembler._setup_variables(allprocs_abs_names,
-                                   model._var_abs2data_io,
-                                   model._var_abs_names)
-
-        model._setup_var_indices()
-        model._setup_partials()
-        model._setup_connections()
-
-        # Assembler setup: variable connections
-        assembler._setup_connections(model._manual_connections_abs,
-                                     model._var_allprocs_prom2abs_list,
-                                     model._var_abs2data_io)
-
-        # Assembler setup: global transfer indices vector
-        assembler._setup_src_indices(model._var_abs2data_io,
-                                     model._var_abs_names)
-
-        # Assembler setup: compute data required for units/scaling
-        assembler._setup_src_data(model._var_abs_names['output'])
-
-        # Set up scaling vectors
-        model._setup_scaling()
-
-        # Set up lower and upper bounds vectors
-        lower_bounds = vector_class('lower', 'output', self.model)
-        upper_bounds = vector_class('upper', 'output', self.model)
-        model._setup_bounds_vectors(lower_bounds, upper_bounds, True)
-
-        # Vector setup for the basic execution vector
-        self.setup_vector('nonlinear', vector_class, self._use_ref_vector)
-
-        # Vector setup for the linear vector
-        self.setup_vector('linear', vector_class, self._use_ref_vector)
-
-        model._setup_jacobians()
-
-        for system in model.system_iter(include_self=True, recurse=True):
-            # set up all the solvers.
-            if system._nl_solver is not None:
-                system._nl_solver._setup_solvers(system, 0)
-            if system._ln_solver is not None:
-                system._ln_solver._setup_solvers(system, 0)
-
-        # Finally, prepare the driver for execution.
         self.driver._setup_driver(self)
-
-        if check:
-            check_config(self, logger)
-
-        for system in model.system_iter(recurse=True, typ=DepComponent):
-            system._first_setup = True
-
-        self.setupx(vector_class, mode)
 
         return self
 
@@ -382,37 +277,6 @@ class Problem(object):
 
         self.driver._setup_processors(self.model, self.comm, {},
                                       self._assembler)
-
-    def setup_vector(self, vec_name, vector_class, use_ref_vector):
-        """
-        Set up the 'vec_name' <Vector>.
-
-        Parameters
-        ----------
-        vec_name : str
-            name of the vector.
-        vector_class : type
-            reference to the actual <Vector> class.
-        use_ref_vector : bool
-            if True, allocate vectors to store ref. values.
-        """
-        model = self.model
-        assembler = self._assembler
-
-        vectors = {}
-        for key in ['input', 'output', 'residual']:
-            if key is 'residual':
-                typ = 'output'
-            else:
-                typ = key
-
-            vectors[key] = vector_class(vec_name, typ, self.model)
-
-        # TODO: implement this properly
-        ind1, ind2 = self.model._var_allprocs_idx_range['output']
-        vector_var_ids = np.arange(ind1, ind2)
-
-        self.model._setup_vector(vectors, vector_var_ids, use_ref_vector)
 
     def check_partial_derivatives(self, out_stream=sys.stdout, comps=None,
                                   compact_print=False, abs_err_tol=1e-6,
@@ -517,13 +381,13 @@ class Problem(object):
 
                 # TODO: Check deprecated deriv_options.
 
-                with comp._units_scaling_context(scale_jac=True):
+                with comp._units_scaling_context():
                     subjacs = comp._jacobian._subjacs
                     if explicit:
                         comp._negate_jac()
 
-                    of_list = list(comp._var_allprocs_prom2abs_list['output'].keys())
-                    wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
+                    of_list = list(comp._varx_allprocs_prom2abs_list['output'].keys())
+                    wrt_list = list(comp._varx_allprocs_prom2abs_list['input'].keys())
 
                     # The only outputs in wrt should be implicit states.
                     if deprecated:
@@ -615,16 +479,14 @@ class Problem(object):
 
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                in_size = np.prod(comp._var_abs2data_io[wrt]['metadata']['shape'])
-                                out_size = np.prod(comp._var_abs2data_io[of]['metadata']['shape'])
+                                in_size = np.prod(comp._varx_abs2meta['input'][wrt]['shape'])
+                                out_size = np.prod(comp._varx_abs2meta['output'][of]['shape'])
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
-                                    in_size = np.prod(
-                                        comp._var_abs2data_io[wrt]['metadata']['shape'])
-                                    out_size = np.prod(
-                                        comp._var_abs2data_io[of]['metadata']['shape'])
+                                    in_size = np.prod(comp._varx_abs2meta['input'][wrt]['shape'])
+                                    out_size = np.prod(comp._varx_abs2meta['output'][of]['shape'])
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     # if a scalar value is provided (in declare_partials),
@@ -662,8 +524,8 @@ class Problem(object):
             deprecated = isinstance(comp, DepComponent)
             approximation = scheme()
 
-            of = list(comp._var_allprocs_prom2abs_list['output'].keys())
-            wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
+            of = list(comp._varx_allprocs_prom2abs_list['output'].keys())
+            wrt = list(comp._varx_allprocs_prom2abs_list['input'].keys())
 
             # The only outputs in wrt should be implicit states.
             if deprecated:
@@ -830,13 +692,13 @@ class Problem(object):
             oldof = of
             of = []
             for names in oldof:
-                of.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
+                of.append(tuple(model._varx_allprocs_prom2abs_list['output'][name][0]
                                 for name in names))
 
             oldwrt = wrt
             wrt = []
             for names in oldwrt:
-                wrt.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
+                wrt.append(tuple(model._varx_allprocs_prom2abs_list['output'][name][0]
                                  for name in names))
 
         if fwd:
@@ -859,8 +721,7 @@ class Problem(object):
         dinputs = input_vec[vecname]
         doutputs = output_vec[vecname]
 
-        ranges = self._assembler._var_dist_ranges
-        owners = self._assembler._var_owned_by['output']
+        iproc = model.comm.rank
 
         # If Forward mode, solve linear system for each 'wrt'
         # If Adjoint mode, solve linear system for each 'of'
@@ -869,8 +730,10 @@ class Problem(object):
                 # Dictionary access returns a scaler for 1d input, and we
                 # need a vector for clean code, so use _views_flat.
                 flat_view = dinputs._views_flat[input_name]
-                start, end, total_size = ranges[input_name]
-                in_var_idx = self._assembler._var_allprocs_abs2idx_io[input_name]
+                in_var_idx = model._varx_allprocs_abs2idx['output'][input_name]
+                start = np.sum(model._varx_sizes['output'][:iproc, in_var_idx])
+                end = np.sum(model._varx_sizes['output'][:iproc + 1, in_var_idx])
+                total_size = np.sum(model._varx_sizes['output'][:, in_var_idx])
 
                 if input_name in input_vois:
                     in_idxs = input_vois[input_name]['indices']
@@ -881,13 +744,13 @@ class Problem(object):
                 if in_idxs is not None:
                     irange = in_idxs
                     loc_size = len(in_idxs)
-                elif owners[in_var_idx] != -1:  # var is duplicated
+                else:  # var is duplicated
                     irange = range(end - start)
                     loc_size = end - start
                     dup = True
-                else:  # distributed full var
-                    irange = range(total_size)
-                    loc_size = end - start
+                # else:  # distributed full var
+                #     irange = range(total_size)
+                #     loc_size = end - start
 
                 for idx in irange:
 
@@ -916,7 +779,7 @@ class Problem(object):
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_names in enumerate(output_list):
                         for oname_count, output_name in enumerate(output_names):
-                            out_var_idx = self._assembler._var_allprocs_abs2idx_io[output_name]
+                            out_var_idx = model._varx_allprocs_abs2idx['output'][output_name]
                             deriv_val = doutputs._views_flat[output_name]
                             if output_name in output_vois:
                                 out_idxs = output_vois[output_name]['indices']
@@ -929,8 +792,9 @@ class Problem(object):
                                 deriv_val = deriv_val[oidxs]
                             len_val = len(deriv_val)
 
-                            if nproc > 1 and owners[out_var_idx] != -1:  # var is duplicated
-                                self.comm.Bcast(deriv_val, root=owners[out_var_idx])
+                            if nproc > 1:  # var is duplicated
+                                self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
+                                    model._varx_sizes['output'][:, out_var_idx])[0][0]))
 
                             if return_format == 'flat_dict':
                                 if fwd:

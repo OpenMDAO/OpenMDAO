@@ -414,15 +414,9 @@ class PetscKSP(LinearSolver):
         if vec_name in self._ksp:
             return self._ksp[vec_name]
 
-        lsize = 0
-        for abs_name in system._var_abs_names['output']:
-            lsize += np.prod(system._var_abs2data_io[abs_name]['metadata']['shape'])
-
-        size = 0
-        global_var_sizes = system._assembler._var_sizes_all['output']
-        idx_start, idx_end = system._var_allprocs_idx_range['output']
-        for idx in range(idx_start, idx_end):
-            size += sum(global_var_sizes[:, idx])
+        iproc = system.comm.rank
+        lsize = np.sum(system._varx_sizes['output'][iproc, :])
+        size = np.sum(system._varx_sizes['output'])
 
         jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
                                            comm=system.comm)

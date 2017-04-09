@@ -353,10 +353,9 @@ class TestJacobianFeatures(unittest.TestCase):
             ('units.flow:P', 'units.P'): -1.,
         }
 
-        with units._units_scaling_context(scale_jac=True):
-            jac = units._jacobian._subjacs
-            for deriv, val in iteritems(expected_subjacs):
-                assert_rel_error(self, jac[deriv], val, 1e-6)
+        jac = units._jacobian._subjacs
+        for deriv, val in iteritems(expected_subjacs):
+            assert_rel_error(self, jac[deriv], val, 1e-6)
 
 if __name__ == '__main__':
     unittest.main()

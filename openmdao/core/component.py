@@ -574,8 +574,8 @@ class Component(System):
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         glob_patterns = {'*', '?', '['}
-        outs = self._var_allprocs_prom2abs_list['output']
-        ins = self._var_allprocs_prom2abs_list['input']
+        outs = self._varx_allprocs_prom2abs_list['output']
+        ins = self._varx_allprocs_prom2abs_list['input']
 
         def find_matches(pattern, var_list):
             if glob_patterns.intersection(pattern):
@@ -602,8 +602,11 @@ class Component(System):
         """
         of, wrt = abs_key2rel_key(self, abs_key)
         if meta['dependent']:
-            out_size = np.prod(self._var_abs2data_io[abs_key[0]]['metadata']['shape'])
-            in_size = np.prod(self._var_abs2data_io[abs_key[1]]['metadata']['shape'])
+            out_size = np.prod(self._varx_abs2meta['output'][abs_key[0]]['shape'])
+            if abs_key[1] in self._varx_abs2meta['input']:
+                in_size = np.prod(self._varx_abs2meta['input'][abs_key[1]]['shape'])
+            elif abs_key[1] in self._varx_abs2meta['output']:
+                in_size = np.prod(self._varx_abs2meta['output'][abs_key[1]]['shape'])
             rows = meta['rows']
             cols = meta['cols']
             if rows is not None:
