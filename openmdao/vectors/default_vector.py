@@ -388,7 +388,8 @@ class DefaultVectorX(VectorX):
         # Loop over varsets and find the largest amount a bound is violated
         # where positive means a bound is violated - i.e. the required d_alpha.
         for u_data, du_data, lower_data, upper_data in zip(
-                u._data, du._data, lower_bounds._data, upper_bounds._data):
+                u._data.values(), du._data.values(),
+                lower_bounds._data.values(), upper_bounds._data.values()):
 
             mask = du_data != 0
             if mask.any():
@@ -442,7 +443,8 @@ class DefaultVectorX(VectorX):
 
         # Loop over varsets and enforce bounds on step in-place.
         for u_data, du_data, lower_data, upper_data in zip(
-                u._data, du._data, lower_bounds._data, upper_bounds._data):
+                u._data.values(), du._data.values(),
+                lower_bounds._data.values(), upper_bounds._data.values()):
 
             # If u > lower, we're just adding zero. Otherwise, we're adding
             # the step required to get up to the lower bound.
@@ -486,7 +488,8 @@ class DefaultVectorX(VectorX):
 
         # Loop over varsets and enforce bounds on step in-place.
         for u_data, du_data, lower_data, upper_data in zip(
-                u._data, du._data, lower_bounds._data, upper_bounds._data):
+                u._data.values(), du._data.values(),
+                lower_bounds._data.values(), upper_bounds._data.values()):
 
             # If u > lower, we're just adding zero. Otherwise, we're adding
             # the step required to get up to the lower bound.
