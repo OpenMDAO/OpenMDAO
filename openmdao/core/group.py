@@ -776,7 +776,7 @@ class Group(System):
             enable users to instantiate and add a subsystem at the
             same time, and get the reference back.
         """
-        for sub in self._subsystems_allprocs:
+        for sub in self._subsystems_allprocs + self._static_subsystems_allprocs:
             if name == sub.name:
                 raise RuntimeError("Subsystem name '%s' is already used." %
                                    name)
@@ -844,10 +844,11 @@ class Group(System):
             return
 
         # target should not already be connected
-        if tgt_name in self._manual_connections:
-            srcname = self._manual_connections[tgt_name][0]
-            raise RuntimeError("Input '%s' is already connected to '%s'." %
-                               (tgt_name, srcname))
+        for manual_connections in [self._manual_connections, self._static_manual_connections]:
+            if tgt_name in manual_connections:
+                srcname = manual_connections[tgt_name][0]
+                raise RuntimeError(
+                    "Input '%s' is already connected to '%s'." % (tgt_name, srcname))
 
         # source and target should not be in the same system
         if src_name.rsplit('.', 1)[0] == tgt_name.rsplit('.', 1)[0]:
@@ -873,7 +874,7 @@ class Group(System):
         # Make sure the new_order is valid. It must contain all subsystems
         # in this model.
         newset = set(new_order)
-        olddict = {s.name: s for s in self._subsystems_allprocs}
+        olddict = {s.name: s for s in self._static_subsystems_allprocs}
         oldset = set(olddict)
 
         if oldset != newset:
@@ -897,7 +898,7 @@ class Group(System):
             raise ValueError("%s: Duplicate name(s) found in subsystem order list: %s" %
                              (self.pathname, sorted(dupes)))
 
-        self._subsystems_allprocs = [olddict[name] for name in new_order]
+        self._static_subsystems_allprocs = [olddict[name] for name in new_order]
 
     def get_req_procs(self):
         """
