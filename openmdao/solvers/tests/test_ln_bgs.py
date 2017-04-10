@@ -7,7 +7,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp, Problem, AssembledJacobian
+from openmdao.api import Group, IndepVarComp, Problem, AssembledJacobian, ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.ln_bgs import LinearBlockGS
 from openmdao.solvers.nl_newton import NewtonSolver
@@ -499,6 +499,36 @@ class TestBGSSolver(unittest.TestCase):
         for key, val in iteritems(Jbase):
             assert_rel_error(self, J[key], val, .00001)
 
+    def test_simple_implicit(self):
+
+        class SimpleImp(ImplicitComponent):
+
+            def initialize_variables(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = 3.0*inputs['a'] + 2.0*outputs['x']
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = 2.0
+                jacobian['x', 'a'] = 3.0
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p', IndepVarComp('a', 5.0))
+        model.add_subsystem('comp', SimpleImp())
+        model.connect('p.a', 'comp.a')
+
+        from openmdao.api import ScipyIterativeSolver
+        model.ln_solver = LinearBlockGS()
+
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
+
+        deriv = prob.compute_total_derivs(of=['comp.x'], wrt=['p.a'])
+        self.assertEqual(deriv['comp.x', 'p.a'], -1.5)
+
     def test_implicit_cycle(self):
 
         prob = Problem()
@@ -514,7 +544,7 @@ class TestBGSSolver(unittest.TestCase):
 
         from openmdao.api import DirectSolver
         model.nl_solver = NewtonSolver()
-        model.nl_solver.options['maxiter'] = 2#5
+        model.nl_solver.options['maxiter'] = 5
         model.ln_solver = DirectSolver()
         model.ln_solver = LinearBlockGS()
 

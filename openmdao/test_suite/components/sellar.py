@@ -121,8 +121,11 @@ class SellarDis2withDerivatives(SellarDis2):
         """
         Jacobian for Sellar discipline 2.
         """
+        y1 = inputs['y1']
+        if y1.real < 0.0:
+            y1 *= -1
 
-        J['y2', 'y1'] = .5*inputs['y1']**-.5
+        J['y2', 'y1'] = .5*y1**-.5
         J['y2', 'z'] = np.array([[1.0, 1.0]])
 
 

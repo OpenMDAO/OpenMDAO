@@ -7,6 +7,7 @@ from six import itervalues
 
 from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.name_maps import rel_name2abs_name
 
 
 class ImplicitComponent(Component):
@@ -135,11 +136,14 @@ class ImplicitComponent(Component):
                 abs_errors.append(result[1])
                 rel_errors.append(result[2])
 
-                #with self._units_scaling_context(outputs=[d_outputs], residuals=[d_residuals]):
-                    #if mode == 'fwd':
-                        #d_outputs.set_vec(d_residuals)
-                    #elif mode == 'rev':
-                        #d_residuals.set_vec(d_outputs)
+                # Jacobian and vectors are all scaled, unitless
+                #with self.jacobian_context() as J:
+                    #for name in d_residuals:
+                        #key = (name, name)
+                        #absname = rel_name2abs_name(self, name)
+                        #if key in J:
+                            #d_residuals._views_flat[absname] /= np.diag(J[key])
+                            #d_outputs._views_flat[absname][:] = d_residuals._views_flat[absname]
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
