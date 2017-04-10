@@ -666,6 +666,7 @@ class TestScaling(unittest.TestCase):
         base_x = model.get_subsystem('comp')._outputs['x'].copy()
         base_ex = model.get_subsystem('comp')._outputs['extra'].copy()
         base_res_x = model.get_subsystem('comp')._residuals['x'].copy()
+
         with model._scaled_context():
             val = model.get_subsystem('comp')._outputs['x']
             assert_rel_error(self, val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
@@ -682,20 +683,9 @@ class TestScaling(unittest.TestCase):
         with model._scaled_context():
             subjacs = comp.jacobian._subjacs
 
-            assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][0], (2.0 - 4.0)/(7.0 - 13.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][0], (2.0 - 4.0)/(11.0 - 18.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][1], (3.0 - 9.0)/(7.0 - 13.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][1], (3.0 - 9.0)/(11.0 - 18.0))
-
-            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][0][0], (12.0 - 14.0)/(7.0 - 13.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][1][0], (12.0 - 14.0)/(11.0 - 18.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][0][1], (13.0 - 17.0)/(7.0 - 13.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][1][1], (13.0 - 17.0)/(11.0 - 18.0))
-
-            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][0], -1.0/(7.0 - 13.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][0], 0.0)
-            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][1], 0.0)
-            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][1], -1.0/(11.0 - 18.0))
+            assert_rel_error(self, subjacs['comp.x', 'comp.x'], np.ones((2, 2)))
+            assert_rel_error(self, subjacs['comp.x', 'comp.extra'], np.ones((2, 2)))
+            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'], -np.eye(2))
 
     def test_implicit_scale_with_scalar_jac(self):
         raise unittest.SkipTest('Cannot specify an n by m subjac with a scalar yet.')
