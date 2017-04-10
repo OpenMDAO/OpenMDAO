@@ -261,7 +261,12 @@ class ImplicitComponent(Component):
         None or bool or (bool, float, float)
             The bool is the failure flag; and the two floats are absolute and relative error.
         """
-        pass
+        if mode == 'fwd':
+            d_outputs.set_vec(d_residuals)
+            d_outputs *= -1.0
+        elif mode == 'rev':
+            d_residuals.set_vec(d_outputs)
+            d_residuals *= -1.0
 
     def linearize(self, inputs, outputs, jacobian):
         """
