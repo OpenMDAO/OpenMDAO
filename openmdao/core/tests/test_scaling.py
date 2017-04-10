@@ -375,7 +375,7 @@ class TestScaling(unittest.TestCase):
         out2 = model.get_subsystem('p2')._outputs.get_data()[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2 + 1.0))
-        with model._scaled_context():
+        with model._scaled_context_all():
             res1 = model.get_subsystem('p1')._residuals.get_data()[0]
             out1 = model.get_subsystem('p1')._outputs.get_data()[0]
             out2 = model.get_subsystem('p2')._outputs.get_data()[0]
@@ -408,7 +408,7 @@ class TestScaling(unittest.TestCase):
         out2 = model.get_subsystem('p2')._outputs.get_data()[0]
 
         self.assertEqual(res1, (out1 - 2.0*(out2 + 1.0)))
-        with model._scaled_context():
+        with model._scaled_context_all():
             res1a = model.get_subsystem('p1')._residuals.get_data()[0]
 
             self.assertEqual(res1a, (res1-ref0)/(ref-ref0))
@@ -438,7 +438,7 @@ class TestScaling(unittest.TestCase):
         out2 = model.get_subsystem('p2')._outputs.get_data()[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2+1.0))
-        with model._scaled_context():
+        with model._scaled_context_all():
             res1a = model.get_subsystem('p1')._residuals.get_data()[0]
 
             self.assertEqual(res1a, (res1-res_ref0)/(res_ref-res_ref0))
@@ -470,7 +470,7 @@ class TestScaling(unittest.TestCase):
         out2 = model.get_subsystem('p2')._outputs.get_data()[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2+1.0))
-        with model._scaled_context():
+        with model._scaled_context_all():
             res1a = model.get_subsystem('p1')._residuals.get_data()[0]
 
             self.assertEqual(res1a, (res1-res_ref0)/(res_ref-res_ref0))
@@ -504,7 +504,7 @@ class TestScaling(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.total_volume'], 4.)
 
-        with model._scaled_context():
+        with model._scaled_context_all():
             val = model.get_subsystem('comp')._outputs['areas']
             assert_rel_error(self, val[0, 0], 0.5)
             assert_rel_error(self, val[0, 1], 0.5)
@@ -545,7 +545,7 @@ class TestScaling(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.total_volume'], 4.)
 
-        with model._scaled_context():
+        with model._scaled_context_all():
             val = model.get_subsystem('comp')._outputs['areas']
             assert_rel_error(self, val[0, 0], 1.0/2)
             assert_rel_error(self, val[0, 1], 1.0/3)
@@ -591,7 +591,7 @@ class TestScaling(unittest.TestCase):
         assert_rel_error(self, prob['comp.total_volume'], 4.)
 
         # (res1-res_ref0)/(res_ref-res_ref0))
-        with model._scaled_context():
+        with model._scaled_context_all():
             val = model.get_subsystem('comp')._outputs['areas']
             assert_rel_error(self, val[0, 0], (1.0 - 0.1)/(2 - 0.1))
             assert_rel_error(self, val[0, 1], (1.0 - 0.2)/(3 - 0.2))
@@ -667,7 +667,7 @@ class TestScaling(unittest.TestCase):
         base_ex = model.get_subsystem('comp')._outputs['extra'].copy()
         base_res_x = model.get_subsystem('comp')._residuals['x'].copy()
 
-        with model._scaled_context():
+        with model._scaled_context_all():
             val = model.get_subsystem('comp')._outputs['x']
             assert_rel_error(self, val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
             assert_rel_error(self, val[1], (base_x[1] - 9.0)/(3.0 - 9.0))
@@ -680,7 +680,7 @@ class TestScaling(unittest.TestCase):
 
         model.run_linearize()
 
-        with model._scaled_context():
+        with model._scaled_context_all():
             subjacs = comp.jacobian._subjacs
 
             assert_rel_error(self, subjacs['comp.x', 'comp.x'], np.ones((2, 2)))
@@ -726,7 +726,7 @@ class TestScaling(unittest.TestCase):
         base_x = model.get_subsystem('comp')._outputs['x'].copy()
         base_ex = model.get_subsystem('comp')._outputs['extra'].copy()
         base_res_x = model.get_subsystem('comp')._residuals['x'].copy()
-        with model._scaled_context():
+        with model._scaled_context_all():
             val = model.get_subsystem('comp')._outputs['x']
             assert_rel_error(self, val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
             assert_rel_error(self, val[1], (base_x[1] - 9.0)/(3.0 - 9.0))
@@ -739,7 +739,7 @@ class TestScaling(unittest.TestCase):
 
         model.run_linearize()
 
-        with model._scaled_context():
+        with model._scaled_context_all():
             subjacs = comp.jacobian._subjacs
 
             assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][0], (2.0 - 4.0)/(7.0 - 13.0))
@@ -773,7 +773,7 @@ class TestScaling(unittest.TestCase):
 
         model.run_apply_nonlinear()
 
-        with model._scaled_context():
+        with model._scaled_context_all():
             val = model.get_subsystem('comp')._outputs['y1']
             assert_rel_error(self, val, 2.0)
             val = model.get_subsystem('comp')._outputs['y2']
@@ -795,7 +795,7 @@ class TestScaling(unittest.TestCase):
 
         model.run_apply_nonlinear()
 
-        with model._scaled_context():
+        with model._scaled_context_all():
             val = model.get_subsystem('comp')._outputs['y1']
             assert_rel_error(self, val, 200.0)
             val = model.get_subsystem('comp')._outputs['y2']
@@ -817,7 +817,7 @@ class TestScaling(unittest.TestCase):
 
         model.run_apply_nonlinear()
 
-        with model._scaled_context():
+        with model._scaled_context_all():
             val = model.get_subsystem('comp')._residuals['y1']
             assert_rel_error(self, val, -.995)
             val = model.get_subsystem('comp')._residuals['y2']
@@ -837,7 +837,7 @@ class TestScaling(unittest.TestCase):
 
         model.run_apply_nonlinear()
 
-        with model._scaled_context():
+        with model._scaled_context_all():
             val = model.get_subsystem('comp')._residuals['y']
             assert_rel_error(self, val[0], (1-200.)/200.)
             assert_rel_error(self, val[1], (1-6000.)/6000.)

@@ -182,7 +182,7 @@ class Problem(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        with self.model._scaled_context():
+        with self.model._scaled_context_all():
             return self.driver.run()
 
     def run_once(self):
@@ -381,7 +381,7 @@ class Problem(object):
 
                 # TODO: Check deprecated deriv_options.
 
-                with comp._units_scaling_context():
+                with comp._unscaled_context():
                     subjacs = comp._jacobian._subjacs
                     if explicit:
                         comp._negate_jac()
@@ -583,7 +583,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        with self.model._scaled_context():
+        with self.model._scaled_context_all():
             totals = self._compute_total_derivs(of=of, wrt=wrt, return_format=return_format,
                                                 global_names=False)
 

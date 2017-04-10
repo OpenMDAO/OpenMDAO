@@ -27,7 +27,7 @@ class DictionaryJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        with self._system._units_scaling_context(outputs=[d_outputs],
+        with self._system._unscaled_context(outputs=[d_outputs],
                                                  residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys():
                 subjac = self._subjacs[abs_key]

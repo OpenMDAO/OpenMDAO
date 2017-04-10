@@ -682,7 +682,7 @@ class System(object):
         self._set_partials_meta()
 
         for subsys in self._subsystems_myproc:
-            subsys._setup_jacobians(jacobian)
+            subsys._setupx_jacobians(jacobian)
 
         if self._owns_assembled_jac:
             self._jacobian._system = self
@@ -718,9 +718,14 @@ class System(object):
         vec_inputs = self._vectors['input'][vec_name]
         vec_outputs = self._vectors['output'][vec_name]
 
-        self._scale_vec(vec_inputs, 'input', 'norm')
+        if mode == 'fwd':
+            direction = ('norm', 'phys')
+        elif mode == 'rev':
+            direction = ('phys', 'norm')
+
+        self._scale_vec(vec_inputs, 'input', direction[0])
         self._xfers[vec_name][mode, isub](vec_inputs, vec_outputs, mode)
-        self._scale_vec(vec_inputs, 'input', 'phys')
+        self._scale_vec(vec_inputs, 'input', direction[1])
 
     def get_req_procs(self):
         """
@@ -738,49 +743,6 @@ class System(object):
         """
         # by default, systems only require 1 proc
         return (1, 1)
-
-    def _setup_jacobians(self, jacobian=None):
-        """
-        Set and populate jacobians down through the system tree.
-
-        Parameters
-        ----------
-        jacobian : <AssembledJacobian> or None
-            The global jacobian to populate for this system.
-        """
-        self._jacobian_changed = False
-
-        if self._owns_assembled_jac:
-
-            # At present, we don't support a AssembledJacobian in a group if any subcomponents
-            # are matrix-free.
-            for subsys in self.system_iter():
-
-                try:
-                    if subsys._matrix_free:
-                        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
-                        raise RuntimeError(msg)
-
-                # Groups don't have `_matrix_free`
-                # Note, we could put this attribute on Group, but this would be True for a
-                # default Group, and thus we would need an isinstance on Component, which is the
-                # reason for the try block anyway.
-                except AttributeError:
-                    continue
-
-            jacobian = self._jacobian
-
-        elif jacobian is not None:
-            self._jacobian = jacobian
-
-        self._set_partials_meta()
-
-        for subsys in self._subsystems_myproc:
-            subsys._setup_jacobians(jacobian)
-
-        if self._owns_assembled_jac:
-            self._jacobian._system = self
-            self._jacobian._initialize()
 
     def _get_maps(self, prom_names):
         """
@@ -911,7 +873,7 @@ class System(object):
         self._jacobian_changed = True
 
     @contextmanager
-    def _units_scaling_context(self, outputs=[], residuals=[]):
+    def _unscaled_context(self, outputs=[], residuals=[]):
         """
         Context manager for units and scaling for vectors and Jacobians.
 
@@ -926,8 +888,6 @@ class System(object):
         residuals : list of residual <Vector> objects
             List of residual vectors to apply the unit and scaling conversions.
         """
-        scal_vecs = self._scaling_vecs
-
         for vec in outputs:
             self._scale_vec(vec, 'output', 'phys')
         for vec in residuals:
@@ -939,6 +899,19 @@ class System(object):
             self._scale_vec(vec, 'output', 'norm')
         for vec in residuals:
             self._scale_vec(vec, 'residual', 'norm')
+
+    @contextmanager
+    def _scaled_context_all(self):
+        """
+        Context manager that temporarily puts all vectors and Jacobians in a scaled state.
+        """
+        for vec_type in ['output', 'residual']:
+            for vec in self._vectors[vec_type].values():
+                self._scale_vec(vec, vec_type, 'norm')
+        yield
+        for vec_type in ['output', 'residual']:
+            for vec in self._vectors[vec_type].values():
+                self._scale_vec(vec, vec_type, 'phys')
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):
@@ -1066,19 +1039,6 @@ class System(object):
         self._jacobian._precompute_iter()
         yield self._jacobian
         self._jacobian._system = oldsys
-
-    @contextmanager
-    def _scaled_context(self):
-        """
-        Context manager that temporarily puts all vectors and Jacobians in a scaled state.
-        """
-        for vec_type in ['output', 'residual']:
-            for vec in self._vectors[vec_type].values():
-                self._scale_vec(vec, vec_type, 'norm')
-        yield
-        for vec_type in ['output', 'residual']:
-            for vec in self._vectors[vec_type].values():
-                self._scale_vec(vec, vec_type, 'phys')
 
     @property
     def nl_solver(self):
@@ -1646,7 +1606,7 @@ class System(object):
 
         This calls _apply_nonlinear, but with the model assumed to be in an unscaled state.
         """
-        with self._scaled_context():
+        with self._scaled_context_all():
             self._apply_nonlinear()
 
     def run_solve_nonlinear(self):
@@ -1664,7 +1624,7 @@ class System(object):
         float
             absolute error.
         """
-        with self._scaled_context():
+        with self._scaled_context_all():
             result = self._solve_nonlinear()
 
         return result
@@ -1688,7 +1648,7 @@ class System(object):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        with self._scaled_context():
+        with self._scaled_context_all():
             self._apply_linear(vec_names, mode, scope_out, scope_in)
 
     def run_solve_linear(self, vec_names, mode):
@@ -1713,7 +1673,7 @@ class System(object):
         float
             absolute error.
         """
-        with self._scaled_context():
+        with self._scaled_context_all():
             result = self._solve_linear(vec_names, mode)
 
         return result
@@ -1732,7 +1692,7 @@ class System(object):
             Flag indicating if the linear solver should be linearized.
 
         """
-        with self._scaled_context():
+        with self._scaled_context_all():
             self._linearize(do_nl, do_ln)
 
     def _apply_nonlinear(self):
