@@ -337,10 +337,6 @@ class Group(System):
         allprocs_prom2abs_list_out = self._varx_allprocs_prom2abs_list['output']
         abs2meta_in = self._varx_abs2meta['input']
 
-        # Recursion
-        for subsys in self._subsystems_myproc:
-            subsys._setupx_global_connections()
-
         abs_in2out = {}
 
         if self.pathname == '':
@@ -422,9 +418,15 @@ class Group(System):
                               "connected to output '%s' which has "
                               "no units." % (abs_in, in_units, abs_out))
 
+        # Recursion
+        for subsys in self._subsystems_myproc:
+            subsys._conn_parents_abs_in2out = abs_in2out
+            subsys._setupx_global_connections()
+
         # Compute global_abs_in2out by first adding this group's contributions,
-        # then adding contributions from subsystems, then allgathering.
+        # then adding contributions from systems above/below, then allgathering.
         global_abs_in2out.update(abs_in2out)
+        global_abs_in2out.update(self._conn_parents_abs_in2out)
         for subsys in self._subsystems_myproc:
             global_abs_in2out.update(subsys._conn_global_abs_in2out)
 

@@ -112,6 +112,8 @@ class System(object):
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned by this system
         or any descendant system. The data is the same across all processors.
+    _conn_parents_abs_in2out : {'abs_in': 'abs_out'}
+        Dictionary containing all explicit & implicit connections from systems above.
     _conn_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned
         by this system only. The data is the same across all processors.
@@ -221,6 +223,7 @@ class System(object):
         self._varx_sizes_byset = {'input': {}, 'output': {}}
 
         self._conn_global_abs_in2out = {}
+        self._conn_parents_abs_in2out = {}
         self._conn_abs_in2out = {}
 
         self._subjacs_info = {}

@@ -76,29 +76,32 @@ def compute_sys_graph(group, input_srcs, comps_only=False):
     else:
         subsystems = group._subsystems_allprocs
 
-    i_start, i_end = group._var_allprocs_idx_range['input']
-    o_start, o_end = group._var_allprocs_idx_range['output']
+    i_start = group._ext_num_vars['input'][0]
+    i_end = group._ext_num_vars['input'][0] + group._num_var['input']
+    o_start = group._ext_num_vars['output'][0]
+    o_end = group._ext_num_vars['output'][0] + group._num_var['output']
 
     # mapping arrays to find the system ID given the variable ID
-    invar2sys = np.empty(i_end - i_start, dtype=int)
-    outvar2sys = np.empty(o_end - o_start, dtype=int)
+    invar2sys = np.empty(group._num_var['input'], dtype=int)
+    outvar2sys = np.empty(group._num_var['output'], dtype=int)
 
     for i, s in enumerate(subsystems):
-        start, end = s._var_allprocs_idx_range['input']
+        start = s._ext_num_vars['input'][0]
+        end = s._ext_num_vars['input'][0] + s._num_var['input']
         invar2sys[start - i_start:end - i_start] = i
 
-        start, end = s._var_allprocs_idx_range['output']
+        start = s._ext_num_vars['output'][0]
+        end = s._ext_num_vars['output'][0] + s._num_var['output']
         outvar2sys[start - o_start:end - o_start] = i
 
     graph = nx.DiGraph()
 
-    indices = group._assembler._var_allprocs_abs2idx_io
+    indices = group._varx_allprocs_abs2idx
     for in_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
-            src_id = indices[src_abs]
-            in_id = indices[in_abs]
+            src_id = indices['output'][src_abs] + group._ext_num_vars['output'][0]
+            in_id = indices['input'][in_abs] + group._ext_num_vars['input'][0]
             if ((o_start <= src_id < o_end) and (i_start <= in_id < i_end)):
-                # offset the ids to index into our var2sys arrays
                 graph.add_edge(subsystems[outvar2sys[src_id - o_start]].pathname,
                                subsystems[invar2sys[in_id - i_start]].pathname)
 
