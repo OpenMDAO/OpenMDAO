@@ -545,10 +545,8 @@ class TestBGSSolver(unittest.TestCase):
         model.connect('d1.y1', 'd2.y1')
         model.connect('d2.y2', 'd1.y2')
 
-        from openmdao.api import DirectSolver
         model.nl_solver = NewtonSolver()
         model.nl_solver.options['maxiter'] = 5
-        model.ln_solver = DirectSolver()
         model.ln_solver = LinearBlockGS()
 
         prob.setup(check=False)
@@ -557,9 +555,8 @@ class TestBGSSolver(unittest.TestCase):
         prob.run_model()
         res = model._residuals.get_norm()
 
-        # So the base solve_linear for ImplicitComponent is identity, which isn't a great derivative,
-        # but at least Newton gets somewhere with it slowly.
-        self.assertLess(res, 5.0e-2)
+        # Newton is kinda slow on this for some reason, this is how far it gets with directsolver too.
+        self.assertLess(res, 2.0e-2)
 
 
 class TestBGSSolverFeature(unittest.TestCase):

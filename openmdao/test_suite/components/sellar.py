@@ -352,16 +352,16 @@ class SellarImplicitDis1(ImplicitComponent):
 
         y1 = outputs['y1']
 
-        resids['y1'] =  z1**2 + z2 + x1 - 0.2*y2 - y1
+        resids['y1'] =  -(z1**2 + z2 + x1 - 0.2*y2 - y1)
 
     def linearize(self, inputs, outputs, J):
         """
         Jacobian for Sellar discipline 1.
         """
-        J['y1', 'y2'] = -0.2
-        J['y1', 'z'] = np.array([[2.0 * inputs['z'][0], 1.0]])
-        J['y1', 'x'] = 1.0
-        J['y1', 'y1'] = -1.0
+        J['y1', 'y2'] = 0.2
+        J['y1', 'z'] = -np.array([[2.0 * inputs['z'][0], 1.0]])
+        J['y1', 'x'] = -1.0
+        J['y1', 'y1'] = 1.0
 
 
 class SellarImplicitDis2(ImplicitComponent):
@@ -401,7 +401,7 @@ class SellarImplicitDis2(ImplicitComponent):
         if y1.real < 0.0:
             y1 *= -1
 
-        resids['y2'] = y1**.5 + z1 + z2 - y2
+        resids['y2'] = -(y1**.5 + z1 + z2 - y2)
 
     def linearize(self, inputs, outputs, J):
         """
@@ -411,7 +411,7 @@ class SellarImplicitDis2(ImplicitComponent):
         if y1.real < 0.0:
             y1 *= -1
 
-        J['y2', 'y1'] = .5*y1**-.5
-        J['y2', 'z'] = np.array([[1.0, 1.0]])
-        J['y2', 'y2'] = -1.0
+        J['y2', 'y1'] = -.5*y1**-.5
+        J['y2', 'z'] = -np.array([[1.0, 1.0]])
+        J['y2', 'y2'] = 1.0
 

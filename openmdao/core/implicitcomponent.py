@@ -136,15 +136,6 @@ class ImplicitComponent(Component):
                 abs_errors.append(result[1])
                 rel_errors.append(result[2])
 
-                # Jacobian and vectors are all scaled, unitless
-                #with self.jacobian_context() as J:
-                    #for name in d_residuals:
-                        #key = (name, name)
-                        #absname = rel_name2abs_name(self, name)
-                        #if key in J:
-                            #d_residuals._views_flat[absname] /= np.diag(J[key])
-                            #d_outputs._views_flat[absname][:] = d_residuals._views_flat[absname]
-
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
     def _linearize(self, do_nl=True, do_ln=True):
@@ -263,10 +254,8 @@ class ImplicitComponent(Component):
         """
         if mode == 'fwd':
             d_outputs.set_vec(d_residuals)
-            d_outputs *= -1.0
         elif mode == 'rev':
             d_residuals.set_vec(d_outputs)
-            d_residuals *= -1.0
 
     def linearize(self, inputs, outputs, jacobian):
         """
