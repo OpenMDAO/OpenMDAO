@@ -48,9 +48,6 @@ class System(object):
         MPI communicator object.
     metadata : <GeneralizedDictionary>
         Dictionary of user-defined arguments.
-    _first_setup : bool
-        If True, this is the first time we are setting up, so we should not clear the
-        _var_rel2data_io and _var_rel_names attributes prior to setup.
     _mpi_proc_allocator : <ProcAllocator>
         Object that distributes procs among subsystems.
     _mpi_req_procs : (int, int or None)
@@ -60,6 +57,8 @@ class System(object):
         Therefore, if this is not a parallel group, this range is always (0, comm.size).
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
+    _static_subsystems_allprocs : [<System>, ...]
+        List of subsystems that stores all subsystems added outside of initialize_subsystems.
     _subsystems_myproc : [<System>, ...]
         List of local subsystems that exist on this proc.
     _subsystems_myproc_inds : [int, ...]
@@ -70,6 +69,8 @@ class System(object):
         (used to calculate promoted names)
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
+    _static_manual_connections : dict
+        Dictionary that stores all explicit connections added outside of initialize_subsystems.
     _num_var : {'input': int, 'output': int}
         Number of allprocs variables owned by this system.
     _num_var_byset : {'input': dict of int, 'output': dict of int}
@@ -170,7 +171,11 @@ class System(object):
         dict of all driver design vars added to the system.
     _responses : dict of namedtuple
         dict of all driver responses added to the system.
-
+    _static_mode : bool
+        If true, we are outside of initialize_subsystems and initialize_variables.
+        In this case, add_input, add_output, and add_subsystem all add to the
+        '_static' versions of the respective data structures.
+        These data structures are never reset during reconfiguration.
     """
 
     def __init__(self, **kwargs):
@@ -188,10 +193,8 @@ class System(object):
         self.metadata = GeneralizedDictionary()
         self.metadata.update(kwargs)
 
-        self._first_setup = True
-
         self._mpi_proc_allocator = DefaultAllocator()
-        self._mpi_req_procs = None
+        self._mpi_req_procs = (1, 1)
         self._mpi_proc_range = None
 
         self._subsystems_allprocs = []
@@ -267,6 +270,10 @@ class System(object):
 
         self._design_vars = {}
         self._responses = {}
+
+        self._static_subsystems_allprocs = []
+        self._static_manual_connections = {}
+        self._static_mode = True
 
     def _get_initial_var_indices(self):
         """
@@ -612,8 +619,21 @@ class System(object):
                     if not np.isscalar(ref0):
                         ref0 = ref0.reshape(shape)
 
+                # Compute scaling arrays for inputs using a0 and a1
+                # Example:
+                #   Let x, x_src, x_tgt be the variable in dimensionless, source, and target units, resp.
+                #   x_src = a0 + a1 x
+                #   x_tgt = b0 + b1 x
+                #   x_tgt = g(x_src) = d0 + d1 x_src
+                #   b0 + b1 x = d0 + d1 a0 + d1 a1 x
+                #   b0 = d0 + d1 a0
+                #   b0 = g(a0)
+                #   b1 = d0 + d1 a1 - d0
+                #   b1 = g(a1) - g(0)
+
                 a0 = convert_units(ref0, units_out, units_in)
-                a1 = convert_units(ref - ref0, units_out, units_in)
+                a1 = convert_units(ref - ref0, units_out, units_in) \
+                    - convert_units(0., units_out, units_in)
                 vecs['input', 'phys0'][vec_name]._views[abs_in][:] = a0
                 vecs['input', 'phys1'][vec_name]._views[abs_in][:] = a1
                 vecs['input', 'norm0'][vec_name]._views[abs_in][:] = -a0 / a1
@@ -678,7 +698,8 @@ class System(object):
         vec_name = vec._name
 
         vec.elem_mult(scal_vecs[key, scale_to + '1'][vec_name])
-        vec += scal_vecs[key, scale_to + '0'][vec_name]
+        if vec_name == 'nonlinear':
+            vec += scal_vecs[key, scale_to + '0'][vec_name]
 
     def _transfer(self, vec_name, mode, isub=None):
         """

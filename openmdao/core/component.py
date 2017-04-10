@@ -37,13 +37,17 @@ class Component(System):
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian.
     _var_rel2data_io : dict
-        Dictionary mapping rellative names to dicts with keys (prom, rel, my_idx, type_, metadata).
+        Dictionary mapping relative names to dicts with keys (prom, rel, my_idx, type_, metadata).
         This is only needed while adding inputs and outputs. During setup, these are used to
         build _var_abs2data_io.
+    _static_var_rel2data_io : dict
+        Static version of above - stores data for variables added outside of initialize_variables.
     _var_rel_names : {'input': [str, ...], 'output': [str, ...]}
         List of relative names of owned variables existing on current proc.
         This is only needed while adding inputs and outputs. During setup, these are used to
         determine the _var_abs_names.
+    _static_var_rel_names : dict
+        Static version of above - stores names of variables added outside of initialize_variables.
     """
 
     def __init__(self, **kwargs):
@@ -63,24 +67,40 @@ class Component(System):
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
 
+        self._static_var_rel_names = {'input': [], 'output': []}
+        self._static_var_rel2data_io = {}
+
     #
     #
     # -------------------------------------------------------------------------------------
     # Start of reconfigurability changes
+
+    def initialize_variables(self):
+        """
+        Required method for components to declare inputs and outputs.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+        """
+        pass
 
     def _setupx_vars(self):
         super(Component, self)._setupx_vars()
         num_var = self._num_var
         num_var_byset = self._num_var_byset
 
-        # Only necessary to clear the rel_* data structures if we are not on the first setup
-        if self._first_setup:
-            self._first_setup = False
-        else:
-            self._var_rel_names = {'input': [], 'output': []}
-            self._var_rel2data_io = {}
+        self._var_rel_names = {'input': [], 'output': []}
+        self._var_rel2data_io = {}
 
+        self._static_mode = False
+        self._var_rel2data_io.update(self._static_var_rel2data_io)
+        for type_ in ['input', 'output']:
+            self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
         self.initialize_variables()
+        self._static_mode = True
 
         # Compute num_var
         for type_ in ['input', 'output']:
@@ -274,10 +294,18 @@ class Component(System):
         metadata['var_set'] = var_set
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
-        self._var_rel2data_io[name] = {'prom': name, 'rel': name,
-                                       'my_idx': len(self._var_rel_names['input']),
-                                       'type': 'input', 'metadata': metadata}
-        self._var_rel_names['input'].append(name)
+        if self._static_mode:
+            var_rel2data_io = self._static_var_rel2data_io
+            var_rel_names = self._static_var_rel_names
+        else:
+            var_rel2data_io = self._var_rel2data_io
+            var_rel_names = self._var_rel_names
+
+        var_rel2data_io[name] = {
+            'prom': name, 'rel': name,
+            'my_idx': len(self._var_rel_names['input']),
+            'type': 'input', 'metadata': metadata}
+        var_rel_names['input'].append(name)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
@@ -406,10 +434,18 @@ class Component(System):
         metadata['var_set'] = var_set
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
-        self._var_rel2data_io[name] = {'prom': name, 'rel': name,
-                                       'my_idx': len(self._var_rel_names['output']),
-                                       'type': 'output', 'metadata': metadata}
-        self._var_rel_names['output'].append(name)
+        if self._static_mode:
+            var_rel2data_io = self._static_var_rel2data_io
+            var_rel_names = self._static_var_rel_names
+        else:
+            var_rel2data_io = self._var_rel2data_io
+            var_rel_names = self._var_rel_names
+
+        var_rel2data_io[name] = {
+            'prom': name, 'rel': name,
+            'my_idx': len(self._var_rel_names['output']),
+            'type': 'output', 'metadata': metadata}
+        var_rel_names['output'].append(name)
 
     def approx_partials(self, of, wrt, method='fd', **kwargs):
         """

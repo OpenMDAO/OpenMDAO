@@ -49,17 +49,23 @@ class Group(System):
     # -------------------------------------------------------------------------------------
     # Start of reconfigurability changes
 
+    def initialize_subsystems(self):
+        """
+        Add subsystems to this group.
+        """
+        pass
+
     def _setupx_procs(self, pathname, comm, proc_range):
         super(Group, self)._setupx_procs(pathname, comm, proc_range)
 
-        # Only necessary to clear _subsystems_allprocs if we are not on the first setup
-        if self._first_setup:
-            self._first_setup = False
-        else:
-            pass
-            # self._subsystems_allprocs = []
+        self._subsystems_allprocs = []
+        self._manual_connections = {}
 
+        self._static_mode = False
+        self._subsystems_allprocs.extend(self._static_subsystems_allprocs)
+        self._manual_connections.update(self._static_manual_connections)
         self.initialize_subsystems()
+        self._static_mode = True
 
         nsub = len(self._subsystems_allprocs)
 
@@ -87,12 +93,6 @@ class Group(System):
                 sub_pathname = subsys.name
 
             subsys._setupx_procs(sub_pathname, sub_comm, sub_proc_range)
-
-    def initialize_subsystems(self):
-        """
-        Add subsystems to this group.
-        """
-        pass
 
     def _setupx_vars(self):
         super(Group, self)._setupx_vars()
@@ -781,7 +781,6 @@ class Group(System):
                 raise RuntimeError("Subsystem name '%s' is already used." %
                                    name)
 
-        self._subsystems_allprocs.append(subsys)
         subsys.name = name
 
         if isinstance(promotes, string_types) or \
@@ -796,6 +795,13 @@ class Group(System):
             subsys._var_promotes['input'] = promotes_inputs
         if promotes_outputs:
             subsys._var_promotes['output'] = promotes_outputs
+
+        if self._static_mode:
+            subsystems_allprocs = self._static_subsystems_allprocs
+        else:
+            subsystems_allprocs = self._subsystems_allprocs
+
+        subsystems_allprocs.append(subsys)
 
         return subsys
 
@@ -848,7 +854,12 @@ class Group(System):
             raise RuntimeError("Output and input are in the same System for " +
                                "connection from '%s' to '%s'." % (src_name, tgt_name))
 
-        self._manual_connections[tgt_name] = (src_name, src_indices)
+        if self._static_mode:
+            manual_connections = self._static_manual_connections
+        else:
+            manual_connections = self._manual_connections
+
+        manual_connections[tgt_name] = (src_name, src_indices)
 
     def set_order(self, new_order):
         """
@@ -964,7 +975,7 @@ class Group(System):
         """
         system = self
         for subname in name.split('.'):
-            for sub in system._subsystems_allprocs:
+            for sub in system._subsystems_allprocs + system._static_subsystems_allprocs:
                 if sub.name == subname:
                     system = sub
                     break
