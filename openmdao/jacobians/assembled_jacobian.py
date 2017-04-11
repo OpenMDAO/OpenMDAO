@@ -143,7 +143,6 @@ class AssembledJacobian(Jacobian):
                     if out_abs_name is None:  # skip unconnected inputs
                         continue
 
-                    in_offset = in_offsets[in_abs_name]
                     abs_key = (res_abs_name, in_abs_name)
                     self._keymap[abs_key] = abs_key
 
@@ -173,7 +172,8 @@ class AssembledJacobian(Jacobian):
                             self._int_mtx._add_submat(abs_key2, info, res_offset, out_offset,
                                                       src_indices, shape)
                     else:
-                        self._ext_mtx._add_submat(abs_key, info, res_offset, in_offset,
+                        self._ext_mtx._add_submat(abs_key, info, res_offset,
+                                                  in_offsets[in_abs_name],
                                                   None, shape)
 
             self._view_ranges[s.pathname] = (min_res_offset, max_res_offset + 1,

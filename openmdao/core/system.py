@@ -539,12 +539,12 @@ class System(object):
             # currently an error.
             if (self._nl_solver is not None and
                 self._nl_solver.supports['gradients'] and not
-                isinstance(jacobian, DenseJacobian)):
-                    raise RuntimeError("System '%s' has a solver of type '%s'"
-                                       "but an AssembledJacobian has been set in a "
-                                       "higher level system." %
-                                       (self.pathname,
-                                        self._nl_solver.__class__.__name__))
+                    isinstance(jacobian, DenseJacobian)):
+                raise RuntimeError("System '%s' has a solver of type '%s'"
+                                   "but a sparse AssembledJacobian has been set in a "
+                                   "higher level system." %
+                                   (self.pathname,
+                                    self._nl_solver.__class__.__name__))
             self._owns_assembled_jac = False
 
         if self._owns_assembled_jac:
