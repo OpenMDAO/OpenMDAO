@@ -336,6 +336,7 @@ class Group(System):
         allprocs_prom2abs_list_in = self._varx_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._varx_allprocs_prom2abs_list['output']
         abs2meta_in = self._varx_abs2meta['input']
+        pathname = self.pathname
 
         abs_in2out = {}
 
@@ -426,7 +427,9 @@ class Group(System):
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
         global_abs_in2out.update(abs_in2out)
-        global_abs_in2out.update(self._conn_parents_abs_in2out)
+        for abs_in, abs_out in iteritems(self._conn_parents_abs_in2out):
+            if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
+                global_abs_in2out[abs_in] = abs_out
         for subsys in self._subsystems_myproc:
             global_abs_in2out.update(subsys._conn_global_abs_in2out)
 
