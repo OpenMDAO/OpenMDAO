@@ -39,13 +39,13 @@ class Component(System):
     _var_rel2data_io : dict
         Dictionary mapping relative names to dicts with keys (prom, rel, my_idx, type_, metadata).
         This is only needed while adding inputs and outputs. During setup, these are used to
-        build _var_abs2data_io.
+        build the dictionaries of metadata.
     _static_var_rel2data_io : dict
         Static version of above - stores data for variables added outside of initialize_variables.
     _var_rel_names : {'input': [str, ...], 'output': [str, ...]}
         List of relative names of owned variables existing on current proc.
         This is only needed while adding inputs and outputs. During setup, these are used to
-        determine the _var_abs_names.
+        determine the list of absolute names.
     _static_var_rel_names : dict
         Static version of above - stores names of variables added outside of initialize_variables.
     """

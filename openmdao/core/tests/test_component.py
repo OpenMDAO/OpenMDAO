@@ -87,7 +87,7 @@ class TestExplicitComponent(unittest.TestCase):
 
     def test_setup_bug1(self):
         # This tests a bug where, if you run setup more than once on a derived component class,
-        # the _var_abs_names continually gets prepended with the component global path.
+        # the list of var names continually gets prepended with the component global path.
 
         class NewBase(Component):
             def __init__(self, **kwargs):
