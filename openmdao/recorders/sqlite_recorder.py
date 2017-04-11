@@ -81,15 +81,20 @@ class SqliteRecorder(BaseRecorder):
         self.model_viewer_data = None
 
         self._counter = 0 
+
         # isolation_level=None causes autocommit
         self.con = sqlite3.connect(out, detect_types=sqlite3.PARSE_DECLTYPES,isolation_level=None)
+
+        # write the metadata
+        self.con.execute("CREATE TABLE metadata( format_version INT)")
+        self.con.execute("INSERT INTO metadata(format_version) VALUES(?)", (format_version,) )
 
         # Create the table for iterations for a driver
         # The primary key gets filled in automatically. It can be our "counter"
         # that John wants. It gets incremented by 1
         #   for each write of a record to this table
         self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT, \
-                         timestamp REAL, success INT, msg TEXT, driver_values array)")
+                         timestamp REAL, success INT, msg TEXT, desvars array, responses array, objectives array, constraints array)")
         self.con.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT,  \
                          timestamp REAL, success INT, msg TEXT, system_values array)")
         self.con.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT,  \
@@ -127,69 +132,151 @@ class SqliteRecorder(BaseRecorder):
         """
         Record an iteration using the driver options.
         """
-        dtype_tuples = []
 
-        # We will go through the recording options of Driver to construct the entry to be inserted.
+        # make a nested numpy named array using the example 
+        #   http://stackoverflow.com/questions/19201868/how-to-set-dtype-for-nested-numpy-ndarray
+        # e.g.
+        # table = np.array(data, dtype=[('instrument', 'S32'),
+        #                        ('filter', 'S64'),
+        #                        ('response', [('linenumber', 'i'),
+        #                                      ('wavelength', 'f'),
+        #                                      ('throughput', 'f')], (2,))
+        #                       ])
+
+
+        desvars_array = None
+        responses_array = None
+        objectives_array = None
+        constraints_array = None
+
+
+        # Just an example of the syntax for creating a numpy structured array
+        # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
+
+        # This returns a dict of names and values. Use this to build up the tuples of
+        # used for the dtypes in the creation of the numpy structured array
+        # we want to write to sqlite
         if self.options['record_desvars']:
-            # Just an example of the syntax for creating a numpy structured array
-            # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
-
-            design_vars = object_requesting_recording.get_design_var_values()
-            # This returns a dict of names and values. Use this to build up the tuples of
-            # used for the dtypes in the creation of the numpy structured array
-            # we want to write to sqlite
-            if design_vars:
-                for name, value in iteritems(design_vars):
-                    tple = ('design_var.' + name, '({},)f8'.format(len(value)))
+            desvars_values = object_requesting_recording.get_design_var_values()
+            if desvars_values:
+                dtype_tuples = []
+                for name, value in iteritems(desvars_values):
+                    tple = (name, '({},)f8'.format(len(value)))
                     dtype_tuples.append(tple)
+
+                desvars_array = np.zeros((1,), dtype=dtype_tuples)
+
+                for name, value in iteritems(desvars_values):
+                    desvars_array[name] = value
 
         if self.options['record_responses']:
-            responses = object_requesting_recording.get_response_values()
-
-            if responses:
-                for name, value in iteritems(responses):
-                    tple = ('response.' + name, '({},)f8'.format(len(value)))
+            responses_values = object_requesting_recording.get_response_values()
+            if responses_values:
+                dtype_tuples = []
+                for name, value in iteritems(responses_values):
+                    tple = (name, '({},)f8'.format(len(value)))
                     dtype_tuples.append(tple)
+
+                responses_array = np.zeros((1,), dtype=dtype_tuples)
+
+                for name, value in iteritems(responses_values):
+                    responses_array[name] = value
 
         if self.options['record_objectives']:
-            objectives = object_requesting_recording.get_objective_values()
-
-            if objectives:
-                for name, value in iteritems(objectives):
-                    tple = ('objective.' + name, '({},)f8'.format(len(value)))
+            objectives_values = object_requesting_recording.get_objective_values()
+            if objectives_values:
+                dtype_tuples = []
+                for name, value in iteritems(objectives_values):
+                    tple = (name, '({},)f8'.format(len(value)))
                     dtype_tuples.append(tple)
+
+                objectives_array = np.zeros((1,), dtype=dtype_tuples)
+
+                for name, value in iteritems(objectives_values):
+                    objectives_array[name] = value
 
         if self.options['record_constraints']:
-            constraints = object_requesting_recording.get_constraint_values()
-
-            if constraints:
-                for name, value in iteritems(constraints):
-                    tple = ('constraint.' + name, '({},)f8'.format(len(value)))
+            constraints_values = object_requesting_recording.get_constraint_values()
+            if constraints_values:
+                dtype_tuples = []
+                for name, value in iteritems(constraints_values):
+                    tple = (name, '({},)f8'.format(len(value)))
                     dtype_tuples.append(tple)
 
-        driver_values = np.zeros((1,), dtype=dtype_tuples)
+                constraints_array = np.zeros((1,), dtype=dtype_tuples)
 
-        # Write the actual values to this array
-        if self.options['record_desvars'] and design_vars:
-            for name, value in iteritems(design_vars):
-                driver_values['design_var.' + name] = value
-        if self.options['record_responses'] and responses:
-            for name, value in iteritems(responses):
-                driver_values['response.' + name] = value
-        if self.options['record_objectives'] and objectives:
-            for name, value in iteritems(objectives):
-                driver_values['objective.' + name] = value
-        if self.options['record_constraints'] and constraints:
-            for name, value in iteritems(constraints):
-                driver_values['constraint.' + name] = value
+                for name, value in iteritems(constraints_values):
+                    constraints_array[name] = value
 
-        print("INSERT RECORD: DRIVER VALUES:", metadata['coord'], metadata['timestamp'],
-              metadata['success'], metadata['msg'], driver_values)
+        #==============
+        # dtype_tuples = []
+
+        # # We will go through the recording options of Driver to construct the entry to be inserted.
+        # if self.options['record_desvars']:
+        #     # Just an example of the syntax for creating a numpy structured array
+        #     # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
+
+        #     design_vars = object_requesting_recording.get_design_var_values()
+        #     # This returns a dict of names and values. Use this to build up the tuples of
+        #     # used for the dtypes in the creation of the numpy structured array
+        #     # we want to write to sqlite
+        #     if design_vars:
+        #         for name, value in iteritems(design_vars):
+        #             tple = ('design_var.' + name, '({},)f8'.format(len(value)))
+        #             dtype_tuples.append(tple)
+
+        # if self.options['record_responses']:
+        #     responses = object_requesting_recording.get_response_values()
+
+        #     if responses:
+        #         for name, value in iteritems(responses):
+        #             tple = ('response.' + name, '({},)f8'.format(len(value)))
+        #             dtype_tuples.append(tple)
+
+        # if self.options['record_objectives']:
+        #     objectives = object_requesting_recording.get_objective_values()
+
+        #     if objectives:
+        #         for name, value in iteritems(objectives):
+        #             tple = ('objective.' + name, '({},)f8'.format(len(value)))
+        #             dtype_tuples.append(tple)
+
+        # if self.options['record_constraints']:
+        #     constraints = object_requesting_recording.get_constraint_values()
+
+        #     if constraints:
+        #         for name, value in iteritems(constraints):
+        #             tple = ('constraint.' + name, '({},)f8'.format(len(value)))
+        #             dtype_tuples.append(tple)
+
+        # driver_values = np.zeros((1,), dtype=dtype_tuples)
+
+        # # Write the actual values to this array
+        # if self.options['record_desvars'] and design_vars:
+        #     for name, value in iteritems(design_vars):
+        #         driver_values['design_var.' + name] = value
+        # if self.options['record_responses'] and responses:
+        #     for name, value in iteritems(responses):
+        #         driver_values['response.' + name] = value
+        # if self.options['record_objectives'] and objectives:
+        #     for name, value in iteritems(objectives):
+        #         driver_values['objective.' + name] = value
+        # if self.options['record_constraints'] and constraints:
+        #     for name, value in iteritems(constraints):
+        #         driver_values['constraint.' + name] = value
+
+        print("INSERT RECORD: DRIVER VALUES:", format_iteration_coordinate( metadata['coord']), metadata['timestamp'],
+              metadata['success'], metadata['msg'], desvars_array['pz.z'][0], responses_array, objectives_array['obj_cmp.obj'], constraints_array)
         # Write this mega array to the database
+        # self.con.execute("INSERT INTO driver_iterations(iteration_coordinate, timestamp, "
+        #                  "success, msg, driver_values) VALUES(?,?,?,?,?)",
+        #                  (format_iteration_coordinate(metadata['coord']), metadata['timestamp'],
+        #                   metadata['success'], metadata['msg'], driver_values))
+
         self.con.execute("INSERT INTO driver_iterations(iteration_coordinate, timestamp, "
-                         "success, msg, driver_values) VALUES(?,?,?,?,?)",
+                         "success, msg, desvars , responses , objectives , constraints ) VALUES(?,?,?,?,?,?,?,?)",
                          (format_iteration_coordinate(metadata['coord']), metadata['timestamp'],
-                          metadata['success'], metadata['msg'], driver_values))
+                          metadata['success'], metadata['msg'], desvars_array, responses_array, objectives_array, constraints_array))
 
     def record_iteration_system(self, object_requesting_recording, metadata):
         """
@@ -329,25 +416,7 @@ class SqliteRecorder(BaseRecorder):
                                                solver_values))
 
     def close(self):
-<<<<<<< HEAD
-        """Closes `out`"""
-
-        print("closing sqlite_recorder")
-        self.con.close() # Not completely sure if it is this simple.
-
-        # if self._open_close_sqlitedict:
-        #     # if self.out_metadata is not None:
-        #     #     self.out_metadata.close()
-        #     #     self.out_metadata = None
-        #     if self.out_driver_iterations is not None:
-        #         self.out_driver_iterations.close()
-        #         self.out_driver_iterations = None
-        #     # if self.out_derivs is not None:
-        #     #     self.out_derivs.close()
-        #     #     self.out_derivs = None
-=======
         """
         Close `out`.
         """
         self.con.close()  # Not completely sure if it is this simple.
->>>>>>> keithfork/master
