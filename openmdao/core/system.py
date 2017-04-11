@@ -263,7 +263,8 @@ class System(object):
             ('input', 'norm0'): {}, ('input', 'norm1'): {},
             ('output', 'phys0'): {}, ('output', 'phys1'): {},
             ('output', 'norm0'): {}, ('output', 'norm1'): {},
-            ('residual', 'phys'): {}, ('residual', 'norm'): {}
+            ('residual', 'phys0'): {}, ('residual', 'phys1'): {}
+            ('residual', 'norm0'): {}, ('residual', 'norm1'): {}
         }
 
         self._nl_solver = None
