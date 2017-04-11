@@ -752,7 +752,6 @@ class System(object):
         for vec in residuals:
             vec._scale(self._scaling_to_phys['residual'])
         if scale_jac:
-            self._jacobian._precompute_iter()
             self._jacobian._scale(self._scaling_to_phys)
 
         yield
@@ -764,7 +763,6 @@ class System(object):
         for vec in residuals:
             vec._scale(self._scaling_to_norm['residual'])
         if scale_jac:
-            self._jacobian._precompute_iter()
             self._jacobian._scale(self._scaling_to_norm)
 
     @contextmanager
@@ -897,7 +895,6 @@ class System(object):
                                "called." % self.pathname)
         oldsys = self._jacobian._system
         self._jacobian._system = self
-        self._jacobian._precompute_iter()
         yield self._jacobian
         self._jacobian._system = oldsys
 
@@ -931,7 +928,6 @@ class System(object):
         for system in self.system_iter(include_self=True, recurse=True):
             if system._owns_assembled_jac:
                 with system.jacobian_context():
-                    system._jacobian._precompute_iter()
                     system._jacobian._scale(scaling)
 
     @property

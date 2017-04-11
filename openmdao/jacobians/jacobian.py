@@ -30,8 +30,6 @@ class Jacobian(object):
     _keymap : dict
         Mapping of original (output, input) key to (output, source) in cases
         where the input has src_indices.
-    _iter_list : [(out_name, in_name), ...]
-        List of output-input pairs to iterate over where the keys are absolute names.
     options : <OptionsDictionary>
         Options dictionary.
     """
@@ -52,7 +50,6 @@ class Jacobian(object):
         self._int_mtx = None
         self._ext_mtx = None
         self._keymap = {}
-        self._iter_list = None
 
         self.options = OptionsDictionary()
         self.options.update(kwargs)
@@ -122,23 +119,6 @@ class Jacobian(object):
             # subjac larger than 1x1 is not implemented.
             self._subjacs[abs_key] = left_vec * self._subjacs[abs_key][0] / right_vec
 
-    def _precompute_iter(self):
-        """
-        Cache list of absolute name pairs found in the jacobian for the current System.
-        """
-        system = self._system
-
-        iter_list = []
-        for res_name in system._var_abs_names['output']:
-            for out_name in system._var_abs_names['output']:
-                if (res_name, out_name) in self._subjacs:
-                    iter_list.append((res_name, out_name))
-            for in_name in system._var_abs_names['input']:
-                if (res_name, in_name) in self._subjacs:
-                    iter_list.append((res_name, in_name))
-
-        self._iter_list = iter_list
-
     def __contains__(self, key):
         """
         Return whether there is a subjac for the given promoted or relative name pair.
@@ -153,8 +133,7 @@ class Jacobian(object):
         boolean
             return whether sub-Jacobian has been defined.
         """
-        abs_key = key2abs_key(self._system, key)
-        return abs_key in self._subjacs
+        return key2abs_key(self._system, key) in self._subjacs
 
     def __getitem__(self, key):
         """
@@ -232,13 +211,23 @@ class Jacobian(object):
         Iterate over subjacs keyed by absolute names.
 
         This includes only subjacs that have been set and are part of the current system.
-
-        Returns
-        -------
-        iterator
-            Iterator over subjacs keyed by absolute names that have been set on this Jacobian.
         """
-        return iter(self._iter_list)
+        system = self._system
+        subjacs = self._subjacs
+
+        # FIXME: these keys should really be cached in system, not as they were previously
+        # in precompute_iter_keys, since they had to be constantly recomputed whenever the
+        # jacobian's system changed.  There is an ordering issue with caching them in system
+        # because this method gets called once (for scaling) prior to the first call to
+        # linearize for each system which can add keys to the jacobian, so we'll need to
+        # make sure we recompute the keys for each system after the first call to lineraize
+        # after a new jacobian has been set.
+        for res_name in system._var_abs_names['output']:
+            for type_ in ('output', 'input'):
+                for name in system._var_abs_names[type_]:
+                    key = (res_name, name)
+                    if key in subjacs:
+                        yield key
 
     def _scale_subjac(self, abs_key, coeffs):
         """

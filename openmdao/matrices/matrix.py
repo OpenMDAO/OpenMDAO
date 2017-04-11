@@ -89,7 +89,7 @@ class Matrix(object):
         """
         pass
 
-    def _prod(self, vec, mode):
+    def _prod(self, vec, mode, ranges):
         """
         Perform a matrix vector product.
 
@@ -99,6 +99,8 @@ class Matrix(object):
             incoming vector to multiply.
         mode : str
             'fwd' or 'rev'.
+        ranges : (int, int, int, int)
+            Min row, max row, min col, max col for the current system.
 
         Returns
         -------

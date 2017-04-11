@@ -21,6 +21,11 @@ SUBJAC_META_DEFAULTS = {
 class AssembledJacobian(Jacobian):
     """
     Assemble dense global <Jacobian>.
+
+    Attributes
+    ----------
+    _view_ranges : dict
+        Maps system pathnames to jacobian sub-view ranges
     """
 
     def __init__(self, **kwargs):
@@ -36,6 +41,7 @@ class AssembledJacobian(Jacobian):
         self.options.declare('matrix_class', value=DenseMatrix,
                              desc='<Matrix> class to use in this <Jacobian>.')
         self.options.update(kwargs)
+        self._view_ranges = {}
 
     def _get_var_range(self, ivar_all, typ):
         """
@@ -55,9 +61,9 @@ class AssembledJacobian(Jacobian):
         int
             the ending index in the Jacobian.
         """
-        sizes_all = self._system._assembler._var_sizes_all['output']
+        sizes_all = self._system._assembler._var_sizes_all[typ]
         iproc = self._system._assembler._comm.rank
-        ivar_all0 = self._system._var_allprocs_idx_range['output'][0]
+        ivar_all0 = self._system._var_allprocs_idx_range[typ][0]
 
         ind1 = np.sum(sizes_all[iproc, ivar_all0:ivar_all])
         ind2 = np.sum(sizes_all[iproc, ivar_all0:ivar_all + 1])
@@ -93,10 +99,30 @@ class AssembledJacobian(Jacobian):
         # avoid circular imports
         from openmdao.core.component import Component
         for s in self._system.system_iter(local=True, recurse=True,
-                                          include_self=True, typ=Component):
+                                          include_self=True):
+
+            min_res_offset = 999999
+            max_res_offset = 0
+            min_in_offset = 999999
+            max_in_offset = 0
+
+            for in_abs_name in s._var_abs_names['input']:
+                in_offset = in_offsets[in_abs_name]
+                if in_offset > max_in_offset:
+                    max_in_offset = in_offset
+                if in_offset < min_in_offset:
+                    min_in_offset = in_offset
 
             for res_abs_name in s._var_abs_names['output']:
                 res_offset = out_offsets[res_abs_name]
+                if res_offset > max_res_offset:
+                    max_res_offset = res_offset
+                if res_offset < min_res_offset:
+                    min_res_offset = res_offset
+
+                # only need to collect subjac info for compnents, not subgroups
+                if not isinstance(s, Component):
+                    continue
 
                 for out_abs_name in s._var_abs_names['output']:
                     out_offset = out_offsets[out_abs_name]
@@ -109,24 +135,24 @@ class AssembledJacobian(Jacobian):
                         shape = (system._residuals._views_flat[res_abs_name].size,
                                  system._outputs._views_flat[out_abs_name].size)
 
-                    self._int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
+                    self._int_mtx._add_submat(abs_key, info, res_offset, out_offset,
+                                              None, shape)
 
                 for in_abs_name in s._var_abs_names['input']:
-                    in_offset = in_offsets[in_abs_name]
+                    out_abs_name = assembler._abs_input2src[in_abs_name]
+                    if out_abs_name is None:  # skip unconnected inputs
+                        continue
 
+                    in_offset = in_offsets[in_abs_name]
                     abs_key = (res_abs_name, in_abs_name)
+                    self._keymap[abs_key] = abs_key
+
                     if abs_key in self._subjacs_info:
                         info, shape = self._subjacs_info[abs_key]
                     else:
                         info = SUBJAC_META_DEFAULTS
                         shape = (system._residuals._views_flat[res_abs_name].size,
                                  system._inputs._views_flat[in_abs_name].size)
-
-                    self._keymap[abs_key] = abs_key
-
-                    out_abs_name = assembler._abs_input2src[in_abs_name]
-                    if out_abs_name is None:  # skip unconnected inputs
-                        continue
 
                     out_idx = assembler._var_allprocs_abs2idx_io[out_abs_name]
 
@@ -147,8 +173,11 @@ class AssembledJacobian(Jacobian):
                             self._int_mtx._add_submat(abs_key2, info, res_offset, out_offset,
                                                       src_indices, shape)
                     else:
-                        self._ext_mtx._add_submat(abs_key, info, res_offset, in_offset, None, shape)
+                        self._ext_mtx._add_submat(abs_key, info, res_offset, in_offset,
+                                                  None, shape)
 
+            self._view_ranges[s.pathname] = (min_res_offset, max_res_offset + 1,
+                                             min_in_offset, max_in_offset + 1)
         iproc = self._system._assembler._comm.rank
         out_size = np.sum(
             assembler._var_sizes_all['output'][iproc, out_start:out_end])
@@ -207,12 +236,15 @@ class AssembledJacobian(Jacobian):
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx
 
+        ranges = self._view_ranges[self._system.pathname]
+        int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])
+
         if mode == 'fwd':
-            d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode))
-            d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode))
+            d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
+            d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, ranges))
         elif mode == 'rev':
-            d_outputs.iadd_data(int_mtx._prod(d_residuals.get_data(), mode))
-            d_inputs.iadd_data(ext_mtx._prod(d_residuals.get_data(), mode))
+            d_outputs.iadd_data(int_mtx._prod(d_residuals.get_data(), mode, int_ranges))
+            d_inputs.iadd_data(ext_mtx._prod(d_residuals.get_data(), mode, ranges))
 
 
 class DenseJacobian(AssembledJacobian):
