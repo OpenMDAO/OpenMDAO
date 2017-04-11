@@ -371,17 +371,6 @@ class System(object):
         return root_vectors
 
     def _setupx(self, comm, vector_class):
-        # TEMPORARY: this is meant to only be here during the transition to reconfigurability
-        from openmdao.vectors.default_vector import DefaultVector, DefaultVectorX
-        if vector_class is DefaultVector:
-            vector_class = DefaultVectorX
-        try:
-            from openmdao.vectors.petsc_vector import PETScVector, PETScVectorX
-            if vector_class is PETScVector:
-                vector_class = PETScVectorX
-        except:
-            pass
-
         vec_names = ['nonlinear', 'linear']
 
         self._mpi_req_procs = self.get_req_procs()
