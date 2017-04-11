@@ -9,8 +9,9 @@ import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem, AssembledJacobian, ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.solvers.ln_bgs import LinearBlockGS
+from openmdao.solvers.ln_direct import DirectSolver
+from openmdao.solvers.ln_scipy import ScipyIterativeSolver
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
@@ -537,8 +538,6 @@ class TestBGSSolver(unittest.TestCase):
         prob = Problem()
         model = prob.model = Group()
 
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-
         model.add_subsystem('p1', IndepVarComp('x', 1.0))
         model.add_subsystem('d1', SellarImplicitDis1())
         model.add_subsystem('d2', SellarImplicitDis2())
@@ -548,6 +547,31 @@ class TestBGSSolver(unittest.TestCase):
         model.nl_solver = NewtonSolver()
         model.nl_solver.options['maxiter'] = 5
         model.ln_solver = LinearBlockGS()
+
+        prob.setup(check=False)
+        prob.model.suppress_solver_output = True
+
+        prob.run_model()
+        res = model._residuals.get_norm()
+
+        # Newton is kinda slow on this for some reason, this is how far it gets with directsolver too.
+        self.assertLess(res, 2.0e-2)
+
+    def test_implicit_cycle_precon(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+        model.add_subsystem('d1', SellarImplicitDis1())
+        model.add_subsystem('d2', SellarImplicitDis2())
+        model.connect('d1.y1', 'd2.y1')
+        model.connect('d2.y2', 'd1.y2')
+
+        model.nl_solver = NewtonSolver()
+        model.nl_solver.options['maxiter'] = 5
+        model.ln_solver = ScipyIterativeSolver()
+        model.ln_solver.precon = LinearBlockGS()
 
         prob.setup(check=False)
         prob.model.suppress_solver_output = False

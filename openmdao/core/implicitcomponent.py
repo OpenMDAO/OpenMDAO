@@ -7,7 +7,6 @@ from six import itervalues
 
 from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.name_maps import rel_name2abs_name
 
 
 class ImplicitComponent(Component):
