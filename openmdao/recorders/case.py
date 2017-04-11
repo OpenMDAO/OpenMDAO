@@ -44,21 +44,22 @@ class Case(object):
         float or dict.
     """
 
-    def __init__(self, filename, case_id, case_dict):
+    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, desvars_array, responses_array, objectives_array, constraints_array):
         """
         Initialize.
         """
         self.filename = filename
-        self.case_id = case_id
+        self.counter = counter
+        self.iteration_coordinate = iteration_coordinate
 
-        self.timestamp = case_dict.get('timestamp', None)
-        self.success = case_dict.get('success', None)
-        self.msg = case_dict.get('msg', None)
+        self.timestamp = timestamp
+        self.success = success
+        self.msg = msg
 
-        self.parameters = case_dict.get('Parameters', None)
-        self.unknowns = case_dict.get('Unknowns', None)
-        self.derivs = case_dict.get('Derivatives', None)
-        self.resids = case_dict.get('Residuals', None)
+        self.desvars = desvars_array[0] if desvars_array else None
+        self.responses = responses_array[0] if responses_array else None
+        self.objectives = objectives_array[0] if objectives_array else None
+        self.constraints = constraints_array[0] if constraints_array else None
 
     def __getitem__(self, item):
         """

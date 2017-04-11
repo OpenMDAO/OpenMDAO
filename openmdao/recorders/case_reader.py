@@ -2,7 +2,7 @@
 CaseReader class definition.
 """
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
-from openmdao.recorders.hdf5_reader import HDF5CaseReader
+# from openmdao.recorders.hdf5_reader import HDF5CaseReader
 
 
 def CaseReader(filename):
@@ -27,8 +27,8 @@ def CaseReader(filename):
         # filename not a valid Sqlite database file
         pass
 
-    try:
-        reader = HDF5CaseReader(filename)
-        return reader
-    except IOError:
-        raise IOError('Unable to load cases from file {0}'.format(filename))
+    # try:
+    #     reader = HDF5CaseReader(filename)
+    #     return reader
+    # except IOError:
+    #     raise IOError('Unable to load cases from file {0}'.format(filename))
