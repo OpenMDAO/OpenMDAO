@@ -337,7 +337,10 @@ class DefaultVector(Vector):
         for iset, data in enumerate(self._data):
             idx = self._ivar_map[iset]
             data *= coeffs[idx, 1]
-            data += coeffs[idx, 0]
+
+            # Linear vectors only need to scale by the multiplicative factor.
+            if self._name == 'nonlinear':
+                data += coeffs[idx, 0]
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """
