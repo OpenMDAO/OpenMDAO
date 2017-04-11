@@ -678,22 +678,22 @@ class Group(System):
                     rev_xfer_in[isub][key] = merge(rev_xfer_in[isub][key])
                     rev_xfer_out[isub][key] = merge(rev_xfer_out[isub][key])
 
-        xfers = self._xfers
+        transfers = self._transfers
         vectors = self._vectors
         for vec_name in self._vec_names:
             transfer_class = vectors['output'][vec_name].TRANSFER
 
-            xfers[vec_name] = {}
+            transfers[vec_name] = {}
             xfer_all = transfer_class(
                 vectors['input'][vec_name], vectors['output'][vec_name],
                 xfer_in, xfer_out, self.comm)
-            xfers[vec_name]['fwd', None] = xfer_all
-            xfers[vec_name]['rev', None] = xfer_all
+            transfers[vec_name]['fwd', None] = xfer_all
+            transfers[vec_name]['rev', None] = xfer_all
             for isub in range(nsub_allprocs):
-                xfers[vec_name]['fwd', isub] = transfer_class(
+                transfers[vec_name]['fwd', isub] = transfer_class(
                     vectors['input'][vec_name], vectors['output'][vec_name],
                     fwd_xfer_in[isub], fwd_xfer_out[isub], self.comm)
-                xfers[vec_name]['rev', isub] = transfer_class(
+                transfers[vec_name]['rev', isub] = transfer_class(
                     vectors['input'][vec_name], vectors['output'][vec_name],
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
 

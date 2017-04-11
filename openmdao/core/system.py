@@ -135,7 +135,7 @@ class System(object):
         Set of output variable absolute names relevant for each vec_name.
     _relevant_vars_in : dict of set
         Set of input variable absolute names relevant for each vec_name.
-    _xfers : dict of dict of Transfers
+    _transfers : dict of dict of Transfers
         First key is the vec_name, second key is (mode, isub) where
         mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
         or isub can be None for the full, simultaneous transfer.
@@ -240,7 +240,7 @@ class System(object):
         self._relevant_vars_out = set()
         self._relevant_vars_in = set()
 
-        self._xfers = {}
+        self._transfers = {}
 
         self._inputs = None
         self._outputs = None
@@ -497,7 +497,7 @@ class System(object):
             self._outputs._views[abs_name][:] = meta['value']
 
     def _setup_transfers(self):
-        self._xfers = {}
+        self._transfers = {}
 
     def _setup_bounds(self, root_lower, root_upper):
         vector_class = root_lower.__class__
@@ -714,7 +714,7 @@ class System(object):
             direction = ('phys', 'norm')
 
         self._scale_vec(vec_inputs, 'input', direction[0])
-        self._xfers[vec_name][mode, isub](vec_inputs, vec_outputs, mode)
+        self._transfers[vec_name][mode, isub](vec_inputs, vec_outputs, mode)
         self._scale_vec(vec_inputs, 'input', direction[1])
 
     def get_req_procs(self):
