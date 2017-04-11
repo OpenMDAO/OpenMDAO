@@ -266,8 +266,8 @@ class System(object):
             ('input', 'norm0'): {}, ('input', 'norm1'): {},
             ('output', 'phys0'): {}, ('output', 'phys1'): {},
             ('output', 'norm0'): {}, ('output', 'norm1'): {},
-            ('residual', 'phys0'): {}, ('residual', 'phys1'): {}
-            ('residual', 'norm0'): {}, ('residual', 'norm1'): {}
+            ('residual', 'phys0'): {}, ('residual', 'phys1'): {},
+            ('residual', 'norm0'): {}, ('residual', 'norm1'): {},
         }
 
         self._nl_solver = None
@@ -403,7 +403,7 @@ class System(object):
         self._setup_solvers()
         self._setup_jacobians()
 
-    def _setup_procs(self, pathname, comm, proc_range):
+    def _setup_procs(self, pathname, comm, proc_range, recurse=True):
         self.pathname = pathname
         self.comm = comm
         self._mpi_proc_range = proc_range
@@ -413,11 +413,11 @@ class System(object):
             raise RuntimeError("%s needs %d MPI processes, but was given only %d." %
                                (self.pathname, minp, comm.size))
 
-    def _setup_vars(self):
+    def _setup_vars(self, recurse=True):
         self._num_var = {'input': 0, 'output': 0}
         self._num_var_byset = {'input': {}, 'output': {}}
 
-    def _setup_var_index_ranges(self, set2iset, var_range, var_range_byset):
+    def _setup_var_index_ranges(self, set2iset, var_range, var_range_byset, recurse=True):
         self._var_set2iset = set2iset
         self._var_range = var_range
         self._var_range_byset = var_range_byset
@@ -428,7 +428,7 @@ class System(object):
                 if set_name not in num_var_byset[type_]:
                     num_var_byset[type_][set_name] = 0
 
-    def _setup_var_data(self):
+    def _setup_var_data(self, recurse=True):
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
@@ -436,7 +436,7 @@ class System(object):
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
 
-    def _setup_var_index_maps(self):
+    def _setup_var_index_maps(self, recurse=True):
         self._var_allprocs_abs2idx = allprocs_abs2idx = {'input': {}, 'output': {}}
         self._var_allprocs_abs2idx_byset = allprocs_abs2idx_byset = {'input': {}, 'output': {}}
 
@@ -453,26 +453,27 @@ class System(object):
                 allprocs_abs2idx_byset_t[abs_name] = counter[set_name]
                 counter[set_name] += 1
 
-    def _setup_var_sizes(self):
+    def _setup_var_sizes(self, recurse=True):
         self._var_sizes = {'input': None, 'output': None}
         self._var_sizes_byset = {'input': {}, 'output': {}}
 
-    def _setup_global_connections(self):
+    def _setup_global_connections(self, recurse=True):
         self._conn_global_abs_in2out = {}
 
-    def _setup_connections(self):
+    def _setup_connections(self, recurse=True):
         self._conn_abs_in2out = {}
 
-    def _setup_partials(self):
+    def _setup_partials(self, recurse=True):
         self._subjacs_info = {}
 
-    def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
+    def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset,
+                      recurse=True):
         self._ext_num_vars = ext_num_vars
         self._ext_num_vars_byset = ext_num_vars_byset
         self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
 
-    def _setup_vectors(self, vec_names, root_vectors, excl_out=None, excl_in=None):
+    def _setup_vectors(self, vec_names, root_vectors, excl_out=None, excl_in=None, recurse=True):
         self._vec_names = vec_names
         self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._excluded_vars_out = excl_out
@@ -502,10 +503,10 @@ class System(object):
         for abs_name, meta in iteritems(self._var_abs2meta['output']):
             self._outputs._views[abs_name][:] = meta['value']
 
-    def _setup_transfers(self):
+    def _setup_transfers(self, recurse=True):
         self._transfers = {}
 
-    def _setup_bounds(self, root_lower, root_upper):
+    def _setup_bounds(self, root_lower, root_upper, recurse=True):
         vector_class = root_lower.__class__
         self._lower_bounds = lower = vector_class('lower', 'output', self, root_lower)
         self._upper_bounds = upper = vector_class('upper', 'output', self, root_upper)
@@ -532,7 +533,7 @@ class System(object):
             else:
                 upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
 
-    def _setup_scaling(self, root_vectors):
+    def _setup_scaling(self, root_vectors, recurse=True):
         self._scaling_vecs = vecs = {
             ('input', 'phys0'): {}, ('input', 'phys1'): {},
             ('input', 'norm0'): {}, ('input', 'norm1'): {},
@@ -635,13 +636,13 @@ class System(object):
                 vecs['input', 'norm0'][vec_name]._views[abs_in][:] = -a0 / a1
                 vecs['input', 'norm1'][vec_name]._views[abs_in][:] = 1.0 / a1
 
-    def _setup_solvers(self):
+    def _setup_solvers(self, recurse=True):
         if self._nl_solver is not None:
             self._nl_solver._setup_solvers(self, 0)
         if self._ln_solver is not None:
             self._ln_solver._setup_solvers(self, 0)
 
-    def _setup_jacobians(self, jacobian=None):
+    def _setup_jacobians(self, jacobian=None, recurse=True):
         """
         Set and populate jacobians down through the system tree.
 
@@ -649,6 +650,8 @@ class System(object):
         ----------
         jacobian : <AssembledJacobian> or None
             The global jacobian to populate for this system.
+        recurse : bool
+            Whether to perform recursion.
         """
         self._jacobian_changed = False
 
@@ -677,8 +680,9 @@ class System(object):
 
         self._set_partials_meta()
 
-        for subsys in self._subsystems_myproc:
-            subsys._setup_jacobians(jacobian)
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_jacobians(jacobian, recurse)
 
         if self._owns_assembled_jac:
             self._jacobian._system = self

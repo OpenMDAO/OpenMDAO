@@ -31,10 +31,7 @@ class ExplicitComponent(Component):
         if overrides_method('compute_jacvec_product', self, ExplicitComponent):
             self._matrix_free = True
 
-    def _setup_partials(self):
-        """
-        Set up partial derivative sparsity structures and approximation schemes.
-        """
+    def _setup_partials(self, recurse=True):
         super(ExplicitComponent, self)._setup_partials()
 
         abs2meta_out = self._var_abs2meta['output']

@@ -42,6 +42,45 @@ class Component(BaseComponent):
                          'backwards compatibility with OpenMDAO <= 1.x as '
                          'this Component class is deprecated')
 
+    def _setup_partials(self, recurse=True):
+        super(Component, self)._setup_partials()
+
+        abs2meta_out = self._var_abs2meta['output']
+        abs2prom_out = self._var_abs2prom['output']
+
+        # Note: These declare calls are outside of initialize_partials so that users do not have to
+        # call the super version of initialize_partials. This is still post-initialize_variables.
+        other_names = []
+        for out_abs in self._var_abs_names['output']:
+            meta = abs2meta_out[out_abs]
+            out_name = abs2prom_out[out_abs]
+            size = np.prod(meta['shape'])
+            arange = np.arange(size)
+
+            # Skip all states. The user declares those derivatives.
+            if out_name in self._state_names:
+                continue
+
+            # No need to FD outputs wrt other outputs
+            abs_key = (out_abs, out_abs)
+            if abs_key in self._subjacs_info:
+                if 'method' in self._subjacs_info[abs_key]:
+                    del self._subjacs_info[abs_key]['method']
+
+            # If our OpenMDAO Alpha component has any states at all, then even the non-state
+            # outputs need to be flipped.
+            if len(self._state_names) > 0:
+                val = -1.0
+            else:
+                val = 1.0
+
+            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=val)
+
+            for other_name in other_names:
+                self.declare_partials(out_name, other_name, dependent=False)
+                self.declare_partials(other_name, out_name, dependent=False)
+            other_names.append(out_name)
+
     def add_param(self, name, val=1.0, **kwargs):
         """
         Add an param variable to the component.
@@ -256,48 +295,6 @@ class Component(BaseComponent):
 
             if self._owns_assembled_jac:
                 J._update()
-
-    def _setup_partials(self):
-        """
-        Set up partial derivative sparsity structures and approximation schemes.
-        """
-        super(Component, self)._setup_partials()
-
-        abs2meta_out = self._var_abs2meta['output']
-        abs2prom_out = self._var_abs2prom['output']
-
-        # Note: These declare calls are outside of initialize_partials so that users do not have to
-        # call the super version of initialize_partials. This is still post-initialize_variables.
-        other_names = []
-        for out_abs in self._var_abs_names['output']:
-            meta = abs2meta_out[out_abs]
-            out_name = abs2prom_out[out_abs]
-            size = np.prod(meta['shape'])
-            arange = np.arange(size)
-
-            # Skip all states. The user declares those derivatives.
-            if out_name in self._state_names:
-                continue
-
-            # No need to FD outputs wrt other outputs
-            abs_key = (out_abs, out_abs)
-            if abs_key in self._subjacs_info:
-                if 'method' in self._subjacs_info[abs_key]:
-                    del self._subjacs_info[abs_key]['method']
-
-            # If our OpenMDAO Alpha component has any states at all, then even the non-state
-            # outputs need to be flipped.
-            if len(self._state_names) > 0:
-                val = -1.0
-            else:
-                val = 1.0
-
-            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=val)
-
-            for other_name in other_names:
-                self.declare_partials(out_name, other_name, dependent=False)
-                self.declare_partials(other_name, out_name, dependent=False)
-            other_names.append(out_name)
 
     def _negate_jac(self):
         """
