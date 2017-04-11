@@ -132,6 +132,8 @@ class System(object):
     _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
         Same as above, but by var_set name.
     #
+    _vec_names : [str, ...]
+        List of names of the vectors (i.e., the right-hand sides).
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
     _excluded_vars_out : dict of set
@@ -246,6 +248,7 @@ class System(object):
         self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
         self._ext_sizes_byset = {'input': {}, 'output': {}}
 
+        self._vec_names = []
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._excluded_vars_out = set()
         self._excluded_vars_in = set()
