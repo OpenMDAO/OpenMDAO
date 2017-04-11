@@ -145,7 +145,7 @@ class Vector(object):
         type_ = self._typ
 
         if new_array is None:
-            total_size = np.sum(system._varx_sizes[type_][self._iproc, :])
+            total_size = np.sum(system._var_sizes[type_][self._iproc, :])
             new_array = np.zeros(total_size)
 
         for set_name, data in iteritems(self._data):
@@ -205,10 +205,10 @@ class Vector(object):
         system = self._system
         type_ = self._typ
 
-        abs_names_t = system._varx_abs_names[type_]
+        abs_names_t = system._var_abs_names[type_]
 
         iter_list = []
-        for abs_name in system._varx_abs_names[type_]:
+        for abs_name in system._var_abs_names[type_]:
             if abs_name in self._names:
                 rel_name = abs_name[len(system.pathname) + 1:]
                 iter_list.append(rel_name)
@@ -478,7 +478,7 @@ class Vector(object):
         """
         Print the names and values of all variables in this vector, one per line.
         """
-        abs2prom = self._system._varx_abs2prom[self._typ]
+        abs2prom = self._system._var_abs2prom[self._typ]
         print('-' * 30)
         print('   Vector %s, type %s' % (self._name, self._typ))
         for abs_name, view in iteritems(self._views):

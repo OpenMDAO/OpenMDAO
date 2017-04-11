@@ -108,7 +108,7 @@ def prom_name2abs_name(system, prom_name, type_):
     str or None
         Absolute variable name or None if prom_name is invalid.
     """
-    prom2abs_list = system._varx_allprocs_prom2abs_list[type_]
+    prom2abs_list = system._var_allprocs_prom2abs_list[type_]
 
     if prom_name in prom2abs_list:
         abs_list = prom2abs_list[prom_name]
@@ -173,7 +173,7 @@ def prom_key2abs_key(system, prom_key):
     (str, str) or None
         Absolute name pair of sub-Jacobian or None is prom_key is invalid.
     """
-    prom2abs_list = system._varx_allprocs_prom2abs_list
+    prom2abs_list = system._var_allprocs_prom2abs_list
 
     abs_name0 = prom_name2abs_name(system, prom_key[0], 'output')
 
@@ -214,8 +214,8 @@ def key2abs_key(system, key):
     (str, str) or None
         Absolute name pair of sub-Jacobian if unique abs_key found or None otherwise.
     """
-    abs2meta_out = system._varx_abs2meta['output']
-    abs2meta_in = system._varx_abs2meta['input']
+    abs2meta_out = system._var_abs2meta['output']
+    abs2meta_in = system._var_abs2meta['input']
 
     abs_key = prom_key2abs_key(system, key)
     if abs_key is not None:

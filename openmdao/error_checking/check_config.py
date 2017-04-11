@@ -96,7 +96,7 @@ def compute_sys_graph(group, input_srcs, comps_only=False):
 
     graph = nx.DiGraph()
 
-    indices = group._varx_allprocs_abs2idx
+    indices = group._var_allprocs_abs2idx
     for in_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
             src_id = indices['output'][src_abs] + group._ext_num_vars['output'][0]
@@ -222,7 +222,7 @@ def _get_out_of_order_subs(group, input_srcs):
         end = s._ext_num_vars['output'][0] + s._num_var['output']
         outvar2sys[start - o_start:end - o_start] = i
 
-    indices = group._varx_allprocs_abs2idx
+    indices = group._var_allprocs_abs2idx
     ubcs = {}
     for in_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
@@ -256,7 +256,7 @@ def _check_hanging_inputs(problem, logger):
 
     hanging = sorted([
         name
-        for name in problem.model._varx_allprocs_abs_names['input']
+        for name in problem.model._var_allprocs_abs_names['input']
         if name not in input_srcs
     ])
 

@@ -415,8 +415,8 @@ class PetscKSP(LinearSolver):
             return self._ksp[vec_name]
 
         iproc = system.comm.rank
-        lsize = np.sum(system._varx_sizes['output'][iproc, :])
-        size = np.sum(system._varx_sizes['output'])
+        lsize = np.sum(system._var_sizes['output'][iproc, :])
+        size = np.sum(system._var_sizes['output'])
 
         jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
                                            comm=system.comm)

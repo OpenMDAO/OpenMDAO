@@ -118,12 +118,12 @@ class Component(System):
 
     def _setupx_var_data(self):
         super(Component, self)._setupx_var_data()
-        allprocs_abs_names = self._varx_allprocs_abs_names
-        abs_names = self._varx_abs_names
-        allprocs_prom2abs_list = self._varx_allprocs_prom2abs_list
-        abs2prom = self._varx_abs2prom
-        allprocs_abs2meta = self._varx_allprocs_abs2meta
-        abs2meta = self._varx_abs2meta
+        allprocs_abs_names = self._var_allprocs_abs_names
+        abs_names = self._var_abs_names
+        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
+        abs2prom = self._var_abs2prom
+        allprocs_abs2meta = self._var_allprocs_abs2meta
+        abs2meta = self._var_abs2meta
 
         # Compute the prefix for turning rel/prom names into abs names
         if self.pathname is not '':
@@ -163,13 +163,13 @@ class Component(System):
     def _setupx_var_sizes(self):
         super(Component, self)._setupx_var_sizes()
 
-        sizes = self._varx_sizes
-        sizes_byset = self._varx_sizes_byset
+        sizes = self._var_sizes
+        sizes_byset = self._var_sizes_byset
 
         iproc = self.comm.rank
         nproc = self.comm.size
 
-        set2iset = self._varx_set2iset
+        set2iset = self._var_set2iset
 
         # Initialize empty arrays
         for type_ in ['input', 'output']:
@@ -180,11 +180,11 @@ class Component(System):
                 sizes_byset[type_][set_name] = np.zeros(
                     (nproc, self._num_var_byset[type_][set_name]), int)
 
-        # Compute _varx_sizes and _varx_sizes_byset
+        # Compute _var_sizes and _var_sizes_byset
         for type_ in ['input', 'output']:
-            abs2meta_t = self._varx_abs2meta[type_]
-            allprocs_abs2idx_byset_t = self._varx_allprocs_abs2idx_byset[type_]
-            for idx, abs_name in enumerate(self._varx_abs_names[type_]):
+            abs2meta_t = self._var_abs2meta[type_]
+            allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[type_]
+            for idx, abs_name in enumerate(self._var_abs_names[type_]):
                 meta = abs2meta_t[abs_name]
                 set_name = meta['var_set']
                 size = np.prod(meta['shape'])
@@ -196,7 +196,7 @@ class Component(System):
         if self.comm.size > 1:
             for type_ in ['input', 'output']:
                 self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
-                for set_name in self._varx_set2iset[type_]:
+                for set_name in self._var_set2iset[type_]:
                     self.comm.Allgather(
                         sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
 
@@ -610,8 +610,8 @@ class Component(System):
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         glob_patterns = {'*', '?', '['}
-        outs = self._varx_allprocs_prom2abs_list['output']
-        ins = self._varx_allprocs_prom2abs_list['input']
+        outs = self._var_allprocs_prom2abs_list['output']
+        ins = self._var_allprocs_prom2abs_list['input']
 
         def find_matches(pattern, var_list):
             if glob_patterns.intersection(pattern):
@@ -638,11 +638,11 @@ class Component(System):
         """
         of, wrt = abs_key2rel_key(self, abs_key)
         if meta['dependent']:
-            out_size = np.prod(self._varx_abs2meta['output'][abs_key[0]]['shape'])
-            if abs_key[1] in self._varx_abs2meta['input']:
-                in_size = np.prod(self._varx_abs2meta['input'][abs_key[1]]['shape'])
-            elif abs_key[1] in self._varx_abs2meta['output']:
-                in_size = np.prod(self._varx_abs2meta['output'][abs_key[1]]['shape'])
+            out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
+            if abs_key[1] in self._var_abs2meta['input']:
+                in_size = np.prod(self._var_abs2meta['input'][abs_key[1]]['shape'])
+            elif abs_key[1] in self._var_abs2meta['output']:
+                in_size = np.prod(self._var_abs2meta['output'][abs_key[1]]['shape'])
             rows = meta['rows']
             cols = meta['cols']
             if rows is not None:

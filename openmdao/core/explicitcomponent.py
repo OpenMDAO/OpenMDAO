@@ -37,13 +37,13 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._setupx_partials()
 
-        abs2meta_out = self._varx_abs2meta['output']
-        abs2prom_out = self._varx_abs2prom['output']
+        abs2meta_out = self._var_abs2meta['output']
+        abs2prom_out = self._var_abs2prom['output']
 
         # Note: These declare calls are outside of initialize_partials so that users do not have to
         # call the super version of initialize_partials. This is still post-initialize_variables.
         other_names = []
-        for out_abs in self._varx_abs_names['output']:
+        for out_abs in self._var_abs_names['output']:
             meta = abs2meta_out[out_abs]
             out_name = abs2prom_out[out_abs]
             size = np.prod(meta['shape'])
@@ -262,8 +262,8 @@ class ExplicitComponent(Component):
         Negate this component's part of the jacobian.
         """
         if self._jacobian._subjacs:
-            for res_name in self._varx_abs_names['output']:
-                for in_name in self._varx_abs_names['input']:
+            for res_name in self._var_abs_names['output']:
+                for in_name in self._var_abs_names['input']:
                     abs_key = (res_name, in_name)
                     if abs_key in self._jacobian._subjacs:
                         self._jacobian._multiply_subjac(abs_key, -1.)

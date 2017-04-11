@@ -366,8 +366,8 @@ class Problem(object):
                     if explicit:
                         comp._negate_jac()
 
-                    of_list = list(comp._varx_allprocs_prom2abs_list['output'].keys())
-                    wrt_list = list(comp._varx_allprocs_prom2abs_list['input'].keys())
+                    of_list = list(comp._var_allprocs_prom2abs_list['output'].keys())
+                    wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
 
                     # The only outputs in wrt should be implicit states.
                     if deprecated:
@@ -459,14 +459,14 @@ class Problem(object):
 
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                in_size = np.prod(comp._varx_abs2meta['input'][wrt]['shape'])
-                                out_size = np.prod(comp._varx_abs2meta['output'][of]['shape'])
+                                in_size = np.prod(comp._var_abs2meta['input'][wrt]['shape'])
+                                out_size = np.prod(comp._var_abs2meta['output'][of]['shape'])
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
-                                    in_size = np.prod(comp._varx_abs2meta['input'][wrt]['shape'])
-                                    out_size = np.prod(comp._varx_abs2meta['output'][of]['shape'])
+                                    in_size = np.prod(comp._var_abs2meta['input'][wrt]['shape'])
+                                    out_size = np.prod(comp._var_abs2meta['output'][of]['shape'])
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     # if a scalar value is provided (in declare_partials),
@@ -504,8 +504,8 @@ class Problem(object):
             deprecated = isinstance(comp, DepComponent)
             approximation = scheme()
 
-            of = list(comp._varx_allprocs_prom2abs_list['output'].keys())
-            wrt = list(comp._varx_allprocs_prom2abs_list['input'].keys())
+            of = list(comp._var_allprocs_prom2abs_list['output'].keys())
+            wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
 
             # The only outputs in wrt should be implicit states.
             if deprecated:
@@ -672,13 +672,13 @@ class Problem(object):
             oldof = of
             of = []
             for names in oldof:
-                of.append(tuple(model._varx_allprocs_prom2abs_list['output'][name][0]
+                of.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                 for name in names))
 
             oldwrt = wrt
             wrt = []
             for names in oldwrt:
-                wrt.append(tuple(model._varx_allprocs_prom2abs_list['output'][name][0]
+                wrt.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                  for name in names))
 
         if fwd:
@@ -710,10 +710,10 @@ class Problem(object):
                 # Dictionary access returns a scaler for 1d input, and we
                 # need a vector for clean code, so use _views_flat.
                 flat_view = dinputs._views_flat[input_name]
-                in_var_idx = model._varx_allprocs_abs2idx['output'][input_name]
-                start = np.sum(model._varx_sizes['output'][:iproc, in_var_idx])
-                end = np.sum(model._varx_sizes['output'][:iproc + 1, in_var_idx])
-                total_size = np.sum(model._varx_sizes['output'][:, in_var_idx])
+                in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
+                start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
+                end = np.sum(model._var_sizes['output'][:iproc + 1, in_var_idx])
+                total_size = np.sum(model._var_sizes['output'][:, in_var_idx])
 
                 if input_name in input_vois:
                     in_idxs = input_vois[input_name]['indices']
@@ -759,7 +759,7 @@ class Problem(object):
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_names in enumerate(output_list):
                         for oname_count, output_name in enumerate(output_names):
-                            out_var_idx = model._varx_allprocs_abs2idx['output'][output_name]
+                            out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
                             deriv_val = doutputs._views_flat[output_name]
                             if output_name in output_vois:
                                 out_idxs = output_vois[output_name]['indices']
@@ -774,7 +774,7 @@ class Problem(object):
 
                             if nproc > 1:  # var is duplicated
                                 self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
-                                    model._varx_sizes['output'][:, out_var_idx])[0][0]))
+                                    model._var_sizes['output'][:, out_var_idx])[0][0]))
 
                             if return_format == 'flat_dict':
                                 if fwd:

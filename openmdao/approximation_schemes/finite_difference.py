@@ -190,10 +190,10 @@ class FiniteDifference(ApproximationScheme):
             coeffs = fd_form.coeffs / step
             current_coeff = fd_form.current_coeff / step
 
-            if wrt in system._varx_abs2meta['input']:
-                in_size = np.prod(system._varx_abs2meta['input'][wrt]['shape'])
-            elif wrt in system._varx_abs2meta['output']:
-                in_size = np.prod(system._varx_abs2meta['output'][wrt]['shape'])
+            if wrt in system._var_abs2meta['input']:
+                in_size = np.prod(system._var_abs2meta['input'][wrt]['shape'])
+            elif wrt in system._var_abs2meta['output']:
+                in_size = np.prod(system._var_abs2meta['output'][wrt]['shape'])
 
             result = system._outputs._clone(True)
 
@@ -204,7 +204,7 @@ class FiniteDifference(ApproximationScheme):
             for approx_tuple in approximations:
                 of = approx_tuple[0]
                 # TODO: Sparse derivatives
-                out_size = np.prod(system._varx_abs2meta['output'][of]['shape'])
+                out_size = np.prod(system._var_abs2meta['output'][of]['shape'])
                 outputs.append((of, np.zeros((out_size, in_size))))
 
             for idx in range(in_size):

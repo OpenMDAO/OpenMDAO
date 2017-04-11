@@ -75,40 +75,40 @@ class System(object):
         Number of allprocs variables owned by this system.
     _num_var_byset : {'input': dict of int, 'output': dict of int}
         Same as above, but by var_set name.
-    _varx_set2iset : {'input': dict, 'output': dict}
+    _var_set2iset : {'input': dict, 'output': dict}
         Dictionary mapping the var_set name to the var_set index.
-    _varx_range : {'input': (int, int), 'output': (int, int)}
+    _var_range : {'input': (int, int), 'output': (int, int)}
         Range of this system's allprocs variables relative to the immediate parent.
         If this is the root, the range is simply (0, total_num).
-    _varx_range_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
+    _var_range_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
         Same as above, but by var_set name.
-    _varx_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
+    _var_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of this system's variables on all procs.
-    _varx_abs_names : {'input': [str, ...], 'output': [str, ...]}
+    _var_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of this system's variables existing on current proc.
-    _varx_allprocs_prom2abs_list : {'input': dict, 'output': dict}
+    _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
-    _varx_abs2prom : {'input': dict, 'output': dict}
+    _var_abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names, on current proc.
-    _varx_allprocs_abs2meta : {'input': dict, 'output': dict}
+    _var_allprocs_abs2meta : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
         The keys are
         ('units', 'shape', 'var_set') for inputs and
         ('units', 'shape', 'var_set', 'ref', 'ref0') for outputs.
-    _varx_abs2meta : {'input': dict, 'output': dict}
+    _var_abs2meta : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
-    _varx_allprocs_abs2idx : {'input': dict, 'output': dict}
+    _var_allprocs_abs2idx : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to their indices
         among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
-    _varx_allprocs_abs2idx_byset : {'input': dict of dict, 'output': dict of dict}
+    _var_allprocs_abs2idx_byset : {'input': dict of dict, 'output': dict of dict}
         Same as above, but by var_set name.
-    _varx_sizes : {'input': ndarray, 'output': ndarray}
+    _var_sizes : {'input': ndarray, 'output': ndarray}
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
-    _varx_sizes_byset : {'input': dict of ndarray, 'output': dict of ndarray}
+    _var_sizes_byset : {'input': dict of ndarray, 'output': dict of ndarray}
         Same as above, but by var_set name.
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned by this system
@@ -208,22 +208,22 @@ class System(object):
         self._num_var = {'input': 0, 'output': 0}
         self._num_var_byset = {'input': {}, 'output': {}}
 
-        self._varx_set2iset = {'input': {}, 'output': {}}
-        self._varx_range = {'input': (0, 0), 'output': (0, 0)}
-        self._varx_range_byset = {'input': {}, 'output': {}}
+        self._var_set2iset = {'input': {}, 'output': {}}
+        self._var_range = {'input': (0, 0), 'output': (0, 0)}
+        self._var_range_byset = {'input': {}, 'output': {}}
 
-        self._varx_allprocs_abs_names = {'input': [], 'output': []}
-        self._varx_abs_names = {'input': [], 'output': []}
-        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        self._varx_abs2prom = {'input': {}, 'output': {}}
-        self._varx_allprocs_abs2meta = {'input': {}, 'output': {}}
-        self._varx_abs2meta = {'input': {}, 'output': {}}
+        self._var_allprocs_abs_names = {'input': [], 'output': []}
+        self._var_abs_names = {'input': [], 'output': []}
+        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._var_abs2prom = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
+        self._var_abs2meta = {'input': {}, 'output': {}}
 
-        self._varx_allprocs_abs2idx = {'input': {}, 'output': {}}
-        self._varx_allprocs_abs2idx_byset = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2idx = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2idx_byset = {'input': {}, 'output': {}}
 
-        self._varx_sizes = {'input': None, 'output': None}
-        self._varx_sizes_byset = {'input': {}, 'output': {}}
+        self._var_sizes = {'input': None, 'output': None}
+        self._var_sizes_byset = {'input': {}, 'output': {}}
 
         self._conn_global_abs_in2out = {}
         self._conn_parents_abs_in2out = {}
@@ -277,7 +277,7 @@ class System(object):
 
     def _get_initial_var_indices(self):
         """
-        Get initial values for _varx_set2iset, _varx_range, _varx_range_byset.
+        Get initial values for _var_set2iset, _var_range, _var_range_byset.
 
         Returns
         -------
@@ -324,12 +324,12 @@ class System(object):
         ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
         ext_sizes = {'input': (0, 0), 'output': (0, 0)}
         ext_num_vars_byset = {
-            'input': {set_name: (0, 0) for set_name in self._varx_set2iset['input']},
-            'output': {set_name: (0, 0) for set_name in self._varx_set2iset['output']},
+            'input': {set_name: (0, 0) for set_name in self._var_set2iset['input']},
+            'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']},
         }
         ext_sizes_byset = {
-            'input': {set_name: (0, 0) for set_name in self._varx_set2iset['input']},
-            'output': {set_name: (0, 0) for set_name in self._varx_set2iset['output']},
+            'input': {set_name: (0, 0) for set_name in self._var_set2iset['input']},
+            'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']},
         }
         return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
@@ -406,35 +406,35 @@ class System(object):
         self._num_var_byset = {'input': {}, 'output': {}}
 
     def _setupx_var_index_ranges(self, set2iset, var_range, var_range_byset):
-        self._varx_set2iset = set2iset
-        self._varx_range = var_range
-        self._varx_range_byset = var_range_byset
+        self._var_set2iset = set2iset
+        self._var_range = var_range
+        self._var_range_byset = var_range_byset
 
         num_var_byset = self._num_var_byset
         for type_ in ['input', 'output']:
-            for set_name in self._varx_set2iset[type_]:
+            for set_name in self._var_set2iset[type_]:
                 if set_name not in num_var_byset[type_]:
                     num_var_byset[type_][set_name] = 0
 
     def _setupx_var_data(self):
-        self._varx_allprocs_abs_names = {'input': [], 'output': []}
-        self._varx_abs_names = {'input': [], 'output': []}
-        self._varx_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        self._varx_abs2prom = {'input': {}, 'output': {}}
-        self._varx_allprocs_abs2meta = {'input': {}, 'output': {}}
-        self._varx_abs2meta = {'input': {}, 'output': {}}
+        self._var_allprocs_abs_names = {'input': [], 'output': []}
+        self._var_abs_names = {'input': [], 'output': []}
+        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._var_abs2prom = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
+        self._var_abs2meta = {'input': {}, 'output': {}}
 
     def _setupx_var_index_maps(self):
-        self._varx_allprocs_abs2idx = allprocs_abs2idx = {'input': {}, 'output': {}}
-        self._varx_allprocs_abs2idx_byset = allprocs_abs2idx_byset = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2idx = allprocs_abs2idx = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2idx_byset = allprocs_abs2idx_byset = {'input': {}, 'output': {}}
 
         for type_ in ['input', 'output']:
-            allprocs_abs2meta_t = self._varx_allprocs_abs2meta[type_]
+            allprocs_abs2meta_t = self._var_allprocs_abs2meta[type_]
             allprocs_abs2idx_t = allprocs_abs2idx[type_]
             allprocs_abs2idx_byset_t = allprocs_abs2idx_byset[type_]
 
-            counter = {set_name: 0 for set_name in self._varx_set2iset[type_]}
-            for idx, abs_name in enumerate(self._varx_allprocs_abs_names[type_]):
+            counter = {set_name: 0 for set_name in self._var_set2iset[type_]}
+            for idx, abs_name in enumerate(self._var_allprocs_abs_names[type_]):
                 allprocs_abs2idx_t[abs_name] = idx
 
                 set_name = allprocs_abs2meta_t[abs_name]['var_set']
@@ -442,8 +442,8 @@ class System(object):
                 counter[set_name] += 1
 
     def _setupx_var_sizes(self):
-        self._varx_sizes = {'input': None, 'output': None}
-        self._varx_sizes_byset = {'input': {}, 'output': {}}
+        self._var_sizes = {'input': None, 'output': None}
+        self._var_sizes_byset = {'input': {}, 'output': {}}
 
     def _setupx_global_connections(self):
         self._conn_global_abs_in2out = {}
@@ -470,12 +470,12 @@ class System(object):
             self._relevant_vars_out = {}
             for vec_name in vec_names:
                 self._relevant_vars_out[vec_name] = \
-                    set(self._varx_abs_names['output'])
+                    set(self._var_abs_names['output'])
         if rel_in is None:
             self._relevant_vars_in = {}
             for vec_name in vec_names:
                 self._relevant_vars_in[vec_name] = \
-                    set(self._varx_abs_names['input'])
+                    set(self._var_abs_names['input'])
 
         for vec_name in vec_names:
             vector_class = root_vectors['output'][vec_name].__class__
@@ -490,10 +490,10 @@ class System(object):
         self._outputs = vectors['output']['nonlinear']
         self._residuals = vectors['residual']['nonlinear']
 
-        for abs_name, meta in iteritems(self._varx_abs2meta['input']):
+        for abs_name, meta in iteritems(self._var_abs2meta['input']):
             self._inputs._views[abs_name][:] = meta['value']
 
-        for abs_name, meta in iteritems(self._varx_abs2meta['output']):
+        for abs_name, meta in iteritems(self._var_abs2meta['output']):
             self._outputs._views[abs_name][:] = meta['value']
 
     def _setupx_transfers(self):
@@ -504,7 +504,7 @@ class System(object):
         self._lower_bounds = lower = vector_class('lower', 'output', self, root_lower)
         self._upper_bounds = upper = vector_class('upper', 'output', self, root_upper)
 
-        for abs_name, meta in iteritems(self._varx_abs2meta['output']):
+        for abs_name, meta in iteritems(self._var_abs2meta['output']):
             shape = meta['shape']
             ref0 = meta['ref0']
             ref = meta['ref']
@@ -536,8 +536,8 @@ class System(object):
             ('residual', 'norm0'): {}, ('residual', 'norm1'): {},
         }
 
-        allprocs_abs2meta_out = self._varx_allprocs_abs2meta['output']
-        abs2meta_in = self._varx_abs2meta['input']
+        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
+        abs2meta_in = self._var_abs2meta['input']
 
         for vec_name in self._vec_names:
             vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
@@ -547,7 +547,7 @@ class System(object):
                 vecs[key][vec_name] = vector_class(
                     vec_name, type_, self, root_vectors[key][vec_name])
 
-            for abs_name, meta in iteritems(self._varx_abs2meta['output']):
+            for abs_name, meta in iteritems(self._var_abs2meta['output']):
                 shape = meta['shape']
                 ref = meta['ref']
                 ref0 = meta['ref0']
@@ -824,23 +824,23 @@ class System(object):
     def _get_scope(self, excl_sub=None):
         if excl_sub is None:
             # All myproc outputs
-            scope_out = set(self._varx_abs_names['output'])
+            scope_out = set(self._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system
             scope_in = set(self._conn_global_abs_in2out.keys()) \
-                & set(self._varx_abs_names['input'])
+                & set(self._var_abs_names['input'])
         else:
             # All myproc outputs not in excl_sub
-            scope_out = set(self._varx_abs_names['output']) \
-                - set(excl_sub._varx_abs_names['output'])
+            scope_out = set(self._var_abs_names['output']) \
+                - set(excl_sub._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system but not in excl_sub
             scope_in = []
-            for abs_in in self._varx_abs_names['input']:
+            for abs_in in self._var_abs_names['input']:
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
-                    if abs_out not in excl_sub._varx_allprocs_abs2idx['output']:
+                    if abs_out not in excl_sub._var_allprocs_abs2idx['output']:
                         scope_in.append(abs_in)
             scope_in = set(scope_in)
 
@@ -950,15 +950,15 @@ class System(object):
         rel_out = self._relevant_vars_out[vec_name]
         rel_in = self._relevant_vars_in[vec_name]
 
-        res_names = set(self._varx_abs_names['output']) & rel_out
+        res_names = set(self._var_abs_names['output']) & rel_out
         if scope_out is None:
-            out_names = set(self._varx_abs_names['output']) & rel_out
+            out_names = set(self._var_abs_names['output']) & rel_out
         else:
-            out_names = set(self._varx_abs_names['output']) & rel_out & scope_out
+            out_names = set(self._var_abs_names['output']) & rel_out & scope_out
         if scope_in is None:
-            in_names = set(self._varx_abs_names['input']) & rel_in
+            in_names = set(self._var_abs_names['input']) & rel_in
         else:
-            in_names = set(self._varx_abs_names['input']) & rel_in & scope_in
+            in_names = set(self._var_abs_names['input']) & rel_in & scope_in
 
         d_inputs._names = in_names
         d_outputs._names = out_names
@@ -1462,7 +1462,7 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        pro2abs = self._varx_allprocs_prom2abs_list['output']
+        pro2abs = self._var_allprocs_prom2abs_list['output']
 
         # Human readable error message during Driver setup.
         try:
@@ -1516,7 +1516,7 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        prom2abs = self._varx_allprocs_prom2abs_list['output']
+        prom2abs = self._var_allprocs_prom2abs_list['output']
 
         # Human readable error message during Driver setup.
         try:

@@ -32,8 +32,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
     local_prom_dict = OrderedDict()
 
-    from_prom_name = OrderedDict(system._varx_allprocs_prom2abs_list['input'])
-    from_prom_name.update(system._varx_allprocs_prom2abs_list['output'])
+    from_prom_name = OrderedDict(system._var_allprocs_prom2abs_list['input'])
+    from_prom_name.update(system._var_allprocs_prom2abs_list['output'])
     for var_prom_name, var_abs_name_list in iteritems(from_prom_name):
         for var_abs_name in var_abs_name_list:
             if "." in var_prom_name:
@@ -48,9 +48,9 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
         children = []
         for typ in ['input', 'output']:
-            for ind, abs_name in enumerate(system._varx_abs_names[typ]):
-                meta = system._varx_abs2meta[typ][abs_name]
-                name = system._varx_abs2prom[typ][abs_name]
+            for ind, abs_name in enumerate(system._var_abs_names[typ]):
+                meta = system._var_abs2meta[typ][abs_name]
+                name = system._var_abs2prom[typ][abs_name]
 
                 var_dict = OrderedDict()
                 var_dict['name'] = name

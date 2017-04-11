@@ -86,20 +86,20 @@ class DefaultVector(Vector):
         type_ = self._typ
         iproc = self._iproc
 
-        sizes_byset_t = system._varx_sizes_byset[type_]
-        sizes_t = system._varx_sizes[type_]
-        allprocs_abs2idx_t = system._varx_allprocs_abs2idx[type_]
-        allprocs_abs2idx_byset_t = system._varx_allprocs_abs2idx_byset[type_]
-        abs2meta_t = system._varx_abs2meta[type_]
+        sizes_byset_t = system._var_sizes_byset[type_]
+        sizes_t = system._var_sizes[type_]
+        allprocs_abs2idx_t = system._var_allprocs_abs2idx[type_]
+        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
+        abs2meta_t = system._var_abs2meta[type_]
 
         data = {}
         indices = {}
-        for set_name in system._varx_set2iset[type_]:
+        for set_name in system._var_set2iset[type_]:
             size = np.sum(sizes_byset_t[set_name][iproc, :])
             data[set_name] = np.zeros(size)
             indices[set_name] = np.zeros(size, int)
 
-        for abs_name in system._varx_abs_names[type_]:
+        for abs_name in system._var_abs_names[type_]:
             idx = allprocs_abs2idx_t[abs_name]
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
             set_name = abs2meta_t[abs_name]['var_set']
@@ -132,10 +132,10 @@ class DefaultVector(Vector):
 
         data = {}
         indices = {}
-        for set_name in system._varx_set2iset[type_]:
+        for set_name in system._var_set2iset[type_]:
             offset_byset = system._ext_sizes_byset[type_][set_name][0]
             ind_byset1 = offset_byset
-            ind_byset2 = offset_byset + np.sum(system._varx_sizes_byset[type_][set_name][iproc, :])
+            ind_byset2 = offset_byset + np.sum(system._var_sizes_byset[type_][set_name][iproc, :])
 
             data[set_name] = root_vec._data[set_name][ind_byset1:ind_byset2]
             indices[set_name] = root_vec._indices[set_name][ind_byset1:ind_byset2] - offset
@@ -173,11 +173,11 @@ class DefaultVector(Vector):
         type_ = self._typ
         iproc = self._iproc
 
-        allprocs_abs2idx_t = system._varx_allprocs_abs2idx[type_]
-        allprocs_abs2idx_byset_t = system._varx_allprocs_abs2idx_byset[type_]
-        sizes_byset_t = system._varx_sizes_byset[type_]
-        abs2meta_t = system._varx_abs2meta[type_]
-        var_range_byset_t = system._varx_range_byset[type_]
+        allprocs_abs2idx_t = system._var_allprocs_abs2idx[type_]
+        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
+        sizes_byset_t = system._var_sizes_byset[type_]
+        abs2meta_t = system._var_abs2meta[type_]
+        var_range_byset_t = system._var_range_byset[type_]
 
         # idxs contains a 0 index for floats or a slice(None) for arrays so getitem
         # will return either a float or a properly shaped array respectively.
@@ -185,7 +185,7 @@ class DefaultVector(Vector):
         views = {}
         views_flat = {}
 
-        for abs_name in system._varx_abs_names[type_]:
+        for abs_name in system._var_abs_names[type_]:
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
             set_name = abs2meta_t[abs_name]['var_set']
 

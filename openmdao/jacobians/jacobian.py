@@ -73,7 +73,7 @@ class Jacobian(object):
         in_size : int
             local size of the input variable.
         """
-        abs2meta = self._system._varx_abs2meta
+        abs2meta = self._system._var_abs2meta
 
         meta0 = abs2meta['output'][abs_key[0]]
         if abs_key[1] in abs2meta['output']:
@@ -110,11 +110,11 @@ class Jacobian(object):
         system = self._system
 
         iter_list = []
-        for res_name in system._varx_abs_names['output']:
-            for out_name in system._varx_abs_names['output']:
+        for res_name in system._var_abs_names['output']:
+            for out_name in system._var_abs_names['output']:
                 if (res_name, out_name) in self._subjacs:
                     iter_list.append((res_name, out_name))
-            for in_name in system._varx_abs_names['input']:
+            for in_name in system._var_abs_names['input']:
                 if (res_name, in_name) in self._subjacs:
                     iter_list.append((res_name, in_name))
 
