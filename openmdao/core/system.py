@@ -13,7 +13,7 @@ import numpy as np
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.units import convert_units
@@ -537,14 +537,15 @@ class System(object):
             # this means that somewhere above us is an AssembledJacobian. If
             # we have a nonlinear solver that uses derivatives, this is
             # currently an error.
-            if self._nl_solver is not None and self._nl_solver.supports['gradients']:
-                raise RuntimeError("System '%s' has a solver of type '%s'"
-                                   "but an AssembledJacobian has been set in a "
-                                   "higher level system." % (self.pathname,
-                                                             self._nl_solver.__class__.__name__))
+            if (self._nl_solver is not None and
+                self._nl_solver.supports['gradients'] and not
+                isinstance(jacobian, DenseJacobian)):
+                    raise RuntimeError("System '%s' has a solver of type '%s'"
+                                       "but an AssembledJacobian has been set in a "
+                                       "higher level system." %
+                                       (self.pathname,
+                                        self._nl_solver.__class__.__name__))
             self._owns_assembled_jac = False
-            # TODO: add checks to see if we have lower level solvers requiring derivs
-            #    and raise an exception if we do
 
         if self._owns_assembled_jac:
 
