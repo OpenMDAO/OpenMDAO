@@ -42,6 +42,10 @@ class Assembler(object):
                            'output': list of ndarray[nproc, nvar]}
         list of local variable offset arrays, num procs x num vars by var_set.
         Contains starting global offset for each var in each proc.
+    _var_owned_by : {'input': ndarray[nvar], 'output': ndarray[nvar]}
+        Arrays where each entry is the owning rank for the corresponding allprocs
+        variable.  A value of -1 indicates that a variable is distributed and so
+        is not owned by any single rank.
     _var_set_IDs : {'input': {}, 'output': {}}
         dictionary mapping var_set names to their IDs.
     _var_set_indices : {'input': ndarray[nvar_all, 2],
@@ -87,6 +91,7 @@ class Assembler(object):
         self._var_sizes_all = {'input': None, 'output': None}
         self._var_sizes_by_set = {'input': [], 'output': []}
         self._var_offsets_by_set = {'input': [], 'output': []}
+        self._var_owned_by = {'input': [], 'output': []}
         self._var_dist_ranges = {}
         self._var_set_IDs = {'input': {}, 'output': {}}
         self._var_set_indices = {'input': None, 'output': None}
@@ -204,6 +209,13 @@ class Assembler(object):
                 self._comm.Allgather(self._var_sizes_all[typ][iproc, :],
                                      self._var_sizes_all[typ])
 
+        self._var_owned_by = {'input':
+                              np.empty(self._var_sizes_all['input'].shape[1],
+                                       dtype=int),
+                              'output':
+                              np.empty(self._var_sizes_all['output'].shape[1],
+                                       dtype=int)}
+
         for typ in ['input', 'output']:
             for sizes in self._var_sizes_by_set[typ]:
                 # calculate offsets for all varsets
@@ -211,6 +223,16 @@ class Assembler(object):
                 if offsets.size > 1:
                     offsets[1:] = np.cumsum(sizes.flat)[:-1]
                 self._var_offsets_by_set[typ].append(offsets.reshape(sizes.shape))
+
+            sizes = self._var_sizes_all[typ]
+            # calculate owning ranks
+            for ivar_all, abs_name in enumerate(allprocs_abs_names[typ]):
+                global_shape = abs2meta[abs_name].get('global_shape')
+                if global_shape is None or global_shape == abs2meta[abs_name]['shape']:
+                    self._var_owned_by[typ][ivar_all] = \
+                        np.min(np.nonzero(sizes[:, ivar_all])[0][0])
+                else:
+                    self._var_owned_by[typ][ivar_all] = -1  # it's a distributed var
 
         sizes = self._var_sizes_all['output']
         self._var_dist_ranges = ranges = {}
