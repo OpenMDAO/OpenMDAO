@@ -7,7 +7,6 @@ import inspect
 import re
 
 directories = [
-    'assemblers',
     'core',
     'jacobians',
     'matrices',

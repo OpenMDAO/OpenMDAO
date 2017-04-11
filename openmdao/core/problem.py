@@ -258,29 +258,6 @@ class Problem(object):
 
         return self
 
-    def _setup_processors(self):
-        """
-        Set up MPI communicators for the driver and model.
-        """
-        # first determine how many procs that we can possibly use
-        minproc, maxproc = self.driver.get_req_procs(self.model)
-        if MPI:
-            if not (maxproc is None or maxproc >= self.comm.size):
-                # we have more procs than we can use, so just raise an
-                # exception to encourage the user not to waste resources :)
-                raise RuntimeError("This problem was given %d MPI processes, "
-                                   "but it requires between %d and %d." %
-                                   (self.comm.size, minproc, maxproc))
-            elif self.comm.size < minproc:
-                if maxproc is None:
-                    maxproc = '(any)'
-                raise RuntimeError("This problem was given %d MPI processes, "
-                                   "but it requires between %s and %s." %
-                                   (self.comm.size, minproc, maxproc))
-
-        self.driver._setup_processors(self.model, self.comm, {},
-                                      self._assembler)
-
     def check_partial_derivatives(self, out_stream=sys.stdout, comps=None,
                                   compact_print=False, abs_err_tol=1e-6,
                                   rel_err_tol=1e-6, global_options=None,
