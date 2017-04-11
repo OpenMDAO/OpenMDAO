@@ -370,28 +370,28 @@ class System(object):
 
         return root_vectors
 
-    def _setupx(self, comm, vector_class):
+    def _setup(self, comm, vector_class):
         vec_names = ['nonlinear', 'linear']
 
         self._mpi_req_procs = self.get_req_procs()
-        self._setupx_procs('', comm, (0, comm.size))
-        self._setupx_vars()
-        self._setupx_var_index_ranges(*self._get_initial_var_indices())
-        self._setupx_var_data()
-        self._setupx_var_index_maps()
-        self._setupx_var_sizes()
-        self._setupx_global_connections()
-        self._setupx_connections()
-        self._setupx_partials()
-        self._setupx_global(*self._get_initial_global())
-        self._setupx_vectors(vec_names, self._get_root_vectors(vec_names, vector_class))
-        self._setupx_transfers()
-        self._setupx_bounds(*self._get_bounds_root_vectors(vector_class))
-        self._setupx_scaling(self._get_scaling_root_vectors(vec_names, vector_class))
-        self._setupx_solvers()
-        self._setupx_jacobians()
+        self._setup_procs('', comm, (0, comm.size))
+        self._setup_vars()
+        self._setup_var_index_ranges(*self._get_initial_var_indices())
+        self._setup_var_data()
+        self._setup_var_index_maps()
+        self._setup_var_sizes()
+        self._setup_global_connections()
+        self._setup_connections()
+        self._setup_partials()
+        self._setup_global(*self._get_initial_global())
+        self._setup_vectors(vec_names, self._get_root_vectors(vec_names, vector_class))
+        self._setup_transfers()
+        self._setup_bounds(*self._get_bounds_root_vectors(vector_class))
+        self._setup_scaling(self._get_scaling_root_vectors(vec_names, vector_class))
+        self._setup_solvers()
+        self._setup_jacobians()
 
-    def _setupx_procs(self, pathname, comm, proc_range):
+    def _setup_procs(self, pathname, comm, proc_range):
         self.pathname = pathname
         self.comm = comm
         self._mpi_proc_range = proc_range
@@ -401,11 +401,11 @@ class System(object):
             raise RuntimeError("%s needs %d MPI processes, but was given only %d." %
                                (self.pathname, minp, comm.size))
 
-    def _setupx_vars(self):
+    def _setup_vars(self):
         self._num_var = {'input': 0, 'output': 0}
         self._num_var_byset = {'input': {}, 'output': {}}
 
-    def _setupx_var_index_ranges(self, set2iset, var_range, var_range_byset):
+    def _setup_var_index_ranges(self, set2iset, var_range, var_range_byset):
         self._var_set2iset = set2iset
         self._var_range = var_range
         self._var_range_byset = var_range_byset
@@ -416,7 +416,7 @@ class System(object):
                 if set_name not in num_var_byset[type_]:
                     num_var_byset[type_][set_name] = 0
 
-    def _setupx_var_data(self):
+    def _setup_var_data(self):
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
@@ -424,7 +424,7 @@ class System(object):
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
 
-    def _setupx_var_index_maps(self):
+    def _setup_var_index_maps(self):
         self._var_allprocs_abs2idx = allprocs_abs2idx = {'input': {}, 'output': {}}
         self._var_allprocs_abs2idx_byset = allprocs_abs2idx_byset = {'input': {}, 'output': {}}
 
@@ -441,26 +441,26 @@ class System(object):
                 allprocs_abs2idx_byset_t[abs_name] = counter[set_name]
                 counter[set_name] += 1
 
-    def _setupx_var_sizes(self):
+    def _setup_var_sizes(self):
         self._var_sizes = {'input': None, 'output': None}
         self._var_sizes_byset = {'input': {}, 'output': {}}
 
-    def _setupx_global_connections(self):
+    def _setup_global_connections(self):
         self._conn_global_abs_in2out = {}
 
-    def _setupx_connections(self):
+    def _setup_connections(self):
         self._conn_abs_in2out = {}
 
-    def _setupx_partials(self):
+    def _setup_partials(self):
         self._subjacs_info = {}
 
-    def _setupx_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
+    def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
         self._ext_num_vars = ext_num_vars
         self._ext_num_vars_byset = ext_num_vars_byset
         self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
 
-    def _setupx_vectors(self, vec_names, root_vectors, rel_out=None, rel_in=None):
+    def _setup_vectors(self, vec_names, root_vectors, rel_out=None, rel_in=None):
         self._vec_names = vec_names
         self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._relevant_vars_out = rel_out
@@ -496,10 +496,10 @@ class System(object):
         for abs_name, meta in iteritems(self._var_abs2meta['output']):
             self._outputs._views[abs_name][:] = meta['value']
 
-    def _setupx_transfers(self):
+    def _setup_transfers(self):
         self._xfers = {}
 
-    def _setupx_bounds(self, root_lower, root_upper):
+    def _setup_bounds(self, root_lower, root_upper):
         vector_class = root_lower.__class__
         self._lower_bounds = lower = vector_class('lower', 'output', self, root_lower)
         self._upper_bounds = upper = vector_class('upper', 'output', self, root_upper)
@@ -526,7 +526,7 @@ class System(object):
             else:
                 upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
 
-    def _setupx_scaling(self, root_vectors):
+    def _setup_scaling(self, root_vectors):
         self._scaling_vecs = vecs = {
             ('input', 'phys0'): {}, ('input', 'phys1'): {},
             ('input', 'norm0'): {}, ('input', 'norm1'): {},
@@ -629,13 +629,13 @@ class System(object):
                 vecs['input', 'norm0'][vec_name]._views[abs_in][:] = -a0 / a1
                 vecs['input', 'norm1'][vec_name]._views[abs_in][:] = 1.0 / a1
 
-    def _setupx_solvers(self):
+    def _setup_solvers(self):
         if self._nl_solver is not None:
             self._nl_solver._setup_solvers(self, 0)
         if self._ln_solver is not None:
             self._ln_solver._setup_solvers(self, 0)
 
-    def _setupx_jacobians(self, jacobian=None):
+    def _setup_jacobians(self, jacobian=None):
         """
         Set and populate jacobians down through the system tree.
 
@@ -672,7 +672,7 @@ class System(object):
         self._set_partials_meta()
 
         for subsys in self._subsystems_myproc:
-            subsys._setupx_jacobians(jacobian)
+            subsys._setup_jacobians(jacobian)
 
         if self._owns_assembled_jac:
             self._jacobian._system = self

@@ -55,8 +55,8 @@ class Group(System):
         """
         pass
 
-    def _setupx_procs(self, pathname, comm, proc_range):
-        super(Group, self)._setupx_procs(pathname, comm, proc_range)
+    def _setup_procs(self, pathname, comm, proc_range):
+        super(Group, self)._setup_procs(pathname, comm, proc_range)
 
         self._subsystems_allprocs = []
         self._manual_connections = {}
@@ -92,16 +92,16 @@ class Group(System):
             else:
                 sub_pathname = subsys.name
 
-            subsys._setupx_procs(sub_pathname, sub_comm, sub_proc_range)
+            subsys._setup_procs(sub_pathname, sub_comm, sub_proc_range)
 
-    def _setupx_vars(self):
-        super(Group, self)._setupx_vars()
+    def _setup_vars(self):
+        super(Group, self)._setup_vars()
         num_var = self._num_var
         num_var_byset = self._num_var_byset
 
         # Recursion
         for subsys in self._subsystems_myproc:
-            subsys._setupx_vars()
+            subsys._setup_vars()
 
         # Compute num_var, num_var_byset, at least locally
         for type_ in ['input', 'output']:
@@ -139,8 +139,8 @@ class Group(System):
                         else:
                             num_var_byset[type_][set_name] = num
 
-    def _setupx_var_index_ranges(self, set2iset, var_range, var_range_byset):
-        super(Group, self)._setupx_var_index_ranges(set2iset, var_range, var_range_byset)
+    def _setup_var_index_ranges(self, set2iset, var_range, var_range_byset):
+        super(Group, self)._setup_var_index_ranges(set2iset, var_range, var_range_byset)
 
         nsub_allprocs = len(self._subsystems_allprocs)
         num_var = self._num_var
@@ -196,10 +196,10 @@ class Group(System):
                         np.sum(allprocs_counters_byset[type_][:isub + 1, iset])
                     )
 
-            subsys._setupx_var_index_ranges(set2iset, sub_var_range, sub_var_range_byset)
+            subsys._setup_var_index_ranges(set2iset, sub_var_range, sub_var_range_byset)
 
-    def _setupx_var_data(self):
-        super(Group, self)._setupx_var_data()
+    def _setup_var_data(self):
+        super(Group, self)._setup_var_data()
         allprocs_abs_names = self._var_allprocs_abs_names
         abs_names = self._var_abs_names
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
@@ -209,7 +209,7 @@ class Group(System):
 
         # Recursion
         for subsys in self._subsystems_myproc:
-            subsys._setupx_var_data()
+            subsys._setup_var_data()
 
         for subsys in self._subsystems_myproc:
             var_maps = subsys._get_maps(subsys._var_allprocs_prom2abs_list)
@@ -280,15 +280,15 @@ class Group(System):
                         else:
                             allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
-    def _setupx_var_index_maps(self):
-        super(Group, self)._setupx_var_index_maps()
+    def _setup_var_index_maps(self):
+        super(Group, self)._setup_var_index_maps()
 
         # Recursion
         for subsys in self._subsystems_myproc:
-            subsys._setupx_var_index_maps()
+            subsys._setup_var_index_maps()
 
-    def _setupx_var_sizes(self):
-        super(Group, self)._setupx_var_sizes()
+    def _setup_var_sizes(self):
+        super(Group, self)._setup_var_sizes()
         sizes = self._var_sizes
         sizes_byset = self._var_sizes_byset
 
@@ -300,7 +300,7 @@ class Group(System):
 
         # Recursion
         for subsys in self._subsystems_myproc:
-            subsys._setupx_var_sizes()
+            subsys._setup_var_sizes()
 
         # Compute _var_sizes
         for type_ in ['input', 'output']:
@@ -329,8 +329,8 @@ class Group(System):
                     self.comm.Allgather(
                         sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
 
-    def _setupx_global_connections(self):
-        super(Group, self)._setupx_global_connections()
+    def _setup_global_connections(self):
+        super(Group, self)._setup_global_connections()
         global_abs_in2out = self._conn_global_abs_in2out
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
@@ -422,7 +422,7 @@ class Group(System):
         # Recursion
         for subsys in self._subsystems_myproc:
             subsys._conn_parents_abs_in2out = abs_in2out
-            subsys._setupx_global_connections()
+            subsys._setup_global_connections()
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
@@ -444,8 +444,8 @@ class Group(System):
             for myproc_global_abs_in2out in gathered:
                 global_abs_in2out.update(myproc_global_abs_in2out)
 
-    def _setupx_connections(self):
-        super(Group, self)._setupx_connections()
+    def _setup_connections(self):
+        super(Group, self)._setup_connections()
         abs_in2out = self._conn_abs_in2out
 
         global_abs_in2out = self._conn_global_abs_in2out
@@ -455,7 +455,7 @@ class Group(System):
 
         # Recursion
         for subsys in self._subsystems_myproc:
-            subsys._setupx_connections()
+            subsys._setup_connections()
 
         if pathname == '':
             path_len = 0
@@ -472,14 +472,14 @@ class Group(System):
                 if out_subsys != in_subsys:
                     abs_in2out[abs_in] = abs_out
 
-    def _setupx_partials(self):
-        super(Group, self)._setupx_partials()
+    def _setup_partials(self):
+        super(Group, self)._setup_partials()
 
         for subsys in self._subsystems_myproc:
-            subsys._setupx_partials()
+            subsys._setup_partials()
 
-    def _setupx_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
-        super(Group, self)._setupx_global(
+    def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
+        super(Group, self)._setup_global(
             ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
 
         iproc = self.comm.rank
@@ -522,23 +522,23 @@ class Group(System):
                         ext_sizes_byset[type_][set_name][1] + size2,
                     )
 
-            subsys._setupx_global(
+            subsys._setup_global(
                 sub_ext_num_vars, sub_ext_num_vars_byset,
                 sub_ext_sizes, sub_ext_sizes_byset,
             )
 
-    def _setupx_vectors(self, vec_names, root_vectors, rel_out=None, rel_in=None):
-        super(Group, self)._setupx_vectors(vec_names, root_vectors, rel_out, rel_in)
+    def _setup_vectors(self, vec_names, root_vectors, rel_out=None, rel_in=None):
+        super(Group, self)._setup_vectors(vec_names, root_vectors, rel_out, rel_in)
 
         for subsys in self._subsystems_myproc:
-            subsys._setupx_vectors(
+            subsys._setup_vectors(
                 vec_names, root_vectors, self._relevant_vars_out, self._relevant_vars_in)
 
-    def _setupx_transfers(self):
-        super(Group, self)._setupx_transfers()
+    def _setup_transfers(self):
+        super(Group, self)._setup_transfers()
 
         for subsys in self._subsystems_myproc:
-            subsys._setupx_transfers()
+            subsys._setup_transfers()
 
         # Pre-compute map from abs_names to the index of the containing subsystem
         abs2isub = {'input': {}, 'output': {}}
@@ -697,23 +697,23 @@ class Group(System):
                     vectors['input'][vec_name], vectors['output'][vec_name],
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
 
-    def _setupx_bounds(self, root_lower, root_upper):
-        super(Group, self)._setupx_bounds(root_lower, root_upper)
+    def _setup_bounds(self, root_lower, root_upper):
+        super(Group, self)._setup_bounds(root_lower, root_upper)
 
         for subsys in self._subsystems_myproc:
-            subsys._setupx_bounds(root_lower, root_upper)
+            subsys._setup_bounds(root_lower, root_upper)
 
-    def _setupx_scaling(self, root_vectors):
-        super(Group, self)._setupx_scaling(root_vectors)
-
-        for subsys in self._subsystems_myproc:
-            subsys._setupx_scaling(root_vectors)
-
-    def _setupx_solvers(self):
-        super(Group, self)._setupx_solvers()
+    def _setup_scaling(self, root_vectors):
+        super(Group, self)._setup_scaling(root_vectors)
 
         for subsys in self._subsystems_myproc:
-            subsys._setupx_solvers()
+            subsys._setup_scaling(root_vectors)
+
+    def _setup_solvers(self):
+        super(Group, self)._setup_solvers()
+
+        for subsys in self._subsystems_myproc:
+            subsys._setup_solvers()
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------

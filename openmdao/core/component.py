@@ -87,8 +87,8 @@ class Component(System):
         """
         pass
 
-    def _setupx_vars(self):
-        super(Component, self)._setupx_vars()
+    def _setup_vars(self):
+        super(Component, self)._setup_vars()
         num_var = self._num_var
         num_var_byset = self._num_var_byset
 
@@ -116,8 +116,8 @@ class Component(System):
             else:
                 num_var_byset[type_][set_name] = 1
 
-    def _setupx_var_data(self):
-        super(Component, self)._setupx_var_data()
+    def _setup_var_data(self):
+        super(Component, self)._setup_var_data()
         allprocs_abs_names = self._var_allprocs_abs_names
         abs_names = self._var_abs_names
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
@@ -160,8 +160,8 @@ class Component(System):
                 # Compute abs2meta
                 abs2meta[type_][abs_name] = metadata
 
-    def _setupx_var_sizes(self):
-        super(Component, self)._setupx_var_sizes()
+    def _setup_var_sizes(self):
+        super(Component, self)._setup_var_sizes()
 
         sizes = self._var_sizes
         sizes_byset = self._var_sizes_byset
@@ -200,8 +200,8 @@ class Component(System):
                     self.comm.Allgather(
                         sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
 
-    def _setupx_partials(self):
-        super(Component, self)._setupx_partials()
+    def _setup_partials(self):
+        super(Component, self)._setup_partials()
 
         self.initialize_partials()
 

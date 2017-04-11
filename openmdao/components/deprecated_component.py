@@ -257,11 +257,11 @@ class Component(BaseComponent):
             if self._owns_assembled_jac:
                 J._update()
 
-    def _setupx_partials(self):
+    def _setup_partials(self):
         """
         Set up partial derivative sparsity structures and approximation schemes.
         """
-        super(Component, self)._setupx_partials()
+        super(Component, self)._setup_partials()
 
         abs2meta_out = self._var_abs2meta['output']
         abs2prom_out = self._var_abs2prom['output']
