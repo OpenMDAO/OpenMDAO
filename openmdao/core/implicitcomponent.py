@@ -257,6 +257,8 @@ class ImplicitComponent(Component):
         elif mode == 'rev':
             d_residuals.set_vec(d_outputs)
 
+        return False, 0., 0.
+
     def linearize(self, inputs, outputs, jacobian):
         """
         Compute sub-jacobian parts and any applicable matrix factorizations.

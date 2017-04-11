@@ -1,4 +1,5 @@
 """Define the LinearBlockJac class."""
+
 from six.moves import range
 
 from openmdao.solvers.solver import BlockLinearSolver
@@ -33,24 +34,12 @@ class LinearBlockGS(BlockLinearSolver):
                     subsys._var_allprocs_idx_range['output'][1],
                     system._var_allprocs_idx_range['output'][1],
                 ]
-                #print('Pre-Apply')
-                #print('in', d_inputs._data)
-                #print('out', d_outputs._data)
-                #print('res', system._vectors['residual'][vec_name]._data)
                 subsys._apply_linear(vec_names, mode, var_inds)
-                #print('Post-Apply')
-                #print('in', d_inputs._data)
-                #print('out', d_outputs._data)
-                #print('res', system._vectors['residual'][vec_name]._data)
                 for vec_name in vec_names:
                     b_vec = system._vectors['residual'][vec_name]
                     b_vec *= -1.0
                     b_vec += self._rhs_vecs[vec_name]
                 subsys._solve_linear(vec_names, mode)
-                #print('Post-Solve')
-                #print('in', d_inputs._data)
-                #print('out', d_outputs._data)
-                #print('res', system._vectors['residual'][vec_name]._data)
 
         elif mode == 'rev':
             subsystems = system._subsystems_allprocs
