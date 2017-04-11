@@ -133,8 +133,8 @@ class ExplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        with self._unscaled_context(outputs=[self._outputs],
-                                         residuals=[self._residuals]):
+        with self._unscaled_context(
+                outputs=[self._outputs], residuals=[self._residuals]):
             self._residuals.set_vec(self._outputs)
             self.compute(self._inputs, self._outputs)
             self._residuals -= self._outputs
@@ -153,8 +153,8 @@ class ExplicitComponent(Component):
         float
             relative error.
         """
-        with self._unscaled_context(outputs=[self._outputs],
-                                         residuals=[self._residuals]):
+        with self._unscaled_context(
+                outputs=[self._outputs], residuals=[self._residuals]):
             self._residuals.set_const(0.0)
             failed = self.compute(self._inputs, self._outputs)
 
@@ -186,8 +186,8 @@ class ExplicitComponent(Component):
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
 
                 # Jacobian and vectors are all unscaled, dimensional
-                with self._unscaled_context(outputs=[self._outputs],
-                                                 residuals=[d_residuals]):
+                with self._unscaled_context(
+                        outputs=[self._outputs], residuals=[d_residuals]):
                     d_residuals *= -1.0
                     self.compute_jacvec_product(self._inputs, self._outputs,
                                                 d_inputs, d_residuals, mode)
@@ -217,8 +217,8 @@ class ExplicitComponent(Component):
             d_outputs = self._vectors['output'][vec_name]
             d_residuals = self._vectors['residual'][vec_name]
 
-            with self._unscaled_context(outputs=[d_outputs],
-                                             residuals=[d_residuals]):
+            with self._unscaled_context(
+                    outputs=[d_outputs], residuals=[d_residuals]):
                 if mode == 'fwd':
                     d_outputs.set_vec(d_residuals)
                 elif mode == 'rev':
@@ -238,8 +238,8 @@ class ExplicitComponent(Component):
             Flag indicating if the linear solver should be linearized.
         """
         with self.jacobian_context() as J:
-            with self._unscaled_context(outputs=[self._outputs],
-                                             residuals=[self._residuals]):
+            with self._unscaled_context(
+                    outputs=[self._outputs], residuals=[self._residuals]):
                 # Since the residuals are already negated, this call should come before negate_jac
                 # Additionally, computing the approximation before the call to compute_partials
                 # allows users to override FD'd values.

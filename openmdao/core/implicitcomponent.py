@@ -32,8 +32,8 @@ class ImplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        with self._unscaled_context(outputs=[self._outputs],
-                                         residuals=[self._residuals]):
+        with self._unscaled_context(
+                outputs=[self._outputs], residuals=[self._residuals]):
             self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
     def _solve_nonlinear(self):
@@ -88,8 +88,8 @@ class ImplicitComponent(Component):
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
 
                 # Jacobian and vectors are all unscaled, dimensional
-                with self._unscaled_context(outputs=[self._outputs, d_outputs],
-                                                 residuals=[d_residuals]):
+                with self._unscaled_context(
+                        outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
                     self.apply_linear(self._inputs, self._outputs,
                                       d_inputs, d_outputs, d_residuals, mode)
 
@@ -123,8 +123,8 @@ class ImplicitComponent(Component):
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
-                with self._unscaled_context(outputs=[d_outputs],
-                                                 residuals=[d_residuals]):
+                with self._unscaled_context(
+                        outputs=[d_outputs], residuals=[d_residuals]):
                     result = self.solve_linear(d_outputs, d_residuals, mode)
 
                 if result is None:

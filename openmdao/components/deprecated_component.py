@@ -161,8 +161,8 @@ class Component(BaseComponent):
                     self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                           mode)
 
-                with self._unscaled_context(outputs=[self._outputs, d_outputs],
-                                                 residuals=[d_residuals]):
+                with self._unscaled_context(
+                        outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
 
                     if len(self._state_names) == 0:
                         for name in d_inputs:
@@ -237,8 +237,8 @@ class Component(BaseComponent):
             Flag indicating if the linear solver should be linearized.
         """
         with self.jacobian_context() as J:
-            with self._unscaled_context(outputs=[self._outputs],
-                                             residuals=[self._residuals]):
+            with self._unscaled_context(
+                    outputs=[self._outputs], residuals=[self._residuals]):
 
                 # If we are a purely explicit component, then negate constant subjacs (and others
                 # that will get overwritten) back to normal.

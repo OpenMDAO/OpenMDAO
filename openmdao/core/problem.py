@@ -253,6 +253,9 @@ class Problem(object):
         model._setupx(comm, vector_class)
         self.driver._setup_driver(self)
 
+        if check:
+            check_config(self, logger)
+
         return self
 
     def _setup_processors(self):

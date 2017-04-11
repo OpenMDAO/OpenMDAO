@@ -621,7 +621,8 @@ class System(object):
 
                 # Compute scaling arrays for inputs using a0 and a1
                 # Example:
-                #   Let x, x_src, x_tgt be the variable in dimensionless, source, and target units, resp.
+                #   Let x, x_src, x_tgt be the dimensionless variable,
+                #   variable in source units, and variable in target units, resp.
                 #   x_src = a0 + a1 x
                 #   x_tgt = b0 + b1 x
                 #   x_tgt = g(x_src) = d0 + d1 x_src

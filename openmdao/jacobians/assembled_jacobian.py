@@ -197,8 +197,8 @@ class AssembledJacobian(Jacobian):
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx
 
-        with self._system._unscaled_context(outputs=[d_outputs],
-                                                 residuals=[d_residuals]):
+        with self._system._unscaled_context(
+                outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
                 d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode))
                 d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode))
