@@ -112,9 +112,13 @@ class DenseMatrix(Matrix):
         ndarray[:]
             vector resulting from the product.
         """
+        # when we have a derivative based solver at a level below the
+        # group that owns the AssembledJacobian, we need to use only
+        # the part of the matrix that is relevant to the lower level
+        # system.
         rstart, rend, cstart, cend = ranges
         mat = self._matrix[rstart:rend, cstart:cend]
         if mode == 'fwd':
             return mat.dot(in_vec)
-        elif mode == 'rev':
+        else:  # rev
             return mat.T.dot(in_vec)

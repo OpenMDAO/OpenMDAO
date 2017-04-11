@@ -186,7 +186,10 @@ class AssembledJacobian(Jacobian):
             assembler._var_sizes_all['input'][iproc, in_start:in_end])
 
         self._int_mtx._build(out_size, out_size)
-        self._ext_mtx._build(out_size, in_size)
+        if self._ext_mtx._submats:
+            self._ext_mtx._build(out_size, in_size)
+        else:
+            self._ext_mtx = None
 
     def _update(self):
         """
@@ -215,7 +218,7 @@ class AssembledJacobian(Jacobian):
                         if out_start <= out_idx < out_end:
                             self._int_mtx._update_submat(self._keymap[abs_key],
                                                          self._subjacs[abs_key])
-                        else:
+                        elif self._ext_mtx is not None:
                             self._ext_mtx._update_submat(abs_key, self._subjacs[abs_key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
@@ -241,10 +244,13 @@ class AssembledJacobian(Jacobian):
 
         if mode == 'fwd':
             d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
-            d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, ranges))
-        elif mode == 'rev':
-            d_outputs.iadd_data(int_mtx._prod(d_residuals.get_data(), mode, int_ranges))
-            d_inputs.iadd_data(ext_mtx._prod(d_residuals.get_data(), mode, ranges))
+            if ext_mtx is not None:
+                d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, ranges))
+        else:  # rev
+            dresids = d_residuals.get_data()
+            d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
+            if ext_mtx is not None:
+                d_inputs.iadd_data(ext_mtx._prod(dresids, mode, ranges))
 
 
 class DenseJacobian(AssembledJacobian):
