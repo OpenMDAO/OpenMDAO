@@ -111,9 +111,10 @@ class TestNewton(unittest.TestCase):
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nl_solver = NewtonSolver()
+        prob.model.ln_solver = LinearBlockGS()
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.model.suppress_solver_output = False
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)

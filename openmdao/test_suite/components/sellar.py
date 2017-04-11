@@ -121,8 +121,11 @@ class SellarDis2withDerivatives(SellarDis2):
         """
         Jacobian for Sellar discipline 2.
         """
+        y1 = inputs['y1']
+        if y1.real < 0.0:
+            y1 *= -1
 
-        J['y2', 'y1'] = .5*inputs['y1']**-.5
+        J['y2', 'y1'] = .5*y1**-.5
         J['y2', 'z'] = np.array([[1.0, 1.0]])
 
 
@@ -312,3 +315,103 @@ class SellarStateConnection(Group):
         self.connect('d2.y2', 'con_cmp2.y2')
 
         self.nl_solver = NewtonSolver()
+
+
+class SellarImplicitDis1(ImplicitComponent):
+    """
+    Component containing Discipline 1 -- no derivatives version.
+    """
+
+    def __init__(self):
+        super(SellarImplicitDis1, self).__init__()
+        self.execution_count = 0
+
+    def initialize_variables(self):
+        # Global Design Variable
+        self.add_input('z', val=np.zeros(2))
+
+        # Local Design Variable
+        self.add_input('x', val=0.)
+
+        # Coupling parameter
+        self.add_input('y2', val=1.0)
+
+        # Coupling output
+        self.add_output('y1', val=1.0)
+
+    def apply_nonlinear(self, inputs, outputs, resids):
+        """
+        Evaluates the equation
+        y1 = z1**2 + z2 + x1 - 0.2*y2
+        """
+
+        z1 = inputs['z'][0]
+        z2 = inputs['z'][1]
+        x1 = inputs['x']
+        y2 = inputs['y2']
+
+        y1 = outputs['y1']
+
+        resids['y1'] =  -(z1**2 + z2 + x1 - 0.2*y2 - y1)
+
+    def linearize(self, inputs, outputs, J):
+        """
+        Jacobian for Sellar discipline 1.
+        """
+        J['y1', 'y2'] = 0.2
+        J['y1', 'z'] = -np.array([[2.0 * inputs['z'][0], 1.0]])
+        J['y1', 'x'] = -1.0
+        J['y1', 'y1'] = 1.0
+
+
+class SellarImplicitDis2(ImplicitComponent):
+    """
+    Component containing Discipline 2 -- implicit version.
+    """
+
+    def __init__(self):
+        super(SellarImplicitDis2, self).__init__()
+        self.execution_count = 0
+
+    def initialize_variables(self):
+        # Global Design Variable
+        self.add_input('z', val=np.zeros(2))
+
+        # Coupling parameter
+        self.add_input('y1', val=1.0)
+
+        # Coupling output
+        self.add_output('y2', val=1.0)
+
+    def apply_nonlinear(self, inputs, outputs, resids):
+        """
+        Evaluates the equation
+        y2 = y1**(.5) + z1 + z2
+        """
+
+        z1 = inputs['z'][0]
+        z2 = inputs['z'][1]
+        y1 = inputs['y1']
+
+        y2 = outputs['y2']
+
+        # Note: this may cause some issues. However, y1 is constrained to be
+        # above 3.16, so lets just let it converge, and the optimizer will
+        # throw it out
+        if y1.real < 0.0:
+            y1 *= -1
+
+        resids['y2'] = -(y1**.5 + z1 + z2 - y2)
+
+    def linearize(self, inputs, outputs, J):
+        """
+        Jacobian for Sellar discipline 2.
+        """
+        y1 = inputs['y1']
+        if y1.real < 0.0:
+            y1 *= -1
+
+        J['y2', 'y1'] = -.5*y1**-.5
+        J['y2', 'z'] = -np.array([[1.0, 1.0]])
+        J['y2', 'y2'] = 1.0
+
