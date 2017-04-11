@@ -1,4 +1,5 @@
-"""Define the LinearBlockJac class."""
+"""Define the LinearBlockGS class."""
+
 from six.moves import range
 
 from openmdao.solvers.solver import BlockLinearSolver
