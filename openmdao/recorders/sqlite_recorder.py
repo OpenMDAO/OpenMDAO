@@ -6,7 +6,6 @@ from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.solvers.solver import Solver
 from openmdao.utils.record_util import format_iteration_coordinate
-# from openmdao.devtools.partition_tree_n2 import get_model_viewer_data
 
 from six import iteritems
 
@@ -58,12 +57,12 @@ class SqliteRecorder(BaseRecorder):
     -------
     options['record_metadata'] :  bool(True)
         Tells recorder whether to record variable attribute metadata.
-    options['record_unknowns'] :  bool(True)
-        Tells recorder whether to record the unknowns vector.
-    options['record_params'] :  bool(False)
-        Tells recorder whether to record the params vector.
-    options['record_resids'] :  bool(False)
-        Tells recorder whether to record the ressiduals vector.
+    options['record_outputs'] :  bool(True)
+        Tells recorder whether to record the outputs vector.
+    options['record_inputs'] :  bool(False)
+        Tells recorder whether to record the inputs vector.
+    options['record_residuals'] :  bool(False)
+        Tells recorder whether to record the residuals vector.
     options['record_derivs'] :  bool(True)
         Tells recorder whether to record derivatives that are requested by a `Driver`.
     options['includes'] :  list of strings
@@ -83,17 +82,17 @@ class SqliteRecorder(BaseRecorder):
         self._counter = 0
         # isolation_level=None causes autocommit
         self.con = sqlite3.connect(out, detect_types=sqlite3.PARSE_DECLTYPES, isolation_level=None)
-
-        # Create the table for iterations for a driver
-        # The primary key gets filled in automatically. It can be our "counter"
-        # that John wants. It gets incremented by 1
-        #   for each write of a record to this table
         self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT, \
                          timestamp REAL, success INT, msg TEXT, driver_values array)")
         self.con.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT,  \
                          timestamp REAL, success INT, msg TEXT, system_values array)")
         self.con.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT,  \
                          timestamp REAL, success INT, msg TEXT, solver_values array)")
+        self.con.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, model_viewer_data BLOB)")
+        self.con.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, input_scale_factor REAL, output_scale_factor REAL)")
+        self.con.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, solver_junk REAL)")
+
+
 
     def startup(self):
         """
@@ -101,7 +100,6 @@ class SqliteRecorder(BaseRecorder):
         """
         super(SqliteRecorder, self).startup()
         self._counter = 0
-        # self.model_viewer_data = get_model_viewer_data(group)
 
     def record_iteration(self, object_requesting_recording, metadata):
         """
@@ -193,12 +191,12 @@ class SqliteRecorder(BaseRecorder):
 
     def record_iteration_system(self, object_requesting_recording, metadata):
         """
-        Record an iteration using driver options.
+        Record an iteration using system options.
         """
         if isinstance(object_requesting_recording, System):
             dtype_tuples = []
 
-            # go through the recording options of Driver to construct the entry to be inserted.
+            # go through the recording options of Solver to construct the entry to be inserted.
             if self.options['record_inputs']:
                 inputs = object_requesting_recording._inputs
                 if inputs:
@@ -256,11 +254,11 @@ class SqliteRecorder(BaseRecorder):
 
     def record_iteration_solver(self, object_requesting_recording, metadata):
         """
-        Record an iteration using driver options.
+        Record an iteration using solver options.
         """
         dtype_tuples = []
 
-        # Go through the recording options of Driver to construct the entry to be inserted.
+        # Go through the recording options of Solver to construct the entry to be inserted.
         if self.options['record_abs_error']:
             abs_errors = object_requesting_recording.get_abs_error()
             if abs_errors:
@@ -288,8 +286,6 @@ class SqliteRecorder(BaseRecorder):
                 for name, value in iteritems(residuals):
                     tple = ('residual.' + name, '({},)f8'.format(len(value)))
                     dtype_tuples.append(tple)
-
-        print("DTYPE_TUPLES: ", dtype_tuples)
 
         # Create the mega array that we will write to the database
         # All of this needs to be looked into to be optimized !!
@@ -328,8 +324,32 @@ class SqliteRecorder(BaseRecorder):
                                                metadata['success'], metadata['msg'],
                                                solver_values))
 
+    def record_metadata(self, object_requesting_recording):
+        if isinstance(object_requesting_recording, Driver):
+            self.record_metadata_driver(object_requesting_recording)
+        elif isinstance(object_requesting_recording, System):
+            self.record_metadata_system(object_requesting_recording)
+        elif isinstance(object_requesting_recording, Solver):
+            record_metadata_solver(object_requesting_recording)
+
+    def record_metadata_driver(self, object_requesting_recording):
+        model_viewer_data = object_requesting_recording._model_viewer_data
+        # pickle stuff here?
+        print ("Model viewer data: ", model_viewer_data)
+        self.con.execute("INSERT INTO driver_metadata(model_viewer_data) "
+                         "VALUES(?)", (model_viewer_data))
+
+    def record_metadata_system(self, object_requesting_recording):
+        self.con.execute("INSERT INTO system_metadata(scaling_factor_input, scaling_factor_output) "
+                         "VALUES(?,?)", (object_requesting_recording._scaling_to_phys['input'],
+                                         object_requesting_recording._scaling_to_phys['output']))
+
+    def record_metadata_solver(self, object_requesting_recording):
+        pass
+
     def close(self):
         """
         Close `out`.
         """
         self.con.close()  # Not completely sure if it is this simple.
+

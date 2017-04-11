@@ -25,7 +25,7 @@ class BaseRecorder(object):
     options['record_inputs'] :  bool(False)
         Tells recorder whether to record the inputs vector.
     options['record_residuals'] :  bool(False)
-        Tells recorder whether to record the ressiduals vector.
+        Tells recorder whether to record the residuals vector.
     options['record_derivatives'] :  bool(True)
         Tells recorder whether to record derivatives that are requested by a `Driver`.
     options['includes'] :  list of strings
@@ -168,14 +168,14 @@ class BaseRecorder(object):
         pathname = self._get_pathname(iteration_coordinate)
         return {n: vecwrapper[n] for n in self._filtered[pathname][key]}
 
-    def record_metadata(self, group):
+    def record_metadata(self, object_requesting_recording):
         """
-        Write the metadata of the given group.
+        Write the metadata of the given object.
 
         Args
         ----
-        group : `System`
-            `System` containing vectors.
+        object_requesting_recording :
+            System, Solver, Driver in need of recording.
         """
         raise NotImplementedError()
 
@@ -200,20 +200,6 @@ class BaseRecorder(object):
         """
         self._counter += 1
         # raise NotImplementedError()
-
-    def record_derivatives(self, derivs, metadata):
-        """
-        Write the metadata of the given group.
-
-        Args
-        ----
-        derivs : dict
-            Dictionary containing derivatives
-
-        metadata : dict, optional
-            Dictionary containing execution metadata (e.g. iteration coordinate).
-        """
-        raise NotImplementedError()
 
     def close(self):
         """

@@ -16,7 +16,8 @@ from sqlitedict import SqliteDict
 import numpy as np
 from numpy.testing import assert_allclose
 
-from openmdao.api import Problem, SqliteRecorder
+# from openmdao.core.problem import Problem
+from openmdao.recorders.sqlite_recorder import  SqliteRecorder
 # from openmdao.util.record_util import format_iteration_coordinate
 
 from openmdao.recorders.sqlite_recorder import format_version

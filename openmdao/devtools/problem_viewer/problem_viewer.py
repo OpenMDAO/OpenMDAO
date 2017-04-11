@@ -16,7 +16,6 @@ except ImportError:
     h5py = None
 
 from openmdao.core.group import Group
-from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.error_checking.check_config import compute_sys_graph
@@ -89,6 +88,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
 def _get_viewer_data(problem_or_rootgroup):
     """Get the data needed by the N2 viewer as a dictionary."""
+    from openmdao.core.problem import Problem
+
     if isinstance(problem_or_rootgroup, Problem):
         root_group = problem_or_rootgroup.model
     elif isinstance(problem_or_rootgroup, Group):
@@ -226,6 +227,7 @@ def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_brows
     with open(os.path.join(code_dir, 'awesomplete.js'), "r") as f:
             awesomplete_js = "%s" % (f.read())
 
+    from openmdao.core.problem import Problem
     if isinstance(problem_or_filename, Problem):
         model_viewer_data = _get_viewer_data(problem_or_filename)
     else:

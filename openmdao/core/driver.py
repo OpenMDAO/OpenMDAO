@@ -5,6 +5,7 @@ from six import iteritems
 from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, update_local_meta
 from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 
 import numpy as np
 
@@ -68,6 +69,7 @@ class Driver(object):
 
         self.iter_count = 0
         self.metadata = None
+        self._model_viewer_data = None
 
         # TODO, support these in Openmdao blue
         # self.supports.declare('integer_design_vars', True)
@@ -111,7 +113,9 @@ class Driver(object):
         self._responses = model.get_responses(recurse=True)
         self._objs = model.get_objectives(recurse=True)
         self._cons = model.get_constraints(recurse=True)
+        self._model_viewer_data = _get_viewer_data(problem)
         self._rec_mgr.startup()
+        self._rec_mgr.record_metadata(self)
 
     def get_design_var_values(self):
         """

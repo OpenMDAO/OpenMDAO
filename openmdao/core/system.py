@@ -314,6 +314,7 @@ class System(object):
 
             self.initialize_variables()
             self._rec_mgr.startup()
+            self._rec_mgr.record_metadata(self)
 
     def _setup_variable_indices(self, global_index, recurse=True):
         """
