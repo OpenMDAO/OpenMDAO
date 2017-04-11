@@ -56,6 +56,7 @@ class System(object):
     _mpi_proc_range : (int, int)
         The range of procs this system's comm owns, among all of this system's processors.
         Therefore, if this is not a parallel group, this range is always (0, comm.size).
+        This information is not used if this is the top-level group.
     #
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
@@ -287,9 +288,40 @@ class System(object):
         self._static_subsystems_allprocs = []
         self._static_manual_connections = {}
 
-    def _get_initial_var_indices(self):
+    def _get_initial_procs(self, comm, reconf):
+        """
+        Get initial values for pathname, comm, and proc_range.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm>
+            The MPI communicator.
+        reconf : bool
+            Whether we are reconfiguring - i.e., the model has been previously setup.
+
+        Returns
+        -------
+        str
+            Global name of the system, including the path.
+        MPI.Comm or <FakeComm>
+            The MPI communicator.
+        (int, int)
+            The range of procs this system's comm owns, among all of this system's processors.
+            This information is not used if this is the top-level group.
+        """
+        if reconf:
+            return self.pathname, self.comm, self._mpi_proc_range
+        else:
+            return '', comm, (0, comm.size)
+
+    def _get_initial_var_indices(self, reconf):
         """
         Get initial values for _var_set2iset, _var_range, _var_range_byset.
+
+        Parameters
+        ----------
+        reconf : bool
+            Whether we are reconfiguring - i.e., the model has been previously setup.
 
         Returns
         -------
@@ -301,26 +333,34 @@ class System(object):
         {'input': dict of (int, int), 'output': dict of (int, int)}
             Same as above, but by var_set name.
         """
-        set2iset = {}
-        for type_ in ['input', 'output']:
-            set2iset[type_] = {}
-            for iset, set_name in enumerate(self._num_var_byset[type_]):
-                set2iset[type_][set_name] = iset
+        if reconf:
+            return self._var_set2iset, self._var_range, self._var_range_byset
+        else:
+            set2iset = {}
+            for type_ in ['input', 'output']:
+                set2iset[type_] = {}
+                for iset, set_name in enumerate(self._num_var_byset[type_]):
+                    set2iset[type_][set_name] = iset
 
-        var_range = {}
-        var_range_byset = {}
-        for type_ in ['input', 'output']:
-            var_range[type_] = (0, self._num_var[type_])
+            var_range = {}
+            var_range_byset = {}
+            for type_ in ['input', 'output']:
+                var_range[type_] = (0, self._num_var[type_])
 
-            var_range_byset[type_] = {}
-            for set_name in set2iset[type_]:
-                var_range_byset[type_][set_name] = (0, self._num_var_byset[type_][set_name])
+                var_range_byset[type_] = {}
+                for set_name in set2iset[type_]:
+                    var_range_byset[type_][set_name] = (0, self._num_var_byset[type_][set_name])
 
-        return set2iset, var_range, var_range_byset
+            return set2iset, var_range, var_range_byset
 
-    def _get_initial_global(self):
+    def _get_initial_global(self, reconf):
         """
         Get initial values for _ext_num_vars, _ext_num_vars_byset, _ext_sizes, _ext_sizes_byset.
+
+        Parameters
+        ----------
+        reconf : bool
+            Whether we are reconfiguring - i.e., the model has been previously setup.
 
         Returns
         -------
@@ -332,35 +372,50 @@ class System(object):
             Total size of allprocs variables in system before/after this one.
         _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
             Same as above, but by var_set name.
+        reconf: bool
+            Whether we are reconfiguring - i.e., the model has been previously setup.
         """
-        ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
-        ext_sizes = {'input': (0, 0), 'output': (0, 0)}
-        ext_num_vars_byset = {
-            'input': {set_name: (0, 0) for set_name in self._var_set2iset['input']},
-            'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']},
-        }
-        ext_sizes_byset = {
-            'input': {set_name: (0, 0) for set_name in self._var_set2iset['input']},
-            'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']},
-        }
-        return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
+        if reconf:
+            return (
+                self._ext_num_vars, self._ext_num_vars_byset,
+                self._ext_sizes, self._ext_sizes_byset)
+        else:
+            ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
+            ext_sizes = {'input': (0, 0), 'output': (0, 0)}
+            ext_num_vars_byset = {
+                'input': {set_name: (0, 0) for set_name in self._var_set2iset['input']},
+                'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']},
+            }
+            ext_sizes_byset = {
+                'input': {set_name: (0, 0) for set_name in self._var_set2iset['input']},
+                'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']},
+            }
+            return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
-    def _get_root_vectors(self, vec_names, vector_class):
+    def _get_root_vectors(self, vec_names, vector_class, reconf):
         root_vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         for key in ['input', 'output', 'residual']:
             type_ = 'output' if key is 'residual' else key
             for vec_name in vec_names:
-                root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
+                if reconf:
+                    root_vectors[key][vec_name] = self._vectors[key][vec_name]._root_vector
+                else:
+                    root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
 
         return root_vectors
 
-    def _get_bounds_root_vectors(self, vector_class):
-        lower = vector_class('lower', 'output', self)
-        upper = vector_class('upper', 'output', self)
+    def _get_bounds_root_vectors(self, vector_class, reconf):
+        if reconf:
+            lower = self._lower_bounds._root_vector
+            upper = self._upper_bounds._root_vector
+        else:
+            lower = vector_class('lower', 'output', self)
+            upper = vector_class('upper', 'output', self)
+
         return lower, upper
 
-    def _get_scaling_root_vectors(self, vec_names, vector_class):
+    def _get_scaling_root_vectors(self, vec_names, vector_class, reconf):
         root_vectors = {
             ('input', 'phys0'): {}, ('input', 'phys1'): {},
             ('input', 'norm0'): {}, ('input', 'norm1'): {},
@@ -375,31 +430,34 @@ class System(object):
             type_ = 'output' if vec_key == 'residual' else vec_key
 
             for vec_name in vec_names:
-                root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
+                if reconf:
+                    root_vectors[key][vec_name] = self._scaling_vecs[key][vec_name]
+                else:
+                    root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
 
-                if coeff_key[-1] != '0':
-                    root_vectors[key][vec_name].set_const(1.0)
+                    if coeff_key[-1] != '0':
+                        root_vectors[key][vec_name].set_const(1.0)
 
         return root_vectors
 
-    def _setup(self, comm, vector_class):
+    def _setup(self, comm, vector_class, reconf=False):
         vec_names = ['nonlinear', 'linear']
 
         self._mpi_req_procs = self.get_req_procs()
-        self._setup_procs('', comm, (0, comm.size))
+        self._setup_procs(*self._get_initial_procs(comm, reconf))
         self._setup_vars()
-        self._setup_var_index_ranges(*self._get_initial_var_indices())
+        self._setup_var_index_ranges(*self._get_initial_var_indices(reconf))
         self._setup_var_data()
         self._setup_var_index_maps()
         self._setup_var_sizes()
         self._setup_global_connections()
         self._setup_connections()
         self._setup_partials()
-        self._setup_global(*self._get_initial_global())
-        self._setup_vectors(vec_names, self._get_root_vectors(vec_names, vector_class))
+        self._setup_global(*self._get_initial_global(reconf))
+        self._setup_vectors(vec_names, self._get_root_vectors(vec_names, vector_class, reconf))
         self._setup_transfers()
-        self._setup_bounds(*self._get_bounds_root_vectors(vector_class))
-        self._setup_scaling(self._get_scaling_root_vectors(vec_names, vector_class))
+        self._setup_bounds(*self._get_bounds_root_vectors(vector_class, reconf))
+        self._setup_scaling(self._get_scaling_root_vectors(vec_names, vector_class, reconf))
         self._setup_solvers()
         self._setup_jacobians()
 
