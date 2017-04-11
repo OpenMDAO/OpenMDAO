@@ -237,6 +237,11 @@ class ImplicitComponent(Component):
 
             'rev': d_outputs \|-> d_residuals
 
+        Note: this is not the linear solution for the implicit component. We use identity so
+        that simple implicit components can function in a preconditioner under linear gauss-seidel.
+        To correctly solve this component, you should slot a solver in ln_solver or override this
+        method.
+
         Parameters
         ----------
         d_outputs : Vector
