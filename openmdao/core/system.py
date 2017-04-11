@@ -48,6 +48,7 @@ class System(object):
         MPI communicator object.
     metadata : <GeneralizedDictionary>
         Dictionary of user-defined arguments.
+    #
     _mpi_proc_allocator : <ProcAllocator>
         Object that distributes procs among subsystems.
     _mpi_req_procs : (int, int or None)
@@ -55,26 +56,20 @@ class System(object):
     _mpi_proc_range : (int, int)
         The range of procs this system's comm owns, among all of this system's processors.
         Therefore, if this is not a parallel group, this range is always (0, comm.size).
+    #
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
-    _static_subsystems_allprocs : [<System>, ...]
-        List of subsystems that stores all subsystems added outside of initialize_subsystems.
     _subsystems_myproc : [<System>, ...]
         List of local subsystems that exist on this proc.
     _subsystems_myproc_inds : [int, ...]
         List of indices of subsystems on this proc among all of this system's subsystems
         (i.e. among _subsystems_allprocs).
-    _var_promotes : { 'any': [], 'input': [], 'output': [] }
-        Dictionary of lists of variable names/wildcards specifying promotion
-        (used to calculate promoted names)
-    _manual_connections : dict
-        Dictionary of input_name: (output_name, src_indices) connections.
-    _static_manual_connections : dict
-        Dictionary that stores all explicit connections added outside of initialize_subsystems.
+    #
     _num_var : {'input': int, 'output': int}
         Number of allprocs variables owned by this system.
     _num_var_byset : {'input': dict of int, 'output': dict of int}
         Same as above, but by var_set name.
+    #
     _var_set2iset : {'input': dict, 'output': dict}
         Dictionary mapping the var_set name to the var_set index.
     _var_range : {'input': (int, int), 'output': (int, int)}
@@ -82,6 +77,10 @@ class System(object):
         If this is the root, the range is simply (0, total_num).
     _var_range_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
         Same as above, but by var_set name.
+    #
+    _var_promotes : { 'any': [], 'input': [], 'output': [] }
+        Dictionary of lists of variable names/wildcards specifying promotion
+        (used to calculate promoted names)
     _var_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of this system's variables on all procs.
     _var_abs_names : {'input': [str, ...], 'output': [str, ...]}
@@ -98,18 +97,23 @@ class System(object):
         ('units', 'shape', 'var_set', 'ref', 'ref0') for outputs.
     _var_abs2meta : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
+    #
     _var_allprocs_abs2idx : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to their indices
         among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
     _var_allprocs_abs2idx_byset : {'input': dict of dict, 'output': dict of dict}
         Same as above, but by var_set name.
+    #
     _var_sizes : {'input': ndarray, 'output': ndarray}
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
     _var_sizes_byset : {'input': dict of ndarray, 'output': dict of ndarray}
         Same as above, but by var_set name.
+    #
+    _manual_connections : dict
+        Dictionary of input_name: (output_name, src_indices) connections.
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned by this system
         or any descendant system. The data is the same across all processors.
@@ -118,9 +122,7 @@ class System(object):
     _conn_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned
         by this system only. The data is the same across all processors.
-    _subjacs_info : dict of dict
-        Sub-jacobian metadata for each (output, input) pair added using
-        declare_partials. Members of each pair may be glob patterns.
+    #
     _ext_num_vars : {'input': (int, int), 'output': (int, int)}
         Total number of allprocs variables in system before/after this one.
     _ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
@@ -129,28 +131,33 @@ class System(object):
         Total size of allprocs variables in system before/after this one.
     _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
         Same as above, but by var_set name.
+    #
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
-    _relevant_vars_out : dict of set
-        Set of output variable absolute names relevant for each vec_name.
-    _relevant_vars_in : dict of set
-        Set of input variable absolute names relevant for each vec_name.
-    _transfers : dict of dict of Transfers
-        First key is the vec_name, second key is (mode, isub) where
-        mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
-        or isub can be None for the full, simultaneous transfer.
+    _excluded_vars_out : dict of set
+        Set of output variable absolute names not relevant for each vec_name.
+    _excluded_vars_in : dict of set
+        Set of input variable absolute names not relevant for each vec_name.
+    #
     _inputs : <Vector>
         The inputs vector; points to _vectors['input']['nonlinear'].
     _outputs : <Vector>
         The outputs vector; points to _vectors['output']['nonlinear'].
     _residuals : <Vector>
         The residuals vector; points to _vectors['residual']['nonlinear'].
+    _transfers : dict of dict of Transfers
+        First key is the vec_name, second key is (mode, isub) where
+        mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
+        or isub can be None for the full, simultaneous transfer.
+    #
     _lower_bounds : <Vector>
         Vector of lower bounds, scaled and dimensionless.
     _upper_bounds : <Vector>
         Vector of upper bounds, scaled and dimensionless.
+    #
     _scaling_vecs : dict of dict of Vectors
         First key is indicates vector type and coefficient, second key is vec_name.
+    #
     _nl_solver : <NonlinearSolver>
         Nonlinear solver to be used for solve_nonlinear.
     _ln_solver : <LinearSolver>
@@ -158,6 +165,7 @@ class System(object):
     _suppress_solver_output : boolean
         Flag that turns off all solver output for this System and all
         of its descendants if False.
+    #
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
     _jacobian_changed : bool
@@ -167,15 +175,21 @@ class System(object):
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
-    _design_vars : dict of namedtuple
+    #
+    _design_vars : dict of dict
         dict of all driver design vars added to the system.
-    _responses : dict of namedtuple
+    _responses : dict of dict
         dict of all driver responses added to the system.
+    #
     _static_mode : bool
         If true, we are outside of initialize_subsystems and initialize_variables.
         In this case, add_input, add_output, and add_subsystem all add to the
         '_static' versions of the respective data structures.
         These data structures are never reset during reconfiguration.
+    _static_subsystems_allprocs : [<System>, ...]
+        List of subsystems that stores all subsystems added outside of initialize_subsystems.
+    _static_manual_connections : dict
+        Dictionary that stores all explicit connections added outside of initialize_subsystems.
     """
 
     def __init__(self, **kwargs):
@@ -201,10 +215,6 @@ class System(object):
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
 
-        self._var_promotes = {'input': [], 'output': [], 'any': []}
-
-        self._manual_connections = {}
-
         self._num_var = {'input': 0, 'output': 0}
         self._num_var_byset = {'input': {}, 'output': {}}
 
@@ -212,6 +222,7 @@ class System(object):
         self._var_range = {'input': (0, 0), 'output': (0, 0)}
         self._var_range_byset = {'input': {}, 'output': {}}
 
+        self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
@@ -225,11 +236,10 @@ class System(object):
         self._var_sizes = {'input': None, 'output': None}
         self._var_sizes_byset = {'input': {}, 'output': {}}
 
+        self._manual_connections = {}
         self._conn_global_abs_in2out = {}
         self._conn_parents_abs_in2out = {}
         self._conn_abs_in2out = {}
-
-        self._subjacs_info = {}
 
         self._ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
         self._ext_num_vars_byset = {'input': {}, 'output': {}}
@@ -237,14 +247,13 @@ class System(object):
         self._ext_sizes_byset = {'input': {}, 'output': {}}
 
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
-        self._relevant_vars_out = set()
-        self._relevant_vars_in = set()
-
-        self._transfers = {}
+        self._excluded_vars_out = set()
+        self._excluded_vars_in = set()
 
         self._inputs = None
         self._outputs = None
         self._residuals = None
+        self._transfers = {}
 
         self._lower_bounds = None
         self._upper_bounds = None
@@ -265,15 +274,14 @@ class System(object):
         self._jacobian._system = self
         self._jacobian_changed = True
         self._owns_assembled_jac = False
-
         self._subjacs_info = {}
 
         self._design_vars = {}
         self._responses = {}
 
+        self._static_mode = True
         self._static_subsystems_allprocs = []
         self._static_manual_connections = {}
-        self._static_mode = True
 
     def _get_initial_var_indices(self):
         """
@@ -460,22 +468,16 @@ class System(object):
         self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
 
-    def _setup_vectors(self, vec_names, root_vectors, rel_out=None, rel_in=None):
+    def _setup_vectors(self, vec_names, root_vectors, excl_out=None, excl_in=None):
         self._vec_names = vec_names
         self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
-        self._relevant_vars_out = rel_out
-        self._relevant_vars_in = rel_in
+        self._excluded_vars_out = excl_out
+        self._excluded_vars_in = excl_in
 
-        if rel_out is None:
-            self._relevant_vars_out = {}
-            for vec_name in vec_names:
-                self._relevant_vars_out[vec_name] = \
-                    set(self._var_abs_names['output'])
-        if rel_in is None:
-            self._relevant_vars_in = {}
-            for vec_name in vec_names:
-                self._relevant_vars_in[vec_name] = \
-                    set(self._var_abs_names['input'])
+        if excl_out is None:
+            self._excluded_vars_out = {vec_name: set() for vec_name in vec_names}
+        if excl_in is None:
+            self._excluded_vars_in = {vec_name: set() for vec_name in vec_names}
 
         for vec_name in vec_names:
             vector_class = root_vectors['output'][vec_name].__class__
@@ -947,18 +949,16 @@ class System(object):
                 d_inputs.set_const(0.0)
                 d_outputs.set_const(0.0)
 
-        rel_out = self._relevant_vars_out[vec_name]
-        rel_in = self._relevant_vars_in[vec_name]
+        excl_out = self._excluded_vars_out[vec_name]
+        excl_in = self._excluded_vars_in[vec_name]
 
-        res_names = set(self._var_abs_names['output']) & rel_out
-        if scope_out is None:
-            out_names = set(self._var_abs_names['output']) & rel_out
-        else:
-            out_names = set(self._var_abs_names['output']) & rel_out & scope_out
-        if scope_in is None:
-            in_names = set(self._var_abs_names['input']) & rel_in
-        else:
-            in_names = set(self._var_abs_names['input']) & rel_in & scope_in
+        res_names = set(self._var_abs_names['output']) - excl_out
+        out_names = set(self._var_abs_names['output']) - excl_out
+        in_names = set(self._var_abs_names['input']) - excl_in
+        if scope_out is not None:
+            out_names = out_names & scope_out
+        if scope_in is not None:
+            in_names = in_names & scope_in
 
         d_inputs._names = in_names
         d_outputs._names = out_names

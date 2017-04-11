@@ -527,12 +527,12 @@ class Group(System):
                 sub_ext_sizes, sub_ext_sizes_byset,
             )
 
-    def _setup_vectors(self, vec_names, root_vectors, rel_out=None, rel_in=None):
-        super(Group, self)._setup_vectors(vec_names, root_vectors, rel_out, rel_in)
+    def _setup_vectors(self, vec_names, root_vectors, excl_out=None, excl_in=None):
+        super(Group, self)._setup_vectors(vec_names, root_vectors, excl_out, excl_in)
 
         for subsys in self._subsystems_myproc:
             subsys._setup_vectors(
-                vec_names, root_vectors, self._relevant_vars_out, self._relevant_vars_in)
+                vec_names, root_vectors, self._excluded_vars_out, self._excluded_vars_in)
 
     def _setup_transfers(self):
         super(Group, self)._setup_transfers()
