@@ -62,9 +62,9 @@ class System(object):
         List of indices of subsystems on this proc among all of this system's subsystems
         (i.e. among _subsystems_allprocs).
     _subsystems_proc_range : (int, int)
-        List of ranges of each subsystem's processors relative to those of this system.
+        List of ranges of each myproc subsystem's processors relative to those of this system.
     _subsystems_var_range : {'input': list of (int, int), 'output': list of (int, int)}
-        List of ranges of each subsystem's allprocs variables relative to this system.
+        List of ranges of each myproc subsystem's allprocs variables relative to this system.
     _subsystems_var_range_byset : {'input': list of dict, 'output': list of dict}
         Same as above, but by var_set name.
     #
@@ -96,8 +96,7 @@ class System(object):
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
     #
     _var_allprocs_abs2idx : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to their indices
-        among this system's allprocs variables.
+        Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
     _var_allprocs_abs2idx_byset : {'input': dict of dict, 'output': dict of dict}
         Same as above, but by var_set name.
@@ -285,14 +284,14 @@ class System(object):
 
     def _get_initial_procs(self, comm, reconf):
         """
-        Get initial values for pathname, comm, and proc_range.
+        Get initial values for pathname and comm.
 
         Parameters
         ----------
         comm : MPI.Comm or <FakeComm>
             The MPI communicator.
         reconf : bool
-            Whether we are reconfiguring - i.e., the model has been previously setup.
+            Whether we are reconfiguring - i.e., whether the model has been previously setup.
 
         Returns
         -------
@@ -313,7 +312,7 @@ class System(object):
         Parameters
         ----------
         reconf : bool
-            Whether we are reconfiguring - i.e., the model has been previously setup.
+            Whether we are reconfiguring - i.e., whether the model has been previously setup.
 
         Returns
         -------
@@ -350,8 +349,6 @@ class System(object):
             Total size of allprocs variables in system before/after this one.
         _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
             Same as above, but by var_set name.
-        reconf: bool
-            Whether we are reconfiguring - i.e., the model has been previously setup.
         """
         if reconf:
             return (
@@ -371,6 +368,29 @@ class System(object):
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
     def _get_root_vectors(self, vec_names, vector_class, reconf):
+        """
+        Get the root vectors for the nonlinear and linear vectors for the model.
+
+        Parameters
+        ----------
+        vec_names : str
+            List of vector (right-hand side) names.
+        vector_class : Vector
+            The Vector class used to instantiate the root vectors.
+        reconf : bool
+            Whether we are reconfiguring - i.e., whether the model has been previously setup.
+
+        Returns
+        -------
+        str
+            List of vector (right-hand side) names.
+        dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        dict of set
+            Dictionary of sets of excluded output variable absolute names, keyed by vec_name.
+        dict of set
+            Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
+        """
         root_vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         for key in ['input', 'output', 'residual']:
@@ -381,9 +401,33 @@ class System(object):
                 else:
                     root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
 
-        return vec_names, root_vectors, None, None, reconf
+        if reconf:
+            excl_out = self._excluded_vars_out
+            excl_in = self._excluded_vars_in
+        else:
+            excl_out = {vec_name: set() for vec_name in vec_names}
+            excl_in = {vec_name: set() for vec_name in vec_names}
+
+        return vec_names, root_vectors, excl_out, excl_in
 
     def _get_bounds_root_vectors(self, vector_class, reconf):
+        """
+        Get the root vectors for the lower and upper bounds vectors.
+
+        Parameters
+        ----------
+        vector_class : Vector
+            The Vector class used to instantiate the root vectors.
+        reconf : bool
+            Whether we are reconfiguring - i.e., whether the model has been previously setup.
+
+        Returns
+        -------
+        Vector
+            Lower bounds vector.
+        Vector
+            Upper bounds vector.
+        """
         if reconf:
             lower = self._lower_bounds._root_vector
             upper = self._upper_bounds._root_vector
@@ -391,9 +435,24 @@ class System(object):
             lower = vector_class('lower', 'output', self)
             upper = vector_class('upper', 'output', self)
 
-        return lower, upper, reconf
+        return lower, upper
 
-    def _get_scaling_root_vectors(self, vec_names, vector_class, reconf):
+    def _get_scaling_root_vectors(self, vector_class, reconf):
+        """
+        Get the root vectors for the scaling vectors.
+
+        Parameters
+        ----------
+        vector_class : Vector
+            The Vector class used to instantiate the root vectors.
+        reconf : bool
+            Whether we are reconfiguring - i.e., whether the model has been previously setup.
+
+        Returns
+        -------
+        dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        """
         root_vectors = {
             ('input', 'phys0'): {}, ('input', 'phys1'): {},
             ('input', 'norm0'): {}, ('input', 'norm1'): {},
@@ -407,7 +466,7 @@ class System(object):
             vec_key, coeff_key = key
             type_ = 'output' if vec_key == 'residual' else vec_key
 
-            for vec_name in vec_names:
+            for vec_name in self._vec_names:
                 if reconf:
                     root_vectors[key][vec_name] = self._scaling_vecs[key][vec_name]._root_vector
                 else:
@@ -416,7 +475,7 @@ class System(object):
                     if coeff_key[-1] != '0':
                         root_vectors[key][vec_name].set_const(1.0)
 
-        return root_vectors, reconf
+        return root_vectors
 
     def setup(self):
         """
@@ -438,9 +497,12 @@ class System(object):
         self._setup_global_connections(recurse=recurse)
         self._setup_connections(recurse=recurse)
         self._setup_global(*self._get_initial_global(reconf))
-        self._setup_vectors(*self._get_root_vectors(vec_names, vector_class, reconf))
-        self._setup_bounds(*self._get_bounds_root_vectors(vector_class, reconf))
-        self._setup_scaling(*self._get_scaling_root_vectors(vec_names, vector_class, reconf))
+        self._setup_vectors(
+            *self._get_root_vectors(vec_names, vector_class, reconf), resize=reconf and recurse)
+        self._setup_bounds(
+            *self._get_bounds_root_vectors(vector_class, reconf), resize=reconf and recurse)
+        self._setup_scaling(
+            self._get_scaling_root_vectors(vector_class, reconf), resize=reconf and recurse)
         self._setup_transfers(recurse=recurse)
         self._setup_solvers(recurse=recurse)
         self._setup_partials(recurse=recurse)
@@ -511,16 +573,11 @@ class System(object):
         self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
 
-    def _setup_vectors(self, vec_names, root_vectors, excl_out, excl_in, reconf=False):
+    def _setup_vectors(self, vec_names, root_vectors, excl_out, excl_in, resize=False):
         self._vec_names = vec_names
         self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._excluded_vars_out = excl_out
         self._excluded_vars_in = excl_in
-
-        if excl_out is None:
-            self._excluded_vars_out = {vec_name: set() for vec_name in vec_names}
-        if excl_in is None:
-            self._excluded_vars_in = {vec_name: set() for vec_name in vec_names}
 
         for vec_name in vec_names:
             vector_class = root_vectors['output'][vec_name].__class__
@@ -529,7 +586,7 @@ class System(object):
                 type_ = 'output' if key is 'residual' else key
 
                 vectors[key][vec_name] = vector_class(
-                    vec_name, type_, self, root_vectors[key][vec_name], reconf=reconf)
+                    vec_name, type_, self, root_vectors[key][vec_name], resize=resize)
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
@@ -541,12 +598,12 @@ class System(object):
         for abs_name, meta in iteritems(self._var_abs2meta['output']):
             self._outputs._views[abs_name][:] = meta['value']
 
-    def _setup_bounds(self, root_lower, root_upper, reconf=False):
+    def _setup_bounds(self, root_lower, root_upper, resize=False):
         vector_class = root_lower.__class__
         self._lower_bounds = lower = vector_class(
-            'lower', 'output', self, root_lower, reconf=reconf)
+            'lower', 'output', self, root_lower, resize=resize)
         self._upper_bounds = upper = vector_class(
-            'upper', 'output', self, root_upper, reconf=reconf)
+            'upper', 'output', self, root_upper, resize=resize)
 
         for abs_name, meta in iteritems(self._var_abs2meta['output']):
             shape = meta['shape']
@@ -570,7 +627,7 @@ class System(object):
             else:
                 upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
 
-    def _setup_scaling(self, root_vectors, reconf=False):
+    def _setup_scaling(self, root_vectors, resize=False):
         self._scaling_vecs = vecs = {
             ('input', 'phys0'): {}, ('input', 'phys1'): {},
             ('input', 'norm0'): {}, ('input', 'norm1'): {},
@@ -589,7 +646,7 @@ class System(object):
             for key in vecs:
                 type_ = 'output' if key[0] == 'residual' else key[0]
                 vecs[key][vec_name] = vector_class(
-                    vec_name, type_, self, root_vectors[key][vec_name], reconf=reconf)
+                    vec_name, type_, self, root_vectors[key][vec_name], resize=resize)
 
             for abs_name, meta in iteritems(self._var_abs2meta['output']):
                 shape = meta['shape']

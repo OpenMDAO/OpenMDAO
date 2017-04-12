@@ -76,13 +76,6 @@ class PETScVector(DefaultVector):
 
     TRANSFER = PETScTransfer
 
-    def _update_root_data(self):
-        super(PETScVector, self)._update_root_data()
-
-        self._root_vector._petsc = petsc = {}
-        for set_name, data in iteritems(self._root_vector._data):
-            petsc[set_name] = PETSc.Vec().createWithArray(data, comm=self._system.comm)
-
     def _initialize_data(self, root_vector):
         """
         Internally allocate vectors.

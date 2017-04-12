@@ -46,7 +46,7 @@ class Vector(object):
         List of indices mapping the varset-grouped data to the global vector.
     """
 
-    def __init__(self, name, typ, system, root_vector=None, reconf=False):
+    def __init__(self, name, typ, system, root_vector=None, resize=False):
         """
         Initialize all attributes.
 
@@ -60,7 +60,7 @@ class Vector(object):
             Pointer to the owning system.
         root_vector : <Vector>
             Pointer to the vector owned by the root system.
-        reconf : bool
+        resize : bool
             If true, resize the root vector.
         """
         self._name = name
@@ -85,10 +85,10 @@ class Vector(object):
         else:
             self._root_vector = root_vector
 
-        if reconf:
+        if resize:
             if root_vector is None:
                 raise RuntimeError(
-                    'Cannot reconfigure the vector because the root vector has not yet '
+                    'Cannot resize the vector because the root vector has not yet '
                     + ' been created in system %s' % system.pathname)
             self._update_root_data()
 

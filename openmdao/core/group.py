@@ -541,22 +541,22 @@ class Group(System):
                 sub_ext_sizes, sub_ext_sizes_byset,
             )
 
-    def _setup_vectors(self, vec_names, root_vectors, excl_out, excl_in, reconf=False):
+    def _setup_vectors(self, vec_names, root_vectors, excl_out, excl_in, resize=False):
         super(Group, self)._setup_vectors(
-            vec_names, root_vectors, excl_out, excl_in, reconf=reconf)
+            vec_names, root_vectors, excl_out, excl_in, resize=resize)
 
         for subsys in self._subsystems_myproc:
             subsys._setup_vectors(
                 vec_names, root_vectors, self._excluded_vars_out, self._excluded_vars_in)
 
-    def _setup_bounds(self, root_lower, root_upper, reconf=False):
-        super(Group, self)._setup_bounds(root_lower, root_upper, reconf=reconf)
+    def _setup_bounds(self, root_lower, root_upper, resize=False):
+        super(Group, self)._setup_bounds(root_lower, root_upper, resize=resize)
 
         for subsys in self._subsystems_myproc:
             subsys._setup_bounds(root_lower, root_upper)
 
-    def _setup_scaling(self, root_vectors, reconf=False):
-        super(Group, self)._setup_scaling(root_vectors, reconf=reconf)
+    def _setup_scaling(self, root_vectors, resize=False):
+        super(Group, self)._setup_scaling(root_vectors, resize=resize)
 
         for subsys in self._subsystems_myproc:
             subsys._setup_scaling(root_vectors)
