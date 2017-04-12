@@ -281,8 +281,8 @@ class TestNewton(unittest.TestCase):
 
         prob = Problem()
         root = prob.model = Group()
-        root.add_subsystem('comp', CubicImplicit())
         root.add_subsystem('p1', IndepVarComp('x', 17.4))
+        root.add_subsystem('comp', CubicImplicit())
         root.connect('p1.x', 'comp.x')
 
         prob.model.nl_solver = NewtonSolver()
@@ -449,6 +449,46 @@ class TestNewton(unittest.TestCase):
         self.assertEqual(g1.nl_solver.total_count, 4)
         self.assertEqual(g2.nl_solver.total_count, 4)
         self.assertEqual(g1.ln_solver.lin_count, 6)
+
+    def test_maxiter_one(self):
+        # Fix bug when maxiter was set to 1.
+        # This bug caused linearize to run before apply in this case.
+
+        class ImpComp(ImplicitComponent):
+
+            def initialize_variables(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+                self.applied = False
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = np.exp(outputs['x']) - \
+                    inputs['a']**2 * outputs['x']**2
+                self.applied = True
+
+            def solve_nonlinear(self, inputs, outputs):
+                pass
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = np.exp(outputs['x']) - \
+                    2 * inputs['a']**2 * outputs['x']
+                jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
+
+                if not self.applied:
+                    raise RuntimeError("Bug! Linearize called before Apply!")
+
+        prob = Problem()
+        root = prob.model = Group()
+        root.add_subsystem('p1', IndepVarComp('a', 1.0))
+        root.add_subsystem('comp', ImpComp())
+        root.connect('p1.a', 'comp.a')
+
+        root.nl_solver = NewtonSolver()
+        root.nl_solver.options['maxiter'] = 1
+        root.suppress_solver_output = True
+
+        prob.setup()
+        prob.run_model()
 
 
 class TestNewtonFeatures(unittest.TestCase):

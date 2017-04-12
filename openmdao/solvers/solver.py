@@ -255,7 +255,7 @@ class NonlinearSolver(Solver):
         float
             error at the first iteration.
         """
-        if self.options['maxiter'] > 1:
+        if self.options['maxiter'] > 0:
             norm = self._iter_get_norm()
         else:
             norm = 1.0
