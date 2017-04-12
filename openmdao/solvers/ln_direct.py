@@ -92,6 +92,7 @@ class DirectSolver(LinearSolver):
         """
         vec_name = 'linear'
         system = self._system
+        mode = self._mode
 
         # assign x and b vectors based on fwd mode
         x_vec = system._vectors['output'][vec_name]
@@ -103,7 +104,7 @@ class DirectSolver(LinearSolver):
         # apply linear
         ind1, ind2 = system._var_allprocs_idx_range['output']
         var_inds = [ind1, ind2, ind1, ind2]
-        system._apply_linear([vec_name], 'fwd', var_inds)
+        system._apply_linear([vec_name], mode, var_inds)
 
         # return result
         return b_vec.get_data()
