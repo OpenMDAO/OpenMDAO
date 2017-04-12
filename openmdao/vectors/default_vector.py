@@ -341,6 +341,8 @@ class DefaultVector(Vector):
             # Linear vectors only need to scale by the multiplicative factor.
             if self._name == 'nonlinear':
                 data += coeffs[idx, 0]
+            else:
+                print('here')
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """
