@@ -1504,6 +1504,41 @@ class System(object):
         with self._scaled_context():
             self._apply_nonlinear()
 
+    def list_states(self, stream=sys.stdout):
+        """
+        Recursively list all states and their initial values.
+
+        Parameters
+        ----------
+        stream : output stream, optional
+            Stream to write the state info to. Default is sys.stdout.
+        """
+
+        outputs = self.outputs
+        resids = self.resids
+        states = []
+        for uname in outputs:
+            meta = outputs.metadata(uname)
+            if meta.get('state'):
+                states.append(uname)
+
+        pathname = self.pathname
+        if pathname == '':
+            pathname = 'model'
+        if states:
+            stream.write("\nStates in %s:\n\n" % pathname)
+            outputs = self.outputs
+            for uname in states:
+                stream.write("%s\n" % uname)
+                stream.write("Value: ")
+                stream.write(str(outputs[uname]))
+                stream.write('\n')
+                stream.write("Residual: ")
+                stream.write(str(resids[uname]))
+                stream.write('\n\n')
+        else:
+            stream.write("\nNo states in %s.\n" % pathname)
+
     def run_solve_nonlinear(self):
         """
         Compute outputs.
