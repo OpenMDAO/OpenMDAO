@@ -97,14 +97,14 @@ class NewtonSolver(NonlinearSolver):
         """
         system = self._system
 
-        # Hybrid newton support.
-        if self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']:
-            for isub, subsys in enumerate(system._subsystems_allprocs):
-                system._transfers['fwd', isub](system._inputs,
-                                               system._outputs, 'fwd')
+        # # Hybrid newton support.
+        # if self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']:
+        #     for isub, subsys in enumerate(system._subsystems_allprocs):
+        #         system._transfers['fwd', isub](system._inputs,
+        #                                        system._outputs, 'fwd')
 
-                if subsys in system._subsystems_myproc:
-                    subsys._solve_nonlinear()
+        #         if subsys in system._subsystems_myproc:
+        #             subsys._solve_nonlinear()
 
         system._apply_nonlinear()
         return system._residuals.get_norm()
@@ -138,9 +138,89 @@ class NewtonSolver(NonlinearSolver):
         system = self._system
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0
+
         system._linearize()
+        system._linearize()
+
+        # Hybrid newton support.
+        hybrid = False
+        if self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']:
+            hybrid = True
+            for isub, subsys in enumerate(system._subsystems_allprocs):
+                system._transfers['fwd', isub](system._inputs,
+                                               system._outputs, 'fwd')
+
+                if subsys in system._subsystems_myproc:
+                    subsys._solve_nonlinear()
+            system._apply_nonlinear()
+
+            system._linearize()
+
+        if hybrid:
+            system._vectors['residual']['linear'].set_vec(system._residuals)
+            system._vectors['residual']['linear'] *= -1.0
+
         self.ln_solver.solve(['linear'], 'fwd')
         if self.linesearch:
             self.linesearch.solve()
         else:
             system._outputs += system._vectors['output']['linear']
+
+    # def _iter_get_norm(self):
+    #     """
+    #     Return the norm of the residual.
+    #
+    #     Returns
+    #     -------
+    #     float
+    #         norm.
+    #     """
+    #     system = self._system
+    #
+    #     # Hybrid newton support.
+    #     if self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']:
+    #         for isub, subsys in enumerate(system._subsystems_allprocs):
+    #             system._transfers['fwd', isub](system._inputs,
+    #                                            system._outputs, 'fwd')
+    #
+    #             if subsys in system._subsystems_myproc:
+    #                 subsys._solve_nonlinear()
+    #
+    #     system._apply_nonlinear()
+    #     return system._residuals.get_norm()
+    #
+    # def _linearize_children(self):
+    #     """
+    #     Return a flag that is True when we need to call linearize on our subsystems' solvers.
+    #
+    #     Returns
+    #     -------
+    #     boolean
+    #         Flag for indicating child linerization
+    #     """
+    #     return (self.options['solve_subsystems']
+    #             and self._iter_count <= self.options['max_sub_solves'])
+    #
+    # def _linearize(self):
+    #     """
+    #     Perform any required linearization operations such as matrix factorization.
+    #     """
+    #     if not self._ln_solver_from_parent:
+    #         self.ln_solver._linearize()
+    #
+    #     if self.linesearch is not None:
+    #         self.linesearch._linearize()
+    #
+    # def _iter_execute(self):
+    #     """
+    #     Perform the operations in the iteration loop.
+    #     """
+    #     system = self._system
+    #     system._vectors['residual']['linear'].set_vec(system._residuals)
+    #     system._vectors['residual']['linear'] *= -1.0
+    #     system._linearize()
+    #     self.ln_solver.solve(['linear'], 'fwd')
+    #     if self.linesearch:
+    #         self.linesearch.solve()
+    #     else:
+    #         system._outputs += system._vectors['output']['linear']
