@@ -44,11 +44,9 @@ class Vector(object):
         List of the actual allocated data (depends on implementation).
     _indices : list
         List of indices mapping the varset-grouped data to the global vector.
-    _ivar_map : list[nvar_set] of int ndarray[size]
-        List of index arrays mapping each entry to its variable index.
     """
 
-    def __init__(self, name, typ, system, root_vector=None):
+    def __init__(self, name, typ, system, root_vector=None, reconf=False):
         """
         Initialize all attributes.
 
@@ -62,6 +60,8 @@ class Vector(object):
             Pointer to the owning system.
         root_vector : <Vector>
             Pointer to the vector owned by the root system.
+        reconf : bool
+            If true, resize the root vector.
         """
         self._name = name
         self._typ = typ
@@ -80,11 +80,17 @@ class Vector(object):
         self._root_vector = None
         self._data = {}
         self._indices = {}
-        self._ivar_map = []
         if root_vector is None:
             self._root_vector = self
         else:
             self._root_vector = root_vector
+
+        if reconf:
+            if root_vector is None:
+                raise RuntimeError(
+                    'Cannot reconfigure the vector because the root vector has not yet '
+                    + ' been created in system %s' % system.pathname)
+            self._update_root_data()
 
         self._initialize_data(root_vector)
         self._initialize_views()

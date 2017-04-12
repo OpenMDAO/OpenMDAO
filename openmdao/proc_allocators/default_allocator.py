@@ -15,7 +15,7 @@ class DefaultAllocator(ProcAllocator):
     Default processor allocator.
     """
 
-    def _divide_procs(self, req_procs, comm, proc_range):
+    def _divide_procs(self, req_procs, comm):
         """
         Perform the parallel processor allocation.
 
@@ -25,8 +25,6 @@ class DefaultAllocator(ProcAllocator):
             List of min/max usable procs for each subsystem.
         comm : MPI.Comm or <FakeComm>
             communicator of the owning system.
-        proc_range : (int, int)
-            The range of processors that the comm on this system owns, in the global index space.
 
         Returns
         -------
@@ -34,6 +32,8 @@ class DefaultAllocator(ProcAllocator):
             indices of the owned local subsystems.
         sub_comm : MPI.Comm or <FakeComm>
             communicator to pass to the subsystems.
+        sub_proc_range : (int, int)
+            The range of processors that the subcomm owns, among those of comm.
         """
         iproc = comm.rank
         nproc = comm.size

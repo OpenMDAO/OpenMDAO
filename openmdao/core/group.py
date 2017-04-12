@@ -55,8 +55,9 @@ class Group(System):
         """
         pass
 
-    def _setup_procs(self, pathname, comm, proc_range, recurse=True):
-        super(Group, self)._setup_procs(pathname, comm, proc_range)
+    def _setup_procs(self, pathname, comm):
+        super(Group, self)._setup_procs(pathname, comm)
+        subsystems_proc_range = self._subsystems_proc_range
 
         self._subsystems_allprocs = []
         self._manual_connections = {}
@@ -72,8 +73,7 @@ class Group(System):
         req_procs = [s._mpi_req_procs for s in self._subsystems_allprocs]
         # Call the load balancing algorithm
         try:
-            sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
-                req_procs, comm, proc_range)
+            sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(req_procs, comm)
         except ProcAllocationError as err:
             raise RuntimeError("subsystem %s requested %d processes "
                                "but got %d" %
@@ -85,15 +85,18 @@ class Group(System):
                                    for ind in sub_inds]
         self._subsystems_myproc_inds = sub_inds
 
-        # Perform recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                if self.pathname is not '':
-                    sub_pathname = '.'.join((self.pathname, subsys.name))
-                else:
-                    sub_pathname = subsys.name
+        # Compute _subsystems_proc_range
+        for subsys in self._subsystems_myproc:
+            subsystems_proc_range.append(sub_proc_range)
 
-                subsys._setup_procs(sub_pathname, sub_comm, sub_proc_range, recurse)
+        # Perform recursion
+        for subsys in self._subsystems_myproc:
+            if self.pathname is not '':
+                sub_pathname = '.'.join((self.pathname, subsys.name))
+            else:
+                sub_pathname = subsys.name
+
+            subsys._setup_procs(sub_pathname, sub_comm)
 
     def _setup_vars(self, recurse=True):
         super(Group, self)._setup_vars()
@@ -141,8 +144,10 @@ class Group(System):
                         else:
                             num_var_byset[type_][set_name] = num
 
-    def _setup_var_index_ranges(self, set2iset, var_range, var_range_byset, recurse=True):
-        super(Group, self)._setup_var_index_ranges(set2iset, var_range, var_range_byset)
+    def _setup_var_index_ranges(self, set2iset, recurse=True):
+        super(Group, self)._setup_var_index_ranges(set2iset)
+        subsystems_var_range = self._subsystems_var_range
+        subsystems_var_range_byset = self._subsystems_var_range_byset
 
         nsub_allprocs = len(self._subsystems_allprocs)
         num_var = self._num_var
@@ -182,25 +187,26 @@ class Group(System):
                     allprocs_counters[type_] += myproc_counters[type_]
                     allprocs_counters_byset[type_] += myproc_counters_byset[type_]
 
+        # Compute _subsystems_var_range, _subsystems_var_range_byset
+        for type_ in ['input', 'output']:
+            subsystems_var_range[type_] = []
+            subsystems_var_range_byset[type_] = {set_name: [] for set_name in set2iset[type_]}
+
+        for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
+            for type_ in ['input', 'output']:
+                subsystems_var_range[type_].append((
+                    np.sum(allprocs_counters[type_][:isub]),
+                    np.sum(allprocs_counters[type_][:isub + 1])))
+                for set_name in set2iset[type_]:
+                    iset = set2iset[type_][set_name]
+                    subsystems_var_range_byset[type_][set_name].append((
+                        np.sum(allprocs_counters_byset[type_][:isub, iset]),
+                        np.sum(allprocs_counters_byset[type_][:isub + 1, iset])))
+
         # Recursion
         if recurse:
-            for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
-                sub_var_range = {}
-                sub_var_range_byset = {'input': {}, 'output': {}}
-                for type_ in ['input', 'output']:
-                    sub_var_range[type_] = (
-                        np.sum(allprocs_counters[type_][:isub]),
-                        np.sum(allprocs_counters[type_][:isub + 1])
-                    )
-                    for set_name in set2iset[type_]:
-                        iset = set2iset[type_][set_name]
-                        sub_var_range_byset[type_][set_name] = (
-                            np.sum(allprocs_counters_byset[type_][:isub, iset]),
-                            np.sum(allprocs_counters_byset[type_][:isub + 1, iset])
-                        )
-
-                subsys._setup_var_index_ranges(
-                    set2iset, sub_var_range, sub_var_range_byset, recurse)
+            for subsys in self._subsystems_myproc:
+                subsys._setup_var_index_ranges(set2iset, recurse)
 
     def _setup_var_data(self, recurse=True):
         super(Group, self)._setup_var_data()
@@ -302,7 +308,9 @@ class Group(System):
         nproc = self.comm.size
 
         set2iset = self._var_set2iset
-        var_range_byset = self._var_range_byset
+        subsystems_proc_range = self._subsystems_proc_range
+        subsystems_var_range = self._subsystems_var_range
+        subsystems_var_range_byset = self._subsystems_var_range_byset
 
         # Recursion
         if recurse:
@@ -317,14 +325,14 @@ class Group(System):
                 sizes_byset[type_][set_name] = np.zeros(
                     (nproc, self._num_var_byset[type_][set_name]), int)
 
-            for subsys in self._subsystems_myproc:
-                proc_slice = slice(*subsys._mpi_proc_range)
-                var_slice = slice(*subsys._var_range[type_])
+            for ind, subsys in enumerate(self._subsystems_myproc):
+                proc_slice = slice(*subsystems_proc_range[ind])
+                var_slice = slice(*subsystems_var_range[type_][ind])
                 sizes[type_][proc_slice, var_slice] = subsys._var_sizes[type_]
 
                 for set_name in set2iset[type_]:
-                    proc_slice = slice(*subsys._mpi_proc_range)
-                    var_slice = slice(*subsys._var_range_byset[type_][set_name])
+                    proc_slice = slice(*subsystems_proc_range[ind])
+                    var_slice = slice(*subsystems_var_range_byset[type_][set_name][ind])
                     sizes_byset[type_][set_name][proc_slice, var_slice] = \
                         subsys._var_sizes_byset[type_][set_name]
 
@@ -481,73 +489,77 @@ class Group(System):
                 if out_subsys != in_subsys:
                     abs_in2out[abs_in] = abs_out
 
-    def _setup_partials(self, recurse=True):
-        super(Group, self)._setup_partials()
-
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_partials(recurse)
-
-    def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset,
-                      recurse=True):
+    def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
         super(Group, self)._setup_global(
             ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
 
         iproc = self.comm.rank
 
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                sub_ext_num_vars = {}
-                sub_ext_sizes = {}
-                sub_ext_num_vars_byset = {}
-                sub_ext_sizes_byset = {}
+        subsystems_var_range = self._subsystems_var_range
+        subsystems_var_range_byset = self._subsystems_var_range_byset
 
-                for type_ in ['input', 'output']:
-                    num = self._num_var[type_]
-                    idx1, idx2 = subsys._var_range[type_]
-                    size1 = np.sum(self._var_sizes[type_][iproc, :idx1])
-                    size2 = np.sum(self._var_sizes[type_][iproc, idx2:])
+        for ind, subsys in enumerate(self._subsystems_myproc):
+            sub_ext_num_vars = {}
+            sub_ext_sizes = {}
+            sub_ext_num_vars_byset = {}
+            sub_ext_sizes_byset = {}
 
-                    sub_ext_num_vars[type_] = (
-                        ext_num_vars[type_][0] + idx1,
-                        ext_num_vars[type_][1] + num - idx2,
-                    )
-                    sub_ext_sizes[type_] = (
-                        ext_sizes[type_][0] + size1,
-                        ext_sizes[type_][1] + size2,
-                    )
+            for type_ in ['input', 'output']:
+                num = self._num_var[type_]
+                idx1, idx2 = subsystems_var_range[type_][ind]
+                size1 = np.sum(self._var_sizes[type_][iproc, :idx1])
+                size2 = np.sum(self._var_sizes[type_][iproc, idx2:])
 
-                    sub_ext_sizes_byset[type_] = {}
-                    sub_ext_num_vars_byset[type_] = {}
-                    for set_name in self._var_set2iset[type_]:
-                        num = self._num_var_byset[type_][set_name]
-                        idx1, idx2 = subsys._var_range_byset[type_][set_name]
-                        size1 = np.sum(self._var_sizes_byset[type_][set_name][iproc, :idx1])
-                        size2 = np.sum(self._var_sizes_byset[type_][set_name][iproc, idx2:])
-
-                        sub_ext_num_vars_byset[type_][set_name] = (
-                            ext_num_vars_byset[type_][set_name][0] + idx1,
-                            ext_num_vars_byset[type_][set_name][1] + num - idx2,
-                        )
-                        sub_ext_sizes_byset[type_][set_name] = (
-                            ext_sizes_byset[type_][set_name][0] + size1,
-                            ext_sizes_byset[type_][set_name][1] + size2,
-                        )
-
-                subsys._setup_global(
-                    sub_ext_num_vars, sub_ext_num_vars_byset,
-                    sub_ext_sizes, sub_ext_sizes_byset,
-                    recurse,
+                sub_ext_num_vars[type_] = (
+                    ext_num_vars[type_][0] + idx1,
+                    ext_num_vars[type_][1] + num - idx2,
+                )
+                sub_ext_sizes[type_] = (
+                    ext_sizes[type_][0] + size1,
+                    ext_sizes[type_][1] + size2,
                 )
 
-    def _setup_vectors(self, vec_names, root_vectors, excl_out=None, excl_in=None, recurse=True):
-        super(Group, self)._setup_vectors(vec_names, root_vectors, excl_out, excl_in)
+                sub_ext_sizes_byset[type_] = {}
+                sub_ext_num_vars_byset[type_] = {}
+                for set_name in self._var_set2iset[type_]:
+                    num = self._num_var_byset[type_][set_name]
+                    idx1, idx2 = subsystems_var_range_byset[type_][set_name][ind]
+                    size1 = np.sum(self._var_sizes_byset[type_][set_name][iproc, :idx1])
+                    size2 = np.sum(self._var_sizes_byset[type_][set_name][iproc, idx2:])
 
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_vectors(
-                    vec_names, root_vectors, self._excluded_vars_out, self._excluded_vars_in,
-                    recurse)
+                    sub_ext_num_vars_byset[type_][set_name] = (
+                        ext_num_vars_byset[type_][set_name][0] + idx1,
+                        ext_num_vars_byset[type_][set_name][1] + num - idx2,
+                    )
+                    sub_ext_sizes_byset[type_][set_name] = (
+                        ext_sizes_byset[type_][set_name][0] + size1,
+                        ext_sizes_byset[type_][set_name][1] + size2,
+                    )
+
+            subsys._setup_global(
+                sub_ext_num_vars, sub_ext_num_vars_byset,
+                sub_ext_sizes, sub_ext_sizes_byset,
+            )
+
+    def _setup_vectors(self, vec_names, root_vectors, excl_out, excl_in, reconf=False):
+        super(Group, self)._setup_vectors(
+            vec_names, root_vectors, excl_out, excl_in, reconf=reconf)
+
+        for subsys in self._subsystems_myproc:
+            subsys._setup_vectors(
+                vec_names, root_vectors, self._excluded_vars_out, self._excluded_vars_in)
+
+    def _setup_bounds(self, root_lower, root_upper, reconf=False):
+        super(Group, self)._setup_bounds(root_lower, root_upper, reconf=reconf)
+
+        for subsys in self._subsystems_myproc:
+            subsys._setup_bounds(root_lower, root_upper)
+
+    def _setup_scaling(self, root_vectors, reconf=False):
+        super(Group, self)._setup_scaling(root_vectors, reconf=reconf)
+
+        for subsys in self._subsystems_myproc:
+            subsys._setup_scaling(root_vectors)
 
     def _setup_transfers(self, recurse=True):
         super(Group, self)._setup_transfers()
@@ -713,26 +725,19 @@ class Group(System):
                     vectors['input'][vec_name], vectors['output'][vec_name],
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
 
-    def _setup_bounds(self, root_lower, root_upper, recurse=True):
-        super(Group, self)._setup_bounds(root_lower, root_upper)
-
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_bounds(root_lower, root_upper, recurse)
-
-    def _setup_scaling(self, root_vectors, recurse=True):
-        super(Group, self)._setup_scaling(root_vectors)
-
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_scaling(root_vectors, recurse)
-
     def _setup_solvers(self, recurse=True):
         super(Group, self)._setup_solvers()
 
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_solvers(recurse)
+
+    def _setup_partials(self, recurse=True):
+        super(Group, self)._setup_partials()
+
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_partials(recurse)
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------

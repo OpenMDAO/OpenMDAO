@@ -76,6 +76,13 @@ class PETScVector(DefaultVector):
 
     TRANSFER = PETScTransfer
 
+    def _update_root_data(self):
+        super(PETScVector, self)._update_root_data()
+
+        self._root_vector._petsc = petsc = {}
+        for set_name, data in iteritems(self._root_vector._data):
+            petsc[set_name] = PETSc.Vec().createWithArray(data, comm=self._system.comm)
+
     def _initialize_data(self, root_vector):
         """
         Internally allocate vectors.
@@ -89,10 +96,7 @@ class PETScVector(DefaultVector):
         root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
-        if root_vector is None:
-            self._data, self._indices = self._create_data()
-        else:
-            self._data, self._indices = self._extract_data()
+        super(PETScVector, self)._initialize_data(root_vector)
 
         self._petsc = {}
         for set_name, data in iteritems(self._data):

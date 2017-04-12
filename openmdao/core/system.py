@@ -53,10 +53,6 @@ class System(object):
         Object that distributes procs among subsystems.
     _mpi_req_procs : (int, int or None)
         The number of min and max procs usable by this system.
-    _mpi_proc_range : (int, int)
-        The range of procs this system's comm owns, among all of this system's processors.
-        Therefore, if this is not a parallel group, this range is always (0, comm.size).
-        This information is not used if this is the top-level group.
     #
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
@@ -65,19 +61,19 @@ class System(object):
     _subsystems_myproc_inds : [int, ...]
         List of indices of subsystems on this proc among all of this system's subsystems
         (i.e. among _subsystems_allprocs).
+    _subsystems_proc_range : (int, int)
+        List of ranges of each subsystem's processors relative to those of this system.
+    _subsystems_var_range : {'input': list of (int, int), 'output': list of (int, int)}
+        List of ranges of each subsystem's allprocs variables relative to this system.
+    _subsystems_var_range_byset : {'input': list of dict, 'output': list of dict}
+        Same as above, but by var_set name.
     #
     _num_var : {'input': int, 'output': int}
         Number of allprocs variables owned by this system.
     _num_var_byset : {'input': dict of int, 'output': dict of int}
         Same as above, but by var_set name.
-    #
     _var_set2iset : {'input': dict, 'output': dict}
         Dictionary mapping the var_set name to the var_set index.
-    _var_range : {'input': (int, int), 'output': (int, int)}
-        Range of this system's allprocs variables relative to the immediate parent.
-        If this is the root, the range is simply (0, total_num).
-    _var_range_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
-        Same as above, but by var_set name.
     #
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
@@ -212,18 +208,17 @@ class System(object):
 
         self._mpi_proc_allocator = DefaultAllocator()
         self._mpi_req_procs = (1, 1)
-        self._mpi_proc_range = None
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
+        self._subsystems_proc_range = []
+        self._subsystems_var_range = {'input': [], 'output': []}
+        self._subsystems_var_range_byset = {'input': [], 'output': []}
 
         self._num_var = {'input': 0, 'output': 0}
         self._num_var_byset = {'input': {}, 'output': {}}
-
         self._var_set2iset = {'input': {}, 'output': {}}
-        self._var_range = {'input': (0, 0), 'output': (0, 0)}
-        self._var_range_byset = {'input': {}, 'output': {}}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
@@ -305,18 +300,15 @@ class System(object):
             Global name of the system, including the path.
         MPI.Comm or <FakeComm>
             The MPI communicator.
-        (int, int)
-            The range of procs this system's comm owns, among all of this system's processors.
-            This information is not used if this is the top-level group.
         """
         if reconf:
-            return self.pathname, self.comm, self._mpi_proc_range
+            return self.pathname, self.comm
         else:
-            return '', comm, (0, comm.size)
+            return '', comm
 
     def _get_initial_var_indices(self, reconf):
         """
-        Get initial values for _var_set2iset, _var_range, _var_range_byset.
+        Get initial values for _var_set2iset.
 
         Parameters
         ----------
@@ -327,14 +319,9 @@ class System(object):
         -------
         {'input': dict, 'output': dict}
             Dictionary mapping the var_set name to the var_set index.
-        {'input': (int, int), 'output': (int, int)}
-            Range of this system's allprocs variables relative to the immediate parent.
-            If this is the root, the range is simply (0, total_num).
-        {'input': dict of (int, int), 'output': dict of (int, int)}
-            Same as above, but by var_set name.
         """
         if reconf:
-            return self._var_set2iset, self._var_range, self._var_range_byset
+            return self._var_set2iset
         else:
             set2iset = {}
             for type_ in ['input', 'output']:
@@ -342,16 +329,7 @@ class System(object):
                 for iset, set_name in enumerate(self._num_var_byset[type_]):
                     set2iset[type_][set_name] = iset
 
-            var_range = {}
-            var_range_byset = {}
-            for type_ in ['input', 'output']:
-                var_range[type_] = (0, self._num_var[type_])
-
-                var_range_byset[type_] = {}
-                for set_name in set2iset[type_]:
-                    var_range_byset[type_][set_name] = (0, self._num_var_byset[type_][set_name])
-
-            return set2iset, var_range, var_range_byset
+            return set2iset
 
     def _get_initial_global(self, reconf):
         """
@@ -403,7 +381,7 @@ class System(object):
                 else:
                     root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
 
-        return root_vectors
+        return vec_names, root_vectors, None, None, reconf
 
     def _get_bounds_root_vectors(self, vector_class, reconf):
         if reconf:
@@ -413,7 +391,7 @@ class System(object):
             lower = vector_class('lower', 'output', self)
             upper = vector_class('upper', 'output', self)
 
-        return lower, upper
+        return lower, upper, reconf
 
     def _get_scaling_root_vectors(self, vec_names, vector_class, reconf):
         root_vectors = {
@@ -438,33 +416,39 @@ class System(object):
                     if coeff_key[-1] != '0':
                         root_vectors[key][vec_name].set_const(1.0)
 
-        return root_vectors
+        return root_vectors, reconf
 
-    def _setup(self, comm, vector_class, reconf=False):
+    def setup(self):
+        """
+        Reconfigure after an initial setup has been performed.
+        """
+        self._setup(self.comm, self._outputs.__class__, reconf=True)
+
+    def _setup(self, comm, vector_class, reconf=False, recurse=True):
         vec_names = ['nonlinear', 'linear']
 
-        self._mpi_req_procs = self.get_req_procs()
-        self._setup_procs(*self._get_initial_procs(comm, reconf))
-        self._setup_vars()
-        self._setup_var_index_ranges(*self._get_initial_var_indices(reconf))
-        self._setup_var_data()
-        self._setup_var_index_maps()
-        self._setup_var_sizes()
-        self._setup_global_connections()
-        self._setup_connections()
-        self._setup_partials()
+        if recurse:
+            self._mpi_req_procs = self.get_req_procs()
+            self._setup_procs(*self._get_initial_procs(comm, reconf))
+        self._setup_vars(recurse=recurse)
+        self._setup_var_index_ranges(self._get_initial_var_indices(reconf), recurse=recurse)
+        self._setup_var_data(recurse=recurse)
+        self._setup_var_index_maps(recurse=recurse)
+        self._setup_var_sizes(recurse=recurse)
+        self._setup_global_connections(recurse=recurse)
+        self._setup_connections(recurse=recurse)
         self._setup_global(*self._get_initial_global(reconf))
-        self._setup_vectors(vec_names, self._get_root_vectors(vec_names, vector_class, reconf))
-        self._setup_transfers()
+        self._setup_vectors(*self._get_root_vectors(vec_names, vector_class, reconf))
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, reconf))
-        self._setup_scaling(self._get_scaling_root_vectors(vec_names, vector_class, reconf))
-        self._setup_solvers()
-        self._setup_jacobians()
+        self._setup_scaling(*self._get_scaling_root_vectors(vec_names, vector_class, reconf))
+        self._setup_transfers(recurse=recurse)
+        self._setup_solvers(recurse=recurse)
+        self._setup_partials(recurse=recurse)
+        self._setup_jacobians(recurse=recurse)
 
-    def _setup_procs(self, pathname, comm, proc_range, recurse=True):
+    def _setup_procs(self, pathname, comm):
         self.pathname = pathname
         self.comm = comm
-        self._mpi_proc_range = proc_range
 
         minp, maxp = self._mpi_req_procs
         if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
@@ -475,10 +459,10 @@ class System(object):
         self._num_var = {'input': 0, 'output': 0}
         self._num_var_byset = {'input': {}, 'output': {}}
 
-    def _setup_var_index_ranges(self, set2iset, var_range, var_range_byset, recurse=True):
+    def _setup_var_index_ranges(self, set2iset, recurse=True):
         self._var_set2iset = set2iset
-        self._var_range = var_range
-        self._var_range_byset = var_range_byset
+        self._subsystems_var_range = {'input': [], 'output': []}
+        self._subsystems_var_range_byset = {'input': [], 'output': []}
 
         num_var_byset = self._num_var_byset
         for type_ in ['input', 'output']:
@@ -521,17 +505,13 @@ class System(object):
     def _setup_connections(self, recurse=True):
         self._conn_abs_in2out = {}
 
-    def _setup_partials(self, recurse=True):
-        self._subjacs_info = {}
-
-    def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset,
-                      recurse=True):
+    def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
         self._ext_num_vars = ext_num_vars
         self._ext_num_vars_byset = ext_num_vars_byset
         self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
 
-    def _setup_vectors(self, vec_names, root_vectors, excl_out=None, excl_in=None, recurse=True):
+    def _setup_vectors(self, vec_names, root_vectors, excl_out, excl_in, reconf=False):
         self._vec_names = vec_names
         self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._excluded_vars_out = excl_out
@@ -549,7 +529,7 @@ class System(object):
                 type_ = 'output' if key is 'residual' else key
 
                 vectors[key][vec_name] = vector_class(
-                    vec_name, type_, self, root_vectors[key][vec_name])
+                    vec_name, type_, self, root_vectors[key][vec_name], reconf=reconf)
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
@@ -561,13 +541,12 @@ class System(object):
         for abs_name, meta in iteritems(self._var_abs2meta['output']):
             self._outputs._views[abs_name][:] = meta['value']
 
-    def _setup_transfers(self, recurse=True):
-        self._transfers = {}
-
-    def _setup_bounds(self, root_lower, root_upper, recurse=True):
+    def _setup_bounds(self, root_lower, root_upper, reconf=False):
         vector_class = root_lower.__class__
-        self._lower_bounds = lower = vector_class('lower', 'output', self, root_lower)
-        self._upper_bounds = upper = vector_class('upper', 'output', self, root_upper)
+        self._lower_bounds = lower = vector_class(
+            'lower', 'output', self, root_lower, reconf=reconf)
+        self._upper_bounds = upper = vector_class(
+            'upper', 'output', self, root_upper, reconf=reconf)
 
         for abs_name, meta in iteritems(self._var_abs2meta['output']):
             shape = meta['shape']
@@ -591,7 +570,7 @@ class System(object):
             else:
                 upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
 
-    def _setup_scaling(self, root_vectors, recurse=True):
+    def _setup_scaling(self, root_vectors, reconf=False):
         self._scaling_vecs = vecs = {
             ('input', 'phys0'): {}, ('input', 'phys1'): {},
             ('input', 'norm0'): {}, ('input', 'norm1'): {},
@@ -610,7 +589,7 @@ class System(object):
             for key in vecs:
                 type_ = 'output' if key[0] == 'residual' else key[0]
                 vecs[key][vec_name] = vector_class(
-                    vec_name, type_, self, root_vectors[key][vec_name])
+                    vec_name, type_, self, root_vectors[key][vec_name], reconf=reconf)
 
             for abs_name, meta in iteritems(self._var_abs2meta['output']):
                 shape = meta['shape']
@@ -694,11 +673,17 @@ class System(object):
                 vecs['input', 'norm0'][vec_name]._views[abs_in][:] = -a0 / a1
                 vecs['input', 'norm1'][vec_name]._views[abs_in][:] = 1.0 / a1
 
+    def _setup_transfers(self, recurse=True):
+        self._transfers = {}
+
     def _setup_solvers(self, recurse=True):
         if self._nl_solver is not None:
             self._nl_solver._setup_solvers(self, 0)
         if self._ln_solver is not None:
             self._ln_solver._setup_solvers(self, 0)
+
+    def _setup_partials(self, recurse=True):
+        self._subjacs_info = {}
 
     def _setup_jacobians(self, jacobian=None, recurse=True):
         """

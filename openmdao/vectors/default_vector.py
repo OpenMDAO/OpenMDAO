@@ -114,6 +114,63 @@ class DefaultVector(Vector):
 
         return data, indices
 
+    def _update_root_data(self):
+        """
+        Resize the root data if necesary (i.e., due to reconfiguration).
+        """
+        system = self._system
+        type_ = self._typ
+        iproc = self._iproc
+        root_vec = self._root_vector
+
+        _, tmp_indices = self._create_data()
+
+        ext_sizes_t = system._ext_sizes[type_]
+        int_sizes_t = np.sum(system._var_sizes[type_][iproc, :])
+        old_sizes_total = np.sum([len(data) for data in itervalues(root_vec._data)])
+
+        old_sizes = (
+            ext_sizes_t[0],
+            old_sizes_total - ext_sizes_t[0] - ext_sizes_t[1],
+            ext_sizes_t[1],
+        )
+        new_sizes = (
+            ext_sizes_t[0],
+            int_sizes_t,
+            ext_sizes_t[1],
+        )
+
+        for set_name in system._var_set2iset[type_]:
+            ext_sizes_byset_t = system._ext_sizes_byset[type_][set_name]
+            int_sizes_byset_t = np.sum(system._var_sizes_byset[type_][set_name][iproc, :])
+            old_sizes_total_byset = len(root_vec._data[set_name])
+
+            old_sizes_byset = (
+                ext_sizes_byset_t[0],
+                old_sizes_total_byset - ext_sizes_byset_t[0] - ext_sizes_byset_t[1],
+                ext_sizes_byset_t[1],
+            )
+            new_sizes_byset = (
+                ext_sizes_byset_t[0],
+                int_sizes_byset_t,
+                ext_sizes_byset_t[1],
+            )
+
+            root_vec._data[set_name] = np.concatenate([
+                root_vec._data[set_name][:old_sizes_byset[0]],
+                np.zeros(new_sizes_byset[1]),
+                root_vec._data[set_name][old_sizes_byset[0] + old_sizes_byset[1]:],
+            ])
+
+            root_vec._indices[set_name] = np.concatenate([
+                root_vec._indices[set_name][:old_sizes_byset[0]],
+                tmp_indices[set_name] + new_sizes[0],
+                root_vec._indices[set_name][old_sizes_byset[0] + old_sizes_byset[1]:]
+                    + new_sizes[1] - old_sizes[1],
+            ])
+
+        root_vec._initialize_views()
+
     def _extract_data(self):
         """
         Extract views of arrays from root_vector.
@@ -177,7 +234,6 @@ class DefaultVector(Vector):
         allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
         sizes_byset_t = system._var_sizes_byset[type_]
         abs2meta_t = system._var_abs2meta[type_]
-        var_range_byset_t = system._var_range_byset[type_]
 
         # idxs contains a 0 index for floats or a slice(None) for arrays so getitem
         # will return either a float or a properly shaped array respectively.
