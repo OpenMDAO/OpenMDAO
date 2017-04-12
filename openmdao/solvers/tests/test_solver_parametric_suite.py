@@ -47,7 +47,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         """
         Test the direct solver on a component.
         """
-        for jac in ['dict', 'coo', 'csr', 'dense']:
+        for jac in ['dict', 'csr', 'coo', 'dense']:
             prob = Problem(model=ImplComp4Test())
             prob.model.nl_solver = NewtonSolver()
             prob.model.ln_solver = DirectSolver()
