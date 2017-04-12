@@ -243,7 +243,7 @@ class System(object):
         self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
         self._ext_sizes_byset = {'input': {}, 'output': {}}
 
-        self._vec_names = []
+        self._vec_names = ['nonlinear', 'linear']
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._excluded_vars_out = set()
         self._excluded_vars_in = set()
@@ -480,7 +480,7 @@ class System(object):
         Parameters
         ----------
         setup_mode : str
-            Must be one of 'full', 'partial', or 'update'.
+            Must be one of 'full', 'reconf', or 'update'.
         """
         self._setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
@@ -491,7 +491,7 @@ class System(object):
             recurse = True
             resize = False
         # 2. Partial setup called in the system initiating the reconfiguration.
-        elif setup_mode == 'partial':
+        elif setup_mode == 'reconf':
             initial = False
             recurse = True
             resize = True
@@ -513,10 +513,6 @@ class System(object):
         self._setup_global_connections(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-        if setup_mode == 'full':
-            for sys in self.system_iter(local=True, include_self=True, recurse=True):
-                sys._vec_names = ['nonlinear', 'linear']
-
         self._setup_global(*self._get_initial_global(initial))
         self._setup_vectors(*self._get_root_vectors(vector_class, initial), resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
@@ -526,6 +522,9 @@ class System(object):
         self._setup_solvers(recurse=recurse)
         self._setup_partials(recurse=recurse)
         self._setup_jacobians(recurse=recurse)
+
+        if setup_mode == 'full':
+            self.set_initial_values()
 
     def _setup_procs(self, pathname, comm):
         self.pathname = pathname
@@ -609,12 +608,6 @@ class System(object):
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
         self._residuals = vectors['residual']['nonlinear']
-
-        for abs_name, meta in iteritems(self._var_abs2meta['input']):
-            self._inputs._views[abs_name][:] = meta['value']
-
-        for abs_name, meta in iteritems(self._var_abs2meta['output']):
-            self._outputs._views[abs_name][:] = meta['value']
 
     def _setup_bounds(self, root_lower, root_upper, resize=False):
         vector_class = root_lower.__class__
@@ -810,6 +803,16 @@ class System(object):
     # -------------------------------------------------------------------------------------
     #
     #
+
+    def set_initial_values(self):
+        """
+        Set all input and output variables to their declared initial values.
+        """
+        for abs_name, meta in iteritems(self._var_abs2meta['input']):
+            self._inputs._views[abs_name][:] = meta['value']
+
+        for abs_name, meta in iteritems(self._var_abs2meta['output']):
+            self._outputs._views[abs_name][:] = meta['value']
 
     def _scale_vec(self, vec, key, scale_to):
         scal_vecs = self._scaling_vecs
