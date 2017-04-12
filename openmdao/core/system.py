@@ -409,7 +409,7 @@ class System(object):
 
             for vec_name in vec_names:
                 if reconf:
-                    root_vectors[key][vec_name] = self._scaling_vecs[key][vec_name]
+                    root_vectors[key][vec_name] = self._scaling_vecs[key][vec_name]._root_vector
                 else:
                     root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
 
