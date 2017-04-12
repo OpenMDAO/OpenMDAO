@@ -250,7 +250,7 @@ class Problem(object):
             mode = 'rev'
         self._mode = mode
 
-        model._setup(comm, vector_class)
+        model._setup(comm, vector_class, 'full')
         self.driver._setup_driver(self)
 
         if check:

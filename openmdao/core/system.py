@@ -282,7 +282,7 @@ class System(object):
         self._static_subsystems_allprocs = []
         self._static_manual_connections = {}
 
-    def _get_initial_procs(self, comm, reconf):
+    def _get_initial_procs(self, comm, initial):
         """
         Get initial values for pathname and comm.
 
@@ -290,7 +290,7 @@ class System(object):
         ----------
         comm : MPI.Comm or <FakeComm>
             The MPI communicator.
-        reconf : bool
+        initial : bool
             Whether we are reconfiguring - i.e., whether the model has been previously setup.
 
         Returns
@@ -300,18 +300,18 @@ class System(object):
         MPI.Comm or <FakeComm>
             The MPI communicator.
         """
-        if reconf:
+        if not initial:
             return self.pathname, self.comm
         else:
             return '', comm
 
-    def _get_initial_var_indices(self, reconf):
+    def _get_initial_var_indices(self, initial):
         """
         Get initial values for _var_set2iset.
 
         Parameters
         ----------
-        reconf : bool
+        initial : bool
             Whether we are reconfiguring - i.e., whether the model has been previously setup.
 
         Returns
@@ -319,7 +319,7 @@ class System(object):
         {'input': dict, 'output': dict}
             Dictionary mapping the var_set name to the var_set index.
         """
-        if reconf:
+        if not initial:
             return self._var_set2iset
         else:
             set2iset = {}
@@ -330,13 +330,13 @@ class System(object):
 
             return set2iset
 
-    def _get_initial_global(self, reconf):
+    def _get_initial_global(self, initial):
         """
         Get initial values for _ext_num_vars, _ext_num_vars_byset, _ext_sizes, _ext_sizes_byset.
 
         Parameters
         ----------
-        reconf : bool
+        initial : bool
             Whether we are reconfiguring - i.e., the model has been previously setup.
 
         Returns
@@ -350,7 +350,7 @@ class System(object):
         _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
             Same as above, but by var_set name.
         """
-        if reconf:
+        if not initial:
             return (
                 self._ext_num_vars, self._ext_num_vars_byset,
                 self._ext_sizes, self._ext_sizes_byset)
@@ -367,23 +367,19 @@ class System(object):
             }
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
-    def _get_root_vectors(self, vec_names, vector_class, reconf):
+    def _get_root_vectors(self, vector_class, initial):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
         Parameters
         ----------
-        vec_names : str
-            List of vector (right-hand side) names.
         vector_class : Vector
             The Vector class used to instantiate the root vectors.
-        reconf : bool
+        initial : bool
             Whether we are reconfiguring - i.e., whether the model has been previously setup.
 
         Returns
         -------
-        str
-            List of vector (right-hand side) names.
         dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         dict of set
@@ -395,22 +391,22 @@ class System(object):
 
         for key in ['input', 'output', 'residual']:
             type_ = 'output' if key is 'residual' else key
-            for vec_name in vec_names:
-                if reconf:
+            for vec_name in self._vec_names:
+                if not initial:
                     root_vectors[key][vec_name] = self._vectors[key][vec_name]._root_vector
                 else:
                     root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
 
-        if reconf:
+        if not initial:
             excl_out = self._excluded_vars_out
             excl_in = self._excluded_vars_in
         else:
-            excl_out = {vec_name: set() for vec_name in vec_names}
-            excl_in = {vec_name: set() for vec_name in vec_names}
+            excl_out = {vec_name: set() for vec_name in self._vec_names}
+            excl_in = {vec_name: set() for vec_name in self._vec_names}
 
-        return vec_names, root_vectors, excl_out, excl_in
+        return root_vectors, excl_out, excl_in
 
-    def _get_bounds_root_vectors(self, vector_class, reconf):
+    def _get_bounds_root_vectors(self, vector_class, initial):
         """
         Get the root vectors for the lower and upper bounds vectors.
 
@@ -418,7 +414,7 @@ class System(object):
         ----------
         vector_class : Vector
             The Vector class used to instantiate the root vectors.
-        reconf : bool
+        initial : bool
             Whether we are reconfiguring - i.e., whether the model has been previously setup.
 
         Returns
@@ -428,7 +424,7 @@ class System(object):
         Vector
             Upper bounds vector.
         """
-        if reconf:
+        if not initial:
             lower = self._lower_bounds._root_vector
             upper = self._upper_bounds._root_vector
         else:
@@ -437,7 +433,7 @@ class System(object):
 
         return lower, upper
 
-    def _get_scaling_root_vectors(self, vector_class, reconf):
+    def _get_scaling_root_vectors(self, vector_class, initial):
         """
         Get the root vectors for the scaling vectors.
 
@@ -445,7 +441,7 @@ class System(object):
         ----------
         vector_class : Vector
             The Vector class used to instantiate the root vectors.
-        reconf : bool
+        initial : bool
             Whether we are reconfiguring - i.e., whether the model has been previously setup.
 
         Returns
@@ -467,7 +463,7 @@ class System(object):
             type_ = 'output' if vec_key == 'residual' else vec_key
 
             for vec_name in self._vec_names:
-                if reconf:
+                if not initial:
                     root_vectors[key][vec_name] = self._scaling_vecs[key][vec_name]._root_vector
                 else:
                     root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
@@ -477,32 +473,55 @@ class System(object):
 
         return root_vectors
 
-    def setup(self):
+    def setup(self, setup_mode='full'):
         """
         Reconfigure after an initial setup has been performed.
-        """
-        self._setup(self.comm, self._outputs.__class__, reconf=True)
 
-    def _setup(self, comm, vector_class, reconf=False, recurse=True):
-        vec_names = ['nonlinear', 'linear']
+        Parameters
+        ----------
+        setup_mode : str
+            Must be one of 'full', 'partial', or 'update'.
+        """
+        self._setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
+
+    def _setup(self, comm, vector_class, setup_mode):
+        # 1. Full setup that must be called in the root system.
+        if setup_mode == 'full':
+            initial = True
+            recurse = True
+            resize = False
+        # 2. Partial setup called in the system initiating the reconfiguration.
+        elif setup_mode == 'partial':
+            initial = False
+            recurse = True
+            resize = True
+        # 3. Update-mode setup called in all ancestors of the system initiating the reconf.
+        elif setup_mode == 'update':
+            initial = False
+            recurse = False
+            resize = False
 
         if recurse:
             self._mpi_req_procs = self.get_req_procs()
-            self._setup_procs(*self._get_initial_procs(comm, reconf))
+            self._setup_procs(*self._get_initial_procs(comm, initial))
+
         self._setup_vars(recurse=recurse)
-        self._setup_var_index_ranges(self._get_initial_var_indices(reconf), recurse=recurse)
+        self._setup_var_index_ranges(self._get_initial_var_indices(initial), recurse=recurse)
         self._setup_var_data(recurse=recurse)
         self._setup_var_index_maps(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_global_connections(recurse=recurse)
         self._setup_connections(recurse=recurse)
-        self._setup_global(*self._get_initial_global(reconf))
-        self._setup_vectors(
-            *self._get_root_vectors(vec_names, vector_class, reconf), resize=reconf and recurse)
-        self._setup_bounds(
-            *self._get_bounds_root_vectors(vector_class, reconf), resize=reconf and recurse)
-        self._setup_scaling(
-            self._get_scaling_root_vectors(vector_class, reconf), resize=reconf and recurse)
+
+        if setup_mode == 'full':
+            for sys in self.system_iter(local=True, include_self=True, recurse=True):
+                sys._vec_names = ['nonlinear', 'linear']
+
+        self._setup_global(*self._get_initial_global(initial))
+        self._setup_vectors(*self._get_root_vectors(vector_class, initial), resize=resize)
+        self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
+        self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial), resize=resize)
+
         self._setup_transfers(recurse=recurse)
         self._setup_solvers(recurse=recurse)
         self._setup_partials(recurse=recurse)
@@ -573,13 +592,12 @@ class System(object):
         self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
 
-    def _setup_vectors(self, vec_names, root_vectors, excl_out, excl_in, resize=False):
-        self._vec_names = vec_names
+    def _setup_vectors(self, root_vectors, excl_out, excl_in, resize=False):
         self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._excluded_vars_out = excl_out
         self._excluded_vars_in = excl_in
 
-        for vec_name in vec_names:
+        for vec_name in self._vec_names:
             vector_class = root_vectors['output'][vec_name].__class__
 
             for key in ['input', 'output', 'residual']:
