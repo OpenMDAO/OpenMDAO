@@ -40,7 +40,7 @@ from openmdao.devtools.viewconns import view_connections
 
 # Derivative Specification
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, \
-    DenseJacobian, COOJacobian, CSRJacobian
+    DenseJacobian, COOJacobian, CSRJacobian, CSCJacobian
 
 # Drivers
 try:

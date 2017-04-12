@@ -10,7 +10,8 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, CSRJacobian
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
+                                                  CSRJacobian, CSCJacobian
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
@@ -47,7 +48,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         """
         Test the direct solver on a component.
         """
-        for jac in ['dict', 'csr', 'coo', 'dense']:
+        for jac in ['dict', 'csr', 'csc', 'coo', 'dense']:
             prob = Problem(model=ImplComp4Test())
             prob.model.nl_solver = NewtonSolver()
             prob.model.ln_solver = DirectSolver()
@@ -59,6 +60,8 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
                 prob.model.jacobian = COOJacobian()
             elif jac == 'csr':
                 prob.model.jacobian = CSRJacobian()
+            elif jac == 'csc':
+                prob.model.jacobian = CSCJacobian()
             elif jac == 'dense':
                 prob.model.jacobian = DenseJacobian()
 

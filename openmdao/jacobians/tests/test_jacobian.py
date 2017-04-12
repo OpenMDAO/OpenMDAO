@@ -13,7 +13,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 from openmdao.api import IndepVarComp, Group, Problem, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
                          NewtonSolver, ScipyIterativeSolver, \
-                         DenseJacobian, CSRJacobian, COOJacobian
+                         DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -174,7 +174,7 @@ def _test_func_name(func, num, param):
 class TestJacobian(unittest.TestCase):
 
     @parameterized.expand(itertools.product(
-        [DenseJacobian, CSRJacobian, COOJacobian],
+        [DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian],
         [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist],
         [False, True],  # not nested, nested
         [0, 1],  # extra calls to linearize
@@ -397,7 +397,7 @@ class TestJacobian(unittest.TestCase):
 
         assert_rel_error(self, prob['G1.C1.y'], 50.0)
         assert_rel_error(self, prob['G1.C2.y'], 243.0)
-        
+
     def test_sparse_jac_with_subsolver_error(self):
         prob = Problem()
         indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', 1.0))
@@ -414,7 +414,7 @@ class TestJacobian(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             prob.setup(check=False)
-        self.assertEqual(str(context.exception), 
+        self.assertEqual(str(context.exception),
                          "System 'G1' has a solver of type 'NewtonSolver'but a sparse "
                          "AssembledJacobian has been set in a higher level system.")
 

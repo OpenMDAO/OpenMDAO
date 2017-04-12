@@ -7,6 +7,7 @@ from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
+from openmdao.matrices.csc_matrix import CSCMatrix
 
 
 SUBJAC_META_DEFAULTS = {
@@ -305,3 +306,21 @@ class CSRJacobian(AssembledJacobian):
         """
         super(CSRJacobian, self, **kwargs).__init__()
         self.options['matrix_class'] = CSRMatrix
+
+
+class CSCJacobian(AssembledJacobian):
+    """
+    Assemble sparse global <Jacobian> in Compressed Col Storage format.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(CSCJacobian, self, **kwargs).__init__()
+        self.options['matrix_class'] = CSCMatrix
