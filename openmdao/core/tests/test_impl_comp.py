@@ -1,6 +1,8 @@
 """Simple example demonstrating how to implement an implicit component."""
 from __future__ import division
 
+from six.moves import cStringIO
+
 import unittest
 
 from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp
@@ -128,6 +130,14 @@ class TestImplCompSimple(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.b'], -1.5)
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], -0.5)
 
+        # Piggyback testing of list_states
+
+        stream = cStringIO()
+        prob.model.list_states(stream=stream)
+        content = stream.getvalue()
+
+        self.assertTrue('comp2.x' in content)
+        self.assertTrue('comp3.x' in content)
 
 if __name__ == '__main__':
     unittest.main()

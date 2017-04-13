@@ -258,10 +258,9 @@ class Problem(object):
 
         return self
 
-    def check_partial_derivatives(self, out_stream=sys.stdout, comps=None,
-                                  compact_print=False, abs_err_tol=1e-6,
-                                  rel_err_tol=1e-6, global_options=None,
-                                  force_dense=True):
+    def check_partial_derivs(self, out_stream=sys.stdout, comps=None, compact_print=False,
+                             abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
+                             force_dense=True):
         """
         Check partial derivatives comprehensively for all components in your model.
 
