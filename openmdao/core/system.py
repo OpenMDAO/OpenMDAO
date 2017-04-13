@@ -14,7 +14,7 @@ import numpy as np
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.class_util import overrides_method
@@ -968,6 +968,20 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._jacobian_changed = False
+        if jacobian is not None:
+            # this means that somewhere above us is an AssembledJacobian. If
+            # we have a nonlinear solver that uses derivatives, this is
+            # currently an error if the AssembledJacobian is not a DenseJacobian.
+            # In a future story we'll add support for sparse AssembledJacobians.
+            if (self._nl_solver is not None and
+                self._nl_solver.supports['gradients'] and not
+                    isinstance(jacobian, DenseJacobian)):
+                raise RuntimeError("System '%s' has a solver of type '%s'"
+                                   "but a sparse AssembledJacobian has been set in a "
+                                   "higher level system." %
+                                   (self.pathname,
+                                    self._nl_solver.__class__.__name__))
+            self._owns_assembled_jac = False
 
         if self._owns_assembled_jac:
 
@@ -1353,7 +1367,6 @@ class System(object):
                                "called." % self.pathname)
         oldsys = self._jacobian._system
         self._jacobian._system = self
-        self._jacobian._precompute_iter()
         yield self._jacobian
         self._jacobian._system = oldsys
 

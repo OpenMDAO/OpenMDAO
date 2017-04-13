@@ -1,6 +1,7 @@
 """Define the AssembledJacobian class."""
 from __future__ import division
 
+import sys
 import numpy as np
 
 from openmdao.jacobians.jacobian import Jacobian
@@ -36,6 +37,7 @@ class AssembledJacobian(Jacobian):
         self.options.declare('matrix_class', value=DenseMatrix,
                              desc='<Matrix> class to use in this <Jacobian>.')
         self.options.update(kwargs)
+        self._view_ranges = {}
 
     def _get_var_range(self, abs_name, type_):
         """
@@ -93,10 +95,30 @@ class AssembledJacobian(Jacobian):
         # avoid circular imports
         from openmdao.core.component import Component
         for s in self._system.system_iter(local=True, recurse=True,
-                                          include_self=True, typ=Component):
+                                          include_self=True):
+
+            min_res_offset = sys.maxsize
+            max_res_offset = 0
+            min_in_offset = sys.maxsize
+            max_in_offset = 0
+
+            for in_abs_name in s._var_abs_names['input']:
+                in_offset = in_offsets[in_abs_name]
+                if in_offset > max_in_offset:
+                    max_in_offset = in_offset
+                if in_offset < min_in_offset:
+                    min_in_offset = in_offset
 
             for res_abs_name in s._var_abs_names['output']:
                 res_offset = out_offsets[res_abs_name]
+                if res_offset > max_res_offset:
+                    max_res_offset = res_offset
+                if res_offset < min_res_offset:
+                    min_res_offset = res_offset
+
+                # only need to collect subjac info for compnents, not subgroups
+                if not isinstance(s, Component):
+                    continue
 
                 for out_abs_name in s._var_abs_names['output']:
                     out_offset = out_offsets[out_abs_name]
@@ -114,8 +136,6 @@ class AssembledJacobian(Jacobian):
                         abs_key, info, res_offset, out_offset, None, shape)
 
                 for in_abs_name in s._var_abs_names['input']:
-                    in_offset = in_offsets[in_abs_name]
-
                     abs_key = (res_abs_name, in_abs_name)
                     if abs_key in self._subjacs_info:
                         info, shape = self._subjacs_info[abs_key]
@@ -146,7 +166,10 @@ class AssembledJacobian(Jacobian):
                                 src_indices, shape)
                     else:
                         self._ext_mtx._add_submat(
-                            abs_key, info, res_offset, in_offset, None, shape)
+                            abs_key, info, res_offset, in_offsets[in_abs_name], None, shape)
+
+            self._view_ranges[s.pathname] = (
+                min_res_offset, max_res_offset + 1, min_in_offset, max_in_offset + 1)
 
         sizes = system._var_sizes
         iproc = system.comm.rank
@@ -155,6 +178,10 @@ class AssembledJacobian(Jacobian):
 
         self._int_mtx._build(out_size, out_size)
         self._ext_mtx._build(out_size, in_size)
+        if self._ext_mtx._submats:
+            self._ext_mtx._build(out_size, in_size)
+        else:
+            self._ext_mtx = None
 
     def _update(self):
         """
@@ -176,11 +203,9 @@ class AssembledJacobian(Jacobian):
                 if abs_key in self._subjacs:
 
                     if in_abs_name in system._conn_global_abs_in2out:
-                        self._int_mtx._update_submat(
-                            self._keymap[abs_key], self._subjacs[abs_key])
-                    else:
-                        self._ext_mtx._update_submat(
-                            abs_key, self._subjacs[abs_key])
+                        self._int_mtx._update_submat(self._keymap[abs_key], self._subjacs[abs_key])
+                    elif self._ext_mtx is not None:
+                        self._ext_mtx._update_submat(abs_key, self._subjacs[abs_key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """
@@ -200,14 +225,20 @@ class AssembledJacobian(Jacobian):
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx
 
+        ranges = self._view_ranges[self._system.pathname]
+        int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])
+
         with self._system._unscaled_context(
                 outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
-                d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode))
-                d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode))
+                d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
+                if ext_mtx is not None:
+                    d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, ranges))
             elif mode == 'rev':
-                d_outputs.iadd_data(int_mtx._prod(d_residuals.get_data(), mode))
-                d_inputs.iadd_data(ext_mtx._prod(d_residuals.get_data(), mode))
+                dresids = d_residuals.get_data()
+                d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
+                if ext_mtx is not None:
+                    d_inputs.iadd_data(ext_mtx._prod(dresids, mode, ranges))
 
 
 class DenseJacobian(AssembledJacobian):
@@ -262,3 +293,21 @@ class CSRJacobian(AssembledJacobian):
         """
         super(CSRJacobian, self, **kwargs).__init__()
         self.options['matrix_class'] = CSRMatrix
+
+
+class CSCJacobian(AssembledJacobian):
+    """
+    Assemble sparse global <Jacobian> in Compressed Col Storage format.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(CSCJacobian, self, **kwargs).__init__()
+        self.options['matrix_class'] = CSCMatrix

@@ -213,13 +213,23 @@ class Jacobian(object):
         Iterate over subjacs keyed by absolute names.
 
         This includes only subjacs that have been set and are part of the current system.
-
-        Returns
-        -------
-        iterator
-            Iterator over subjacs keyed by absolute names that have been set on this Jacobian.
         """
-        return iter(self._iter_list)
+        system = self._system
+        subjacs = self._subjacs
+
+        # FIXME: these keys should really be cached in system, not as they were previously
+        # in precompute_iter_keys, since they had to be constantly recomputed whenever the
+        # jacobian's system changed.  There is an ordering issue with caching them in system
+        # because this method gets called once (for scaling) prior to the first call to
+        # linearize for each system which can add keys to the jacobian, so we'll need to
+        # make sure we recompute the keys for each system after the first call to lineraize
+        # after a new jacobian has been set.
+        for res_name in system._var_abs_names['output']:
+            for type_ in ('output', 'input'):
+                for name in system._var_abs_names[type_]:
+                    key = (res_name, name)
+                    if key in subjacs:
+                        yield key
 
     def _initialize(self):
         """
