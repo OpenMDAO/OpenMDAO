@@ -11,6 +11,7 @@ import scipy.sparse.linalg
 from openmdao.solvers.solver import LinearSolver
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
+from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
 
 
@@ -51,12 +52,17 @@ class DirectSolver(LinearSolver):
             if isinstance(mtx, DenseMatrix):
                 np.set_printoptions(precision=3)
                 self._lup = scipy.linalg.lu_factor(mtx._matrix)
-            elif isinstance(mtx, (COOMatrix, CSRMatrix)):
+            elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
                 np.set_printoptions(precision=3)
                 self._lu = scipy.sparse.linalg.splu(mtx._matrix)
+            elif isinstance(mtx, COOMatrix):
+                # calling scipy.sparse.linalg.splu on a COO actually transposes
+                # the matrix during conversion to csc prior to LU decomp
+                raise RuntimeError("Direct solver is not compatible with mtx type "
+                                   "COOMatrix in system '%s'." % system.pathname)
             else:
-                raise RuntimeError('Direct solver not implemented for mtx type %s in system %s'
-                                   % (type(mtx), system.pathname))
+                raise RuntimeError("Direct solver not implemented for mtx type %s"
+                                   " in system '%s'." % (type(mtx), system.pathname))
 
         else:
             # First make a backup of the vectors
