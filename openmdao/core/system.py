@@ -1501,6 +1501,36 @@ class System(object):
         with self._scaled_context():
             self._apply_nonlinear()
 
+    def list_states(self, stream=sys.stdout):
+        """
+        List all states and their values and residuals.
+
+        Parameters
+        ----------
+        stream : output stream, optional
+            Stream to write the state info to. Default is sys.stdout.
+        """
+        outputs = self._outputs
+        resids = self._residuals
+        states = self._list_states()
+
+        pathname = self.pathname
+        if pathname == '':
+            pathname = 'model'
+
+        if states:
+            stream.write("\nStates in %s:\n\n" % pathname)
+            for uname in states:
+                stream.write("%s\n" % uname)
+                stream.write("Value: ")
+                stream.write(str(outputs[uname]))
+                stream.write('\n')
+                stream.write("Residual: ")
+                stream.write(str(resids[uname]))
+                stream.write('\n\n')
+        else:
+            stream.write("\nNo states in %s.\n" % pathname)
+
     def run_solve_nonlinear(self):
         """
         Compute outputs.
@@ -1692,3 +1722,18 @@ class System(object):
             variable names
         """
         pass
+
+    def _list_states(self):
+        """
+        Return list of all states at and below this system.
+
+        Returns
+        -------
+        list
+            List of all states.
+        """
+        states = []
+        for subsys in self._subsystems_myproc:
+            states.extend(subsys._list_states())
+
+        return states

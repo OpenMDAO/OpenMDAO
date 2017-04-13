@@ -44,7 +44,7 @@ is a simple example of this kind of model structure. In these problems, you migh
     but developing an effective and efficient preconditioner is not trivial.
     If you're having trouble converging the linear solves with an iterative solver,
     you should try using the :ref:`Direct <usr_openmdao.solvers.ln_direct.py>` solver instead.
-    But first, verify that all your partials derivatives are correct with the check_partial_derivatives method.
+    But first, verify that all your partials derivatives are correct with the check_partial_derivs method.
 
 
 ----
