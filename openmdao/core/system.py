@@ -420,9 +420,9 @@ class System(object):
         Returns
         -------
         Vector
-            Lower bounds vector.
+            Root vector for the lower bounds vector.
         Vector
-            Upper bounds vector.
+            Root vector for the upper bounds vector.
         """
         if not initial:
             lower = self._lower_bounds._root_vector
@@ -475,7 +475,7 @@ class System(object):
 
     def setup(self, setup_mode='full'):
         """
-        Reconfigure after an initial setup has been performed.
+        Public wrapper for _setup that reconfigures after an initial setup has been performed.
 
         Parameters
         ----------
@@ -485,6 +485,23 @@ class System(object):
         self._setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
     def _setup(self, comm, vector_class, setup_mode):
+        """
+        Perform setup for this system and its descendant systems.
+
+        There are three modes of setup:
+        1. 'full': wipe everything and setup this and all descendant systems from scratch
+        2. 'reconf': don't wipe everything, but reconfigure this and all descendant systems
+        3. 'update': update after one or more immediate systems has done a 'reconf' or 'update'
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The global communicator.
+        vector_class : type
+            reference to an actual <Vector> class; not an instance.
+        setup_mode : str
+            Must be one of 'full', 'reconf', or 'update'.
+        """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
             initial = True
@@ -501,10 +518,14 @@ class System(object):
             recurse = False
             resize = False
 
+        # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
             self._mpi_req_procs = self.get_req_procs()
             self._setup_procs(*self._get_initial_procs(comm, initial))
 
+        # For updating variable and connection data, setup needs to be performed only
+        # in the current system, by gathering data from immediate subsystems,
+        # and no recursion is necessary.
         self._setup_vars(recurse=recurse)
         self._setup_var_index_ranges(self._get_initial_var_indices(initial), recurse=recurse)
         self._setup_var_data(recurse=recurse)
@@ -513,20 +534,37 @@ class System(object):
         self._setup_global_connections(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
+        # For vector-related, setup, recursion is always necessary, even for updating.
+        # For reconfiguration setup, we resize the vectors once, only in the current system.
         self._setup_global(*self._get_initial_global(initial))
         self._setup_vectors(*self._get_root_vectors(vector_class, initial), resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
         self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial), resize=resize)
 
+        # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers(recurse=recurse)
+
+        # Same situation with solvers, partials, and Jacobians.
+        # If we're updating, we just need to re-run setup on these, but no recursion necessary.
         self._setup_solvers(recurse=recurse)
         self._setup_partials(recurse=recurse)
         self._setup_jacobians(recurse=recurse)
 
+        # Full setup means we're are (nearly) starting from scratch, so reset to initial values.
         if setup_mode == 'full':
             self.set_initial_values()
 
     def _setup_procs(self, pathname, comm):
+        """
+        Distribute processors and assign pathnames.
+
+        Parameters
+        ----------
+        pathname : str
+            Global name of the system, including the path.
+        comm : MPI.Comm or <FakeComm>
+            MPI communicator object.
+        """
         self.pathname = pathname
         self.comm = comm
         self._subsystems_proc_range = []
@@ -537,10 +575,28 @@ class System(object):
                                (self.pathname, minp, comm.size))
 
     def _setup_vars(self, recurse=True):
+        """
+        Call initialize_variables in components and count variables, total and by var_set.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         self._num_var = {'input': 0, 'output': 0}
         self._num_var_byset = {'input': {}, 'output': {}}
 
     def _setup_var_index_ranges(self, set2iset, recurse=True):
+        """
+        Compute the division of variables by subsystem and pass down the set_name-to-iset maps.
+
+        Parameters
+        ----------
+        set2iset : {'input': dict, 'output': dict}
+            Dictionary mapping the var_set name to the var_set index.
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         self._var_set2iset = set2iset
         self._subsystems_var_range = {'input': [], 'output': []}
         self._subsystems_var_range_byset = {'input': [], 'output': []}
@@ -552,6 +608,14 @@ class System(object):
                     num_var_byset[type_][set_name] = 0
 
     def _setup_var_data(self, recurse=True):
+        """
+        Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
@@ -560,6 +624,14 @@ class System(object):
         self._var_abs2meta = {'input': {}, 'output': {}}
 
     def _setup_var_index_maps(self, recurse=True):
+        """
+        Compute maps from abs var names to their index among allprocs variables in this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         self._var_allprocs_abs2idx = allprocs_abs2idx = {'input': {}, 'output': {}}
         self._var_allprocs_abs2idx_byset = allprocs_abs2idx_byset = {'input': {}, 'output': {}}
 
@@ -577,22 +649,80 @@ class System(object):
                 counter[set_name] += 1
 
     def _setup_var_sizes(self, recurse=True):
+        """
+        Compute the arrays of local variable sizes for all variables/procs on this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         self._var_sizes = {'input': None, 'output': None}
         self._var_sizes_byset = {'input': {}, 'output': {}}
 
     def _setup_global_connections(self, recurse=True):
+        """
+        Compute dict of all connections between this system's inputs and outputs.
+
+        The connections come from 4 sources:
+        1. Implicit connections owned by the current system
+        2. Explicit connections declared by the current system
+        3. Explicit connections declared by parent systems
+        4. Implicit / explicit from subsystems
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         self._conn_global_abs_in2out = {}
 
     def _setup_connections(self, recurse=True):
+        """
+        Compute dict of all implicit and explicit connections owned by this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         self._conn_abs_in2out = {}
 
     def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
+        """
+        Compute total number and total size of variables in systems before / after this system.
+
+        Parameters
+        ----------
+        ext_num_vars : {'input': (int, int), 'output': (int, int)}
+            Total number of allprocs variables in system before/after this one.
+        ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
+            Same as above, but by var_set name.
+        ext_sizes : {'input': (int, int), 'output': (int, int)}
+            Total size of allprocs variables in system before/after this one.
+        ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
+            Same as above, but by var_set name.
+        """
         self._ext_num_vars = ext_num_vars
         self._ext_num_vars_byset = ext_num_vars_byset
         self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
 
     def _setup_vectors(self, root_vectors, excl_out, excl_in, resize=False):
+        """
+        Compute all vectors for all vec names and assign excluded variables lists.
+
+        Parameters
+        ----------
+        root_vectors : dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        excl_out : dict of set
+            Dictionary of sets of excluded output variable absolute names, keyed by vec_name.
+        excl_in : dict of set
+            Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
+        resize : bool
+            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
+        """
         self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._excluded_vars_out = excl_out
         self._excluded_vars_in = excl_in
@@ -611,6 +741,18 @@ class System(object):
         self._residuals = vectors['residual']['nonlinear']
 
     def _setup_bounds(self, root_lower, root_upper, resize=False):
+        """
+        Compute the lower and upper bounds vectors and set their values.
+
+        Parameters
+        ----------
+        root_lower : Vector
+            Root vector for the lower bounds vector.
+        root_upper : Vector
+            Root vector for the upper bounds vector.
+        resize : bool
+            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
+        """
         vector_class = root_lower.__class__
         self._lower_bounds = lower = vector_class(
             'lower', 'output', self, root_lower, resize=resize)
@@ -640,6 +782,16 @@ class System(object):
                 upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
 
     def _setup_scaling(self, root_vectors, resize=False):
+        """
+        Compute all scaling vectors for all vec names.
+
+        Parameters
+        ----------
+        root_vectors : dict of dict of Vector
+            Root vectors: first key is scaling direction; second key is vec_name.
+        resize : bool
+            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
+        """
         self._scaling_vecs = vecs = {
             ('input', 'phys0'): {}, ('input', 'phys1'): {},
             ('input', 'norm0'): {}, ('input', 'norm1'): {},
@@ -747,15 +899,39 @@ class System(object):
                 vecs['input', 'norm1'][vec_name]._views[abs_in][:] = 1.0 / a1
 
     def _setup_transfers(self, recurse=True):
+        """
+        Compute all transfers that are owned by this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         self._transfers = {}
 
     def _setup_solvers(self, recurse=True):
+        """
+        Perform setup in all solvers.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         if self._nl_solver is not None:
             self._nl_solver._setup_solvers(self, 0)
         if self._ln_solver is not None:
             self._ln_solver._setup_solvers(self, 0)
 
     def _setup_partials(self, recurse=True):
+        """
+        Call initialize_partials in components.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         self._subjacs_info = {}
 
     def _setup_jacobians(self, jacobian=None, recurse=True):
@@ -767,7 +943,7 @@ class System(object):
         jacobian : <AssembledJacobian> or None
             The global jacobian to populate for this system.
         recurse : bool
-            Whether to perform recursion.
+            Whether to call this method in subsystems.
         """
         self._jacobian_changed = False
 

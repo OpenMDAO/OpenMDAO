@@ -88,6 +88,14 @@ class Component(System):
         pass
 
     def _setup_vars(self, recurse=True):
+        """
+        Call initialize_variables in components and count variables, total and by var_set.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Component, self)._setup_vars()
         num_var = self._num_var
         num_var_byset = self._num_var_byset
@@ -117,6 +125,14 @@ class Component(System):
                 num_var_byset[type_][set_name] = 1
 
     def _setup_var_data(self, recurse=True):
+        """
+        Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Component, self)._setup_var_data()
         allprocs_abs_names = self._var_allprocs_abs_names
         abs_names = self._var_abs_names
@@ -161,6 +177,14 @@ class Component(System):
                 abs2meta[type_][abs_name] = metadata
 
     def _setup_var_sizes(self, recurse=True):
+        """
+        Compute the arrays of local variable sizes for all variables/procs on this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Component, self)._setup_var_sizes()
 
         sizes = self._var_sizes
@@ -201,6 +225,14 @@ class Component(System):
                         sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
 
     def _setup_partials(self, recurse=True):
+        """
+        Call initialize_partials in components.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Component, self)._setup_partials()
 
         self.initialize_partials()

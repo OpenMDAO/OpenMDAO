@@ -56,6 +56,16 @@ class Group(System):
         pass
 
     def _setup_procs(self, pathname, comm):
+        """
+        Distribute processors and assign pathnames.
+
+        Parameters
+        ----------
+        pathname : str
+            Global name of the system, including the path.
+        comm : MPI.Comm or <FakeComm>
+            MPI communicator object.
+        """
         super(Group, self)._setup_procs(pathname, comm)
         subsystems_proc_range = self._subsystems_proc_range
 
@@ -99,6 +109,14 @@ class Group(System):
             subsys._setup_procs(sub_pathname, sub_comm)
 
     def _setup_vars(self, recurse=True):
+        """
+        Call initialize_variables in components and count variables, total and by var_set.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Group, self)._setup_vars()
         num_var = self._num_var
         num_var_byset = self._num_var_byset
@@ -145,6 +163,16 @@ class Group(System):
                             num_var_byset[type_][set_name] = num
 
     def _setup_var_index_ranges(self, set2iset, recurse=True):
+        """
+        Compute the division of variables by subsystem and pass down the set_name-to-iset maps.
+
+        Parameters
+        ----------
+        set2iset : {'input': dict, 'output': dict}
+            Dictionary mapping the var_set name to the var_set index.
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Group, self)._setup_var_index_ranges(set2iset)
         subsystems_var_range = self._subsystems_var_range
         subsystems_var_range_byset = self._subsystems_var_range_byset
@@ -209,6 +237,14 @@ class Group(System):
                 subsys._setup_var_index_ranges(set2iset, recurse)
 
     def _setup_var_data(self, recurse=True):
+        """
+        Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Group, self)._setup_var_data()
         allprocs_abs_names = self._var_allprocs_abs_names
         abs_names = self._var_abs_names
@@ -292,6 +328,14 @@ class Group(System):
                             allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
     def _setup_var_index_maps(self, recurse=True):
+        """
+        Compute maps from abs var names to their index among allprocs variables in this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Group, self)._setup_var_index_maps()
 
         # Recursion
@@ -300,6 +344,14 @@ class Group(System):
                 subsys._setup_var_index_maps(recurse)
 
     def _setup_var_sizes(self, recurse=True):
+        """
+        Compute the arrays of local variable sizes for all variables/procs on this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Group, self)._setup_var_sizes()
         sizes = self._var_sizes
         sizes_byset = self._var_sizes_byset
@@ -345,6 +397,20 @@ class Group(System):
                         sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
 
     def _setup_global_connections(self, recurse=True):
+        """
+        Compute dict of all connections between this system's inputs and outputs.
+
+        The connections come from 4 sources:
+        1. Implicit connections owned by the current system
+        2. Explicit connections declared by the current system
+        3. Explicit connections declared by parent systems
+        4. Implicit / explicit from subsystems
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Group, self)._setup_global_connections()
         global_abs_in2out = self._conn_global_abs_in2out
 
@@ -461,6 +527,14 @@ class Group(System):
                 global_abs_in2out.update(myproc_global_abs_in2out)
 
     def _setup_connections(self, recurse=True):
+        """
+        Compute dict of all implicit and explicit connections owned by this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Group, self)._setup_connections()
         abs_in2out = self._conn_abs_in2out
 
@@ -490,6 +564,20 @@ class Group(System):
                     abs_in2out[abs_in] = abs_out
 
     def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
+        """
+        Compute total number and total size of variables in systems before / after this system.
+
+        Parameters
+        ----------
+        ext_num_vars : {'input': (int, int), 'output': (int, int)}
+            Total number of allprocs variables in system before/after this one.
+        ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
+            Same as above, but by var_set name.
+        ext_sizes : {'input': (int, int), 'output': (int, int)}
+            Total size of allprocs variables in system before/after this one.
+        ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
+            Same as above, but by var_set name.
+        """
         super(Group, self)._setup_global(
             ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
 
@@ -542,24 +630,68 @@ class Group(System):
             )
 
     def _setup_vectors(self, root_vectors, excl_out, excl_in, resize=False):
+        """
+        Compute all vectors for all vec names and assign excluded variables lists.
+
+        Parameters
+        ----------
+        root_vectors : dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        excl_out : dict of set
+            Dictionary of sets of excluded output variable absolute names, keyed by vec_name.
+        excl_in : dict of set
+            Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
+        resize : bool
+            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
+        """
         super(Group, self)._setup_vectors(root_vectors, excl_out, excl_in, resize=resize)
 
         for subsys in self._subsystems_myproc:
             subsys._setup_vectors(root_vectors, self._excluded_vars_out, self._excluded_vars_in)
 
     def _setup_bounds(self, root_lower, root_upper, resize=False):
+        """
+        Compute the lower and upper bounds vectors and set their values.
+
+        Parameters
+        ----------
+        root_lower : Vector
+            Root vector for the lower bounds vector.
+        root_upper : Vector
+            Root vector for the upper bounds vector.
+        resize : bool
+            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
+        """
         super(Group, self)._setup_bounds(root_lower, root_upper, resize=resize)
 
         for subsys in self._subsystems_myproc:
             subsys._setup_bounds(root_lower, root_upper)
 
     def _setup_scaling(self, root_vectors, resize=False):
+        """
+        Compute all scaling vectors for all vec names.
+
+        Parameters
+        ----------
+        root_vectors : dict of dict of Vector
+            Root vectors: first key is scaling direction; second key is vec_name.
+        resize : bool
+            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
+        """
         super(Group, self)._setup_scaling(root_vectors, resize=resize)
 
         for subsys in self._subsystems_myproc:
             subsys._setup_scaling(root_vectors)
 
     def _setup_transfers(self, recurse=True):
+        """
+        Compute all transfers that are owned by this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Group, self)._setup_transfers()
 
         if recurse:
@@ -724,6 +856,14 @@ class Group(System):
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
 
     def _setup_solvers(self, recurse=True):
+        """
+        Perform setup in all solvers.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Group, self)._setup_solvers()
 
         if recurse:
@@ -731,6 +871,14 @@ class Group(System):
                 subsys._setup_solvers(recurse)
 
     def _setup_partials(self, recurse=True):
+        """
+        Call initialize_partials in components.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(Group, self)._setup_partials()
 
         if recurse:

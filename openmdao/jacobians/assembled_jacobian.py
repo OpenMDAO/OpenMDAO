@@ -73,6 +73,9 @@ class AssembledJacobian(Jacobian):
         # var_indices are the *global* indices for variables on this proc
         system = self._system
 
+        abs2meta_in = system._var_abs2meta['input']
+        abs2meta_out = system._var_abs2meta['output']
+
         self._int_mtx = self.options['matrix_class'](system.comm)
         self._ext_mtx = self.options['matrix_class'](system.comm)
 
@@ -104,8 +107,8 @@ class AssembledJacobian(Jacobian):
                     else:
                         info = SUBJAC_META_DEFAULTS
                         shape = (
-                            system._residuals._views_flat[res_abs_name].size,
-                            system._outputs._views_flat[out_abs_name].size)
+                            np.prod(abs2meta_out[res_abs_name]['shape']),
+                            np.prod(abs2meta_out[out_abs_name]['shape']))
 
                     self._int_mtx._add_submat(
                         abs_key, info, res_offset, out_offset, None, shape)
@@ -119,8 +122,8 @@ class AssembledJacobian(Jacobian):
                     else:
                         info = SUBJAC_META_DEFAULTS
                         shape = (
-                            system._residuals._views_flat[res_abs_name].size,
-                            system._inputs._views_flat[in_abs_name].size)
+                            np.prod(abs2meta_out[res_abs_name]['shape']),
+                            np.prod(abs2meta_in[in_abs_name]['shape']))
 
                     self._keymap[abs_key] = abs_key
 
