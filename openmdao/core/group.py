@@ -44,11 +44,6 @@ class Group(System):
         if not self._ln_solver:
             self._ln_solver = LNRunOnce()
 
-    #
-    #
-    # -------------------------------------------------------------------------------------
-    # Start of reconfigurability changes
-
     def initialize_subsystems(self):
         """
         Add subsystems to this group.
@@ -785,11 +780,6 @@ class Group(System):
                     vectors['input'][vec_name], vectors['output'][vec_name],
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
 
-    # End of reconfigurability changes
-    # -------------------------------------------------------------------------------------
-    #
-    #
-
     def add(self, name, subsys, promotes=None):
         """
         Deprecated version of <Group.add_subsystem>.
@@ -1026,12 +1016,6 @@ class Group(System):
                 return (min_procs, max_procs)
         else:
             return super(Group, self).get_req_procs()
-
-    def initialize_variables(self):
-        """
-        Set up variable name and metadata lists.
-        """
-        pass
 
     def get_subsystem(self, name):
         """

@@ -1002,11 +1002,6 @@ class System(object):
             self._jacobian._system = self
             self._jacobian._initialize()
 
-    # End of reconfigurability changes
-    # -------------------------------------------------------------------------------------
-    #
-    #
-
     def set_initial_values(self):
         """
         Set all input and output variables to their declared initial values.

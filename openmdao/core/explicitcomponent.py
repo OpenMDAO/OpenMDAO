@@ -32,6 +32,14 @@ class ExplicitComponent(Component):
             self._matrix_free = True
 
     def _setup_partials(self, recurse=True):
+        """
+        Call initialize_partials in components.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
         super(ExplicitComponent, self)._setup_partials()
 
         abs2meta_out = self._var_abs2meta['output']
@@ -125,6 +133,32 @@ class ExplicitComponent(Component):
                                                   res_units=res_units, desc=desc, lower=lower,
                                                   upper=upper, ref=ref, ref0=ref0, res_ref=res_ref,
                                                   res_ref0=res_ref0, var_set=var_set)
+
+    def _negate_jac(self):
+        """
+        Negate this component's part of the jacobian.
+        """
+        if self._jacobian._subjacs:
+            for res_name in self._var_abs_names['output']:
+                for in_name in self._var_abs_names['input']:
+                    abs_key = (res_name, in_name)
+                    if abs_key in self._jacobian._subjacs:
+                        self._jacobian._multiply_subjac(abs_key, -1.)
+
+    def _set_partials_meta(self):
+        """
+        Set subjacobian info into our jacobian.
+        """
+        with self.jacobian_context() as J:
+            for abs_key, meta in iteritems(self._subjacs_info):
+                J._set_partials_meta(abs_key, meta, meta['type'] == 'input')
+
+                method = meta.get('method', False)
+                if method and meta['dependent']:
+                    self._approx_schemes[method].add_approximation(abs_key, meta)
+
+        for approx in itervalues(self._approx_schemes):
+            approx._init_approximations()
 
     def _apply_nonlinear(self):
         """
@@ -253,32 +287,6 @@ class ExplicitComponent(Component):
 
             if self._owns_assembled_jac:
                 J._update()
-
-    def _negate_jac(self):
-        """
-        Negate this component's part of the jacobian.
-        """
-        if self._jacobian._subjacs:
-            for res_name in self._var_abs_names['output']:
-                for in_name in self._var_abs_names['input']:
-                    abs_key = (res_name, in_name)
-                    if abs_key in self._jacobian._subjacs:
-                        self._jacobian._multiply_subjac(abs_key, -1.)
-
-    def _set_partials_meta(self):
-        """
-        Set subjacobian info into our jacobian.
-        """
-        with self.jacobian_context() as J:
-            for abs_key, meta in iteritems(self._subjacs_info):
-                J._set_partials_meta(abs_key, meta, meta['type'] == 'input')
-
-                method = meta.get('method', False)
-                if method and meta['dependent']:
-                    self._approx_schemes[method].add_approximation(abs_key, meta)
-
-        for approx in itervalues(self._approx_schemes):
-            approx._init_approximations()
 
     def compute(self, inputs, outputs):
         """

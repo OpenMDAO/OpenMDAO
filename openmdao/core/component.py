@@ -70,11 +70,6 @@ class Component(System):
         self._static_var_rel_names = {'input': [], 'output': []}
         self._static_var_rel2data_io = {}
 
-    #
-    #
-    # -------------------------------------------------------------------------------------
-    # Start of reconfigurability changes
-
     def initialize_variables(self):
         """
         Required method for components to declare inputs and outputs.
@@ -236,11 +231,6 @@ class Component(System):
         super(Component, self)._setup_partials()
 
         self.initialize_partials()
-
-    # End of reconfigurability changes
-    # -------------------------------------------------------------------------------------
-    #
-    #
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
                   desc='', var_set=0):
