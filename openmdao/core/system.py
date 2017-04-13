@@ -21,8 +21,6 @@ from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
 from openmdao.recorders.recording_manager import RecordingManager
 
-from openmdao.recorders.recording_manager import RecordingManager
-
 
 # This is for storing various data mapped to var pathname
 PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
