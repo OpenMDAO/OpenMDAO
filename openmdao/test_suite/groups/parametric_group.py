@@ -31,7 +31,8 @@ class ParametericTestGroup(Group):
         self.default_params = {
             'vector_class': ['default', 'petsc'],
             'global_jac': [True, False],
-            'jacobian_type': ['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
+            'jacobian_type': ['matvec', 'dense', 'sparse-coo', 'sparse-csr',
+                              'sparse-csc'],
         }
 
         super(ParametericTestGroup, self).__init__(**kwargs)

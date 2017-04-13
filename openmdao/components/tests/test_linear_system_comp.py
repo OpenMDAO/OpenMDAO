@@ -69,7 +69,7 @@ class TestLinearSystem(unittest.TestCase):
             prob.run_model()
             prob.model.run_linearize()
 
-            # prob.check_partial_derivatives()
+            # prob.check_partial_derivs()
 
             # Compare against calculated derivs
             # Ainv = np.linalg.inv(A) # Don't use linalg.inv or a mathematician will die

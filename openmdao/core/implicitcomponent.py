@@ -237,6 +237,11 @@ class ImplicitComponent(Component):
 
             'rev': d_outputs \|-> d_residuals
 
+        Note: this is not the linear solution for the implicit component. We use identity so
+        that simple implicit components can function in a preconditioner under linear gauss-seidel.
+        To correctly solve this component, you should slot a solver in ln_solver or override this
+        method.
+
         Parameters
         ----------
         d_outputs : Vector
@@ -251,7 +256,12 @@ class ImplicitComponent(Component):
         None or bool or (bool, float, float)
             The bool is the failure flag; and the two floats are absolute and relative error.
         """
-        pass
+        if mode == 'fwd':
+            d_outputs.set_vec(d_residuals)
+        elif mode == 'rev':
+            d_residuals.set_vec(d_outputs)
+
+        return False, 0., 0.
 
     def linearize(self, inputs, outputs, jacobian):
         """
@@ -269,3 +279,14 @@ class ImplicitComponent(Component):
             sub-jac components written to jacobian[output_name, input_name]
         """
         pass
+
+    def _list_states(self):
+        """
+        Return list of all states at and below this system.
+
+        Returns
+        -------
+        list
+            List of all states.
+        """
+        return [name for name in self._outputs._names]

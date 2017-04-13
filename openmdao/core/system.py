@@ -13,7 +13,7 @@ import numpy as np
 
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.generalized_dict import GeneralizedDictionary
 from openmdao.utils.units import convert_units
@@ -24,6 +24,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 
 # This is for storing various data mapped to var pathname
 PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
+from openmdao.utils.mpi import MPI
 
 
 class System(object):
@@ -55,8 +56,8 @@ class System(object):
         pointer to the global assembler object.
     _mpi_proc_allocator : <ProcAllocator>
         object that distributes procs among subsystems.
-    _mpi_proc_range : [int, int]
-        indices of procs owned by comm with respect to COMM_WORLD.
+    _mpi_req_procs : (int, int or None)
+        number of min and max procs usable by this system.
     _subsystems_allprocs : [<System>, ...]
         list of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
@@ -64,24 +65,8 @@ class System(object):
     _subsystems_myproc_inds : [int, ...]
         list of indices of subsystems on this proc among all of this system's
         subsystems (subsystems on all of this system's processors).
-    _var_allprocs_pathnames : {'input': [str, ...], 'output': [str, ...]}
-        list of pathnames of all owned variables, not just on current proc.
     _var_allprocs_idx_range : {'input': [int, int], 'output': [int, int]}
         index range of owned variables with respect to all problem variables.
-    _var_allprocs_indices : {'input': dict, 'output': dict}
-        dictionary of global indices keyed by the variable name.
-    _var_myproc_names : {'input': [str, ...], 'output': [str, ...]}
-        list of unpromoted names of owned variables on current proc.
-    _var_myproc_metadata : {'input': list, 'output': list}
-        list of metadata dictionaries of variables that exist on this proc.
-    _var_pathdict : dict
-        maps full variable pathname to local name, index and I/O type
-    _var_name2path : dict
-        maps local var name to full pathname.
-    _var_myproc_indices : {'input': ndarray[:], 'output': ndarray[:]}
-        integer arrays of global indices of variables on this proc.
-    _var_maps : {'input': dict, 'output': dict}
-        dictionary of variable names and their promoted names.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -168,13 +153,12 @@ class System(object):
         self._assembler = None
 
         self._mpi_proc_allocator = DefaultAllocator()
-        self._mpi_proc_range = [0, 1]
+        self._mpi_req_procs = None
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
 
-        self._var_maps = {'input': {}, 'output': {}}
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
         self._manual_connections = {}
@@ -218,8 +202,24 @@ class System(object):
 
         self._rec_mgr = RecordingManager()
 
-    def _setup_processors(self, path, comm, global_dict,
-                          assembler, proc_range):
+    def get_req_procs(self):
+        """
+        Return the min and max MPI processes usable by this System.
+
+        This should be overridden by Components that require more than
+        1 process.
+
+        Returns
+        -------
+        tuple : (int, int or None)
+            A tuple of the form (min_procs, max_procs), indicating the min
+            and max processors usable by this `System`.  max_procs can be None,
+            indicating all available procs can be used.
+        """
+        # by default, systems only require 1 proc
+        return (1, 1)
+
+    def _setup_processors(self, path, comm, global_dict, assembler):
         """
         Recursively split comms and define local subsystems.
 
@@ -227,7 +227,6 @@ class System(object):
             pathname
             comm
             _assembler
-            _mpi_proc_range
             _subsystems_myproc
             _subsystems_myproc_inds
 
@@ -241,14 +240,10 @@ class System(object):
             dictionary with kwargs of all parents assembled in it.
         assembler : Assembler
             pointer to the global assembler object to distribute to everyone.
-        proc_range : [int, int]
-            indices of procs owned by comm with respect to COMM_WORLD.
         """
-        # Set attributes
         self.pathname = '.'.join((path, self.name)) if path else self.name
         self.comm = comm
         self._assembler = assembler
-        self._mpi_proc_range = proc_range
 
         # Add self's kwargs to dictionary of parents' kwargs (already new copy)
         self.metadata._assemble_global_dict(global_dict)
@@ -256,24 +251,10 @@ class System(object):
         # Optional user-defined method
         self.initialize_processors()
 
-        nsub = len(self._subsystems_allprocs)
-        # If this is a group:
-        if nsub > 0:
-            # Call the load balancing algorithm
-            tmp = self._mpi_proc_allocator(nsub, comm, proc_range)
-            sub_inds, sub_comm, sub_proc_range = tmp
-
-            # Define local subsystems
-            self._subsystems_myproc = [self._subsystems_allprocs[ind]
-                                       for ind in sub_inds]
-            self._subsystems_myproc_inds = sub_inds
-
-            # Perform recursion
-            for subsys in self._subsystems_myproc:
-                sub_global_dict = self.metadata._global_dict.copy()
-                subsys._setup_processors(self.pathname, sub_comm,
-                                         sub_global_dict, assembler,
-                                         sub_proc_range)
+        minp, maxp = self._mpi_req_procs
+        if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
+            raise RuntimeError("%s needs %d MPI processes, but was given only %d." %
+                               (self.pathname, minp, comm.size))
 
     def _setup_variables(self, recurse=True):
         """
@@ -289,11 +270,6 @@ class System(object):
         recurse : boolean
             recursion is not performed if traversing up the tree after reconf.
         """
-        # Perform recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_variables()
-
         if overrides_method('initialize_variables', self, System):
             # TODO: we may want to provide a way for component devs to tell
             # the framework that they don't need to re-configure, since the
@@ -314,19 +290,13 @@ class System(object):
             self._rec_mgr.startup()
             self._rec_mgr.record_metadata(self)
 
-    def _setup_variable_indices(self, global_index, recurse=True):
+    def _setup_var_indices(self):
         """
         Define the variable indices and range.
 
         Sets the following attributes:
             _var_allprocs_idx_range
 
-        Parameters
-        ----------
-        global_index : {'input': int, 'output': int}
-            current global variable counter.
-        recurse : boolean
-            recursion is not performed if traversing up the tree after reconf.
         """
         pass
 
@@ -384,6 +354,9 @@ class System(object):
             # vectors['residual']._ivar_map = vectors['output']._ivar_map
 
         # Compute the transfer for this vector set
+        # if vec_name == 'linear':
+        #     self._vector_transfers[vec_name] = self._vector_transfers['nonlinear']
+        # else:
         self._vector_transfers[vec_name] = self._get_transfers(vectors)
 
         # Assign relevant variables IDs array
@@ -571,11 +544,25 @@ class System(object):
             The global jacobian to populate for this system.
         """
         self._jacobian_changed = False
+        if jacobian is not None:
+            # this means that somewhere above us is an AssembledJacobian. If
+            # we have a nonlinear solver that uses derivatives, this is
+            # currently an error if the AssembledJacobian is not a DenseJacobian.
+            # In a future story we'll add support for sparse AssembledJacobians.
+            if (self._nl_solver is not None and
+                self._nl_solver.supports['gradients'] and not
+                    isinstance(jacobian, DenseJacobian)):
+                raise RuntimeError("System '%s' has a solver of type '%s'"
+                                   "but a sparse AssembledJacobian has been set in a "
+                                   "higher level system." %
+                                   (self.pathname,
+                                    self._nl_solver.__class__.__name__))
+            self._owns_assembled_jac = False
 
         if self._owns_assembled_jac:
 
-            # At present, we don't support a AssembledJacobian in a group if any subcomponents
-            # are matrix-free.
+            # At present, we don't support a AssembledJacobian in a group if
+            # any subcomponents are matrix-free.
             for subsys in self.system_iter():
 
                 try:
@@ -620,15 +607,12 @@ class System(object):
         """
         transfer_class = vectors['output'].TRANSFER
 
-        nsub_allprocs = len(self._subsystems_allprocs)
-        var_range = self._var_allprocs_idx_range
-        subsystems_myproc = self._subsystems_myproc
-        subsystems_inds = self._subsystems_myproc_inds
-
         # Call the assembler's transfer setup routine
         compute_transfers = self._assembler._compute_transfers
-        xfer_indices = compute_transfers(nsub_allprocs, var_range,
-                                         subsystems_myproc, subsystems_inds)
+        xfer_indices = compute_transfers(len(self._subsystems_allprocs),
+                                         self._var_allprocs_idx_range,
+                                         self._subsystems_myproc,
+                                         self._subsystems_myproc_inds)
         (xfer_in_inds, xfer_out_inds,
          fwd_xfer_in_inds, fwd_xfer_out_inds,
          rev_xfer_in_inds, rev_xfer_out_inds) = xfer_indices
@@ -651,9 +635,14 @@ class System(object):
                                                     self.comm)
         return transfers
 
-    def _get_maps(self):
+    def _get_maps(self, prom_names):
         """
         Define variable maps based on promotes lists.
+
+        Parameters
+        ----------
+        prom_names : {'input': [], 'output': []}
+            Lists of promoted input and output names.
 
         Returns
         -------
@@ -684,7 +673,6 @@ class System(object):
 
         maps = {'input': {}, 'output': {}}
         gname = self.name + '.' if self.name else ''
-        prom2abs = self._var_allprocs_prom2abs_list
         found = False
 
         promotes = self._var_promotes['any']
@@ -692,6 +680,8 @@ class System(object):
             names, patterns, renames = split_list(promotes)
 
         for typ in ('input', 'output'):
+            pmap = maps[typ]
+
             if promotes:
                 pass
             elif self._var_promotes[typ]:
@@ -699,23 +689,25 @@ class System(object):
             else:
                 names = patterns = renames = ()
 
-            for name in prom2abs[typ]:
-                if name in names:
-                    maps[typ][name] = name
+            for name in prom_names[typ]:
+                if name in pmap:
+                    pass
+                elif name in names:
+                    pmap[name] = name
                     found = True
                 elif name in renames:
-                    maps[typ][name] = renames[name]
+                    pmap[name] = renames[name]
                     found = True
                 else:
                     for pattern in patterns:
                         # if name matches, promote that variable to parent
                         if fnmatchcase(name, pattern):
-                            maps[typ][name] = name
+                            pmap[name] = name
                             found = True
                             break
                     else:
                         # Default: prepend the parent system's name
-                        maps[typ][name] = gname + name if gname else name
+                        pmap[name] = gname + name if gname else name
 
         if not found:
             for io, lst in self._var_promotes.items():
@@ -773,7 +765,6 @@ class System(object):
         for vec in residuals:
             vec._scale(self._scaling_to_phys['residual'])
         if scale_jac:
-            self._jacobian._precompute_iter()
             self._jacobian._scale(self._scaling_to_phys)
 
         yield
@@ -785,7 +776,6 @@ class System(object):
         for vec in residuals:
             vec._scale(self._scaling_to_norm['residual'])
         if scale_jac:
-            self._jacobian._precompute_iter()
             self._jacobian._scale(self._scaling_to_norm)
 
     @contextmanager
@@ -918,7 +908,6 @@ class System(object):
                                "called." % self.pathname)
         oldsys = self._jacobian._system
         self._jacobian._system = self
-        self._jacobian._precompute_iter()
         yield self._jacobian
         self._jacobian._system = oldsys
 
@@ -952,7 +941,6 @@ class System(object):
         for system in self.system_iter(include_self=True, recurse=True):
             if system._owns_assembled_jac:
                 with system.jacobian_context():
-                    system._jacobian._precompute_iter()
                     system._jacobian._scale(scaling)
 
     @property
@@ -1409,10 +1397,16 @@ class System(object):
                 out[name]['size'] = vec[out[name]['name']].size
 
         if recurse:
-            for subsys in self._subsystems_allprocs:
+            for subsys in self._subsystems_myproc:
                 subsys_design_vars = subsys.get_design_vars(recurse=recurse)
                 for key in subsys_design_vars:
                     out[key] = subsys_design_vars[key]
+            if self.comm.size > 1 and self._subsystems_allprocs:
+                iproc = self.comm.rank
+                for rank, all_out in enumerate(self.comm.allgather(out)):
+                    if rank != iproc:
+                        out.update(all_out)
+
         return out
 
     def get_responses(self, recurse=True):
@@ -1450,10 +1444,17 @@ class System(object):
             out[name]['size'] = vec[name].size
 
         if recurse:
-            for subsys in self._subsystems_allprocs:
+            for subsys in self._subsystems_myproc:
                 subsys_responses = subsys.get_responses(recurse=recurse)
                 for key in subsys_responses:
                     out[key] = subsys_responses[key]
+
+            if self.comm.size > 1 and self._subsystems_allprocs:
+                iproc = self.comm.rank
+                for rank, all_out in enumerate(self.comm.allgather(out)):
+                    if rank != iproc:
+                        out.update(all_out)
+
         return out
 
     def get_constraints(self, recurse=True):
@@ -1522,6 +1523,36 @@ class System(object):
         # TODO_RECORDERS
         metadata = None  # ??? Is this correct?
         self._rec_mgr.record_iteration(self, metadata)
+
+    def list_states(self, stream=sys.stdout):
+        """
+        List all states and their values and residuals.
+
+        Parameters
+        ----------
+        stream : output stream, optional
+            Stream to write the state info to. Default is sys.stdout.
+        """
+        outputs = self._outputs
+        resids = self._residuals
+        states = self._list_states()
+
+        pathname = self.pathname
+        if pathname == '':
+            pathname = 'model'
+
+        if states:
+            stream.write("\nStates in %s:\n\n" % pathname)
+            for uname in states:
+                stream.write("%s\n" % uname)
+                stream.write("Value: ")
+                stream.write(str(outputs[uname]))
+                stream.write('\n')
+                stream.write("Residual: ")
+                stream.write(str(resids[uname]))
+                stream.write('\n\n')
+        else:
+            stream.write("\nNo states in %s.\n" % pathname)
 
     def run_solve_nonlinear(self):
         """
@@ -1761,3 +1792,18 @@ class System(object):
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
+
+    def _list_states(self):
+        """
+        Return list of all states at and below this system.
+
+        Returns
+        -------
+        list
+            List of all states.
+        """
+        states = []
+        for subsys in self._subsystems_myproc:
+            states.extend(subsys._list_states())
+
+        return states

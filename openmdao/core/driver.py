@@ -54,25 +54,22 @@ class Driver(object):
         self.options = OptionsDictionary()
 
         # What the driver supports.
-        # Note Driver based class supports setting up problems that use every
-        # feature, but it doesn't do anything except run the model. This is
-        # primarilly for generic testing.
         self.supports = OptionsDictionary()
-        self.supports.declare('inequality_constraints', type_=bool, value=True)
-        self.supports.declare('equality_constraints', type_=bool, value=True)
-        self.supports.declare('linear_constraints', type_=bool, value=True)
-        self.supports.declare('two_sided_constraints', type_=bool, value=True)
-        self.supports.declare('multiple_objectives', type_=bool, value=True)
-        self.supports.declare('integer_design_vars', type_=bool, value=True)
-        self.supports.declare('gradients', type_=bool, value=True)
-        self.supports.declare('active_set', type_=bool, value=True)
+        self.supports.declare('inequality_constraints', type_=bool, value=False)
+        self.supports.declare('equality_constraints', type_=bool, value=False)
+        self.supports.declare('linear_constraints', type_=bool, value=False)
+        self.supports.declare('two_sided_constraints', type_=bool, value=False)
+        self.supports.declare('multiple_objectives', type_=bool, value=False)
+        self.supports.declare('integer_design_vars', type_=bool, value=False)
+        self.supports.declare('gradients', type_=bool, value=False)
+        self.supports.declare('active_set', type_=bool, value=False)
 
         self.iter_count = 0
         self.metadata = None
         self._model_viewer_data = None
 
         # TODO, support these in Openmdao blue
-        # self.supports.declare('integer_design_vars', True)
+        self.supports.declare('integer_design_vars', type_=bool, value=False)
 
         self.fail = False
 
@@ -339,3 +336,45 @@ class Driver(object):
             raise RuntimeError(msg)
 
         return derivs
+
+    def _setup_processors(self, model, comm, global_dict, assembler):
+        """
+        Recursively split comms and define local subsystems.
+
+        Parameters
+        ----------
+        model : <System>
+            top level system driven by this driver.
+        comm : MPI.Comm or <FakeComm>
+            communicator for this system (already split, if applicable).
+        global_dict : dict
+            dictionary with kwargs of all parents assembled in it.
+        assembler : <Assembler>
+            pointer to the global assembler object to distribute to everyone.
+        """
+        #  for most drivers this is just a passthrough to the model, but some,
+        #  e.g., DOEDriver will override and do their own comm splitting before
+        #  passing the comm down to the model.
+        model._setup_processors('', comm, global_dict, assembler)
+
+    def get_req_procs(self, model):
+        """
+        Return min and max MPI processes usable by this Driver for the model.
+
+        This should be overridden by Drivers that can use more processes than
+        the model uses, e.g., DOEDriver.
+
+        Parameters
+        ----------
+        model : <System>
+            Top level <System> that contains the entire model.
+
+        Returns
+        -------
+        tuple : (int, int or None)
+            A tuple of the form (min_procs, max_procs), indicating the min
+            and max processors usable by this `Driver` and the given model.
+            max_procs can be None, indicating all available procs can be used.
+        """
+        model._mpi_req_procs = model.get_req_procs()
+        return model._mpi_req_procs
