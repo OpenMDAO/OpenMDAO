@@ -1,6 +1,7 @@
 """Define the AssembledJacobian class."""
 from __future__ import division
 
+import sys
 import numpy as np
 
 from openmdao.jacobians.jacobian import Jacobian
@@ -102,9 +103,9 @@ class AssembledJacobian(Jacobian):
         for s in self._system.system_iter(local=True, recurse=True,
                                           include_self=True):
 
-            min_res_offset = 999999
+            min_res_offset = sys.maxsize
             max_res_offset = 0
-            min_in_offset = 999999
+            min_in_offset = sys.maxsize
             max_in_offset = 0
 
             for in_abs_name in s._var_abs_names['input']:
