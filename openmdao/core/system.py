@@ -536,7 +536,8 @@ class System(object):
         if jacobian is not None:
             # this means that somewhere above us is an AssembledJacobian. If
             # we have a nonlinear solver that uses derivatives, this is
-            # currently an error.
+            # currently an error if the AssembledJacobian is not a DenseJacobian.
+            # In a future story we'll add support for sparse AssembledJacobians.
             if (self._nl_solver is not None and
                 self._nl_solver.supports['gradients'] and not
                     isinstance(jacobian, DenseJacobian)):
@@ -549,8 +550,8 @@ class System(object):
 
         if self._owns_assembled_jac:
 
-            # At present, we don't support a AssembledJacobian in a group if any subcomponents
-            # are matrix-free.
+            # At present, we don't support a AssembledJacobian in a group if
+            # any subcomponents are matrix-free.
             for subsys in self.system_iter():
 
                 try:
