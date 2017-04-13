@@ -3,7 +3,6 @@ from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
-
 class SubSellar(Group):
 
     def __init__(self, **kwargs):

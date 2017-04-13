@@ -9,7 +9,8 @@ from parameterized import parameterized
 from unittest import SkipTest
 
 from openmdao.core.problem import Problem
-from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, CSRJacobian
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
+                                                  CSRJacobian, CSCJacobian
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.test_suite.groups.cycle_group import CycleGroup
@@ -201,6 +202,8 @@ class ParameterizedInstance(object):
                 prob.model.jacobian = COOJacobian()
             elif jacobian_type == 'sparse-csr':
                 prob.model.jacobian = CSRJacobian()
+            elif jacobian_type == 'sparse-csc':
+                prob.model.jacobian = CSCJacobian()
 
         prob.model.ln_solver = self.linear_solver_class(**self.linear_solver_options)
 
