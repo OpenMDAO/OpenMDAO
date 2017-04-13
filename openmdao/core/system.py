@@ -648,6 +648,11 @@ class System(object):
                 allprocs_abs2idx_byset_t[abs_name] = counter[set_name]
                 counter[set_name] += 1
 
+        # Recursion
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_var_index_maps(recurse)
+
     def _setup_var_sizes(self, recurse=True):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
@@ -740,6 +745,9 @@ class System(object):
         self._outputs = vectors['output']['nonlinear']
         self._residuals = vectors['residual']['nonlinear']
 
+        for subsys in self._subsystems_myproc:
+            subsys._setup_vectors(root_vectors, excl_out, excl_in)
+
     def _setup_bounds(self, root_lower, root_upper, resize=False):
         """
         Compute the lower and upper bounds vectors and set their values.
@@ -780,6 +788,9 @@ class System(object):
                 upper._views[abs_name][:] = np.inf
             else:
                 upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
+
+        for subsys in self._subsystems_myproc:
+            subsys._setup_bounds(root_lower, root_upper)
 
     def _setup_scaling(self, root_vectors, resize=False):
         """
@@ -898,6 +909,9 @@ class System(object):
                 vecs['input', 'norm0'][vec_name]._views[abs_in][:] = -a0 / a1
                 vecs['input', 'norm1'][vec_name]._views[abs_in][:] = 1.0 / a1
 
+        for subsys in self._subsystems_myproc:
+            subsys._setup_scaling(root_vectors)
+
     def _setup_transfers(self, recurse=True):
         """
         Compute all transfers that are owned by this system.
@@ -923,6 +937,10 @@ class System(object):
         if self._ln_solver is not None:
             self._ln_solver._setup_solvers(self, 0)
 
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_solvers(recurse)
+
     def _setup_partials(self, recurse=True):
         """
         Call initialize_partials in components.
@@ -933,6 +951,10 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._subjacs_info = {}
+
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_partials(recurse)
 
     def _setup_jacobians(self, jacobian=None, recurse=True):
         """

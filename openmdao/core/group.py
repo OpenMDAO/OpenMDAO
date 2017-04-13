@@ -327,22 +327,6 @@ class Group(System):
                         else:
                             allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
-    def _setup_var_index_maps(self, recurse=True):
-        """
-        Compute maps from abs var names to their index among allprocs variables in this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        super(Group, self)._setup_var_index_maps()
-
-        # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_var_index_maps(recurse)
-
     def _setup_var_sizes(self, recurse=True):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
@@ -629,60 +613,6 @@ class Group(System):
                 sub_ext_sizes, sub_ext_sizes_byset,
             )
 
-    def _setup_vectors(self, root_vectors, excl_out, excl_in, resize=False):
-        """
-        Compute all vectors for all vec names and assign excluded variables lists.
-
-        Parameters
-        ----------
-        root_vectors : dict of dict of Vector
-            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-        excl_out : dict of set
-            Dictionary of sets of excluded output variable absolute names, keyed by vec_name.
-        excl_in : dict of set
-            Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
-        resize : bool
-            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
-        """
-        super(Group, self)._setup_vectors(root_vectors, excl_out, excl_in, resize=resize)
-
-        for subsys in self._subsystems_myproc:
-            subsys._setup_vectors(root_vectors, self._excluded_vars_out, self._excluded_vars_in)
-
-    def _setup_bounds(self, root_lower, root_upper, resize=False):
-        """
-        Compute the lower and upper bounds vectors and set their values.
-
-        Parameters
-        ----------
-        root_lower : Vector
-            Root vector for the lower bounds vector.
-        root_upper : Vector
-            Root vector for the upper bounds vector.
-        resize : bool
-            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
-        """
-        super(Group, self)._setup_bounds(root_lower, root_upper, resize=resize)
-
-        for subsys in self._subsystems_myproc:
-            subsys._setup_bounds(root_lower, root_upper)
-
-    def _setup_scaling(self, root_vectors, resize=False):
-        """
-        Compute all scaling vectors for all vec names.
-
-        Parameters
-        ----------
-        root_vectors : dict of dict of Vector
-            Root vectors: first key is scaling direction; second key is vec_name.
-        resize : bool
-            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
-        """
-        super(Group, self)._setup_scaling(root_vectors, resize=resize)
-
-        for subsys in self._subsystems_myproc:
-            subsys._setup_scaling(root_vectors)
-
     def _setup_transfers(self, recurse=True):
         """
         Compute all transfers that are owned by this system.
@@ -854,36 +784,6 @@ class Group(System):
                 transfers[vec_name]['rev', isub] = transfer_class(
                     vectors['input'][vec_name], vectors['output'][vec_name],
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
-
-    def _setup_solvers(self, recurse=True):
-        """
-        Perform setup in all solvers.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        super(Group, self)._setup_solvers()
-
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_solvers(recurse)
-
-    def _setup_partials(self, recurse=True):
-        """
-        Call initialize_partials in components.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        super(Group, self)._setup_partials()
-
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_partials(recurse)
 
     # End of reconfigurability changes
     # -------------------------------------------------------------------------------------
