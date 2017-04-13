@@ -225,7 +225,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.run()
 
         ## Make sure check partials handles conversion
-        #data = prob.check_partial_derivatives(out_stream=None)
+        #data = prob.check_partial_derivs(out_stream=None)
 
         #for key1, val1 in iteritems(data):
             #for key2, val2 in iteritems(val1):
@@ -376,7 +376,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.run()
 
         ## Make sure check partials handles conversion
-        #data = prob.check_partial_derivatives(out_stream=None)
+        #data = prob.check_partial_derivs(out_stream=None)
 
         #for key1, val1 in iteritems(data):
             #for key2, val2 in iteritems(val1):

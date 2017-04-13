@@ -7,6 +7,7 @@ import numpy as np
 from openmdao.core.component import Component as BaseComponent
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.name_maps import rel_name2abs_name
 
 
 class Component(BaseComponent):
@@ -408,3 +409,14 @@ class Component(BaseComponent):
             and whose values are ndarrays. None if method is not imeplemented.
         """
         return None
+
+    def _list_states(self):
+        """
+        Return list of all states at and below this system.
+
+        Returns
+        -------
+        list
+            List of all states.
+        """
+        return [rel_name2abs_name(self, name) for name in self._state_names]

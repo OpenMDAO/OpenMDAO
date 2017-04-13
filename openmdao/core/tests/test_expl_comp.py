@@ -1,6 +1,8 @@
 """Simple example demonstrating how to implement an explicit component."""
 from __future__ import division
 
+from six.moves import cStringIO
+
 import unittest
 
 from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp
@@ -78,6 +80,14 @@ class TestExplCompSimple(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp3.area', 'comp1.length'], 2.)
         assert_rel_error(self, total_derivs['comp2.area', 'comp1.width'], 3.)
         assert_rel_error(self, total_derivs['comp3.area', 'comp1.width'], 3.)
+
+        # Piggyback testing of list_states
+
+        stream = cStringIO()
+        prob.model.list_states(stream=stream)
+        content = stream.getvalue()
+
+        self.assertTrue('No states in model' in content)
 
 
 if __name__ == '__main__':

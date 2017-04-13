@@ -1500,8 +1500,8 @@ class System(object):
         stream : output stream, optional
             Stream to write the state info to. Default is sys.stdout.
         """
-        outputs = self.outputs
-        resids = self.resids
+        outputs = self._outputs
+        resids = self._residuals
         states = self._list_states()
 
         pathname = self.pathname
