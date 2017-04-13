@@ -10,7 +10,8 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, CSRJacobian
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
+                                                  CSRJacobian, CSCJacobian
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
@@ -47,7 +48,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         """
         Test the direct solver on a component.
         """
-        for jac in ['dict', 'coo', 'csr', 'dense']:
+        for jac in ['dict', 'coo', 'csr', 'csc', 'dense']:
             prob = Problem(model=ImplComp4Test())
             prob.model.nl_solver = NewtonSolver()
             prob.model.ln_solver = DirectSolver()
@@ -55,14 +56,23 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
 
             if jac == 'dict':
                 pass
-            elif jac == 'coo':
-                prob.model.jacobian = COOJacobian()
             elif jac == 'csr':
                 prob.model.jacobian = CSRJacobian()
+            elif jac == 'csc':
+                prob.model.jacobian = CSCJacobian()
+            elif jac == 'coo':
+                prob.model.jacobian = COOJacobian()
             elif jac == 'dense':
                 prob.model.jacobian = DenseJacobian()
 
             prob.setup(check=False)
+
+            if jac == 'coo':
+                with self.assertRaises(Exception) as context:
+                    prob.run_model()
+                self.assertEqual(str(context.exception),
+                                 "Direct solver is not compatible with mtx type COOMatrix in system ''.")
+                continue
 
             prob.run_model()
             assert_rel_error(self, prob['y'], [-1., 1.])
