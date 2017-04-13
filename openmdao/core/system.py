@@ -529,6 +529,7 @@ class System(object):
     def _setup_procs(self, pathname, comm):
         self.pathname = pathname
         self.comm = comm
+        self._subsystems_proc_range = []
 
         minp, maxp = self._mpi_req_procs
         if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
@@ -706,10 +707,14 @@ class System(object):
                 src_indices = meta_in['src_indices']
 
                 if src_indices is not None:
-                    entries = [list(range(x)) for x in shape_in]
-                    cols = np.vstack(src_indices[i] for i in product(*entries))
-                    dimidxs = [cols[:, i] for i in range(cols.shape[1])]
-                    src_indices = np.ravel_multi_index(dimidxs, shape_out)
+                    if src_indices.ndim != 1:
+                        if len(shape_out) == 1:
+                            src_indices = src_indices.flatten()
+                        else:
+                            entries = [list(range(x)) for x in shape_in]
+                            cols = np.vstack(src_indices[i] for i in product(*entries))
+                            dimidxs = [cols[:, i] for i in range(cols.shape[1])]
+                            src_indices = np.ravel_multi_index(dimidxs, shape_out)
                     if not np.isscalar(ref):
                         ref = ref[src_indices]
                     if not np.isscalar(ref0):
