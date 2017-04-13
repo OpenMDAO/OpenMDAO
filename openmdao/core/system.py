@@ -1506,28 +1506,23 @@ class System(object):
 
     def list_states(self, stream=sys.stdout):
         """
-        Recursively list all states and their initial values.
+        List all states and their values and residuals.
 
         Parameters
         ----------
         stream : output stream, optional
             Stream to write the state info to. Default is sys.stdout.
         """
-
         outputs = self.outputs
         resids = self.resids
-        states = []
-        for uname in outputs:
-            meta = outputs.metadata(uname)
-            if meta.get('state'):
-                states.append(uname)
+        states = self._list_states()
 
         pathname = self.pathname
         if pathname == '':
             pathname = 'model'
+
         if states:
             stream.write("\nStates in %s:\n\n" % pathname)
-            outputs = self.outputs
             for uname in states:
                 stream.write("%s\n" % uname)
                 stream.write("Value: ")
@@ -1715,3 +1710,18 @@ class System(object):
             variable names
         """
         pass
+
+    def _list_states(self):
+        """
+        Return list of all states at and below this system.
+
+        Returns
+        -------
+        list
+            List of all states.
+        """
+        states = []
+        for subsys in self._subsystems_myproc:
+            states.extend(subsys._list_states())
+
+        return states
