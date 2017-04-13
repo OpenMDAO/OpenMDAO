@@ -8,6 +8,7 @@ from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
     NewtonSolver, ExecComp, ScipyIterativeSolver, ImplicitComponent, \
     DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarNoDerivatives, SellarDerivatives, \
      SellarStateConnection
@@ -110,9 +111,10 @@ class TestNewton(unittest.TestCase):
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nl_solver = NewtonSolver()
+        prob.model.ln_solver = LinearBlockGS()
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.model.suppress_solver_output = False
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -279,8 +281,8 @@ class TestNewton(unittest.TestCase):
 
         prob = Problem()
         root = prob.model = Group()
-        root.add_subsystem('comp', CubicImplicit())
         root.add_subsystem('p1', IndepVarComp('x', 17.4))
+        root.add_subsystem('comp', CubicImplicit())
         root.connect('p1.x', 'comp.x')
 
         prob.model.nl_solver = NewtonSolver()
@@ -295,6 +297,198 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], -4.93191510182, .00001)
         self.assertLessEqual(prob.model.nl_solver._iter_count, 4,
                              msg='Should get there pretty quick because of utol.')
+
+    def test_solve_subsystems_basic(self):
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
+    def test_solve_subsystems_internals(self):
+        # Here we test that this feature is doing what it should do by counting the
+        # number of calls in various places.
+
+        class CountNewton(NewtonSolver):
+            """ This version of Newton also counts how many times it runs in total."""
+
+            def __init__(self, **kwargs):
+                super(CountNewton, self).__init__(**kwargs)
+                self.total_count = 0
+
+            def _iter_execute(self):
+                super(CountNewton, self)._iter_execute()
+                self.total_count += 1
+
+        class CountDS(DirectSolver):
+            """ This version of Newton also counts how many times it linearizes"""
+
+            def __init__(self, **kwargs):
+                super(DirectSolver, self).__init__(**kwargs)
+                self.lin_count = 0
+
+            def _linearize(self):
+                super(CountDS, self)._linearize()
+                self.lin_count += 1
+
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+        # each SubSellar group converges itself
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = CountNewton()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = CountDS()  # used for derivatives
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = CountNewton()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        # Enfore behavior: max_sub_solves = 0 means we run once during init
+
+        model.nl_solver.options['maxiter'] = 5
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 0
+        prob.model.suppress_solver_output = True
+
+        prob.setup()
+        prob.run_model()
+
+        # Verifying subsolvers ran
+        self.assertEqual(g1.nl_solver.total_count, 2)
+        self.assertEqual(g2.nl_solver.total_count, 2)
+        self.assertEqual(g1.ln_solver.lin_count, 3)
+
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+        # each SubSellar group converges itself
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = CountNewton()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = CountDS()  # used for derivatives
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = CountNewton()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        # Enforce Behavior: baseline
+
+        model.nl_solver.options['maxiter'] = 5
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 5
+        prob.model.suppress_solver_output = True
+
+        prob.setup()
+        prob.run_model()
+
+        # Verifying subsolvers ran
+        self.assertEqual(g1.nl_solver.total_count, 5)
+        self.assertEqual(g2.nl_solver.total_count, 5)
+        self.assertEqual(g1.ln_solver.lin_count, 8)
+
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+        # each SubSellar group converges itself
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = CountNewton()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = CountDS()  # used for derivatives
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = CountNewton()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        # Enfore behavior: max_sub_solves = 1 means we run during init and first iteration of iter_execute
+
+        model.nl_solver.options['maxiter'] = 5
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 1
+        prob.model.suppress_solver_output = True
+
+        prob.setup()
+        prob.run_model()
+
+        # Verifying subsolvers ran
+        self.assertEqual(g1.nl_solver.total_count, 4)
+        self.assertEqual(g2.nl_solver.total_count, 4)
+        self.assertEqual(g1.ln_solver.lin_count, 6)
+
+    def test_maxiter_one(self):
+        # Fix bug when maxiter was set to 1.
+        # This bug caused linearize to run before apply in this case.
+
+        class ImpComp(ImplicitComponent):
+
+            def initialize_variables(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+                self.applied = False
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = np.exp(outputs['x']) - \
+                    inputs['a']**2 * outputs['x']**2
+                self.applied = True
+
+            def solve_nonlinear(self, inputs, outputs):
+                pass
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = np.exp(outputs['x']) - \
+                    2 * inputs['a']**2 * outputs['x']
+                jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
+
+                if not self.applied:
+                    raise RuntimeError("Bug! Linearize called before Apply!")
+
+        prob = Problem()
+        root = prob.model = Group()
+        root.add_subsystem('p1', IndepVarComp('a', 1.0))
+        root.add_subsystem('comp', ImpComp())
+        root.connect('p1.a', 'comp.a')
+
+        root.nl_solver = NewtonSolver()
+        root.nl_solver.options['maxiter'] = 1
+        root.suppress_solver_output = True
+
+        prob.setup()
+        prob.run_model()
 
 
 class TestNewtonFeatures(unittest.TestCase):
@@ -370,6 +564,29 @@ class TestNewtonFeatures(unittest.TestCase):
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_feature_max_sub_solves(self):
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 0
+
+        prob.setup()
+        prob.run_model()
 
 if __name__ == "__main__":
     unittest.main()

@@ -137,9 +137,16 @@ class ImplicitComponent(Component):
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
-    def _linearize(self):
+    def _linearize(self, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
+
+        Parameters
+        ----------
+        do_nl : boolean
+            Flag indicating if the nonlinear solver should be linearized.
+        do_ln : boolean
+            Flag indicating if the linear solver should be linearized.
         """
         with self.jacobian_context() as J:
             with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
@@ -153,10 +160,10 @@ class ImplicitComponent(Component):
             if self._owns_assembled_jac:
                 J._update()
 
-        if self._nl_solver is not None:
+        if self._nl_solver is not None and do_nl:
             self._nl_solver._linearize()
 
-        if self._ln_solver is not None:
+        if self._ln_solver is not None and do_ln:
             self._ln_solver._linearize()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
@@ -230,6 +237,11 @@ class ImplicitComponent(Component):
 
             'rev': d_outputs \|-> d_residuals
 
+        Note: this is not the linear solution for the implicit component. We use identity so
+        that simple implicit components can function in a preconditioner under linear gauss-seidel.
+        To correctly solve this component, you should slot a solver in ln_solver or override this
+        method.
+
         Parameters
         ----------
         d_outputs : Vector
@@ -244,7 +256,12 @@ class ImplicitComponent(Component):
         None or bool or (bool, float, float)
             The bool is the failure flag; and the two floats are absolute and relative error.
         """
-        pass
+        if mode == 'fwd':
+            d_outputs.set_vec(d_residuals)
+        elif mode == 'rev':
+            d_residuals.set_vec(d_outputs)
+
+        return False, 0., 0.
 
     def linearize(self, inputs, outputs, jacobian):
         """

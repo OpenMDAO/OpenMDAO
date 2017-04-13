@@ -40,7 +40,7 @@ def _is_context_manager(func):
 
     """
     src = inspect.getsource(func)
-    return 'return GeneratorContextManager' in src
+    return 'return GeneratorContextManager' in src or src.startswith('@contextmanager')
 
 
 class ReturnFinder(ast.NodeVisitor):
@@ -358,7 +358,7 @@ class LintTestCase(unittest.TestCase):
             new_failures.append('is missing docstring')
             return
 
-        if not method.__doc__.startswith('\n'):
+        if method.__doc__ is not None and not method.__doc__.startswith('\n'):
             new_failures.append('docstring should start with a new line')
 
         # Check if docstring references another method
@@ -391,7 +391,7 @@ class LintTestCase(unittest.TestCase):
             new_failures.append('is missing docstring')
             return
 
-        if not clss.__doc__.startswith('\n'):
+        if clss.__doc__ is not None and not clss.__doc__.startswith('\n'):
             new_failures.append('docstring should start with a new line')
 
         if new_failures:
