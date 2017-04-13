@@ -521,7 +521,7 @@ class System(object):
         # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
             self._mpi_req_procs = self.get_req_procs()
-            self._setup_procs(*self._get_initial_procs(comm, initial))
+            self._setup_procs(*self._get_initial_procs(comm, initial), global_dict={})
 
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
@@ -554,7 +554,7 @@ class System(object):
         if setup_mode == 'full':
             self.set_initial_values()
 
-    def _setup_procs(self, pathname, comm):
+    def _setup_procs(self, pathname, comm, global_dict):
         """
         Distribute processors and assign pathnames.
 
@@ -564,10 +564,15 @@ class System(object):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
+        global_dict : dict
+            dictionary with kwargs of all parents assembled in it.
         """
         self.pathname = pathname
         self.comm = comm
         self._subsystems_proc_range = []
+
+        # Add self's kwargs to dictionary of parents' kwargs (already new copy)
+        self.metadata._assemble_global_dict(global_dict)
 
         minp, maxp = self._mpi_req_procs
         if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:

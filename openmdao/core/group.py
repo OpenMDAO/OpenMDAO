@@ -50,7 +50,7 @@ class Group(System):
         """
         pass
 
-    def _setup_procs(self, pathname, comm):
+    def _setup_procs(self, pathname, comm, global_dict):
         """
         Distribute processors and assign pathnames.
 
@@ -60,8 +60,10 @@ class Group(System):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
+        global_dict : dict
+            dictionary with kwargs of all parents assembled in it.
         """
-        super(Group, self)._setup_procs(pathname, comm)
+        super(Group, self)._setup_procs(pathname, comm, global_dict)
         subsystems_proc_range = self._subsystems_proc_range
 
         self._subsystems_allprocs = []
@@ -101,7 +103,8 @@ class Group(System):
             else:
                 sub_pathname = subsys.name
 
-            subsys._setup_procs(sub_pathname, sub_comm)
+            sub_global_dict = self.metadata._global_dict.copy()
+            subsys._setup_procs(sub_pathname, sub_comm, sub_global_dict)
 
     def _setup_vars(self, recurse=True):
         """
