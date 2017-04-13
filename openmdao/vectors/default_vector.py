@@ -401,17 +401,6 @@ class DefaultVector(Vector):
             global_sum += np.sum(data**2)
         return global_sum ** 0.5
 
-    def _scale(self, coeffs):
-        """
-        Change the scaling state.
-
-        Parameters
-        ----------
-        coeffs : int ndarray[nvar_myproc, 2]
-            0th and 1st order coefficients for scaling/unscaling.
-        """
-        pass
-
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """
         Enforce lower/upper bounds, backtracking the entire vector together.

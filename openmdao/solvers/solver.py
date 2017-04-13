@@ -28,6 +28,9 @@ class Solver(object):
         number of iterations for the current invocation of the solver.
     options : <OptionsDictionary>
         options dictionary.
+    supports : <OptionsDictionary>
+        options dictionary describing what features are supported by this
+        solver.
     """
 
     SOLVER = 'base_solver'
@@ -56,6 +59,10 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', type_=int, value=1,
                              desc='whether to print output')
+
+        # What the solver supports.
+        self.supports = OptionsDictionary()
+        self.supports.declare('gradients', type_=bool, value=False)
 
         self._declare_options()
         self.options.update(kwargs)
@@ -255,7 +262,7 @@ class NonlinearSolver(Solver):
         float
             error at the first iteration.
         """
-        if self.options['maxiter'] > 1:
+        if self.options['maxiter'] > 0:
             norm = self._iter_get_norm()
         else:
             norm = 1.0

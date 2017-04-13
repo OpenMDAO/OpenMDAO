@@ -8,6 +8,7 @@ from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
+from openmdao.matrices.csc_matrix import CSCMatrix
 
 
 SUBJAC_META_DEFAULTS = {
@@ -22,6 +23,11 @@ SUBJAC_META_DEFAULTS = {
 class AssembledJacobian(Jacobian):
     """
     Assemble dense global <Jacobian>.
+
+    Attributes
+    ----------
+    _view_ranges : dict
+        Maps system pathnames to jacobian sub-view ranges
     """
 
     def __init__(self, **kwargs):
@@ -137,6 +143,8 @@ class AssembledJacobian(Jacobian):
 
                 for in_abs_name in s._var_abs_names['input']:
                     abs_key = (res_abs_name, in_abs_name)
+                    self._keymap[abs_key] = abs_key
+
                     if abs_key in self._subjacs_info:
                         info, shape = self._subjacs_info[abs_key]
                     else:
@@ -177,7 +185,6 @@ class AssembledJacobian(Jacobian):
         in_size = np.sum(sizes['input'][iproc, :])
 
         self._int_mtx._build(out_size, out_size)
-        self._ext_mtx._build(out_size, in_size)
         if self._ext_mtx._submats:
             self._ext_mtx._build(out_size, in_size)
         else:

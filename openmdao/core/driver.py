@@ -41,21 +41,18 @@ class Driver(object):
         self.options = OptionsDictionary()
 
         # What the driver supports.
-        # Note Driver based class supports setting up problems that use every
-        # feature, but it doesn't do anything except run the model. This is
-        # primarily for generic testing.
         self.supports = OptionsDictionary()
-        self.supports.declare('inequality_constraints', type_=bool, value=True)
-        self.supports.declare('equality_constraints', type_=bool, value=True)
-        self.supports.declare('linear_constraints', type_=bool, value=True)
-        self.supports.declare('two_sided_constraints', type_=bool, value=True)
-        self.supports.declare('multiple_objectives', type_=bool, value=True)
-        self.supports.declare('integer_design_vars', type_=bool, value=True)
-        self.supports.declare('gradients', type_=bool, value=True)
-        self.supports.declare('active_set', type_=bool, value=True)
+        self.supports.declare('inequality_constraints', type_=bool, value=False)
+        self.supports.declare('equality_constraints', type_=bool, value=False)
+        self.supports.declare('linear_constraints', type_=bool, value=False)
+        self.supports.declare('two_sided_constraints', type_=bool, value=False)
+        self.supports.declare('multiple_objectives', type_=bool, value=False)
+        self.supports.declare('integer_design_vars', type_=bool, value=False)
+        self.supports.declare('gradients', type_=bool, value=False)
+        self.supports.declare('active_set', type_=bool, value=False)
 
         # TODO, support these in Openmdao blue
-        # self.supports.declare('integer_design_vars', True)
+        self.supports.declare('integer_design_vars', type_=bool, value=False)
 
         self.fail = False
 

@@ -30,8 +30,6 @@ class Jacobian(object):
     _keymap : dict
         Mapping of original (output, input) key to (output, source) in cases
         where the input has src_indices.
-    _iter_list : [(out_name, in_name), ...]
-        List of output-input pairs to iterate over where the keys are absolute names.
     options : <OptionsDictionary>
         Options dictionary.
     """
@@ -52,7 +50,6 @@ class Jacobian(object):
         self._int_mtx = None
         self._ext_mtx = None
         self._keymap = {}
-        self._iter_list = None
 
         self.options = OptionsDictionary()
         self.options.update(kwargs)
@@ -103,23 +100,6 @@ class Jacobian(object):
         elif len(jac) == 3:
             self._subjacs[abs_key][0] *= val
 
-    def _precompute_iter(self):
-        """
-        Cache list of absolute name pairs found in the jacobian for the current System.
-        """
-        system = self._system
-
-        iter_list = []
-        for res_name in system._var_abs_names['output']:
-            for out_name in system._var_abs_names['output']:
-                if (res_name, out_name) in self._subjacs:
-                    iter_list.append((res_name, out_name))
-            for in_name in system._var_abs_names['input']:
-                if (res_name, in_name) in self._subjacs:
-                    iter_list.append((res_name, in_name))
-
-        self._iter_list = iter_list
-
     def __contains__(self, key):
         """
         Return whether there is a subjac for the given promoted or relative name pair.
@@ -134,8 +114,7 @@ class Jacobian(object):
         boolean
             return whether sub-Jacobian has been defined.
         """
-        abs_key = key2abs_key(self._system, key)
-        return abs_key in self._subjacs
+        return key2abs_key(self._system, key) in self._subjacs
 
     def __getitem__(self, key):
         """

@@ -62,6 +62,7 @@ class NewtonSolver(NonlinearSolver):
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
         self.options.declare('max_sub_solves', type_=int, value=10,
                              desc='Maximum number of subsystem solves.')
+        self.supports['gradients'] = True
 
     def _setup_solvers(self, system, depth):
         """
@@ -95,14 +96,6 @@ class NewtonSolver(NonlinearSolver):
             norm.
         """
         system = self._system
-
-        # Hybrid newton support.
-        if self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']:
-            for isub, subsys in enumerate(system._subsystems_allprocs):
-                system._transfer('nonlinear', 'fwd', isub)
-                if subsys in system._subsystems_myproc:
-                    subsys._solve_nonlinear()
-
         system._apply_nonlinear()
         return system._residuals.get_norm()
 
@@ -133,9 +126,20 @@ class NewtonSolver(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
+
+        # Hybrid newton support.
+        if self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']:
+            for isub, subsys in enumerate(system._subsystems_allprocs):
+                system._transfer('nonlinear', 'fwd', isub)
+
+                if subsys in system._subsystems_myproc:
+                    subsys._solve_nonlinear()
+            system._apply_nonlinear()
+
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0
         system._linearize()
+
         self.ln_solver.solve(['linear'], 'fwd')
         if self.linesearch:
             self.linesearch.solve()
