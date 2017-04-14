@@ -39,7 +39,7 @@ class Comp(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['z'] = 3 * inputs['x']
 
-    def compute_reconf_derivs(self, inputs, outputs, jacobian):
+    def compute_partials_derivs(self, inputs, outputs, jacobian):
         jacobian['z', 'x'] = 3.0
 
 
