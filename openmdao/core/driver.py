@@ -6,6 +6,10 @@ from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, update_local_meta
 from openmdao.recorders.recording_manager import RecordingManager
 
+
+from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+# import openmdao.devtools.problem_viewer.problem_viewer
+
 import numpy as np
 
 

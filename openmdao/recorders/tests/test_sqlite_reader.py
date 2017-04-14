@@ -17,7 +17,8 @@ from sqlitedict import SqliteDict
 from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
-from openmdao.api import Problem, Group, IndepVarComp
+from openmdao.core.problem import Problem
+from openmdao.api import Group, IndepVarComp
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.case import Case
@@ -52,9 +53,12 @@ def _setup_test_case(case, record_inputs=True, record_params=True,
 
     prob = Problem()
     prob.model = model = SellarDerivatives()
-    prob.driver.add_recorder(case.recorder)
 
-    # prob.driver = optimizers[optimizer]()
+    optimizer='pyoptsparse'
+
+    prob.driver = optimizers[optimizer]()
+
+    prob.driver.add_recorder(case.recorder)
 
     case.recorder.options['record_desvars'] = True
     case.recorder.options['record_responses'] = True
@@ -75,11 +79,65 @@ def _setup_test_case(case, record_inputs=True, record_params=True,
 
     prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
 
+def _setup_test_case_converge_diverge(case, record_inputs=True, record_params=True,
+                     record_metadata=True, optimizer='pyoptsparse'):
+
+
+
+    prob.driver.add_recorder(case.recorder)
+    case.recorder.options['record_desvars'] = True
+    case.recorder.options['record_responses'] = True
+    case.recorder.options['record_objectives'] = True
+    case.recorder.options['record_constraints'] = True
+
+
+    case.original_path = os.getcwd()
+    os.chdir(case.dir)
+
+    prob.run()
+    prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+
+
+    #     coordinate = [0, 'Driver', (1, )]
+
+    #     expected_resids = [
+    #         ("comp1.y1", 0.0),
+    #         ("comp1.y2", 0.0),
+    #         ("comp2.y1", 0.0),
+    #         ("comp3.y1", 0.0),
+    #         ("comp4.y1", 0.0),
+    #         ("comp4.y2", 0.0),
+    #         ("comp5.y1", 0.0),
+    #         ("comp6.y1", 0.0),
+    #         ("comp7.y1", 0.0),
+    #         ("p.x", 0.0)
+    #     ]
+
+    #     self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, expected_resids),), self.eps)
+
+
 class TestSqliteCaseReader(unittest.TestCase):
 
+    def setup_sellar_model(self):
+        self.prob = Problem()
+        self.prob.model = model = SellarDerivatives()
+
+        optimizer='pyoptsparse'
+        self.prob.driver = optimizers[optimizer]()
+
+        self.prob.model.add_design_var('z')
+        self.prob.model.add_objective('obj')
+        self.prob.model.add_constraint('con1', lower=0)
+        self.prob.model.suppress_solver_output = True
+
+        self.prob.setup(check=False)
+
     def setUp(self):
-        _setup_test_case(self, record_inputs=True,record_params=True, record_metadata=True,
-                         optimizer='scipy')
+        self.dir = mkdtemp()
+        self.filename = os.path.join(self.dir, "sqlite_test")
+        self.recorder = SqliteRecorder(self.filename)
+        self.original_path = os.getcwd()
+        os.chdir(self.dir)
 
     def tearDown(self):
         os.chdir(self.original_path)
@@ -94,19 +152,71 @@ class TestSqliteCaseReader(unittest.TestCase):
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
 
-    def test_format_version(self):
+    def qqqtest_format_version(self):
+        
+        self.setup_sellar_model()
+
+        self.prob.run_driver()
+
+        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+
         print('self.filename', self.filename)
         cr = CaseReader(self.filename)
         self.assertEqual(cr.format_version, format_version,
                          msg='format version not read correctly')
-
-    def test_reader_instantiates(self):
+    
+    def qqqtest_reader_instantiates(self):
         """ Test that CaseReader returns an HDF5CaseReader. """
+
+        self.setup_sellar_model()
+
+        self.prob.run_driver()
+
+        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+
         cr = CaseReader(self.filename)
         self.assertTrue(isinstance(cr, SqliteCaseReader), msg='CaseReader not'
                         ' returning the correct subclass.')
 
     def test_params(self):
+        """ Tests that the reader returns params correctly. """
+
+        self.setup_sellar_model()
+
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+        self.prob.driver.add_recorder(self.recorder)
+
+        self.prob.run_driver()
+
+        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+
+        cr = CaseReader(self.filename)
+        last_case = cr.get_case(-1)
+
+        print('last_case.desvars', last_case.desvars['pz.z'])
+        np.testing.assert_almost_equal(last_case.desvars['pz.z'], [ 5.,  2.],
+                              err_msg='Case reader gives '
+                                  'incorrect Parameter value'
+                                  ' for {0}'.format('pz.z'))
+
+        print('last_case', last_case)
+        last_case_id = cr.list_cases()[-1]
+        n = cr.num_cases
+
+        print('num cases', n)
+        # with SqliteDict(self.filename, 'iterations', flag='r') as db:
+        #     for key in db[last_case_id]['Parameters'].keys():
+        #         val = db[last_case_id]['Parameters'][key]
+        #         np.testing.assert_almost_equal(last_case.parameters[key], val,
+        #                                        err_msg='Case reader gives '
+        #                                            'incorrect Parameter value'
+        #                                            ' for {0}'.format(key))
+
+
+    def qqqtest_ConvergeDiverge(self):
         """ Tests that the reader returns params correctly. """
         cr = CaseReader(self.filename)
         last_case = cr.get_case(-1)
@@ -120,6 +230,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         print('last_case', last_case)
         last_case_id = cr.list_cases()[-1]
         n = cr.num_cases
+
+        print('num cases', n)
         # with SqliteDict(self.filename, 'iterations', flag='r') as db:
         #     for key in db[last_case_id]['Parameters'].keys():
         #         val = db[last_case_id]['Parameters'][key]
@@ -127,6 +239,85 @@ class TestSqliteCaseReader(unittest.TestCase):
         #                                        err_msg='Case reader gives '
         #                                            'incorrect Parameter value'
         #                                            ' for {0}'.format(key))
+
+
+
+
+
+    # def test_root_derivs_array(self):
+    #     prob = Problem()
+    #     prob.root = SellarDerivativesGrouped()
+
+    #     prob.driver = ScipyOptimizer()
+    #     prob.driver.options['optimizer'] = 'SLSQP'
+    #     prob.driver.options['tol'] = 1.0e-8
+    #     prob.driver.options['disp'] = False
+
+    #     prob.driver.add_desvar('z', lower=np.array([-10.0, 0.0]),
+    #                          upper=np.array([10.0, 10.0]))
+    #     prob.driver.add_desvar('x', lower=0.0, upper=10.0)
+
+    #     prob.driver.add_objective('obj')
+    #     prob.driver.add_constraint('con1', upper=0.0)
+    #     prob.driver.add_constraint('con2', upper=0.0)
+
+    #     prob.driver.add_recorder(self.recorder)
+    #     self.recorder.options['record_metadata'] = False
+    #     self.recorder.options['record_derivs'] = True
+    #     prob.setup(check=False)
+
+    #     prob.run()
+
+    #     prob.cleanup()
+
+    #     db = SqliteDict(self.filename, self.tablename_derivs, flag='r')
+    #     J1 = db['rank0:SLSQP|1']['Derivatives']
+
+    #     assert_rel_error(self, J1[0][0], 9.61001155, .00001)
+    #     assert_rel_error(self, J1[0][1], 1.78448534, .00001)
+    #     assert_rel_error(self, J1[0][2], 2.98061392, .00001)
+    #     assert_rel_error(self, J1[1][0], -9.61002285, .00001)
+    #     assert_rel_error(self, J1[1][1], -0.78449158, .00001)
+    #     assert_rel_error(self, J1[1][2], -0.98061433, .00001)
+    #     assert_rel_error(self, J1[2][0], 1.94989079, .00001)
+    #     assert_rel_error(self, J1[2][1], 1.0775421, .00001)
+    #     assert_rel_error(self, J1[2][2], 0.09692762, .00001)
+
+
+
+
+    # def test_only_resids_recorded(self):
+    #     prob = Problem()
+    #     prob.root = ConvergeDiverge()
+    #     prob.driver.add_recorder(self.recorder)
+    #     self.recorder.options['record_params'] = False
+    #     self.recorder.options['record_unknowns'] = False
+    #     self.recorder.options['record_resids'] = True
+    #     prob.setup(check=False)
+
+    #     t0, t1 = run_problem(prob)
+    #     prob.cleanup()  # closes recorders
+
+    #     coordinate = [0, 'Driver', (1, )]
+
+    #     expected_resids = [
+    #         ("comp1.y1", 0.0),
+    #         ("comp1.y2", 0.0),
+    #         ("comp2.y1", 0.0),
+    #         ("comp3.y1", 0.0),
+    #         ("comp4.y1", 0.0),
+    #         ("comp4.y2", 0.0),
+    #         ("comp5.y1", 0.0),
+    #         ("comp6.y1", 0.0),
+    #         ("comp7.y1", 0.0),
+    #         ("p.x", 0.0)
+    #     ]
+
+    #     self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, expected_resids),), self.eps)
+
+
+
+
 
 # @unittest.skipIf(pyOptSparseDriver is None, 'pyOptSparse not available.')
 # @unittest.skipIf(slsqp is None, 'pyOptSparse SLSQP not available.')
