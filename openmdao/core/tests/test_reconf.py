@@ -97,7 +97,9 @@ class Test(unittest.TestCase):
         assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones(3))
         print(p['x'], p['y'], p['z'], totals['y', 'x'].flatten())
 
-        # Finally, setup reconf from root - faster than
+        # Finally, setup reconf from root; size of y = 4
+        # Since we are at the root, calling setup('full') and setup('reconf') have the same effect.
+        # In both cases, variable values are lost so we have to set x=3 again.
         p.model.setup('reconf')
         p['x'] = 3
         p.run_model()
