@@ -117,12 +117,11 @@ def _setup_test_case_converge_diverge(case, record_inputs=True, record_params=Tr
 
 
 class TestSqliteCaseReader(unittest.TestCase):
-
     def setup_sellar_model(self):
         self.prob = Problem()
         self.prob.model = model = SellarDerivatives()
 
-        optimizer='pyoptsparse'
+        optimizer = 'pyoptsparse'
         self.prob.driver = optimizers[optimizer]()
 
         self.prob.model.add_design_var('z')
@@ -131,6 +130,35 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.prob.model.suppress_solver_output = True
 
         self.prob.setup(check=False)
+
+
+    def setup_sellar2_model(self):
+        self.prob = Problem()
+        self.prob.model = model = SellarDerivatives()
+
+        optimizer = 'pyoptsparse'
+        self.prob.driver = optimizers[optimizer]()
+
+        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                   upper=np.array([10.0, 10.0]))
+        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
+        self.prob.model.add_objective('obj')
+        self.prob.model.add_constraint('con1', upper=0.0)
+        self.prob.model.add_constraint('con2', upper=0.0)
+        self.prob.model.suppress_solver_output = True
+
+        #     prob.driver.add_desvar('z', lower=np.array([-10.0, 0.0]),
+        #                            upper=np.array([10.0, 10.0]))
+        #     prob.driver.add_desvar('x', lower=0.0, upper=10.0)
+        #
+        #     prob.driver.add_objective('obj')
+        #     prob.driver.add_constraint('con1', upper=0.0)
+        #     prob.driver.add_constraint('con2', upper=0.0)
+
+
+
+        self.prob.setup(check=False)
+
 
     def setUp(self):
         self.dir = mkdtemp()
@@ -178,7 +206,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertTrue(isinstance(cr, SqliteCaseReader), msg='CaseReader not'
                         ' returning the correct subclass.')
 
-    def test_params(self):
+    def qqqtest_basic_sellar(self):
         """ Tests that the reader returns params correctly. """
 
         self.setup_sellar_model()
@@ -207,13 +235,70 @@ class TestSqliteCaseReader(unittest.TestCase):
         n = cr.num_cases
 
         print('num cases', n)
-        # with SqliteDict(self.filename, 'iterations', flag='r') as db:
-        #     for key in db[last_case_id]['Parameters'].keys():
-        #         val = db[last_case_id]['Parameters'][key]
-        #         np.testing.assert_almost_equal(last_case.parameters[key], val,
-        #                                        err_msg='Case reader gives '
-        #                                            'incorrect Parameter value'
-        #                                            ' for {0}'.format(key))
+
+    def test_basic_sellar2(self):
+        """ Tests that the reader returns params correctly. """
+
+        self.setup_sellar2_model()
+
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+        self.prob.driver.add_recorder(self.recorder)
+
+        self.prob.run_driver()
+
+        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+
+        cr = CaseReader(self.filename)
+        last_case = cr.get_case(-1)
+
+        #     assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        #     assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
+        #     assert_rel_error(self, prob['x'], 0.0, 1e-3)
+
+        print('last_case.desvars', last_case.desvars['pz.z'])
+        np.testing.assert_almost_equal(last_case.desvars['pz.z'], [ 1.9776389,  0.],
+                              err_msg='Case reader gives '
+                                  'incorrect Parameter value'
+                                  ' for {0}'.format('pz.z'))
+        np.testing.assert_almost_equal(last_case.desvars['px.x'], [ 0.0,],
+                              err_msg='Case reader gives '
+                                  'incorrect Parameter value'
+                                  ' for {0}'.format('px.x'))
+
+        print('last_case', last_case)
+        last_case_id = cr.list_cases()[-1]
+        n = cr.num_cases
+
+        print('num cases', n)
+
+
+    # def test_Sellar_SLSQP(self):
+    #
+    #     prob = Problem()
+    #     prob.root = SellarDerivatives()
+    #
+    #     prob.driver = ScipyOptimizer()
+    #     prob.driver.options['optimizer'] = 'SLSQP'
+    #     prob.driver.options['tol'] = 1.0e-8
+    #
+    #     prob.driver.add_desvar('z', lower=np.array([-10.0, 0.0]),
+    #                            upper=np.array([10.0, 10.0]))
+    #     prob.driver.add_desvar('x', lower=0.0, upper=10.0)
+    #
+    #     prob.driver.add_objective('obj')
+    #     prob.driver.add_constraint('con1', upper=0.0)
+    #     prob.driver.add_constraint('con2', upper=0.0)
+    #     prob.driver.options['disp'] = False
+    #
+    #     prob.setup(check=False)
+    #     prob.run()
+    #
+    #     assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+    #     assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
+    #     assert_rel_error(self, prob['x'], 0.0, 1e-3)
 
 
     def qqqtest_ConvergeDiverge(self):
