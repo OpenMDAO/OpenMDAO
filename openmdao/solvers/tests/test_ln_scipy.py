@@ -50,16 +50,16 @@ class TestScipyIterativeSolver(unittest.TestCase):
             d_outputs.set_const(0.0)
             group.run_solve_linear(['linear'], 'fwd')
             output = d_outputs._data
-            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-            assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+            assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
+            assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
 
             # reverse
             d_outputs.set_const(1.0)
             d_residuals.set_const(0.0)
             group.run_solve_linear(['linear'], 'rev')
             output = d_residuals._data
-            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-            assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+            assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
+            assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
 
     def test_solve_linear_scipy_maxiter(self):
         """Verify that ScipyIterativeSolver abides by the 'maxiter' option."""
@@ -486,8 +486,8 @@ class TestScipyIterativeSolver(unittest.TestCase):
             group.run_solve_linear(['linear'], 'fwd')
 
             output = d_outputs._data
-            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-            assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+            assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
+            assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
 
             self.assertTrue(precon._iter_count > 0)
 
@@ -497,8 +497,8 @@ class TestScipyIterativeSolver(unittest.TestCase):
             group.run_solve_linear(['linear'], 'rev')
 
             output = d_residuals._data
-            assert_rel_error(self, output[0], group.expected_solution[0], 3e-15)
-            assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
+            assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
+            assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
 
             self.assertTrue(precon._iter_count > 0)
 
@@ -514,8 +514,8 @@ class TestScipyIterativeSolver(unittest.TestCase):
             group.run_solve_linear(['linear'], 'fwd')
 
             output = d_outputs._data
-            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-            assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+            assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
+            assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
 
             # reverse
             d_outputs.set_const(1.0)
@@ -524,8 +524,8 @@ class TestScipyIterativeSolver(unittest.TestCase):
             group.run_solve_linear(['linear'], 'rev')
 
             output = d_residuals._data
-            assert_rel_error(self, output[0], group.expected_solution[0], 3e-15)
-            assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
+            assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
+            assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
 
     def test_solve_on_subsystem(self):
         """solve an implicit system with GMRES attached to a subsystem"""
@@ -553,7 +553,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
             # The empty first entry in _data is due to the dummy
             #     variable being in a different variable set not owned by g1
             assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
-            assert_rel_error(self, output[2], g1.expected_solution[1], 1e-15)
+            assert_rel_error(self, output[5], g1.expected_solution[1], 1e-15)
 
         # reverse
         with g1.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
@@ -564,7 +564,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
 
             output = d_residuals._data
             assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
-            assert_rel_error(self, output[2], g1.expected_solution[1], 3e-15)
+            assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
 
 
 class TestScipyIterativeSolverFeature(unittest.TestCase):

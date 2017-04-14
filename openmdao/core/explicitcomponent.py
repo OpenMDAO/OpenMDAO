@@ -31,6 +31,40 @@ class ExplicitComponent(Component):
         if overrides_method('compute_jacvec_product', self, ExplicitComponent):
             self._matrix_free = True
 
+    def _setup_partials(self, recurse=True):
+        """
+        Call initialize_partials in components.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(ExplicitComponent, self)._setup_partials()
+
+        abs2meta_out = self._var_abs2meta['output']
+        abs2prom_out = self._var_abs2prom['output']
+
+        # Note: These declare calls are outside of initialize_partials so that users do not have to
+        # call the super version of initialize_partials. This is still post-initialize_variables.
+        other_names = []
+        for out_abs in self._var_abs_names['output']:
+            meta = abs2meta_out[out_abs]
+            out_name = abs2prom_out[out_abs]
+            size = np.prod(meta['shape'])
+            arange = np.arange(size)
+
+            # No need to FD outputs wrt other outputs
+            abs_key = (out_abs, out_abs)
+            if abs_key in self._subjacs_info:
+                if 'method' in self._subjacs_info[abs_key]:
+                    del self._subjacs_info[abs_key]['method']
+            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
+            for other_name in other_names:
+                self.declare_partials(out_name, other_name, dependent=False)
+                self.declare_partials(other_name, out_name, dependent=False)
+            other_names.append(out_name)
+
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
                    res_ref=None, res_ref0=None, var_set=0):
@@ -100,12 +134,38 @@ class ExplicitComponent(Component):
                                                   upper=upper, ref=ref, ref0=ref0, res_ref=res_ref,
                                                   res_ref0=res_ref0, var_set=var_set)
 
+    def _negate_jac(self):
+        """
+        Negate this component's part of the jacobian.
+        """
+        if self._jacobian._subjacs:
+            for res_name in self._var_abs_names['output']:
+                for in_name in self._var_abs_names['input']:
+                    abs_key = (res_name, in_name)
+                    if abs_key in self._jacobian._subjacs:
+                        self._jacobian._multiply_subjac(abs_key, -1.)
+
+    def _set_partials_meta(self):
+        """
+        Set subjacobian info into our jacobian.
+        """
+        with self.jacobian_context() as J:
+            for abs_key, meta in iteritems(self._subjacs_info):
+                J._set_partials_meta(abs_key, meta, meta['type'] == 'input')
+
+                method = meta.get('method', False)
+                if method and meta['dependent']:
+                    self._approx_schemes[method].add_approximation(abs_key, meta)
+
+        for approx in itervalues(self._approx_schemes):
+            approx._init_approximations()
+
     def _apply_nonlinear(self):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
-                                         residuals=[self._residuals]):
+        with self._unscaled_context(
+                outputs=[self._outputs], residuals=[self._residuals]):
             self._residuals.set_vec(self._outputs)
             self.compute(self._inputs, self._outputs)
             self._residuals -= self._outputs
@@ -124,14 +184,14 @@ class ExplicitComponent(Component):
         float
             relative error.
         """
-        with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
-                                         residuals=[self._residuals]):
+        with self._unscaled_context(
+                outputs=[self._outputs], residuals=[self._residuals]):
             self._residuals.set_const(0.0)
             failed = self.compute(self._inputs, self._outputs)
 
         return bool(failed), 0., 0.
 
-    def _apply_linear(self, vec_names, mode, var_inds=None):
+    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -141,12 +201,15 @@ class ExplicitComponent(Component):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
-        var_inds : [int, int, int, int] or None
-            ranges of variable IDs involved in this matrix-vector product.
-            The ordering is [lb1, ub1, lb2, ub2].
+        scope_out : set or None
+            Set of absolute output names in the scope of this mat-vec product.
+            If None, all are in the scope.
+        scope_in : set or None
+            Set of absolute input names in the scope of this mat-vec product.
+            If None, all are in the scope.
         """
         for vec_name in vec_names:
-            with self._matvec_context(vec_name, var_inds, mode) as vecs:
+            with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
                 # Jacobian and vectors are all scaled, unitless
@@ -154,9 +217,8 @@ class ExplicitComponent(Component):
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
 
                 # Jacobian and vectors are all unscaled, dimensional
-                with self._units_scaling_context(inputs=[self._inputs, d_inputs],
-                                                 outputs=[self._outputs],
-                                                 residuals=[d_residuals]):
+                with self._unscaled_context(
+                        outputs=[self._outputs], residuals=[d_residuals]):
                     d_residuals *= -1.0
                     self.compute_jacvec_product(self._inputs, self._outputs,
                                                 d_inputs, d_residuals, mode)
@@ -186,7 +248,8 @@ class ExplicitComponent(Component):
             d_outputs = self._vectors['output'][vec_name]
             d_residuals = self._vectors['residual'][vec_name]
 
-            with self._units_scaling_context(outputs=[d_outputs], residuals=[d_residuals]):
+            with self._unscaled_context(
+                    outputs=[d_outputs], residuals=[d_residuals]):
                 if mode == 'fwd':
                     d_outputs.set_vec(d_residuals)
                 elif mode == 'rev':
@@ -206,8 +269,8 @@ class ExplicitComponent(Component):
             Flag indicating if the linear solver should be linearized.
         """
         with self.jacobian_context() as J:
-            with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
-                                             residuals=[self._residuals], scale_jac=True):
+            with self._unscaled_context(
+                    outputs=[self._outputs], residuals=[self._residuals]):
                 # Since the residuals are already negated, this call should come before negate_jac
                 # Additionally, computing the approximation before the call to compute_partials
                 # allows users to override FD'd values.
@@ -224,60 +287,6 @@ class ExplicitComponent(Component):
 
             if self._owns_assembled_jac:
                 J._update()
-
-    def _setup_partials(self):
-        """
-        Set up partial derivative sparsity structures and approximation schemes.
-        """
-        self.initialize_partials()
-
-        abs2data = self._var_abs2data_io
-
-        # Note: These declare calls are outside of initialize_partials so that users do not have to
-        # call the super version of initialize_partials. This is still post-initialize_variables.
-        other_names = []
-        for out_abs in self._var_abs_names['output']:
-            meta = abs2data[out_abs]['metadata']
-            out_name = abs2data[out_abs]['prom']
-            size = np.prod(meta['shape'])
-            arange = np.arange(size)
-
-            # No need to FD outputs wrt other outputs
-            abs_key = (out_abs, out_abs)
-            if abs_key in self._subjacs_info:
-                if 'method' in self._subjacs_info[abs_key]:
-                    del self._subjacs_info[abs_key]['method']
-            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
-            for other_name in other_names:
-                self.declare_partials(out_name, other_name, dependent=False)
-                self.declare_partials(other_name, out_name, dependent=False)
-            other_names.append(out_name)
-
-    def _negate_jac(self):
-        """
-        Negate this component's part of the jacobian.
-        """
-        if self._jacobian._subjacs:
-            for res_name in self._var_abs_names['output']:
-                for in_name in self._var_abs_names['input']:
-                    abs_key = (res_name, in_name)
-                    if abs_key in self._jacobian._subjacs:
-                        self._jacobian._multiply_subjac(abs_key, -1.)
-
-    def _set_partials_meta(self):
-        """
-        Set subjacobian info into our jacobian.
-        """
-        with self.jacobian_context() as J:
-            for abs_key, meta in iteritems(self._subjacs_info):
-                J._set_partials_meta(abs_key, meta, meta['type'] == 'input')
-
-                method = meta.get('method', False)
-                if method and meta['dependent']:
-                    self._approx_schemes[method].add_approximation(abs_key, meta)
-
-        for approx in itervalues(self._approx_schemes):
-            approx._init_approximations()
 
     def compute(self, inputs, outputs):
         """

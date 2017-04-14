@@ -28,7 +28,6 @@ setup(name='openmdao',
       packages=[
           'openmdao',
           'openmdao.approximation_schemes',
-          'openmdao.assemblers',
           'openmdao.code_review',
           'openmdao.components',
           'openmdao.core',

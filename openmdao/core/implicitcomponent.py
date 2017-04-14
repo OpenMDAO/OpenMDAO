@@ -32,8 +32,8 @@ class ImplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
-                                         residuals=[self._residuals]):
+        with self._unscaled_context(
+                outputs=[self._outputs], residuals=[self._residuals]):
             self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
     def _solve_nonlinear(self):
@@ -52,7 +52,7 @@ class ImplicitComponent(Component):
         if self._nl_solver is not None:
             return self._nl_solver.solve()
         else:
-            with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs]):
+            with self._unscaled_context(outputs=[self._outputs]):
                 result = self.solve_nonlinear(self._inputs, self._outputs)
 
             if result is None:
@@ -62,7 +62,7 @@ class ImplicitComponent(Component):
             else:
                 return result
 
-    def _apply_linear(self, vec_names, mode, var_inds=None):
+    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -72,12 +72,15 @@ class ImplicitComponent(Component):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
-        var_inds : [int, int, int, int] or None
-            ranges of variable IDs involved in this matrix-vector product.
-            The ordering is [lb1, ub1, lb2, ub2].
+        scope_out : set or None
+            Set of absolute output names in the scope of this mat-vec product.
+            If None, all are in the scope.
+        scope_in : set or None
+            Set of absolute input names in the scope of this mat-vec product.
+            If None, all are in the scope.
         """
         for vec_name in vec_names:
-            with self._matvec_context(vec_name, var_inds, mode) as vecs:
+            with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
                 # Jacobian and vectors are all scaled, unitless
@@ -85,9 +88,8 @@ class ImplicitComponent(Component):
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
 
                 # Jacobian and vectors are all unscaled, dimensional
-                with self._units_scaling_context(inputs=[self._inputs, d_inputs],
-                                                 outputs=[self._outputs, d_outputs],
-                                                 residuals=[d_residuals]):
+                with self._unscaled_context(
+                        outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
                     self.apply_linear(self._inputs, self._outputs,
                                       d_inputs, d_outputs, d_residuals, mode)
 
@@ -121,9 +123,8 @@ class ImplicitComponent(Component):
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
-                with self._units_scaling_context(inputs=[],
-                                                 outputs=[d_outputs],
-                                                 residuals=[d_residuals]):
+                with self._unscaled_context(
+                        outputs=[d_outputs], residuals=[d_residuals]):
                     result = self.solve_linear(d_outputs, d_residuals, mode)
 
                 if result is None:
@@ -149,8 +150,7 @@ class ImplicitComponent(Component):
             Flag indicating if the linear solver should be linearized.
         """
         with self.jacobian_context() as J:
-            with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
-                                             scale_jac=True):
+            with self._unscaled_context(outputs=[self._outputs]):
                 # Computing the approximation before the call to compute_partials allows users to
                 # override FD'd values.
                 for approximation in itervalues(self._approx_schemes):

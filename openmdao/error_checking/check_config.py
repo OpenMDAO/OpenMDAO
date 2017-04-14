@@ -76,29 +76,32 @@ def compute_sys_graph(group, input_srcs, comps_only=False):
     else:
         subsystems = group._subsystems_allprocs
 
-    i_start, i_end = group._var_allprocs_idx_range['input']
-    o_start, o_end = group._var_allprocs_idx_range['output']
+    i_start = group._ext_num_vars['input'][0]
+    i_end = group._ext_num_vars['input'][0] + group._num_var['input']
+    o_start = group._ext_num_vars['output'][0]
+    o_end = group._ext_num_vars['output'][0] + group._num_var['output']
 
     # mapping arrays to find the system ID given the variable ID
-    invar2sys = np.empty(i_end - i_start, dtype=int)
-    outvar2sys = np.empty(o_end - o_start, dtype=int)
+    invar2sys = np.empty(group._num_var['input'], dtype=int)
+    outvar2sys = np.empty(group._num_var['output'], dtype=int)
 
     for i, s in enumerate(subsystems):
-        start, end = s._var_allprocs_idx_range['input']
+        start = s._ext_num_vars['input'][0]
+        end = s._ext_num_vars['input'][0] + s._num_var['input']
         invar2sys[start - i_start:end - i_start] = i
 
-        start, end = s._var_allprocs_idx_range['output']
+        start = s._ext_num_vars['output'][0]
+        end = s._ext_num_vars['output'][0] + s._num_var['output']
         outvar2sys[start - o_start:end - o_start] = i
 
     graph = nx.DiGraph()
 
-    indices = group._assembler._var_allprocs_abs2idx_io
+    indices = group._var_allprocs_abs2idx
     for in_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
-            src_id = indices[src_abs]
-            in_id = indices[in_abs]
+            src_id = indices['output'][src_abs] + group._ext_num_vars['output'][0]
+            in_id = indices['input'][in_abs] + group._ext_num_vars['input'][0]
             if ((o_start <= src_id < o_end) and (i_start <= in_id < i_end)):
-                # offset the ids to index into our var2sys arrays
                 graph.add_edge(subsystems[outvar2sys[src_id - o_start]].pathname,
                                subsystems[invar2sys[in_id - i_start]].pathname)
 
@@ -126,7 +129,7 @@ def get_sccs(group, comps_only=False):
     list of sets of str
         A list of strongly connected components in topological order.
     """
-    graph = compute_sys_graph(group, group._assembler._abs_input2src,
+    graph = compute_sys_graph(group, group._conn_global_abs_in2out,
                               comps_only=comps_only)
 
     # Tarjan's algorithm returns SCCs in reverse topological order, so
@@ -148,8 +151,7 @@ def _check_dataflow(group, logger):
     logger : object
         The object that manages logging output.
     """
-    for system in group.system_iter(include_self=True, recurse=True,
-                                    typ=Group):
+    for system in group.system_iter(include_self=True, recurse=True, typ=Group):
         sccs = get_sccs(system)
         cycles = [sorted(s) for s in sccs if len(s) > 1]
         cycle_idxs = {}
@@ -163,8 +165,7 @@ def _check_dataflow(group, logger):
                 for s in cycle:
                     cycle_idxs[s] = i
 
-        ubcs = _get_out_of_order_subs(system,
-                                      system._assembler._abs_input2src)
+        ubcs = _get_out_of_order_subs(system, system._conn_global_abs_in2out)
 
         for tgt_system, src_systems in sorted(ubcs.items()):
             keep_srcs = []
@@ -203,26 +204,30 @@ def _get_out_of_order_subs(group, input_srcs):
     """
     subsystems = group._subsystems_allprocs
 
-    i_start, i_end = group._var_allprocs_idx_range['input']
-    o_start, o_end = group._var_allprocs_idx_range['output']
+    i_start = group._ext_num_vars['input'][0]
+    i_end = group._ext_num_vars['input'][0] + group._num_var['input']
+    o_start = group._ext_num_vars['output'][0]
+    o_end = group._ext_num_vars['output'][0] + group._num_var['output']
 
     # mapping arrays to find the system ID given the variable ID
     invar2sys = np.empty(i_end - i_start, dtype=int)
     outvar2sys = np.empty(o_end - o_start, dtype=int)
 
     for i, s in enumerate(subsystems):
-        start, end = s._var_allprocs_idx_range['input']
+        start = s._ext_num_vars['input'][0]
+        end = s._ext_num_vars['input'][0] + s._num_var['input']
         invar2sys[start - i_start:end - i_start] = i
 
-        start, end = s._var_allprocs_idx_range['output']
+        start = s._ext_num_vars['output'][0]
+        end = s._ext_num_vars['output'][0] + s._num_var['output']
         outvar2sys[start - o_start:end - o_start] = i
 
-    indices = group._assembler._var_allprocs_abs2idx_io
+    indices = group._var_allprocs_abs2idx
     ubcs = {}
     for in_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
-            src_id = indices[src_abs]
-            in_id = indices[in_abs]
+            src_id = indices['output'][src_abs] + group._ext_num_vars['output'][0]
+            in_id = indices['input'][in_abs] + group._ext_num_vars['input'][0]
             if ((o_start <= src_id < o_end) and (i_start <= in_id < i_end)):
                 # offset the ids to index into our var2sys arrays
                 src_sysID = outvar2sys[src_id - o_start]
@@ -247,11 +252,12 @@ def _check_hanging_inputs(problem, logger):
     logger : object
         The object that managers logging output.
     """
-    input_srcs = problem._assembler._abs_input2src
+    input_srcs = problem.model._conn_global_abs_in2out
 
     hanging = sorted([
-        name for name in problem._assembler._var_allprocs_abs_names['input'] if
-                                                       input_srcs[name] is None
+        name
+        for name in problem.model._var_allprocs_abs_names['input']
+        if name not in input_srcs
     ])
 
     if hanging:

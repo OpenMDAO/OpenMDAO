@@ -73,16 +73,11 @@ class TestNumpyVec(unittest.TestCase):
         self.assertEqual(names, ['v1', 'v2', 'v3', 'v4'])
 
     def test__var_set_IDs(self):
-        set_IDs = self.p._assembler._var_set_IDs['output']
+        set_IDs = self.p.model._var_set2iset['output']
         self.assertEqual(set_IDs[1], 0)
         self.assertEqual(set_IDs[2], 1)
         self.assertEqual(set_IDs[3], 2)
         self.assertEqual(set_IDs[4], 3)
-
-    def test__var_set_indices(self):
-        set_indices = self.p._assembler._var_set_indices['output']
-        array = np.array([[0,0],[1,0],[2,0],[3,0]])
-        assert_rel_error(self, set_indices, array)
 
     def test_transfer(self):
         root = self.p.model
@@ -108,7 +103,7 @@ class TestNumpyVec(unittest.TestCase):
             assert_rel_error(self, comp2._inputs['v3'], 1.0)
             assert_rel_error(self, comp2._inputs['v4'], 1.0)
 
-            root._vector_transfers['nonlinear']['fwd', 0](root._inputs, root._outputs)
+            root._transfer('nonlinear', 'fwd', 0)
 
             assert_rel_error(self, comp1._outputs['v1'], 2.0)
             assert_rel_error(self, comp1._inputs['v2'], 4.0)
@@ -120,7 +115,7 @@ class TestNumpyVec(unittest.TestCase):
             assert_rel_error(self, comp2._inputs['v3'], 1.0)
             assert_rel_error(self, comp2._inputs['v4'], 1.0)
 
-            root._vector_transfers['nonlinear'][None](root._inputs, root._outputs)
+            root._transfer('nonlinear', 'fwd', None)
 
             assert_rel_error(self, comp1._outputs['v1'], 2.0)
             assert_rel_error(self, comp1._inputs['v2'], 4.0)
