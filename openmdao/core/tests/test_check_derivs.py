@@ -194,6 +194,9 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.assertAlmostEqual(abs_error.forward_reverse, 0.)
 
         # Make sure we only FD this twice.
+        # The count is 5 because in check_partial_derivs, there are two calls to apply_nonlinear
+        # when compute the fwd and rev analytic derivatives, then one call to apply_nonlinear
+        # to compute the reference point for FD, then two additional calls for the two inputs.
         comp = model.get_subsystem('units')
         self.assertEqual(comp.run_count, 5)
 
