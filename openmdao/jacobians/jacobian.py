@@ -23,13 +23,6 @@ class Jacobian(object):
         Dictionary of the user-supplied sub-Jacobians keyed by absolute names.
     _subjacs_info : dict
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
-    _int_mtx : <Matrix>
-        Global internal Jacobian.
-    _ext_mtx : <Matrix>
-        Global external Jacobian.
-    _keymap : dict
-        Mapping of original (output, input) key to (output, source) in cases
-        where the input has src_indices.
     options : <OptionsDictionary>
         Options dictionary.
     """
@@ -47,9 +40,6 @@ class Jacobian(object):
 
         self._subjacs = {}
         self._subjacs_info = {}
-        self._int_mtx = None
-        self._ext_mtx = None
-        self._keymap = {}
 
         self.options = OptionsDictionary()
         self.options.update(kwargs)

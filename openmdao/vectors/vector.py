@@ -40,8 +40,9 @@ class Vector(object):
         Set of variables that are relevant in the current context.
     _root_vector : Vector
         Pointer to the vector owned by the root system.
-    _data : list
-        List of the actual allocated data (depends on implementation).
+    _data : {}
+        Dict of the actual allocated data (depends on implementation), keyed
+        by varset name.
     _indices : list
         List of indices mapping the varset-grouped data to the global vector.
     """
@@ -147,11 +148,8 @@ class Vector(object):
         ndarray
             Array combining the data of all the varsets.
         """
-        system = self._system
-        type_ = self._typ
-
         if new_array is None:
-            total_size = np.sum(system._var_sizes[type_][self._iproc, :])
+            total_size = np.sum(self._system._var_sizes[self._typ][self._iproc, :])
             new_array = np.zeros(total_size)
 
         for set_name, data in iteritems(self._data):

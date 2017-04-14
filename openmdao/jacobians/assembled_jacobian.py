@@ -28,6 +28,13 @@ class AssembledJacobian(Jacobian):
     ----------
     _view_ranges : dict
         Maps system pathnames to jacobian sub-view ranges
+    _int_mtx : <Matrix>
+        Global internal Jacobian.
+    _ext_mtx : <Matrix>
+        Global external Jacobian.
+    _keymap : dict
+        Mapping of original (output, input) key to (output, source) in cases
+        where the input has src_indices.
     """
 
     def __init__(self, **kwargs):
@@ -44,6 +51,9 @@ class AssembledJacobian(Jacobian):
                              desc='<Matrix> class to use in this <Jacobian>.')
         self.options.update(kwargs)
         self._view_ranges = {}
+        self._int_mtx = None
+        self._ext_mtx = None
+        self._keymap = {}
 
     def _get_var_range(self, abs_name, type_):
         """
