@@ -122,13 +122,13 @@ class pyOptSparseDriver(Driver):
         self.supports['integer_design_vars'] = False
 
         # User Options
-        self.options.declare('optimizer', value='SLSQP', values=_check_imports(),
+        self.options.declare('optimizer', default='SLSQP', values=_check_imports(),
                              desc='Name of optimizers to use')
-        self.options.declare('title', value='Optimization using pyOpt_sparse',
+        self.options.declare('title', default='Optimization using pyOpt_sparse',
                              desc='Title of this optimization run')
-        self.options.declare('print_results', type_=bool, value=True,
+        self.options.declare('print_results', type_=bool, default=True,
                              desc='Print pyOpt results if True')
-        self.options.declare('gradient method', value='openmdao',
+        self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
 

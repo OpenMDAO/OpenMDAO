@@ -38,10 +38,10 @@ class ScipyIterativeSolver(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('solver', type_=object, value=gmres,
+        self.options.declare('solver', type_=object, default=gmres,
                              desc='function handle for actual solver')
 
-        self.options.declare('restart', value=20, type_=int,
+        self.options.declare('restart', default=20, type_=int,
                              desc='Number of iterations between restarts. Larger values increase '
                                   'iteration cost, but may be necessary for convergence')
 

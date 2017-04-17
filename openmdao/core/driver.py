@@ -2,7 +2,7 @@
 
 from six import iteritems
 
-from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary
 
 
 class Driver(object):
@@ -42,17 +42,17 @@ class Driver(object):
 
         # What the driver supports.
         self.supports = OptionsDictionary()
-        self.supports.declare('inequality_constraints', type_=bool, value=False)
-        self.supports.declare('equality_constraints', type_=bool, value=False)
-        self.supports.declare('linear_constraints', type_=bool, value=False)
-        self.supports.declare('two_sided_constraints', type_=bool, value=False)
-        self.supports.declare('multiple_objectives', type_=bool, value=False)
-        self.supports.declare('integer_design_vars', type_=bool, value=False)
-        self.supports.declare('gradients', type_=bool, value=False)
-        self.supports.declare('active_set', type_=bool, value=False)
+        self.supports.declare('inequality_constraints', type_=bool, default=False)
+        self.supports.declare('equality_constraints', type_=bool, default=False)
+        self.supports.declare('linear_constraints', type_=bool, default=False)
+        self.supports.declare('two_sided_constraints', type_=bool, default=False)
+        self.supports.declare('multiple_objectives', type_=bool, default=False)
+        self.supports.declare('integer_design_vars', type_=bool, default=False)
+        self.supports.declare('gradients', type_=bool, default=False)
+        self.supports.declare('active_set', type_=bool, default=False)
 
         # TODO, support these in Openmdao blue
-        self.supports.declare('integer_design_vars', type_=bool, value=False)
+        self.supports.declare('integer_design_vars', type_=bool, default=False)
 
         self.fail = False
 

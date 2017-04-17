@@ -43,9 +43,7 @@ class CycleGroup(ParametericTestGroup):
     Group with a cycle. Derivatives and values are known.
     """
 
-    def __init__(self, **kwargs):
-        super(CycleGroup, self).__init__(**kwargs)
-
+    def initialize(self):
         self.default_params.update({
             'component_class': ['explicit', 'deprecated'],
             'connection_type': ['implicit', 'explicit'],
@@ -56,26 +54,26 @@ class CycleGroup(ParametericTestGroup):
             'var_shape': [(2, 3), (3,)],
         })
 
-        self.metadata.declare('num_comp', type_=int, value=2,
+        self.metadata.declare('num_comp', type_=int, default=2,
                               desc='Total number of components')
-        self.metadata.declare('num_var', type_=int, value=1,
+        self.metadata.declare('num_var', type_=int, default=1,
                               desc='Number of variables per component')
-        self.metadata.declare('var_shape', value=(3,),
+        self.metadata.declare('var_shape', default=(3,),
                               desc='Shape of each variable')
-        self.metadata.declare('connection_type', type_=str, value='explicit',
+        self.metadata.declare('connection_type', type_=str, default='explicit',
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
-        self.metadata.declare('component_class', type_=str, value='explicit',
+        self.metadata.declare('component_class', type_=str, default='explicit',
                               values=['explicit', 'deprecated'],
                               desc='Component class to instantiate')
-        self.metadata.declare('jacobian_type', value='matvec',
+        self.metadata.declare('jacobian_type', default='matvec',
                               values=['matvec', 'dense', 'sparse-coo',
                                       'sparse-csr', 'sparse-csc'],
                               desc='method of assembling derivatives')
-        self.metadata.declare('partial_type', value='array',
+        self.metadata.declare('partial_type', default='array',
                               values=['array', 'sparse', 'aij'],
                               desc='type of partial derivatives')
-        self.metadata.declare('finite_difference', value=False,
+        self.metadata.declare('finite_difference', default=False,
                               type_=bool,
                               desc='If the derivatives should be finite differenced.')
 

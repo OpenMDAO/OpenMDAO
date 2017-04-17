@@ -72,13 +72,25 @@ class Component(System):
 
     def initialize_variables(self):
         """
-        Required method for components to declare inputs and outputs.
+        Required method to declare inputs and outputs.
 
         Available attributes:
             name
             pathname
             comm
-            metadata (local and global)
+            metadata
+        """
+        pass
+
+    def initialize_partials(self):
+        """
+        Optional method to declare Jacobian structure/approximations.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata
         """
         pass
 

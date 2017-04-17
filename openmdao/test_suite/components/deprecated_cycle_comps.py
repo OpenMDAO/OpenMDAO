@@ -65,20 +65,20 @@ class DeprecatedCycleComp(Component):
             self._cycle_names['theta_out'] = 'theta_out'
             self._cycle_promotes_in = self._cycle_promotes_out = []
 
-        self.metadata.declare('jacobian_type', value='matvec',
+        self.metadata.declare('jacobian_type', default='matvec',
                               values=['matvec', 'dense', 'sparse-coo', 'sparse-csr',
                                       'sparse-csc'],
                               desc='method of assembling derivatives')
-        self.metadata.declare('partial_type', value='array',
+        self.metadata.declare('partial_type', default='array',
                               values=['array', 'sparse', 'aij'],
                               desc='type of partial derivatives')
-        self.metadata.declare('num_var', type_=int, value=1,
+        self.metadata.declare('num_var', type_=int, default=1,
                               desc='Number of variables per component')
-        self.metadata.declare('var_shape', type_=tuple, value=(3,),
+        self.metadata.declare('var_shape', type_=tuple, default=(3,),
                               desc='Shape of each variable')
         self.metadata.declare('index', type_=int,
                               desc='Index of the component. Used for testing implicit connections')
-        self.metadata.declare('connection_type', type_=str, value='explicit',
+        self.metadata.declare('connection_type', type_=str, default='explicit',
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
 

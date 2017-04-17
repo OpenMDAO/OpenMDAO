@@ -1,4 +1,4 @@
-from openmdao.api import GeneralizedDictionary, OptionsDictionary
+from openmdao.api import OptionsDictionary
 import unittest
 from six import PY3, assertRegex
 
@@ -9,12 +9,12 @@ class TestOptionsDict(unittest.TestCase):
         self.dict = OptionsDictionary()
 
     def test_type_checking(self):
-        self.dict.declare('test', int, 'Test integer value')
+        self.dict.declare('test', type_=int, desc='Test integer value')
 
         self.dict['test'] = 1
         self.assertEqual(self.dict['test'], 1)
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(TypeError) as context:
             self.dict['test'] = ''
 
         class_or_type = 'class' if PY3 else 'type'
@@ -22,21 +22,48 @@ class TestOptionsDict(unittest.TestCase):
         self.assertEqual(expected_msg, str(context.exception))
 
         # make sure bools work
-        self.dict.declare('flag', value=False, type_=bool)
+        self.dict.declare('flag', default=False, type_=bool)
         self.assertEqual(self.dict['flag'], False)
         self.dict['flag'] = True
         self.assertEqual(self.dict['flag'], True)
+
+    def test_type_and_values(self):
+        # Test with only type_
+        self.dict.declare('test1', type_=int)
+        self.dict['test1'] = 1
+        self.assertEqual(self.dict['test1'], 1)
+
+        # Test with only values
+        self.dict.declare('test2', values=['a', 'b'])
+        self.dict['test2'] = 'a'
+        self.assertEqual(self.dict['test2'], 'a')
+
+        # Test with both type_ and values
+        self.dict.declare('test3', type_=int, values=['a', 'b'])
+        self.dict['test3'] = 1
+        self.assertEqual(self.dict['test3'], 1)
+        self.dict['test3'] = 'a'
+        self.assertEqual(self.dict['test3'], 'a')
+
+    def test_required(self):
+        self.dict.declare('test', required=True)
+
+        with self.assertRaises(RuntimeError) as context:
+            self.dict['test']
+
+        expected_msg = "Entry 'test' is required but has not been set."
+        self.assertEqual(expected_msg, str(context.exception))
 
     def test_unnamed_args(self):
         with self.assertRaises(KeyError) as context:
             self.dict['test'] = 1
 
         # KeyError ends up with an extra set of quotes.
-        expected_msg = "\"Entry 'test' is not declared\""
+        expected_msg = "\"Key 'test' cannot be set because it has not been declared.\""
         self.assertEqual(expected_msg, str(context.exception))
 
     def test_update(self):
-        self.dict.declare('test', object, 'Test value')
+        self.dict.declare('test', default='Test value', type_=object)
 
         obj = object()
         self.dict.update({'test': obj})
@@ -47,7 +74,7 @@ class TestOptionsDict(unittest.TestCase):
             self.dict.update({'test': 2})
 
         # KeyError ends up with an extra set of quotes.
-        expected_msg = "\"Entry '{}' is not declared\"".format('test')
+        expected_msg = "\"Key 'test' cannot be set because it has not been declared.\""
         self.assertEqual(expected_msg, str(context.exception))
 
     def test_get_missing(self):
@@ -61,52 +88,17 @@ class TestOptionsDict(unittest.TestCase):
         obj_def = object()
         obj_new = object()
 
-        self.dict.declare('test', object, value=obj_def)
+        self.dict.declare('test', default=obj_def, type_=object)
 
         self.assertIs(self.dict['test'], obj_def)
 
         self.dict['test'] = obj_new
         self.assertIs(self.dict['test'], obj_new)
 
-    def test_get_missing_default(self):
-        self.dict.declare('test', object)
-
-        with self.assertRaises(KeyError) as context:
-            self.dict['test']
-
-        expected_msg = "\"Entry 'test' has no default\""
-        self.assertEqual(expected_msg, str(context.exception))
-
-    def test_assemble_global(self):
-        parent_dict = OptionsDictionary()
-        parent_dict.declare('test', object)
-        parent_dict.declare('test2', object)
-
-        obj = object()
-        parent_dict['test'] = obj
-        parent_dict['test2'] = obj
-
-        with self.assertRaises(KeyError) as context:
-            self.dict._assemble_global_dict(parent_dict)
-
-        expected_msg = "\"Entry 'test(2)?' is not declared\""
-        assertRegex(self, str(context.exception), expected_msg)
-
-        self.dict.declare('test', object)
-        self.dict.declare('test2', object)
-        self.dict._assemble_global_dict(parent_dict)
-
-        self.assertIs(self.dict._global_dict['test'], obj)
-        obj2 = object()
-        self.dict['test2'] = obj2
-        self.dict._assemble_global_dict(parent_dict)
-
-        self.assertIs(self.dict._global_dict['test2'], obj2)
-
     def test_values(self):
         obj1 = object()
         obj2 = object()
-        self.dict.declare('test', object, values=[obj1, obj2])
+        self.dict.declare('test', values=[obj1, obj2])
 
         self.dict['test'] = obj1
         self.assertIs(self.dict['test'], obj1)
@@ -128,47 +120,8 @@ class TestOptionsDict(unittest.TestCase):
         expected_msg = ("Tried to set 'permanent' on a read-only OptionsDictionary")
         assertRegex(self, str(context.exception), expected_msg)
 
-
-class TestGeneralizedDict(TestOptionsDict):
-    def setUp(self):
-        self.dict = GeneralizedDictionary()
-
-    def test_unnamed_args(self):
-        obj = object()
-        self.dict['test'] = obj
-        self.assertIs(self.dict['test'], obj)
-
-    def test_update_extra(self):
-        obj = object()
-        self.dict.update({'test': obj})
-        self.assertIs(self.dict['test'], obj)
-
-    def test_assemble_global(self):
-        parent_dict = OptionsDictionary()
-        parent_dict.declare('test', object)
-        parent_dict.declare('test2', object)
-
-        obj = object()
-        parent_dict['test'] = obj
-        parent_dict['test2'] = obj
-        self.dict._assemble_global_dict(parent_dict)
-
-        self.assertIs(self.dict._global_dict['test'], obj)
-        obj2 = object()
-        self.dict['test2'] = obj2
-        self.dict._assemble_global_dict(parent_dict)
-
-        self.assertIs(self.dict._global_dict['test2'], obj2)
-
-    def test_default_values(self):
-        self.dict.declare('foo', value=False)
-        self.assertFalse(self.dict['foo'])
-
-        self.dict.declare('foobar', value="barfoo")
-        self.assertEqual(self.dict['foobar'], "barfoo")
-
     def test_bounds(self):
-        self.dict.declare('x', value=1.0, lower=0.0, upper=2.0)
+        self.dict.declare('x', default=1.0, lower=0.0, upper=2.0)
 
         with self.assertRaises(ValueError) as context:
             self.dict['x'] = 3.0
@@ -181,6 +134,7 @@ class TestGeneralizedDict(TestOptionsDict):
 
         expected_msg = ("Value of -3.0 exceeds minimum of 0.0 for entry 'x'")
         assertRegex(self, str(context.exception), expected_msg)
+
 
 if __name__ == "__main__":
     unittest.main()

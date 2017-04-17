@@ -202,10 +202,10 @@ class PetscKSP(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('ksp_type', value='fgmres', values=KSP_TYPES,
+        self.options.declare('ksp_type', default='fgmres', values=KSP_TYPES,
                              desc="KSP algorithm to use. Default is 'fgmres'.")
 
-        self.options.declare('restart', value=1000, type_=int,
+        self.options.declare('restart', default=1000, type_=int,
                              desc='Number of iterations between restarts. Larger values increase '
                              'iteration cost, but may be necessary for convergence')
 
