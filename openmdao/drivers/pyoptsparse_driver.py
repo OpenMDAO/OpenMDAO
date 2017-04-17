@@ -374,6 +374,8 @@ class pyOptSparseDriver(Driver):
 
             # Record after getting obj and constraint to assure they have
             # been gathered in MPI.
+
+            print('in pyoptsparse recording')
             self._rec_mgr.record_iteration(self, metadata)
 
         except Exception as msg:

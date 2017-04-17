@@ -16,8 +16,9 @@ from sqlitedict import SqliteDict
 import numpy as np
 from numpy.testing import assert_allclose
 
-# from openmdao.core.problem import Problem
-from openmdao.recorders.sqlite_recorder import  SqliteRecorder
+from openmdao.core.problem import Problem
+from openmdao.api import SqliteRecorder
+
 # from openmdao.util.record_util import format_iteration_coordinate
 
 from openmdao.recorders.sqlite_recorder import format_version
@@ -26,7 +27,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives
 import warnings
 
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+from openmdao.api import Group, IndepVarComp, ExecComp
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
@@ -86,7 +87,6 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_simple_driver_recording(self):
         prob = Problem()
         model = prob.model = Group()
-
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])

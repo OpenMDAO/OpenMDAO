@@ -89,7 +89,6 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 def _get_viewer_data(problem_or_rootgroup):
     """Get the data needed by the N2 viewer as a dictionary."""
     from openmdao.core.problem import Problem
-
     if isinstance(problem_or_rootgroup, Problem):
         root_group = problem_or_rootgroup.model
     elif isinstance(problem_or_rootgroup, Group):
