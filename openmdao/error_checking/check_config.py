@@ -72,7 +72,7 @@ def compute_sys_graph(group, input_srcs, comps_only=False):
         A directed graph containing names of subsystems and their connections.
     """
     if comps_only:
-        subsystems = list(group.system_iter(recurse=True, typ=Component))
+        subsystems = list(group.system_iter(recurse=True, typ=Component, local=False))
     else:
         subsystems = group._subsystems_allprocs
 

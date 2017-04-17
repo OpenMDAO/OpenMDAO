@@ -15,6 +15,7 @@ except ImportError:
     # Necessary for the file to parse
     h5py = None
 
+# from openmdao.core.problem import Problem
 from openmdao.core.group import Group
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
@@ -99,7 +100,7 @@ def _get_viewer_data(problem_or_rootgroup):
         raise TypeError('get_model_viewer_data only accepts Problems or Groups')
 
     data_dict = {}
-    component_execution_idx = [0] #list so pass by ref
+    component_execution_idx = [0]  # list so pass by ref
     component_execution_orders = {}
     data_dict['tree'] = _get_tree_dict(root_group, component_execution_orders, component_execution_idx)
 

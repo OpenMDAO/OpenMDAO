@@ -110,8 +110,10 @@ class Driver(object):
         self._responses = model.get_responses(recurse=True)
         self._objs = model.get_objectives(recurse=True)
         self._cons = model.get_constraints(recurse=True)
-        self._model_viewer_data = _get_viewer_data(problem)
+
         self._rec_mgr.startup()
+        if (self._rec_mgr._recorders):
+            self._model_viewer_data = _get_viewer_data(problem)
         self._rec_mgr.record_metadata(self)
 
     def get_design_var_values(self):
