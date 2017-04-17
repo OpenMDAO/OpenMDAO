@@ -32,6 +32,8 @@ class DefaultAllocator(ProcAllocator):
             indices of the owned local subsystems.
         sub_comm : MPI.Comm or <FakeComm>
             communicator to pass to the subsystems.
+        sub_proc_range : (int, int)
+            The range of processors that the subcomm owns, among those of comm.
         """
         iproc = comm.rank
         nproc = comm.size
@@ -122,18 +124,21 @@ class DefaultAllocator(ProcAllocator):
         # an entry for each processor it will be given
         # e.g. [0, 1, 1, 1, 1, 2, 2, 3, 3, 3, UND, UND]
         color = np.full(nproc, MPI.UNDEFINED, dtype=int)
+        comm_sizes = np.empty(nproc, int)
         start, end = 0, 0
         for i, b in enumerate(buckets):
             num_procs = b[0]
             end += num_procs
             color[start:end] = i
+            comm_sizes[start:end] = num_procs
             start += num_procs
 
         # create a sub-communicator for each color and
         # get the one assigned to our color/process
         rank_color = color[iproc]
         sub_comm = comm.Split(rank_color)
+        sub_proc_range = (np.sum(comm_sizes[:iproc]), np.sum(comm_sizes[:iproc + 1]))
 
         isubs = [] if sub_comm == MPI.COMM_NULL else buckets[rank_color][1]
 
-        return isubs, sub_comm
+        return isubs, sub_comm, sub_proc_range

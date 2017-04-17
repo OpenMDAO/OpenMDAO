@@ -377,13 +377,8 @@ class LinearSolver(Solver):
             norm.
         """
         system = self._system
-        var_inds = [
-            system._var_allprocs_idx_range['output'][0],
-            system._var_allprocs_idx_range['output'][1],
-            system._var_allprocs_idx_range['output'][0],
-            system._var_allprocs_idx_range['output'][1],
-        ]
-        system._apply_linear(self._vec_names, self._mode, var_inds)
+        scope_out, scope_in = system._get_scope()
+        system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
 
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']

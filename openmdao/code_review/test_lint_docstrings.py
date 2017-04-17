@@ -12,7 +12,6 @@ from six import PY3
 from numpydoc.docscrape import NumpyDocString
 
 directories = [
-    'assemblers',
     'core',
     'jacobians',
     'matrices',

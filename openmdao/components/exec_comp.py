@@ -250,7 +250,7 @@ class ExecComp(ExplicitComponent):
         """
         # our complex step
         step = self.complex_stepsize * 1j
-        out_names = self._var_rel_names['output']
+        out_names = self._var_allprocs_prom2abs_list['output']
 
         for param in inputs:
 

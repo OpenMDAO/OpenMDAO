@@ -434,7 +434,7 @@ class TestDirectSolver(unittest.TestCase):
             # The empty first entry in _data is due to the dummy
             #     variable being in a different variable set not owned by g1
             assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
-            assert_rel_error(self, output[2], g1.expected_solution[1], 1e-15)
+            assert_rel_error(self, output[5], g1.expected_solution[1], 1e-15)
 
         # reverse
         with g1.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
@@ -445,7 +445,7 @@ class TestDirectSolver(unittest.TestCase):
 
             output = d_residuals._data
             assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
-            assert_rel_error(self, output[2], g1.expected_solution[1], 3e-15)
+            assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
 
 
 class TestDirectSolverFeature(unittest.TestCase):

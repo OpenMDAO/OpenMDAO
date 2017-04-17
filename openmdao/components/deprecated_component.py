@@ -43,6 +43,45 @@ class Component(BaseComponent):
                          'backwards compatibility with OpenMDAO <= 1.x as '
                          'this Component class is deprecated')
 
+    def _setup_partials(self, recurse=True):
+        super(Component, self)._setup_partials()
+
+        abs2meta_out = self._var_abs2meta['output']
+        abs2prom_out = self._var_abs2prom['output']
+
+        # Note: These declare calls are outside of initialize_partials so that users do not have to
+        # call the super version of initialize_partials. This is still post-initialize_variables.
+        other_names = []
+        for out_abs in self._var_abs_names['output']:
+            meta = abs2meta_out[out_abs]
+            out_name = abs2prom_out[out_abs]
+            size = np.prod(meta['shape'])
+            arange = np.arange(size)
+
+            # Skip all states. The user declares those derivatives.
+            if out_name in self._state_names:
+                continue
+
+            # No need to FD outputs wrt other outputs
+            abs_key = (out_abs, out_abs)
+            if abs_key in self._subjacs_info:
+                if 'method' in self._subjacs_info[abs_key]:
+                    del self._subjacs_info[abs_key]['method']
+
+            # If our OpenMDAO Alpha component has any states at all, then even the non-state
+            # outputs need to be flipped.
+            if len(self._state_names) > 0:
+                val = -1.0
+            else:
+                val = 1.0
+
+            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=val)
+
+            for other_name in other_names:
+                self.declare_partials(out_name, other_name, dependent=False)
+                self.declare_partials(other_name, out_name, dependent=False)
+            other_names.append(out_name)
+
     def add_param(self, name, val=1.0, **kwargs):
         """
         Add an param variable to the component.
@@ -101,15 +140,15 @@ class Component(BaseComponent):
         """
         Compute residuals.
         """
-        self._inputs._scale(self._scaling_to_phys['input'])
-        self._outputs._scale(self._scaling_to_phys['output'])
-        self._residuals._scale(self._scaling_to_phys['residual'])
+        self._scale_vec(self._inputs, 'input', 'phys')
+        self._scale_vec(self._outputs, 'output', 'phys')
+        self._scale_vec(self._residuals, 'residual', 'phys')
 
         self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
-        self._inputs._scale(self._scaling_to_norm['input'])
-        self._outputs._scale(self._scaling_to_norm['output'])
-        self._residuals._scale(self._scaling_to_norm['residual'])
+        self._scale_vec(self._inputs, 'input', 'norm')
+        self._scale_vec(self._outputs, 'output', 'norm')
+        self._scale_vec(self._residuals, 'residual', 'norm')
 
     def _solve_nonlinear(self):
         """
@@ -127,17 +166,17 @@ class Component(BaseComponent):
         if self._nl_solver is not None:
             self._nl_solver.solve()
         else:
-            self._inputs._scale(self._scaling_to_phys['input'])
-            self._outputs._scale(self._scaling_to_phys['output'])
-            self._residuals._scale(self._scaling_to_phys['residual'])
+            self._scale_vec(self._inputs, 'input', 'phys')
+            self._scale_vec(self._outputs, 'output', 'phys')
+            self._scale_vec(self._residuals, 'residual', 'phys')
 
             self.solve_nonlinear(self._inputs, self._outputs, self._residuals)
 
-            self._inputs._scale(self._scaling_to_norm['input'])
-            self._outputs._scale(self._scaling_to_norm['output'])
-            self._residuals._scale(self._scaling_to_norm['residual'])
+            self._scale_vec(self._inputs, 'input', 'norm')
+            self._scale_vec(self._outputs, 'output', 'norm')
+            self._scale_vec(self._residuals, 'residual', 'norm')
 
-    def _apply_linear(self, vec_names, mode, var_inds=None):
+    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product.
 
@@ -147,21 +186,23 @@ class Component(BaseComponent):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
-        var_inds : [int, int, int, int] or None
-            ranges of variable IDs involved in this matrix-vector product.
-            The ordering is [lb1, ub1, lb2, ub2].
+        scope_out : set or None
+            Set of absolute output names in the scope of this mat-vec product.
+            If None, all are in the scope.
+        scope_in : set or None
+            Set of absolute input names in the scope of this mat-vec product.
+            If None, all are in the scope.
         """
         for vec_name in vec_names:
-            with self._matvec_context(vec_name, var_inds, mode) as vecs:
+            with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
                 with self.jacobian_context():
                     self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                           mode)
 
-                with self._units_scaling_context(inputs=[self._inputs, d_inputs],
-                                                 outputs=[self._outputs, d_outputs],
-                                                 residuals=[d_residuals]):
+                with self._unscaled_context(
+                        outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
 
                     if len(self._state_names) == 0:
                         for name in d_inputs:
@@ -201,8 +242,8 @@ class Component(BaseComponent):
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
-                d_outputs._scale(self._scaling_to_phys['output'])
-                d_residuals._scale(self._scaling_to_phys['residual'])
+                self._scale_vec(d_outputs, 'output', 'phys')
+                self._scale_vec(d_residuals, 'residual', 'phys')
 
             self.solve_linear(self._vectors['output'],
                               self._vectors['residual'],
@@ -219,8 +260,8 @@ class Component(BaseComponent):
                             elif mode == 'rev':
                                 d_residuals[name] = d_outputs[name]
 
-                d_outputs._scale(self._scaling_to_norm['output'])
-                d_residuals._scale(self._scaling_to_norm['residual'])
+                self._scale_vec(d_outputs, 'output', 'norm')
+                self._scale_vec(d_residuals, 'residual', 'norm')
 
             return False, 0., 0.
 
@@ -236,8 +277,8 @@ class Component(BaseComponent):
             Flag indicating if the linear solver should be linearized.
         """
         with self.jacobian_context() as J:
-            with self._units_scaling_context(inputs=[self._inputs], outputs=[self._outputs],
-                                             residuals=[self._residuals], scale_jac=True):
+            with self._unscaled_context(
+                    outputs=[self._outputs], residuals=[self._residuals]):
 
                 # If we are a purely explicit component, then negate constant subjacs (and others
                 # that will get overwritten) back to normal.
@@ -255,46 +296,6 @@ class Component(BaseComponent):
 
             if self._owns_assembled_jac:
                 J._update()
-
-    def _setup_partials(self):
-        """
-        Set up partial derivative sparsity structures and approximation schemes.
-        """
-        abs2data = self._var_abs2data_io
-
-        # Note: These declare calls are outside of initialize_partials so that users do not have to
-        # call the super version of initialize_partials. This is still post-initialize_variables.
-        other_names = []
-        for out_abs in self._var_abs_names['output']:
-
-            meta = abs2data[out_abs]['metadata']
-            out_name = abs2data[out_abs]['prom']
-            size = np.prod(meta['shape'])
-            arange = np.arange(size)
-
-            # Skip all states. The user declares those derivatives.
-            if out_name in self._state_names:
-                continue
-
-            # No need to FD outputs wrt other outputs
-            abs_key = (out_abs, out_abs)
-            if abs_key in self._subjacs_info:
-                if 'method' in self._subjacs_info[abs_key]:
-                    del self._subjacs_info[abs_key]['method']
-
-            # If our OpenMDAO Alpha component has any states at all, then even the non-state
-            # outputs need to be flipped.
-            if len(self._state_names) > 0:
-                val = -1.0
-            else:
-                val = 1.0
-
-            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=val)
-
-            for other_name in other_names:
-                self.declare_partials(out_name, other_name, dependent=False)
-                self.declare_partials(other_name, out_name, dependent=False)
-            other_names.append(out_name)
 
     def _negate_jac(self):
         """

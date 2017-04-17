@@ -70,22 +70,16 @@ class Matrix(object):
         """
         pass
 
-    def _update_submat(self, submats, metadata, key, jac, system):
+    def _update_submat(self, key, jac):
         """
         Update the values of a sub-jacobian.
 
         Parameters
         ----------
-        submats : dict
-            dictionary of sub-jacobian data keyed by (out_ind, in_ind).
-        metadata : dict
-            implementation-specific data for the sub-jacobians.
         key : (int, int)
             the global output and input variable indices.
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
-        system : <System>
-            The System that owns the jacobian.
         """
         pass
 
