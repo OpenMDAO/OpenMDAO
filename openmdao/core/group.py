@@ -1147,7 +1147,7 @@ class Group(System):
                 subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
 
             # Update jacobian
-            if self._owns_assembled_jac:
+            if self._owns_assembled_jac or self._views_assembled_jac:
                 J._update()
 
         if self._nl_solver is not None and do_nl:

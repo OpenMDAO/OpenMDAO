@@ -30,8 +30,8 @@ class AssembledJacobian(Jacobian):
         Maps system pathnames to jacobian sub-view ranges
     _int_mtx : <Matrix>
         Global internal Jacobian.
-    _ext_mtx : <Matrix>
-        Global external Jacobian.
+    _ext_mtx : {str: <Matrix>, ...}
+        External Jacobian for each viewing subsystem.
     _keymap : dict
         Mapping of original (output, input) key to (output, source) in cases
         where the input has src_indices.
@@ -46,13 +46,17 @@ class AssembledJacobian(Jacobian):
         **kwargs : dict
             options dictionary.
         """
+        global Component
+        # avoid circular imports
+        from openmdao.core.component import Component
+        
         super(AssembledJacobian, self).__init__()
         self.options.declare('matrix_class', value=DenseMatrix,
                              desc='<Matrix> class to use in this <Jacobian>.')
         self.options.update(kwargs)
         self._view_ranges = {}
         self._int_mtx = None
-        self._ext_mtx = None
+        self._ext_mtx = {}
         self._keymap = {}
 
     def _get_var_range(self, abs_name, type_):
@@ -94,8 +98,8 @@ class AssembledJacobian(Jacobian):
         abs2meta_in = system._var_abs2meta['input']
         abs2meta_out = system._var_abs2meta['output']
 
-        self._int_mtx = self.options['matrix_class'](system.comm)
-        self._ext_mtx = self.options['matrix_class'](system.comm)
+        self._int_mtx = int_mtx = self.options['matrix_class'](system.comm)
+        ext_mtx = self.options['matrix_class'](system.comm)
 
         out_offsets = {}
         for abs_name in system._var_allprocs_abs_names['output']:
@@ -108,8 +112,6 @@ class AssembledJacobian(Jacobian):
             src_indices_dict[abs_name] = \
                 system._var_abs2meta['input'][abs_name]['src_indices']
 
-        # avoid circular imports
-        from openmdao.core.component import Component
         for s in self._system.system_iter(local=True, recurse=True,
                                           include_self=True):
 
@@ -148,7 +150,7 @@ class AssembledJacobian(Jacobian):
                             np.prod(abs2meta_out[res_abs_name]['shape']),
                             np.prod(abs2meta_out[out_abs_name]['shape']))
 
-                    self._int_mtx._add_submat(
+                    int_mtx._add_submat(
                         abs_key, info, res_offset, out_offset, None, shape)
 
                 for in_abs_name in s._var_abs_names['input']:
@@ -171,7 +173,7 @@ class AssembledJacobian(Jacobian):
                         src_indices = src_indices_dict[in_abs_name]
 
                         if src_indices is None:
-                            self._int_mtx._add_submat(
+                            int_mtx._add_submat(
                                 abs_key, info, res_offset, out_offset, None, shape)
                         else:
                             # need to add an entry for d(output)/d(source)
@@ -179,11 +181,11 @@ class AssembledJacobian(Jacobian):
                             # src_indices
                             abs_key2 = (res_abs_name, out_abs_name)
                             self._keymap[abs_key] = abs_key2
-                            self._int_mtx._add_submat(
+                            int_mtx._add_submat(
                                 abs_key2, info, res_offset, out_offset,
                                 src_indices, shape)
                     else:
-                        self._ext_mtx._add_submat(
+                        ext_mtx._add_submat(
                             abs_key, info, res_offset, in_offsets[in_abs_name], None, shape)
 
             self._view_ranges[s.pathname] = (
@@ -194,11 +196,62 @@ class AssembledJacobian(Jacobian):
         out_size = np.sum(sizes['output'][iproc, :])
         in_size = np.sum(sizes['input'][iproc, :])
 
-        self._int_mtx._build(out_size, out_size)
-        if self._ext_mtx._submats:
-            self._ext_mtx._build(out_size, in_size)
+        int_mtx._build(out_size, out_size)
+        if ext_mtx._submats:
+            ext_mtx._build(out_size, in_size)
         else:
-            self._ext_mtx = None
+            ext_mtx = None
+
+        self._ext_mtx[system.pathname] = ext_mtx
+
+    def _init_view(self, system):
+        """
+        Allocate the global matrices.
+        """
+        abs2meta_in = system._var_abs2meta['input']
+        abs2meta_out = system._var_abs2meta['output']
+
+        ext_mtx = self.options['matrix_class'](system.comm)
+
+        in_offsets = {}
+        src_indices_dict = {}
+        for abs_name in system._var_allprocs_abs_names['input']:
+            in_offsets[abs_name] = self._get_var_range(abs_name, 'input')[0]
+            src_indices_dict[abs_name] = \
+                system._var_abs2meta['input'][abs_name]['src_indices']
+
+        for s in system.system_iter(local=True, recurse=True,
+                                    include_self=True, typ=Component):
+            for res_abs_name in s._var_abs_names['output']:
+                res_offset = self._get_var_range(res_abs_name, 'output')[0]
+
+                for in_abs_name in s._var_abs_names['input']:
+                    abs_key = (res_abs_name, in_abs_name)
+                    self._keymap[abs_key] = abs_key
+
+                    if abs_key in self._subjacs_info:
+                        info, shape = self._subjacs_info[abs_key]
+                    else:
+                        info = SUBJAC_META_DEFAULTS
+                        shape = (np.prod(abs2meta_out[res_abs_name]['shape']),
+                                 np.prod(abs2meta_in[in_abs_name]['shape']))
+
+                    if in_abs_name not in system._conn_global_abs_in2out:
+                        ext_mtx._add_submat(
+                            abs_key, info, res_offset, in_offsets[in_abs_name],
+                            None, shape)
+
+        sizes = system._var_sizes
+        iproc = system.comm.rank
+        out_size = np.sum(sizes['output'][iproc, :])
+        in_size = np.sum(sizes['input'][iproc, :])
+
+        # if ext_mtx._submats:
+        #     ext_mtx._build(out_size, in_size)
+        # else:
+        ext_mtx = None
+
+        self._ext_mtx[system.pathname] = ext_mtx
 
     def _update(self):
         """
@@ -221,8 +274,9 @@ class AssembledJacobian(Jacobian):
 
                     if in_abs_name in system._conn_global_abs_in2out:
                         self._int_mtx._update_submat(self._keymap[abs_key], self._subjacs[abs_key])
-                    elif self._ext_mtx is not None:
-                        self._ext_mtx._update_submat(abs_key, self._subjacs[abs_key])
+                    elif self._ext_mtx[system.pathname] is not None:
+                        self._ext_mtx[system.pathname]._update_submat(abs_key,
+                                                                      self._subjacs[abs_key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """
@@ -240,7 +294,7 @@ class AssembledJacobian(Jacobian):
             'fwd' or 'rev'.
         """
         int_mtx = self._int_mtx
-        ext_mtx = self._ext_mtx
+        ext_mtx = self._ext_mtx[self._system.pathname]
 
         ranges = self._view_ranges[self._system.pathname]
         int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])

@@ -1025,7 +1025,7 @@ class System(object):
 
             for s in self.system_iter(local=True, recurse=True):
                 if s._views_assembled_jac:
-                    pass
+                    self._jacobian._init_view(s)
 
     def set_initial_values(self):
         """
