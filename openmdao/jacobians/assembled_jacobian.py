@@ -294,7 +294,10 @@ class AssembledJacobian(Jacobian):
             'fwd' or 'rev'.
         """
         int_mtx = self._int_mtx
-        ext_mtx = self._ext_mtx[self._system.pathname]
+        if self._system.pathname in self._ext_mtx:
+            ext_mtx = self._ext_mtx[self._system.pathname]
+        else:
+            ext_mtx = None
 
         ranges = self._view_ranges[self._system.pathname]
         int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])

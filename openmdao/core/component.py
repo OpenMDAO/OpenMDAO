@@ -136,7 +136,6 @@ class Component(System):
         allprocs_abs2meta = self._var_allprocs_abs2meta
         abs2meta = self._var_abs2meta
 
-        print("%s setup_var_data" % self.pathname)
         # Compute the prefix for turning rel/prom names into abs names
         if self.pathname is not '':
             prefix = self.pathname + '.'
@@ -154,7 +153,6 @@ class Component(System):
                 data = self._var_rel2data_io[prom_name]
                 metadata = data['metadata']
 
-                if type_ == 'input': print(abs_name)
                 # Compute allprocs_abs_names, abs_names
                 allprocs_abs_names[type_].append(abs_name)
                 abs_names[type_].append(abs_name)
