@@ -38,7 +38,7 @@ class OptionsDictionary(object):
 
         The optional checks consist of ensuring: the value is one of a list of acceptable values,
         the type of value is one of a list of acceptable types, value is not less than lower,
-        and value is not greater than upper.
+        value is not greater than upper, and value satisfies is_valid.
 
         Parameters
         ----------
@@ -51,6 +51,7 @@ class OptionsDictionary(object):
         type_ = self._dict[name]['type_']
         lower = self._dict[name]['lower']
         upper = self._dict[name]['upper']
+        is_valid = self._dict[name]['is_valid']
 
         # If values and type_ are both declared
         if values is not None and type_ is not None:
@@ -76,8 +77,12 @@ class OptionsDictionary(object):
                 msg = ("Value of {} exceeds minimum of {} for entry 'x'")
                 raise ValueError(msg.format(value, lower))
 
+        # General function test
+        if is_valid is not None and not is_valid(value):
+            raise ValueError("Function is_valid returns False for {}.".format(name))
+
     def declare(self, name, default=None, values=None, type_=None, desc='', required=False,
-                upper=None, lower=None):
+                upper=None, lower=None, is_valid=None):
         """
         Declare an option.
 
@@ -105,6 +110,8 @@ class OptionsDictionary(object):
             Maximum allowable value.
         lower : float or None
             Minimum allowable value.
+        is_valid : function or None
+            General check function that returns True if valid.
         """
         if values is not None and not isinstance(values, (set, list, tuple)):
             raise TypeError("'values' must be of type None, list, or tuple - not %s." % values)
@@ -118,6 +125,7 @@ class OptionsDictionary(object):
             'desc': desc,
             'upper': upper,
             'lower': lower,
+            'is_valid': is_valid,
             'has_been_set': not required,  # If not required, has_been_set is True from the getgo
         }
 

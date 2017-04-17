@@ -54,6 +54,17 @@ class TestOptionsDict(unittest.TestCase):
         expected_msg = "Entry 'test' is required but has not been set."
         self.assertEqual(expected_msg, str(context.exception))
 
+    def test_isvalid(self):
+        self.dict.declare('even_test', type_=int, is_valid=lambda x: x%2 == 0)
+        self.dict['even_test'] = 2
+        self.dict['even_test'] = 4
+
+        with self.assertRaises(ValueError) as context:
+            self.dict['even_test'] = 3
+
+        expected_msg = "Function is_valid returns False for {}.".format('even_test')
+        self.assertEqual(expected_msg, str(context.exception))
+
     def test_unnamed_args(self):
         with self.assertRaises(KeyError) as context:
             self.dict['test'] = 1
