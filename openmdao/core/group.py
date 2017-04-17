@@ -77,7 +77,7 @@ class Group(System):
 
         nsub = len(self._subsystems_allprocs)
 
-        req_procs = [s._mpi_req_procs for s in self._subsystems_allprocs]
+        req_procs = [s.get_req_procs() for s in self._subsystems_allprocs]
         # Call the load balancing algorithm
         try:
             sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(req_procs, comm)
@@ -842,7 +842,8 @@ class Group(System):
             enable users to instantiate and add a subsystem at the
             same time, and get the reference back.
         """
-        for sub in self._subsystems_allprocs + self._static_subsystems_allprocs:
+        for sub in chain(self._subsystems_allprocs,
+                         self._static_subsystems_allprocs):
             if name == sub.name:
                 raise RuntimeError("Subsystem name '%s' is already used." %
                                    name)
@@ -984,9 +985,7 @@ class Group(System):
 
                 for sub in chain(self._static_subsystems_allprocs,
                                  self._subsystems_allprocs):
-                    if sub._mpi_req_procs is None:
-                        sub._mpi_req_procs = sub.get_req_procs()
-                    sub_min, sub_max = sub._mpi_req_procs
+                    sub_min, sub_max = sub.get_req_procs()
                     if sub_min > min_procs:
                         min_procs = sub_min
                     if max_procs is not None:
@@ -1008,9 +1007,7 @@ class Group(System):
 
                 for sub in chain(self._static_subsystems_allprocs,
                                  self._subsystems_allprocs):
-                    if sub._mpi_req_procs is None:
-                        sub._mpi_req_procs = sub.get_req_procs()
-                    sub_min, sub_max = sub._mpi_req_procs
+                    sub_min, sub_max = sub.get_req_procs()
                     min_procs = max(min_procs, sub_min)
                     if max_procs is not None:
                         if sub_max is None:
@@ -1038,7 +1035,8 @@ class Group(System):
         """
         system = self
         for subname in name.split('.'):
-            for sub in system._subsystems_allprocs + system._static_subsystems_allprocs:
+            for sub in chain(system._static_subsystems_allprocs,
+                             system._subsystems_allprocs):
                 if sub.name == subname:
                     system = sub
                     break
