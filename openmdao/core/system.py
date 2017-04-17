@@ -573,14 +573,7 @@ class System(object):
         self.comm = comm
         self._subsystems_proc_range = []
 
-<<<<<<< HEAD
-        minp, maxp = self._mpi_req_procs
-=======
-        # Add self's kwargs to dictionary of parents' kwargs (already new copy)
-        self.metadata._assemble_global_dict(global_dict)
-
         minp, maxp = self.get_req_procs()
->>>>>>> ab5aab114167f9ba59c3041363b983789b933c7b
         if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
             raise RuntimeError("%s needs %d MPI processes, but was given only %d." %
                                (self.pathname, minp, comm.size))
