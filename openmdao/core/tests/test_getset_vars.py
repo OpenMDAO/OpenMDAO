@@ -34,15 +34,15 @@ class TestGetSetVariables(unittest.TestCase):
         p['g.c.y'] = 5.0
         self.assertEqual(p['g.c.y'], 5.0)
 
-        with g.nonlinear_vector_context() as (inputs, outputs, residuals):
+        inputs, outputs, residuals = g.get_nonlinear_vectors()
 
-            # inputs
-            inputs['c.x'] = 5.0
-            self.assertEqual(inputs['c.x'], 5.0)
+        # inputs
+        inputs['c.x'] = 5.0
+        self.assertEqual(inputs['c.x'], 5.0)
 
-            # outputs
-            outputs['c.y'] = 5.0
-            self.assertEqual(outputs['c.y'], 5.0)
+        # outputs
+        outputs['c.y'] = 5.0
+        self.assertEqual(outputs['c.y'], 5.0)
 
         with g.jacobian_context() as jac:
 
@@ -85,17 +85,17 @@ class TestGetSetVariables(unittest.TestCase):
         p['y'] = 5.0
         self.assertEqual(p['y'], 5.0)
 
-        with g.nonlinear_vector_context() as (inputs, outputs, residuals):
+        inputs, outputs, residuals = g.get_nonlinear_vectors()
 
-            # inputs
-            inputs['c2.x'] = 5.0
-            self.assertEqual(inputs['c2.x'], 5.0)
+        # inputs
+        inputs['c2.x'] = 5.0
+        self.assertEqual(inputs['c2.x'], 5.0)
 
-            # outputs
-            outputs['c2.y'] = 5.0
-            self.assertEqual(outputs['c2.y'], 5.0)
-            outputs['y'] = 5.0
-            self.assertEqual(outputs['y'], 5.0)
+        # outputs
+        outputs['c2.y'] = 5.0
+        self.assertEqual(outputs['c2.y'], 5.0)
+        outputs['y'] = 5.0
+        self.assertEqual(outputs['y'], 5.0)
 
         with g.jacobian_context() as jac:
 
@@ -141,27 +141,27 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(p['y'], 5.0)
 
         msg = 'Variable name "{}" not found.'
-        with g.nonlinear_vector_context() as (inputs, outputs, residuals):
+        inputs, outputs, residuals = g.get_nonlinear_vectors()
 
-            # inputs
-            with assertRaisesRegex(self, KeyError, msg.format('x')):
-                inputs['x'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg.format('x')):
-                self.assertEqual(inputs['x'], 5.0)
-            with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
-                inputs['g.c.x'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
-                self.assertEqual(inputs['g.c.x'], 5.0)
+        # inputs
+        with assertRaisesRegex(self, KeyError, msg.format('x')):
+            inputs['x'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg.format('x')):
+            self.assertEqual(inputs['x'], 5.0)
+        with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
+            inputs['g.c.x'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
+            self.assertEqual(inputs['g.c.x'], 5.0)
 
-            # outputs
-            with assertRaisesRegex(self, KeyError, msg.format('y')):
-                outputs['y'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg.format('y')):
-                self.assertEqual(outputs['y'], 5.0)
-            with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
-                outputs['g.c.y'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
-                self.assertEqual(outputs['g.c.y'], 5.0)
+        # outputs
+        with assertRaisesRegex(self, KeyError, msg.format('y')):
+            outputs['y'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg.format('y')):
+            self.assertEqual(outputs['y'], 5.0)
+        with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
+            outputs['g.c.y'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
+            self.assertEqual(outputs['g.c.y'], 5.0)
 
         msg = 'Variable name pair \("{}", "{}"\) not found.'
         with g.jacobian_context() as jac:
@@ -209,23 +209,23 @@ class TestGetSetVariables(unittest.TestCase):
 
         msg1 = 'Variable name "{}" not found.'
         msg2 = 'The promoted name "{}" is invalid because it is non-unique.'
-        with g.nonlinear_vector_context() as (inputs, outputs, residuals):
+        inputs, outputs, residuals = g.get_nonlinear_vectors()
 
-            # inputs
-            with assertRaisesRegex(self, KeyError, msg2.format('x')):
-                inputs['x'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg2.format('x')):
-                self.assertEqual(inputs['x'], 5.0)
-            with assertRaisesRegex(self, KeyError, msg1.format('g.c2.x')):
-                inputs['g.c2.x'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg1.format('g.c2.x')):
-                self.assertEqual(inputs['g.c2.x'], 5.0)
+        # inputs
+        with assertRaisesRegex(self, KeyError, msg2.format('x')):
+            inputs['x'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg2.format('x')):
+            self.assertEqual(inputs['x'], 5.0)
+        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.x')):
+            inputs['g.c2.x'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.x')):
+            self.assertEqual(inputs['g.c2.x'], 5.0)
 
-            # outputs
-            with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y')):
-                outputs['g.c2.y'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y')):
-                self.assertEqual(outputs['g.c2.y'], 5.0)
+        # outputs
+        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y')):
+            outputs['g.c2.y'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y')):
+            self.assertEqual(outputs['g.c2.y'], 5.0)
 
         msg1 = 'Variable name pair \("{}", "{}"\) not found.'
         msg2 = 'The promoted name "{}" is invalid because it is non-unique.'

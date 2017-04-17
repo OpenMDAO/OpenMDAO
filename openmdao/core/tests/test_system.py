@@ -26,14 +26,12 @@ class TestSystem(unittest.TestCase):
 
         # Test pre-setup errors
         with self.assertRaises(Exception) as cm:
-            with model.nonlinear_vector_context() as (inputs, outputs, residuals):
-                pass
+            inputs, outputs, residuals = model.get_nonlinear_vectors()
         self.assertEqual(str(cm.exception),
                          "Cannot get vectors because setup has not yet been called.")
 
         with self.assertRaises(Exception) as cm:
-            with model.linear_vector_context('vec') as (d_inputs, d_outputs, d_residuals):
-                pass
+            d_inputs, d_outputs, d_residuals = model.get_linear_vectors('vec')
         self.assertEqual(str(cm.exception),
                          "Cannot get vectors because setup has not yet been called.")
 
@@ -41,52 +39,50 @@ class TestSystem(unittest.TestCase):
         p.run_model()
 
         # Test inputs with original values
-        with model.nonlinear_vector_context() as (inputs, outputs, residuals):
-            self.assertEqual(inputs['G1.G2.C1.a'], 5.)
+        inputs, outputs, residuals = model.get_nonlinear_vectors()
+        self.assertEqual(inputs['G1.G2.C1.a'], 5.)
 
-        with g1.nonlinear_vector_context() as (inputs, outputs, residuals):
-            self.assertEqual(inputs['G2.C1.a'], 5.)
+        inputs, outputs, residuals = g1.get_nonlinear_vectors()
+        self.assertEqual(inputs['G2.C1.a'], 5.)
 
         # Test inputs after setting a new value
-        with g2.nonlinear_vector_context() as (inputs, outputs, residuals):
-            inputs['C1.a'] = -1.
+        inputs, outputs, residuals = g2.get_nonlinear_vectors()
+        inputs['C1.a'] = -1.
 
-        with model.nonlinear_vector_context() as (inputs, outputs, residuals):
-            self.assertEqual(inputs['G1.G2.C1.a'], -1.)
+        inputs, outputs, residuals = model.get_nonlinear_vectors()
+        self.assertEqual(inputs['G1.G2.C1.a'], -1.)
 
-        with g1.nonlinear_vector_context() as (inputs, outputs, residuals):
-            self.assertEqual(inputs['G2.C1.a'], -1.)
+        inputs, outputs, residuals = g1.get_nonlinear_vectors()
+        self.assertEqual(inputs['G2.C1.a'], -1.)
 
         # Test outputs with original values
-        with model.nonlinear_vector_context() as (inputs, outputs, residuals):
-            self.assertEqual(outputs['G1.G2.C1.b'], 10.)
+        inputs, outputs, residuals = model.get_nonlinear_vectors()
+        self.assertEqual(outputs['G1.G2.C1.b'], 10.)
 
-        with g2.nonlinear_vector_context() as (inputs, outputs, residuals):
-            self.assertEqual(outputs['C1.b'], 10.)
+        inputs, outputs, residuals = g2.get_nonlinear_vectors()
 
         # Test outputs after setting a new value
-        with model.nonlinear_vector_context() as (inputs, outputs, residuals):
-            outputs['G1.G2.C1.b'] = 123.
-            self.assertEqual(outputs['G1.G2.C1.b'], 123.)
+        inputs, outputs, residuals = model.get_nonlinear_vectors()
+        outputs['G1.G2.C1.b'] = 123.
+        self.assertEqual(outputs['G1.G2.C1.b'], 123.)
 
-        with g2.nonlinear_vector_context() as (inputs, outputs, residuals):
-            outputs['C1.b'] = 789.
-            self.assertEqual(outputs['C1.b'], 789.)
+        inputs, outputs, residuals = g2.get_nonlinear_vectors()
+        outputs['C1.b'] = 789.
+        self.assertEqual(outputs['C1.b'], 789.)
 
         # Test residuals
-        with model.nonlinear_vector_context() as (inputs, outputs, residuals):
-            residuals['G1.G2.C1.b'] = 99.0
-            self.assertEqual(residuals['G1.G2.C1.b'], 99.0)
+        inputs, outputs, residuals = model.get_nonlinear_vectors()
+        residuals['G1.G2.C1.b'] = 99.0
+        self.assertEqual(residuals['G1.G2.C1.b'], 99.0)
 
         # Test linear
-        with model.linear_vector_context('linear') as (d_inputs, d_outputs, d_residuals):
-            d_outputs['G1.G2.C1.b'] = 10.
-            self.assertEqual(d_outputs['G1.G2.C1.b'], 10.)
+        d_inputs, d_outputs, d_residuals = model.get_linear_vectors('linear')
+        d_outputs['G1.G2.C1.b'] = 10.
+        self.assertEqual(d_outputs['G1.G2.C1.b'], 10.)
 
         # Test linear with invalid vec_name
         with self.assertRaises(Exception) as cm:
-            with model.linear_vector_context('bad_name') as (d_inputs, d_outputs, d_residuals):
-                pass
+            d_inputs, d_outputs, d_residuals = model.get_linear_vectors('bad_name')
         self.assertEqual(str(cm.exception),
                          "There is no linear vector named %s" % 'bad_name')
 
@@ -122,90 +118,90 @@ class TestSystem(unittest.TestCase):
         arr_val = -10*np.ones((5, 1))
         bad_val = -10*np.ones((10))
 
-        with g2.nonlinear_vector_context() as (inputs, outputs, residuals):
-            #
-            # set input
-            #
+        inputs, outputs, residuals = g2.get_nonlinear_vectors()
+        #
+        # set input
+        #
 
-            # assign array to scalar
-            with assertRaisesRegex(self, ValueError, msg):
-                inputs['C1.a'] = arr_val
+        # assign array to scalar
+        with assertRaisesRegex(self, ValueError, msg):
+            inputs['C1.a'] = arr_val
 
-            # assign scalar to array
-            inputs['C2.x'] = num_val
-            assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
+        # assign scalar to array
+        inputs['C2.x'] = num_val
+        assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
 
-            # assign array to array
-            inputs['C2.x'] = arr_val
-            assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
+        # assign array to array
+        inputs['C2.x'] = arr_val
+        assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
 
-            # assign bad array shape to array
-            with assertRaisesRegex(self, ValueError, msg):
-                inputs['C2.x'] = bad_val
+        # assign bad array shape to array
+        with assertRaisesRegex(self, ValueError, msg):
+            inputs['C2.x'] = bad_val
 
-            # assign list to array
-            inputs['C2.x'] = arr_val.tolist()
-            assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
+        # assign list to array
+        inputs['C2.x'] = arr_val.tolist()
+        assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
 
-            # assign bad list shape to array
-            with assertRaisesRegex(self, ValueError, msg):
-                inputs['C2.x'] = bad_val.tolist()
+        # assign bad list shape to array
+        with assertRaisesRegex(self, ValueError, msg):
+            inputs['C2.x'] = bad_val.tolist()
 
-            #
-            # set output
-            #
+        #
+        # set output
+        #
 
-            # assign array to scalar
-            with assertRaisesRegex(self, ValueError, msg):
-                outputs['C1.b'] = arr_val
+        # assign array to scalar
+        with assertRaisesRegex(self, ValueError, msg):
+            outputs['C1.b'] = arr_val
 
-            # assign scalar to array
-            outputs['C2.y'] = num_val
-            assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
+        # assign scalar to array
+        outputs['C2.y'] = num_val
+        assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
 
-            # assign array to array
-            outputs['C2.y'] = arr_val
-            assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
+        # assign array to array
+        outputs['C2.y'] = arr_val
+        assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
 
-            # assign bad array shape to array
-            with assertRaisesRegex(self, ValueError, msg):
-                outputs['C2.y'] = bad_val
+        # assign bad array shape to array
+        with assertRaisesRegex(self, ValueError, msg):
+            outputs['C2.y'] = bad_val
 
-            # assign list to array
-            outputs['C2.y'] = arr_val.tolist()
-            assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
+        # assign list to array
+        outputs['C2.y'] = arr_val.tolist()
+        assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
 
-            # assign bad list shape to array
-            with assertRaisesRegex(self, ValueError, msg):
-                outputs['C2.y'] = bad_val.tolist()
+        # assign bad list shape to array
+        with assertRaisesRegex(self, ValueError, msg):
+            outputs['C2.y'] = bad_val.tolist()
 
-            #
-            # set residual
-            #
+        #
+        # set residual
+        #
 
-            # assign array to scalar
-            with assertRaisesRegex(self, ValueError, msg):
-                residuals['C1.b'] = arr_val
+        # assign array to scalar
+        with assertRaisesRegex(self, ValueError, msg):
+            residuals['C1.b'] = arr_val
 
-            # assign scalar to array
-            residuals['C2.y'] = num_val
-            assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
+        # assign scalar to array
+        residuals['C2.y'] = num_val
+        assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
 
-            # assign array to array
-            residuals['C2.y'] = arr_val
-            assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
+        # assign array to array
+        residuals['C2.y'] = arr_val
+        assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
 
-            # assign bad array shape to array
-            with assertRaisesRegex(self, ValueError, msg):
-                residuals['C2.y'] = bad_val
+        # assign bad array shape to array
+        with assertRaisesRegex(self, ValueError, msg):
+            residuals['C2.y'] = bad_val
 
-            # assign list to array
-            residuals['C2.y'] = arr_val.tolist()
-            assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
+        # assign list to array
+        residuals['C2.y'] = arr_val.tolist()
+        assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
 
-            # assign bad list shape to array
-            with assertRaisesRegex(self, ValueError, msg):
-                residuals['C2.y'] = bad_val.tolist()
+        # assign bad list shape to array
+        with assertRaisesRegex(self, ValueError, msg):
+            residuals['C2.y'] = bad_val.tolist()
 
 
 if __name__ == "__main__":
