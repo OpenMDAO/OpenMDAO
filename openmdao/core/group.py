@@ -5,7 +5,7 @@ import sys
 
 from six import iteritems, string_types
 from six.moves import range
-from itertools import product
+from itertools import product, chain
 from collections import Iterable, Counter
 
 import numpy as np
@@ -977,12 +977,13 @@ class Group(System):
             and max processors usable by this <Group>.  max_procs can be None,
             indicating all available procs can be used.
         """
-        if self._subsystems_allprocs:
+        if self._static_subsystems_allprocs or self._subsystems_allprocs:
             if self._mpi_proc_allocator.parallel:
                 # for a parallel group, we add up all of the required procs
                 min_procs, max_procs = 0, 0
 
-                for sub in self._subsystems_allprocs:
+                for sub in chain(self._static_subsystems_allprocs,
+                                 self._subsystems_allprocs):
                     if sub._mpi_req_procs is None:
                         sub._mpi_req_procs = sub.get_req_procs()
                     sub_min, sub_max = sub._mpi_req_procs
@@ -1005,7 +1006,8 @@ class Group(System):
                 # for a serial group, we take the max required procs
                 min_procs, max_procs = 1, 1
 
-                for sub in self._subsystems_allprocs:
+                for sub in chain(self._static_subsystems_allprocs,
+                                 self._subsystems_allprocs):
                     if sub._mpi_req_procs is None:
                         sub._mpi_req_procs = sub.get_req_procs()
                     sub_min, sub_max = sub._mpi_req_procs

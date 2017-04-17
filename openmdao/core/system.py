@@ -206,7 +206,7 @@ class System(object):
         self.metadata.update(kwargs)
 
         self._mpi_proc_allocator = DefaultAllocator()
-        self._mpi_req_procs = (1, 1)
+        self._mpi_req_procs = None
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
