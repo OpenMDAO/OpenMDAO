@@ -36,7 +36,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         # TODO_RECORDERS - need to actually read this in
         con = sqlite3.connect(self.filename)
-        cur = con.cursor()    
+        cur = con.cursor()
         cur.execute("SELECT format_version FROM metadata")
         row = cur.fetchone()
         self.format_version = row[0]
@@ -68,7 +68,6 @@ class SqliteCaseReader(BaseCaseReader):
             # with SqliteDict(self.filename, 'metadata', flag='r') as db:
             #     self._parameters = db.get('Parameters', None)
             #     self._unknowns = db.get('Unknowns', None)
-
 
             # Store the identifier for each iteration in _case_keys
             # with SqliteDict(self.filename, 'iterations', flag='r') as db:
@@ -102,35 +101,40 @@ class SqliteCaseReader(BaseCaseReader):
             An instance of Case populated with data from the
             specified case/iteration.
         """
-
         con = sqlite3.connect(self.filename, detect_types=sqlite3.PARSE_DECLTYPES)
         cur = con.cursor()
-
 
         if isinstance(case_id, int):
             # If case_id is an integer, assume the user
             # wants a case as an index
 
-            iteration_coordinate = self._case_keys[case_id] # handles negative indices for example
+            iteration_coordinate = self._case_keys[case_id]  # handles negative indices for example
 
             _case_id = self._case_keys[case_id]
-            # cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": case_id})
-            cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": _case_id})
+            # cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=
+            # :iteration_coordinate", {"iteration_coordinate": case_id})
+            cur.execute("SELECT * FROM driver_iterations WHERE "
+                        "iteration_coordinate=:iteration_coordinate",
+                        {"iteration_coordinate": _case_id})
 
             # cur.execute("SELECT * FROM driver_iterations WHERE id=:id", {"id": _case_id})
         else:
             # Otherwise assume we were given the case string identifier
-            cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": case_id})        
+            cur.execute("SELECT * FROM driver_iterations WHERE "
+                        "iteration_coordinate=:iteration_coordinate",
+                        {"iteration_coordinate": case_id})
             # _case_id = case_id
 
         # Initialize the Case object from the iterations data
         # with SqliteDict(self.filename, 'iterations', flag='r') as iter_db:
         #     case = Case(self.filename, _case_id, iter_db[_case_id])
 
-        row  = cur.fetchone()
-        counter, iteration_coordinate, timestamp, success, msg, desvars_array, responses_array, objectives_array, constraints_array = row
+        row = cur.fetchone()
+        counter, iteration_coordinate, timestamp, success, msg, desvars_array, responses_array, \
+            objectives_array, constraints_array = row
 
-        case = Case(self.filename, counter, iteration_coordinate, timestamp, success, msg, desvars_array, responses_array, objectives_array, constraints_array)
+        case = Case(self.filename, counter, iteration_coordinate, timestamp, success, msg,
+                    desvars_array, responses_array, objectives_array, constraints_array)
         # returns something like this
 
         # [(1, u'rank0:Driver|1', 1491860346.232551, 1, u'', array([([5.0, 2.0],)],

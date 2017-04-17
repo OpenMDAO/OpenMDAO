@@ -1,17 +1,11 @@
 """Define a base class for all Drivers in OpenMDAO."""
 
-from six import iteritems
-
+from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, update_local_meta
-from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-
-
-from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+from six import iteritems
 # import openmdao.devtools.problem_viewer.problem_viewer
-
-import numpy as np
 
 
 class Driver(object):
@@ -38,6 +32,8 @@ class Driver(object):
         Contains all response info.
     _rec_mgr : list of recorders
         list of recorders that have been added to this system.
+    _model_viewer_data : dict
+        structure of model, used to make n2 diagram.
     iter_count : int
         keep track of iterations for case recording
     metadata : list

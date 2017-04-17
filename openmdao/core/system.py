@@ -20,11 +20,10 @@ from openmdao.utils.units import convert_units
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
 from openmdao.recorders.recording_manager import RecordingManager
-
+from openmdao.utils.mpi import MPI
 
 # This is for storing various data mapped to var pathname
 PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
-from openmdao.utils.mpi import MPI
 
 
 class System(object):

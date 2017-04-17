@@ -44,7 +44,8 @@ class Case(object):
         float or dict.
     """
 
-    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, desvars_array, responses_array, objectives_array, constraints_array):
+    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg,
+                 desvars_array, responses_array, objectives_array, constraints_array):
         """
         Initialize.
         """
