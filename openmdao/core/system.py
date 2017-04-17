@@ -1316,33 +1316,31 @@ class System(object):
         d_outputs._names = d_outputs._views
         d_residuals._names = d_residuals._views
 
-    @contextmanager
-    def nonlinear_vector_context(self):
+    def get_nonlinear_vectors(self):
         """
-        Context manager that yields the inputs, outputs, and residuals vectors.
+        Return the inputs, outputs, and residuals vectors.
 
-        Yields
-        ------
+        Returns
+        -------
         (inputs, outputs, residuals) : tuple of <Vector> instances
             Yields the inputs, outputs, and residuals nonlinear vectors.
         """
         if self._inputs is None:
             raise RuntimeError("Cannot get vectors because setup has not yet been called.")
 
-        yield self._inputs, self._outputs, self._residuals
+        return self._inputs, self._outputs, self._residuals
 
-    @contextmanager
-    def linear_vector_context(self, vec_name='linear'):
+    def get_linear_vectors(self, vec_name='linear'):
         """
-        Context manager that yields linear inputs, outputs, and residuals vectors.
+        Return the linear inputs, outputs, and residuals vectors.
 
         Parameters
         ----------
         vec_name : str
             Name of the linear right-hand-side vector. The default is 'linear'.
 
-        Yields
-        ------
+        Returns
+        -------
         (inputs, outputs, residuals) : tuple of <Vector> instances
             Yields the inputs, outputs, and residuals linear vectors for vec_name.
         """
@@ -1352,9 +1350,9 @@ class System(object):
         if vec_name not in self._vectors['input']:
             raise ValueError("There is no linear vector named %s" % vec_name)
 
-        yield (self._vectors['input'][vec_name],
-               self._vectors['output'][vec_name],
-               self._vectors['residual'][vec_name])
+        return (self._vectors['input'][vec_name],
+                self._vectors['output'][vec_name],
+                self._vectors['residual'][vec_name])
 
     @contextmanager
     def jacobian_context(self):
