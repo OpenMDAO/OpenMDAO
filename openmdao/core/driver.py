@@ -356,5 +356,4 @@ class Driver(object):
             and max processors usable by this `Driver` and the given model.
             max_procs can be None, indicating all available procs can be used.
         """
-        model._mpi_req_procs = model.get_req_procs()
-        return model._mpi_req_procs
+        return model.get_req_procs()
