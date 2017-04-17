@@ -44,7 +44,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         p.setup(check=False)
         p.model.suppress_solver_output = True
 
-        d_inputs, d_outputs, d_residuals = group.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
         d_residuals.set_const(1.0)
@@ -72,7 +72,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         p.setup(check=False)
         p.model.suppress_solver_output = True
 
-        d_inputs, d_outputs, d_residuals = group.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
         d_residuals.set_const(1.0)
@@ -481,7 +481,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         p.setup(check=False)
         p.model.suppress_solver_output = True
 
-        d_inputs, d_outputs, d_residuals = group.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
         d_residuals.set_const(1.0)
@@ -509,7 +509,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         precon = group.ln_solver.precon = DirectSolver()
         p.setup(check=False)
 
-        d_inputs, d_outputs, d_residuals = group.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
         d_residuals.set_const(1.0)
@@ -548,7 +548,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         p.model.suppress_solver_output = True
 
         # forward
-        d_inputs, d_outputs, d_residuals = g1.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 
         d_residuals.set_const(1.0)
         d_outputs.set_const(0.0)
@@ -561,7 +561,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         assert_rel_error(self, output[5], g1.expected_solution[1], 1e-15)
 
         # reverse
-        d_inputs, d_outputs, d_residuals = g1.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)

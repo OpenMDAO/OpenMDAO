@@ -359,7 +359,7 @@ class TestProblem(unittest.TestCase):
         prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
         prob.run_model()
 
-        inputs, outputs, residuals = prob.model.nonlinear_vector_context()
+        inputs, outputs, residuals = prob.model.get_nonlinear_vectors()
 
         self.assertLess(residuals['y1'], 1e-6)
         self.assertLess(residuals['y2'], 1e-6)

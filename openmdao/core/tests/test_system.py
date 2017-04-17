@@ -26,12 +26,12 @@ class TestSystem(unittest.TestCase):
 
         # Test pre-setup errors
         with self.assertRaises(Exception) as cm:
-            inputs, outputs, residuals = model.nonlinear_vector_context()
+            inputs, outputs, residuals = model.get_nonlinear_vectors()
         self.assertEqual(str(cm.exception),
                          "Cannot get vectors because setup has not yet been called.")
 
         with self.assertRaises(Exception) as cm:
-            d_inputs, d_outputs, d_residuals = model.linear_vector_context('vec')
+            d_inputs, d_outputs, d_residuals = model.get_linear_vectors('vec')
         self.assertEqual(str(cm.exception),
                          "Cannot get vectors because setup has not yet been called.")
 
@@ -39,50 +39,50 @@ class TestSystem(unittest.TestCase):
         p.run_model()
 
         # Test inputs with original values
-        inputs, outputs, residuals = model.nonlinear_vector_context()
+        inputs, outputs, residuals = model.get_nonlinear_vectors()
         self.assertEqual(inputs['G1.G2.C1.a'], 5.)
 
-        inputs, outputs, residuals = g1.nonlinear_vector_context()
+        inputs, outputs, residuals = g1.get_nonlinear_vectors()
         self.assertEqual(inputs['G2.C1.a'], 5.)
 
         # Test inputs after setting a new value
-        inputs, outputs, residuals = g2.nonlinear_vector_context()
+        inputs, outputs, residuals = g2.get_nonlinear_vectors()
         inputs['C1.a'] = -1.
 
-        inputs, outputs, residuals = model.nonlinear_vector_context()
+        inputs, outputs, residuals = model.get_nonlinear_vectors()
         self.assertEqual(inputs['G1.G2.C1.a'], -1.)
 
-        inputs, outputs, residuals = g1.nonlinear_vector_context()
+        inputs, outputs, residuals = g1.get_nonlinear_vectors()
         self.assertEqual(inputs['G2.C1.a'], -1.)
 
         # Test outputs with original values
-        inputs, outputs, residuals = model.nonlinear_vector_context()
+        inputs, outputs, residuals = model.get_nonlinear_vectors()
         self.assertEqual(outputs['G1.G2.C1.b'], 10.)
 
-        inputs, outputs, residuals = g2.nonlinear_vector_context()
+        inputs, outputs, residuals = g2.get_nonlinear_vectors()
 
         # Test outputs after setting a new value
-        inputs, outputs, residuals = model.nonlinear_vector_context()
+        inputs, outputs, residuals = model.get_nonlinear_vectors()
         outputs['G1.G2.C1.b'] = 123.
         self.assertEqual(outputs['G1.G2.C1.b'], 123.)
 
-        inputs, outputs, residuals = g2.nonlinear_vector_context()
+        inputs, outputs, residuals = g2.get_nonlinear_vectors()
         outputs['C1.b'] = 789.
         self.assertEqual(outputs['C1.b'], 789.)
 
         # Test residuals
-        inputs, outputs, residuals = model.nonlinear_vector_context()
+        inputs, outputs, residuals = model.get_nonlinear_vectors()
         residuals['G1.G2.C1.b'] = 99.0
         self.assertEqual(residuals['G1.G2.C1.b'], 99.0)
 
         # Test linear
-        d_inputs, d_outputs, d_residuals = model.linear_vector_context('linear')
+        d_inputs, d_outputs, d_residuals = model.get_linear_vectors('linear')
         d_outputs['G1.G2.C1.b'] = 10.
         self.assertEqual(d_outputs['G1.G2.C1.b'], 10.)
 
         # Test linear with invalid vec_name
         with self.assertRaises(Exception) as cm:
-            d_inputs, d_outputs, d_residuals = model.linear_vector_context('bad_name')
+            d_inputs, d_outputs, d_residuals = model.get_linear_vectors('bad_name')
         self.assertEqual(str(cm.exception),
                          "There is no linear vector named %s" % 'bad_name')
 
@@ -118,7 +118,7 @@ class TestSystem(unittest.TestCase):
         arr_val = -10*np.ones((5, 1))
         bad_val = -10*np.ones((10))
 
-        inputs, outputs, residuals = g2.nonlinear_vector_context()
+        inputs, outputs, residuals = g2.get_nonlinear_vectors()
         #
         # set input
         #

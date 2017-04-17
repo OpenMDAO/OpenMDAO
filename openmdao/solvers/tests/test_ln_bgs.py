@@ -64,7 +64,7 @@ class TestBGSSolver(unittest.TestCase):
         p.setup(check=False)
         p.model.suppress_solver_output = True
 
-        d_inputs, d_outputs, d_residuals = group.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
         d_residuals.set_const(1.0)

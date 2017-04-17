@@ -34,7 +34,7 @@ class TestGetSetVariables(unittest.TestCase):
         p['g.c.y'] = 5.0
         self.assertEqual(p['g.c.y'], 5.0)
 
-        inputs, outputs, residuals = g.nonlinear_vector_context()
+        inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
         inputs['c.x'] = 5.0
@@ -85,7 +85,7 @@ class TestGetSetVariables(unittest.TestCase):
         p['y'] = 5.0
         self.assertEqual(p['y'], 5.0)
 
-        inputs, outputs, residuals = g.nonlinear_vector_context()
+        inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
         inputs['c2.x'] = 5.0
@@ -141,7 +141,7 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(p['y'], 5.0)
 
         msg = 'Variable name "{}" not found.'
-        inputs, outputs, residuals = g.nonlinear_vector_context()
+        inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
         with assertRaisesRegex(self, KeyError, msg.format('x')):
@@ -209,7 +209,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         msg1 = 'Variable name "{}" not found.'
         msg2 = 'The promoted name "{}" is invalid because it is non-unique.'
-        inputs, outputs, residuals = g.nonlinear_vector_context()
+        inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
         with assertRaisesRegex(self, KeyError, msg2.format('x')):

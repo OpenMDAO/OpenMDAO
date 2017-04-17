@@ -35,7 +35,7 @@ class TestVarSets(unittest.TestCase):
     def test_apply_linear(self):
         # apply linear, 'fwd' with varsets
         root = self.p.model
-        d_inputs, d_outputs, d_residuals = root.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
         d_outputs.set_const(1.0)
         root.run_apply_linear(['linear'], 'fwd')
@@ -47,7 +47,7 @@ class TestVarSets(unittest.TestCase):
 
         # apply linear, 'fwd' with no varsets, number should be the same, but reordered
         root = self.p_no_varsets.model
-        d_inputs, d_outputs, d_residuals = root.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
         d_outputs.set_const(1.0)
         root.run_apply_linear(['linear'], 'fwd')
@@ -58,7 +58,7 @@ class TestVarSets(unittest.TestCase):
 
         # apply linear, 'rev' with varsets
         root = self.p.model
-        d_inputs, d_outputs, d_residuals = root.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
         d_residuals.set_const(1.0)
         root.run_apply_linear(['linear'], 'rev')
@@ -70,7 +70,7 @@ class TestVarSets(unittest.TestCase):
 
         # apply linear, 'rev' with no varsets, number should be the same, but reordered
         root = self.p_no_varsets.model
-        d_inputs, d_outputs, d_residuals = root.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
         d_residuals.set_const(1.0)
         root.run_apply_linear(['linear'], 'rev')
@@ -82,7 +82,7 @@ class TestVarSets(unittest.TestCase):
     def test_solve_linear(self):
         # solve linear, 'fwd' with varsets
         root = self.p.model
-        d_inputs, d_outputs, d_residuals = root.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
         d_residuals.set_const(1.0)
         d_outputs.set_const(0.0)
@@ -95,7 +95,7 @@ class TestVarSets(unittest.TestCase):
 
         # solve linear, 'fwd' with no varsets for comparison
         root = self.p_no_varsets.model
-        d_inputs, d_outputs, d_residuals = root.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
         d_residuals.set_const(1.0)
         d_outputs.set_const(0.0)
@@ -107,7 +107,7 @@ class TestVarSets(unittest.TestCase):
 
         # solve linear, 'rev' with varsets
         root = self.p.model
-        d_inputs, d_outputs, d_residuals = root.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)
@@ -120,7 +120,7 @@ class TestVarSets(unittest.TestCase):
 
         # solve linear, 'rev' with no varsets for comparison
         root = self.p_no_varsets.model
-        d_inputs, d_outputs, d_residuals = root.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)

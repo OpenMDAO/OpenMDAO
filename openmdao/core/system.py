@@ -1313,7 +1313,7 @@ class System(object):
         d_outputs._names = d_outputs._views
         d_residuals._names = d_residuals._views
 
-    def nonlinear_vector_context(self):
+    def get_nonlinear_vectors(self):
         """
         Return the inputs, outputs, and residuals vectors.
 
@@ -1327,7 +1327,7 @@ class System(object):
 
         return self._inputs, self._outputs, self._residuals
 
-    def linear_vector_context(self, vec_name='linear'):
+    def get_linear_vectors(self, vec_name='linear'):
         """
         Return the linear inputs, outputs, and residuals vectors.
 

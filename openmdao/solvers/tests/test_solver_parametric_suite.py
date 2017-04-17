@@ -77,7 +77,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
             prob.run_model()
             assert_rel_error(self, prob['y'], [-1., 1.])
 
-            d_inputs, d_outputs, d_residuals = prob.model.linear_vector_context()
+            d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
             d_residuals.set_const(2.0)
             d_outputs.set_const(0.0)
@@ -100,7 +100,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         prob.setup(check=False)
         prob.model.run_linearize()
 
-        d_inputs, d_outputs, d_residuals = prob.model.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
         d_residuals.set_const(1.0)
         d_outputs.set_const(0.0)

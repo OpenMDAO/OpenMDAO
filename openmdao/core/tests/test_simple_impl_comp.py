@@ -93,7 +93,7 @@ class Test(unittest.TestCase):
         root = self.p.model
         root.suppress_solver_output = True
 
-        d_inputs, d_outputs, d_residuals = root.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
         d_outputs.set_const(1.0)
         root.run_apply_linear(['linear'], 'fwd')
@@ -109,7 +109,7 @@ class Test(unittest.TestCase):
         root = self.p.model
         root.suppress_solver_output = True
 
-        d_inputs, d_outputs, d_residuals = root.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
         d_residuals.set_const(11.0)
         d_outputs.set_const(0.0)

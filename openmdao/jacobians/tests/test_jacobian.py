@@ -229,7 +229,7 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
     def _check_fwd(self, prob, check_vec):
-        d_inputs, d_outputs, d_residuals = prob.model.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
         work = d_outputs._clone()
         work.set_const(1.0)
@@ -250,7 +250,7 @@ class TestJacobian(unittest.TestCase):
         self.assertAlmostEqual(d_outputs.get_norm(), 0, delta=1e-6)
 
     def _check_rev(self, prob, check_vec):
-        d_inputs, d_outputs, d_residuals = prob.model.linear_vector_context()
+        d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
         work = d_outputs._clone()
         work.set_const(1.0)

@@ -80,7 +80,7 @@ class TestLinearSystem(unittest.TestCase):
             dx_dA = np.outer(Ainv, -x).reshape(3, 9)
             dx_db = Ainv
 
-            d_inputs, d_outputs, d_residuals = lingrp.linear_vector_context()
+            d_inputs, d_outputs, d_residuals = lingrp.get_linear_vectors()
 
             # Forward mode with RHS of self.b
             d_residuals['lin.x'] = b
