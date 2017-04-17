@@ -978,6 +978,10 @@ class Group(System):
             and max processors usable by this <Group>.  max_procs can be None,
             indicating all available procs can be used.
         """
+        # NOTE: this must only be called BEFORE _subsystems_allprocs and
+        # _static_subsystems_allprocs have been combined, else we may
+        # double count some subsystems and mess up the proc allocation.
+
         if self._static_subsystems_allprocs or self._subsystems_allprocs:
             if self._mpi_proc_allocator.parallel:
                 # for a parallel group, we add up all of the required procs
