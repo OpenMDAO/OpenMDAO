@@ -51,8 +51,6 @@ class System(object):
     #
     _mpi_proc_allocator : <ProcAllocator>
         Object that distributes procs among subsystems.
-    _mpi_req_procs : (int, int or None)
-        The number of min and max procs usable by this system.
     #
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
@@ -206,7 +204,6 @@ class System(object):
         self.metadata.update(kwargs)
 
         self._mpi_proc_allocator = DefaultAllocator()
-        self._mpi_req_procs = (1, 1)
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
@@ -520,7 +517,6 @@ class System(object):
 
         # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
-            self._mpi_req_procs = self.get_req_procs()
             self._setup_procs(*self._get_initial_procs(comm, initial), global_dict={})
 
         # For updating variable and connection data, setup needs to be performed only
@@ -574,7 +570,7 @@ class System(object):
         # Add self's kwargs to dictionary of parents' kwargs (already new copy)
         self.metadata._assemble_global_dict(global_dict)
 
-        minp, maxp = self._mpi_req_procs
+        minp, maxp = self.get_req_procs()
         if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
             raise RuntimeError("%s needs %d MPI processes, but was given only %d." %
                                (self.pathname, minp, comm.size))
@@ -1323,33 +1319,31 @@ class System(object):
         d_outputs._names = d_outputs._views
         d_residuals._names = d_residuals._views
 
-    @contextmanager
-    def nonlinear_vector_context(self):
+    def get_nonlinear_vectors(self):
         """
-        Context manager that yields the inputs, outputs, and residuals vectors.
+        Return the inputs, outputs, and residuals vectors.
 
-        Yields
-        ------
+        Returns
+        -------
         (inputs, outputs, residuals) : tuple of <Vector> instances
             Yields the inputs, outputs, and residuals nonlinear vectors.
         """
         if self._inputs is None:
             raise RuntimeError("Cannot get vectors because setup has not yet been called.")
 
-        yield self._inputs, self._outputs, self._residuals
+        return self._inputs, self._outputs, self._residuals
 
-    @contextmanager
-    def linear_vector_context(self, vec_name='linear'):
+    def get_linear_vectors(self, vec_name='linear'):
         """
-        Context manager that yields linear inputs, outputs, and residuals vectors.
+        Return the linear inputs, outputs, and residuals vectors.
 
         Parameters
         ----------
         vec_name : str
             Name of the linear right-hand-side vector. The default is 'linear'.
 
-        Yields
-        ------
+        Returns
+        -------
         (inputs, outputs, residuals) : tuple of <Vector> instances
             Yields the inputs, outputs, and residuals linear vectors for vec_name.
         """
@@ -1359,9 +1353,9 @@ class System(object):
         if vec_name not in self._vectors['input']:
             raise ValueError("There is no linear vector named %s" % vec_name)
 
-        yield (self._vectors['input'][vec_name],
-               self._vectors['output'][vec_name],
-               self._vectors['residual'][vec_name])
+        return (self._vectors['input'][vec_name],
+                self._vectors['output'][vec_name],
+                self._vectors['residual'][vec_name])
 
     @contextmanager
     def jacobian_context(self):
