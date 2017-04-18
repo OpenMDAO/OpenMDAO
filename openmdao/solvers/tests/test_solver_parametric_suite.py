@@ -116,7 +116,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
 
     @parametric_suite(
         vector_class=['default'],
-        global_jac=[False, True],
+        assembled_jac=[False, True],
         jacobian_type=['dense'],
         partial_type=['array', 'sparse', 'aij'],
         num_var=[2, 3],

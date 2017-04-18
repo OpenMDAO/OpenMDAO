@@ -66,10 +66,6 @@ class CycleGroup(ParametericTestGroup):
         self.metadata.declare('component_class', type_=str, default='explicit',
                               values=['explicit', 'deprecated'],
                               desc='Component class to instantiate')
-        self.metadata.declare('jacobian_type', default='matvec',
-                              values=['matvec', 'dense', 'sparse-coo',
-                                      'sparse-csr', 'sparse-csc'],
-                              desc='method of assembling derivatives')
         self.metadata.declare('partial_type', default='array',
                               values=['array', 'sparse', 'aij'],
                               desc='type of partial derivatives')
@@ -77,6 +73,7 @@ class CycleGroup(ParametericTestGroup):
                               type_=bool,
                               desc='If the derivatives should be finite differenced.')
 
+    def initialize_subsystems(self):
         num_comp = self.metadata['num_comp']
         if num_comp < 2:
             raise ValueError('Number of components must be at least 2.')
@@ -115,10 +112,10 @@ class CycleGroup(ParametericTestGroup):
             (theta_name, 'psi_comp.psi'): -1. / (num_comp - 1),
         }
 
-        expected_theta = (2*np.pi - PSI) / (num_comp - 1)
+        expected_theta = (2 * np.pi - PSI) / (num_comp - 1)
         self.expected_values = {
             theta_name: expected_theta,
-            'last.x_norm2': 0.5*self.size,
+            'last.x_norm2': 0.5 * self.size,
         }
 
     def _generate_components(self, conn_type, first_class, middle_class, last_class, num_comp):
@@ -132,7 +129,8 @@ class CycleGroup(ParametericTestGroup):
             'jacobian_type': self.metadata['jacobian_type'],
             'partial_type': self.metadata['partial_type'],
             'connection_type': conn_type,
-            'finite_difference': self.metadata['finite_difference']
+            'finite_difference': self.metadata['finite_difference'],
+            'num_comp': self.metadata['num_comp']
         }
 
         self.add_subsystem('psi_comp', IndepVarComp('psi', PSI))
@@ -143,6 +141,7 @@ class CycleGroup(ParametericTestGroup):
         idx = 0
 
         first_comp = first_class(index=idx, **comp_args)
+        first_comp._init_parameterized()
         self.add_subsystem(first_name, first_comp,
                            promotes_inputs=first_comp._cycle_promotes_in,
                            promotes_outputs=first_comp._cycle_promotes_out)
@@ -155,6 +154,7 @@ class CycleGroup(ParametericTestGroup):
         for idx in range(1, num_comp - 1):
             current_name = 'middle_{0}'.format(idx)
             middle_comp = middle_class(index=idx, **comp_args)
+            middle_comp._init_parameterized()
             self.add_subsystem(current_name, middle_comp,
                                promotes_inputs=middle_comp._cycle_promotes_in,
                                promotes_outputs=middle_comp._cycle_promotes_out)
@@ -166,6 +166,7 @@ class CycleGroup(ParametericTestGroup):
 
         # Final Subsystem
         last_comp = last_class(index=idx+1, **comp_args)
+        last_comp._init_parameterized()
         self.add_subsystem(last_name, last_comp,
                            promotes_inputs=last_comp._cycle_promotes_in,
                            promotes_outputs=last_comp._cycle_promotes_out)
