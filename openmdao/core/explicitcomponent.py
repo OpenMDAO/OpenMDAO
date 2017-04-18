@@ -215,6 +215,10 @@ class ExplicitComponent(Component):
                 # Jacobian and vectors are all scaled, unitless
                 with self.jacobian_context() as J:
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
+                print(self.pathname)
+                print('inputs', d_inputs._data[0])
+                print('outputs', d_outputs._data[0])
+                print('resids', d_residuals._data[0])
 
                 # Jacobian and vectors are all unscaled, dimensional
                 with self._unscaled_context(
