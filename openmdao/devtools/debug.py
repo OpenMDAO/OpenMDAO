@@ -5,7 +5,7 @@ import sys
 from six.moves import zip_longest
 from openmdao.core.group import Group
 
-def dump_dist_idxs(problem, stream=sys.stdout, recurse=True):  # pragma: no cover
+def dump_dist_idxs(problem, stream=sys.stdout):  # pragma: no cover
     """Print out the distributed idxs for each variable in input and output vecs.
 
     Output looks like this:
@@ -40,56 +40,44 @@ def dump_dist_idxs(problem, stream=sys.stdout, recurse=True):  # pragma: no cove
 
     Parameters
     ----------
+    problem : <Problem>
+        The problem object that contains the model.
     stream : File-like
         Where dump output will go.
-
-    recurse : bool
-        If True, dump info for all systems contained in this system.
     """
+    def _get_data(g, type_):
 
-    def _dump(g, stream=sys.stdout):
-        idx = 0
-        pdata = []
-        pnwid = 0
-        piwid = 0
-        set_IDs = g._assembler._var_set_IDs
-        sizes = g._assembler._var_sizes_by_set
-        vnames = g._assembler._var_allprocs_abs_names
-        offsets = g._assembler._var_offsets_by_set
-        vidxs = g._assembler._var_allprocs_abs2idx_io
-        set_idxs = g._assembler._var_set_indices
-
-        for _, iset in set_IDs['input'].items():
-            set_total = 0
-            for rank in range(g.comm.size):
-                for ivar, (vset, setidx) in enumerate(set_idxs['input']):
-                    if vset == iset and sizes['input'][vset][rank, setidx] > 0:
-                        name = vnames['input'][ivar]
-                        pdata.append((name, str(set_total)))
-                        pnwid = max(pnwid, len(name))
-                        piwid = max(piwid, len(pdata[-1][1]))
-                        set_total += sizes['input'][vset][rank, setidx]
-
-                # insert a blank line to visually sparate sets
-                pdata.append(('', '', '', ''))
+        set_IDs = g._var_set2iset
+        sizes = g._var_sizes_byset
+        vnames = g._var_allprocs_abs_names
+        set_idxs = g._var_allprocs_abs2idx_byset
+        abs2meta = g._var_allprocs_abs2meta
 
         idx = 0
-        udata = []
-        unwid = 0
-        uiwid = 0
-        for _, iset in set_IDs['output'].items():
+        data = []
+        nwid = 0
+        iwid = 0
+        for sname, iset in set_IDs[type_].items():
             set_total = 0
             for rank in range(g.comm.size):
-                for ivar, (vset, setidx) in enumerate(set_idxs['output']):
-                    if vset == iset and sizes['output'][vset][rank, setidx] > 0:
-                        name = vnames['output'][ivar]
-                        udata.append((name, str(set_total)))
-                        unwid = max(unwid, len(name))
-                        uiwid = max(uiwid, len(udata[-1][1]))
-                        set_total += sizes['output'][vset][rank, setidx]
+                for ivar, vname in enumerate(vnames[type_]):
+                    vset = abs2meta[type_][vname]['var_set']
+                    if vset == sname:
+                        sz = sizes[type_][vset][rank, set_idxs[type_][vname]]
+                        if sz > 0.:
+                            data.append((vname, str(set_total)))
+                        nwid = max(nwid, len(vname))
+                        iwid = max(iwid, len(data[-1][1]))
+                        set_total += sz
 
-                # insert a blank line to visually sparate sets
-                udata.append(('', '', '', ''))
+            # insert a blank line to visually sparate sets
+            data.append(('', '', '', ''))
+        return data, nwid, iwid
+
+    def _dump(g, stream):
+
+        pdata, pnwid, piwid = _get_data(g, 'input')
+        udata, unwid, uiwid = _get_data(g, 'output')
 
         data = []
         for u, p in zip_longest(udata, pdata, fillvalue=('', '')):
