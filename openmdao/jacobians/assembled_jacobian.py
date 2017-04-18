@@ -49,7 +49,7 @@ class AssembledJacobian(Jacobian):
         global Component
         # avoid circular imports
         from openmdao.core.component import Component
-        
+
         super(AssembledJacobian, self).__init__()
         self.options.declare('matrix_class', value=DenseMatrix,
                              desc='<Matrix> class to use in this <Jacobian>.')
@@ -101,14 +101,14 @@ class AssembledJacobian(Jacobian):
         self._int_mtx = int_mtx = self.options['matrix_class'](system.comm)
         ext_mtx = self.options['matrix_class'](system.comm)
 
-        out_offsets = {}
+        out_ranges = {}
         for abs_name in system._var_allprocs_abs_names['output']:
-            out_offsets[abs_name] = self._get_var_range(abs_name, 'output')[0]
+            out_ranges[abs_name] = self._get_var_range(abs_name, 'output')
 
-        in_offsets = {}
+        in_ranges = {}
         src_indices_dict = {}
         for abs_name in system._var_allprocs_abs_names['input']:
-            in_offsets[abs_name] = self._get_var_range(abs_name, 'input')[0]
+            in_ranges[abs_name] = self._get_var_range(abs_name, 'input')
             src_indices_dict[abs_name] = \
                 system._var_abs2meta['input'][abs_name]['src_indices']
 
@@ -121,16 +121,16 @@ class AssembledJacobian(Jacobian):
             max_in_offset = 0
 
             for in_abs_name in s._var_abs_names['input']:
-                in_offset = in_offsets[in_abs_name]
-                if in_offset > max_in_offset:
-                    max_in_offset = in_offset
+                in_offset, in_end = in_ranges[in_abs_name]
+                if in_end > max_in_offset:
+                    max_in_offset = in_end
                 if in_offset < min_in_offset:
                     min_in_offset = in_offset
 
             for res_abs_name in s._var_abs_names['output']:
-                res_offset = out_offsets[res_abs_name]
-                if res_offset > max_res_offset:
-                    max_res_offset = res_offset
+                res_offset, res_end = out_ranges[res_abs_name]
+                if res_end > max_res_offset:
+                    max_res_offset = res_end
                 if res_offset < min_res_offset:
                     min_res_offset = res_offset
 
@@ -139,7 +139,7 @@ class AssembledJacobian(Jacobian):
                     continue
 
                 for out_abs_name in s._var_abs_names['output']:
-                    out_offset = out_offsets[out_abs_name]
+                    out_offset, _ = out_ranges[out_abs_name]
 
                     abs_key = (res_abs_name, out_abs_name)
                     if abs_key in self._subjacs_info:
@@ -169,7 +169,7 @@ class AssembledJacobian(Jacobian):
 
                     if in_abs_name in system._conn_global_abs_in2out:
                         out_abs_name = system._conn_global_abs_in2out[in_abs_name]
-                        out_offset = out_offsets[out_abs_name]
+                        out_offset, _ = out_ranges[out_abs_name]
                         src_indices = src_indices_dict[in_abs_name]
 
                         if src_indices is None:
@@ -186,10 +186,11 @@ class AssembledJacobian(Jacobian):
                                 src_indices, shape)
                     else:
                         ext_mtx._add_submat(
-                            abs_key, info, res_offset, in_offsets[in_abs_name], None, shape)
+                            abs_key, info, res_offset, in_ranges[in_abs_name][0],
+                            None, shape)
 
             self._view_ranges[s.pathname] = (
-                min_res_offset, max_res_offset + 1, min_in_offset, max_in_offset + 1)
+                min_res_offset, max_res_offset, min_in_offset, max_in_offset)
 
         sizes = system._var_sizes
         iproc = system.comm.rank
@@ -206,17 +207,23 @@ class AssembledJacobian(Jacobian):
 
     def _init_view(self, system):
         """
-        Allocate the global matrices.
+        Determine the _ext_mtx for a sub-view of the assemble jacobian.
+
+        Parameters
+        ----------
+        system : <System>
+            The system being solved using a sub-view of the jacobian.
         """
         abs2meta_in = system._var_abs2meta['input']
         abs2meta_out = system._var_abs2meta['output']
+        ranges = self._view_ranges[system.pathname]
 
         ext_mtx = self.options['matrix_class'](system.comm)
 
-        in_offsets = {}
+        in_ranges = {}
         src_indices_dict = {}
         for abs_name in system._var_allprocs_abs_names['input']:
-            in_offsets[abs_name] = self._get_var_range(abs_name, 'input')[0]
+            in_ranges[abs_name] = self._get_var_range(abs_name, 'input')[0]
             src_indices_dict[abs_name] = \
                 system._var_abs2meta['input'][abs_name]['src_indices']
 
@@ -238,7 +245,8 @@ class AssembledJacobian(Jacobian):
 
                     if in_abs_name not in system._conn_global_abs_in2out:
                         ext_mtx._add_submat(
-                            abs_key, info, res_offset, in_offsets[in_abs_name],
+                            abs_key, info, res_offset - ranges[0],
+                            in_ranges[in_abs_name] - ranges[2],
                             None, shape)
 
         sizes = system._var_sizes
@@ -246,10 +254,10 @@ class AssembledJacobian(Jacobian):
         out_size = np.sum(sizes['output'][iproc, :])
         in_size = np.sum(sizes['input'][iproc, :])
 
-        # if ext_mtx._submats:
-        #     ext_mtx._build(out_size, in_size)
-        # else:
-        ext_mtx = None
+        if ext_mtx._submats:
+            ext_mtx._build(out_size, in_size)
+        else:
+            ext_mtx = None
 
         self._ext_mtx[system.pathname] = ext_mtx
 

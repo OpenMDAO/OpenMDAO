@@ -64,20 +64,21 @@ class TestBGSSolver(unittest.TestCase):
         p.setup(check=False)
         p.model.suppress_solver_output = True
 
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
+
         # forward
-        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            d_residuals.set_const(1.0)
-            d_outputs.set_const(0.0)
-            group.run_solve_linear(['linear'], 'fwd')
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        group.run_solve_linear(['linear'], 'fwd')
 
-            self.assertTrue(group.ln_solver._iter_count == 2)
+        self.assertTrue(group.ln_solver._iter_count == 2)
 
-            # reverse
-            d_outputs.set_const(1.0)
-            d_residuals.set_const(0.0)
-            group.run_solve_linear(['linear'], 'rev')
+        # reverse
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        group.run_solve_linear(['linear'], 'rev')
 
-            self.assertTrue(group.ln_solver._iter_count == 2)
+        self.assertTrue(group.ln_solver._iter_count == 2)
 
     def test_simple_matvec(self):
         # Tests derivatives on a simple comp that defines compute_jacvec.
