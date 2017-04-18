@@ -10,13 +10,13 @@ from six.moves import range
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
-from openmdao.api import IndepVarComp, Group, Problem, \
+from openmdao.api import IndepVarComp, Group, Problem, DirectSolver, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
-                         NewtonSolver, ScipyIterativeSolver, \
+                         NewtonSolver, ScipyIterativeSolver, DenseJacobian, \
                          DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.test_suite.components.sellar import SellarDerivatives, SellarImplicitDis1, SellarImplicitDis2
 
 
 class MyExplicitComp(ExplicitComponent):
@@ -540,6 +540,42 @@ class TestJacobian(unittest.TestCase):
         with assertRaisesRegex(self, Exception, msg):
             prob.setup()
 
+    def test_for_bret(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add('px', IndepVarComp(name='x', val=2.0))
+
+        sub1 = model.add_subsystem('sub1', Group())
+        sub1.add_subsystem('d1', SellarImplicitDis1())
+        sub1.nl_solver = NewtonSolver()
+        sub1.ln_solver = DirectSolver()
+
+        sub2 = model.add_subsystem('sub2', Group())
+        sub2.add_subsystem('d2', SellarImplicitDis2())
+        sub2.nl_solver = NewtonSolver()
+        sub2.ln_solver = DirectSolver()
+
+        model.connect('sub1.d1.y1', 'sub2.d2.y1')
+        model.connect('sub2.d2.y2', 'sub1.d1.y2')
+        model.connect('px.x', 'sub1.d1.x')
+
+        model.nl_solver = NewtonSolver()
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['maxiter'] = 100
+        model.nl_solver.options['rtol'] = 1.0e-5
+        model.ln_solver = ScipyIterativeSolver()
+        model.ln_solver.options['iprint'] = 0
+
+        model.jacobian = DenseJacobian()
+
+        prob.setup(check=False)
+
+        prob.run()
+
+        sub1.run_solve_linear(['linear'], 'fwd')
+        print(sub1)
 
 if __name__ == '__main__':
     unittest.main()
