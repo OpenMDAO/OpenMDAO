@@ -156,7 +156,7 @@ class OptionsDictionary(object):
         """
         return iter(self._dict)
 
-    def __contain__(self, key):
+    def __contains__(self, key):
         """
         Check if the key is in the local dictionary.
 
