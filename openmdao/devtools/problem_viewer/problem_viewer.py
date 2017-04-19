@@ -81,19 +81,28 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     return tree_dict
 
 
-def _get_viewer_data(problem_or_rootgroup):
+def _get_viewer_data(problem_or_rootgroup_or_filename):
     """Get the data needed by the N2 viewer as a dictionary."""
     from openmdao.core.problem import Problem
-    if isinstance(problem_or_rootgroup, Problem):
-        root_group = problem_or_rootgroup.model
-    elif isinstance(problem_or_rootgroup, Group):
-        if not problem_or_rootgroup.pathname: # root group
-            root_group = problem_or_rootgroup
+    if isinstance(problem_or_rootgroup_or_filename, Problem):
+        root_group = problem_or_rootgroup_or_filename.model
+    elif isinstance(problem_or_rootgroup_or_filename, Group):
+        if not problem_or_rootgroup_or_filename.pathname: # root group
+            root_group = problem_or_rootgroup_or_filename
         else:
             # this function only makes sense when it is at the root
             return {}
+    elif is_valid_sqlite3_db(problem_or_rootgroup_or_filename):
+        import sqlite3
+        con = sqlite3.connect(problem_or_rootgroup_or_filename, detect_types=sqlite3.PARSE_DECLTYPES)
+        cur = con.cursor()
+        cur.execute("SELECT model_viewer_data FROM driver_metadata;")
+        model_pickle = cur.fetchone()
+        import cPickle
+        return cPickle.loads(str(model_pickle[0]))
+
     else:
-        raise TypeError('get_model_viewer_data only accepts Problems or Groups')
+        raise TypeError('_get_viewer_data only accepts Problems or Groups or sqlite filenames')
 
     data_dict = {}
     component_execution_idx = [0]  # list so pass by ref
@@ -140,22 +149,9 @@ def _get_viewer_data(problem_or_rootgroup):
         else:
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs)]))
 
-
     data_dict['connections_list'] = connections_list
 
     return data_dict
-
-
-def _get_viewer_data_from_sqlite(filename):
-    if is_valid_sqlite3_db(filename):
-        import sqlite3
-        con = sqlite3.connect(filename, detect_types=sqlite3.PARSE_DECLTYPES)
-        cur = con.cursor()
-        cur.execute("SELECT model_viewer_data FROM driver_metadata;")
-        model_pickle = cur.fetchone()
-        import cPickle
-        model_viewer_data = cPickle.loads(str(model_pickle[0]))
-        return model_viewer_data
 
 
 def view_tree(*args, **kwargs):
@@ -165,7 +161,9 @@ def view_tree(*args, **kwargs):
     warn_deprecation("view_tree is deprecated. Please switch to view_model.")
     view_model(*args, **kwargs)
 
-def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_browser=True, offline=True, embed=False):
+
+def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_browser=True,
+               offline=True, embed=False):
     """
     Generates a self-contained html file containing a tree viewer
     of the specified type.  Optionally pops up a web browser to
@@ -232,21 +230,7 @@ def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_brows
     with open(os.path.join(code_dir, 'awesomplete.js'), "r") as f:
             awesomplete_js = "%s" % (f.read())
 
-    from openmdao.core.problem import Problem
-    if isinstance(problem_or_filename, Problem):
-        model_viewer_data = _get_viewer_data(problem_or_filename)
-    else:
-        # Do not know file type. Try opening to see what works
-        if is_valid_sqlite3_db(problem_or_filename):
-            model_viewer_data = _get_viewer_data_from_sqlite(problem_or_filename)
-        else:
-            try:
-                hdf = h5py.File(problem_or_filename, 'r')
-                metadata = hdf.get('metadata', None)
-                model_viewer_data = pickle.loads(metadata.get('model_viewer_data').value)
-
-            except:
-                raise ValueError("The given filename is not one of the supported file formats: sqlite or hdf5")
+    model_viewer_data = _get_viewer_data(problem_or_filename)
 
     tree_json = json.dumps(model_viewer_data['tree'])
     conns_json = json.dumps(model_viewer_data['connections_list'])
