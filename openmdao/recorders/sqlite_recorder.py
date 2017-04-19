@@ -265,9 +265,9 @@ class SqliteRecorder(BaseRecorder):
         #     for name, value in iteritems(constraints):
         #         driver_values['constraint.' + name] = value
 
-        print("INSERT RECORD: DRIVER VALUES:", format_iteration_coordinate( metadata['coord']), metadata['timestamp'],
-              metadata['success'], metadata['msg'], desvars_array['pz.z'][0], responses_array, objectives_array['obj_cmp.obj'], constraints_array)
-        # Write this mega array to the database
+        # print("INSERT RECORD: DRIVER VALUES:", format_iteration_coordinate( metadata['coord']), metadata['timestamp'],
+        #       metadata['success'], metadata['msg'], desvars_array['pz.z'][0], responses_array, objectives_array['obj_cmp.obj'], constraints_array)
+        # # Write this mega array to the database
         # self.con.execute("INSERT INTO driver_iterations(iteration_coordinate, timestamp, "
         #                  "success, msg, driver_values) VALUES(?,?,?,?,?)",
         #                  (format_iteration_coordinate(metadata['coord']), metadata['timestamp'],
