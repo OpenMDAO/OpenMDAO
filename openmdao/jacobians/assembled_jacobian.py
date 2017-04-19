@@ -315,12 +315,12 @@ class AssembledJacobian(Jacobian):
             if mode == 'fwd':
                 d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
                 if ext_mtx is not None:
-                    d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, ranges))
+                    d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None))
             elif mode == 'rev':
                 dresids = d_residuals.get_data()
                 d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
                 if ext_mtx is not None:
-                    d_inputs.iadd_data(ext_mtx._prod(dresids, mode, ranges))
+                    d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
 
 
 class DenseJacobian(AssembledJacobian):

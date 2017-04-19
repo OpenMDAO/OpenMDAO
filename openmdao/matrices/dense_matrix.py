@@ -116,8 +116,11 @@ class DenseMatrix(Matrix):
         # group that owns the AssembledJacobian, we need to use only
         # the part of the matrix that is relevant to the lower level
         # system.
-        rstart, rend, cstart, cend = ranges
-        mat = self._matrix[rstart:rend, cstart:cend]
+        if ranges is None:
+            mat = self._matrix
+        else:
+            rstart, rend, cstart, cend = ranges
+            mat = self._matrix[rstart:rend, cstart:cend]
         if mode == 'fwd':
             return mat.dot(in_vec)
         else:  # rev
