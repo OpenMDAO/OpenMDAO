@@ -73,6 +73,15 @@ class TestOptionsDict(unittest.TestCase):
         expected_msg = "\"Key 'test' cannot be set because it has not been declared.\""
         self.assertEqual(expected_msg, str(context.exception))
 
+    def test_contains(self):
+        self.dict.declare('test')
+
+        contains = 'undeclared' in self.dict
+        self.assertTrue(not contains)
+
+        contains = 'test' in self.dict
+        self.assertTrue(contains)
+
     def test_update(self):
         self.dict.declare('test', default='Test value', type_=object)
 
