@@ -286,7 +286,8 @@ class DeprecatedLastComp(DeprecatedFirstComp):
 
             return partials
 
-    def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+    def jac_vec(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+        # Turned into apply_linear for matvec tests.
         if self.metadata['jacobian_type'] == 'matvec':
             k = self.metadata['num_comp']
             num_var = self.metadata['num_var']

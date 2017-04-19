@@ -189,6 +189,7 @@ class ParameterizedInstance(object):
         self.problem = prob = Problem(group)
 
         if args['assembled_jac']:
+
             jacobian_type = args['jacobian_type']
             if jacobian_type == 'dense':
                 prob.model.jacobian = DenseJacobian()
