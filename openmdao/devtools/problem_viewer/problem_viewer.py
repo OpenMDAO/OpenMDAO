@@ -1,5 +1,3 @@
-from six.moves import range
-import numpy as np
 import os
 import pickle
 import json
@@ -7,20 +5,17 @@ from six import iteritems
 import networkx as nx
 from collections import OrderedDict
 
-from sqlitedict import SqliteDict
-
 try:
     import h5py
 except ImportError:
     # Necessary for the file to parse
     h5py = None
 
-# from openmdao.core.problem import Problem
 from openmdao.core.group import Group
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.error_checking.check_config import compute_sys_graph
-#from openmdao.util.record_util import is_valid_sqlite3_db
+from openmdao.utils.record_util import is_valid_sqlite3_db
 import base64
 
 
@@ -85,6 +80,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
     return tree_dict
 
+
 def _get_viewer_data(problem_or_rootgroup):
     """Get the data needed by the N2 viewer as a dictionary."""
     from openmdao.core.problem import Problem
@@ -132,7 +128,6 @@ def _get_viewer_data(problem_or_rootgroup):
                     if(exe_order < exe_low or exe_order > exe_high):
                         subg.remove_node(n)
 
-
                 src_to_tgt_str = src_subsystem + ' ' + tgt_subsystem
                 for tup in subg.edges():
                     edge_str = tup[0] + ' ' + tup[1]
@@ -149,6 +144,19 @@ def _get_viewer_data(problem_or_rootgroup):
     data_dict['connections_list'] = connections_list
 
     return data_dict
+
+
+def _get_viewer_data_from_sqlite(filename):
+    if is_valid_sqlite3_db(filename):
+        import sqlite3
+        con = sqlite3.connect(filename, detect_types=sqlite3.PARSE_DECLTYPES)
+        cur = con.cursor()
+        cur.execute("SELECT model_viewer_data FROM driver_metadata;")
+        model_pickle = cur.fetchone()
+        import cPickle
+        model_viewer_data = cPickle.loads(str(model_pickle[0]))
+        return model_viewer_data
+
 
 def view_tree(*args, **kwargs):
     """
@@ -229,23 +237,16 @@ def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_brows
         model_viewer_data = _get_viewer_data(problem_or_filename)
     else:
         # Do not know file type. Try opening to see what works
-        file_type = None
         if is_valid_sqlite3_db(problem_or_filename):
-            db = SqliteDict(filename=problem_or_filename, flag='r', tablename='metadata')
-            file_type = "sqlite"
+            model_viewer_data = _get_viewer_data_from_sqlite(problem_or_filename)
         else:
             try:
                 hdf = h5py.File(problem_or_filename, 'r')
-                file_type = 'hdf5'
+                metadata = hdf.get('metadata', None)
+                model_viewer_data = pickle.loads(metadata.get('model_viewer_data').value)
+
             except:
                 raise ValueError("The given filename is not one of the supported file formats: sqlite or hdf5")
-
-        if file_type == "sqlite":
-            model_viewer_data = db['model_viewer_data']
-        elif file_type == "hdf5":
-            metadata = hdf.get('metadata', None)
-            model_viewer_data = pickle.loads(metadata.get('model_viewer_data').value)
-
 
     tree_json = json.dumps(model_viewer_data['tree'])
     conns_json = json.dumps(model_viewer_data['connections_list'])

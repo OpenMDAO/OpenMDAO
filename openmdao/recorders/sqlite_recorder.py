@@ -210,69 +210,6 @@ class SqliteRecorder(BaseRecorder):
                 for name, value in iteritems(constraints_values):
                     constraints_array[name] = value
 
-        # dtype_tuples = []
-
-        # We will go through the recording options of Driver to
-        # construct the entry to be inserted.
-        # if self.options['record_desvars']:
-        #     # Just an example of the syntax for creating a numpy structured array
-        #     # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
-
-        #     design_vars = object_requesting_recording.get_design_var_values()
-        #     # This returns a dict of names and values. Use this to build up the tuples of
-        #     # used for the dtypes in the creation of the numpy structured array
-        #     # we want to write to sqlite
-        #     if design_vars:
-        #         for name, value in iteritems(design_vars):
-        #             tple = ('design_var.' + name, '({},)f8'.format(len(value)))
-        #             dtype_tuples.append(tple)
-
-        # if self.options['record_responses']:
-        #     responses = object_requesting_recording.get_response_values()
-
-        #     if responses:
-        #         for name, value in iteritems(responses):
-        #             tple = ('response.' + name, '({},)f8'.format(len(value)))
-        #             dtype_tuples.append(tple)
-
-        # if self.options['record_objectives']:
-        #     objectives = object_requesting_recording.get_objective_values()
-
-        #     if objectives:
-        #         for name, value in iteritems(objectives):
-        #             tple = ('objective.' + name, '({},)f8'.format(len(value)))
-        #             dtype_tuples.append(tple)
-
-        # if self.options['record_constraints']:
-        #     constraints = object_requesting_recording.get_constraint_values()
-
-        #     if constraints:
-        #         for name, value in iteritems(constraints):
-        #             tple = ('constraint.' + name, '({},)f8'.format(len(value)))
-        #             dtype_tuples.append(tple)
-
-        # driver_values = np.zeros((1,), dtype=dtype_tuples)
-
-        # # Write the actual values to this array
-        # if self.options['record_desvars'] and design_vars:
-        #     for name, value in iteritems(design_vars):
-        #         driver_values['design_var.' + name] = value
-        # if self.options['record_responses'] and responses:
-        #     for name, value in iteritems(responses):
-        #         driver_values['response.' + name] = value
-        # if self.options['record_objectives'] and objectives:
-        #     for name, value in iteritems(objectives):
-        #         driver_values['objective.' + name] = value
-        # if self.options['record_constraints'] and constraints:
-        #     for name, value in iteritems(constraints):
-        #         driver_values['constraint.' + name] = value
-
-        # Write this mega array to the database
-        # self.con.execute("INSERT INTO driver_iterations(iteration_coordinate, timestamp, "
-        #                  "success, msg, driver_values) VALUES(?,?,?,?,?)",
-        #                  (format_iteration_coordinate(metadata['coord']), metadata['timestamp'],
-        #                   metadata['success'], metadata['msg'], driver_values))
-
         self.con.execute("INSERT INTO driver_iterations(iteration_coordinate, timestamp, "
                          "success, msg, desvars , responses , objectives , constraints ) "
                          "VALUES(?,?,?,?,?,?,?,?)", (format_iteration_coordinate(metadata['coord']),
@@ -432,12 +369,11 @@ class SqliteRecorder(BaseRecorder):
         """
         Record driver metadata.
         """
-        # name = object_requesting_recording
+        driver_class = type(object_requesting_recording).__name__
         model_viewer_data = cPickle.dumps(object_requesting_recording._model_viewer_data,
                                           cPickle.HIGHEST_PROTOCOL)
-
         self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
-                         "VALUES(?,:model_viewer_data)", ("name",
+                         "VALUES(?,:model_viewer_data)", (driver_class,
                                                           sqlite3.Binary(model_viewer_data)))
 
     def record_metadata_system(self, object_requesting_recording):
@@ -446,7 +382,8 @@ class SqliteRecorder(BaseRecorder):
         """
         self.con.execute("INSERT INTO system_metadata(id, scaling_factor_input, "
                          "scaling_factor_output, scaling_factor_residual) VALUES(?,?,?,?)",
-                         ("name", object_requesting_recording._scaling_to_phys['input'],
+                         (object_requesting_recording.pathname,
+                          object_requesting_recording._scaling_to_phys['input'],
                           object_requesting_recording._scaling_to_phys['output']),
                          object_requesting_recording._scaling_to_phys['residual'])
 
@@ -454,12 +391,15 @@ class SqliteRecorder(BaseRecorder):
         """
         Record solver metadata.
         """
+        path = object_requesting_recording._system.pathname
+        solver_class = type(object_requesting_recording).__name__
+        id = "%s.%s".format(path, solver_class)
+
         solver_options = cPickle.dumps(object_requesting_recording.options,
                                        cPickle.HIGHEST_PROTOCOL)
-        solver_class = object_requesting_recording
         self.con.execute(
-            "INSERT INTO system_metadata(id, solver_options, solver_class) "
-            "VALUES(?, :solver_options,?)", ("name", sqlite3.Binary(solver_options), solver_class))
+            "INSERT INTO solver_metadata(id, solver_options, solver_class) "
+            "VALUES(?, :solver_options,?)", (id, sqlite3.Binary(solver_options), solver_class))
 
     def close(self):
         """
