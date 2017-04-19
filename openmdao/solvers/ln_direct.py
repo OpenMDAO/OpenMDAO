@@ -11,6 +11,7 @@ import scipy.sparse.linalg
 from openmdao.solvers.solver import LinearSolver
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
+from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
 
 
@@ -51,12 +52,17 @@ class DirectSolver(LinearSolver):
             if isinstance(mtx, DenseMatrix):
                 np.set_printoptions(precision=3)
                 self._lup = scipy.linalg.lu_factor(mtx._matrix)
-            elif isinstance(mtx, (COOMatrix, CSRMatrix)):
+            elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
                 np.set_printoptions(precision=3)
                 self._lu = scipy.sparse.linalg.splu(mtx._matrix)
+            elif isinstance(mtx, COOMatrix):
+                # calling scipy.sparse.linalg.splu on a COO actually transposes
+                # the matrix during conversion to csc prior to LU decomp
+                raise RuntimeError("Direct solver is not compatible with mtx type "
+                                   "COOMatrix in system '%s'." % system.pathname)
             else:
-                raise RuntimeError('Direct solver not implemented for mtx type %s in system %s'
-                                   % (type(mtx), system.pathname))
+                raise RuntimeError("Direct solver not implemented for mtx type %s"
+                                   " in system '%s'." % (type(mtx), system.pathname))
 
         else:
             # First make a backup of the vectors
@@ -64,11 +70,11 @@ class DirectSolver(LinearSolver):
             x_data = system._vectors['output']['linear'].get_data()
 
             # Assemble the Jacobian by running the identity matrix through apply_linear
-            nmtx = system._vectors['output']['linear'].get_data().size
+            nmtx = x_data.size
             eye = np.eye(nmtx)
             mtx = np.empty((nmtx, nmtx))
             for i in range(nmtx):
-                mtx[:, i] = self._mat_vec(eye[:, i])
+                self._mat_vec(eye[:, i], mtx[:, i])
 
             # Restore the backed-up vectors
             system._vectors['residual']['linear'].set_data(b_data)
@@ -76,7 +82,7 @@ class DirectSolver(LinearSolver):
 
             self._lup = scipy.linalg.lu_factor(mtx)
 
-    def _mat_vec(self, in_vec):
+    def _mat_vec(self, in_vec, out_vec):
         """
         Compute matrix-vector product.
 
@@ -84,14 +90,12 @@ class DirectSolver(LinearSolver):
         ----------
         in_vec : ndarray
             the incoming array (combines all varsets).
-
-        Returns
-        -------
-        ndarray
-            the outgoing array after the product (combines all varsets).
+        out_vec : ndarray
+            where the outgoing array after the product (combines all varsets) will be stored
         """
         vec_name = 'linear'
         system = self._system
+        mode = self._mode
 
         # assign x and b vectors based on fwd mode
         x_vec = system._vectors['output'][vec_name]
@@ -101,12 +105,11 @@ class DirectSolver(LinearSolver):
         x_vec.set_data(in_vec)
 
         # apply linear
-        ind1, ind2 = system._var_allprocs_idx_range['output']
-        var_inds = [ind1, ind2, ind1, ind2]
-        system._apply_linear([vec_name], 'fwd', var_inds)
+        scope_out, scope_in = system._get_scope()
+        system._apply_linear([vec_name], self._mode, scope_out, scope_in)
 
-        # return result
-        return b_vec.get_data()
+        # put new value in out_vec
+        b_vec.get_data(out_vec)
 
     def solve(self, vec_names, mode):
         """

@@ -7,12 +7,16 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp, Problem, AssembledJacobian
+from openmdao.api import Group, IndepVarComp, Problem, AssembledJacobian, ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.ln_bgs import LinearBlockGS
+from openmdao.solvers.ln_direct import DirectSolver
+from openmdao.solvers.ln_scipy import ScipyIterativeSolver
+from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
-     SellarStateConnection, SellarDerivatives
+     SellarStateConnection, SellarDerivatives, SellarImplicitDis1, SellarImplicitDis2
+
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
@@ -60,20 +64,21 @@ class TestBGSSolver(unittest.TestCase):
         p.setup(check=False)
         p.model.suppress_solver_output = True
 
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
+
         # forward
-        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            d_residuals.set_const(1.0)
-            d_outputs.set_const(0.0)
-            group.run_solve_linear(['linear'], 'fwd')
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        group.run_solve_linear(['linear'], 'fwd')
 
-            self.assertTrue(group.ln_solver._iter_count == 2)
+        self.assertTrue(group.ln_solver._iter_count == 2)
 
-            # reverse
-            d_outputs.set_const(1.0)
-            d_residuals.set_const(0.0)
-            group.run_solve_linear(['linear'], 'rev')
+        # reverse
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        group.run_solve_linear(['linear'], 'rev')
 
-            self.assertTrue(group.ln_solver._iter_count == 2)
+        self.assertTrue(group.ln_solver._iter_count == 2)
 
     def test_simple_matvec(self):
         # Tests derivatives on a simple comp that defines compute_jacvec.
@@ -496,6 +501,87 @@ class TestBGSSolver(unittest.TestCase):
         J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
         for key, val in iteritems(Jbase):
             assert_rel_error(self, J[key], val, .00001)
+
+    def test_simple_implicit(self):
+        # This verifies that we can perform lgs around an implicit comp and get the right answer
+        # as long as we slot a non-lgs linear solver on that component.
+
+        class SimpleImp(ImplicitComponent):
+
+            def initialize_variables(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = 3.0*inputs['a'] + 2.0*outputs['x']
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = 2.0
+                jacobian['x', 'a'] = 3.0
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p', IndepVarComp('a', 5.0))
+        comp = model.add_subsystem('comp', SimpleImp())
+        model.connect('p.a', 'comp.a')
+
+        model.ln_solver = LinearBlockGS()
+        comp.ln_solver = DirectSolver()
+
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
+
+        deriv = prob.compute_total_derivs(of=['comp.x'], wrt=['p.a'])
+        self.assertEqual(deriv['comp.x', 'p.a'], -1.5)
+
+    def test_implicit_cycle(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+        model.add_subsystem('d1', SellarImplicitDis1())
+        model.add_subsystem('d2', SellarImplicitDis2())
+        model.connect('d1.y1', 'd2.y1')
+        model.connect('d2.y2', 'd1.y2')
+
+        model.nl_solver = NewtonSolver()
+        model.nl_solver.options['maxiter'] = 5
+        model.ln_solver = LinearBlockGS()
+
+        prob.setup(check=False)
+        prob.model.suppress_solver_output = True
+
+        prob.run_model()
+        res = model._residuals.get_norm()
+
+        # Newton is kinda slow on this for some reason, this is how far it gets with directsolver too.
+        self.assertLess(res, 2.0e-2)
+
+    def test_implicit_cycle_precon(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+        model.add_subsystem('d1', SellarImplicitDis1())
+        model.add_subsystem('d2', SellarImplicitDis2())
+        model.connect('d1.y1', 'd2.y1')
+        model.connect('d2.y2', 'd1.y2')
+
+        model.nl_solver = NewtonSolver()
+        model.nl_solver.options['maxiter'] = 5
+        model.ln_solver = ScipyIterativeSolver()
+        model.ln_solver.precon = LinearBlockGS()
+
+        prob.setup(check=False)
+        prob.model.suppress_solver_output = False
+
+        prob.run_model()
+        res = model._residuals.get_norm()
+
+        # Newton is kinda slow on this for some reason, this is how far it gets with directsolver too.
+        self.assertLess(res, 2.0e-2)
 
 
 class TestBGSSolverFeature(unittest.TestCase):

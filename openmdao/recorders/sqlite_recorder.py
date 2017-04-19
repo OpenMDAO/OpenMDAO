@@ -6,17 +6,18 @@ from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.solvers.solver import Solver
 from openmdao.utils.record_util import format_iteration_coordinate
-# from openmdao.devtools.partition_tree_n2 import get_model_viewer_data
 
 from six import iteritems
 
 import sqlite3
 import numpy as np
 import io
-
+import cPickle
 
 # this basically defines a special type of variable that can be written/read from a sqlite db.
 #  the type is called "array"
+
+
 def adapt_array(arr):
     """
     http://stackoverflow.com/a/31312102/190597 (SoulNibbler).
@@ -58,12 +59,12 @@ class SqliteRecorder(BaseRecorder):
     -------
     options['record_metadata'] :  bool(True)
         Tells recorder whether to record variable attribute metadata.
-    options['record_unknowns'] :  bool(True)
-        Tells recorder whether to record the unknowns vector.
-    options['record_params'] :  bool(False)
-        Tells recorder whether to record the params vector.
-    options['record_resids'] :  bool(False)
-        Tells recorder whether to record the ressiduals vector.
+    options['record_outputs'] :  bool(True)
+        Tells recorder whether to record the outputs vector.
+    options['record_inputs'] :  bool(False)
+        Tells recorder whether to record the inputs vector.
+    options['record_residuals'] :  bool(False)
+        Tells recorder whether to record the residuals vector.
     options['record_derivs'] :  bool(True)
         Tells recorder whether to record derivatives that are requested by a `Driver`.
     options['includes'] :  list of strings
@@ -80,25 +81,30 @@ class SqliteRecorder(BaseRecorder):
 
         self.model_viewer_data = None
 
-        self._counter = 0 
-
+        self._counter = 0
         # isolation_level=None causes autocommit
-        self.con = sqlite3.connect(out, detect_types=sqlite3.PARSE_DECLTYPES,isolation_level=None)
-
+        self.con = sqlite3.connect(out, detect_types=sqlite3.PARSE_DECLTYPES, isolation_level=None)
         # write the metadata
         self.con.execute("CREATE TABLE metadata( format_version INT)")
-        self.con.execute("INSERT INTO metadata(format_version) VALUES(?)", (format_version,) )
+        self.con.execute("INSERT INTO metadata(format_version) VALUES(?)", (format_version,))
 
-        # Create the table for iterations for a driver
-        # The primary key gets filled in automatically. It can be our "counter"
-        # that John wants. It gets incremented by 1
-        #   for each write of a record to this table
-        self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT, \
-                         timestamp REAL, success INT, msg TEXT, desvars array, responses array, objectives array, constraints array)")
-        self.con.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT,  \
-                         timestamp REAL, success INT, msg TEXT, system_values array)")
-        self.con.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, iteration_coordinate TEXT,  \
-                         timestamp REAL, success INT, msg TEXT, solver_values array)")
+        self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
+                         "iteration_coordinate TEXT, timestamp REAL, success INT, msg TEXT, "
+                         "desvars array, responses array, objectives array, constraints array)")
+        self.con.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
+                         "iteration_coordinate TEXT,  timestamp REAL, success INT, msg TEXT, "
+                         "system_values array)")
+        self.con.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
+                         "iteration_coordinate TEXT, timestamp REAL, success INT, msg TEXT, "
+                         "solver_values array)")
+
+        self.con.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
+                         "model_viewer_data BLOB)")
+        self.con.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
+                         "input_scale_factor REAL, output_scale_factor REAL, "
+                         "residual_scale_factor REAL)")
+        self.con.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, solver_options BLOB,"
+                         " solver_class TEXT)")
 
     def startup(self):
         """
@@ -106,7 +112,6 @@ class SqliteRecorder(BaseRecorder):
         """
         super(SqliteRecorder, self).startup()
         self._counter = 0
-        # self.model_viewer_data = get_model_viewer_data(group)
 
     def record_iteration(self, object_requesting_recording, metadata):
         """
@@ -132,8 +137,7 @@ class SqliteRecorder(BaseRecorder):
         """
         Record an iteration using the driver options.
         """
-
-        # make a nested numpy named array using the example 
+        # make a nested numpy named array using the example
         #   http://stackoverflow.com/questions/19201868/how-to-set-dtype-for-nested-numpy-ndarray
         # e.g.
         # table = np.array(data, dtype=[('instrument', 'S32'),
@@ -143,12 +147,10 @@ class SqliteRecorder(BaseRecorder):
         #                                      ('throughput', 'f')], (2,))
         #                       ])
 
-
         desvars_array = None
         responses_array = None
         objectives_array = None
         constraints_array = None
-
 
         # Just an example of the syntax for creating a numpy structured array
         # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
@@ -207,85 +209,22 @@ class SqliteRecorder(BaseRecorder):
 
                 for name, value in iteritems(constraints_values):
                     constraints_array[name] = value
-
-        #==============
-        # dtype_tuples = []
-
-        # # We will go through the recording options of Driver to construct the entry to be inserted.
-        # if self.options['record_desvars']:
-        #     # Just an example of the syntax for creating a numpy structured array
-        #     # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
-
-        #     design_vars = object_requesting_recording.get_design_var_values()
-        #     # This returns a dict of names and values. Use this to build up the tuples of
-        #     # used for the dtypes in the creation of the numpy structured array
-        #     # we want to write to sqlite
-        #     if design_vars:
-        #         for name, value in iteritems(design_vars):
-        #             tple = ('design_var.' + name, '({},)f8'.format(len(value)))
-        #             dtype_tuples.append(tple)
-
-        # if self.options['record_responses']:
-        #     responses = object_requesting_recording.get_response_values()
-
-        #     if responses:
-        #         for name, value in iteritems(responses):
-        #             tple = ('response.' + name, '({},)f8'.format(len(value)))
-        #             dtype_tuples.append(tple)
-
-        # if self.options['record_objectives']:
-        #     objectives = object_requesting_recording.get_objective_values()
-
-        #     if objectives:
-        #         for name, value in iteritems(objectives):
-        #             tple = ('objective.' + name, '({},)f8'.format(len(value)))
-        #             dtype_tuples.append(tple)
-
-        # if self.options['record_constraints']:
-        #     constraints = object_requesting_recording.get_constraint_values()
-
-        #     if constraints:
-        #         for name, value in iteritems(constraints):
-        #             tple = ('constraint.' + name, '({},)f8'.format(len(value)))
-        #             dtype_tuples.append(tple)
-
-        # driver_values = np.zeros((1,), dtype=dtype_tuples)
-
-        # # Write the actual values to this array
-        # if self.options['record_desvars'] and design_vars:
-        #     for name, value in iteritems(design_vars):
-        #         driver_values['design_var.' + name] = value
-        # if self.options['record_responses'] and responses:
-        #     for name, value in iteritems(responses):
-        #         driver_values['response.' + name] = value
-        # if self.options['record_objectives'] and objectives:
-        #     for name, value in iteritems(objectives):
-        #         driver_values['objective.' + name] = value
-        # if self.options['record_constraints'] and constraints:
-        #     for name, value in iteritems(constraints):
-        #         driver_values['constraint.' + name] = value
-
-        # print("INSERT RECORD: DRIVER VALUES:", format_iteration_coordinate( metadata['coord']), metadata['timestamp'],
-        #       metadata['success'], metadata['msg'], desvars_array['pz.z'][0], responses_array, objectives_array['obj_cmp.obj'], constraints_array)
-        # # Write this mega array to the database
-        # self.con.execute("INSERT INTO driver_iterations(iteration_coordinate, timestamp, "
-        #                  "success, msg, driver_values) VALUES(?,?,?,?,?)",
-        #                  (format_iteration_coordinate(metadata['coord']), metadata['timestamp'],
-        #                   metadata['success'], metadata['msg'], driver_values))
-
         self.con.execute("INSERT INTO driver_iterations(iteration_coordinate, timestamp, "
-                         "success, msg, desvars , responses , objectives , constraints ) VALUES(?,?,?,?,?,?,?,?)",
-                         (format_iteration_coordinate(metadata['coord']), metadata['timestamp'],
-                          metadata['success'], metadata['msg'], desvars_array, responses_array, objectives_array, constraints_array))
+                         "success, msg, desvars , responses , objectives , constraints ) "
+                         "VALUES(?,?,?,?,?,?,?,?)", (format_iteration_coordinate(metadata['coord']),
+                                                     metadata['timestamp'], metadata['success'],
+                                                     metadata['msg'], desvars_array,
+                                                     responses_array, objectives_array,
+                                                     constraints_array))
 
     def record_iteration_system(self, object_requesting_recording, metadata):
         """
-        Record an iteration using driver options.
+        Record an iteration using system options.
         """
         if isinstance(object_requesting_recording, System):
             dtype_tuples = []
 
-            # go through the recording options of Driver to construct the entry to be inserted.
+            # go through the recording options of Solver to construct the entry to be inserted.
             if self.options['record_inputs']:
                 inputs = object_requesting_recording._inputs
                 if inputs:
@@ -343,11 +282,11 @@ class SqliteRecorder(BaseRecorder):
 
     def record_iteration_solver(self, object_requesting_recording, metadata):
         """
-        Record an iteration using driver options.
+        Record an iteration using solver options.
         """
         dtype_tuples = []
 
-        # Go through the recording options of Driver to construct the entry to be inserted.
+        # Go through the recording options of Solver to construct the entry to be inserted.
         if self.options['record_abs_error']:
             abs_errors = object_requesting_recording.get_abs_error()
             if abs_errors:
@@ -375,8 +314,6 @@ class SqliteRecorder(BaseRecorder):
                 for name, value in iteritems(residuals):
                     tple = ('residual.' + name, '({},)f8'.format(len(value)))
                     dtype_tuples.append(tple)
-
-        print("DTYPE_TUPLES: ", dtype_tuples)
 
         # Create the mega array that we will write to the database
         # All of this needs to be looked into to be optimized !!
@@ -414,6 +351,54 @@ class SqliteRecorder(BaseRecorder):
                          "VALUES(?,?,?,?,?)", (metadata['coord'], metadata['timestamp'],
                                                metadata['success'], metadata['msg'],
                                                solver_values))
+
+    def record_metadata(self, object_requesting_recording):
+        """
+        Route the record_metadata call to the proper object.
+        """
+        if self.options['record_metadata']:
+            if isinstance(object_requesting_recording, Driver):
+                self.record_metadata_driver(object_requesting_recording)
+            elif isinstance(object_requesting_recording, System):
+                self.record_metadata_system(object_requesting_recording)
+            elif isinstance(object_requesting_recording, Solver):
+                record_metadata_solver(object_requesting_recording)
+
+    def record_metadata_driver(self, object_requesting_recording):
+        """
+        Record driver metadata.
+        """
+        driver_class = type(object_requesting_recording).__name__
+        model_viewer_data = cPickle.dumps(object_requesting_recording._model_viewer_data,
+                                          cPickle.HIGHEST_PROTOCOL)
+        self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
+                         "VALUES(?,:model_viewer_data)", (driver_class,
+                                                          sqlite3.Binary(model_viewer_data)))
+
+    def record_metadata_system(self, object_requesting_recording):
+        """
+        Record system metadata.
+        """
+        self.con.execute("INSERT INTO system_metadata(id, scaling_factor_input, "
+                         "scaling_factor_output, scaling_factor_residual) VALUES(?,?,?,?)",
+                         (object_requesting_recording.pathname,
+                          object_requesting_recording._scaling_to_phys['input'],
+                          object_requesting_recording._scaling_to_phys['output']),
+                         object_requesting_recording._scaling_to_phys['residual'])
+
+    def record_metadata_solver(self, object_requesting_recording):
+        """
+        Record solver metadata.
+        """
+        path = object_requesting_recording._system.pathname
+        solver_class = type(object_requesting_recording).__name__
+        id = "%s.%s".format(path, solver_class)
+
+        solver_options = cPickle.dumps(object_requesting_recording.options,
+                                       cPickle.HIGHEST_PROTOCOL)
+        self.con.execute(
+            "INSERT INTO solver_metadata(id, solver_options, solver_class) "
+            "VALUES(?, :solver_options,?)", (id, sqlite3.Binary(solver_options), solver_class))
 
     def close(self):
         """

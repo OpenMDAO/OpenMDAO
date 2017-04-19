@@ -30,8 +30,6 @@ class Jacobian(object):
     _keymap : dict
         Mapping of original (output, input) key to (output, source) in cases
         where the input has src_indices.
-    _iter_list : [(out_name, in_name), ...]
-        List of output-input pairs to iterate over where the keys are absolute names.
     options : <OptionsDictionary>
         Options dictionary.
     """
@@ -52,7 +50,6 @@ class Jacobian(object):
         self._int_mtx = None
         self._ext_mtx = None
         self._keymap = {}
-        self._iter_list = None
 
         self.options = OptionsDictionary()
         self.options.update(kwargs)
@@ -73,8 +70,15 @@ class Jacobian(object):
         in_size : int
             local size of the input variable.
         """
-        return (np.prod(self._system._var_abs2data_io[abs_key[0]]['metadata']['shape']),
-                np.prod(self._system._var_abs2data_io[abs_key[1]]['metadata']['shape']))
+        abs2meta = self._system._var_abs2meta
+
+        meta0 = abs2meta['output'][abs_key[0]]
+        if abs_key[1] in abs2meta['output']:
+            meta1 = abs2meta['output'][abs_key[1]]
+        elif abs_key[1] in abs2meta['input']:
+            meta1 = abs2meta['input'][abs_key[1]]
+
+        return (np.prod(meta0['shape']), np.prod(meta1['shape']))
 
     def _multiply_subjac(self, abs_key, val):
         """
@@ -96,49 +100,6 @@ class Jacobian(object):
         elif len(jac) == 3:
             self._subjacs[abs_key][0] *= val
 
-    def _pre_and_post_multiply_subjac(self, abs_key, left_vec, right_vec):
-        """
-        Compute left_vec transposed times this sub-Jacobian times right_vec.
-
-        Parameters
-        ----------
-        abs_key : (str, str)
-            Absolute name pair of sub-Jacobian.
-        left_vec : ndarray
-            Array to pre-multiply by.
-        right_vec : ndarray
-            Array to post-multiply by.
-        """
-        jac = self._subjacs[abs_key]
-        left_vec = np.atleast_2d(left_vec).T
-
-        if isinstance(jac, np.ndarray):
-            self._subjacs[abs_key] = left_vec * jac / right_vec
-        elif isinstance(jac, (coo_matrix, csr_matrix)):
-            # DOK not supported
-            self._subjacs[abs_key].data = left_vec * self._subjacs[abs_key].data / right_vec
-        else:
-            # TODO: This is currently untested because support for scaler specification of a
-            # subjac larger than 1x1 is not implemented.
-            self._subjacs[abs_key] = left_vec * self._subjacs[abs_key][0] / right_vec
-
-    def _precompute_iter(self):
-        """
-        Cache list of absolute name pairs found in the jacobian for the current System.
-        """
-        system = self._system
-
-        iter_list = []
-        for res_name in system._var_abs_names['output']:
-            for out_name in system._var_abs_names['output']:
-                if (res_name, out_name) in self._subjacs:
-                    iter_list.append((res_name, out_name))
-            for in_name in system._var_abs_names['input']:
-                if (res_name, in_name) in self._subjacs:
-                    iter_list.append((res_name, in_name))
-
-        self._iter_list = iter_list
-
     def __contains__(self, key):
         """
         Return whether there is a subjac for the given promoted or relative name pair.
@@ -153,8 +114,7 @@ class Jacobian(object):
         boolean
             return whether sub-Jacobian has been defined.
         """
-        abs_key = key2abs_key(self._system, key)
-        return abs_key in self._subjacs
+        return key2abs_key(self._system, key) in self._subjacs
 
     def __getitem__(self, key):
         """
@@ -232,60 +192,23 @@ class Jacobian(object):
         Iterate over subjacs keyed by absolute names.
 
         This includes only subjacs that have been set and are part of the current system.
-
-        Returns
-        -------
-        iterator
-            Iterator over subjacs keyed by absolute names that have been set on this Jacobian.
         """
-        return iter(self._iter_list)
+        system = self._system
+        subjacs = self._subjacs
 
-    def _scale_subjac(self, abs_key, coeffs):
-        """
-        Change the scaling state of a single subjac.
-
-        Parameters
-        ----------
-        abs_key : (str, str)
-            Absolute name pair of sub-Jacobian.
-        coeffs : dict of ndarray[nvar_myproc, 2]
-            0th and 1st order coefficients for scaling/unscaling.
-            The keys are 'input', 'output', and 'residual'
-        """
-        data0 = self._system._var_abs2data_io[abs_key[0]]
-        data1 = self._system._var_abs2data_io[abs_key[1]]
-
-        ind_of0, ind_of1 = data0['resid_scale_idx']
-
-        # Implicit states are the only wrt that will have this
-        try:
-            ind_wrt0, ind_wrt1 = data1['output_scale_idx']
-        except KeyError:
-            ind_wrt0 = data1['my_idx']
-            ind_wrt1 = ind_wrt0 + 1
-
-        type_ = data1['type']
-
-        # A vector scale factor on the residual needs to be transposed and pre-multiplied.
-        if (ind_of1 - ind_of0) > 1:
-            self._pre_and_post_multiply_subjac(abs_key, coeffs['residual'][ind_of0:ind_of1, 1],
-                                               coeffs[type_][ind_wrt0:ind_wrt1, 1])
-        else:
-            val = coeffs['residual'][ind_of0:ind_of1, 1] / coeffs[type_][ind_wrt0:ind_wrt1, 1]
-            self._multiply_subjac(abs_key, val)
-
-    def _scale(self, coeffs):
-        """
-        Change the scaling state for all subjacs under the current system.
-
-        Parameters
-        ----------
-        coeffs : dict of ndarray[nvar_myproc, 2]
-            0th and 1st order coefficients for scaling/unscaling.
-            The keys are 'input', 'output', and 'residual'.
-        """
-        for abs_key in self._iter_abs_keys():
-            self._scale_subjac(abs_key, coeffs)
+        # FIXME: these keys should really be cached in system, not as they were previously
+        # in precompute_iter_keys, since they had to be constantly recomputed whenever the
+        # jacobian's system changed.  There is an ordering issue with caching them in system
+        # because this method gets called once (for scaling) prior to the first call to
+        # linearize for each system which can add keys to the jacobian, so we'll need to
+        # make sure we recompute the keys for each system after the first call to lineraize
+        # after a new jacobian has been set.
+        for res_name in system._var_abs_names['output']:
+            for type_ in ('output', 'input'):
+                for name in system._var_abs_names[type_]:
+                    key = (res_name, name)
+                    if key in subjacs:
+                        yield key
 
     def _initialize(self):
         """

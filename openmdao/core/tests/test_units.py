@@ -225,7 +225,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.run()
 
         ## Make sure check partials handles conversion
-        #data = prob.check_partial_derivatives(out_stream=None)
+        #data = prob.check_partial_derivs(out_stream=None)
 
         #for key1, val1 in iteritems(data):
             #for key2, val2 in iteritems(val1):
@@ -240,6 +240,80 @@ class TestUnitConversion(unittest.TestCase):
         #conv = prob.root.list_unit_conv(stream=stream)
         #self.assertTrue((('src.x2', 'tgtF.x2'), ('degC', 'degF')) in conv)
         #self.assertTrue((('src.x2', 'tgtK.x2'), ('degC', 'degK')) in conv)
+
+    def test_basic_apply(self):
+        """Test that output values and total derivatives are correct."""
+
+        class SrcCompa(ExplicitComponent):
+            """Source provides degrees Celsius."""
+
+            def initialize_variables(self):
+                self.add_input('x1', 100.0)
+                self.add_output('x2', 100.0, units='degC')
+
+            def compute(self, inputs, outputs):
+                """ Pass through."""
+                outputs['x2'] = inputs['x1']
+
+            def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+                """ Derivative is 1.0"""
+
+                if mode == 'fwd':
+                    d_outputs['x2'] += d_inputs['x1']
+                else:
+                    d_inputs['x1'] += d_outputs['x2']
+
+
+        class TgtCompFa(ExplicitComponent):
+            """Target expressed in degrees F."""
+
+            def initialize_variables(self):
+                self.add_input('x2', 100.0, units='degF')
+                self.add_output('x3', 100.0)
+
+            def compute(self, inputs, outputs):
+                """ Pass through."""
+                outputs['x3'] = inputs['x2']
+
+            def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+                """ Derivative is 1.0"""
+
+                if mode == 'fwd':
+                    d_outputs['x3'] += d_inputs['x2']
+                else:
+                    d_inputs['x2'] += d_outputs['x3']
+
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        model.add_subsystem('src', SrcCompa())
+        model.add_subsystem('tgtF', TgtCompFa())
+
+        model.connect('px1.x1', 'src.x1')
+        model.connect('src.x2', 'tgtF.x2')
+
+        # Check the outputs after running to test the unit conversions
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
+
+        assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
+        assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
+
+        # Check the total derivatives in forward mode
+        wrt = ['px1.x1']
+        of = ['tgtF.x3']
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+
+        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+
+        # Check the total derivatives in reverse mode
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+
+        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
 
     #def test_basic_force_fd_comps(self):
 
@@ -299,7 +373,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.run()
 
         ## Make sure check partials handles conversion
-        #data = prob.check_partial_derivatives(out_stream=None)
+        #data = prob.check_partial_derivs(out_stream=None)
 
         #for key1, val1 in iteritems(data):
             #for key2, val2 in iteritems(val1):

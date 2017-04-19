@@ -26,12 +26,15 @@ class TestExplicitComponent(unittest.TestCase):
         prob = Problem(comp).setup(check=False)
 
         # check optional metadata (desc)
-        self.assertEqual(comp._var_abs2data_io['length']['metadata']['desc'],
-                         'length of rectangle')
-        self.assertEqual(comp._var_abs2data_io['width']['metadata']['desc'],
-                         'width of rectangle')
-        self.assertEqual(comp._var_abs2data_io['area']['metadata']['desc'],
-                         'area of rectangle')
+        self.assertEqual(
+            comp._var_abs2meta['input']['length']['desc'],
+            'length of rectangle')
+        self.assertEqual(
+            comp._var_abs2meta['input']['width']['desc'],
+            'width of rectangle')
+        self.assertEqual(
+            comp._var_abs2meta['output']['area']['desc'],
+            'area of rectangle')
 
         prob['length'] = 3.
         prob['width'] = 2.
@@ -84,7 +87,7 @@ class TestExplicitComponent(unittest.TestCase):
 
     def test_setup_bug1(self):
         # This tests a bug where, if you run setup more than once on a derived component class,
-        # the _var_abs_names continually gets prepended with the component global path.
+        # the list of var names continually gets prepended with the component global path.
 
         class NewBase(Component):
             def __init__(self, **kwargs):
@@ -93,6 +96,7 @@ class TestExplicitComponent(unittest.TestCase):
         class MyComp(NewBase):
             def __init__(self, **kwargs):
                 super(MyComp, self).__init__(**kwargs)
+            def initialize_variables(self):
                 self.add_input('x', val=0.0)
                 self.add_output('y', val=0.0)
 

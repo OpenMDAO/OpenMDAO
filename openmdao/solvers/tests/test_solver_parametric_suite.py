@@ -10,7 +10,8 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, CSRJacobian
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
+                                                  CSRJacobian, CSCJacobian
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
@@ -47,7 +48,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         """
         Test the direct solver on a component.
         """
-        for jac in ['dict', 'coo', 'csr', 'dense']:
+        for jac in ['dict', 'coo', 'csr', 'csc', 'dense']:
             prob = Problem(model=ImplComp4Test())
             prob.model.nl_solver = NewtonSolver()
             prob.model.ln_solver = DirectSolver()
@@ -55,30 +56,40 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
 
             if jac == 'dict':
                 pass
-            elif jac == 'coo':
-                prob.model.jacobian = COOJacobian()
             elif jac == 'csr':
                 prob.model.jacobian = CSRJacobian()
+            elif jac == 'csc':
+                prob.model.jacobian = CSCJacobian()
+            elif jac == 'coo':
+                prob.model.jacobian = COOJacobian()
             elif jac == 'dense':
                 prob.model.jacobian = DenseJacobian()
 
             prob.setup(check=False)
 
+            if jac == 'coo':
+                with self.assertRaises(Exception) as context:
+                    prob.run_model()
+                self.assertEqual(str(context.exception),
+                                 "Direct solver is not compatible with mtx type COOMatrix in system ''.")
+                continue
+
             prob.run_model()
             assert_rel_error(self, prob['y'], [-1., 1.])
 
-            with prob.model.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-                d_residuals.set_const(2.0)
-                d_outputs.set_const(0.0)
-                prob.model.run_solve_linear(['linear'], 'fwd')
-                result = d_outputs.get_data()
-                assert_rel_error(self, result, [-2., 2.])
+            d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
-                d_outputs.set_const(2.0)
-                d_residuals.set_const(0.0)
-                prob.model.run_solve_linear(['linear'], 'rev')
-                result = d_residuals.get_data()
-                assert_rel_error(self, result, [2., -2.])
+            d_residuals.set_const(2.0)
+            d_outputs.set_const(0.0)
+            prob.model.run_solve_linear(['linear'], 'fwd')
+            result = d_outputs.get_data()
+            assert_rel_error(self, result, [-2., 2.])
+
+            d_outputs.set_const(2.0)
+            d_residuals.set_const(0.0)
+            prob.model.run_solve_linear(['linear'], 'rev')
+            result = d_residuals.get_data()
+            assert_rel_error(self, result, [2., -2.])
 
     def test_direct_solver_group(self):
         """
@@ -89,20 +100,21 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         prob.setup(check=False)
         prob.model.run_linearize()
 
-        with prob.model.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            d_residuals.set_const(1.0)
-            d_outputs.set_const(0.0)
-            prob.model.run_solve_linear(['linear'], 'fwd')
-            result = d_outputs._data
-            assert_rel_error(self, result[0], prob.model.expected_solution[0], 1e-15)
-            assert_rel_error(self, result[1], prob.model.expected_solution[1], 1e-15)
+        d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
-            d_outputs.set_const(1.0)
-            d_residuals.set_const(0.0)
-            prob.model.run_solve_linear(['linear'], 'rev')
-            result = d_residuals._data
-            assert_rel_error(self, result[0], prob.model.expected_solution[0], 1e-15)
-            assert_rel_error(self, result[1], prob.model.expected_solution[1], 1e-15)
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        prob.model.run_solve_linear(['linear'], 'fwd')
+        result = d_outputs._data
+        assert_rel_error(self, result[1], prob.model.expected_solution[0], 1e-15)
+        assert_rel_error(self, result[5], prob.model.expected_solution[1], 1e-15)
+
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        prob.model.run_solve_linear(['linear'], 'rev')
+        result = d_residuals._data
+        assert_rel_error(self, result[1], prob.model.expected_solution[0], 1e-15)
+        assert_rel_error(self, result[5], prob.model.expected_solution[1], 1e-15)
 
     @parametric_suite(
         vector_class=['default'],

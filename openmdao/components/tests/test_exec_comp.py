@@ -176,7 +176,7 @@ class TestExecComp(unittest.TestCase):
         prob.model.suppress_solver_output = True
         prob.run_model()
 
-        data = prob.check_partial_derivatives(out_stream=None)
+        data = prob.check_partial_derivs(out_stream=None)
 
         assert_rel_error(self, data['comp'][('y','x')]['abs error'][0], 0.0, 1e-5)
         assert_rel_error(self, data['comp'][('y','x')]['abs error'][1], 0.0, 1e-5)
@@ -199,7 +199,7 @@ class TestExecComp(unittest.TestCase):
         prob.model.suppress_solver_output = True
         prob.run_model()
 
-        data = prob.check_partial_derivatives(out_stream=None)
+        data = prob.check_partial_derivs(out_stream=None)
 
         assert_rel_error(self, data['comp'][('y','x')]['abs error'][0], 0.0, 1e-5)
         assert_rel_error(self, data['comp'][('y','x')]['abs error'][1], 0.0, 1e-5)

@@ -1,13 +1,9 @@
-from six.moves import range
-import numpy as np
 import os
 import pickle
 import json
 from six import iteritems
 import networkx as nx
 from collections import OrderedDict
-
-from sqlitedict import SqliteDict
 
 try:
     import h5py
@@ -19,7 +15,7 @@ from openmdao.core.group import Group
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.error_checking.check_config import compute_sys_graph
-#from openmdao.util.record_util import is_valid_sqlite3_db
+from openmdao.utils.record_util import is_valid_sqlite3_db
 import base64
 
 
@@ -40,7 +36,6 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         if(len(local_prom_dict) > 0):
             tree_dict['promotions'] = OrderedDict(sorted(local_prom_dict.items())) # sort to make deterministic for testing
 
-
     if not isinstance(system, Group):
         tree_dict['subsystem_type'] = 'component'
         component_execution_orders[system.pathname] = component_execution_index[0]
@@ -49,9 +44,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         children = []
         for typ in ['input', 'output']:
             for ind, abs_name in enumerate(system._var_abs_names[typ]):
-                data = system._var_abs2data_io[abs_name]
-                meta = data['metadata']
-                name = data['prom']
+                meta = system._var_abs2meta[typ][abs_name]
+                name = system._var_abs2prom[typ][abs_name]
 
                 var_dict = OrderedDict()
                 var_dict['name'] = name
@@ -86,28 +80,37 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
     return tree_dict
 
-def _get_viewer_data(problem_or_rootgroup):
+
+def _get_viewer_data(problem_or_rootgroup_or_filename):
     """Get the data needed by the N2 viewer as a dictionary."""
     from openmdao.core.problem import Problem
-    if isinstance(problem_or_rootgroup, Problem):
-        root_group = problem_or_rootgroup.model
-    elif isinstance(problem_or_rootgroup, Group):
-        if not problem_or_rootgroup.pathname: # root group
-            root_group = problem_or_rootgroup
+    if isinstance(problem_or_rootgroup_or_filename, Problem):
+        root_group = problem_or_rootgroup_or_filename.model
+    elif isinstance(problem_or_rootgroup_or_filename, Group):
+        if not problem_or_rootgroup_or_filename.pathname: # root group
+            root_group = problem_or_rootgroup_or_filename
         else:
             # this function only makes sense when it is at the root
             return {}
+    elif is_valid_sqlite3_db(problem_or_rootgroup_or_filename):
+        import sqlite3
+        con = sqlite3.connect(problem_or_rootgroup_or_filename, detect_types=sqlite3.PARSE_DECLTYPES)
+        cur = con.cursor()
+        cur.execute("SELECT model_viewer_data FROM driver_metadata;")
+        model_pickle = cur.fetchone()
+        import cPickle
+        return cPickle.loads(str(model_pickle[0]))
+
     else:
-        raise TypeError('get_model_viewer_data only accepts Problems or Groups')
+        raise TypeError('_get_viewer_data only accepts Problems or Groups or sqlite filenames')
 
     data_dict = {}
-    component_execution_idx = [0] #list so pass by ref
+    component_execution_idx = [0]  # list so pass by ref
     component_execution_orders = {}
     data_dict['tree'] = _get_tree_dict(root_group, component_execution_orders, component_execution_idx)
 
-    abs2data = root_group._var_abs2data_io
     connections_list = []
-    sorted_abs_input2src = OrderedDict(sorted(root_group._assembler._abs_input2src.items())) # sort to make deterministic for testing
+    sorted_abs_input2src = OrderedDict(sorted(root_group._conn_global_abs_in2out.items())) # sort to make deterministic for testing
     G = compute_sys_graph(root_group, sorted_abs_input2src, comps_only=True)
     scc = nx.strongly_connected_components(G)
     scc_list = [s for s in scc if len(s)>1] #list(scc)
@@ -134,7 +137,6 @@ def _get_viewer_data(problem_or_rootgroup):
                     if(exe_order < exe_low or exe_order > exe_high):
                         subg.remove_node(n)
 
-
                 src_to_tgt_str = src_subsystem + ' ' + tgt_subsystem
                 for tup in subg.edges():
                     edge_str = tup[0] + ' ' + tup[1]
@@ -147,10 +149,10 @@ def _get_viewer_data(problem_or_rootgroup):
         else:
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs)]))
 
-
     data_dict['connections_list'] = connections_list
 
     return data_dict
+
 
 def view_tree(*args, **kwargs):
     """
@@ -159,7 +161,9 @@ def view_tree(*args, **kwargs):
     warn_deprecation("view_tree is deprecated. Please switch to view_model.")
     view_model(*args, **kwargs)
 
-def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_browser=True, offline=True, embed=False):
+
+def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_browser=True,
+               offline=True, embed=False):
     """
     Generates a self-contained html file containing a tree viewer
     of the specified type.  Optionally pops up a web browser to
@@ -226,28 +230,7 @@ def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_brows
     with open(os.path.join(code_dir, 'awesomplete.js'), "r") as f:
             awesomplete_js = "%s" % (f.read())
 
-    from openmdao.core.problem import Problem
-    if isinstance(problem_or_filename, Problem):
-        model_viewer_data = _get_viewer_data(problem_or_filename)
-    else:
-        # Do not know file type. Try opening to see what works
-        file_type = None
-        if is_valid_sqlite3_db(problem_or_filename):
-            db = SqliteDict(filename=problem_or_filename, flag='r', tablename='metadata')
-            file_type = "sqlite"
-        else:
-            try:
-                hdf = h5py.File(problem_or_filename, 'r')
-                file_type = 'hdf5'
-            except:
-                raise ValueError("The given filename is not one of the supported file formats: sqlite or hdf5")
-
-        if file_type == "sqlite":
-            model_viewer_data = db['model_viewer_data']
-        elif file_type == "hdf5":
-            metadata = hdf.get('metadata', None)
-            model_viewer_data = pickle.loads(metadata.get('model_viewer_data').value)
-
+    model_viewer_data = _get_viewer_data(problem_or_filename)
 
     tree_json = json.dumps(model_viewer_data['tree'])
     conns_json = json.dumps(model_viewer_data['connections_list'])

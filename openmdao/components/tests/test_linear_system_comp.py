@@ -69,7 +69,7 @@ class TestLinearSystem(unittest.TestCase):
             prob.run_model()
             prob.model.run_linearize()
 
-            # prob.check_partial_derivatives()
+            # prob.check_partial_derivs()
 
             # Compare against calculated derivs
             # Ainv = np.linalg.inv(A) # Don't use linalg.inv or a mathematician will die
@@ -80,22 +80,23 @@ class TestLinearSystem(unittest.TestCase):
             dx_dA = np.outer(Ainv, -x).reshape(3, 9)
             dx_db = Ainv
 
-            with lingrp.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-                # Forward mode with RHS of self.b
-                d_residuals['lin.x'] = b
-                lingrp.run_solve_linear(['linear'], 'fwd')
-                sol = d_outputs['lin.x']
-                assert_rel_error(self, sol, x, .0001)
+            d_inputs, d_outputs, d_residuals = lingrp.get_linear_vectors()
 
-                # Reverse mode with RHS of self.b_T
-                d_outputs['lin.x'] = b_T
-                lingrp.run_solve_linear(['linear'], 'rev')
-                sol = d_residuals['lin.x']
-                assert_rel_error(self, sol, x, .0001)
+            # Forward mode with RHS of self.b
+            d_residuals['lin.x'] = b
+            lingrp.run_solve_linear(['linear'], 'fwd')
+            sol = d_outputs['lin.x']
+            assert_rel_error(self, sol, x, .0001)
 
-                J = prob.compute_total_derivs(['lin.x'], ['p1.A', 'p2.b'], return_format='flat_dict')
-                assert_rel_error(self, J['lin.x', 'p1.A'], dx_dA, .0001)
-                assert_rel_error(self, J['lin.x', 'p2.b'], dx_db, .0001)
+            # Reverse mode with RHS of self.b_T
+            d_outputs['lin.x'] = b_T
+            lingrp.run_solve_linear(['linear'], 'rev')
+            sol = d_residuals['lin.x']
+            assert_rel_error(self, sol, x, .0001)
+
+            J = prob.compute_total_derivs(['lin.x'], ['p1.A', 'p2.b'], return_format='flat_dict')
+            assert_rel_error(self, J['lin.x', 'p1.A'], dx_dA, .0001)
+            assert_rel_error(self, J['lin.x', 'p2.b'], dx_db, .0001)
 
         # print
         lin_sys_comp = LinearSystemComp(size=3, partial_type="matrix_free")

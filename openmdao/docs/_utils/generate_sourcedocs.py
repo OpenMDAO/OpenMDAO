@@ -86,8 +86,17 @@ OpenMDAO User Source Documentation
     # the important packages in this list explicitly. Any new ones that
     # get added will show up at the end.
     packages = [
-        'approximation_schemes', 'assemblers', 'core', 'components', 'drivers', 'error_checking',
-        'jacobians', 'matrices', 'solvers', 'proc_allocators', 'utils', 'vectors'
+        'approximation_schemes',
+        'core',
+        'components',
+        'drivers',
+        'error_checking',
+        'jacobians',
+        'matrices',
+        'solvers',
+        'proc_allocators',
+        'utils',
+        'vectors',
     ]
 
     # everything in openmdao dir that isn't discarded is appended as a source package.

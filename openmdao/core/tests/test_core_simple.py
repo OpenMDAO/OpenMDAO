@@ -60,7 +60,7 @@ class Test(unittest.TestCase):
     def test_var_indices(self):
         def get_inds(p, sname, type_):
             system = p.model.get_subsystem(sname) if sname else p.model
-            idxs = p._assembler._var_allprocs_abs2idx_io
+            idxs = p.model._var_allprocs_abs2idx[type_]
             return np.array([
                 idxs[name] for name in system._var_abs_names[type_]
             ])
@@ -75,24 +75,13 @@ class Test(unittest.TestCase):
         assert_rel_error(self, get_inds(self.p, 'B', 'output'), np.array([1]))
 
     def test_var_allprocs_idx_range(self):
-        root_rng = self.p.model._var_allprocs_idx_range
-        compA_rng = self.p.model.get_subsystem('A')._var_allprocs_idx_range
-        compB_rng = self.p.model.get_subsystem('B')._var_allprocs_idx_range
+        rng = self.p.model._subsystems_var_range
 
-        assert_rel_error(self, root_rng['input'], np.array([0,1]))
-        assert_rel_error(self, root_rng['output'], np.array([0,2]))
+        assert_rel_error(self, rng['input'][0], np.array([0,0]))
+        assert_rel_error(self, rng['input'][1], np.array([0,1]))
 
-        assert_rel_error(self, compA_rng['input'], np.array([0,0]))
-        assert_rel_error(self, compA_rng['output'], np.array([0,1]))
-
-        assert_rel_error(self, compB_rng['input'], np.array([0,1]))
-        assert_rel_error(self, compB_rng['output'], np.array([1,2]))
-
-    def test_connections(self):
-        root = self.p.model
-
-        self.assertEqual(root._manual_connections_abs[0][0], 'B.x')
-        self.assertEqual(root._manual_connections_abs[0][1], 'A.x')
+        assert_rel_error(self, rng['output'][0], np.array([0,1]))
+        assert_rel_error(self, rng['output'][1], np.array([1,2]))
 
     def test_GS(self):
         root = self.p.model

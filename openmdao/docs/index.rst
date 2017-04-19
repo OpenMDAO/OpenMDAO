@@ -83,6 +83,7 @@ Solvers (nonlinear and linear)
    features/solvers/ln_scipy
    features/solvers/ln_petscksp
    features/solvers/ln_bjac
+   features/solvers/ls_backtracking
 
 Running your models
 ================================

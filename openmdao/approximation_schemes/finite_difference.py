@@ -69,6 +69,9 @@ class FiniteDifference(ApproximationScheme):
 
     For example, using the 'forward' form with a step size of 'h' will approximate the derivative in
     the following way:
+
+    .. math::
+
         f'(x) = \frac{f(x+h) - f(x)}{h} + O(h).
 
     Attributes
@@ -136,7 +139,7 @@ class FiniteDifference(ApproximationScheme):
 
     def compute_approximations(self, system, jac=None, deriv_type='partial'):
         """
-        Execute the system to compute the approximate (sub)-Jacobians.
+        Execute the system to compute the approximate sub-Jacobians.
 
         Parameters
         ----------
@@ -187,7 +190,10 @@ class FiniteDifference(ApproximationScheme):
             coeffs = fd_form.coeffs / step
             current_coeff = fd_form.current_coeff / step
 
-            in_size = np.prod(system._var_abs2data_io[wrt]['metadata']['shape'])
+            if wrt in system._var_abs2meta['input']:
+                in_size = np.prod(system._var_abs2meta['input'][wrt]['shape'])
+            elif wrt in system._var_abs2meta['output']:
+                in_size = np.prod(system._var_abs2meta['output'][wrt]['shape'])
 
             result = system._outputs._clone(True)
 
@@ -198,7 +204,7 @@ class FiniteDifference(ApproximationScheme):
             for approx_tuple in approximations:
                 of = approx_tuple[0]
                 # TODO: Sparse derivatives
-                out_size = np.prod(system._var_abs2data_io[of]['metadata']['shape'])
+                out_size = np.prod(system._var_abs2meta['output'][of]['shape'])
                 outputs.append((of, np.zeros((out_size, in_size))))
 
             for idx in range(in_size):

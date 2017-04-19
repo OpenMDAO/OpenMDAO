@@ -31,7 +31,9 @@ class Solver(object):
         list of recorders that have been added to this system.
     options : <OptionsDictionary>
         options dictionary.
-
+    supports : <OptionsDictionary>
+        options dictionary describing what features are supported by this
+        solver.
     """
 
     SOLVER = 'base_solver'
@@ -60,6 +62,10 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', type_=int, value=1,
                              desc='whether to print output')
+
+        # What the solver supports.
+        self.supports = OptionsDictionary()
+        self.supports.declare('gradients', type_=bool, value=False)
 
         self._declare_options()
         self.options.update(kwargs)
@@ -99,6 +105,7 @@ class Solver(object):
         self._system = system
         self._depth = depth
         self._rec_mgr.startup()
+        self._rec_mgr.record_metadata(self)
 
     def _mpi_print(self, iteration, abs_res, rel_res):
         """
@@ -282,7 +289,7 @@ class NonlinearSolver(Solver):
         float
             error at the first iteration.
         """
-        if self.options['maxiter'] > 1:
+        if self.options['maxiter'] > 0:
             norm = self._iter_get_norm()
         else:
             norm = 1.0
@@ -370,13 +377,8 @@ class LinearSolver(Solver):
             norm.
         """
         system = self._system
-        var_inds = [
-            system._var_allprocs_idx_range['output'][0],
-            system._var_allprocs_idx_range['output'][1],
-            system._var_allprocs_idx_range['output'][0],
-            system._var_allprocs_idx_range['output'][1],
-        ]
-        system._apply_linear(self._vec_names, self._mode, var_inds)
+        scope_out, scope_in = system._get_scope()
+        system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
 
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']

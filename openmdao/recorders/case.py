@@ -1,9 +1,14 @@
-class Case(object):
-    """ Case wraps the data from a single iteration/case of a recording
-    to make it more easily accessible to the user.
+"""
+A Case class.
+"""
 
-    Args
-    ----
+
+class Case(object):
+    """
+    Case wraps the data from a single iteration of a recording to make it more easily accessible.
+
+    Parameters
+    ----------
     filename : str
         The filename from which the Case was constructed.
     case_id : str
@@ -39,7 +44,11 @@ class Case(object):
         float or dict.
     """
 
-    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, desvars_array, responses_array, objectives_array, constraints_array):
+    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg,
+                 desvars_array, responses_array, objectives_array, constraints_array):
+        """
+        Initialize.
+        """
         self.filename = filename
         self.counter = counter
         self.iteration_coordinate = iteration_coordinate

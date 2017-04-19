@@ -9,16 +9,17 @@ import inspect
 
 from fnmatch import fnmatchcase
 import numpy as np
-from itertools import product, chain
-from six import string_types, iteritems
+from itertools import product
+from six import string_types, iteritems, itervalues
 from scipy.sparse import issparse
 from copy import deepcopy
 from collections import OrderedDict, Iterable
 
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.core.system import System, PathData
+from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation
 from openmdao.utils.name_maps import rel_name2abs_name, rel_key2abs_key, abs_key2rel_key
@@ -30,21 +31,23 @@ class Component(System):
 
     Attributes
     ----------
-    _var2meta : dict
-        A mapping of local variable name to its metadata.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
     _matrix_free : Bool
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian.
     _var_rel2data_io : dict
-        Dictionary mapping rellative names to dicts with keys (prom, rel, my_idx, type_, metadata).
+        Dictionary mapping relative names to dicts with keys (prom, rel, my_idx, type_, metadata).
         This is only needed while adding inputs and outputs. During setup, these are used to
-        build _var_abs2data_io.
+        build the dictionaries of metadata.
+    _static_var_rel2data_io : dict
+        Static version of above - stores data for variables added outside of initialize_variables.
     _var_rel_names : {'input': [str, ...], 'output': [str, ...]}
         List of relative names of owned variables existing on current proc.
         This is only needed while adding inputs and outputs. During setup, these are used to
-        determine the _var_abs_names.
+        determine the list of absolute names.
+    _static_var_rel_names : dict
+        Static version of above - stores names of variables added outside of initialize_variables.
     """
 
     def __init__(self, **kwargs):
@@ -63,6 +66,171 @@ class Component(System):
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
+
+        self._static_var_rel_names = {'input': [], 'output': []}
+        self._static_var_rel2data_io = {}
+
+    def initialize_variables(self):
+        """
+        Required method for components to declare inputs and outputs.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+        """
+        pass
+
+    def _setup_vars(self, recurse=True):
+        """
+        Call initialize_variables in components and count variables, total and by var_set.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(Component, self)._setup_vars()
+        num_var = self._num_var
+        num_var_byset = self._num_var_byset
+
+        self._var_rel_names = {'input': [], 'output': []}
+        self._var_rel2data_io = {}
+
+        self._static_mode = False
+        self._var_rel2data_io.update(self._static_var_rel2data_io)
+        for type_ in ['input', 'output']:
+            self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
+        self.initialize_variables()
+        self._static_mode = True
+
+        # Compute num_var
+        for type_ in ['input', 'output']:
+            num_var[type_] = len(self._var_rel_names[type_])
+
+        # Compute num_var_byset
+        for data in itervalues(self._var_rel2data_io):
+            type_ = data['type']
+            metadata = data['metadata']
+            set_name = metadata['var_set']
+            if set_name in num_var_byset[type_]:
+                num_var_byset[type_][set_name] += 1
+            else:
+                num_var_byset[type_][set_name] = 1
+
+    def _setup_var_data(self, recurse=True):
+        """
+        Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(Component, self)._setup_var_data()
+        allprocs_abs_names = self._var_allprocs_abs_names
+        abs_names = self._var_abs_names
+        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
+        abs2prom = self._var_abs2prom
+        allprocs_abs2meta = self._var_allprocs_abs2meta
+        abs2meta = self._var_abs2meta
+
+        # Compute the prefix for turning rel/prom names into abs names
+        if self.pathname is not '':
+            prefix = self.pathname + '.'
+        else:
+            prefix = ''
+
+        meta_names = {
+            'input': ('units', 'shape', 'var_set'),
+            'output': ('units', 'shape', 'var_set', 'ref', 'ref0'),
+        }
+
+        for type_ in ['input', 'output']:
+            for ind, prom_name in enumerate(self._var_rel_names[type_]):
+                abs_name = prefix + prom_name
+                data = self._var_rel2data_io[prom_name]
+                metadata = data['metadata']
+
+                # Compute allprocs_abs_names, abs_names
+                allprocs_abs_names[type_].append(abs_name)
+                abs_names[type_].append(abs_name)
+
+                # Compute allprocs_prom2abs_list, abs2prom
+                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+                abs2prom[type_][abs_name] = prom_name
+
+                # Compute allprocs_abs2meta
+                allprocs_metadata = {
+                    meta_name: metadata[meta_name]
+                    for meta_name in meta_names[type_]
+                }
+                allprocs_abs2meta[type_][abs_name] = allprocs_metadata
+
+                # Compute abs2meta
+                abs2meta[type_][abs_name] = metadata
+
+    def _setup_var_sizes(self, recurse=True):
+        """
+        Compute the arrays of local variable sizes for all variables/procs on this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(Component, self)._setup_var_sizes()
+
+        sizes = self._var_sizes
+        sizes_byset = self._var_sizes_byset
+
+        iproc = self.comm.rank
+        nproc = self.comm.size
+
+        set2iset = self._var_set2iset
+
+        # Initialize empty arrays
+        for type_ in ['input', 'output']:
+            sizes[type_] = np.zeros((nproc, self._num_var[type_]), int)
+
+            sizes_byset[type_] = {}
+            for set_name in set2iset[type_]:
+                sizes_byset[type_][set_name] = np.zeros(
+                    (nproc, self._num_var_byset[type_][set_name]), int)
+
+        # Compute _var_sizes and _var_sizes_byset
+        for type_ in ['input', 'output']:
+            abs2meta_t = self._var_abs2meta[type_]
+            allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[type_]
+            for idx, abs_name in enumerate(self._var_abs_names[type_]):
+                meta = abs2meta_t[abs_name]
+                set_name = meta['var_set']
+                size = np.prod(meta['shape'])
+                idx_byset = allprocs_abs2idx_byset_t[abs_name]
+
+                sizes[type_][iproc, idx] = size
+                sizes_byset[type_][set_name][iproc, idx_byset] = size
+
+        if self.comm.size > 1:
+            for type_ in ['input', 'output']:
+                self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                for set_name in self._var_set2iset[type_]:
+                    self.comm.Allgather(
+                        sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
+
+    def _setup_partials(self, recurse=True):
+        """
+        Call initialize_partials in components.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(Component, self)._setup_partials()
+
+        self.initialize_partials()
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
                   desc='', var_set=0):
@@ -148,11 +316,18 @@ class Component(System):
         metadata['var_set'] = var_set
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
-        self._var_rel2data_io[name] = {'prom': name, 'rel': name,
-                                       'my_idx': len(self._var_rel_names['input']),
-                                       'type': 'input', 'metadata': metadata}
-        self._var_rel_names['input'].append(name)
-        self._var_allprocs_prom2abs_list['input'][name] = [name]
+        if self._static_mode:
+            var_rel2data_io = self._static_var_rel2data_io
+            var_rel_names = self._static_var_rel_names
+        else:
+            var_rel2data_io = self._var_rel2data_io
+            var_rel_names = self._var_rel_names
+
+        var_rel2data_io[name] = {
+            'prom': name, 'rel': name,
+            'my_idx': len(self._var_rel_names['input']),
+            'type': 'input', 'metadata': metadata}
+        var_rel_names['input'].append(name)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0,
@@ -222,16 +397,18 @@ class Component(System):
             raise TypeError('The name argument should be a string')
         if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
             raise TypeError('The val argument should be a float, list, tuple, or ndarray')
+        if not np.isscalar(ref) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+            raise TypeError('The ref argument should be a float, list, tuple, or ndarray')
+        if not np.isscalar(ref0) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+            raise TypeError('The ref0 argument should be a float, list, tuple, or ndarray')
+        if not np.isscalar(res_ref) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+            raise TypeError('The res_ref argument should be a float, list, tuple, or ndarray')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
         if units is not None and not isinstance(units, str):
             raise TypeError('The units argument should be a str or None')
         if res_units is not None and not isinstance(res_units, str):
             raise TypeError('The res_units argument should be a str or None')
-        if lower is not None:
-            lower = format_as_float_or_array('lower', lower)
-        if upper is not None:
-            upper = format_as_float_or_array('upper', upper)
 
         # Check that units are valid
         if units is not None and not valid_units(units):
@@ -249,13 +426,11 @@ class Component(System):
         # desc: taken as is
         metadata['desc'] = desc
 
-        # lower, upper: check the shape if necessary
-        if lower is not None and not np.isscalar(lower) and \
-                np.atleast_1d(lower).shape != metadata['shape']:
-            raise ValueError('The lower argument has the wrong shape')
-        if upper is not None and not np.isscalar(upper) and \
-                np.atleast_1d(upper).shape != metadata['shape']:
-            raise ValueError('The upper argument has the wrong shape')
+        if lower is not None:
+            lower = ensure_compatible(name, lower, metadata['shape'])[0]
+        if upper is not None:
+            upper = ensure_compatible(name, upper, metadata['shape'])[0]
+
         metadata['lower'] = lower
         metadata['upper'] = upper
 
@@ -281,11 +456,18 @@ class Component(System):
         metadata['var_set'] = var_set
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
-        self._var_rel2data_io[name] = {'prom': name, 'rel': name,
-                                       'my_idx': len(self._var_rel_names['output']),
-                                       'type': 'output', 'metadata': metadata}
-        self._var_rel_names['output'].append(name)
-        self._var_allprocs_prom2abs_list['output'][name] = [name]
+        if self._static_mode:
+            var_rel2data_io = self._static_var_rel2data_io
+            var_rel_names = self._static_var_rel_names
+        else:
+            var_rel2data_io = self._var_rel2data_io
+            var_rel_names = self._var_rel_names
+
+        var_rel2data_io[name] = {
+            'prom': name, 'rel': name,
+            'my_idx': len(self._var_rel_names['output']),
+            'type': 'output', 'metadata': metadata}
+        var_rel_names['output'].append(name)
 
     def approx_partials(self, of, wrt, method='fd', **kwargs):
         """
@@ -478,8 +660,11 @@ class Component(System):
         """
         of, wrt = abs_key2rel_key(self, abs_key)
         if meta['dependent']:
-            out_size = np.prod(self._var_abs2data_io[abs_key[0]]['metadata']['shape'])
-            in_size = np.prod(self._var_abs2data_io[abs_key[1]]['metadata']['shape'])
+            out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
+            if abs_key[1] in self._var_abs2meta['input']:
+                in_size = np.prod(self._var_abs2meta['input'][abs_key[1]]['shape'])
+            elif abs_key[1] in self._var_abs2meta['output']:
+                in_size = np.prod(self._var_abs2meta['output'][abs_key[1]]['shape'])
             rows = meta['rows']
             cols = meta['cols']
             if rows is not None:
@@ -524,124 +709,3 @@ class Component(System):
 
         for approx in self._approx_schemes:
             approx._init_approximations()
-
-    def _setup_partials(self):
-        """
-        Set up partial derivative sparsity structures and approximation schemes.
-        """
-        self.initialize_partials()
-
-    def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
-        r"""
-        Add this vector and assign sub_vectors to subsystems.
-
-        Sets the following attributes:
-
-        - _vectors
-        - _vector_transfers
-        - _inputs*
-        - _outputs*
-        - _residuals*
-        - _transfers*
-
-        \* If vec_name is 'nonlinear'
-
-        Parameters
-        ----------
-        vectors : {'input': <Vector>, 'output': <Vector>, 'residual': <Vector>}
-            <Vector> objects corresponding to 'name'.
-        vector_var_ids : ndarray[:]
-            integer array of all relevant variables for this vector.
-        use_ref_vector : bool
-            if True, allocate vectors to store ref. values.
-        """
-        super(Component, self)._setup_vector(vectors, vector_var_ids,
-                                             use_ref_vector)
-
-        # Components must load their initial input and output values into the
-        # vectors.
-
-        # Note: It's possible for meta['value'] to not match
-        #       meta['shape'], and input and output vectors are sized according
-        #       to shape, so if, for example, value is not specified it
-        #       defaults to 1.0 and the shape can be anything, resulting in the
-        #       value of 1.0 being broadcast into all values in the vector
-        #       that were allocated according to the shape.
-        if vectors['input']._name is 'nonlinear':
-            inputs = self._inputs
-            outputs = self._outputs
-            abs2data = self._var_abs2data_io
-
-            for name in self._var_abs_names['input']:
-                inputs[abs2data[name]['rel']] = abs2data[name]['metadata']['value']
-
-            # inputs are nonlinear, so are outputs
-            for name in self._var_abs_names['output']:
-                outputs[abs2data[name]['rel']] = abs2data[name]['metadata']['value']
-
-    def _setup_variables(self):
-        """
-        Compute variable dict/list for variables on the current processor.
-
-        Sets the following attributes:
-            _var_abs2data_io
-            _var_abs_names
-            _var_allprocs_prom2abs_list
-
-        Returns
-        -------
-        {'input': [str, ...], 'output': [str, ...]}
-            List of absolute names of owned variables existing on current proc.
-        """
-        super(Component, self)._setup_variables()
-
-        # Now that we know the pathname, create _var_abs_names from _var_rel_names.
-        for type_ in ['input', 'output']:
-            abs_names = []
-            allprocs_prom2abs_list = {}
-            for name in self._var_rel_names[type_]:
-                abs_name = rel_name2abs_name(self, name)
-                abs_names.append(abs_name)
-                allprocs_prom2abs_list[name] = [abs_name]
-            self._var_abs_names[type_] = abs_names
-            self._var_allprocs_prom2abs_list[type_] = allprocs_prom2abs_list
-
-        # Now that we know the pathname, create _var_abs2data_io from _var_rel2data_io.
-        abs2data_io = {}
-        for name, data in iteritems(self._var_rel2data_io):
-            abs_name = rel_name2abs_name(self, name)
-            abs2data_io[abs_name] = data
-        self._var_abs2data_io = abs2data_io
-
-        # If this is a component, myproc names = allprocs names
-        # and _var_allprocs_prom2abs_list was already computed in add_input / add_output.
-
-        # We use allprocs_abs_names to count the total number of allprocs variables
-        # and put it in _var_allprocs_idx_range.
-        for type_ in ['input', 'output']:
-            self._var_allprocs_idx_range[type_] = [0, len(self._var_abs_names[type_])]
-
-        return self._var_abs_names
-
-    def _setup_variable_indices(self, global_index):
-        """
-        Compute the global index range for variables on all processors.
-
-        Computes the following attributes:
-            _var_allprocs_idx_range
-
-        Parameters
-        ----------
-        global_index : {'input': int, 'output': int}
-            current global variable counter.
-        """
-        # At this point, _var_allprocs_idx_range is correct except for an offset.
-        # We apply the global_index offset to make _var_allprocs_idx_range correct.
-        for type_ in ['input', 'output']:
-            for ind in range(2):
-                self._var_allprocs_idx_range[type_][ind] += global_index[type_]
-
-        # Reset index dict to the global variable counter on all procs.
-        # Necessary for younger siblings to have proper index values.
-        for type_ in ['input', 'output']:
-            global_index[type_] = self._var_allprocs_idx_range[type_][1]

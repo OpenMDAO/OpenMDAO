@@ -9,7 +9,7 @@ import itertools
 import warnings
 
 import numpy as np
-from nose_parameterized import parameterized
+from parameterized import parameterized
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, NLRunOnce
 from openmdao.devtools.testutil import assert_rel_error
@@ -352,7 +352,7 @@ class TestGroup(unittest.TestCase):
         p = Problem(model=Group())
         indep = p.model.add_subsystem('indep', IndepVarComp())
         indep.add_output('x', np.ones(5), units='ft')
-        p.model.add_subsystem('C1', ExecComp('y=sum(x)', x={'value': np.zeros(5), 'units': 'inch'}, 
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)', x={'value': np.zeros(5), 'units': 'inch'},
                                              y={'units': 'inch'}))
         p.model.connect('indep.x', 'C1.x')
         p.model.suppress_solver_output = True
@@ -647,7 +647,7 @@ class TestGroup(unittest.TestCase):
         model.suppress_solver_output = True
 
         self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
-                         [s.name for s in model._subsystems_allprocs])
+                         [s.name for s in model._static_subsystems_allprocs])
 
         prob.setup(check=False)
         prob.run_model()
@@ -681,7 +681,7 @@ class TestGroup(unittest.TestCase):
         model.suppress_solver_output = True
 
         self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
-                         [s.name for s in model._subsystems_allprocs])
+                         [s.name for s in model._static_subsystems_allprocs])
 
         prob.setup(check=False)
         prob.run_model()

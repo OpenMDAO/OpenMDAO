@@ -1,16 +1,11 @@
 """Define a base class for all Drivers in OpenMDAO."""
 
-from six import iteritems
-
+from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, update_local_meta
-from openmdao.recorders.recording_manager import RecordingManager
-
-
-from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+from six import iteritems
 # import openmdao.devtools.problem_viewer.problem_viewer
-
-import numpy as np
 
 
 class Driver(object):
@@ -37,6 +32,8 @@ class Driver(object):
         Contains all response info.
     _rec_mgr : list of recorders
         list of recorders that have been added to this system.
+    _model_viewer_data : dict
+        structure of model, used to make n2 diagram.
     iter_count : int
         keep track of iterations for case recording
     metadata : list
@@ -57,24 +54,22 @@ class Driver(object):
         self.options = OptionsDictionary()
 
         # What the driver supports.
-        # Note Driver based class supports setting up problems that use every
-        # feature, but it doesn't do anything except run the model. This is
-        # primarilly for generic testing.
         self.supports = OptionsDictionary()
-        self.supports.declare('inequality_constraints', type_=bool, value=True)
-        self.supports.declare('equality_constraints', type_=bool, value=True)
-        self.supports.declare('linear_constraints', type_=bool, value=True)
-        self.supports.declare('two_sided_constraints', type_=bool, value=True)
-        self.supports.declare('multiple_objectives', type_=bool, value=True)
-        self.supports.declare('integer_design_vars', type_=bool, value=True)
-        self.supports.declare('gradients', type_=bool, value=True)
-        self.supports.declare('active_set', type_=bool, value=True)
+        self.supports.declare('inequality_constraints', type_=bool, value=False)
+        self.supports.declare('equality_constraints', type_=bool, value=False)
+        self.supports.declare('linear_constraints', type_=bool, value=False)
+        self.supports.declare('two_sided_constraints', type_=bool, value=False)
+        self.supports.declare('multiple_objectives', type_=bool, value=False)
+        self.supports.declare('integer_design_vars', type_=bool, value=False)
+        self.supports.declare('gradients', type_=bool, value=False)
+        self.supports.declare('active_set', type_=bool, value=False)
 
         self.iter_count = 0
         self.metadata = None
+        self._model_viewer_data = None
 
         # TODO, support these in Openmdao blue
-        # self.supports.declare('integer_design_vars', True)
+        self.supports.declare('integer_design_vars', type_=bool, value=False)
 
         self.fail = False
 
@@ -115,7 +110,11 @@ class Driver(object):
         self._responses = model.get_responses(recurse=True)
         self._objs = model.get_objectives(recurse=True)
         self._cons = model.get_constraints(recurse=True)
+
         self._rec_mgr.startup()
+        if (self._rec_mgr._recorders):
+            self._model_viewer_data = _get_viewer_data(problem)
+        self._rec_mgr.record_metadata(self)
 
     def get_design_var_values(self):
         """
@@ -339,3 +338,24 @@ class Driver(object):
             raise RuntimeError(msg)
 
         return derivs
+
+    def get_req_procs(self, model):
+        """
+        Return min and max MPI processes usable by this Driver for the model.
+
+        This should be overridden by Drivers that can use more processes than
+        the model uses, e.g., DOEDriver.
+
+        Parameters
+        ----------
+        model : <System>
+            Top level <System> that contains the entire model.
+
+        Returns
+        -------
+        tuple : (int, int or None)
+            A tuple of the form (min_procs, max_procs), indicating the min
+            and max processors usable by this `Driver` and the given model.
+            max_procs can be None, indicating all available procs can be used.
+        """
+        return model.get_req_procs()

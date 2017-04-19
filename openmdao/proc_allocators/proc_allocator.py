@@ -6,45 +6,71 @@ from six.moves import range
 from openmdao.utils.generalized_dict import OptionsDictionary
 
 
+class ProcAllocationError(Exception):
+    """
+    Exception raised when processor allocation fails.
+
+    Attributes
+    ----------
+    sub_idx : int
+        Index into the parent's _subsystems_allprocs list.
+    requested : int
+        Number of processes requested by the indexed subsystem.
+    remaining : int
+        Number of processes available to the indexed subsystem.
+    """
+
+    def __init__(self, sub_idx, requested, remaining):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        sub_idx : int
+            Index into the parent's _subsystems_allprocs list.
+        requested : int
+            Number of processes requested by the indexed subsystem.
+        remaining : int
+            Number of processes available to the indexed subsystem.
+        """
+        super(ProcAllocationError, self).__init__('')
+        self.sub_idx = sub_idx
+        self.requested = requested
+        self.remaining = remaining
+
+
 class ProcAllocator(object):
     """
     Algorithm for allocating processors to a given system's subsystems.
 
     Attributes
     ----------
-    _parallel : boolean
+    parallel : boolean
         True means the comm is split across subsystems;
         False means the comm is passed to all subsystems.
-    options : <OptionsDictionary>
-        options dictionary.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, parallel=False):
         """
         Initialize all attributes.
 
         Parameters
         ----------
-        **kwargs : dict
-            Contains options.
+        parallel : bool
+            If True, split subsystem comm.
         """
-        self.options = OptionsDictionary()
-        self.options.declare('parallel', type_=bool, value=False,
-                             desc='whether to parallelize between subsystems')
-        self.options.update(kwargs)
+        self.parallel = parallel
 
-    def __call__(self, nsub, comm, proc_range):
+    def __call__(self, req_procs, comm):
         """
         Perform the allocation if parallel.
 
         Parameters
         ----------
-        nsub : int
-            Number of subsystems.
+        req_procs : list of (int, int)
+            list of min/max usable procs for each subsystem.
         comm : MPI.Comm or <FakeComm>
             communicator of the owning system.
-        proc_range : [int, int]
-            global processor index range.
 
         Returns
         -------
@@ -52,31 +78,28 @@ class ProcAllocator(object):
             indices of the owned local subsystems.
         sub_comm : MPI.Comm or <FakeComm>
             communicator to pass to the subsystems.
-        sub_proc_range : [int, int]
-            global processor index range to pass to the subsystems.
+        sub_proc_range : (int, int)
+            The range of processors that the subcomm owns, among those of comm.
         """
-        # This is a serial group - all procs get all subsystems
-        if not self.options['parallel'] or comm.size == 1:
-            isubs = list(range(nsub))
-            sub_comm = comm
-            sub_proc_range = [proc_range[0], proc_range[1]]
-            return isubs, sub_comm, sub_proc_range
-        # This is a parallel group
+        if self.parallel and comm.size > 1:
+            # This is a parallel group
+            return self._divide_procs(req_procs, comm)
         else:
-            return self._divide_procs(nsub, comm, proc_range)
+            # This is a serial group - all procs get all subsystems
+            return list(range(len(req_procs))), comm, (0, comm.size)
 
-    def _divide_procs(self, nsub, comm, proc_range):
+    def _divide_procs(self, req_procs, comm, proc_range):
         """
         Perform the parallel processor allocation.
 
         Parameters
         ----------
-        nsub : int
-            Number of subsystems.
+        req_procs : list of (int, int)
+            list of min/max usable procs for each subsystem.
         comm : MPI.Comm or <FakeComm>
             communicator of the owning system.
-        proc_range : [int, int]
-            global processor index range.
+        proc_range : (int, int)
+            The range of processors that the comm on this system owns, in the global index space.
 
         Returns
         -------
@@ -84,7 +107,5 @@ class ProcAllocator(object):
             indices of the owned local subsystems.
         sub_comm : MPI.Comm or <FakeComm>
             communicator to pass to the subsystems.
-        sub_proc_range : [int, int]
-            global processor index range to pass to the subsystems.
         """
         pass

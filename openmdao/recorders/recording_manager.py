@@ -60,12 +60,12 @@ class RecordingManager(object):
 
     def record_iteration(self, object_requesting_recording, metadata):
         """
-        Gather variables for non-parallel case recorders and calls record for all recorders.
+        Call record_iteration for all recorders.
 
         Args
         ----
-        root : `System`
-           System containing variables.
+        object_requesting_recording :
+            The thing that needs an iteration of itself recorded.
 
         metadata : dict
             Metadata for iteration coordinate
@@ -78,3 +78,19 @@ class RecordingManager(object):
 
         for recorder in self._recorders:
             recorder.record_iteration(object_requesting_recording, metadata)
+
+    def record_metadata(self, object_requesting_recording):
+        """
+        Call record_metadata for all recorders.
+
+        Args
+        ----
+        object_requesting_recording :
+            The thing that needs its metadata recorded.
+
+        """
+        if not self._recorders:
+            return
+
+        for recorder in self._recorders:
+            recorder.record_metadata(object_requesting_recording)

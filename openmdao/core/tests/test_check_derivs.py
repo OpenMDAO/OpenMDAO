@@ -1,4 +1,4 @@
-""" Testing for Problem.check_partial_derivatives and check_total_derivatives."""
+""" Testing for Problem.check_partial_derivs and check_total_derivatives."""
 
 import unittest
 from six import iteritems
@@ -49,7 +49,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         string_stream = StringIO()
 
-        data = prob.check_partial_derivatives(out_stream=string_stream)
+        data = prob.check_partial_derivs(out_stream=string_stream)
 
         lines = string_stream.getvalue().split("\n")
 
@@ -95,7 +95,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
 
-        data = prob.check_partial_derivatives(out_stream=stream)
+        data = prob.check_partial_derivs(out_stream=stream)
 
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']
@@ -141,7 +141,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
         p.setup()
-        data = p.check_partial_derivatives(out_stream=None)
+        data = p.check_partial_derivs(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -184,7 +184,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         model.nl_solver = NLRunOnce()
 
         p.setup()
-        data = p.check_partial_derivatives(out_stream=None)
+        data = p.check_partial_derivs(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -194,8 +194,11 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.assertAlmostEqual(abs_error.forward_reverse, 0.)
 
         # Make sure we only FD this twice.
+        # The count is 5 because in check_partial_derivs, there are two calls to apply_nonlinear
+        # when compute the fwd and rev analytic derivatives, then one call to apply_nonlinear
+        # to compute the reference point for FD, then two additional calls for the two inputs.
         comp = model.get_subsystem('units')
-        self.assertEqual(comp.run_count, 3)
+        self.assertEqual(comp.run_count, 5)
 
     def test_scalar_val(self):
         class PassThrough(ExplicitComponent):
@@ -251,7 +254,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        data = p.check_partial_derivatives(out_stream=None)
+        data = p.check_partial_derivs(out_stream=None)
         identity = np.eye(4)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
@@ -277,7 +280,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partial_derivatives(out_stream=None)
+        data = prob.check_partial_derivs(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -309,7 +312,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partial_derivatives(out_stream=None)
+        data = prob.check_partial_derivs(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
