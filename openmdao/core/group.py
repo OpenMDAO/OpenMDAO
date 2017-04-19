@@ -788,7 +788,7 @@ class Group(System):
 
     def add(self, name, subsys, promotes=None):
         """
-        Deprecated version of <Group.add_subsystem>.
+        Add a subsystem (deprecated version of <Group.add_subsystem>).
 
         Parameters
         ----------

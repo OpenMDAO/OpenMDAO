@@ -326,7 +326,7 @@ class pyOptSparseDriver(Driver):
 
     def _objfunc(self, dv_dict):
         """
-        Function that evaluates and returns the objective function and constraints.
+        Compute the objective function and constraints.
 
         This function is passed to pyOpt's Optimization object and is called
         from its optimizers.
@@ -379,7 +379,7 @@ class pyOptSparseDriver(Driver):
 
     def _gradfunc(self, dv_dict, func_dict):
         """
-        Function that evaluates and returns the gradient of the objective function and constraints.
+        Compute the gradient of the objective function and constraints.
 
         This function is passed to pyOpt's Optimization object and is called
         from its optimizers.

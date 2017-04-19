@@ -1196,7 +1196,7 @@ class System(object):
     @property
     def jacobian(self):
         """
-        A Jacobian object or None.
+        Get the Jacobian object assigned to this system (or None if unassigned).
         """
         return self._jacobian
 
@@ -1375,7 +1375,7 @@ class System(object):
     @property
     def nl_solver(self):
         """
-        The nonlinear solver for this system.
+        Get the nonlinear solver for this system.
         """
         return self._nl_solver
 
@@ -1389,21 +1389,21 @@ class System(object):
     @property
     def ln_solver(self):
         """
-        The linear (adjoint) solver for this system.
+        Get the linear solver for this system.
         """
         return self._ln_solver
 
     @ln_solver.setter
     def ln_solver(self, solver):
         """
-        Set this system's linear (adjoint) solver and perform setup.
+        Set this system's linear solver and perform setup.
         """
         self._ln_solver = solver
 
     @property
     def suppress_solver_output(self):
         """
-        The value of the global toggle to disable solver printing.
+        Get the value of the global toggle to disable solver printing.
         """
         return self._suppress_solver_output
 
@@ -1421,7 +1421,7 @@ class System(object):
     @property
     def proc_allocator(self):
         """
-        The current system's processor allocator object.
+        Get the current system's processor allocator object.
         """
         return self._mpi_proc_allocator
 
@@ -1443,7 +1443,7 @@ class System(object):
     def system_iter(self, local=True, include_self=False, recurse=True,
                     typ=None):
         """
-        A generator of subsystems of this system.
+        Yield a generator of subsystems of this system.
 
         Parameters
         ----------

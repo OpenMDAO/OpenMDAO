@@ -48,7 +48,7 @@ class LinearSystemComp(ImplicitComponent):
 
     def initialize_partials(self):
         """
-        Setup the derivatives according to the user specified mode.
+        Set up the derivatives according to the user specified mode.
         """
         partial_type = self.metadata['partial_type']
 

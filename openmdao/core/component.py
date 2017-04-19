@@ -72,7 +72,7 @@ class Component(System):
 
     def initialize_variables(self):
         """
-        Required method to declare inputs and outputs.
+        Declare inputs and outputs.
 
         Available attributes:
             name
@@ -84,7 +84,7 @@ class Component(System):
 
     def initialize_partials(self):
         """
-        Optional method to declare Jacobian structure/approximations.
+        Declare Jacobian structure/approximations.
 
         Available attributes:
             name
