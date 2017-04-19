@@ -47,10 +47,16 @@ class Group(System):
     def initialize_subsystems(self):
         """
         Add subsystems to this group.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata
         """
         pass
 
-    def _setup_procs(self, pathname, comm, global_dict):
+    def _setup_procs(self, pathname, comm):
         """
         Distribute processors and assign pathnames.
 
@@ -60,10 +66,8 @@ class Group(System):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        global_dict : dict
-            dictionary with kwargs of all parents assembled in it.
         """
-        super(Group, self)._setup_procs(pathname, comm, global_dict)
+        super(Group, self)._setup_procs(pathname, comm)
         subsystems_proc_range = self._subsystems_proc_range
 
         self._subsystems_allprocs = []
@@ -103,8 +107,7 @@ class Group(System):
             else:
                 sub_pathname = subsys.name
 
-            sub_global_dict = self.metadata._global_dict.copy()
-            subsys._setup_procs(sub_pathname, sub_comm, sub_global_dict)
+            subsys._setup_procs(sub_pathname, sub_comm)
 
     def _setup_vars(self, recurse=True):
         """
@@ -785,7 +788,7 @@ class Group(System):
 
     def add(self, name, subsys, promotes=None):
         """
-        Deprecated version of <Group.add_subsystem>.
+        Add a subsystem (deprecated version of <Group.add_subsystem>).
 
         Parameters
         ----------

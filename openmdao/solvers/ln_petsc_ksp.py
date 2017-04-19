@@ -60,6 +60,8 @@ KSP_TYPES = [
 
 def _get_petsc_vec_array_new(vec):
     """
+    Get the array of values for the given PETSc vector.
+
     Helper function to handle a petsc backwards incompatibility.
 
     Parameters
@@ -77,6 +79,8 @@ def _get_petsc_vec_array_new(vec):
 
 def _get_petsc_vec_array_old(vec):
     """
+    Get the array of values for the given PETSc vector.
+    
     Helper function to handle a petsc backwards incompatibility.
 
     Parameters
@@ -202,10 +206,10 @@ class PetscKSP(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('ksp_type', value='fgmres', values=KSP_TYPES,
+        self.options.declare('ksp_type', default='fgmres', values=KSP_TYPES,
                              desc="KSP algorithm to use. Default is 'fgmres'.")
 
-        self.options.declare('restart', value=1000, type_=int,
+        self.options.declare('restart', default=1000, type_=int,
                              desc='Number of iterations between restarts. Larger values increase '
                              'iteration cost, but may be necessary for convergence')
 
