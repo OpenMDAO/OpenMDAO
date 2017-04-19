@@ -327,7 +327,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 assert_rel_error(self, rel_error.forward_reverse, 0., 1e-5)
 
     def test_implicit_undeclared(self):
-        # Test to see that we can check_partial_derivs works when certain key partials are not
+        # Test to see that check_partial_derivs works when state_wrt_input and state_wrt_state
+        # partials are missing.
 
         class ImplComp4Test(ImplicitComponent):
 
