@@ -631,7 +631,7 @@ class System(object):
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
 
-        self._rec_mgr.startup()
+        self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
 
     def _setup_var_index_maps(self, recurse=True):

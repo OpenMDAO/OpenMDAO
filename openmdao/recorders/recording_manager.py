@@ -44,12 +44,12 @@ class RecordingManager(object):
         """
         self._recorders.append(recorder)
 
-    def startup(self):
+    def startup(self, object_requesting_recording):
         """
         Initialization during setup.
         """
         for recorder in self._recorders:
-            recorder.startup()
+            recorder.startup(object_requesting_recording)
 
     def close(self):
         """

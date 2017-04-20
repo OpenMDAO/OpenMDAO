@@ -104,7 +104,7 @@ class Solver(object):
         """
         self._system = system
         self._depth = depth
-        self._rec_mgr.startup()
+        self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
 
     def _mpi_print(self, iteration, abs_res, rel_res):

@@ -111,7 +111,7 @@ class Driver(object):
         self._objs = model.get_objectives(recurse=True)
         self._cons = model.get_constraints(recurse=True)
 
-        self._rec_mgr.startup()
+        self._rec_mgr.startup(self)
         if (self._rec_mgr._recorders):
             self._model_viewer_data = _get_viewer_data(problem)
         self._rec_mgr.record_metadata(self)
