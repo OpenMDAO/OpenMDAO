@@ -150,7 +150,7 @@ class Problem(object):
         Provide for setting the 'root' property for backwards compatibility.
 
         Parameters
-        -------
+        ----------
         model : <Group>
             reference to a <Group> to be assigned to the 'model' property.
         """
