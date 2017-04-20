@@ -209,7 +209,6 @@ class SqliteRecorder(BaseRecorder):
 
                 for name, value in iteritems(constraints_values):
                     constraints_array[name] = value
-
         self.con.execute("INSERT INTO driver_iterations(iteration_coordinate, timestamp, "
                          "success, msg, desvars , responses , objectives , constraints ) "
                          "VALUES(?,?,?,?,?,?,?,?)", (format_iteration_coordinate(metadata['coord']),
