@@ -16,8 +16,6 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         system = self._system
         for isub, subsys in enumerate(system._subsystems_allprocs):
-            system._transfers['fwd', isub](system._inputs,
-                                           system._outputs, 'fwd')
-
+            system._transfer('nonlinear', 'fwd', isub)
             if subsys in system._subsystems_myproc:
                 subsys._solve_nonlinear()

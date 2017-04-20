@@ -41,7 +41,6 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         if(len(local_prom_dict) > 0):
             tree_dict['promotions'] = OrderedDict(sorted(local_prom_dict.items())) # sort to make deterministic for testing
 
-
     if not isinstance(system, Group):
         tree_dict['subsystem_type'] = 'component'
         component_execution_orders[system.pathname] = component_execution_index[0]
@@ -50,9 +49,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         children = []
         for typ in ['input', 'output']:
             for ind, abs_name in enumerate(system._var_abs_names[typ]):
-                data = system._var_abs2data_io[abs_name]
-                meta = data['metadata']
-                name = data['prom']
+                meta = system._var_abs2meta[typ][abs_name]
+                name = system._var_abs2prom[typ][abs_name]
 
                 var_dict = OrderedDict()
                 var_dict['name'] = name
@@ -105,9 +103,8 @@ def _get_viewer_data(problem_or_rootgroup):
     component_execution_orders = {}
     data_dict['tree'] = _get_tree_dict(root_group, component_execution_orders, component_execution_idx)
 
-    abs2data = root_group._var_abs2data_io
     connections_list = []
-    sorted_abs_input2src = OrderedDict(sorted(root_group._assembler._abs_input2src.items())) # sort to make deterministic for testing
+    sorted_abs_input2src = OrderedDict(sorted(root_group._conn_global_abs_in2out.items())) # sort to make deterministic for testing
     G = compute_sys_graph(root_group, sorted_abs_input2src, comps_only=True)
     scc = nx.strongly_connected_components(G)
     scc_list = [s for s in scc if len(s)>1] #list(scc)

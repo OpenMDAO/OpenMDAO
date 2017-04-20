@@ -1,5 +1,10 @@
+"""
+Test the DeprecatedComponent which allows openmmdao 1.x components to run.
+"""
+
 import unittest
 from six import iteritems
+from six.moves import cStringIO
 
 import numpy as np
 
@@ -217,7 +222,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
         # Check partials
-        data = prob.check_partial_derivatives(out_stream=None)
+        data = prob.check_partial_derivs(out_stream=None)
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -259,7 +264,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
         # Check partials
-        data = prob.check_partial_derivatives(out_stream=None)
+        data = prob.check_partial_derivs(out_stream=None)
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -303,7 +308,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
         # Check partials
-        data = prob.check_partial_derivatives(out_stream=None)
+        data = prob.check_partial_derivs(out_stream=None)
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -315,6 +320,14 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, data['comp'][('y', 'z')]['J_fwd'][0][0], 2.0, 1e-6)
         assert_rel_error(self, data['comp'][('z', 'x')]['J_fwd'][0][0], 2.66666667, 1e-6)
         assert_rel_error(self, data['comp'][('z', 'z')]['J_fwd'][0][0], 1.5, 1e-6)
+
+        # Piggyback testing of list_states
+
+        stream = cStringIO()
+        prob.model.list_states(stream=stream)
+        content = stream.getvalue()
+
+        self.assertTrue('comp.z' in content)
 
     def test_simple_implicit_self_solve(self):
 
@@ -350,7 +363,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
         # Check partials
-        data = prob.check_partial_derivatives(out_stream=None)
+        data = prob.check_partial_derivs(out_stream=None)
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -397,7 +410,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
         # Check partials
-        data = prob.check_partial_derivatives(out_stream=None)
+        data = prob.check_partial_derivs(out_stream=None)
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -443,7 +456,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
         # Check partials
-        data = prob.check_partial_derivatives(out_stream=None)
+        data = prob.check_partial_derivs(out_stream=None)
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):

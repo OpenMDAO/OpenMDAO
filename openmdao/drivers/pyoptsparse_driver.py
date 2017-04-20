@@ -122,13 +122,13 @@ class pyOptSparseDriver(Driver):
         self.supports['integer_design_vars'] = False
 
         # User Options
-        self.options.declare('optimizer', value='SLSQP', values=_check_imports(),
+        self.options.declare('optimizer', default='SLSQP', values=_check_imports(),
                              desc='Name of optimizers to use')
-        self.options.declare('title', value='Optimization using pyOpt_sparse',
+        self.options.declare('title', default='Optimization using pyOpt_sparse',
                              desc='Title of this optimization run')
-        self.options.declare('print_results', type_=bool, value=True,
+        self.options.declare('print_results', type_=bool, default=True,
                              desc='Print pyOpt results if True')
-        self.options.declare('gradient method', value='openmdao',
+        self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
 
@@ -326,7 +326,7 @@ class pyOptSparseDriver(Driver):
 
     def _objfunc(self, dv_dict):
         """
-        Function that evaluates and returns the objective function and constraints.
+        Compute the objective function and constraints.
 
         This function is passed to pyOpt's Optimization object and is called
         from its optimizers.
@@ -379,7 +379,7 @@ class pyOptSparseDriver(Driver):
 
     def _gradfunc(self, dv_dict, func_dict):
         """
-        Function that evaluates and returns the gradient of the objective function and constraints.
+        Compute the gradient of the objective function and constraints.
 
         This function is passed to pyOpt's Optimization object and is called
         from its optimizers.

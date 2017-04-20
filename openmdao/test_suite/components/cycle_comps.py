@@ -76,9 +76,40 @@ class ExplicitCycleComp(ExplicitComponent):
     def __str__(self):
         return 'Explicit Cycle Component'
 
-    def __init__(self, **kwargs):
-        super(ExplicitCycleComp, self).__init__(**kwargs)
+    def initialize(self):
+        self.metadata.declare('jacobian_type', default='matvec',
+                              values=['matvec', 'dense', 'sparse-coo', 'sparse-csr',
+                                      'sparse-csc'],
+                              desc='method of assembling derivatives')
+        self.metadata.declare('partial_type', default='array',
+                              values=['array', 'sparse', 'aij'],
+                              desc='type of partial derivatives')
+        self.metadata.declare('num_var', type_=int, default=1,
+                              desc='Number of variables per component')
+        self.metadata.declare('var_shape', type_=tuple, default=(3,),
+                              desc='Shape of each variable')
+        self.metadata.declare('index', type_=int,
+                              desc='Index of the component. Used for testing implicit connections')
+        self.metadata.declare('connection_type', type_=str, default='explicit',
+                              values=['explicit', 'implicit'],
+                              desc='How to connect variables.')
+        self.metadata.declare('finite_difference', default=False,
+                              type_=bool,
+                              desc='If the derivatives should be finite differenced.')
+        self.metadata.declare('num_comp', type_=int, default=2,
+                              desc='Total number of components')
+
+        self.angle_param = 'theta'
+
         self._cycle_names = {}
+
+    def _init_parameterized(self):
+        self.num_var = self.metadata['num_var']
+        self.var_shape = self.metadata['var_shape']
+        self.size = self.num_var * np.prod(self.var_shape)
+
+        if self.metadata['jacobian_type'] == 'matvec':
+            self.compute_jacvec_product = self.jacvec_product
 
         if self.metadata['connection_type'] == 'implicit':
             idx = self.metadata['index']
@@ -98,32 +129,7 @@ class ExplicitCycleComp(ExplicitComponent):
             self._cycle_names['theta_out'] = 'theta_out'
             self._cycle_promotes_in = self._cycle_promotes_out = []
 
-        self.metadata.declare('jacobian_type', value='matvec',
-                              values=['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
-                              desc='method of assembling derivatives')
-        self.metadata.declare('partial_type', value='array',
-                              values=['array', 'sparse', 'aij'],
-                              desc='type of partial derivatives')
-        self.metadata.declare('num_var', type_=int, value=1,
-                              desc='Number of variables per component')
-        self.metadata.declare('var_shape', type_=tuple, value=(3,),
-                              desc='Shape of each variable')
-        self.metadata.declare('index', type_=int,
-                              desc='Index of the component. Used for testing implicit connections')
-        self.metadata.declare('connection_type', type_=str, value='explicit',
-                              values=['explicit', 'implicit'],
-                              desc='How to connect variables.')
-        self.metadata.declare('finite_difference', value=False,
-                              type_=bool,
-                              desc='If the derivatives should be finite differenced.')
-
-        self.angle_param = 'theta'
-
     def initialize_variables(self):
-        self.num_var = self.metadata['num_var']
-        self.var_shape = self.metadata['var_shape']
-        self.size = self.num_var * np.prod(self.var_shape)
-
         for i in range(self.num_var):
             self.add_input(self._cycle_names['x'].format(i), shape=self.var_shape)
             self.add_output(self._cycle_names['y'].format(i), shape=self.var_shape)
@@ -139,63 +145,62 @@ class ExplicitCycleComp(ExplicitComponent):
         self._vector_to_outputs(y, outputs)
         outputs[self._cycle_names['theta_out']] = theta
 
-    def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
-        if self.metadata['jacobian_type'] == 'matvec':
-            angle_param = self._cycle_names[self.angle_param]
-            x = self._inputs_to_vector(inputs)
-            angle = inputs[angle_param]
-            A = _compute_A(self.size, angle)
-            dA = _compute_dA(self.size, angle)
+    def jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+        angle_param = self._cycle_names[self.angle_param]
+        x = self._inputs_to_vector(inputs)
+        angle = inputs[angle_param]
+        A = _compute_A(self.size, angle)
+        dA = _compute_dA(self.size, angle)
 
-            var_shape = self.metadata['var_shape']
-            var_size = np.prod(var_shape)
-            num_var = self.metadata['num_var']
-            x_name = self._cycle_names['x']
-            y_name = self._cycle_names['y']
-            theta_name = self._cycle_names['theta']
-            theta_out_name = self._cycle_names['theta_out']
+        var_shape = self.metadata['var_shape']
+        var_size = np.prod(var_shape)
+        num_var = self.metadata['num_var']
+        x_name = self._cycle_names['x']
+        y_name = self._cycle_names['y']
+        theta_name = self._cycle_names['theta']
+        theta_out_name = self._cycle_names['theta_out']
 
-            if mode == 'fwd':
-                for j in range(num_var):
-                    x_j = x_name.format(j)
-                    if x_j in d_inputs:
-                        dx = d_inputs[x_j].flat[:]
-                        for i in range(num_var):
-                            y_i = y_name.format(i)
-                            if y_i in d_outputs:
-                                Aij = A[array_idx(i, var_size), array_idx(j, var_size)]
-                                d_outputs[y_i] += Aij.dot(dx).reshape(var_shape)
-
-                if theta_name in d_inputs and theta_out_name in d_outputs:
-                    dtheta = d_inputs[theta_name]
-                    d_outputs[theta_out_name] += dtheta
-
-                if angle_param in d_inputs:
-                    dangle = d_inputs[angle_param]
-                    dy_dangle = (dA.dot(x)) * dangle
+        if mode == 'fwd':
+            for j in range(num_var):
+                x_j = x_name.format(j)
+                if x_j in d_inputs:
+                    dx = d_inputs[x_j].flat[:]
                     for i in range(num_var):
                         y_i = y_name.format(i)
                         if y_i in d_outputs:
-                            d_outputs[y_i] += dy_dangle[array_idx(i, var_size)].reshape(var_shape)
+                            Aij = A[array_idx(i, var_size), array_idx(j, var_size)]
+                            d_outputs[y_i] += Aij.dot(dx).reshape(var_shape)
 
-            elif mode == 'rev':
+            if theta_name in d_inputs and theta_out_name in d_outputs:
+                dtheta = d_inputs[theta_name]
+                d_outputs[theta_out_name] += dtheta
+
+            if angle_param in d_inputs:
+                dangle = d_inputs[angle_param]
+                dy_dangle = (dA.dot(x)) * dangle
                 for i in range(num_var):
                     y_i = y_name.format(i)
                     if y_i in d_outputs:
-                        dy_i = d_outputs[y_i].flat[:]
-                        for j in range(num_var):
-                            x_j = x_name.format(j)
-                            if x_j in d_inputs:
-                                Aij = A[array_idx(i, var_size), array_idx(j, var_size)]
-                                d_inputs[x_j] += Aij.T.dot(dy_i).reshape(var_shape)
-                            if angle_param in d_inputs:
-                                dAij = dA[array_idx(i, var_size), array_idx(j, var_size)]
-                                x_j_vec = inputs[x_j].flat[:]
-                                d_inputs[angle_param] += x_j_vec.T.dot(dAij.T.dot(dy_i))
+                        d_outputs[y_i] += dy_dangle[array_idx(i, var_size)].reshape(var_shape)
 
-                if theta_out_name in d_outputs and theta_name in d_inputs:
-                    dtheta_out = d_outputs[theta_out_name]
-                    d_inputs[theta_name] += dtheta_out
+        elif mode == 'rev':
+            for i in range(num_var):
+                y_i = y_name.format(i)
+                if y_i in d_outputs:
+                    dy_i = d_outputs[y_i].flat[:]
+                    for j in range(num_var):
+                        x_j = x_name.format(j)
+                        if x_j in d_inputs:
+                            Aij = A[array_idx(i, var_size), array_idx(j, var_size)]
+                            d_inputs[x_j] += Aij.T.dot(dy_i).reshape(var_shape)
+                        if angle_param in d_inputs:
+                            dAij = dA[array_idx(i, var_size), array_idx(j, var_size)]
+                            x_j_vec = inputs[x_j].flat[:]
+                            d_inputs[angle_param] += x_j_vec.T.dot(dAij.T.dot(dy_i))
+
+            if theta_out_name in d_outputs and theta_name in d_inputs:
+                dtheta_out = d_outputs[theta_out_name]
+                d_inputs[theta_name] += dtheta_out
 
     def make_jacobian_entry(self, A, pd_type):
         if pd_type == 'array':
@@ -365,7 +370,7 @@ class ExplicitLastComp(ExplicitFirstComp):
             partials[theta_out, self._cycle_names['psi']] = \
                 self.make_jacobian_entry(np.array([-1/(2*k-2)]), pd_type)
 
-    def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+    def jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
         if self.metadata['jacobian_type'] == 'matvec':
             k = self.metadata['num_comp']
             num_var = self.metadata['num_var']

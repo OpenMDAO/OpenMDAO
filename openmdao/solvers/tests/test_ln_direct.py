@@ -424,28 +424,30 @@ class TestDirectSolver(unittest.TestCase):
         p.model.suppress_solver_output = True
 
         # forward
-        with g1.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            d_residuals.set_const(1.0)
-            d_outputs.set_const(0.0)
-            g1._linearize()
-            g1._solve_linear(['linear'], 'fwd')
+        d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 
-            output = d_outputs._data
-            # The empty first entry in _data is due to the dummy
-            #     variable being in a different variable set not owned by g1
-            assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
-            assert_rel_error(self, output[2], g1.expected_solution[1], 1e-15)
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        g1._linearize()
+        g1._solve_linear(['linear'], 'fwd')
+
+        output = d_outputs._data
+        # The empty first entry in _data is due to the dummy
+        #     variable being in a different variable set not owned by g1
+        assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
+        assert_rel_error(self, output[5], g1.expected_solution[1], 1e-15)
 
         # reverse
-        with g1.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            d_outputs.set_const(1.0)
-            d_residuals.set_const(0.0)
-            g1.ln_solver._linearize()
-            g1._solve_linear(['linear'], 'rev')
+        d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 
-            output = d_residuals._data
-            assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
-            assert_rel_error(self, output[2], g1.expected_solution[1], 3e-15)
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        g1.ln_solver._linearize()
+        g1._solve_linear(['linear'], 'rev')
+
+        output = d_residuals._data
+        assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
+        assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
 
 
 class TestDirectSolverFeature(unittest.TestCase):

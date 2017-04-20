@@ -103,3 +103,29 @@ def dump_dist_idxs(problem, stream=sys.stdout, recurse=True):  # pragma: no cove
         stream.write("\n\n")
 
     _dump(problem.model, stream)
+
+def tree(system, include_solvers=True, stream=sys.stdout):
+    """
+    Dump the model tree structure to the given stream.
+
+    Parameters
+    ----------
+    include_solvers : bool
+        If True, include solvers in the tree.
+    stream : File-like
+        Where dump output will go.
+    """
+    for s in system.system_iter(include_self=True, recurse=True):
+        if s.pathname:
+            parts = s.pathname.split('.')
+            depth = len(parts)
+        else:
+            depth = 0
+        indent = '   ' * depth
+        stream.write(indent)
+        stream.write("%s %s\n" % (type(s).__name__, s.pathname))
+        if include_solvers:
+            if s.nl_solver is not None:
+                stream.write("%s %s nl_solver\n" % (indent, type(s.nl_solver).__name__))
+            if s.ln_solver is not None:
+                stream.write("%s %s ln_solver\n" % (indent, type(s.ln_solver).__name__))

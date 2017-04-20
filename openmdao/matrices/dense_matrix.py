@@ -94,7 +94,7 @@ class DenseMatrix(Matrix):
         elif isinstance(jac, list):
             self._matrix[irows, icols] = jac[0]
 
-    def _prod(self, in_vec, mode):
+    def _prod(self, in_vec, mode, ranges):
         """
         Perform a matrix vector product.
 
@@ -104,13 +104,21 @@ class DenseMatrix(Matrix):
             incoming vector to multiply.
         mode : str
             'fwd' or 'rev'.
+        ranges : (int, int, int, int)
+            Min row, max row, min col, max col for the current system.
 
         Returns
         -------
         ndarray[:]
             vector resulting from the product.
         """
+        # when we have a derivative based solver at a level below the
+        # group that owns the AssembledJacobian, we need to use only
+        # the part of the matrix that is relevant to the lower level
+        # system.
+        rstart, rend, cstart, cend = ranges
+        mat = self._matrix[rstart:rend, cstart:cend]
         if mode == 'fwd':
-            return self._matrix.dot(in_vec)
-        elif mode == 'rev':
-            return self._matrix.T.dot(in_vec)
+            return mat.dot(in_vec)
+        else:  # rev
+            return mat.T.dot(in_vec)

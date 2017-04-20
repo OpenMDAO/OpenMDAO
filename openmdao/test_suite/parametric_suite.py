@@ -9,7 +9,8 @@ from parameterized import parameterized
 from unittest import SkipTest
 
 from openmdao.core.problem import Problem
-from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, CSRJacobian
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
+                                                  CSRJacobian, CSCJacobian
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.test_suite.groups.cycle_group import CycleGroup
@@ -187,12 +188,7 @@ class ParameterizedInstance(object):
 
         self.problem = prob = Problem(group)
 
-        if args['global_jac']:
-
-            # Deprecated test won't work with AssembledJacobian because it defines an apply_linear.
-            # Explicit cycle test won't work with AssembledJacobian because it defines a compute_jacvec_product.
-            if args['component_class'] in ['deprecated', 'explicit']:
-                raise SkipTest('AssembledJacobian not suppported in Cycle test.')
+        if args['assembled_jac']:
 
             jacobian_type = args['jacobian_type']
             if jacobian_type == 'dense':
@@ -201,6 +197,8 @@ class ParameterizedInstance(object):
                 prob.model.jacobian = COOJacobian()
             elif jacobian_type == 'sparse-csr':
                 prob.model.jacobian = CSRJacobian()
+            elif jacobian_type == 'sparse-csc':
+                prob.model.jacobian = CSCJacobian()
 
         prob.model.ln_solver = self.linear_solver_class(**self.linear_solver_options)
 

@@ -3,7 +3,7 @@
 from __future__ import division, print_function
 import numpy as np
 
-from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 
 
@@ -28,6 +28,9 @@ class Solver(object):
         number of iterations for the current invocation of the solver.
     options : <OptionsDictionary>
         options dictionary.
+    supports : <OptionsDictionary>
+        options dictionary describing what features are supported by this
+        solver.
     """
 
     SOLVER = 'base_solver'
@@ -48,14 +51,18 @@ class Solver(object):
         self._iter_count = 0
 
         self.options = OptionsDictionary()
-        self.options.declare('maxiter', type_=int, value=10,
+        self.options.declare('maxiter', type_=int, default=10,
                              desc='maximum number of iterations')
-        self.options.declare('atol', value=1e-10,
+        self.options.declare('atol', default=1e-10,
                              desc='absolute error tolerance')
-        self.options.declare('rtol', value=1e-10,
+        self.options.declare('rtol', default=1e-10,
                              desc='relative error tolerance')
-        self.options.declare('iprint', type_=int, value=1,
+        self.options.declare('iprint', type_=int, default=1,
                              desc='whether to print output')
+
+        # What the solver supports.
+        self.supports = OptionsDictionary()
+        self.supports.declare('gradients', type_=bool, default=False)
 
         self._declare_options()
         self.options.update(kwargs)
@@ -343,13 +350,8 @@ class LinearSolver(Solver):
             norm.
         """
         system = self._system
-        var_inds = [
-            system._var_allprocs_idx_range['output'][0],
-            system._var_allprocs_idx_range['output'][1],
-            system._var_allprocs_idx_range['output'][0],
-            system._var_allprocs_idx_range['output'][1],
-        ]
-        system._apply_linear(self._vec_names, self._mode, var_inds)
+        scope_out, scope_in = system._get_scope()
+        system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
 
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']

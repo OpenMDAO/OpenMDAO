@@ -225,7 +225,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.run()
 
         ## Make sure check partials handles conversion
-        #data = prob.check_partial_derivatives(out_stream=None)
+        #data = prob.check_partial_derivs(out_stream=None)
 
         #for key1, val1 in iteritems(data):
             #for key2, val2 in iteritems(val1):
@@ -308,15 +308,12 @@ class TestUnitConversion(unittest.TestCase):
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
 
-        # TODO - Uncomment these after John's Reconfigurability merge and
-        # see if it passes and fix if it doesn't.
-
         # Check the total derivatives in reverse mode
-        #prob.setup(check=False, mode='rev')
-        #prob.run_model()
-        #J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
 
-        #assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
 
     #def test_basic_force_fd_comps(self):
 
@@ -376,7 +373,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.run()
 
         ## Make sure check partials handles conversion
-        #data = prob.check_partial_derivatives(out_stream=None)
+        #data = prob.check_partial_derivs(out_stream=None)
 
         #for key1, val1 in iteritems(data):
             #for key2, val2 in iteritems(val1):

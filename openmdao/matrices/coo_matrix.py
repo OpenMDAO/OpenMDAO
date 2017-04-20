@@ -157,7 +157,7 @@ class COOMatrix(Matrix):
         elif isinstance(jac, list):
             self._matrix.data[idxs] = jac[0]
 
-    def _prod(self, in_vec, mode):
+    def _prod(self, in_vec, mode, ranges):
         """
         Perform a matrix vector product.
 
@@ -167,6 +167,8 @@ class COOMatrix(Matrix):
             incoming vector to multiply.
         mode : str
             'fwd' or 'rev'.
+        ranges : (int, int, int, int)
+            Min row, max row, min col, max col for the current system.
 
         Returns
         -------

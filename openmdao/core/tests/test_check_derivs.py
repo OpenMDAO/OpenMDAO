@@ -1,4 +1,4 @@
-""" Testing for Problem.check_partial_derivatives and check_total_derivatives."""
+""" Testing for Problem.check_partial_derivs and check_total_derivatives."""
 
 import unittest
 from six import iteritems
@@ -6,7 +6,8 @@ from six.moves import cStringIO as StringIO
 
 import numpy as np
 
-from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NLRunOnce
+from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NLRunOnce, \
+                         ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid import ParaboloidMatVec
@@ -49,7 +50,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         string_stream = StringIO()
 
-        data = prob.check_partial_derivatives(out_stream=string_stream)
+        data = prob.check_partial_derivs(out_stream=string_stream)
 
         lines = string_stream.getvalue().split("\n")
 
@@ -95,7 +96,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
 
-        data = prob.check_partial_derivatives(out_stream=stream)
+        data = prob.check_partial_derivs(out_stream=stream)
 
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']
@@ -141,7 +142,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
         p.setup()
-        data = p.check_partial_derivatives(out_stream=None)
+        data = p.check_partial_derivs(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -184,7 +185,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         model.nl_solver = NLRunOnce()
 
         p.setup()
-        data = p.check_partial_derivatives(out_stream=None)
+        data = p.check_partial_derivs(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -194,8 +195,11 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.assertAlmostEqual(abs_error.forward_reverse, 0.)
 
         # Make sure we only FD this twice.
+        # The count is 5 because in check_partial_derivs, there are two calls to apply_nonlinear
+        # when compute the fwd and rev analytic derivatives, then one call to apply_nonlinear
+        # to compute the reference point for FD, then two additional calls for the two inputs.
         comp = model.get_subsystem('units')
-        self.assertEqual(comp.run_count, 3)
+        self.assertEqual(comp.run_count, 5)
 
     def test_scalar_val(self):
         class PassThrough(ExplicitComponent):
@@ -251,7 +255,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        data = p.check_partial_derivatives(out_stream=None)
+        data = p.check_partial_derivs(out_stream=None)
         identity = np.eye(4)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
@@ -277,7 +281,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partial_derivatives(out_stream=None)
+        data = prob.check_partial_derivs(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -309,7 +313,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partial_derivatives(out_stream=None)
+        data = prob.check_partial_derivs(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -321,6 +325,51 @@ class TestProblemCheckPartials(unittest.TestCase):
                 assert_rel_error(self, rel_error.forward, 0., 1e-5)
                 assert_rel_error(self, rel_error.reverse, 0., 1e-5)
                 assert_rel_error(self, rel_error.forward_reverse, 0., 1e-5)
+
+    def test_implicit_undeclared(self):
+        # Test to see that check_partial_derivs works when state_wrt_input and state_wrt_state
+        # partials are missing.
+
+        class ImplComp4Test(ImplicitComponent):
+
+            def initialize_variables(self):
+                self.add_input('x', np.ones(2))
+                self.add_input('dummy', np.ones(2))
+                self.add_output('y', np.ones(2))
+                self.add_output('extra', np.ones(2))
+                self.mtx = np.array([
+                    [ 3., 4.],
+                    [ 2., 3.],
+                ])
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['y'] = self.mtx.dot(outputs['y']) - inputs['x']
+
+            def linearize(self, inputs, outputs, partials):
+                partials['y', 'x'] = -np.eye(2)
+                partials['y', 'y'] = self.mtx
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones((2, ))))
+        prob.model.add_subsystem('p2', IndepVarComp('dummy', np.ones((2, ))))
+        prob.model.add_subsystem('comp', ImplComp4Test())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.dummy', 'comp.dummy')
+
+        prob.model.suppress_solver_output = True
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partial_derivs(out_stream=None)
+
+        assert_rel_error(self, data['comp']['y', 'extra']['J_fwd'], np.zeros((2, 2)))
+        assert_rel_error(self, data['comp']['y', 'extra']['J_rev'], np.zeros((2, 2)))
+        assert_rel_error(self, data['comp']['y', 'dummy']['J_fwd'], np.zeros((2, 2)))
+        assert_rel_error(self, data['comp']['y', 'dummy']['J_rev'], np.zeros((2, 2)))
+
 
 if __name__ == "__main__":
     unittest.main()

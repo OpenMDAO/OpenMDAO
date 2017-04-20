@@ -40,7 +40,7 @@ from openmdao.devtools.viewconns import view_connections
 
 # Derivative Specification
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, \
-    DenseJacobian, COOJacobian, CSRJacobian
+    DenseJacobian, COOJacobian, CSRJacobian, CSCJacobian
 
 # Drivers
 try:
@@ -49,5 +49,4 @@ except ImportError:
     pass
 
 # System-Building Tools
-from openmdao.utils.generalized_dict import GeneralizedDictionary
-from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary
