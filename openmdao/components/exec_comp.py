@@ -17,9 +17,8 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 VAR_RGX = re.compile('([_a-zA-Z]\w*[ ]*\(?)')
 
 # Names of metadata entries allowed for ExecComp variables.
-_allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
-                 'var_set', 'ref', 'ref0', 'res_ref', 'res_ref0',
-                 'lower', 'upper', 'src_indices'}
+_allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc', 'var_set',
+                 'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices'}
 
 
 def array_idx_iter(shape):
