@@ -619,7 +619,8 @@ class System(object):
         self._setup_jacobians(recurse=recurse)
 
         # Full setup means we're are (nearly) starting from scratch, so reset to initial values.
-        if setup_mode == 'full':
+        # if setup_mode == 'full':
+        if setup_mode in ('full', 'reconf'):
             self.set_initial_values()
 
     def _setup_procs(self, pathname, comm):
