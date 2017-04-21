@@ -1128,13 +1128,9 @@ class System(object):
         elif mode == 'rev':
             direction = ('phys', 'norm')
 
-        if self.pathname == '':
-            print('1', self.get_subsystem('s2.comp')._inputs['x'])
         self._scale_vec(vec_inputs, 'input', direction[0])
         self._transfers[vec_name][mode, isub](vec_inputs, vec_outputs, mode)
         self._scale_vec(vec_inputs, 'input', direction[1])
-        if self.pathname == '':
-            print('2', self.get_subsystem('s2.comp')._inputs['x'])
 
     def get_req_procs(self):
         """
