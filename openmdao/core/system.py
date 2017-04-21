@@ -1248,7 +1248,9 @@ class System(object):
         for vec_type in ['output', 'residual']:
             for vec in self._vectors[vec_type].values():
                 self._scale_vec(vec, vec_type, 'norm')
+
         yield
+
         for vec_type in ['output', 'residual']:
             for vec in self._vectors[vec_type].values():
                 self._scale_vec(vec, vec_type, 'phys')

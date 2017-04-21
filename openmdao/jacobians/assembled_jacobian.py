@@ -301,16 +301,20 @@ class AssembledJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
+        system = self._system
         int_mtx = self._int_mtx
-        if self._system.pathname in self._ext_mtx:
-            ext_mtx = self._ext_mtx[self._system.pathname]
+        if system.pathname in self._ext_mtx:
+            ext_mtx = self._ext_mtx[system.pathname]
         else:
             ext_mtx = None
 
-        ranges = self._view_ranges[self._system.pathname]
+        ranges = self._view_ranges[system.pathname]
         int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])
 
-        with self._system._unscaled_context(
+        # TODO: remove the _unscaled_context call here (and in DictionaryJacobian)
+        # and do it outside so that we can avoid an unnecessary extra unscaling/rescaling
+        # in _apply_linear
+        with system._unscaled_context(
                 outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
                 d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
@@ -321,6 +325,67 @@ class AssembledJacobian(Jacobian):
                 d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
                 if ext_mtx is not None:
                     d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
+
+    def _scale_subjac(self, abs_key, coeffs):
+        """
+        Change the scaling state of a single subjac.
+
+        Parameters
+        ----------
+        abs_key : (str, str)
+            Absolute name pair of sub-Jacobian.
+        coeffs : dict of ndarray[nvar_myproc, 2]
+            0th and 1st order coefficients for scaling/unscaling.
+            The keys are 'input', 'output', and 'residual'
+        """
+        system = self._system
+        meta0 = system._var_allprocs_abs2meta['output'][abs_key[0]]
+        meta1 = system._var_allprocs_abs2meta['output'][abs_key[1]]
+
+        ind_of0, ind_of1 = meta0['resid_scale_idx']
+
+        # Implicit states are the only wrt that will have this
+        try:
+            ind_wrt0, ind_wrt1 = meta1['output_scale_idx']
+        except KeyError:
+            ind_wrt0 = meta1['my_idx']
+            ind_wrt1 = ind_wrt0 + 1
+
+        type_ = data1['type']
+
+        # A vector scale factor on the residual needs to be transposed and pre-multiplied.
+        if (ind_of1 - ind_of0) > 1:
+            self._pre_and_post_multiply_subjac(abs_key, coeffs['residual'][ind_of0:ind_of1, 1],
+                                               coeffs[type_][ind_wrt0:ind_wrt1, 1])
+        else:
+            val = coeffs['residual'][ind_of0:ind_of1, 1] / coeffs[type_][ind_wrt0:ind_wrt1, 1]
+            self._multiply_subjac(abs_key, val)
+
+    def _pre_and_post_multiply_subjac(self, abs_key, left_vec, right_vec):
+        """
+        Compute left_vec transposed times this sub-Jacobian times right_vec.
+
+        Parameters
+        ----------
+        abs_key : (str, str)
+            Absolute name pair of sub-Jacobian.
+        left_vec : ndarray
+            Array to pre-multiply by.
+        right_vec : ndarray
+            Array to post-multiply by.
+        """
+        jac = self._subjacs[abs_key]
+        left_vec = np.atleast_2d(left_vec).T
+
+        if isinstance(jac, np.ndarray):
+            self._subjacs[abs_key] = left_vec * jac / right_vec
+        elif isinstance(jac, (coo_matrix, csr_matrix)):
+            # DOK not supported
+            self._subjacs[abs_key].data = left_vec * self._subjacs[abs_key].data / right_vec
+        else:
+            # TODO: This is currently untested because support for scaler specification of a
+            # subjac larger than 1x1 is not implemented.
+            self._subjacs[abs_key] = left_vec * self._subjacs[abs_key][0] / right_vec
 
 
 class DenseJacobian(AssembledJacobian):
