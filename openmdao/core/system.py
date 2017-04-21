@@ -186,6 +186,9 @@ class System(object):
         List of subsystems that stores all subsystems added outside of initialize_subsystems.
     _static_manual_connections : dict
         Dictionary that stores all explicit connections added outside of initialize_subsystems.
+    #
+    _reconfigured : bool
+        If True, this system has reconfigured, and the immediate parent should update.
     """
 
     def __init__(self, **kwargs):
@@ -278,8 +281,63 @@ class System(object):
         self._static_subsystems_allprocs = []
         self._static_manual_connections = {}
 
+        self._reconfigured = False
+
         self.initialize()
         self.metadata.update(kwargs)
+
+    def _check_reconf(self):
+        """
+        Check if this systems wants to reconfigure and if so, perform the reconfiguration.
+        """
+        reconf = not self.reconfigure()
+
+        if reconf:
+            with self._unscaled_context_all():
+                # Backup input values
+                inputs = self._inputs
+
+                # Perform reconfiguration
+                self.setup('reconf')
+
+                # Reload input values where possible
+                for abs_name in inputs._views_flat:
+                    if abs_name in self._inputs._views_flat and (
+                            len(self._inputs._views_flat[abs_name])
+                            == len(inputs._views_flat[abs_name])):
+                        self._inputs._views_flat[abs_name][:] = inputs._views_flat[abs_name]
+
+            self._reconfigured = True
+
+    def _check_reconf_update(self):
+        """
+        Check if any subsystem has reconfigured and if so, perform the necessary update setup.
+        """
+        # See if any local subsystem has reconfigured
+        reconf = np.any([subsys._reconfigured for subsys in self._subsystems_myproc])
+
+        # See if any subsystem on this or any other processor has configured
+        reconf = self.comm.allreduce(reconf) > 0
+
+        if reconf:
+            # Perform an update setup
+            with self._unscaled_context_all():
+                self.setup('update')
+
+            # Reset the _reconfigured attribute to False
+            for subsys in self._subsystems_myproc:
+                subsys._reconfigured = False
+
+    def reconfigure(self):
+        """
+        Perform reconfiguration.
+
+        Returns
+        -------
+        bool
+            If True, reconfiguration was not performed.
+        """
+        return True
 
     def initialize(self):
         """
@@ -1052,6 +1110,9 @@ class System(object):
             If None, perform a full transfer.
             If int, perform a partial transfer for linear Gauss--Seidel.
         """
+        # Check if any subsystem has reconfigured
+        self._check_reconf_update()
+
         vec_inputs = self._vectors['input'][vec_name]
         vec_outputs = self._vectors['output'][vec_name]
 
@@ -1236,6 +1297,19 @@ class System(object):
             self._scale_vec(vec, 'output', 'norm')
         for vec in residuals:
             self._scale_vec(vec, 'residual', 'norm')
+
+    @contextmanager
+    def _unscaled_context_all(self):
+        """
+        Context manager that temporarily puts all vectors and Jacobians in an unscaled state.
+        """
+        for vec_type in ['output', 'residual']:
+            for vec in self._vectors[vec_type].values():
+                self._scale_vec(vec, vec_type, 'phys')
+        yield
+        for vec_type in ['output', 'residual']:
+            for vec in self._vectors[vec_type].values():
+                self._scale_vec(vec, vec_type, 'norm')
 
     @contextmanager
     def _scaled_context_all(self):
@@ -2076,7 +2150,9 @@ class System(object):
         float
             absolute error.
         """
-        pass
+        self._check_reconf()
+
+        return False, 0., 0.
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """

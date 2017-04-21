@@ -184,6 +184,8 @@ class ExplicitComponent(Component):
         float
             relative error.
         """
+        super(ExplicitComponent, self)._solve_nonlinear()
+
         with self._unscaled_context(
                 outputs=[self._outputs], residuals=[self._residuals]):
             self._residuals.set_const(0.0)

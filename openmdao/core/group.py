@@ -1073,6 +1073,8 @@ class Group(System):
         float
             absolute error.
         """
+        super(Group, self)._solve_nonlinear()
+
         return self._nl_solver.solve()
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):

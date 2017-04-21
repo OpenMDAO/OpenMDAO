@@ -49,6 +49,8 @@ class ImplicitComponent(Component):
         float
             relative error.
         """
+        super(ImplicitComponent, self)._solve_nonlinear()
+
         if self._nl_solver is not None:
             return self._nl_solver.solve()
         else:

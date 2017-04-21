@@ -163,6 +163,8 @@ class Component(BaseComponent):
         float
             absolute error.
         """
+        super(Component, self)._solve_nonlinear()
+
         if self._nl_solver is not None:
             self._nl_solver.solve()
         else:
