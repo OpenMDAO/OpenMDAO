@@ -296,7 +296,7 @@ class System(object):
         """
         Check if this systems wants to reconfigure and if so, perform the reconfiguration.
         """
-        reconf = not self.reconfigure()
+        reconf = self.reconfigure()
 
         if reconf:
             with self._unscaled_context_all():
@@ -341,9 +341,9 @@ class System(object):
         Returns
         -------
         bool
-            If True, reconfiguration was not performed.
+            If True, reconfiguration is to be performed.
         """
-        return True
+        return False
 
     def initialize(self):
         """
