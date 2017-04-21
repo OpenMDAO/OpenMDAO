@@ -618,8 +618,7 @@ class System(object):
         self._setup_partials(recurse=recurse)
         self._setup_jacobians(recurse=recurse)
 
-        # Full setup means we're are (nearly) starting from scratch, so reset to initial values.
-        # if setup_mode == 'full':
+        # If full or reconf setup, reset this system's variables to initial values.
         if setup_mode in ('full', 'reconf'):
             self.set_initial_values()
 
