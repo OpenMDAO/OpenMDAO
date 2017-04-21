@@ -186,6 +186,10 @@ class System(object):
         List of subsystems that stores all subsystems added outside of initialize_subsystems.
     _static_manual_connections : dict
         Dictionary that stores all explicit connections added outside of initialize_subsystems.
+    _static_design_vars : dict of dict
+        Driver design variables added outside of initialize_subsystems.
+    _static_responses : dict of dict
+        Driver responses added outside of initialize_subsystems.
     #
     _reconfigured : bool
         If True, this system has reconfigured, and the immediate parent should update.
@@ -280,6 +284,8 @@ class System(object):
         self._static_mode = True
         self._static_subsystems_allprocs = []
         self._static_manual_connections = {}
+        self._static_design_vars = {}
+        self._static_responses = {}
 
         self._reconfigured = False
 
@@ -1583,7 +1589,7 @@ class System(object):
         The argument :code:`ref0` represents the physical value when the scaled value is 0.
         The argument :code:`ref` represents the physical value when the scaled value is 1.
         """
-        if name in self._design_vars:
+        if name in self._design_vars or name in self._static_design_vars:
             msg = "Design Variable '{}' already exists."
             raise RuntimeError(msg.format(name))
 
@@ -1607,7 +1613,14 @@ class System(object):
         upper = (upper + adder) * scaler
 
         meta = kwargs if kwargs else None
-        self._design_vars[name] = dvs = OrderedDict()
+
+        if self._static_mode:
+            design_vars = self._static_design_vars
+        else:
+            design_vars = self._design_vars
+
+        design_vars[name] = dvs = OrderedDict()
+
         dvs['name'] = name
         dvs['upper'] = upper
         dvs['lower'] = lower
@@ -1674,7 +1687,7 @@ class System(object):
             raise ValueError('The type must be one of \'con\' or \'obj\': '
                              'Got \'{0}\' instead'.format(name))
 
-        if name in self._responses:
+        if name in self._responses or name in self._static_responses:
             typemap = {'con': 'Constraint', 'obj': 'Objective'}
             msg = '{0} \'{1}\' already exists.'.format(typemap[type], name)
             raise RuntimeError(msg.format(name))
@@ -1732,7 +1745,14 @@ class System(object):
             equals = (equals + adder) * scaler
 
         meta = kwargs if kwargs else None
-        self._responses[name] = resp = OrderedDict()
+
+        if self._static_mode:
+            responses = self._static_responses
+        else:
+            responses = self._responses
+
+        responses[name] = resp = OrderedDict()
+
         resp['name'] = name
         resp['scaler'] = None if scaler == 1.0 else scaler
         resp['adder'] = None if adder == 0.0 else adder

@@ -72,10 +72,14 @@ class Group(System):
 
         self._subsystems_allprocs = []
         self._manual_connections = {}
+        self._design_vars = {}
+        self._responses = {}
 
         self._static_mode = False
         self._subsystems_allprocs.extend(self._static_subsystems_allprocs)
         self._manual_connections.update(self._static_manual_connections)
+        self._design_vars.update(self._static_design_vars)
+        self._responses.update(self._static_responses)
         self.initialize_subsystems()
         self._static_mode = True
 
