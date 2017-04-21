@@ -326,7 +326,13 @@ class AssembledJacobian(Jacobian):
                 if ext_mtx is not None:
                     d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
 
-    def _scale_subjac(self, abs_key, coeffs):
+    def _scale_vec(self, vec, key, scale_to):
+        scal_vecs = self._scaling_vecs
+        vec_name = vec._name
+
+        vec.elem_mult(scal_vecs[key, scale_to + '1'][vec_name])
+
+    def _scale_subjac(self, abs_key, scale_to):
         """
         Change the scaling state of a single subjac.
 
@@ -334,9 +340,8 @@ class AssembledJacobian(Jacobian):
         ----------
         abs_key : (str, str)
             Absolute name pair of sub-Jacobian.
-        coeffs : dict of ndarray[nvar_myproc, 2]
-            0th and 1st order coefficients for scaling/unscaling.
-            The keys are 'input', 'output', and 'residual'
+        scale_to: str
+            Indicates whether to scale to physical or normalized.
         """
         system = self._system
         meta0 = system._var_allprocs_abs2meta['output'][abs_key[0]]
@@ -360,6 +365,18 @@ class AssembledJacobian(Jacobian):
         else:
             val = coeffs['residual'][ind_of0:ind_of1, 1] / coeffs[type_][ind_wrt0:ind_wrt1, 1]
             self._multiply_subjac(abs_key, val)
+
+    def _scale(self, scale_to):
+        """
+        Change the scaling state for all subjacs under the current system.
+
+        Parameters
+        ----------
+        scale_to: str
+            Indicates whether to scale to physical or normalized.
+        """
+        for abs_key in self._iter_abs_keys():
+            self._scale_subjac(abs_key, scale_to)
 
     def _pre_and_post_multiply_subjac(self, abs_key, left_vec, right_vec):
         """
