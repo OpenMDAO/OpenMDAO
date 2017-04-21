@@ -301,19 +301,21 @@ class System(object):
         if reconf:
             with self._unscaled_context_all():
                 # Backup input values
-                old_inputs = self._inputs
+                old = {'input': self._inputs, 'output': self._outputs}
 
                 # Perform reconfiguration
                 self.setup('reconf')
 
-                new_inputs = self._inputs
+                new = {'input': self._inputs, 'output': self._outputs}
 
-                # Reload input values where possible
-                for abs_name in old_inputs._views_flat:
-                    if abs_name in new_inputs._views_flat and (
-                            len(old_inputs._views_flat[abs_name])
-                            == len(new_inputs._views_flat[abs_name])):
-                        new_inputs._views_flat[abs_name][:] = old_inputs._views_flat[abs_name]
+                # Reload input and output values where possible
+                for type_ in ['input', 'output']:
+                    for abs_name, old_view in iteritems(old[type_]._views_flat):
+                        if abs_name in new[type_]._views_flat:
+                            new_view = new[type_]._views_flat[abs_name]
+
+                            if len(old_view) == len(new_view):
+                                new_view[:] = old_view
 
             self._reconfigured = True
 
