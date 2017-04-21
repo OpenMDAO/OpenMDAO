@@ -342,8 +342,7 @@ class Component(System):
         var_rel_names['input'].append(name)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0,
-                   res_ref=1.0, res_ref0=0.0, var_set=0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
         """
         Add an output variable to the component.
 
@@ -383,9 +382,6 @@ class Component(System):
         res_ref : float
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        res_ref0 : float
-            Scaling parameter. The value in the user-defined res_units of this output's residual
-            when the scaled value is 0. Default is 0.
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
@@ -447,8 +443,8 @@ class Component(System):
         metadata['upper'] = upper
 
         # All refs: check the shape if necessary
-        for item, msg in zip([ref, ref0, res_ref, res_ref0],
-                             ['ref', 'ref0', 'res_ref', 'res_ref0']):
+        for item, msg in zip([ref, ref0, res_ref],
+                             ['ref', 'ref0', 'res_ref']):
             if not np.isscalar(item) and \
                np.atleast_1d(item).shape != metadata['shape']:
                 raise ValueError('The %s argument has the wrong shape' % msg)
@@ -456,13 +452,11 @@ class Component(System):
         ref = format_as_float_or_array('ref', ref, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
         res_ref = format_as_float_or_array('res_ref', res_ref, flatten=True)
-        res_ref0 = format_as_float_or_array('res_ref0', res_ref0, flatten=True)
 
-        # ref, ref0, res_ref, res_ref0: taken as is
+        # ref, ref0, res_ref: taken as is
         metadata['ref'] = ref
         metadata['ref0'] = ref0
         metadata['res_ref'] = res_ref
-        metadata['res_ref0'] = res_ref0
 
         # var_set: taken as is
         metadata['var_set'] = var_set
