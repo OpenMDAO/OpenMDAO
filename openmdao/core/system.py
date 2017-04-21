@@ -1117,7 +1117,8 @@ class System(object):
             If int, perform a partial transfer for linear Gauss--Seidel.
         """
         # Check if any subsystem has reconfigured
-        self._check_reconf_update()
+        if vec_name == 'nonlinear':
+            self._check_reconf_update()
 
         vec_inputs = self._vectors['input'][vec_name]
         vec_outputs = self._vectors['output'][vec_name]
