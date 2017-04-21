@@ -301,17 +301,19 @@ class System(object):
         if reconf:
             with self._unscaled_context_all():
                 # Backup input values
-                inputs = self._inputs
+                old_inputs = self._inputs
 
                 # Perform reconfiguration
                 self.setup('reconf')
 
+                new_inputs = self._inputs
+
                 # Reload input values where possible
-                for abs_name in inputs._views_flat:
-                    if abs_name in self._inputs._views_flat and (
-                            len(self._inputs._views_flat[abs_name])
-                            == len(inputs._views_flat[abs_name])):
-                        self._inputs._views_flat[abs_name][:] = inputs._views_flat[abs_name]
+                for abs_name in old_inputs._views_flat:
+                    if abs_name in new_inputs._views_flat and (
+                            len(old_inputs._views_flat[abs_name])
+                            == len(new_inputs._views_flat[abs_name])):
+                        new_inputs._views_flat[abs_name][:] = old_inputs._views_flat[abs_name]
 
             self._reconfigured = True
 
@@ -333,6 +335,8 @@ class System(object):
             # Reset the _reconfigured attribute to False
             for subsys in self._subsystems_myproc:
                 subsys._reconfigured = False
+
+            self._reconfigured = True
 
     def reconfigure(self):
         """
@@ -1116,10 +1120,6 @@ class System(object):
             If None, perform a full transfer.
             If int, perform a partial transfer for linear Gauss--Seidel.
         """
-        # Check if any subsystem has reconfigured
-        if vec_name == 'nonlinear':
-            self._check_reconf_update()
-
         vec_inputs = self._vectors['input'][vec_name]
         vec_outputs = self._vectors['output'][vec_name]
 

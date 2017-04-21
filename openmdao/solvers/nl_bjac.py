@@ -13,6 +13,8 @@ class NonlinearBlockJac(NonlinearSolver):
         """
         Perform the operations in the iteration loop.
         """
-        self._system._transfer('nonlinear', 'fwd')
-        for subsys in self._system._subsystems_myproc:
+        system = self._system
+        system._transfer('nonlinear', 'fwd')
+        for subsys in system._subsystems_myproc:
             subsys._solve_nonlinear()
+        system._check_reconf_update()
