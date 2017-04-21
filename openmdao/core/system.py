@@ -909,15 +909,12 @@ class System(object):
                 ref = meta['ref']
                 ref0 = meta['ref0']
                 res_ref = meta['res_ref']
-                res_ref0 = meta['res_ref0']
                 if not np.isscalar(ref):
                     ref = ref.reshape(shape)
                 if not np.isscalar(ref0):
                     ref0 = ref0.reshape(shape)
                 if not np.isscalar(res_ref):
                     res_ref = res_ref.reshape(shape)
-                if not np.isscalar(res_ref0):
-                    res_ref0 = res_ref0.reshape(shape)
 
                 a0 = ref0
                 a1 = ref - ref0
@@ -926,12 +923,10 @@ class System(object):
                 vecs['output', 'norm0'][vec_name]._views[abs_name][:] = -a0 / a1
                 vecs['output', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / a1
 
-                a0 = res_ref0
-                a1 = res_ref - res_ref0
-                vecs['residual', 'phys0'][vec_name]._views[abs_name][:] = a0
-                vecs['residual', 'phys1'][vec_name]._views[abs_name][:] = a1
-                vecs['residual', 'norm0'][vec_name]._views[abs_name][:] = -a0 / a1
-                vecs['residual', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / a1
+                vecs['residual', 'phys0'][vec_name]._views[abs_name][:] = 0.0
+                vecs['residual', 'phys1'][vec_name]._views[abs_name][:] = res_ref
+                vecs['residual', 'norm0'][vec_name]._views[abs_name][:] = 0.0
+                vecs['residual', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / res_ref
 
             for abs_in, abs_out in iteritems(self._conn_abs_in2out):
                 if abs_in not in abs2meta_in:

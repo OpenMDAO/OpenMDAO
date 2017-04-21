@@ -219,18 +219,6 @@ class TestScaling(unittest.TestCase):
         with assertRaisesRegex(self, ValueError, msg):
             prob.setup(check=False)
 
-        class EComp(ImplicitComponent):
-            def initialize_variables(self):
-                self.add_output('zz', val=np.ones((4, 2)), res_ref0=np.ones((3, 5)))
-
-        prob = Problem()
-        model = prob.model = Group()
-        model.add_subsystem('comp', EComp())
-
-        msg = "The res_ref0 argument has the wrong shape"
-        with assertRaisesRegex(self, ValueError, msg):
-            prob.setup(check=False)
-
     def test_pass_through(self):
         group = Group()
         group.add_subsystem('sys1', IndepVarComp('old_length', 1.0,
@@ -347,10 +335,9 @@ class TestScaling(unittest.TestCase):
                 ref = self.metadata['ref']
                 ref0 = self.metadata['ref0']
                 res_ref = self.metadata['res_ref']
-                res_ref0 = self.metadata['res_ref0']
 
                 self.add_input('x', val=1.0)
-                self.add_output('y', val=1.0, ref=ref, ref0=ref0, res_ref=res_ref, res_ref0=res_ref0)
+                self.add_output('y', val=1.0, ref=ref, ref0=ref0, res_ref=res_ref)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = 2.0*(inputs['x'] + 1.0)
@@ -413,17 +400,16 @@ class TestScaling(unittest.TestCase):
         with model._scaled_context_all():
             res1a = model.get_subsystem('p1')._residuals.get_data()[0]
 
-            self.assertEqual(res1a, (res1-ref0)/(ref-ref0))
+            self.assertEqual(res1a, (res1)/(ref))
 
         # Scale the residual
 
         res_ref = 4.0
-        res_ref0 = 3.5
 
         prob = Problem()
         model = prob.model = Group()
-        model.add_subsystem('p1', Simple(res_ref=res_ref, res_ref0=res_ref0))
-        model.add_subsystem('p2', Simple(res_ref=res_ref, res_ref0=res_ref0))
+        model.add_subsystem('p1', Simple(res_ref=res_ref))
+        model.add_subsystem('p2', Simple(res_ref=res_ref))
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
@@ -443,19 +429,18 @@ class TestScaling(unittest.TestCase):
         with model._scaled_context_all():
             res1a = model.get_subsystem('p1')._residuals.get_data()[0]
 
-            self.assertEqual(res1a, (res1-res_ref0)/(res_ref-res_ref0))
+            self.assertEqual(res1a, res1/res_ref)
 
         # Simultaneously scale the residual and output with different values
 
         ref = 3.0
         ref0 = 2.75
         res_ref = 4.0
-        res_ref0 = 3.5
 
         prob = Problem()
         model = prob.model = Group()
-        model.add_subsystem('p1', Simple(ref=ref, ref0=ref0, res_ref=res_ref, res_ref0=res_ref0))
-        model.add_subsystem('p2', Simple(ref=ref, ref0=ref0, res_ref=res_ref, res_ref0=res_ref0))
+        model.add_subsystem('p1', Simple(ref=ref, ref0=ref0, res_ref=res_ref))
+        model.add_subsystem('p2', Simple(ref=ref, ref0=ref0, res_ref=res_ref))
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
@@ -475,7 +460,7 @@ class TestScaling(unittest.TestCase):
         with model._scaled_context_all():
             res1a = model.get_subsystem('p1')._residuals.get_data()[0]
 
-            self.assertEqual(res1a, (res1-res_ref0)/(res_ref-res_ref0))
+            self.assertEqual(res1a, (res1)/(res_ref))
 
     def test_scale_array_with_float(self):
 
@@ -592,7 +577,6 @@ class TestScaling(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.total_volume'], 4.)
 
-        # (res1-res_ref0)/(res_ref-res_ref0))
         with model._scaled_context_all():
             val = model.get_subsystem('comp')._outputs['areas']
             assert_rel_error(self, val[0, 0], (1.0 - 0.1)/(2 - 0.1))
@@ -637,8 +621,7 @@ class TestScaling(unittest.TestCase):
                 self.add_input('rhs', val=np.ones(2))
                 self.add_output('x', val=np.zeros(2), ref=np.array([2.0, 3.0]),
                                 ref0=np.array([4.0, 9.0]),
-                                res_ref=np.array([7.0, 11.0]),
-                                res_ref0=np.array([13.0, 18.0]))
+                                res_ref=np.array([7.0, 11.0]))
                 self.add_output('extra', val=np.zeros(2), ref=np.array([12.0, 13.0]),
                                 ref0=np.array([14.0, 17.0]))
 
@@ -677,8 +660,8 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val[0], (base_ex[0] - 14.0)/(12.0 - 14.0))
             assert_rel_error(self, val[1], (base_ex[1] - 17.0)/(13.0 - 17.0))
             val = model.get_subsystem('comp')._residuals['x'].copy()
-            assert_rel_error(self, val[0], (base_res_x[0] - 13.0)/(7.0 - 13.0))
-            assert_rel_error(self, val[1], (base_res_x[1] - 18.0)/(11.0 - 18.0))
+            assert_rel_error(self, val[0], (base_res_x[0])/(7.0))
+            assert_rel_error(self, val[1], (base_res_x[1])/(11.0))
 
         model.run_linearize()
 
@@ -697,8 +680,7 @@ class TestScaling(unittest.TestCase):
                 self.add_input('rhs', val=np.ones(2))
                 self.add_output('x', val=np.zeros(2), ref=np.array([2.0, 3.0]),
                                 ref0=np.array([4.0, 9.0]),
-                                res_ref=np.array([7.0, 11.0]),
-                                res_ref0=np.array([13.0, 18.0]))
+                                res_ref=np.array([7.0, 11.0]))
                 self.add_output('extra', val=np.zeros(2), ref=np.array([12.0, 13.0]),
                                 ref0=np.array([14.0, 17.0]))
 
@@ -736,8 +718,8 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val[0], (base_ex[0] - 14.0)/(12.0 - 14.0))
             assert_rel_error(self, val[1], (base_ex[1] - 17.0)/(13.0 - 17.0))
             val = model.get_subsystem('comp')._residuals['x'].copy()
-            assert_rel_error(self, val[0], (base_res_x[0] - 13.0)/(7.0 - 13.0))
-            assert_rel_error(self, val[1], (base_res_x[1] - 18.0)/(11.0 - 18.0))
+            assert_rel_error(self, val[0], (base_res_x[0])/(7.0))
+            assert_rel_error(self, val[1], (base_res_x[1])/(11.0))
 
         model.run_linearize()
 
