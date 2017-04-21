@@ -1,11 +1,11 @@
 """Define the base Jacobian class."""
 from __future__ import division
 import numpy as np
-from scipy.sparse import coo_matrix, csr_matrix
 from six.moves import range
 
 from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.utils.name_maps import key2abs_key
+from openmdao.matrices.matrix import sparse_types
 
 
 class Jacobian(object):
@@ -85,7 +85,7 @@ class Jacobian(object):
 
         if isinstance(jac, np.ndarray):
             self._subjacs[abs_key] = val * jac
-        elif isinstance(jac, (coo_matrix, csr_matrix)):
+        elif isinstance(jac, sparse_types):
             self._subjacs[abs_key].data *= val  # DOK not supported
         elif len(jac) == 3:
             self._subjacs[abs_key][0] *= val
@@ -162,7 +162,7 @@ class Jacobian(object):
             # np.promote_types will choose the smallest dtype that can contain both arguments
             safe_dtype = np.promote_types(subjac.dtype, float)
             subjac = subjac.astype(safe_dtype, copy=False)
-        elif isinstance(subjac, (coo_matrix, csr_matrix)):
+        elif isinstance(subjac, sparse_types):
             pass
         elif isinstance(subjac, (tuple, list)):
             if len(subjac) != 3:

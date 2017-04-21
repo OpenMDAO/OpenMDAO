@@ -7,7 +7,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 
 from six import iteritems
 
-from openmdao.matrices.matrix import Matrix, _compute_index_map
+from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
 
 
 class COOMatrix(Matrix):
@@ -36,7 +36,7 @@ class COOMatrix(Matrix):
         submats = self._submats
         metadata = self._metadata
         pre_metadata = {}
-        for key, (info, irow, icol, src_indices, shape) in iteritems(submats):
+        for key, (info, irow, icol, src_indices, shape, factor) in iteritems(submats):
             if not info['dependent']:
                 continue
             val = info['value']
@@ -58,7 +58,7 @@ class COOMatrix(Matrix):
         cols = -np.ones(counter, int)
 
         for key, (ind1, ind2, idxs) in iteritems(pre_metadata):
-            info, irow, icol, src_indices, shape = submats[key]
+            info, irow, icol, src_indices, shape, factor = submats[key]
             val = info['value']
             dense = (info['rows'] is None and (val is None or
                      isinstance(val, ndarray)))
@@ -84,7 +84,7 @@ class COOMatrix(Matrix):
                 cols[ind1:ind2] += icol
 
             else:  # sparse
-                if isinstance(val, (coo_matrix, csr_matrix)):
+                if isinstance(val, sparse_types):
                     jac_type = type(val)
                     jac = val.tocoo()
                     jrows = jac.row
@@ -104,7 +104,7 @@ class COOMatrix(Matrix):
                     rows[ind1:ind2] = irows
                     cols[ind1:ind2] = icols
 
-            metadata[key] = (ind1, ind2, idxs, jac_type)
+            metadata[key] = (ind1, ind2, idxs, jac_type, factor)
 
         return data, rows, cols
 
@@ -122,13 +122,13 @@ class COOMatrix(Matrix):
         data, rows, cols = self._build_sparse(num_rows, num_cols)
 
         metadata = self._metadata
-        for key, (ind1, ind2, idxs, jac_type) in iteritems(metadata):
+        for key, (ind1, ind2, idxs, jac_type, factor) in iteritems(metadata):
             if idxs is None:
-                metadata[key] = (slice(ind1, ind2), jac_type)
+                metadata[key] = (slice(ind1, ind2), jac_type, factor)
             else:
                 # store reverse indices to avoid copying subjac data during
                 # update_submat.
-                metadata[key] = (np.argsort(idxs) + ind1, jac_type)
+                metadata[key] = (np.argsort(idxs) + ind1, jac_type, factor)
 
         self._matrix = coo_matrix((data, (rows, cols)),
                                   shape=(num_rows, num_cols))
@@ -144,7 +144,7 @@ class COOMatrix(Matrix):
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
-        idxs, jac_type = self._metadata[key]
+        idxs, jac_type, factor = self._metadata[key]
         if not isinstance(jac, jac_type):
             raise TypeError("Jacobian entry for %s is of different type (%s) than "
                             "the type (%s) used at init time." % (key,
@@ -152,10 +152,13 @@ class COOMatrix(Matrix):
                                                                   jac_type.__name__))
         if isinstance(jac, ndarray):
             self._matrix.data[idxs] = jac.flat
-        elif isinstance(jac, (coo_matrix, csr_matrix)):
+        elif isinstance(jac, sparse_types):
             self._matrix.data[idxs] = jac.data
         elif isinstance(jac, list):
             self._matrix.data[idxs] = jac[0]
+
+        if factor is not None:
+            self._matrix.data[idxs] *= factor
 
     def _prod(self, in_vec, mode, ranges):
         """

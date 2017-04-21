@@ -9,7 +9,8 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
-
+from openmdao.matrices.matrix import sparse_types
+from openmdao.utils.units import get_conversion
 
 SUBJAC_META_DEFAULTS = {
     'rows': None,
@@ -138,6 +139,8 @@ class AssembledJacobian(Jacobian):
                 if not isinstance(s, Component):
                     continue
 
+                res_shape = abs2meta_out[res_abs_name]['shape']
+
                 for out_abs_name in s._var_abs_names['output']:
                     out_offset, _ = out_ranges[out_abs_name]
 
@@ -147,7 +150,7 @@ class AssembledJacobian(Jacobian):
                     else:
                         info = SUBJAC_META_DEFAULTS
                         shape = (
-                            np.prod(abs2meta_out[res_abs_name]['shape']),
+                            np.prod(res_shape),
                             np.prod(abs2meta_out[out_abs_name]['shape']))
 
                     int_mtx._add_submat(
@@ -162,7 +165,7 @@ class AssembledJacobian(Jacobian):
                     else:
                         info = SUBJAC_META_DEFAULTS
                         shape = (
-                            np.prod(abs2meta_out[res_abs_name]['shape']),
+                            np.prod(res_shape),
                             np.prod(abs2meta_in[in_abs_name]['shape']))
 
                     self._keymap[abs_key] = abs_key
@@ -172,9 +175,18 @@ class AssembledJacobian(Jacobian):
                         out_offset, _ = out_ranges[out_abs_name]
                         src_indices = src_indices_dict[in_abs_name]
 
+                        # calculate unit conversion
+                        in_units = abs2meta_in[in_abs_name]['units']
+                        out_units = abs2meta_out[out_abs_name]['units']
+                        if in_units and out_units:
+                            factor, _ = get_conversion(out_units, in_units)
+                        else:
+                            factor = None
+
                         if src_indices is None:
                             int_mtx._add_submat(
-                                abs_key, info, res_offset, out_offset, None, shape)
+                                abs_key, info, res_offset, out_offset, None, shape,
+                                factor)
                         else:
                             # need to add an entry for d(output)/d(source)
                             # instead of d(output)/d(input) when we have
@@ -183,7 +195,7 @@ class AssembledJacobian(Jacobian):
                             self._keymap[abs_key] = abs_key2
                             int_mtx._add_submat(
                                 abs_key2, info, res_offset, out_offset,
-                                src_indices, shape)
+                                src_indices, shape, factor)
                     else:
                         ext_mtx._add_submat(
                             abs_key, info, res_offset, in_ranges[in_abs_name][0],
@@ -281,7 +293,8 @@ class AssembledJacobian(Jacobian):
                 if abs_key in self._subjacs:
 
                     if in_abs_name in system._conn_global_abs_in2out:
-                        self._int_mtx._update_submat(self._keymap[abs_key], self._subjacs[abs_key])
+                        self._int_mtx._update_submat(self._keymap[abs_key],
+                                                     self._subjacs[abs_key])
                     elif self._ext_mtx[system.pathname] is not None:
                         self._ext_mtx[system.pathname]._update_submat(abs_key,
                                                                       self._subjacs[abs_key])
@@ -325,84 +338,6 @@ class AssembledJacobian(Jacobian):
                 d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
                 if ext_mtx is not None:
                     d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
-
-    def _scale_vec(self, vec, key, scale_to):
-        scal_vecs = self._scaling_vecs
-        vec_name = vec._name
-
-        vec.elem_mult(scal_vecs[key, scale_to + '1'][vec_name])
-
-    def _scale_subjac(self, abs_key, scale_to):
-        """
-        Change the scaling state of a single subjac.
-
-        Parameters
-        ----------
-        abs_key : (str, str)
-            Absolute name pair of sub-Jacobian.
-        scale_to: str
-            Indicates whether to scale to physical or normalized.
-        """
-        system = self._system
-        meta0 = system._var_allprocs_abs2meta['output'][abs_key[0]]
-        meta1 = system._var_allprocs_abs2meta['output'][abs_key[1]]
-
-        ind_of0, ind_of1 = meta0['resid_scale_idx']
-
-        # Implicit states are the only wrt that will have this
-        try:
-            ind_wrt0, ind_wrt1 = meta1['output_scale_idx']
-        except KeyError:
-            ind_wrt0 = meta1['my_idx']
-            ind_wrt1 = ind_wrt0 + 1
-
-        type_ = data1['type']
-
-        # A vector scale factor on the residual needs to be transposed and pre-multiplied.
-        if (ind_of1 - ind_of0) > 1:
-            self._pre_and_post_multiply_subjac(abs_key, coeffs['residual'][ind_of0:ind_of1, 1],
-                                               coeffs[type_][ind_wrt0:ind_wrt1, 1])
-        else:
-            val = coeffs['residual'][ind_of0:ind_of1, 1] / coeffs[type_][ind_wrt0:ind_wrt1, 1]
-            self._multiply_subjac(abs_key, val)
-
-    def _scale(self, scale_to):
-        """
-        Change the scaling state for all subjacs under the current system.
-
-        Parameters
-        ----------
-        scale_to: str
-            Indicates whether to scale to physical or normalized.
-        """
-        for abs_key in self._iter_abs_keys():
-            self._scale_subjac(abs_key, scale_to)
-
-    def _pre_and_post_multiply_subjac(self, abs_key, left_vec, right_vec):
-        """
-        Compute left_vec transposed times this sub-Jacobian times right_vec.
-
-        Parameters
-        ----------
-        abs_key : (str, str)
-            Absolute name pair of sub-Jacobian.
-        left_vec : ndarray
-            Array to pre-multiply by.
-        right_vec : ndarray
-            Array to post-multiply by.
-        """
-        jac = self._subjacs[abs_key]
-        left_vec = np.atleast_2d(left_vec).T
-
-        if isinstance(jac, np.ndarray):
-            self._subjacs[abs_key] = left_vec * jac / right_vec
-        elif isinstance(jac, (coo_matrix, csr_matrix)):
-            # DOK not supported
-            self._subjacs[abs_key].data = left_vec * self._subjacs[abs_key].data / right_vec
-        else:
-            # TODO: This is currently untested because support for scaler specification of a
-            # subjac larger than 1x1 is not implemented.
-            self._subjacs[abs_key] = left_vec * self._subjacs[abs_key][0] / right_vec
 
 
 class DenseJacobian(AssembledJacobian):

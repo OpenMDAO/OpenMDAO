@@ -967,6 +967,25 @@ def is_compatible(old_units, new_units):
     return old_unit.is_compatible(new_unit)
 
 
+def get_conversion(old_units, new_units):
+    """
+    Return conversion factor and offset between old and new units.
+
+    Parameters
+    ----------
+    old_units : str
+        original units as a string.
+    new_units : str
+        new units to return the value in.
+
+    Returns
+    -------
+    (float, float)
+        Conversion factor and offset
+    """
+    return _find_unit(old_units).conversion_tuple_to(_find_unit(new_units))
+
+
 def convert_units(val, old_units, new_units=None):
     """
     Take a given quantity and return in different units.

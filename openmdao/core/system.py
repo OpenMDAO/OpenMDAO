@@ -1213,7 +1213,7 @@ class System(object):
         self._jacobian_changed = True
 
     @contextmanager
-    def _unscaled_context(self, outputs=[], residuals=[], scale_jac=False):
+    def _unscaled_context(self, outputs=[], residuals=[]):
         """
         Context manager for units and scaling for vectors and Jacobians.
 
@@ -1233,18 +1233,12 @@ class System(object):
         for vec in residuals:
             self._scale_vec(vec, 'residual', 'phys')
 
-        if scale_jac:
-            self._jacobian._scale('phys')
-
         yield
 
         for vec in outputs:
             self._scale_vec(vec, 'output', 'norm')
         for vec in residuals:
             self._scale_vec(vec, 'residual', 'norm')
-
-        if scale_jac:
-            self._jacobian._scale('norm')
 
     @contextmanager
     def _scaled_context_all(self):
