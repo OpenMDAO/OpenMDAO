@@ -900,8 +900,9 @@ class System(object):
                 # for those sources are not available, so those components of the
                 # scaling vectors will just be 0. That will zero out input values
                 # during transfers, so the multiplier must be 1 by default.
-                if '1' in key[1]:
-                    vecs[key][vec_name].set_const(1.)
+                if resize:
+                    if '1' in key[1]:
+                        vecs[key][vec_name].set_const(1.)
 
             for abs_name, meta in iteritems(self._var_abs2meta['output']):
                 shape = meta['shape']
