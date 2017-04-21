@@ -22,21 +22,14 @@ class LinearSystemComp(ImplicitComponent):
         matrix factorization returned from scipy.linag.lu_factor
     """
 
-    def __init__(self, **kwargs):
+    def initialize(self):
         """
-        Define additional attributes.
+        Declare metadata.
         """
-        super(LinearSystemComp, self).__init__(**kwargs)
-        self.metadata.declare('size', value=1, type_=int,
-                              desc='the size of the linear system')
-        self.metadata.declare('partial_type', value='dense',
+        self.metadata.declare('size', default=1, type_=int, desc='the size of the linear system')
+        self.metadata.declare('partial_type', default='dense',
                               values=['dense', 'sparse', 'matrix_free'],
                               desc='the way the derivatives are defined')
-
-        self._lup = None
-
-        if self.metadata['partial_type'] == "matrix_free":
-            self.apply_linear = self._mat_vec_prod
 
     def initialize_variables(self):
         """
@@ -44,13 +37,18 @@ class LinearSystemComp(ImplicitComponent):
         """
         size = self.metadata['size']
 
+        self._lup = None
+
+        if self.metadata['partial_type'] == "matrix_free":
+            self.apply_linear = self._mat_vec_prod
+
         self.add_input("A", val=np.eye(size))
         self.add_input("b", val=np.ones(size))
         self.add_output("x", shape=size, val=.1)
 
     def initialize_partials(self):
         """
-        Setup the derivatives according to the user specified mode.
+        Set up the derivatives according to the user specified mode.
         """
         partial_type = self.metadata['partial_type']
 

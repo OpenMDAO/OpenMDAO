@@ -49,5 +49,4 @@ except ImportError:
     pass
 
 # System-Building Tools
-from openmdao.utils.generalized_dict import GeneralizedDictionary
-from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary

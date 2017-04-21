@@ -31,7 +31,7 @@ class BoundsCheck(NonlinearSolver):
         """
         opt = self.options
         opt.declare(
-            'bound_enforcement', value='vector', values=['vector', 'scalar', 'wall'],
+            'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
             desc="If this is set to 'vector', then the the output vector is backtracked to the "
             "first point where violation occured. If it is set to 'scalar' or 'wall', then only "
             "the violated variables are backtracked to their point of violation.")
@@ -91,15 +91,15 @@ class BacktrackingLineSearch(NonlinearSolver):
         opt['maxiter'] = 5
         opt['rtol'] = 0.95
         opt.declare(
-            'bound_enforcement', value='vector', values=['vector', 'scalar', 'wall'],
+            'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
             desc="If this is set to 'vector', the entire vector is backtracked together " +
                  "when a bound is violated. If this is set to 'scalar', only the violating " +
                  "entries are set to the bound and then the backtracking occurs on the vector " +
                  "as a whole. If this is set to 'wall', only the violating entries are set " +
                  "to the bound, and then the backtracking follows the wall - i.e., the " +
                  "violating entries do not change during the line search.")
-        opt.declare('rho', value=0.5, lower=0.0, upper=1.0, desc="Backtracking multiplier.")
-        opt.declare('alpha', value=1.0, desc="Initial line search step.")
+        opt.declare('rho', default=0.5, lower=0.0, upper=1.0, desc="Backtracking multiplier.")
+        opt.declare('alpha', default=1.0, desc="Initial line search step.")
 
     def _iter_initialize(self):
         """
@@ -160,7 +160,7 @@ class ArmijoGoldstein(BacktrackingLineSearch):
         """
         super(ArmijoGoldstein, self)._declare_options()
         opt = self.options
-        opt.declare('c', value=0.1, desc="Slope parameter for line of sufficient decrease. The "
+        opt.declare('c', default=0.1, desc="Slope parameter for line of sufficient decrease. The "
                     "larger the step, the more decrease is required to terminate the line search. "
                     "This parameter is 'c' in: '||res_k|| < ||res_0|| (1 - c * alpha)' for the "
                     "termination criterion.")

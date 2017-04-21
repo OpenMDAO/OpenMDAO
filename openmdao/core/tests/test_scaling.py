@@ -126,10 +126,12 @@ class ScalingTestComp(ImplicitComponent):
     This component computes one row of the above system.
     """
 
-    def initialize_variables(self):
+    def initialize(self):
         self.metadata.declare('row', values=[1, 2])
         self.metadata.declare('coeffs')
         self.metadata.declare('use_scal', type_=bool)
+
+    def initialize_variables(self):
 
         r1, r2, c1, c2 = self.metadata['coeffs']
 
@@ -331,14 +333,14 @@ class TestScaling(unittest.TestCase):
 
         class Simple(ExplicitComponent):
 
-            def __init__(self, ref=1.0, res_ref=None, ref0=0.0, res_ref0=None, **kwargs):
-
-                kwargs['ref'] = ref
-                kwargs['ref0'] = ref0
-                kwargs['res_ref'] = res_ref
-                kwargs['res_ref0'] = res_ref0
-
+            def __init__(self, **kwargs):
                 super(Simple, self).__init__(**kwargs)
+
+            def initialize(self):
+                self.metadata.declare('ref', default=1.0)
+                self.metadata.declare('ref0', default=0.0)
+                self.metadata.declare('res_ref', default=None)
+                self.metadata.declare('res_ref0', default=None)
 
             def initialize_variables(self):
 
