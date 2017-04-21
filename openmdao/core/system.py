@@ -16,7 +16,7 @@ from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
 
-from openmdao.utils.generalized_dict import GeneralizedDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
@@ -46,7 +46,7 @@ class System(object):
         Global name of the system, including the path.
     comm : MPI.Comm or <FakeComm>
         MPI communicator object.
-    metadata : <GeneralizedDictionary>
+    metadata : <OptionsDictionary>
         Dictionary of user-defined arguments.
     #
     _mpi_proc_allocator : <ProcAllocator>
@@ -200,8 +200,7 @@ class System(object):
         self.name = ''
         self.pathname = ''
         self.comm = None
-        self.metadata = GeneralizedDictionary()
-        self.metadata.update(kwargs)
+        self.metadata = OptionsDictionary()
 
         self._mpi_proc_allocator = DefaultAllocator()
 
@@ -278,6 +277,15 @@ class System(object):
         self._static_mode = True
         self._static_subsystems_allprocs = []
         self._static_manual_connections = {}
+
+        self.initialize()
+        self.metadata.update(kwargs)
+
+    def initialize(self):
+        """
+        Perform any one-time initialization run at instantiation.
+        """
+        pass
 
     def _get_initial_procs(self, comm, initial):
         """
@@ -517,7 +525,7 @@ class System(object):
 
         # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
-            self._setup_procs(*self._get_initial_procs(comm, initial), global_dict={})
+            self._setup_procs(*self._get_initial_procs(comm, initial))
 
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
@@ -550,7 +558,7 @@ class System(object):
         if setup_mode == 'full':
             self.set_initial_values()
 
-    def _setup_procs(self, pathname, comm, global_dict):
+    def _setup_procs(self, pathname, comm):
         """
         Distribute processors and assign pathnames.
 
@@ -560,15 +568,10 @@ class System(object):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        global_dict : dict
-            dictionary with kwargs of all parents assembled in it.
         """
         self.pathname = pathname
         self.comm = comm
         self._subsystems_proc_range = []
-
-        # Add self's kwargs to dictionary of parents' kwargs (already new copy)
-        self.metadata._assemble_global_dict(global_dict)
 
         minp, maxp = self.get_req_procs()
         if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
@@ -1188,7 +1191,7 @@ class System(object):
     @property
     def jacobian(self):
         """
-        A Jacobian object or None.
+        Get the Jacobian object assigned to this system (or None if unassigned).
         """
         return self._jacobian
 
@@ -1367,7 +1370,7 @@ class System(object):
     @property
     def nl_solver(self):
         """
-        The nonlinear solver for this system.
+        Get the nonlinear solver for this system.
         """
         return self._nl_solver
 
@@ -1381,21 +1384,21 @@ class System(object):
     @property
     def ln_solver(self):
         """
-        The linear (adjoint) solver for this system.
+        Get the linear solver for this system.
         """
         return self._ln_solver
 
     @ln_solver.setter
     def ln_solver(self, solver):
         """
-        Set this system's linear (adjoint) solver and perform setup.
+        Set this system's linear solver and perform setup.
         """
         self._ln_solver = solver
 
     @property
     def suppress_solver_output(self):
         """
-        The value of the global toggle to disable solver printing.
+        Get the value of the global toggle to disable solver printing.
         """
         return self._suppress_solver_output
 
@@ -1413,7 +1416,7 @@ class System(object):
     @property
     def proc_allocator(self):
         """
-        The current system's processor allocator object.
+        Get the current system's processor allocator object.
         """
         return self._mpi_proc_allocator
 
@@ -1435,7 +1438,7 @@ class System(object):
     def system_iter(self, local=True, include_self=False, recurse=True,
                     typ=None):
         """
-        A generator of subsystems of this system.
+        Yield a generator of subsystems of this system.
 
         Parameters
         ----------
@@ -2118,43 +2121,6 @@ class System(object):
             Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
-        """
-        pass
-
-    def initialize_processors(self):
-        """
-        Optional user-defined method run after repartitioning/rebalancing.
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-        """
-        pass
-
-    def initialize_variables(self):
-        """
-        Required method for components to declare inputs and outputs.
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-        """
-        pass
-
-    def initialize_partials(self):
-        """
-        Optional method for components to declare Jacobian structure/approximations.
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-            variable names
         """
         pass
 

@@ -6,7 +6,8 @@ from six.moves import cStringIO as StringIO
 
 import numpy as np
 
-from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NLRunOnce
+from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NLRunOnce, \
+                         ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid import ParaboloidMatVec
@@ -324,6 +325,51 @@ class TestProblemCheckPartials(unittest.TestCase):
                 assert_rel_error(self, rel_error.forward, 0., 1e-5)
                 assert_rel_error(self, rel_error.reverse, 0., 1e-5)
                 assert_rel_error(self, rel_error.forward_reverse, 0., 1e-5)
+
+    def test_implicit_undeclared(self):
+        # Test to see that check_partial_derivs works when state_wrt_input and state_wrt_state
+        # partials are missing.
+
+        class ImplComp4Test(ImplicitComponent):
+
+            def initialize_variables(self):
+                self.add_input('x', np.ones(2))
+                self.add_input('dummy', np.ones(2))
+                self.add_output('y', np.ones(2))
+                self.add_output('extra', np.ones(2))
+                self.mtx = np.array([
+                    [ 3., 4.],
+                    [ 2., 3.],
+                ])
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['y'] = self.mtx.dot(outputs['y']) - inputs['x']
+
+            def linearize(self, inputs, outputs, partials):
+                partials['y', 'x'] = -np.eye(2)
+                partials['y', 'y'] = self.mtx
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones((2, ))))
+        prob.model.add_subsystem('p2', IndepVarComp('dummy', np.ones((2, ))))
+        prob.model.add_subsystem('comp', ImplComp4Test())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.dummy', 'comp.dummy')
+
+        prob.model.suppress_solver_output = True
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partial_derivs(out_stream=None)
+
+        assert_rel_error(self, data['comp']['y', 'extra']['J_fwd'], np.zeros((2, 2)))
+        assert_rel_error(self, data['comp']['y', 'extra']['J_rev'], np.zeros((2, 2)))
+        assert_rel_error(self, data['comp']['y', 'dummy']['J_fwd'], np.zeros((2, 2)))
+        assert_rel_error(self, data['comp']['y', 'dummy']['J_rev'], np.zeros((2, 2)))
+
 
 if __name__ == "__main__":
     unittest.main()

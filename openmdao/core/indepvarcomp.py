@@ -41,7 +41,7 @@ class IndepVarComp(ExplicitComponent):
         **kwargs : dict
             keyword arguments.
         """
-        super(IndepVarComp, self).__init__(**kwargs)
+        super(IndepVarComp, self).__init__()
         self._indep = []
         self._indep_external = []
 
