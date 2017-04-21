@@ -52,7 +52,7 @@ class AssembledJacobian(Jacobian):
         from openmdao.core.component import Component
 
         super(AssembledJacobian, self).__init__()
-        self.options.declare('matrix_class', value=DenseMatrix,
+        self.options.declare('matrix_class', default=DenseMatrix,
                              desc='<Matrix> class to use in this <Jacobian>.')
         self.options.update(kwargs)
         self._view_ranges = {}

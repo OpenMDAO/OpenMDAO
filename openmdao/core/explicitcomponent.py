@@ -66,13 +66,11 @@ class ExplicitComponent(Component):
             other_names.append(out_name)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0,
-                   res_ref=None, res_ref0=None, var_set=0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0):
         """
         Add an output variable to the component.
 
-        For ExplicitComponent, res_ref and res_ref0 default to the values in res and res0 unless
-        otherwise specified.
+        For ExplicitComponent, res_ref defaults to the value in res unless otherwise specified.
 
         Parameters
         ----------
@@ -111,18 +109,12 @@ class ExplicitComponent(Component):
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is None, which means residual scaling matches
             output scaling.
-        res_ref0 : float
-            Scaling parameter. The value in the user-defined res_units of this output's residual
-            when the scaled value is 0. Default is None, which means residual scaling matches
-            output scaling.
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
         """
         if res_ref is None:
             res_ref = ref
-        if res_ref0 is None:
-            res_ref0 = ref0
 
         if inspect.stack()[1][3] == '__init__':
             warn_deprecation("In the future, the 'add_output' method must be "
@@ -132,7 +124,7 @@ class ExplicitComponent(Component):
         super(ExplicitComponent, self).add_output(name, val=val, shape=shape, units=units,
                                                   res_units=res_units, desc=desc, lower=lower,
                                                   upper=upper, ref=ref, ref0=ref0, res_ref=res_ref,
-                                                  res_ref0=res_ref0, var_set=var_set)
+                                                  var_set=var_set)
 
     def _negate_jac(self):
         """

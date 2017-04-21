@@ -1,7 +1,7 @@
 """Base class used to define the interface for derivative approximation schemes."""
 from __future__ import print_function, division
 
-from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary
 
 
 class ApproximationScheme(object):

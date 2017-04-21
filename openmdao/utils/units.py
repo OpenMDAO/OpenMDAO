@@ -249,7 +249,7 @@ class PhysicalUnit(object):
 
     def __repr__(self):
         """
-        String representation of myself.
+        Get the string representation of this unit.
 
         Returns
         -------

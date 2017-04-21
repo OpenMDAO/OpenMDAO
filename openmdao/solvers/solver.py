@@ -3,7 +3,7 @@
 from __future__ import division, print_function
 import numpy as np
 
-from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 
 
@@ -51,18 +51,18 @@ class Solver(object):
         self._iter_count = 0
 
         self.options = OptionsDictionary()
-        self.options.declare('maxiter', type_=int, value=10,
+        self.options.declare('maxiter', type_=int, default=10,
                              desc='maximum number of iterations')
-        self.options.declare('atol', value=1e-10,
+        self.options.declare('atol', default=1e-10,
                              desc='absolute error tolerance')
-        self.options.declare('rtol', value=1e-10,
+        self.options.declare('rtol', default=1e-10,
                              desc='relative error tolerance')
-        self.options.declare('iprint', type_=int, value=1,
+        self.options.declare('iprint', type_=int, default=1,
                              desc='whether to print output')
 
         # What the solver supports.
         self.supports = OptionsDictionary()
-        self.supports.declare('gradients', type_=bool, value=False)
+        self.supports.declare('gradients', type_=bool, default=False)
 
         self._declare_options()
         self.options.update(kwargs)

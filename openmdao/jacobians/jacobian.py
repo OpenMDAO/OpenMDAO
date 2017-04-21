@@ -3,7 +3,7 @@ from __future__ import division
 import numpy as np
 from six.moves import range
 
-from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.name_maps import key2abs_key
 from openmdao.matrices.matrix import sparse_types
 
