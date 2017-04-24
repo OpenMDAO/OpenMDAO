@@ -1,50 +1,34 @@
 """
 Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 """
+
+import cPickle
+import io
+import numpy as np
+from six import iteritems
+import sqlite3
+
 from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.solvers.solver import Solver
 from openmdao.utils.record_util import format_iteration_coordinate
 
-from six import iteritems
-
-import sqlite3
-import numpy as np
-import io
-import cPickle
-
-# this basically defines a special type of variable that can be written/read from a sqlite db.
-#  the type is called "array"
-
-
-def adapt_array(arr):
-    """
-    http://stackoverflow.com/a/31312102/190597 (SoulNibbler).
-    """
+def array_to_blob(array):
+    '''Convert a numpy array to something that can be written
+    to a BLOB field in sqlite
+    '''
     out = io.BytesIO()
-    np.save(out, arr)
+    np.save(out, array)
     out.seek(0)
     return sqlite3.Binary(out.read())
 
-
-def convert_array(text):
-    """
-    Utility function for numpy structured arrays.
-    """
-    out = io.BytesIO(text)
+def blob_to_array(blob):
+    out = io.BytesIO(blob)
     out.seek(0)
     return np.load(out)
 
-
-# Converts np.array to TEXT when inserting
-sqlite3.register_adapter(np.ndarray, adapt_array)
-
-# Converts TEXT to np.array when selecting
-sqlite3.register_converter("array", convert_array)
-
 format_version = 1
-
 
 class SqliteRecorder(BaseRecorder):
     """
@@ -83,14 +67,14 @@ class SqliteRecorder(BaseRecorder):
 
         self._counter = 0
         # isolation_level=None causes autocommit
-        self.con = sqlite3.connect(out, detect_types=sqlite3.PARSE_DECLTYPES, isolation_level=None)
-        # write the metadata
+        self.con = sqlite3.connect(out, isolation_level=None)
+
         self.con.execute("CREATE TABLE metadata( format_version INT)")
         self.con.execute("INSERT INTO metadata(format_version) VALUES(?)", (format_version,))
 
         self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                          "iteration_coordinate TEXT, timestamp REAL, success INT, msg TEXT, "
-                         "desvars array, responses array, objectives array, constraints array)")
+                         "desvars BLOB, responses BLOB, objectives BLOB, constraints BLOB)")
         self.con.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
                          "iteration_coordinate TEXT,  timestamp REAL, success INT, msg TEXT, "
                          "system_values array)")
@@ -169,6 +153,7 @@ class SqliteRecorder(BaseRecorder):
                 desvars_array = np.zeros((1,), dtype=dtype_tuples)
 
                 for name, value in iteritems(desvars_values):
+                    # break # TODO_RECORDERS - remove
                     desvars_array[name] = value
 
         if self.options['record_responses']:
@@ -182,6 +167,7 @@ class SqliteRecorder(BaseRecorder):
                 responses_array = np.zeros((1,), dtype=dtype_tuples)
 
                 for name, value in iteritems(responses_values):
+                    # break # TODO_RECORDERS - remove
                     responses_array[name] = value
 
         if self.options['record_objectives']:
@@ -195,10 +181,13 @@ class SqliteRecorder(BaseRecorder):
                 objectives_array = np.zeros((1,), dtype=dtype_tuples)
 
                 for name, value in iteritems(objectives_values):
+                    # break # TODO_RECORDERS - remove
                     objectives_array[name] = value
 
         if self.options['record_constraints']:
             constraints_values = object_requesting_recording.get_constraint_values()
+            print('constraints_values', constraints_values)
+
             if constraints_values:
                 dtype_tuples = []
                 for name, value in iteritems(constraints_values):
@@ -208,14 +197,22 @@ class SqliteRecorder(BaseRecorder):
                 constraints_array = np.zeros((1,), dtype=dtype_tuples)
 
                 for name, value in iteritems(constraints_values):
+                    # break # TODO_RECORDERS - remove
                     constraints_array[name] = value
+
+        desvars_blob = array_to_blob(desvars_array)
+        responses_blob = array_to_blob(responses_array)
+        objectives_blob = array_to_blob(objectives_array)
+        constraints_blob = array_to_blob(constraints_array)
+
         self.con.execute("INSERT INTO driver_iterations(iteration_coordinate, timestamp, "
                          "success, msg, desvars , responses , objectives , constraints ) "
                          "VALUES(?,?,?,?,?,?,?,?)", (format_iteration_coordinate(metadata['coord']),
                                                      metadata['timestamp'], metadata['success'],
-                                                     metadata['msg'], desvars_array,
-                                                     responses_array, objectives_array,
-                                                     constraints_array))
+                                                     metadata['msg'], desvars_blob,
+                                                     responses_blob, objectives_blob,
+                                                     constraints_blob))
+
 
     def record_iteration_system(self, object_requesting_recording, metadata):
         """
@@ -346,11 +343,12 @@ class SqliteRecorder(BaseRecorder):
 
         print("SOLVER VALUES:", solver_values)
         # Write this mega array to the database
-        self.con.execute("INSERT INTO solver_iterations(iteration_coordinate, timestamp, "
-                         "success, msg, solver_values) "
-                         "VALUES(?,?,?,?,?)", (metadata['coord'], metadata['timestamp'],
-                                               metadata['success'], metadata['msg'],
-                                               solver_values))
+        with self.con:
+            self.con.execute("INSERT INTO solver_iterations(iteration_coordinate, timestamp, "
+                             "success, msg, solver_values) "
+                             "VALUES(?,?,?,?,?)", (metadata['coord'], metadata['timestamp'],
+                                                   metadata['success'], metadata['msg'],
+                                                   solver_values))
 
     def record_metadata(self, object_requesting_recording):
         """
