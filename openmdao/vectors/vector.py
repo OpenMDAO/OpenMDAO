@@ -201,7 +201,7 @@ class Vector(object):
 
     def __iter__(self):
         """
-        Iterator over variables involved in the current mat-vec product (relative names).
+        Yield an iterator over variables involved in the current mat-vec product (relative names).
 
         Returns
         -------

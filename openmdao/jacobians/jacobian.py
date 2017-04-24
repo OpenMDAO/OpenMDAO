@@ -4,7 +4,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 from six.moves import range
 
-from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.name_maps import key2abs_key
 
 

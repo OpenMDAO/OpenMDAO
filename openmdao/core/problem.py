@@ -150,7 +150,7 @@ class Problem(object):
         Provide for setting the 'root' property for backwards compatibility.
 
         Parameters
-        -------
+        ----------
         model : <Group>
             reference to a <Group> to be assigned to the 'model' property.
         """
@@ -464,7 +464,11 @@ class Problem(object):
 
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                in_size = np.prod(comp._var_abs2meta['input'][wrt]['shape'])
+                                try:
+                                    in_size = np.prod(comp._var_abs2meta['input'][wrt]['shape'])
+                                except KeyError:
+                                    in_size = np.prod(comp._var_abs2meta['output'][wrt]['shape'])
+
                                 out_size = np.prod(comp._var_abs2meta['output'][of]['shape'])
                                 deriv_value = np.zeros((out_size, in_size))
 

@@ -7,7 +7,6 @@ def overrides_method(method_name, obj, base):
 
     Parameters
     ----------
-
     method_name : str
         Name of the method to search for.
 

@@ -16,7 +16,7 @@ from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
 
-from openmdao.utils.generalized_dict import GeneralizedDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
@@ -50,7 +50,7 @@ class System(object):
         Global name of the system, including the path.
     comm : MPI.Comm or <FakeComm>
         MPI communicator object.
-    metadata : <GeneralizedDictionary>
+    metadata : <OptionsDictionary>
         Dictionary of user-defined arguments.
     #
     _mpi_proc_allocator : <ProcAllocator>
@@ -206,8 +206,7 @@ class System(object):
         self.name = ''
         self.pathname = ''
         self.comm = None
-        self.metadata = GeneralizedDictionary()
-        self.metadata.update(kwargs)
+        self.metadata = OptionsDictionary()
 
         self._mpi_proc_allocator = DefaultAllocator()
 
@@ -285,6 +284,15 @@ class System(object):
         self._static_mode = True
         self._static_subsystems_allprocs = []
         self._static_manual_connections = {}
+
+        self.initialize()
+        self.metadata.update(kwargs)
+
+    def initialize(self):
+        """
+        Perform any one-time initialization run at instantiation.
+        """
+        pass
 
     def _get_initial_procs(self, comm, initial):
         """
@@ -524,7 +532,7 @@ class System(object):
 
         # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
-            self._setup_procs(*self._get_initial_procs(comm, initial), global_dict={})
+            self._setup_procs(*self._get_initial_procs(comm, initial))
 
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
@@ -557,7 +565,7 @@ class System(object):
         if setup_mode == 'full':
             self.set_initial_values()
 
-    def _setup_procs(self, pathname, comm, global_dict):
+    def _setup_procs(self, pathname, comm):
         """
         Distribute processors and assign pathnames.
 
@@ -567,15 +575,10 @@ class System(object):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        global_dict : dict
-            dictionary with kwargs of all parents assembled in it.
         """
         self.pathname = pathname
         self.comm = comm
         self._subsystems_proc_range = []
-
-        # Add self's kwargs to dictionary of parents' kwargs (already new copy)
-        self.metadata._assemble_global_dict(global_dict)
 
         minp, maxp = self.get_req_procs()
         if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
@@ -839,15 +842,12 @@ class System(object):
                 ref = meta['ref']
                 ref0 = meta['ref0']
                 res_ref = meta['res_ref']
-                res_ref0 = meta['res_ref0']
                 if not np.isscalar(ref):
                     ref = ref.reshape(shape)
                 if not np.isscalar(ref0):
                     ref0 = ref0.reshape(shape)
                 if not np.isscalar(res_ref):
                     res_ref = res_ref.reshape(shape)
-                if not np.isscalar(res_ref0):
-                    res_ref0 = res_ref0.reshape(shape)
 
                 a0 = ref0
                 a1 = ref - ref0
@@ -856,12 +856,10 @@ class System(object):
                 vecs['output', 'norm0'][vec_name]._views[abs_name][:] = -a0 / a1
                 vecs['output', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / a1
 
-                a0 = res_ref0
-                a1 = res_ref - res_ref0
-                vecs['residual', 'phys0'][vec_name]._views[abs_name][:] = a0
-                vecs['residual', 'phys1'][vec_name]._views[abs_name][:] = a1
-                vecs['residual', 'norm0'][vec_name]._views[abs_name][:] = -a0 / a1
-                vecs['residual', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / a1
+                vecs['residual', 'phys0'][vec_name]._views[abs_name][:] = 0.0
+                vecs['residual', 'phys1'][vec_name]._views[abs_name][:] = res_ref
+                vecs['residual', 'norm0'][vec_name]._views[abs_name][:] = 0.0
+                vecs['residual', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / res_ref
 
             for abs_in, abs_out in iteritems(self._conn_abs_in2out):
                 if abs_in not in abs2meta_in:
@@ -1203,7 +1201,7 @@ class System(object):
     @property
     def jacobian(self):
         """
-        A Jacobian object or None.
+        Get the Jacobian object assigned to this system (or None if unassigned).
         """
         return self._jacobian
 
@@ -1382,7 +1380,7 @@ class System(object):
     @property
     def nl_solver(self):
         """
-        The nonlinear solver for this system.
+        Get the nonlinear solver for this system.
         """
         return self._nl_solver
 
@@ -1396,21 +1394,21 @@ class System(object):
     @property
     def ln_solver(self):
         """
-        The linear (adjoint) solver for this system.
+        Get the linear solver for this system.
         """
         return self._ln_solver
 
     @ln_solver.setter
     def ln_solver(self, solver):
         """
-        Set this system's linear (adjoint) solver and perform setup.
+        Set this system's linear solver and perform setup.
         """
         self._ln_solver = solver
 
     @property
     def suppress_solver_output(self):
         """
-        The value of the global toggle to disable solver printing.
+        Get the value of the global toggle to disable solver printing.
         """
         return self._suppress_solver_output
 
@@ -1428,7 +1426,7 @@ class System(object):
     @property
     def proc_allocator(self):
         """
-        The current system's processor allocator object.
+        Get the current system's processor allocator object.
         """
         return self._mpi_proc_allocator
 
@@ -1450,7 +1448,7 @@ class System(object):
     def system_iter(self, local=True, include_self=False, recurse=True,
                     typ=None):
         """
-        A generator of subsystems of this system.
+        Yield a generator of subsystems of this system.
 
         Parameters
         ----------
@@ -2221,17 +2219,6 @@ class System(object):
         """
         pass
 
-    def add_recorder(self, recorder):
-        """
-        Add a recorder to the driver.
-
-        Parameters
-        ----------
-        recorder : BaseRecorder
-           A recorder instance.
-        """
-        self._rec_mgr.append(recorder)
-
     def _list_states(self):
         """
         Return list of all states at and below this system.
@@ -2246,3 +2233,14 @@ class System(object):
             states.extend(subsys._list_states())
 
         return states
+
+    def add_recorder(self, recorder):
+        """
+        Add a recorder to the driver.
+
+        Parameters
+        ----------
+        recorder : BaseRecorder
+           A recorder instance.
+        """
+        self._rec_mgr.append(recorder)
