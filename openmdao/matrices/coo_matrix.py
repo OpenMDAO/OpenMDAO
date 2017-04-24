@@ -1,16 +1,16 @@
 """Define the COOmatrix class."""
 from __future__ import division
 
-import numpy
+import numpy as np
 from numpy import ndarray
 from scipy.sparse import coo_matrix, csr_matrix
-from six.moves import range
+
 from six import iteritems
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map
 
 
-class COOmatrix(Matrix):
+class COOMatrix(Matrix):
     """
     Sparse matrix in Coordinate list format.
     """
@@ -45,7 +45,7 @@ class COOmatrix(Matrix):
                      isinstance(val, ndarray)))
             ind1 = counter
             if dense:
-                counter += numpy.prod(shape)
+                counter += np.prod(shape)
             elif rows is None:
                 counter += val.data.size
             else:
@@ -53,9 +53,9 @@ class COOmatrix(Matrix):
             ind2 = counter
             pre_metadata[key] = (ind1, ind2, None)
 
-        data = numpy.zeros(counter)
-        rows = -numpy.ones(counter, int)
-        cols = -numpy.ones(counter, int)
+        data = np.zeros(counter)
+        rows = -np.ones(counter, int)
+        cols = -np.ones(counter, int)
 
         for key, (ind1, ind2, idxs) in iteritems(pre_metadata):
             info, irow, icol, src_indices, shape = submats[key]
@@ -65,10 +65,10 @@ class COOmatrix(Matrix):
 
             if dense:
                 jac_type = ndarray
-                rowrange = numpy.arange(shape[0], dtype=int)
+                rowrange = np.arange(shape[0], dtype=int)
 
                 if src_indices is None:
-                    colrange = numpy.arange(shape[1], dtype=int)
+                    colrange = np.arange(shape[1], dtype=int)
                 else:
                     colrange = src_indices
 
@@ -128,7 +128,7 @@ class COOmatrix(Matrix):
             else:
                 # store reverse indices to avoid copying subjac data during
                 # update_submat.
-                metadata[key] = (numpy.argsort(idxs) + ind1, jac_type)
+                metadata[key] = (np.argsort(idxs) + ind1, jac_type)
 
         self._matrix = coo_matrix((data, (rows, cols)),
                                   shape=(num_rows, num_cols))
@@ -157,7 +157,7 @@ class COOmatrix(Matrix):
         elif isinstance(jac, list):
             self._matrix.data[idxs] = jac[0]
 
-    def _prod(self, in_vec, mode):
+    def _prod(self, in_vec, mode, ranges):
         """
         Perform a matrix vector product.
 
@@ -167,6 +167,8 @@ class COOmatrix(Matrix):
             incoming vector to multiply.
         mode : str
             'fwd' or 'rev'.
+        ranges : (int, int, int, int)
+            Min row, max row, min col, max col for the current system.
 
         Returns
         -------

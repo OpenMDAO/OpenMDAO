@@ -1,8 +1,10 @@
 """ Tests the ins and outs of automatic unit conversion in OpenMDAO."""
 
 import unittest
+import warnings
+
 from six import iteritems
-from six.moves import cStringIO
+from six.moves import cStringIO, range
 
 import numpy as np
 
@@ -120,7 +122,9 @@ class UnitConvGroup(Group):
     units degF, degC, and degK respectively. Good for testing unit
     conversion."""
 
-    def initialize(self):
+    def __init__(self):
+        super(UnitConvGroup, self).__init__()
+
         self.add_subsystem('px1', IndepVarComp('x1', 100.0))
         self.add_subsystem('src', SrcComp())
         self.add_subsystem('tgtF', TgtCompF())
@@ -141,16 +145,25 @@ class UnitConvGroupImplicitConns(Group):
     In this version, all connections are Implicit.
     """
 
-    def initialize(self):
-        self.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs='x1')
-        self.add_subsystem('src', SrcComp(), promotes_inputs='x1', promotes_outputs='x2')
-        self.add_subsystem('tgtF', TgtCompF(), promotes_inputs='x2')
-        self.add_subsystem('tgtC', TgtCompC(), promotes_inputs='x2')
-        self.add_subsystem('tgtK', TgtCompK(), promotes_inputs='x2')
+    def __init__(self):
+        super(UnitConvGroupImplicitConns, self).__init__()
+
+        self.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
+        self.add_subsystem('src', SrcComp(), promotes_inputs=['x1'], promotes_outputs=['x2'])
+        self.add_subsystem('tgtF', TgtCompF(), promotes_inputs=['x2'])
+        self.add_subsystem('tgtC', TgtCompC(), promotes_inputs=['x2'])
+        self.add_subsystem('tgtK', TgtCompK(), promotes_inputs=['x2'])
 
 
 class TestUnitConversion(unittest.TestCase):
     """ Testing automatic unit conversion."""
+
+    def test_dangling_input_w_units(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('C1', ExecComp('y=x', x={'units': 'ft'}, y={'units': 'm'}))
+        prob.setup()
+        prob.run_model()
+        # this test passes as long as it doesn't raise an exception
 
     def test_speed(self):
         comp = IndepVarComp()
@@ -160,7 +173,7 @@ class TestUnitConversion(unittest.TestCase):
         prob = Problem(model=Group())
         prob.model.add_subsystem('c1', comp)
         prob.model.add_subsystem('c2', SpeedComp())
-        prob.model.add_subsystem('c3', ExecComp('f=speed', units={'speed': 'm/s'}))
+        prob.model.add_subsystem('c3', ExecComp('f=speed',speed={'units': 'm/s'}))
         prob.model.connect('c1.distance', 'c2.distance')
         prob.model.connect('c1.time', 'c2.time')
         prob.model.connect('c2.speed', 'c3.speed')
@@ -212,7 +225,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.run()
 
         ## Make sure check partials handles conversion
-        #data = prob.check_partial_derivatives(out_stream=None)
+        #data = prob.check_partial_derivs(out_stream=None)
 
         #for key1, val1 in iteritems(data):
             #for key2, val2 in iteritems(val1):
@@ -227,6 +240,80 @@ class TestUnitConversion(unittest.TestCase):
         #conv = prob.root.list_unit_conv(stream=stream)
         #self.assertTrue((('src.x2', 'tgtF.x2'), ('degC', 'degF')) in conv)
         #self.assertTrue((('src.x2', 'tgtK.x2'), ('degC', 'degK')) in conv)
+
+    def test_basic_apply(self):
+        """Test that output values and total derivatives are correct."""
+
+        class SrcCompa(ExplicitComponent):
+            """Source provides degrees Celsius."""
+
+            def initialize_variables(self):
+                self.add_input('x1', 100.0)
+                self.add_output('x2', 100.0, units='degC')
+
+            def compute(self, inputs, outputs):
+                """ Pass through."""
+                outputs['x2'] = inputs['x1']
+
+            def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+                """ Derivative is 1.0"""
+
+                if mode == 'fwd':
+                    d_outputs['x2'] += d_inputs['x1']
+                else:
+                    d_inputs['x1'] += d_outputs['x2']
+
+
+        class TgtCompFa(ExplicitComponent):
+            """Target expressed in degrees F."""
+
+            def initialize_variables(self):
+                self.add_input('x2', 100.0, units='degF')
+                self.add_output('x3', 100.0)
+
+            def compute(self, inputs, outputs):
+                """ Pass through."""
+                outputs['x3'] = inputs['x2']
+
+            def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+                """ Derivative is 1.0"""
+
+                if mode == 'fwd':
+                    d_outputs['x3'] += d_inputs['x2']
+                else:
+                    d_inputs['x2'] += d_outputs['x3']
+
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        model.add_subsystem('src', SrcCompa())
+        model.add_subsystem('tgtF', TgtCompFa())
+
+        model.connect('px1.x1', 'src.x1')
+        model.connect('src.x2', 'tgtF.x2')
+
+        # Check the outputs after running to test the unit conversions
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
+
+        assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
+        assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
+
+        # Check the total derivatives in forward mode
+        wrt = ['px1.x1']
+        of = ['tgtF.x3']
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+
+        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+
+        # Check the total derivatives in reverse mode
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+
+        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
 
     #def test_basic_force_fd_comps(self):
 
@@ -286,7 +373,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.run()
 
         ## Make sure check partials handles conversion
-        #data = prob.check_partial_derivatives(out_stream=None)
+        #data = prob.check_partial_derivs(out_stream=None)
 
         #for key1, val1 in iteritems(data):
             #for key2, val2 in iteritems(val1):
@@ -324,28 +411,54 @@ class TestUnitConversion(unittest.TestCase):
         expected_msg = "The units 'junk' are invalid"
         self.assertTrue(expected_msg in str(cm.exception))
 
+    def test_add_unitless_output(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('indep', IndepVarComp('x', 0.0, units='unitless'))
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            prob.setup(check=False)
+            self.assertEqual(str(w[-1].message),
+                             "Output 'x' has units='unitless' but 'unitless' has "
+                             "been deprecated. Use units=None "
+                             "instead.  Note that connecting a unitless variable to "
+                             "one with units is no longer an error, but will issue "
+                             "a warning instead.")
+
+    def test_add_unitless_input(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('C1', ExecComp('y=x', x={'units': 'unitless'}))
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            prob.setup(check=False)
+        self.assertEqual(str(w[-1].message),
+                         "Input 'x' has units='unitless' but 'unitless' has "
+                         "been deprecated. Use units=None "
+                         "instead.  Note that connecting a unitless variable to "
+                         "one with units is no longer an error, but will issue "
+                         "a warning instead.")
+
     def test_incompatible_units(self):
         """Test error handling when only one of src and tgt have units."""
         prob = Problem(model=Group())
-        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs='x1')
-        prob.model.add_subsystem('src', SrcComp(), promotes_inputs='x1')
-        prob.model.add_subsystem('tgt', ExecComp('yy=xx', xx=0.0))
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
+        prob.model.add_subsystem('src', SrcComp(), promotes_inputs=['x1'])
+        prob.model.add_subsystem('tgt', ExecComp('yy=xx', xx={'value': 0.0, 'units': 'unitless'}))
         prob.model.connect('src.x2', 'tgt.xx')
 
-        with self.assertRaises(Exception) as cm:
+        msg = "Output 'src.x2' with units of 'degC' is connected to input 'tgt.xx' which has no units."
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             prob.setup()
-        expected_msg = "Units must be specified for both or neither side of connection " + \
-                       "in '': 'src.x2' has units 'degC' but 'tgt.xx' is unitless."
-        self.assertTrue(expected_msg in str(cm.exception))
+        self.assertEqual(str(w[-1].message), msg)
 
     def test_basic_implicit_conn(self):
         """Test units with all implicit connections."""
         prob = Problem(model=Group())
-        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs='x1')
-        prob.model.add_subsystem('src', SrcComp(), promotes_inputs='x1', promotes_outputs='x2')
-        prob.model.add_subsystem('tgtF', TgtCompF(), promotes_inputs='x2')
-        prob.model.add_subsystem('tgtC', TgtCompC(), promotes_inputs='x2')
-        prob.model.add_subsystem('tgtK', TgtCompK(), promotes_inputs='x2')
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
+        prob.model.add_subsystem('src', SrcComp(), promotes_inputs=['x1'], promotes_outputs=['x2'])
+        prob.model.add_subsystem('tgtF', TgtCompF(), promotes_inputs=['x2'])
+        prob.model.add_subsystem('tgtC', TgtCompC(), promotes_inputs=['x2'])
+        prob.model.add_subsystem('tgtK', TgtCompK(), promotes_inputs=['x2'])
 
         # Check the outputs after running to test the unit conversions
         prob.setup(check=False)
@@ -653,39 +766,37 @@ class TestUnitConversion(unittest.TestCase):
                 #diff = abs(Jf[key][key2] - Jr[key][key2])
                 #assert_rel_error(self, diff, 0.0, 1e-10)
 
-    #def test_incompatible_connections(self):
+    def test_incompatible_connections(self):
 
-        #class BadComp(Component):
-            #def __init__(self):
-                #super(BadComp, self).__init__()
+        class BadComp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x2', 100.0, units='m')
+                self.add_output('x3', 100.0)
 
-                #self.add_param('x2', 100.0, units='m')
-                #self.add_output('x3', 100.0)
+        # Explicit Connection
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('src', SrcComp())
+        prob.model.add_subsystem('dest', BadComp())
+        prob.model.connect('src.x2', 'dest.x2')
+        with self.assertRaises(Exception) as cm:
+            prob.setup(check=False)
 
-        ## Explicit Connection
-        #prob = Problem()
-        #prob.root = Group()
-        #prob.root.add('src', SrcComp())
-        #prob.root.add('dest', BadComp())
-        #prob.root.connect('src.x2', 'dest.x2')
-        #with self.assertRaises(Exception) as cm:
-            #prob.setup(check=False)
+        expected_msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
 
-        #expected_msg = "Unit 'degC' in source 'src.x2' is incompatible with unit 'm' in target 'dest.x2'."
+        self.assertEqual(expected_msg, str(cm.exception))
 
-        #self.assertTrue(expected_msg in str(cm.exception))
+        # Implicit Connection
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('src', SrcComp(), promotes=['x2'])
+        prob.model.add_subsystem('dest', BadComp(),promotes=['x2'])
+        with self.assertRaises(Exception) as cm:
+            prob.setup(check=False)
 
-        ## Implicit Connection
-        #prob = Problem()
-        #prob.root = Group()
-        #prob.root.add('src', SrcComp(), promotes=['x2'])
-        #prob.root.add('dest', BadComp(),promotes=['x2'])
-        #with self.assertRaises(Exception) as cm:
-            #prob.setup(check=False)
+        expected_msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
 
-        #expected_msg = "Unit 'degC' in source 'src.x2' (x2) is incompatible with unit 'm' in target 'dest.x2' (x2)."
-
-        #self.assertTrue(expected_msg in str(cm.exception))
+        self.assertEqual(expected_msg, str(cm.exception))
 
     #def test_nested_relevancy_base(self):
 

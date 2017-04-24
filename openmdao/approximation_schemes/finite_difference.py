@@ -6,8 +6,9 @@ from collections import namedtuple
 from itertools import groupby
 from six.moves import range
 
-
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
+from openmdao.utils.name_maps import abs_key2rel_key
+
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 
@@ -25,14 +26,14 @@ DEFAULT_ORDER = {
 }
 
 FD_COEFFS = {
-    ('forward', 1): FDForm(deltas=np.array([1]),
-                           coeffs=np.array([1]),
-                           current_coeff=-1.),
-    ('backward', 1): FDForm(deltas=np.array([-1]),
-                            coeffs=np.array([-1]),
-                            current_coeff=1.),
-    ('central', 2): FDForm(deltas=np.array([1, -1]),
-                           coeffs=np.array([1 / 2, -1 / 2]),
+    ('forward', 1): FDForm(deltas=np.array([1.0]),
+                           coeffs=np.array([1.0]),
+                           current_coeff=-1.0),
+    ('backward', 1): FDForm(deltas=np.array([-1.0]),
+                            coeffs=np.array([-1.0]),
+                            current_coeff=1.0),
+    ('central', 2): FDForm(deltas=np.array([1.0, -1.0]),
+                           coeffs=np.array([0.5, -0.5]),
                            current_coeff=0.),
 }
 
@@ -68,12 +69,17 @@ class FiniteDifference(ApproximationScheme):
 
     For example, using the 'forward' form with a step size of 'h' will approximate the derivative in
     the following way:
+
+    .. math::
+
         f'(x) = \frac{f(x+h) - f(x)}{h} + O(h).
 
     Attributes
     ----------
     _exec_list : list
         A list of which derivatives (in execution order) to compute.
+        The entries are of the form (of, wrt, fd_options), where of and wrt are absolute names
+        and fd_options is a dictionary.
     """
 
     def __init__(self):
@@ -83,18 +89,18 @@ class FiniteDifference(ApproximationScheme):
         super(FiniteDifference, self).__init__()
         self._exec_list = []
 
-    def add_approximation(self, key, kwargs):
+    def add_approximation(self, abs_key, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
         Parameters
         ----------
-        key : tuple(str,str)
-            Pairing of (of, wrt) for the derivative.
+        abs_key : tuple(str,str)
+            Absolute name pairing of (of, wrt) for the derivative.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
-        of, wrt = key
+        of, wrt = abs_key
         fd_options = DEFAULT_FD_OPTIONS.copy()
         fd_options.update(kwargs)
         if fd_options['order'] is None:
@@ -115,6 +121,7 @@ class FiniteDifference(ApproximationScheme):
         -------
         tuple(str, str, float, int, str)
             Sorting key (wrt, form, step_size, order, step_calc)
+
         """
         fd_options = approx_tuple[2]
         return (approx_tuple[1], fd_options['form'], fd_options['order'],
@@ -132,7 +139,7 @@ class FiniteDifference(ApproximationScheme):
 
     def compute_approximations(self, system, jac=None, deriv_type='partial'):
         """
-        Execute the system to compute the approximate (sub)-Jacobians.
+        Execute the system to compute the approximate sub-Jacobians.
 
         Parameters
         ----------
@@ -173,7 +180,7 @@ class FiniteDifference(ApproximationScheme):
             fd_form = _generate_fd_coeff(form, order)
 
             if step_calc == 'rel':
-                if wrt in system._outputs:
+                if wrt in system._outputs._views_flat:
                     scale = np.linalg.norm(system._outputs._views_flat[wrt])
                 else:
                     scale = np.linalg.norm(system._inputs._views_flat[wrt])
@@ -183,7 +190,10 @@ class FiniteDifference(ApproximationScheme):
             coeffs = fd_form.coeffs / step
             current_coeff = fd_form.current_coeff / step
 
-            in_size = np.prod(system._var2meta[wrt]['shape'])
+            if wrt in system._var_abs2meta['input']:
+                in_size = np.prod(system._var_abs2meta['input'][wrt]['shape'])
+            elif wrt in system._var_abs2meta['output']:
+                in_size = np.prod(system._var_abs2meta['output'][wrt]['shape'])
 
             result = system._outputs._clone(True)
 
@@ -194,7 +204,7 @@ class FiniteDifference(ApproximationScheme):
             for approx_tuple in approximations:
                 of = approx_tuple[0]
                 # TODO: Sparse derivatives
-                out_size = np.prod(system._var2meta[of]['shape'])
+                out_size = np.prod(system._var_abs2meta['output'][of]['shape'])
                 outputs.append((of, np.zeros((out_size, in_size))))
 
             for idx in range(in_size):
@@ -203,6 +213,7 @@ class FiniteDifference(ApproximationScheme):
                     result *= current_coeff
                 else:
                     result.set_const(0.)
+
                 for delta, coeff in zip(deltas, coeffs):
                     input_delta = [(wrt, idx, delta)]
                     result.add_scal_vec(coeff, self._run_point(system, input_delta, deriv_type))
@@ -211,4 +222,5 @@ class FiniteDifference(ApproximationScheme):
                     subjac[:, idx] = result._views_flat[of]
 
             for of, subjac in outputs:
-                jac[of, wrt] = subjac
+                rel_key = abs_key2rel_key(system, (of, wrt))
+                jac[rel_key] = subjac

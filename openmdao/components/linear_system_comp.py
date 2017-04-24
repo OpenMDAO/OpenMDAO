@@ -1,6 +1,9 @@
 """Define the LinearSystemComp class."""
 from __future__ import division, print_function
-import numpy
+
+from six.moves import range
+
+import numpy as np
 from scipy import linalg
 
 from openmdao.core.implicitcomponent import ImplicitComponent
@@ -10,26 +13,23 @@ class LinearSystemComp(ImplicitComponent):
     """
     Component that solves a linear system, Ax=b.
 
+    Designed to handle small and dense linear systems that can be
+    efficiently solved with lu-decomposition
+
     Attributes
     ----------
     _lup : object
         matrix factorization returned from scipy.linag.lu_factor
     """
 
-    def __init__(self, **kwargs):
-        """
-        Define additional attributes.
-        """
-        super(LinearSystemComp, self).__init__(**kwargs)
-
-        self._lup = None
-
     def initialize(self):
         """
-        Define size parameter.
+        Declare metadata.
         """
-        self.metadata.declare('size', value=1, type_=int,
-                              desc='the size of the linear system')
+        self.metadata.declare('size', default=1, type_=int, desc='the size of the linear system')
+        self.metadata.declare('partial_type', default='dense',
+                              values=['dense', 'sparse', 'matrix_free'],
+                              desc='the way the derivatives are defined')
 
     def initialize_variables(self):
         """
@@ -37,9 +37,42 @@ class LinearSystemComp(ImplicitComponent):
         """
         size = self.metadata['size']
 
-        self.add_input("A", val=numpy.eye(size))
-        self.add_input("b", val=numpy.ones(size))
-        self.add_output("x", shape=size)
+        self._lup = None
+
+        if self.metadata['partial_type'] == "matrix_free":
+            self.apply_linear = self._mat_vec_prod
+
+        self.add_input("A", val=np.eye(size))
+        self.add_input("b", val=np.ones(size))
+        self.add_output("x", shape=size, val=.1)
+
+    def initialize_partials(self):
+        """
+        Set up the derivatives according to the user specified mode.
+        """
+        partial_type = self.metadata['partial_type']
+
+        size = self.metadata['size']
+        row_col = np.arange(size, dtype="int")
+
+        if partial_type == 'sparse':
+            self.declare_partials('x', 'b', val=-np.ones(size), rows=row_col, cols=row_col)
+            # self.declare_partials('x', 'b', val=-1, rows=row_col, cols=row_col)
+
+            rows = []
+            cols = []
+            for i in range(size):
+                for j in range(size):
+                    rows.append(i)
+                    cols.append(i * size + j)
+
+            self.dx_da_rows = rows
+            self.dx_da_cols = cols
+
+            self.declare_partials('x', 'A', val=np.ones(size**2), rows=rows, cols=cols)
+
+        elif partial_type == "dense":
+            self.declare_partials('x', 'b', val=-np.eye(size))
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
@@ -71,10 +104,43 @@ class LinearSystemComp(ImplicitComponent):
         self._lup = linalg.lu_factor(inputs['A'])
         outputs['x'] = linalg.lu_solve(self._lup, inputs['b'])
 
-    def apply_linear(self, inputs, outputs, d_inputs, d_outputs,
-                     d_residuals, mode):
-        r"""
+    def linearize(self, inputs, outputs, J):
+        """
+        Compute the non-constant partial derivatives.
+        """
+        partial_type = self.metadata['partial_type']
+        if partial_type == "matrix_free":
+            return
+
+        x = outputs['x']
+        size = self.metadata['size']
+        if partial_type == "dense":
+            dx_dA = np.zeros((size, size**2))
+            for i in range(size):
+                dx_dA[i, i * size:(i + 1) * size] = x
+            J['x', 'A'] = dx_dA
+
+            J['x', 'x'] = inputs['A']
+
+            # constant, defined int initialize_partials
+            # J['x', 'b'] = -np.eye()
+
+        elif partial_type == "sparse":
+
+            J['x', 'A'] = (np.tile(x, size), self.dx_da_rows, self.dx_da_cols)
+            # J['x', 'A'].set_data(np.tile(x, size))
+            J['x', 'x'] = inputs['A']
+
+            # constant, defined int initialize_partials
+            # J['x', 'b'] = -np.ones(size)
+
+    def _mat_vec_prod(self, inputs, outputs, d_inputs, d_outputs,
+                      d_residuals, mode):
+        """
         Compute jac-vector product.
+
+        linear operator for the partial derivative jacobian, only used if the 'partial_type'
+        metadata is set to 'matrix_free'.
 
         Parameters
         ----------
@@ -105,7 +171,7 @@ class LinearSystemComp(ImplicitComponent):
             if 'x' in d_outputs:
                 d_outputs['x'] += inputs['A'].T.dot(d_residuals['x'])
             if 'A' in d_inputs:
-                d_inputs['A'] += numpy.outer(outputs['x'], d_residuals['x']).T
+                d_inputs['A'] += np.outer(outputs['x'], d_residuals['x']).T
             if 'b' in d_inputs:
                 d_inputs['b'] -= d_residuals['x']
 
@@ -134,4 +200,5 @@ class LinearSystemComp(ImplicitComponent):
             sol_vec, rhs_vec = d_residuals, d_outputs
             t = 1
 
+        # print("foobar", rhs_vec['x'])
         sol_vec['x'] = linalg.lu_solve(self._lup, rhs_vec['x'], trans=t)

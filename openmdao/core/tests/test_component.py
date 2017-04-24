@@ -1,13 +1,15 @@
 """Component unittests."""
 from __future__ import division
 
-import numpy
+import numpy as np
 import unittest
 import warnings
 
+from six.moves import range
 from six import assertRaisesRegex
 
-from openmdao.api import Problem, ExplicitComponent
+from openmdao.api import Problem, ExplicitComponent, Group
+from openmdao.core.component import Component
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
@@ -24,12 +26,15 @@ class TestExplicitComponent(unittest.TestCase):
         prob = Problem(comp).setup(check=False)
 
         # check optional metadata (desc)
-        self.assertEqual(comp._var2meta['length']['desc'],
-                         'length of rectangle')
-        self.assertEqual(comp._var2meta['width']['desc'],
-                         'width of rectangle')
-        self.assertEqual(comp._var2meta['area']['desc'],
-                         'area of rectangle')
+        self.assertEqual(
+            comp._var_abs2meta['input']['length']['desc'],
+            'length of rectangle')
+        self.assertEqual(
+            comp._var_abs2meta['input']['width']['desc'],
+            'width of rectangle')
+        self.assertEqual(
+            comp._var_abs2meta['output']['area']['desc'],
+            'area of rectangle')
 
         prob['length'] = 3.
         prob['width'] = 2.
@@ -53,15 +58,15 @@ class TestExplicitComponent(unittest.TestCase):
         msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"
 
         with assertRaisesRegex(self, ValueError, msg):
-            comp.add_output('arr', val=numpy.ones((2,2)), shape=([2]))
+            comp.add_output('arr', val=np.ones((2,2)), shape=([2]))
 
         with assertRaisesRegex(self, ValueError, msg):
-            comp.add_input('arr', val=numpy.ones((2,2)), shape=([2]))
+            comp.add_input('arr', val=np.ones((2,2)), shape=([2]))
 
         msg = "Shape of indices does not match shape for '.*': Expected (.*) but got (.*)"
 
         with assertRaisesRegex(self, ValueError, msg):
-            comp.add_input('arr', val=numpy.ones((2,2)), src_indices=[0,1])
+            comp.add_input('arr', val=np.ones((2,2)), src_indices=[0,1])
 
     def test_deprecated_vars_in_init(self):
         """test that deprecation warning is issued if vars are declared in __init__."""
@@ -80,13 +85,42 @@ class TestExplicitComponent(unittest.TestCase):
                          "called from 'initialize_variables' rather than "
                          "in the '__init__' function.")
 
+    def test_setup_bug1(self):
+        # This tests a bug where, if you run setup more than once on a derived component class,
+        # the list of var names continually gets prepended with the component global path.
+
+        class NewBase(Component):
+            def __init__(self, **kwargs):
+                super(NewBase, self).__init__(**kwargs)
+
+        class MyComp(NewBase):
+            def __init__(self, **kwargs):
+                super(MyComp, self).__init__(**kwargs)
+            def initialize_variables(self):
+                self.add_input('x', val=0.0)
+                self.add_output('y', val=0.0)
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('comp', MyComp())
+
+        prob.setup(check=False)
+        comp = model.get_subsystem('comp')
+        self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
+        self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
+
+        prob.run_model()
+        prob.setup(check=False)
+        self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
+        self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
+
 
 class TestImplicitComponent(unittest.TestCase):
 
     def test___init___simple(self):
         """Test a simple implicit component."""
         x = -0.5
-        a = numpy.abs(numpy.exp(0.5 * x) / x)
+        a = np.abs(np.exp(0.5 * x) / x)
 
         comp = TestImplCompSimple()
         prob = Problem(comp).setup(check=False)
@@ -100,9 +134,59 @@ class TestImplicitComponent(unittest.TestCase):
         comp = TestImplCompArray()
         prob = Problem(comp).setup(check=False)
 
-        prob['rhs'] = numpy.ones(2)
+        prob['rhs'] = np.ones(2)
         prob.run_model()
-        assert_rel_error(self, prob['x'], numpy.ones(2))
+        assert_rel_error(self, prob['x'], np.ones(2))
+
+
+class TestRangePartials(unittest.TestCase):
+
+    def test_range_partials(self):
+        class RangePartialsComp(ExplicitComponent):
+            def __init__(self, size=4):
+                super(RangePartialsComp, self).__init__()
+                self.size = size
+
+            def initialize_variables(self):
+                # verify that both iterable and array types are valid
+                # for val and src_indices arguments to add_input
+                self.add_input('v1', val=range(self.size),
+                                     src_indices=range(self.size))
+
+                self.add_input('v2', val=2*np.ones(self.size),
+                                     src_indices=np.array(range(self.size)))
+
+                # verify that both iterable and array types are valid
+                # for val, upper and lower arguments to add_output
+                self.add_output('vSum', val=range(self.size),
+                                        lower=np.zeros(self.size),
+                                        upper=range(self.size))
+
+                self.add_output('vProd', val=np.zeros(self.size),
+                                         lower=range(self.size),
+                                         upper=np.ones(self.size))
+
+            def initialize_partials(self):
+                # verify that both iterable and list types are valid
+                # for rows and cols arguments to declare_partials
+                rows = range(self.size)
+                cols = list(range(self.size))
+                self.declare_partials(of='vProd', wrt='v1',
+                                      val=np.ones(self.size),
+                                      rows=rows, cols=cols)
+
+            def compute(self, inputs, outputs):
+                outputs['vSum'] = inputs['v1'] + inputs['v2']
+                outputs['vProd'] = inputs['v1'] * inputs['v2']
+
+        comp = RangePartialsComp()
+
+        prob = Problem(model=comp)
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['vSum'], np.array([2.,3.,4.,5.]), 0.00001)
+        assert_rel_error(self, prob['vProd'], np.array([0.,2.,4.,6.]), 0.00001)
 
 
 if __name__ == '__main__':

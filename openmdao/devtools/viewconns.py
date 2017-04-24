@@ -7,20 +7,18 @@ from itertools import chain
 
 from six import iteritems
 
-import numpy
+import numpy as np
 
 from openmdao.core.problem import Problem
-from openmdao.devtools.compat import abs_conn_iter, abs_varname_iter, \
-                                     abs_meta_iter, abs2prom_map
 from openmdao.utils.units import convert_units
 from openmdao.devtools.webview import webview
 
 @contextlib.contextmanager
 def printoptions(*args, **kwargs):
-    original = numpy.get_printoptions()
-    numpy.set_printoptions(*args, **kwargs)
+    original = np.get_printoptions()
+    np.set_printoptions(*args, **kwargs)
     yield
-    numpy.set_printoptions(**original)
+    np.set_printoptions(**original)
 
 def view_connections(root, outfile='connections.html', show_browser=True,
                      src_filter='', tgt_filter='', precision=6):
@@ -56,32 +54,29 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     else:
         system = root
 
-    input_src_ids = system._assembler._input_src_ids
-    abs_tgt_names = system._var_allprocs_pathnames['input']
-    abs_src_names = system._var_allprocs_pathnames['output']
-    connections ={}
-    for tgt_idx in system._var_allprocs_indices['input'].values():
-        if input_src_ids[tgt_idx] > -1:
-            connections[abs_tgt_names[tgt_idx]] = abs_src_names[input_src_ids[tgt_idx]]
-    tmetas = dict(abs_meta_iter(system, 'input'))
-    smetas = dict(abs_meta_iter(system, 'output'))
+    input_srcs = system._conn_global_abs_in2out
+
+    connections = {
+        tgt: src for tgt, src in iteritems(input_srcs) if src is not None
+    }
 
     src2tgts = {}
-    units = {n: m.get('units','') for n,m in chain(iteritems(smetas), iteritems(tmetas))}
+    units = {n: data['metadata'].get('units','')
+                for n, data in iteritems(system._var_abs2data_io)}
     vals = {}
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
-        for idx, t in enumerate(abs_tgt_names):
-            tmeta = tmetas[t]
+        for t in system._var_abs_names['input']:
+            tmeta = system._var_abs2data_io[t]['metadata']
             idxs = tmeta['src_indices']
             if idxs is None:
-                idxs = numpy.arange(numpy.prod(tmeta['shape']), dtype=int)
+                idxs = np.arange(np.prod(tmeta['shape']), dtype=int)
 
             if t in connections:
                 s = connections[t]
                 val = system._outputs[s]
-                if isinstance(val, numpy.ndarray) and idxs is not None:
+                if isinstance(val, np.ndarray) and idxs is not None:
                     shape = val.shape
                     val = system._outputs[s].flatten()[idxs].reshape(shape)
                 else:
@@ -89,8 +84,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
                 # if there's a unit conversion, express the value in the
                 # units of the target
-                if tmeta['units']:
-                    val = convert_units(val, smetas[s]['units'], tmeta['units'])
+                if units[t]:
+                    val = convert_units(val, units[s], units[t])
 
                 if s not in src2tgts:
                     src2tgts[s] = [t]
@@ -99,14 +94,14 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             else: # unconnected param
                 val = system._inputs[t]
 
-            if isinstance(val, numpy.ndarray):
-                val = numpy.array2string(val)
+            if isinstance(val, np.ndarray):
+                val = np.array2string(val)
             else:
                 val = str(val)
 
             vals[t] = val
 
-        noconn_srcs = sorted((n for n in abs_src_names
+        noconn_srcs = sorted((n for n in system._var_abs_names['output']
                                 if n not in src2tgts), reverse=True)
         for s in noconn_srcs:
             vals[s] = str(system._outputs[s])
@@ -115,18 +110,18 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     src_systems = set()
     tgt_systems = set()
-    for s in abs_src_names:
+    for s in system._var_abs_names['output']:
         parts = s.split('.')
         for i in range(len(parts)):
             src_systems.add('.'.join(parts[:i]))
 
-    for t in abs_tgt_names:
+    for t in system._var_abs_names['input']:
         parts = t.split('.')
         for i in range(len(parts)):
             tgt_systems.add('.'.join(parts[:i]))
 
     # reverse sort so that "NO CONNECTION" shows up at the bottom
-    src2tgts['NO CONNECTION'] = sorted([t for t in abs_tgt_names
+    src2tgts['NO CONNECTION'] = sorted([t for t in system._var_abs_names['input']
                                     if t not in connections], reverse=True)
 
     src_systems = [{'name':n} for n in sorted(src_systems)]

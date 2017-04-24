@@ -2,23 +2,27 @@
 
 from __future__ import division
 
+from six.moves import range
+
 import sys
 import inspect
 
 from fnmatch import fnmatchcase
-import numpy
-from itertools import product, chain
-from six import string_types, iteritems
+import numpy as np
+from itertools import product
+from six import string_types, iteritems, itervalues
 from scipy.sparse import issparse
 from copy import deepcopy
-from collections import OrderedDict
+from collections import OrderedDict, Iterable
 
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.core.system import System, PathData
-from openmdao.jacobians.global_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.core.system import System
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
-from openmdao.utils.general_utils import \
-    format_as_float_or_array, ensure_compatible, warn_deprecation
+from openmdao.utils.class_util import overrides_method
+from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
+    warn_deprecation
+from openmdao.utils.name_maps import rel_name2abs_name, rel_key2abs_key, abs_key2rel_key
 
 
 class Component(System):
@@ -27,10 +31,23 @@ class Component(System):
 
     Attributes
     ----------
-    _var2meta : dict
-        A mapping of local variable name to its metadata.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
+    _matrix_free : Bool
+        This is set to True if the component overrides the appropriate function with a user-defined
+        matrix vector product with the Jacobian.
+    _var_rel2data_io : dict
+        Dictionary mapping relative names to dicts with keys (prom, rel, my_idx, type_, metadata).
+        This is only needed while adding inputs and outputs. During setup, these are used to
+        build the dictionaries of metadata.
+    _static_var_rel2data_io : dict
+        Static version of above - stores data for variables added outside of initialize_variables.
+    _var_rel_names : {'input': [str, ...], 'output': [str, ...]}
+        List of relative names of owned variables existing on current proc.
+        This is only needed while adding inputs and outputs. During setup, these are used to
+        determine the list of absolute names.
+    _static_var_rel_names : dict
+        Static version of above - stores names of variables added outside of initialize_variables.
     """
 
     def __init__(self, **kwargs):
@@ -43,8 +60,189 @@ class Component(System):
             available here and in all descendants of this system.
         """
         super(Component, self).__init__(**kwargs)
-        self._var2meta = {}
         self._approx_schemes = OrderedDict()
+
+        self._matrix_free = False
+
+        self._var_rel_names = {'input': [], 'output': []}
+        self._var_rel2data_io = {}
+
+        self._static_var_rel_names = {'input': [], 'output': []}
+        self._static_var_rel2data_io = {}
+
+    def initialize_variables(self):
+        """
+        Declare inputs and outputs.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata
+        """
+        pass
+
+    def initialize_partials(self):
+        """
+        Declare Jacobian structure/approximations.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata
+        """
+        pass
+
+    def _setup_vars(self, recurse=True):
+        """
+        Call initialize_variables in components and count variables, total and by var_set.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(Component, self)._setup_vars()
+        num_var = self._num_var
+        num_var_byset = self._num_var_byset
+
+        self._var_rel_names = {'input': [], 'output': []}
+        self._var_rel2data_io = {}
+
+        self._static_mode = False
+        self._var_rel2data_io.update(self._static_var_rel2data_io)
+        for type_ in ['input', 'output']:
+            self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
+        self.initialize_variables()
+        self._static_mode = True
+
+        # Compute num_var
+        for type_ in ['input', 'output']:
+            num_var[type_] = len(self._var_rel_names[type_])
+
+        # Compute num_var_byset
+        for data in itervalues(self._var_rel2data_io):
+            type_ = data['type']
+            metadata = data['metadata']
+            set_name = metadata['var_set']
+            if set_name in num_var_byset[type_]:
+                num_var_byset[type_][set_name] += 1
+            else:
+                num_var_byset[type_][set_name] = 1
+
+    def _setup_var_data(self, recurse=True):
+        """
+        Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(Component, self)._setup_var_data()
+        allprocs_abs_names = self._var_allprocs_abs_names
+        abs_names = self._var_abs_names
+        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
+        abs2prom = self._var_abs2prom
+        allprocs_abs2meta = self._var_allprocs_abs2meta
+        abs2meta = self._var_abs2meta
+
+        # Compute the prefix for turning rel/prom names into abs names
+        if self.pathname is not '':
+            prefix = self.pathname + '.'
+        else:
+            prefix = ''
+
+        meta_names = {
+            'input': ('units', 'shape', 'var_set'),
+            'output': ('units', 'shape', 'var_set', 'ref', 'ref0'),
+        }
+
+        for type_ in ['input', 'output']:
+            for ind, prom_name in enumerate(self._var_rel_names[type_]):
+                abs_name = prefix + prom_name
+                data = self._var_rel2data_io[prom_name]
+                metadata = data['metadata']
+
+                # Compute allprocs_abs_names, abs_names
+                allprocs_abs_names[type_].append(abs_name)
+                abs_names[type_].append(abs_name)
+
+                # Compute allprocs_prom2abs_list, abs2prom
+                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+                abs2prom[type_][abs_name] = prom_name
+
+                # Compute allprocs_abs2meta
+                allprocs_metadata = {
+                    meta_name: metadata[meta_name]
+                    for meta_name in meta_names[type_]
+                }
+                allprocs_abs2meta[type_][abs_name] = allprocs_metadata
+
+                # Compute abs2meta
+                abs2meta[type_][abs_name] = metadata
+
+    def _setup_var_sizes(self, recurse=True):
+        """
+        Compute the arrays of local variable sizes for all variables/procs on this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(Component, self)._setup_var_sizes()
+
+        sizes = self._var_sizes
+        sizes_byset = self._var_sizes_byset
+
+        iproc = self.comm.rank
+        nproc = self.comm.size
+
+        set2iset = self._var_set2iset
+
+        # Initialize empty arrays
+        for type_ in ['input', 'output']:
+            sizes[type_] = np.zeros((nproc, self._num_var[type_]), int)
+
+            sizes_byset[type_] = {}
+            for set_name in set2iset[type_]:
+                sizes_byset[type_][set_name] = np.zeros(
+                    (nproc, self._num_var_byset[type_][set_name]), int)
+
+        # Compute _var_sizes and _var_sizes_byset
+        for type_ in ['input', 'output']:
+            abs2meta_t = self._var_abs2meta[type_]
+            allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[type_]
+            for idx, abs_name in enumerate(self._var_abs_names[type_]):
+                meta = abs2meta_t[abs_name]
+                set_name = meta['var_set']
+                size = np.prod(meta['shape'])
+                idx_byset = allprocs_abs2idx_byset_t[abs_name]
+
+                sizes[type_][iproc, idx] = size
+                sizes_byset[type_][set_name][iproc, idx_byset] = size
+
+        if self.comm.size > 1:
+            for type_ in ['input', 'output']:
+                self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                for set_name in self._var_set2iset[type_]:
+                    self.comm.Allgather(
+                        sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
+
+    def _setup_partials(self, recurse=True):
+        """
+        Call initialize_partials in components.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(Component, self)._setup_partials()
+
+        self.initialize_partials()
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
                   desc='', var_set=0):
@@ -55,20 +253,20 @@ class Component(System):
         ----------
         name : str
             name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray
+        val : float or list or tuple or ndarray or Iterable
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
         shape : int or tuple or list or None
             Shape of this variable, only required if src_indices not provided and
             val is not an array. Default is None.
-        src_indices : int or list of ints or tuple of ints or int ndarray or None
+        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
             The indices of the source variable to transfer data from.
             If val is given as an array_like object, the shapes of val and
             src_indices must match. A value of None implies this input depends
             on all entries of source. Default is None.
         units : str or None
             Units in which this input variable will be provided to the component
-            during execution. Default is None, which means it has no units.
+            during execution. Default is None, which means it is unitless.
         desc : str
             description of the variable
         var_set : hashable object
@@ -80,17 +278,26 @@ class Component(System):
                              "called from 'initialize_variables' rather than "
                              "in the '__init__' function.")
 
+        if units == 'unitless':
+            warn_deprecation("Input '%s' has units='unitless' but 'unitless' "
+                             "has been deprecated. Use "
+                             "units=None instead.  Note that connecting a "
+                             "unitless variable to one with units is no longer "
+                             "an error, but will issue a warning instead." %
+                             name)
+            units = None
+
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
-        if not numpy.isscalar(val) and not isinstance(val, (list, tuple, numpy.ndarray)):
-            raise TypeError('The val argument should be a float, list, tuple, or ndarray')
+        if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+            raise TypeError('The val argument should be a float, list, tuple, ndarray or Iterable')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
         if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
-                                                                    numpy.ndarray)):
+                                                                    np.ndarray, Iterable)):
             raise TypeError('The src_indices argument should be an int, list, '
-                            'tuple, or ndarray')
+                            'tuple, ndarray or Iterable')
         if units is not None and not isinstance(units, str):
             raise TypeError('The units argument should be a str or None')
 
@@ -109,7 +316,7 @@ class Component(System):
         if src_indices is None:
             metadata['src_indices'] = None
         else:
-            metadata['src_indices'] = numpy.atleast_1d(src_indices)
+            metadata['src_indices'] = np.atleast_1d(src_indices)
 
         # units: taken as is
         metadata['units'] = units
@@ -120,14 +327,22 @@ class Component(System):
         # var_set: taken as is
         metadata['var_set'] = var_set
 
-        self._var_allprocs_names['input'].append(name)
-        self._var_myproc_names['input'].append(name)
-        self._var_myproc_metadata['input'].append(metadata)
-        self._var2meta[name] = metadata
+        # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
+        if self._static_mode:
+            var_rel2data_io = self._static_var_rel2data_io
+            var_rel_names = self._static_var_rel_names
+        else:
+            var_rel2data_io = self._var_rel2data_io
+            var_rel_names = self._var_rel_names
+
+        var_rel2data_io[name] = {
+            'prom': name, 'rel': name,
+            'my_idx': len(self._var_rel_names['input']),
+            'type': 'input', 'metadata': metadata}
+        var_rel_names['input'].append(name)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0,
-                   res_ref=1.0, res_ref0=0.0, var_set=0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
         """
         Add an output variable to the component.
 
@@ -148,12 +363,12 @@ class Component(System):
             Default is None, which means it has no units.
         desc : str
             description of the variable.
-        lower : float or list or tuple or ndarray or None
+        lower : float or list or tuple or ndarray or Iterable or None
             lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no lower bound.
             Default is None.
-        upper : float or list or tuple or ndarray or None
+        upper : float or list or tuple or ndarray or or Iterable None
             upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no upper bound.
@@ -167,9 +382,6 @@ class Component(System):
         res_ref : float
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        res_ref0 : float
-            Scaling parameter. The value in the user-defined res_units of this output's residual
-            when the scaled value is 0. Default is 0.
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
@@ -179,25 +391,32 @@ class Component(System):
                              "called from 'initialize_variables' rather than "
                              "in the '__init__' function.")
 
+        if units == 'unitless':
+            warn_deprecation("Output '%s' has units='unitless' but 'unitless' "
+                             "has been deprecated. Use "
+                             "units=None instead.  Note that connecting a "
+                             "unitless variable to one with units is no longer "
+                             "an error, but will issue a warning instead." %
+                             name)
+            units = None
+
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
-        if not numpy.isscalar(val) and not isinstance(val, (list, tuple, numpy.ndarray)):
+        if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
             raise TypeError('The val argument should be a float, list, tuple, or ndarray')
+        if not np.isscalar(ref) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+            raise TypeError('The ref argument should be a float, list, tuple, or ndarray')
+        if not np.isscalar(ref0) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+            raise TypeError('The ref0 argument should be a float, list, tuple, or ndarray')
+        if not np.isscalar(res_ref) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+            raise TypeError('The res_ref argument should be a float, list, tuple, or ndarray')
         if shape is not None and not isinstance(shape, (int, tuple, list)):
             raise TypeError('The shape argument should be an int, tuple, or list')
         if units is not None and not isinstance(units, str):
             raise TypeError('The units argument should be a str or None')
         if res_units is not None and not isinstance(res_units, str):
             raise TypeError('The res_units argument should be a str or None')
-        if lower is not None:
-            lower = format_as_float_or_array('lower', lower)
-        if upper is not None:
-            upper = format_as_float_or_array('upper', upper)
-
-        for item in [ref, ref0, res_ref, res_ref]:
-            if not numpy.isscalar(item):
-                raise TypeError('The %s argument should be a float' % (item.__name__))
 
         # Check that units are valid
         if units is not None and not valid_units(units):
@@ -215,29 +434,46 @@ class Component(System):
         # desc: taken as is
         metadata['desc'] = desc
 
-        # lower, upper: check the shape if necessary
-        if lower is not None and not numpy.isscalar(lower) and \
-                numpy.atleast_1d(lower).shape != metadata['shape']:
-            raise ValueError('The lower argument has the wrong shape')
-        if upper is not None and not numpy.isscalar(upper) and \
-                numpy.atleast_1d(upper).shape != metadata['shape']:
-            raise ValueError('The upper argument has the wrong shape')
+        if lower is not None:
+            lower = ensure_compatible(name, lower, metadata['shape'])[0]
+        if upper is not None:
+            upper = ensure_compatible(name, upper, metadata['shape'])[0]
+
         metadata['lower'] = lower
         metadata['upper'] = upper
 
-        # ref, ref0, res_ref, res_ref0: taken as is
+        # All refs: check the shape if necessary
+        for item, msg in zip([ref, ref0, res_ref],
+                             ['ref', 'ref0', 'res_ref']):
+            if not np.isscalar(item) and \
+               np.atleast_1d(item).shape != metadata['shape']:
+                raise ValueError('The %s argument has the wrong shape' % msg)
+
+        ref = format_as_float_or_array('ref', ref, flatten=True)
+        ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
+        res_ref = format_as_float_or_array('res_ref', res_ref, flatten=True)
+
+        # ref, ref0, res_ref: taken as is
         metadata['ref'] = ref
         metadata['ref0'] = ref0
         metadata['res_ref'] = res_ref
-        metadata['res_ref0'] = res_ref0
 
         # var_set: taken as is
         metadata['var_set'] = var_set
 
-        self._var_allprocs_names['output'].append(name)
-        self._var_myproc_names['output'].append(name)
-        self._var_myproc_metadata['output'].append(metadata)
-        self._var2meta[name] = metadata
+        # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
+        if self._static_mode:
+            var_rel2data_io = self._static_var_rel2data_io
+            var_rel_names = self._static_var_rel_names
+        else:
+            var_rel2data_io = self._var_rel2data_io
+            var_rel_names = self._var_rel_names
+
+        var_rel2data_io[name] = {
+            'prom': name, 'rel': name,
+            'my_idx': len(self._var_rel_names['output']),
+            'type': 'output', 'metadata': metadata}
+        var_rel_names['output'].append(name)
 
     def approx_partials(self, of, wrt, method='fd', **kwargs):
         """
@@ -278,15 +514,16 @@ class Component(System):
                 raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
 
             for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
-                for key in product(of_matches, wrt_matches):
+                for rel_key in product(of_matches, wrt_matches):
                     meta_changes = {
                         'method': method,
                         'type': type_
                     }
-                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    abs_key = rel_key2abs_key(self, rel_key)
+                    meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
                     meta.update(meta_changes)
                     meta.update(kwargs)
-                    self._subjacs_info[key] = meta
+                    self._subjacs_info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):
@@ -324,16 +561,16 @@ class Component(System):
             raise ValueError('If one of rows/cols is specified, then both must be specified')
 
         if val is not None and not issparse(val):
-            val = numpy.atleast_1d(val)
-            # numpy.promote_types  will choose the smallest dtype that can contain both arguments
-            safe_dtype = numpy.promote_types(val.dtype, float)
+            val = np.atleast_1d(val)
+            # np.promote_types  will choose the smallest dtype that can contain both arguments
+            safe_dtype = np.promote_types(val.dtype, float)
             val = val.astype(safe_dtype, copy=False)
 
         if rows is not None:
-            if isinstance(rows, (list, tuple)):
-                rows = numpy.array(rows, dtype=int)
-            if isinstance(cols, (list, tuple)):
-                cols = numpy.array(cols, dtype=int)
+            if isinstance(rows, (list, tuple, Iterable)):
+                rows = np.array(rows, dtype=int)
+            if isinstance(cols, (list, tuple, Iterable)):
+                cols = np.array(cols, dtype=int)
 
             if rows.shape != cols.shape:
                 raise ValueError('rows and cols must have the same shape,'
@@ -363,7 +600,7 @@ class Component(System):
             multiple_items = True
 
             for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
-                for key in product(of_matches, wrt_matches):
+                for rel_key in product(of_matches, wrt_matches):
                     meta_changes = {
                         'rows': rows,
                         'cols': cols,
@@ -371,10 +608,11 @@ class Component(System):
                         'dependent': dependent,
                         'type': type_
                     }
-                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    abs_key = rel_key2abs_key(self, rel_key)
+                    meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
                     meta.update(meta_changes)
-                    self._check_partials_meta(key, meta)
-                    self._subjacs_info[key] = meta
+                    self._check_partials_meta(abs_key, meta)
+                    self._subjacs_info[abs_key] = meta
 
     def _find_partial_matches(self, of, wrt):
         """
@@ -383,10 +621,10 @@ class Component(System):
         Parameters
         ----------
         of : str or list of str
-            The name of the residual(s) that derivatives are being computed for.
+            The relative name of the residual(s) that derivatives are being computed for.
             May also contain a glob pattern.
         wrt : str or list of str
-            The name of the variables that derivatives are taken with respect to.
+            The relative name of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
 
@@ -400,8 +638,8 @@ class Component(System):
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         glob_patterns = {'*', '?', '['}
-        outs = self._var_allprocs_names['output']
-        ins = self._var_allprocs_names['input']
+        outs = self._var_allprocs_prom2abs_list['output']
+        ins = self._var_allprocs_prom2abs_list['input']
 
         def find_matches(pattern, var_list):
             if glob_patterns.intersection(pattern):
@@ -415,21 +653,24 @@ class Component(System):
                                for pattern in wrt_list]
         return of_pattern_matches, wrt_pattern_matches
 
-    def _check_partials_meta(self, key, meta):
+    def _check_partials_meta(self, abs_key, meta):
         """
         Check a given partial derivative and metadata for the correct shapes.
 
         Parameters
         ----------
-        key : tuple(str,str)
-            The of/wrt pair defining the partial derivative.
+        abs_key : tuple(str,str)
+            The of/wrt pair (given absolute names) defining the partial derivative.
         meta : dict
             Metadata dictionary from declare_partials.
         """
-        of, wrt = key
+        of, wrt = abs_key2rel_key(self, abs_key)
         if meta['dependent']:
-            out_size = numpy.prod(self._var2meta[of]['shape'])
-            in_size = numpy.prod(self._var2meta[wrt]['shape'])
+            out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
+            if abs_key[1] in self._var_abs2meta['input']:
+                in_size = np.prod(self._var_abs2meta['input'][abs_key[1]]['shape'])
+            elif abs_key[1] in self._var_abs2meta['output']:
+                in_size = np.prod(self._var_abs2meta['output'][abs_key[1]]['shape'])
             rows = meta['rows']
             cols = meta['cols']
             if rows is not None:
@@ -463,7 +704,7 @@ class Component(System):
         """
         Set subjacobian info into our jacobian.
         """
-        with self._jacobian_context() as J:
+        with self.jacobian_context() as J:
             for key, meta in iteritems(self._subjacs_info):
                 self._check_partials_meta(key, meta)
                 J._set_partials_meta(key, meta)
@@ -474,91 +715,3 @@ class Component(System):
 
         for approx in self._approx_schemes:
             approx._init_approximations()
-
-    def _setup_variables(self, recurse=False):
-        """
-        Assemble variable metadata and names lists.
-
-        Sets the following attributes:
-            _var_allprocs_names
-            _var_myproc_names
-            _var_myproc_metadata
-            _var_pathdict
-            _var_name2path
-
-        Parameters
-        ----------
-        recurse : boolean
-            Ignored.
-        """
-        super(Component, self)._setup_variables(False)
-
-        # set up absolute path info
-        self._var_pathdict = {}
-        self._var_name2path = {'input': {}, 'output': {}}
-        for typ in ['input', 'output']:
-            names = self._var_allprocs_names[typ]
-            if self.pathname:
-                self._var_allprocs_pathnames[typ] = paths = [
-                    '.'.join((self.pathname, n)) for n in names
-                ]
-            else:
-                self._var_allprocs_pathnames[typ] = paths = names
-            for idx, name in enumerate(names):
-                path = paths[idx]
-                self._var_pathdict[path] = PathData(name, idx, idx, typ)
-                if typ is 'input':
-                    self._var_name2path[typ][name] = (path,)
-                else:
-                    self._var_name2path[typ][name] = path
-
-        # Now that variables are available, we can setup partials
-        self.initialize_partials()
-
-    def _setup_vector(self, vectors, vector_var_ids, use_ref_vector):
-        r"""
-        Add this vector and assign sub_vectors to subsystems.
-
-        Sets the following attributes:
-
-        - _vectors
-        - _vector_transfers
-        - _inputs*
-        - _outputs*
-        - _residuals*
-        - _transfers*
-
-        \* If vec_name is 'nonlinear'
-
-        Parameters
-        ----------
-        vectors : {'input': <Vector>, 'output': <Vector>, 'residual': <Vector>}
-            <Vector> objects corresponding to 'name'.
-        vector_var_ids : ndarray[:]
-            integer array of all relevant variables for this vector.
-        use_ref_vector : bool
-            if True, allocate vectors to store ref. values.
-        """
-        super(Component, self)._setup_vector(vectors, vector_var_ids,
-                                             use_ref_vector)
-
-        # Components must load their initial input and output values into the
-        # vectors.
-
-        # Note: It's possible for meta['value'] to not match
-        #       meta['shape'], and input and output vectors are sized according
-        #       to shape, so if, for example, value is not specified it
-        #       defaults to 1.0 and the shape can be anything, resulting in the
-        #       value of 1.0 being broadcast into all values in the vector
-        #       that were allocated according to the shape.
-        if vectors['input']._name is 'nonlinear':
-            names = self._var_myproc_names['input']
-            inputs = self._inputs
-            for i, meta in enumerate(self._var_myproc_metadata['input']):
-                inputs[names[i]] = meta['value']
-
-        if vectors['output']._name is 'nonlinear':
-            names = self._var_myproc_names['output']
-            outputs = self._outputs
-            for i, meta in enumerate(self._var_myproc_metadata['output']):
-                outputs[names[i]] = meta['value']

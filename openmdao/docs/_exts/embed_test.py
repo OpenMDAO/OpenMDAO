@@ -1,14 +1,11 @@
 import sys
-
-from docutils import nodes
-from docutils.parsers.rst.directives import unchanged
-
-
 import sphinx
 from sphinx.util.compat import Directive
 from sphinx.writers.html import HTMLTranslator
-
-from openmdao.docs._utils.docutil import get_unit_test_source_and_run_outputs, get_unit_test_source_and_run_outputs_in_out
+from docutils import nodes
+from docutils.parsers.rst.directives import unchanged
+from openmdao.docs._utils.docutil import get_unit_test_source_and_run_outputs
+from openmdao.docs._utils.docutil import get_unit_test_source_and_run_outputs_in_out
 
 if sys.version_info[0] == 2:
     import cgi as cgiesc
@@ -29,29 +26,30 @@ def depart_skipped_or_failed_node(self, node):
         self.body.append("output only available for HTML\n")
         return
 
-    html = '<div class="container"><div class="cell border-box-sizing code_cell rendered"><div class="output"><div class="prompt output_prompt">Out&nbsp;[{}]:</div><div class="inner_cell"><div class="{}"><pre>{}</pre></div></div></div></div></div>'.format(node["number"], node["kind"], node["text"])
+    html = '<div class="cell border-box-sizing code_cell rendered"><div class="output"><div class="inner_cell"><div class="{}"><pre>{}</pre></div></div></div></div>'.format(node["kind"], node["text"])
     self.body.append(html)
+
 
 class in_or_out_node(nodes.Element):
     pass
 
+
 def visit_in_or_out_node(self, node):
     pass
 
+
 def depart_in_or_out_node(self, node):
     """
-    This function creates the formatting that sets up the look of
-    In[1]: print(x)
-    Out[1]: 5
+    This function creates the formatting that sets up the look of the blocks.
     The look of the formatting is controlled by _theme/static/style.css
     """
     if not isinstance(self, HTMLTranslator):
         self.body.append("output only available for HTML\n")
         return
     if node["kind"] == "In":
-        html = '<div class="container"><div class="cell border-box-sizing code_cell rendered"><div class="input"><div class="prompt input_prompt">{}&nbsp;[{}]:</div><div class="inner_cell"><div class="input_area"><div class="highlight"><pre>{}</pre></div></div></div></div></div></div>'.format(node["kind"], node["number"], node["text"])
+        html = '<div class="highlight-python"><div class="highlight"><pre>{}</pre></div></div>'.format(node["text"])
     elif node["kind"] == "Out":
-        html = '<div class="container"><div class="cell border-box-sizing code_cell rendered"><div class="output"><div class="prompt output_prompt">{}&nbsp;[{}]:</div><div class="inner_cell"><div class="output_area"><div class="highlight"><pre>{}</pre></div></div></div></div></div></div>'.format(node["kind"], node["number"], node["text"])
+        html = '<div class="cell border-box-sizing code_cell rendered"><div class="output_area"><pre>{}</pre></div></div>'.format(node["text"])
 
     self.body.append(html)
 
@@ -98,7 +96,7 @@ class EmbedTestDirective(Directive):
         if 'no-split' in self.options:
             src, output, skipped, failed = get_unit_test_source_and_run_outputs(method_path)
             # we want the body of test code to be formatted and code highlighted
-            body = in_or_out_node(kind="In", number=n, text=src)
+            body = nodes.literal_block(src, src)
             body['language'] = 'python'
             doc_nodes.append(body)
 
@@ -116,11 +114,10 @@ class EmbedTestDirective(Directive):
         else:
             src, skipped_failed_output, input_blocks, output_blocks, skipped, failed = get_unit_test_source_and_run_outputs_in_out(method_path)
 
-            if skipped or failed: # do the old way
+            if skipped or failed:  # do the old way
                 # we want the body of test code to be formatted and code highlighted
-                #body = nodes.literal_block(src, src)
-                body = in_or_out_node(kind="In", number=n, text=src, language="python")
-                #body['language'] = 'python'
+                body = nodes.literal_block(src, src)
+                body['language'] = 'python'
                 doc_nodes.append(body)
 
                 # we want the output block to also be formatted similarly unless test was skipped
@@ -134,13 +131,9 @@ class EmbedTestDirective(Directive):
 
             else:
                 for input_block, output_block in zip(input_blocks, output_blocks):
-                    #input_node = nodes.literal_block(input_block, input_block)
-                    input_node = in_or_out_node(kind="In", number=n, text=input_block)
-
+                    input_node = nodes.literal_block(input_block, input_block)
                     input_node['language'] = 'python'
                     doc_nodes.append(input_node)
-
-                    #output_node = nodes.literal_block(output_block, output_block)
                     output_node = in_or_out_node(kind="Out", number=n, text=output_block)
                     doc_nodes.append(output_node)
 

@@ -4,13 +4,17 @@ import itertools
 from six.moves import zip
 from six import iteritems, iterkeys, itervalues, string_types
 import collections
-from nose_parameterized import parameterized
+
+from parameterized import parameterized
 from unittest import SkipTest
 
+from openmdao.core.problem import Problem
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
+                                                  CSRJacobian, CSCJacobian
+from openmdao.solvers.ln_scipy import ScipyIterativeSolver
+from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.test_suite.groups.cycle_group import CycleGroup
-from openmdao.api import Problem
-from openmdao.api import DefaultVector, NewtonSolver, ScipyIterativeSolver
-from openmdao.api import GlobalJacobian, DenseMatrix, COOmatrix, CSRmatrix
+from openmdao.vectors.default_vector import DefaultVector
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -117,6 +121,7 @@ def parametric_suite(*args, **kwargs):
 # Needed for Nose
 parametric_suite.__test__ = False
 
+
 class ParameterizedInstance(object):
     """
     Parameterized Instance for a particular ParametricTestGroup. Typically not instantiated
@@ -183,14 +188,17 @@ class ParameterizedInstance(object):
 
         self.problem = prob = Problem(group)
 
-        if args['global_jac']:
+        if args['assembled_jac']:
+
             jacobian_type = args['jacobian_type']
             if jacobian_type == 'dense':
-                prob.model.jacobian = GlobalJacobian(matrix_class=DenseMatrix)
+                prob.model.jacobian = DenseJacobian()
             elif jacobian_type == 'sparse-coo':
-                prob.model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
+                prob.model.jacobian = COOJacobian()
             elif jacobian_type == 'sparse-csr':
-                prob.model.jacobian = GlobalJacobian(matrix_class=CSRmatrix)
+                prob.model.jacobian = CSRJacobian()
+            elif jacobian_type == 'sparse-csc':
+                prob.model.jacobian = CSCJacobian()
 
         prob.model.ln_solver = self.linear_solver_class(**self.linear_solver_options)
 

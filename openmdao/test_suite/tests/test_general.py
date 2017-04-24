@@ -1,5 +1,35 @@
-"""General tests to demonstrate the parametric suite"""
-from __future__ import print_function, division
+"""General tests to demonstrate the parametric suite. Possible arguments are given below (defaults).
+To test more than one option, pass in an Iterable of requested options.
+
+All Parametric Groups
+---------------------
+'group_type': Controls which type of ParametricGroups to test. Will test all groups if not specified
+'vector_class': One of ['default', 'petsc'], which vector class to use for the problem. ('default')
+'assembled_jac': bool. If an assembled jacobian should be used. (True)
+'jacobian_type': One of ['matvec', 'dense', 'sparse-coo', 'sparse-csr', 'sparse-csc']. How the Jacobians are used.
+                 Controls the type of AssembledJacobian. ('matvec')
+                    - 'matvec': Uses compute_jacvec_product.
+                    - 'dense': Uses an ndarray.
+                    - 'sparse-coo': Uses a COOrdinate format sparse matrix.
+                    - 'sparse-csr': Uses a Compressed Sparse Row sparse format.
+                    - 'sparse-csc': Uses a Compressed Sparse Col sparse format.
+
+CycleGroup ('group_type': 'cycle')
+----------------------------------
+'component_class': One of ['explicit', 'deprecated']. Controls the class of Component to use to
+                   build the group. ('explicit')
+'connection_type': One of ['implicit', 'explicit']. If connections are done explicitly or through
+                   promotions ('implicit').
+'partial_type': One of ['array', 'sparse', 'aij']. How the component partial derivatives are
+                specified ('array').
+                    - 'array': Uses an ndarray.
+                    - 'sparse': Uses the Scipy CSR sparse format.
+                    - 'aij': Uses the [values, rows, cols] format.
+'finite_difference': bool. If derivatives should be approximated with finite differences.
+'num_comp': int. Number of components to use. Must be at least 2. (2)
+'num_var': int. Number of variables to use per component. Must be at least 1. (3)
+'var_shape': tuple(int). Shape to use for each variable. (2, 3).
+"""
 
 import unittest
 from six import iterkeys
@@ -42,7 +72,8 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
     @parametric_suite(jacobian_type='*',
                       num_comp=[2, 5, 10],
                       partial_type='aij',
-                      run_by_default=True)
+                      run_by_default=True,
+                      component_class='*')
     def test_subset(self, param_instance):
         param_instance.setup()
         problem = param_instance.problem
@@ -62,6 +93,7 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
             # Reverse Derivatives Check
             totals = param_instance.compute_totals('rev')
             assert_rel_error(self, totals, expected_totals, 1e-8)
+
 
 if __name__ == '__main__':
     unittest.main()

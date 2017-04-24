@@ -1,8 +1,9 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
 from __future__ import division, print_function
-import numpy
-from six import itervalues
+import numpy as np
+
+from six.moves import range
 
 try:
     import petsc4py
@@ -59,6 +60,8 @@ KSP_TYPES = [
 
 def _get_petsc_vec_array_new(vec):
     """
+    Get the array of values for the given PETSc vector.
+
     Helper function to handle a petsc backwards incompatibility.
 
     Parameters
@@ -76,6 +79,8 @@ def _get_petsc_vec_array_new(vec):
 
 def _get_petsc_vec_array_old(vec):
     """
+    Get the array of values for the given PETSc vector.
+
     Helper function to handle a petsc backwards incompatibility.
 
     Parameters
@@ -150,7 +155,7 @@ class Monitor(object):
             self._norm0 = norm
         self._norm = norm
 
-        self._solver._mpi_print(counter, norm / self._norm0, norm)
+        self._solver._mpi_print(counter, norm, norm / self._norm0)
         self._solver._iter_count += 1
 
 
@@ -201,8 +206,12 @@ class PetscKSP(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('ksp_type', value='fgmres', values=KSP_TYPES,
+        self.options.declare('ksp_type', default='fgmres', values=KSP_TYPES,
                              desc="KSP algorithm to use. Default is 'fgmres'.")
+
+        self.options.declare('restart', default=1000, type_=int,
+                             desc='Number of iterations between restarts. Larger values increase '
+                             'iteration cost, but may be necessary for convergence')
 
         # changing the default maxiter from the base class
         self.options['maxiter'] = 100
@@ -261,12 +270,23 @@ class PetscKSP(LinearSolver):
         x_vec.set_data(_get_petsc_vec_array(in_vec))
 
         # apply linear
-        ind1, ind2 = system._var_allprocs_range['output']
-        var_inds = [ind1, ind2, ind1, ind2]
-        system._apply_linear([vec_name], self._mode, var_inds)
+        scope_out, scope_in = system._get_scope()
+        system._apply_linear([vec_name], self._mode, scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
+
+    def _linearize_children(self):
+        """
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.
+
+        Returns
+        -------
+        boolean
+            Flag for indicating child linerization
+        """
+        precon = self.precon
+        return (precon is not None) and (precon._linearize_children())
 
     def _linearize(self):
         """
@@ -402,14 +422,9 @@ class PetscKSP(LinearSolver):
         if vec_name in self._ksp:
             return self._ksp[vec_name]
 
-        lsize = 0
-        for metadata in system._var_myproc_metadata['output']:
-            lsize += numpy.prod(metadata['shape'])
-
-        size = 0
-        global_var_sizes = system._assembler._variable_sizes_all['output']
-        for idx in itervalues(system._var_allprocs_indices['output']):
-            size += sum(global_var_sizes[:, idx])
+        iproc = system.comm.rank
+        lsize = np.sum(system._var_sizes['output'][iproc, :])
+        size = np.sum(system._var_sizes['output'])
 
         jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
                                            comm=system.comm)
@@ -420,7 +435,7 @@ class PetscKSP(LinearSolver):
 
         ksp.setOperators(jac_mat)
         ksp.setType(self.options['ksp_type'])
-        ksp.setGMRESRestart(1000)
+        ksp.setGMRESRestart(self.options['restart'])
         ksp.setPCSide(PETSc.PC.Side.RIGHT)
         ksp.setMonitor(Monitor(self))
 

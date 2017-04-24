@@ -1,16 +1,20 @@
-""" Testing for Problem.check_partial_derivatives and check_total_derivatives."""
+""" Testing for Problem.check_partial_derivs and check_total_derivatives."""
 
 import unittest
-from six import iteritems, StringIO, PY3
+from six import iteritems
 from six.moves import cStringIO as StringIO
 
 import numpy as np
 
-from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem
+from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NLRunOnce, \
+                         ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
+from openmdao.test_suite.components.paraboloid import ParaboloidMatVec
 
 
 class TestProblemCheckPartials(unittest.TestCase):
+
     def test_incorrect_jacobian(self):
         class MyComp(ExplicitComponent):
             def initialize_variables(self):
@@ -39,12 +43,14 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.model.connect('p1.x1', 'comp.x1')
         prob.model.connect('p2.x2', 'comp.x2')
 
+        prob.model.suppress_solver_output = True
+
         prob.setup(check=False)
         prob.run_model()
 
         string_stream = StringIO()
 
-        data = prob.check_partial_derivatives(out_stream=string_stream)
+        data = prob.check_partial_derivs(out_stream=string_stream)
 
         lines = string_stream.getvalue().split("\n")
 
@@ -83,12 +89,14 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.model.connect('p1.x1', 'comp.x1')
         prob.model.connect('p2.x2', 'comp.x2')
 
+        prob.model.suppress_solver_output = True
+
         prob.setup(check=False)
         prob.run_model()
 
         stream = StringIO()
 
-        data = prob.check_partial_derivatives(out_stream=stream)
+        data = prob.check_partial_derivs(out_stream=stream)
 
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']
@@ -134,7 +142,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
         p.setup()
-        data = p.check_partial_derivatives(out_stream=None)
+        data = p.check_partial_derivs(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -153,6 +161,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_output('flow:T', val=284., units="degR", desc="Temperature")
                 self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
 
+                self.run_count = 0
+
             def compute_partial_derivs(self, inputs, outputs, partials):
                 partials['flow:T', 'T'] = 1.
                 partials['flow:P', 'P'] = 1.
@@ -160,6 +170,8 @@ class TestProblemCheckPartials(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['flow:T'] = inputs['T']
                 outputs['flow:P'] = inputs['P']
+
+                self.run_count += 1
 
         p = Problem()
         model = p.model = Group()
@@ -170,8 +182,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
+        model.nl_solver = NLRunOnce()
+
         p.setup()
-        data = p.check_partial_derivatives(out_stream=None)
+        data = p.check_partial_derivs(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -179,6 +193,183 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.assertAlmostEqual(abs_error.forward, 0.)
                 self.assertAlmostEqual(abs_error.reverse, 0.)
                 self.assertAlmostEqual(abs_error.forward_reverse, 0.)
+
+        # Make sure we only FD this twice.
+        # The count is 5 because in check_partial_derivs, there are two calls to apply_nonlinear
+        # when compute the fwd and rev analytic derivatives, then one call to apply_nonlinear
+        # to compute the reference point for FD, then two additional calls for the two inputs.
+        comp = model.get_subsystem('units')
+        self.assertEqual(comp.run_count, 5)
+
+    def test_scalar_val(self):
+        class PassThrough(ExplicitComponent):
+            """
+            Helper component that is needed when variables must be passed
+            directly from input to output
+            """
+
+            def __init__(self, i_var, o_var, val, units=None):
+                super(PassThrough, self).__init__()
+                self.i_var = i_var
+                self.o_var = o_var
+                self.units = units
+                self.val = val
+
+                if isinstance(val, (float, int)) or np.isscalar(val):
+                    size=1
+                else:
+                    size = np.prod(val.shape)
+
+                self.size = size
+
+            def initialize_variables(self):
+                if self.units is None:
+                    self.add_input(self.i_var, self.val)
+                    self.add_output(self.o_var, self.val)
+                else:
+                    self.add_input(self.i_var, self.val, units=self.units)
+                    self.add_output(self.o_var, self.val, units=self.units)
+
+            def initialize_partials(self):
+                row_col = np.arange(self.size)
+                self.declare_partials(of=self.o_var, wrt=self.i_var,
+                                      val=1, rows=row_col, cols=row_col)
+
+            def compute(self, inputs, outputs):
+                outputs[self.o_var] = inputs[self.i_var]
+
+            def linearize(self, inputs, outputs, J):
+                pass
+
+        p = Problem()
+
+        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('foo', val=np.ones(4))
+        indeps.add_output('foo2', val=np.ones(4))
+
+        p.model.add_subsystem('pt', PassThrough("foo", "bar", val=np.ones(4)), promotes=['*'])
+        p.model.add_subsystem('pt2', PassThrough("foo2", "bar2", val=np.ones(4)), promotes=['*'])
+
+        p.model.suppress_solver_output = True
+
+        p.setup()
+        p.run_model()
+
+        data = p.check_partial_derivs(out_stream=None)
+        identity = np.eye(4)
+        assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
+        assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
+        assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fd'], identity, 1e-9)
+
+        assert_rel_error(self, data['pt2'][('bar2', 'foo2')]['J_fwd'], identity, 1e-15)
+        assert_rel_error(self, data['pt2'][('bar2', 'foo2')]['J_rev'], identity, 1e-15)
+        assert_rel_error(self, data['pt2'][('bar2', 'foo2')]['J_fd'], identity, 1e-9)
+
+    def test_matrix_free_explicit(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('comp', ParaboloidMatVec())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.model.suppress_solver_output = True
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partial_derivs(out_stream=None)
+
+        for comp_name, comp in iteritems(data):
+            for partial_name, partial in iteritems(comp):
+                abs_error = partial['abs error']
+                rel_error = partial['rel error']
+                assert_rel_error(self, abs_error.forward, 0., 1e-5)
+                assert_rel_error(self, abs_error.reverse, 0., 1e-5)
+                assert_rel_error(self, abs_error.forward_reverse, 0., 1e-5)
+                assert_rel_error(self, rel_error.forward, 0., 1e-5)
+                assert_rel_error(self, rel_error.reverse, 0., 1e-5)
+                assert_rel_error(self, rel_error.forward_reverse, 0., 1e-5)
+
+        assert_rel_error(self, data['comp'][('f_xy', 'x')]['J_fwd'][0][0], 5.0, 1e-6)
+        assert_rel_error(self, data['comp'][('f_xy', 'x')]['J_rev'][0][0], 5.0, 1e-6)
+        assert_rel_error(self, data['comp'][('f_xy', 'y')]['J_fwd'][0][0], 21.0, 1e-6)
+        assert_rel_error(self, data['comp'][('f_xy', 'y')]['J_rev'][0][0], 21.0, 1e-6)
+
+    def test_matrix_free_implicit(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('rhs', np.ones((2, ))))
+        prob.model.add_subsystem('comp', TestImplCompArrayMatVec())
+
+        prob.model.connect('p1.rhs', 'comp.rhs')
+
+        prob.model.suppress_solver_output = True
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partial_derivs(out_stream=None)
+
+        for comp_name, comp in iteritems(data):
+            for partial_name, partial in iteritems(comp):
+                abs_error = partial['abs error']
+                rel_error = partial['rel error']
+                assert_rel_error(self, abs_error.forward, 0., 1e-5)
+                assert_rel_error(self, abs_error.reverse, 0., 1e-5)
+                assert_rel_error(self, abs_error.forward_reverse, 0., 1e-5)
+                assert_rel_error(self, rel_error.forward, 0., 1e-5)
+                assert_rel_error(self, rel_error.reverse, 0., 1e-5)
+                assert_rel_error(self, rel_error.forward_reverse, 0., 1e-5)
+
+    def test_implicit_undeclared(self):
+        # Test to see that check_partial_derivs works when state_wrt_input and state_wrt_state
+        # partials are missing.
+
+        class ImplComp4Test(ImplicitComponent):
+
+            def initialize_variables(self):
+                self.add_input('x', np.ones(2))
+                self.add_input('dummy', np.ones(2))
+                self.add_output('y', np.ones(2))
+                self.add_output('extra', np.ones(2))
+                self.mtx = np.array([
+                    [ 3., 4.],
+                    [ 2., 3.],
+                ])
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['y'] = self.mtx.dot(outputs['y']) - inputs['x']
+
+            def linearize(self, inputs, outputs, partials):
+                partials['y', 'x'] = -np.eye(2)
+                partials['y', 'y'] = self.mtx
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones((2, ))))
+        prob.model.add_subsystem('p2', IndepVarComp('dummy', np.ones((2, ))))
+        prob.model.add_subsystem('comp', ImplComp4Test())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.dummy', 'comp.dummy')
+
+        prob.model.suppress_solver_output = True
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partial_derivs(out_stream=None)
+
+        assert_rel_error(self, data['comp']['y', 'extra']['J_fwd'], np.zeros((2, 2)))
+        assert_rel_error(self, data['comp']['y', 'extra']['J_rev'], np.zeros((2, 2)))
+        assert_rel_error(self, data['comp']['y', 'dummy']['J_fwd'], np.zeros((2, 2)))
+        assert_rel_error(self, data['comp']['y', 'dummy']['J_rev'], np.zeros((2, 2)))
+
 
 if __name__ == "__main__":
     unittest.main()

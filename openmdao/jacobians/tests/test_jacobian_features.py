@@ -4,13 +4,13 @@ import unittest
 import numpy as np
 import scipy as sp
 import itertools
-from scipy.sparse import coo_matrix, csr_matrix, issparse
-from six import iteritems
-from nose_parameterized import parameterized
 
-from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, DenseMatrix, \
-     GlobalJacobian, CSRmatrix, COOmatrix, ScipyIterativeSolver
-from openmdao.jacobians.default_jacobian import DefaultJacobian
+from six import iteritems
+from parameterized import parameterized
+
+from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, \
+                         COOJacobian, ScipyIterativeSolver
+
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -144,7 +144,7 @@ class TestJacobianFeatures(unittest.TestCase):
         self.problem = Problem(model=model)
         model.suppress_solver_output = True
         model.ln_solver = ScipyIterativeSolver()
-        model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
+        model.jacobian = COOJacobian()
 
     def test_dependence(self):
         problem = self.problem
@@ -228,7 +228,7 @@ class TestJacobianFeatures(unittest.TestCase):
         problem = Problem(model=model)
         model.suppress_solver_output = True
         model.ln_solver = ScipyIterativeSolver()
-        model.jacobian = GlobalJacobian(matrix_class=COOmatrix)
+        model.jacobian = COOJacobian()
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
@@ -354,10 +354,9 @@ class TestJacobianFeatures(unittest.TestCase):
             ('units.flow:P', 'units.P'): -1.,
         }
 
-        with units._units_scaling_context(scale_jac=True):
-            jac = units._jacobian._subjacs
-            for deriv, val in iteritems(expected_subjacs):
-                assert_rel_error(self, jac[deriv], val, 1e-6)
+        jac = units._jacobian._subjacs
+        for deriv, val in iteritems(expected_subjacs):
+            assert_rel_error(self, jac[deriv], val, 1e-6)
 
 if __name__ == '__main__':
     unittest.main()

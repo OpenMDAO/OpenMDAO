@@ -22,7 +22,7 @@ This is the case not only in <Component> methods such as :code:`compute`, :code:
 3. In :code:`add_input` and :code:`add_output`, all arguments are assumed given in the specified units.
 In the case of :code:`add_input`, if :code:`units` is specified, then :code:`val` is assumed to be given in those units.
 In the case of :code:`add_output`, if :code:`units` is specified, then :code:`val`, :code:`lower`, :code:`upper`, :code:`ref`, and :code:`ref0` are all assumed to be given in those units.
-Also in :code:`add_output`, if :code:`res_units` is specified, then :code:`res_ref` and :code:`res_ref0` are assumed to be given in :code:`res_units`.
+Also in :code:`add_output`, if :code:`res_units` is specified, then :code:`res_ref` is assumed to be given in :code:`res_units`.
 
 Units syntax
 ------------
@@ -41,6 +41,12 @@ For illustration, each of the following is a valid unit string representing the 
 - :code:`kg * m / s ** 2`
 - :code:`kg * m * s ** -2`
 - :code:`kkg * mm / s ** 2`
+
+.. note::
+
+    If units are not specified or are specified as :code:`None` then the variable
+    is a assumed to be unitless.  If such a variable is connected to a variable
+    with units, the connection will be allowed but a warning will be issued.
 
 Example
 -------

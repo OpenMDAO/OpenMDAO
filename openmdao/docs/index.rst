@@ -58,6 +58,7 @@ Grouping components for more complex models
     features/grouping_components/add_subsystem
     features/grouping_components/get_subsystem
     features/grouping_components/connect
+    features/grouping_components/set_order
     features/grouping_components/src_indices
 
 
@@ -76,7 +77,17 @@ Solvers (nonlinear and linear)
 
    features/solvers/set_solvers
    features/solvers/solver_options
-
+   features/solvers/nl_runonce
+   features/solvers/nl_bgs
+   features/solvers/nl_bjac
+   features/solvers/nl_newton
+   features/solvers/ln_runonce
+   features/solvers/ln_direct
+   features/solvers/ln_bgs
+   features/solvers/ln_scipy
+   features/solvers/ln_petscksp
+   features/solvers/ln_bjac
+   features/solvers/ls_backtracking
 
 Running your models
 ================================
@@ -103,10 +114,6 @@ Visualization
 
 .. _OpenMDAO Reference Sheets: _srcdocs/index.html
 
-`OpenMDAO Developer Source Documentation`__
-
-.. __: _srcdocs/dev/index.html
-
 `OpenMDAO User Source Documentation`__
 
 .. __: _srcdocs/usr/index.html
@@ -115,3 +122,11 @@ Visualization
    :maxdepth: 1
 
    tags/index
+
+Style for Developers
+====================
+
+.. toctree::
+   :maxdepth: 1
+
+   style_guide/doc_style_guide.rst

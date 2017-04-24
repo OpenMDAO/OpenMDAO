@@ -14,9 +14,11 @@ from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.ln_bgs import LinearBlockGS
 from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver, gmres
+from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec, \
      TestExplCompSimpleDense
-from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
+     SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
@@ -42,22 +44,23 @@ class TestScipyIterativeSolver(unittest.TestCase):
         p.setup(check=False)
         p.model.suppress_solver_output = True
 
-        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            # forward
-            d_residuals.set_const(1.0)
-            d_outputs.set_const(0.0)
-            group.run_solve_linear(['linear'], 'fwd')
-            output = d_outputs._data
-            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-            assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
-            # reverse
-            d_outputs.set_const(1.0)
-            d_residuals.set_const(0.0)
-            group.run_solve_linear(['linear'], 'rev')
-            output = d_residuals._data
-            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-            assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+        # forward
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        group.run_solve_linear(['linear'], 'fwd')
+        output = d_outputs._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+
+        # reverse
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        group.run_solve_linear(['linear'], 'rev')
+        output = d_residuals._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
 
     def test_solve_linear_scipy_maxiter(self):
         """Verify that ScipyIterativeSolver abides by the 'maxiter' option."""
@@ -69,44 +72,21 @@ class TestScipyIterativeSolver(unittest.TestCase):
         p.setup(check=False)
         p.model.suppress_solver_output = True
 
-        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            # forward
-            d_residuals.set_const(1.0)
-            d_outputs.set_const(0.0)
-            group.run_solve_linear(['linear'], 'fwd')
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
-            self.assertTrue(group.ln_solver._iter_count == 2)
+        # forward
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        group.run_solve_linear(['linear'], 'fwd')
 
-            # reverse
-            d_outputs.set_const(1.0)
-            d_residuals.set_const(0.0)
-            group.run_solve_linear(['linear'], 'rev')
+        self.assertTrue(group.ln_solver._iter_count == 2)
 
-            self.assertTrue(group.ln_solver._iter_count == 2)
+        # reverse
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        group.run_solve_linear(['linear'], 'rev')
 
-    def test_feature_simple(self):
-        """Tests feature for adding a Scipy GMRES solver and calculating the
-        derivatives."""
-        # Tests derivatives on a simple comp that defines compute_jacvec.
-        prob = Problem()
-        model = prob.model = Group()
-        model.add_subsystem('x_param', IndepVarComp('length', 3.0),
-                            promotes=['length'])
-        model.add_subsystem('mycomp', TestExplCompSimpleDense(),
-                            promotes=['length', 'width', 'area'])
-
-        model.ln_solver = ScipyIterativeSolver()
-        model.suppress_solver_output = True
-
-        prob.setup(check=False, mode='fwd')
-        prob['width'] = 2.0
-        prob.run_model()
-
-        of = ['area']
-        wrt = ['length']
-
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
+        self.assertTrue(group.ln_solver._iter_count == 2)
 
     def test_simple_matvec(self):
         # Tests derivatives on a simple comp that defines compute_jacvec.
@@ -501,53 +481,55 @@ class TestScipyIterativeSolver(unittest.TestCase):
         p.setup(check=False)
         p.model.suppress_solver_output = True
 
-        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            # forward
-            d_residuals.set_const(1.0)
-            d_outputs.set_const(0.0)
-            group.run_solve_linear(['linear'], 'fwd')
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
-            output = d_outputs._data
-            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-            assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+        # forward
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        group.run_solve_linear(['linear'], 'fwd')
 
-            self.assertTrue(precon._iter_count > 0)
+        output = d_outputs._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
 
-            # reverse
-            d_outputs.set_const(1.0)
-            d_residuals.set_const(0.0)
-            group.run_solve_linear(['linear'], 'rev')
+        self.assertTrue(precon._iter_count > 0)
 
-            output = d_residuals._data
-            assert_rel_error(self, output[0], group.expected_solution[0], 3e-15)
-            assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
+        # reverse
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        group.run_solve_linear(['linear'], 'rev')
 
-            self.assertTrue(precon._iter_count > 0)
+        output = d_residuals._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
+
+        self.assertTrue(precon._iter_count > 0)
 
         # test direct solver precon and make sure the _linearize recurses correctly
         precon = group.ln_solver.precon = DirectSolver()
         p.setup(check=False)
 
-        with group.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            # forward
-            d_residuals.set_const(1.0)
-            d_outputs.set_const(0.0)
-            group.ln_solver._linearize()
-            group.run_solve_linear(['linear'], 'fwd')
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
-            output = d_outputs._data
-            assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
-            assert_rel_error(self, output[1], group.expected_solution[1], 1e-15)
+        # forward
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        group.ln_solver._linearize()
+        group.run_solve_linear(['linear'], 'fwd')
 
-            # reverse
-            d_outputs.set_const(1.0)
-            d_residuals.set_const(0.0)
-            group.ln_solver._linearize()
-            group.run_solve_linear(['linear'], 'rev')
+        output = d_outputs._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
 
-            output = d_residuals._data
-            assert_rel_error(self, output[0], group.expected_solution[0], 3e-15)
-            assert_rel_error(self, output[1], group.expected_solution[1], 3e-15)
+        # reverse
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        group.ln_solver._linearize()
+        group.run_solve_linear(['linear'], 'rev')
+
+        output = d_residuals._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
 
     def test_solve_on_subsystem(self):
         """solve an implicit system with GMRES attached to a subsystem"""
@@ -566,28 +548,122 @@ class TestScipyIterativeSolver(unittest.TestCase):
         p.model.suppress_solver_output = True
 
         # forward
-        with g1.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            d_residuals.set_const(1.0)
-            d_outputs.set_const(0.0)
-            g1._solve_linear(['linear'], 'fwd')
+        d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 
-            output = d_outputs._data
-            # The empty first entry in _data is due to the dummy
-            #     variable being in a different variable set not owned by g1
-            assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
-            assert_rel_error(self, output[2], g1.expected_solution[1], 1e-15)
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        g1._solve_linear(['linear'], 'fwd')
+
+        output = d_outputs._data
+        # The empty first entry in _data is due to the dummy
+        #     variable being in a different variable set not owned by g1
+        assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
+        assert_rel_error(self, output[5], g1.expected_solution[1], 1e-15)
 
         # reverse
-        with g1.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            d_outputs.set_const(1.0)
-            d_residuals.set_const(0.0)
-            g1.ln_solver._linearize()
-            g1._solve_linear(['linear'], 'rev')
+        d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 
-            output = d_residuals._data
-            assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
-            assert_rel_error(self, output[2], g1.expected_solution[1], 3e-15)
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        g1.ln_solver._linearize()
+        g1._solve_linear(['linear'], 'rev')
 
+        output = d_residuals._data
+        assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
+        assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
+
+
+class TestScipyIterativeSolverFeature(unittest.TestCase):
+
+    def test_feature_simple(self):
+        """Tests feature for adding a Scipy GMRES solver and calculating the
+        derivatives."""
+        # Tests derivatives on a simple comp that defines compute_jacvec.
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('x_param', IndepVarComp('length', 3.0),
+                            promotes=['length'])
+        model.add_subsystem('mycomp', TestExplCompSimpleDense(),
+                            promotes=['length', 'width', 'area'])
+
+        model.ln_solver = ScipyIterativeSolver()
+        model.suppress_solver_output = True
+
+        prob.setup(check=False, mode='fwd')
+        prob['width'] = 2.0
+        prob.run_model()
+
+        of = ['area']
+        wrt = ['length']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
+
+    def test_specify_solver(self):
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.ln_solver = ScipyIterativeSolver()
+
+        prob.setup()
+        prob.run_model()
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
+    def test_feature_maxiter(self):
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.ln_solver = ScipyIterativeSolver()
+        model.ln_solver.options['maxiter'] = 3
+
+        prob.setup()
+        prob.run_model()
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 0.0, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 0.0, .00001)
+
+    def test_feature_atol(self):
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.ln_solver = ScipyIterativeSolver()
+        model.ln_solver.options['atol'] = 1.0e-20
+
+        prob.setup()
+        prob.run_model()
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001055699, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
+
+    def test_specify_precon(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nl_solver = NewtonSolver()
+        prob.model.ln_sollver = ScipyIterativeSolver()
+
+        prob.model.ln_solver.precon = LinearBlockGS()
+        prob.model.ln_solver.precon.options['maxiter'] = 2
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
 if __name__ == "__main__":
     unittest.main()

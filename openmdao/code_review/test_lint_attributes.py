@@ -7,7 +7,6 @@ import inspect
 import re
 
 directories = [
-    'assemblers',
     'core',
     'jacobians',
     'matrices',
@@ -101,7 +100,7 @@ class LintAttributesTestCase(unittest.TestCase):
                             method = getattr(class_, '__init__')
                             mysrc = inspect.getsource(method)
                             valid_lines = ''.join(valid_line_with_self_re.findall(mysrc))
-                            all_member_vars = list(set(member_var_re.findall(valid_lines)))
+                            all_member_vars = set(member_var_re.findall(valid_lines))
 
                             # no 'self.*=' statements in __init__ but there is an Attributes section
                             if(len(all_member_vars) == 0 and len(classdoc_matches) == 1):

@@ -2,15 +2,19 @@
 
 import logging
 
-import numpy
+import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
 import networkx as nx
+from six import iteritems
 
 from openmdao.core.group import Group
 from openmdao.core.component import Component
-from openmdao.devtools.compat import abs_varname_iter
+
+# when setup is called multiple times, we need this to prevent adding
+# another handler to the config_check logger each time (if logger arg to check_config is None)
+_set_logger = None
 
 
 def check_config(problem, logger=None):
@@ -25,21 +29,26 @@ def check_config(problem, logger=None):
     logger : object
         Logging object.
     """
+    global _set_logger
     if logger is None:
-        logger = logging.getLogger("config_check")
-        console = logging.StreamHandler()
-        # set a format which is simpler for console use
-        formatter = logging.Formatter('%(levelname)s: %(message)s')
-        # tell the handler to use this format
-        console.setFormatter(formatter)
-        console.setLevel(logging.INFO)
-        logger.addHandler(console)
+        if _set_logger is None:
+            logger = logging.getLogger("config_check")
+            _set_logger = logger
+            console = logging.StreamHandler()
+            # set a format which is simpler for console use
+            formatter = logging.Formatter('%(levelname)s: %(message)s')
+            # tell the handler to use this format
+            console.setFormatter(formatter)
+            console.setLevel(logging.INFO)
+            logger.addHandler(console)
+        else:
+            logger = _set_logger
 
     _check_hanging_inputs(problem, logger)
     _check_dataflow(problem.model, logger)
 
 
-def compute_sys_graph(group, input_src_ids, comps_only=False):
+def compute_sys_graph(group, input_srcs, comps_only=False):
     """
     Compute a dependency graph for subsystems in the given group.
 
@@ -48,9 +57,8 @@ def compute_sys_graph(group, input_src_ids, comps_only=False):
     group : <Group>
         The Group we're computing the graph for.
 
-    input_src_ids : ndarray of int
-        Array containing global variable ids for sources of the inputs
-        indicated by the index into the array.
+    input_srcs : {}
+        dict containing global variable abs names for sources of the inputs.
 
     comps_only : bool (False)
         If True, return a graph of all Components within the given group
@@ -68,28 +76,34 @@ def compute_sys_graph(group, input_src_ids, comps_only=False):
     else:
         subsystems = group._subsystems_allprocs
 
-    i_start, i_end = group._var_allprocs_range['input']
-    o_start, o_end = group._var_allprocs_range['output']
+    i_start = group._ext_num_vars['input'][0]
+    i_end = group._ext_num_vars['input'][0] + group._num_var['input']
+    o_start = group._ext_num_vars['output'][0]
+    o_end = group._ext_num_vars['output'][0] + group._num_var['output']
 
     # mapping arrays to find the system ID given the variable ID
-    invar2sys = numpy.empty(i_end - i_start, dtype=int)
-    outvar2sys = numpy.empty(o_end - o_start, dtype=int)
+    invar2sys = np.empty(group._num_var['input'], dtype=int)
+    outvar2sys = np.empty(group._num_var['output'], dtype=int)
 
     for i, s in enumerate(subsystems):
-        start, end = s._var_allprocs_range['input']
+        start = s._ext_num_vars['input'][0]
+        end = s._ext_num_vars['input'][0] + s._num_var['input']
         invar2sys[start - i_start:end - i_start] = i
 
-        start, end = s._var_allprocs_range['output']
+        start = s._ext_num_vars['output'][0]
+        end = s._ext_num_vars['output'][0] + s._num_var['output']
         outvar2sys[start - o_start:end - o_start] = i
 
     graph = nx.DiGraph()
 
-    for in_id, src_id in enumerate(input_src_ids):
-        if (src_id != -1 and (o_start <= src_id < o_end) and
-                (i_start <= in_id < i_end)):
-            # offset the ids to index into our var2sys arrays
-            graph.add_edge(subsystems[outvar2sys[src_id - o_start]].pathname,
-                           subsystems[invar2sys[in_id - i_start]].pathname)
+    indices = group._var_allprocs_abs2idx
+    for in_abs, src_abs in iteritems(input_srcs):
+        if src_abs is not None:
+            src_id = indices['output'][src_abs] + group._ext_num_vars['output'][0]
+            in_id = indices['input'][in_abs] + group._ext_num_vars['input'][0]
+            if ((o_start <= src_id < o_end) and (i_start <= in_id < i_end)):
+                graph.add_edge(subsystems[outvar2sys[src_id - o_start]].pathname,
+                               subsystems[invar2sys[in_id - i_start]].pathname)
 
     return graph
 
@@ -115,7 +129,7 @@ def get_sccs(group, comps_only=False):
     list of sets of str
         A list of strongly connected components in topological order.
     """
-    graph = compute_sys_graph(group, group._assembler._input_src_ids,
+    graph = compute_sys_graph(group, group._conn_global_abs_in2out,
                               comps_only=comps_only)
 
     # Tarjan's algorithm returns SCCs in reverse topological order, so
@@ -137,8 +151,7 @@ def _check_dataflow(group, logger):
     logger : object
         The object that manages logging output.
     """
-    for system in group.system_iter(include_self=True, recurse=True,
-                                    typ=Group):
+    for system in group.system_iter(include_self=True, recurse=True, typ=Group):
         sccs = get_sccs(system)
         cycles = [sorted(s) for s in sccs if len(s) > 1]
         cycle_idxs = {}
@@ -152,8 +165,7 @@ def _check_dataflow(group, logger):
                 for s in cycle:
                     cycle_idxs[s] = i
 
-        ubcs = _get_out_of_order_subs(system,
-                                      system._assembler._input_src_ids)
+        ubcs = _get_out_of_order_subs(system, system._conn_global_abs_in2out)
 
         for tgt_system, src_systems in sorted(ubcs.items()):
             keep_srcs = []
@@ -170,7 +182,7 @@ def _check_dataflow(group, logger):
                                (tgt_system, sorted(keep_srcs)))
 
 
-def _get_out_of_order_subs(group, input_src_ids):
+def _get_out_of_order_subs(group, input_srcs):
     """
     Return Systems that are executed out of dataflow order.
 
@@ -179,10 +191,10 @@ def _get_out_of_order_subs(group, input_src_ids):
     group : <Group>
         The Group where we're checking subsystem order.
 
-    input_src_ids : ndarray of int
-        Array containing global variable ids for sources of the inputs
-        indicated by the index into the array. This describes all variable
-        connections, either explicit or implicit, in the entire model.
+    input_srcs : {}
+        dict containing variable abs names for sources of the inputs.
+        This describes all variable connections, either explicit or implicit,
+        in the entire model.
 
     Returns
     -------
@@ -192,31 +204,38 @@ def _get_out_of_order_subs(group, input_src_ids):
     """
     subsystems = group._subsystems_allprocs
 
-    i_start, i_end = group._var_allprocs_range['input']
-    o_start, o_end = group._var_allprocs_range['output']
+    i_start = group._ext_num_vars['input'][0]
+    i_end = group._ext_num_vars['input'][0] + group._num_var['input']
+    o_start = group._ext_num_vars['output'][0]
+    o_end = group._ext_num_vars['output'][0] + group._num_var['output']
 
     # mapping arrays to find the system ID given the variable ID
-    invar2sys = numpy.empty(i_end - i_start, dtype=int)
-    outvar2sys = numpy.empty(o_end - o_start, dtype=int)
+    invar2sys = np.empty(i_end - i_start, dtype=int)
+    outvar2sys = np.empty(o_end - o_start, dtype=int)
 
     for i, s in enumerate(subsystems):
-        start, end = s._var_allprocs_range['input']
+        start = s._ext_num_vars['input'][0]
+        end = s._ext_num_vars['input'][0] + s._num_var['input']
         invar2sys[start - i_start:end - i_start] = i
 
-        start, end = s._var_allprocs_range['output']
+        start = s._ext_num_vars['output'][0]
+        end = s._ext_num_vars['output'][0] + s._num_var['output']
         outvar2sys[start - o_start:end - o_start] = i
 
+    indices = group._var_allprocs_abs2idx
     ubcs = {}
-    for in_id, src_id in enumerate(input_src_ids):
-        if (src_id != -1 and (o_start <= src_id < o_end) and
-                (i_start <= in_id < i_end)):
-            # offset the ids to index into our var2sys arrays
-            src_sysID = outvar2sys[src_id - o_start]
-            tgt_sysID = invar2sys[in_id - i_start]
-            if (src_sysID > tgt_sysID):
-                src_sys = subsystems[src_sysID].pathname
-                tgt_sys = subsystems[tgt_sysID].pathname
-                ubcs.setdefault(tgt_sys, []).append(src_sys)
+    for in_abs, src_abs in iteritems(input_srcs):
+        if src_abs is not None:
+            src_id = indices['output'][src_abs] + group._ext_num_vars['output'][0]
+            in_id = indices['input'][in_abs] + group._ext_num_vars['input'][0]
+            if ((o_start <= src_id < o_end) and (i_start <= in_id < i_end)):
+                # offset the ids to index into our var2sys arrays
+                src_sysID = outvar2sys[src_id - o_start]
+                tgt_sysID = invar2sys[in_id - i_start]
+                if (src_sysID > tgt_sysID):
+                    src_sys = subsystems[src_sysID].pathname
+                    tgt_sys = subsystems[tgt_sysID].pathname
+                    ubcs.setdefault(tgt_sys, []).append(src_sys)
 
     return ubcs
 
@@ -233,12 +252,12 @@ def _check_hanging_inputs(problem, logger):
     logger : object
         The object that managers logging output.
     """
-    input_src_ids = problem._assembler._input_src_ids
+    input_srcs = problem.model._conn_global_abs_in2out
 
     hanging = sorted([
-        name for i, name in enumerate(abs_varname_iter(problem.model, 'input',
-                                                       local=False)) if
-                                                       input_src_ids[i] == -1
+        name
+        for name in problem.model._var_allprocs_abs_names['input']
+        if name not in input_srcs
     ])
 
     if hanging:

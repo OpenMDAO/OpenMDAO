@@ -3,6 +3,7 @@
 # Core
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group
+from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
@@ -19,8 +20,10 @@ from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.solvers.ln_petsc_ksp import PetscKSP
 from openmdao.solvers.ln_runonce import LNRunOnce
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
+from openmdao.solvers.ls_backtracking import ArmijoGoldstein
+from openmdao.solvers.ls_backtracking import BacktrackingLineSearch
+from openmdao.solvers.ls_backtracking import BoundsCheck
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
-from openmdao.solvers.nl_btlinesearch import BacktrackingLineSearch
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.solvers.nl_runonce import NLRunOnce
 
@@ -36,10 +39,8 @@ from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
 
 # Derivative Specification
-from openmdao.jacobians.global_jacobian import GlobalJacobian
-from openmdao.matrices.dense_matrix import DenseMatrix
-from openmdao.matrices.coo_matrix import COOmatrix
-from openmdao.matrices.csr_matrix import CSRmatrix
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian, \
+    DenseJacobian, COOJacobian, CSRJacobian, CSCJacobian
 
 # Drivers
 try:
@@ -48,5 +49,4 @@ except ImportError:
     pass
 
 # System-Building Tools
-from openmdao.utils.generalized_dict import GeneralizedDictionary
-from openmdao.utils.generalized_dict import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary

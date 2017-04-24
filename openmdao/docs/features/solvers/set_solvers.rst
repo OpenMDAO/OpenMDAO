@@ -21,7 +21,7 @@ letting you build a hierarchical solver setup to efficiently converge your model
 Solvers for the Sellar Problem
 ----------------------------------
 
-The Sellar Problem has two components with a cyclic dependency, so a a nonlinear solver is necessary.
+The Sellar Problem has two components with a cyclic dependency, so the appropriate nonlinear solver is necessary.
 We'll use the :ref:`Newton <usr_openmdao.solvers.nl_newton.py>` nonlinear solver,
 which requires derivatives so we'll also use the :ref:`Direct <usr_openmdao.solvers.ln_direct.py>` linear solver
 
@@ -44,7 +44,7 @@ is a simple example of this kind of model structure. In these problems, you migh
     but developing an effective and efficient preconditioner is not trivial.
     If you're having trouble converging the linear solves with an iterative solver,
     you should try using the :ref:`Direct <usr_openmdao.solvers.ln_direct.py>` solver instead.
-    But first, verify that all your partials derivatives are correct with the check_partial_derivatives method.
+    But first, verify that all your partials derivatives are correct with the check_partial_derivs method.
 
 
 ----
@@ -53,3 +53,5 @@ You can also specify solvers as part of the initialization of a Group
 
 .. embed-code::
     openmdao.test_suite.components.double_sellar.DoubleSellar
+
+.. tags:: Solver

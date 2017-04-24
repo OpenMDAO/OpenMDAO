@@ -18,7 +18,9 @@ Usage
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_simple
 
-2. Promote the input and output of a component.
+2. Promote the input and output of a component.  Because the promoted names
+of `indep.a` and `comp.a` are the same, `indep.a` is automatically connected
+to `comp1.a`.
 
 .. note::
 
@@ -49,3 +51,8 @@ to top level.
 
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_nested_promoted2
+
+6. Promote with an alias to connect an input to a source.
+
+.. embed-test::
+    openmdao.core.tests.test_group.TestGroup.test_group_rename_connect

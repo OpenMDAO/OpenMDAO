@@ -1,11 +1,12 @@
 from __future__ import division
-import numpy
+import numpy as np
 import unittest
 import scipy.sparse.linalg
 
 from openmdao.api import Problem, ImplicitComponent, Group
 from openmdao.api import LinearBlockGS
-from openmdao.api import view_model
+from openmdao.devtools.testutil import assert_rel_error
+
 
 class CompA(ImplicitComponent):
 
@@ -71,7 +72,8 @@ class CompB(ImplicitComponent):
 
 class GroupG(Group):
 
-    def initialize(self):
+    def __init__(self, **kwargs):
+        super(GroupG, self).__init__(**kwargs)
         self.add_subsystem('CA', CompA(), promotes=['*'])
         self.add_subsystem('CB', CompB(), promotes=['*'])
 
@@ -82,46 +84,44 @@ class Test(unittest.TestCase):
         group = GroupG()
         self.p = Problem(group)
 
-        gmres = scipy.sparse.linalg.gmres
         self.p.model.ln_solver = LinearBlockGS()
         self.p.setup(check=False)
 
         #view_model(self.p, show_browser=False)
 
-    def assertEqualArrays(self, a, b, tol=1e-3):
-        self.assertTrue(numpy.linalg.norm(a-b) < tol)
-
     def test_apply_linear(self):
         root = self.p.model
         root.suppress_solver_output = True
 
-        with root.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            d_outputs.set_const(1.0)
-            root.run_apply_linear(['linear'], 'fwd')
-            output = d_residuals._data[0]
-            self.assertEqualArrays(output, [7, 3])
+        d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
-            d_residuals.set_const(1.0)
-            root.run_apply_linear(['linear'], 'rev')
-            output = d_outputs._data[0]
-            self.assertEqualArrays(output, [7, 3])
+        d_outputs.set_const(1.0)
+        root.run_apply_linear(['linear'], 'fwd')
+        output = d_residuals._data[0]
+        assert_rel_error(self, output, [7, 3])
+
+        d_residuals.set_const(1.0)
+        root.run_apply_linear(['linear'], 'rev')
+        output = d_outputs._data[0]
+        assert_rel_error(self, output, [7, 3])
 
     def test_solve_linear(self):
         root = self.p.model
         root.suppress_solver_output = True
 
-        with root.linear_vector_context() as (d_inputs, d_outputs, d_residuals):
-            d_residuals.set_const(11.0)
-            d_outputs.set_const(0.0)
-            root.run_solve_linear(['linear'], 'fwd')
-            output = d_outputs._data[0]
-            self.assertEqualArrays(output, [1, 5])
+        d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
-            d_outputs.set_const(11.0)
-            d_residuals.set_const(0.0)
-            root.run_solve_linear(['linear'], 'rev')
-            output = d_residuals._data[0]
-            self.assertEqualArrays(output, [1, 5])
+        d_residuals.set_const(11.0)
+        d_outputs.set_const(0.0)
+        root.run_solve_linear(['linear'], 'fwd')
+        output = d_outputs._data[0]
+        assert_rel_error(self, output, [1, 5], 1e-10)
+
+        d_outputs.set_const(11.0)
+        d_residuals.set_const(0.0)
+        root.run_solve_linear(['linear'], 'rev')
+        output = d_residuals._data[0]
+        assert_rel_error(self, output, [1, 5], 1e-10)
 
 
 if __name__ == '__main__':

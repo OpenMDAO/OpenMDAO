@@ -32,13 +32,9 @@ class NLRunOnce(NonlinearSolver):
             relative error.
         """
         system = self._system
-        for isub in range(len(system._subsystems_allprocs)):
-            system._transfers['fwd', isub](system._inputs,
-                                           system._outputs, 'fwd')
-
-            if isub in system._subsystems_myproc_inds:
-                index = system._subsystems_myproc_inds.index(isub)
-                subsys = system._subsystems_myproc[index]
+        for isub, subsys in enumerate(system._subsystems_allprocs):
+            system._transfer('nonlinear', 'fwd', isub)
+            if subsys in system._subsystems_myproc:
                 subsys._solve_nonlinear()
 
         return False, 0.0, 0.0

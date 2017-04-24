@@ -1,10 +1,12 @@
 """Define the base Vector and Transfer classes."""
 from __future__ import division, print_function
-import numpy
+import numpy as np
 
 from six.moves import range
+from six import iteritems
 
 from openmdao.utils.general_utils import ensure_compatible
+from openmdao.utils.name_maps import name2abs_name
 
 
 class Vector(object):
@@ -24,16 +26,14 @@ class Vector(object):
         The name of the vector: 'nonlinear', 'linear', or right-hand side name.
     _typ : str
         Type: 'input' for input vectors; 'output' for output/residual vectors.
-    _assembler : Assembler
-        Pointer to the assembler.
     _system : System
         Pointer to the owning system.
     _iproc : int
         Global processor index.
     _views : dict
-        Dictionary mapping variable names to the ndarray views.
+        Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
-        Dictionary mapping variable names to the flattened ndarray views.
+        Dictionary mapping absolute variable names to the flattened ndarray views.
     _idxs : dict
         Either 0 or slice(None), used so that 1-sized vectors are made floats.
     _names : set([str, ...])
@@ -44,11 +44,9 @@ class Vector(object):
         List of the actual allocated data (depends on implementation).
     _indices : list
         List of indices mapping the varset-grouped data to the global vector.
-    _ivar_map : list[nvar_set] of int ndarray[size]
-        List of index arrays mapping each entry to its variable index.
     """
 
-    def __init__(self, name, typ, system, root_vector=None):
+    def __init__(self, name, typ, system, root_vector=None, resize=False):
         """
         Initialize all attributes.
 
@@ -62,14 +60,15 @@ class Vector(object):
             Pointer to the owning system.
         root_vector : <Vector>
             Pointer to the vector owned by the root system.
+        resize : bool
+            If true, resize the root vector.
         """
         self._name = name
         self._typ = typ
 
-        self._assembler = system._assembler
         self._system = system
 
-        self._iproc = self._system.comm.rank + self._system._mpi_proc_range[0]
+        self._iproc = system.comm.rank
         self._views = {}
         self._views_flat = {}
         self._idxs = {}
@@ -79,13 +78,19 @@ class Vector(object):
         self._names = self._views
 
         self._root_vector = None
-        self._data = []
-        self._indices = []
-        self._ivar_map = []
+        self._data = {}
+        self._indices = {}
         if root_vector is None:
             self._root_vector = self
         else:
             self._root_vector = root_vector
+
+        if resize:
+            if root_vector is None:
+                raise RuntimeError(
+                    'Cannot resize the vector because the root vector has not yet '
+                    + ' been created in system %s' % system.pathname)
+            self._update_root_data()
 
         self._initialize_data(root_vector)
         self._initialize_views()
@@ -128,52 +133,6 @@ class Vector(object):
             vec._initialize_views()
         return vec
 
-    def _compute_ivar_map(self):
-        """
-        Compute the ivar_map.
-
-        The ivar_map index vector is the same length as data and indices,
-        and it yields the index of the local variable.
-
-        """
-        variable_sizes = self._assembler._variable_sizes[self._typ]
-        variable_set_indices = self._assembler._variable_set_indices[self._typ]
-
-        ind1, ind2 = self._system._var_allprocs_range[self._typ]
-        sub_variable_set_indices = variable_set_indices[ind1:ind2, :]
-
-        variable_indices = self._system._var_myproc_indices[self._typ]
-
-        # Create the index arrays for each var_set for ivar_map.
-        # Also store the starting points in the data/index vector.
-        ivar_map = []
-        ind1_list = []
-        for iset in range(len(variable_sizes)):
-            bool_vector = sub_variable_set_indices[:, 0] == iset
-            data_inds = sub_variable_set_indices[bool_vector, 1]
-            if len(data_inds) > 0:
-                sizes_array = variable_sizes[iset]
-                ind1 = numpy.sum(sizes_array[self._iproc, :data_inds[0]])
-                ind2 = numpy.sum(sizes_array[self._iproc, :data_inds[-1] + 1])
-                ivar_map.append(numpy.empty(ind2 - ind1, int))
-                ind1_list.append(ind1)
-            else:
-                ivar_map.append(numpy.zeros(0, int))
-                ind1_list.append(0)
-
-        # Populate ivar_map by looping over local variables in the system.
-        for ind in range(len(variable_indices)):
-            ivar_all = variable_indices[ind]
-            iset, ivar = variable_set_indices[ivar_all, :]
-            sizes_array = variable_sizes[iset]
-            ind1 = numpy.sum(sizes_array[self._iproc, :ivar]) - \
-                ind1_list[iset]
-            ind2 = numpy.sum(sizes_array[self._iproc, :ivar + 1]) - \
-                ind1_list[iset]
-            ivar_map[iset][ind1:ind2] = ind
-
-        self._ivar_map = ivar_map
-
     def get_data(self, new_array=None):
         """
         Get the array combining the data of all the varsets.
@@ -188,13 +147,15 @@ class Vector(object):
         ndarray
             Array combining the data of all the varsets.
         """
-        if new_array is None:
-            inds = self._system._var_myproc_indices[self._typ]
-            sizes = self._assembler._variable_sizes_all[self._typ][self._iproc, inds]
-            new_array = numpy.zeros(numpy.sum(sizes))
+        system = self._system
+        type_ = self._typ
 
-        for ind, data in enumerate(self._data):
-            new_array[self._indices[ind]] = data
+        if new_array is None:
+            total_size = np.sum(system._var_sizes[type_][self._iproc, :])
+            new_array = np.zeros(total_size)
+
+        for set_name, data in iteritems(self._data):
+            new_array[self._indices[set_name]] = data
 
         return new_array
 
@@ -207,8 +168,8 @@ class Vector(object):
         array : ndarray
             Array to set to the data for all the varsets.
         """
-        for ind, data in enumerate(self._data):
-            data[:] = array[self._indices[ind]]
+        for set_name, data in iteritems(self._data):
+            data[:] = array[self._indices[set_name]]
 
     def iadd_data(self, array):
         """
@@ -219,71 +180,102 @@ class Vector(object):
         array : ndarray
             Array to set to the data for all the varsets.
         """
-        for ind, data in enumerate(self._data):
-            data[:] += array[self._indices[ind]]
+        for set_name, data in iteritems(self._data):
+            data += array[self._indices[set_name]]
 
-    def __contains__(self, key):
+    def _contains_abs(self, abs_name):
         """
         Check if the variable is involved in the current mat-vec product.
 
         Parameters
         ----------
-        key : str
-            variable name in the owning system's namespace.
+        abs_name : str
+            Absolute variable name in the owning system's namespace.
 
         Returns
         -------
         boolean
             True or False.
         """
-        return key in self._names
+        return abs_name in self._names
 
     def __iter__(self):
         """
-        Iterator over variables involved in the current mat-vec product.
+        Yield an iterator over variables involved in the current mat-vec product (relative names).
 
         Returns
         -------
         listiterator
             iterator over the variable names.
         """
-        return iter(self._names)
+        system = self._system
+        type_ = self._typ
 
-    def __getitem__(self, key):
+        abs_names_t = system._var_abs_names[type_]
+
+        iter_list = []
+        for abs_name in system._var_abs_names[type_]:
+            if abs_name in self._names:
+                rel_name = abs_name[len(system.pathname) + 1:]
+                iter_list.append(rel_name)
+        return iter(iter_list)
+
+    def __contains__(self, name):
+        """
+        Check if the variable is involved in the current mat-vec product.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
+
+        Returns
+        -------
+        boolean
+            True or False.
+        """
+        abs_name = name2abs_name(self._system, name, self._names, self._typ)
+        return abs_name is not None
+
+    def __getitem__(self, name):
         """
         Get the unscaled variable value in true units.
 
         Parameters
         ----------
-        key : str
-            Variable name in the owning system's namespace.
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
 
         Returns
         -------
         float or ndarray
             variable value (not scaled, not dimensionless).
         """
-        if key in self._names:
-            return self._views[key][self._idxs[key]]
+        abs_name = name2abs_name(self._system, name, self._names, self._typ)
+        if abs_name is not None:
+            return self._views[abs_name][self._idxs[abs_name]]
         else:
-            raise KeyError("Variable '%s' not found." % key)
+            msg = 'Variable name "{}" not found.'
+            raise KeyError(msg.format(name))
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, name, value):
         """
         Set the unscaled variable value in true units.
 
         Parameters
         ----------
-        key : str
-            Variable name in the owning system's namespace.
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
         value : float or list or tuple or ndarray
             variable value to set (not scaled, not dimensionless)
         """
-        if key in self._names:
-            value, shape = ensure_compatible(key, value, self._views[key].shape)
-            self._views[key][:] = value
+        abs_name = name2abs_name(self._system, name, self._names, self._typ)
+        if abs_name is not None:
+            value, shape = ensure_compatible(name, value, self._views[abs_name].shape)
+            self._views[abs_name][:] = value
         else:
-            raise KeyError("Variable '%s' not found." % key)
+            msg = 'Variable name "{}" not found.'
+            raise KeyError(msg.format(name))
 
     def _initialize_data(self, root_vector):
         """
@@ -487,6 +479,19 @@ class Vector(object):
             Upper bounds vector.
         """
         pass
+
+    def print_variables(self):
+        """
+        Print the names and values of all variables in this vector, one per line.
+        """
+        abs2prom = self._system._var_abs2prom[self._typ]
+        print('-' * 30)
+        print('   Vector %s, type %s' % (self._name, self._typ))
+        for abs_name, view in iteritems(self._views):
+            prom_name = abs2prom[abs_name]
+            print(' ' * 3, prom_name, view)
+        print('-' * 30)
+        print()
 
 
 class Transfer(object):

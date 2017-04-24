@@ -1,7 +1,7 @@
 """Define the test group classes."""
 from __future__ import division, print_function
 
-from openmdao.api import Group
+from openmdao.core.group import Group
 
 
 class ParametericTestGroup(Group):
@@ -30,8 +30,23 @@ class ParametericTestGroup(Group):
         self.expected_values = None
         self.default_params = {
             'vector_class': ['default', 'petsc'],
-            'global_jac': [True, False],
-            'jacobian_type': ['matvec', 'dense', 'sparse-coo', 'sparse-csr'],
+            'assembled_jac': [True, False],
+            'jacobian_type': ['matvec', 'dense', 'sparse-coo', 'sparse-csr',
+                              'sparse-csc'],
         }
 
-        super(ParametericTestGroup, self).__init__(**kwargs)
+        super(ParametericTestGroup, self).__init__()
+
+        self.metadata.declare('vector_class', default='default',
+                              values=['default', 'petsc'],
+                              type_=str,
+                              desc='Which vector implementation to use.')
+        self.metadata.declare('assembled_jac', default=True,
+                              type_=bool,
+                              desc='If an assemebled Jacobian should be used.')
+        self.metadata.declare('jacobian_type', default='matvec',
+                              type_=str,
+                              values=['dense', 'matvec', 'sparse-coo', 'sparse-csr', 'sparse-csc'],
+                              desc='Controls the type of the assembled jacobian.')
+
+        self.metadata.update(kwargs)

@@ -1,11 +1,17 @@
+from __future__ import print_function
+
 import unittest
+
 from six import assertRaisesRegex
+from six.moves import range
+
 import itertools
+import warnings
 
 import numpy as np
-from nose_parameterized import parameterized
+from parameterized import parameterized
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, NLRunOnce
 from openmdao.devtools.testutil import assert_rel_error
 try:
     from openmdao.parallel_api import PETScVector
@@ -15,7 +21,9 @@ except ImportError:
 
 class SimpleGroup(Group):
 
-    def initialize(self):
+    def __init__(self):
+        super(SimpleGroup, self).__init__()
+
         self.add_subsystem('comp1', IndepVarComp('x', 5.0))
         self.add_subsystem('comp2', ExecComp('b=2*a'))
         self.connect('comp1.x', 'comp2.a')
@@ -23,7 +31,9 @@ class SimpleGroup(Group):
 
 class BranchGroup(Group):
 
-    def initialize(self):
+    def __init__(self):
+        super(BranchGroup, self).__init__()
+
         b1 = self.add_subsystem('Branch1', Group())
         g1 = b1.add_subsystem('G1', Group())
         g2 = g1.add_subsystem('G2', Group())
@@ -32,6 +42,19 @@ class BranchGroup(Group):
         b2 = self.add_subsystem('Branch2', Group())
         g3 = b2.add_subsystem('G3', Group())
         g3.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
+
+
+class ReportOrderComp(ExplicitComponent):
+    def __init__(self, order_list):
+        super(ReportOrderComp, self).__init__()
+        self._order_list = order_list
+
+    def initialize_variables(self):
+        self.add_input('x', 0.0)
+        self.add_output('y', 0.0)
+
+    def compute(self, inputs, outputs):
+        self._order_list.append(self.pathname)
 
 
 class TestGroup(unittest.TestCase):
@@ -58,15 +81,44 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp1.a'], 3.0)
         self.assertEqual(p['comp1.b'], 6.0)
 
+    def test_group_add(self):
+        model=Group()
+        ecomp = ExecComp('b=2.0*a', a=3.0, b=6.0)
+        comp1 = model.add('comp1', ecomp)
+
+        self.assertTrue(ecomp is comp1)
+
     def test_group_simple_promoted(self):
         p = Problem(model=Group())
-        p.model.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
-                              promotes_inputs=['a'], promotes_outputs=['b'])
+        p.model.add_subsystem('indep', IndepVarComp('a', 3.0),
+                              promotes_outputs=['a'])
+        p.model.add_subsystem('comp1', ExecComp('b=2.0*a'),
+                              promotes_inputs=['a'])
 
         p.setup()
+        p.run_model()
 
-        self.assertEqual(p['comp1.a'], 3.0) # still use unpromoted name
-        self.assertEqual(p['b'], 6.0)
+        self.assertEqual(p['a'], 3.0)
+        self.assertEqual(p['comp1.b'], 6.0)
+
+    def test_group_rename_connect(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('aa', 3.0),
+                              promotes=['aa'])
+        p.model.add_subsystem('comp1', ExecComp('b=2.0*aa'),
+                              promotes_inputs=['aa'])
+
+        # here we alias 'a' to 'aa' so that it will be automatically
+        # connected to the independent variable 'aa'.
+        p.model.add_subsystem('comp2', ExecComp('b=3.0*a'),
+                              promotes_inputs=[('a', 'aa')])
+
+        p.setup()
+        p.run_model()
+
+        self.assertEqual(p['comp1.b'], 6.0)
+        self.assertEqual(p['comp2.b'], 9.0)
+
 
     def test_group_nested(self):
         p = Problem(model=Group())
@@ -148,8 +200,8 @@ class TestGroup(unittest.TestCase):
                 ('a', 2.0),
                 ('x', 5.0),
             ]),
-            promotes_outputs='x')
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs='x')
+            promotes_outputs=['x'])
+        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
         p.model.suppress_solver_output = True
@@ -159,6 +211,49 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['x'], 5)
         self.assertEqual(p['comp2.y'], 10)
 
+    def test_group_renames(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
+                              promotes_outputs=[('x', 'foo')])
+        p.model.add_subsystem('comp2', ExecComp('y=2*foo'), promotes_inputs=['foo'])
+        p.setup()
+
+        p.model.suppress_solver_output = True
+        p.run_model()
+
+        self.assertEqual(p['foo'], 5)
+        self.assertEqual(p['comp2.y'], 10)
+
+    def test_group_renames_errors_single_string(self):
+        p = Problem(model=Group())
+        with self.assertRaises(Exception) as err:
+            p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
+                                  promotes_outputs='x')
+        self.assertEqual(str(err.exception),
+                         ": promotes must be an iterator of strings and/or tuples.")
+
+    def test_group_renames_errors_not_found(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
+                              promotes_outputs=[('xx', 'foo')])
+        p.model.add_subsystem('comp2', ExecComp('y=2*foo'), promotes_inputs=['foo'])
+
+        with self.assertRaises(Exception) as err:
+            p.setup(check=False)
+        self.assertEqual(str(err.exception),
+                         "comp1: no variables were promoted based on promotes_outputs=[('xx', 'foo')]")
+
+    def test_group_renames_errors_bad_tuple(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
+                              promotes_outputs=[('x', 'foo', 'bar')])
+        p.model.add_subsystem('comp2', ExecComp('y=2*foo'), promotes_inputs=['foo'])
+
+        with self.assertRaises(Exception) as err:
+            p.setup(check=False)
+        self.assertEqual(str(err.exception),
+                         "when adding subsystem 'comp1', entry '('x', 'foo', 'bar')' is not a string or tuple of size 2")
+
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
         p = Problem(model=Group())
@@ -167,7 +262,7 @@ class TestGroup(unittest.TestCase):
                 ('x', 5.0),
             ]),
             promotes_outputs=['a', 'x'])
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs='x')
+        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
         p.model.suppress_solver_output = True
@@ -184,7 +279,7 @@ class TestGroup(unittest.TestCase):
                 ('a', 2.0),
                 ('x', 5.0),
             ]),
-            promotes_outputs='*')
+            promotes_outputs=['*'])
         p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
@@ -249,7 +344,7 @@ class TestGroup(unittest.TestCase):
         G1 = prob.model.add_subsystem('G1', Group())
         G1.add_subsystem("C1", ExecComp("y=2.0*x"), promotes=['y'])
         G1.add_subsystem("C2", ExecComp("y=2.0*x"), promotes=['y'])
-        msg = "Output name 'y' refers to multiple outputs: \['G1.C2.y', 'G1.C1.y'\]."
+        msg = "Output name 'y' refers to multiple outputs: \['G1.C1.y', 'G1.C2.y'\]."
         with assertRaisesRegex(self, Exception, msg):
             prob.setup(check=False)
 
@@ -257,8 +352,8 @@ class TestGroup(unittest.TestCase):
         p = Problem(model=Group())
         indep = p.model.add_subsystem('indep', IndepVarComp())
         indep.add_output('x', np.ones(5), units='ft')
-        p.model.add_subsystem('C1', ExecComp('y=sum(x)', x=np.zeros(5),
-                                             units={'x': 'inch', 'y': 'inch'}))
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)', x={'value': np.zeros(5), 'units': 'inch'},
+                                             y={'units': 'inch'}))
         p.model.connect('indep.x', 'C1.x')
         p.model.suppress_solver_output = True
         p.setup()
@@ -338,6 +433,42 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C1.x'], np.array([[0., 10.],
                                                     [7., 4.]]))
         assert_rel_error(self, p['C1.y'], 42.)
+
+    def test_promote_not_found1(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', ExecComp('y=x'), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', ExecComp('y=x'), promotes_outputs=['x*'])
+
+        with self.assertRaises(Exception) as context:
+            p.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "C2: no variables were promoted based on promotes_outputs=['x*']")
+
+    def test_promote_not_found2(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', ExecComp('y=x'), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', ExecComp('y=x'), promotes_inputs=['xx'])
+
+        with self.assertRaises(Exception) as context:
+            p.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "C2: no variables were promoted based on promotes_inputs=['xx']")
+
+    def test_promote_not_found3(self):
+        p = Problem(model=Group())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', ExecComp('y=x'), promotes=['x'])
+        p.model.add_subsystem('C2', ExecComp('y=x'), promotes=['xx'])
+
+        with self.assertRaises(Exception) as context:
+            p.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "C2: no variables were promoted based on promotes=['xx']")
 
     def test_promote_src_indices(self):
         class MyComp1(ExplicitComponent):
@@ -464,6 +595,7 @@ class TestGroup(unittest.TestCase):
     )
     def test_promote_src_indices_param(self, src_info, tgt_shape):
         src_shape, idxvals = src_info
+
         class MyComp(ExplicitComponent):
             def initialize_variables(self):
                 if len(tgt_shape) == 1:
@@ -499,6 +631,100 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C1.x'],
                          np.array([0., 10., 7., 4.]).reshape(tgt_shape))
         assert_rel_error(self, p['C1.y'], 21.)
+
+    def test_set_order_feature(self):
+
+        # this list will record the execution order of our C1, C2, and C3 components
+        order_list = []
+        prob = Problem()
+        model = prob.model
+        model.nl_solver = NLRunOnce()
+        model.add_subsystem('indeps', IndepVarComp('x', 1.))
+        model.add_subsystem('C1', ReportOrderComp(order_list))
+        model.add_subsystem('C2', ReportOrderComp(order_list))
+        model.add_subsystem('C3', ReportOrderComp(order_list))
+
+        model.suppress_solver_output = True
+
+        self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
+                         [s.name for s in model._static_subsystems_allprocs])
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        self.assertEqual(['C1', 'C2', 'C3'], order_list)
+
+        # reset the shared order list
+        order_list[:] = []
+
+        # now swap C2 and C1 in the order
+        model.set_order(['indeps', 'C2', 'C1', 'C3'])
+
+        # after changing the order, we must call setup again
+        prob.setup(check=False)
+        prob.run_model()
+        self.assertEqual(['C2', 'C1', 'C3'], order_list)
+
+    def test_set_order(self):
+
+        order_list = []
+        prob = Problem()
+        model = prob.model
+        model.nl_solver = NLRunOnce()
+        model.add_subsystem('indeps', IndepVarComp('x', 1.))
+        model.add_subsystem('C1', ReportOrderComp(order_list))
+        model.add_subsystem('C2', ReportOrderComp(order_list))
+        model.add_subsystem('C3', ReportOrderComp(order_list))
+        model.connect('indeps.x', 'C1.x')
+        model.connect('C1.y', 'C2.x')
+        model.connect('C2.y', 'C3.x')
+        model.suppress_solver_output = True
+
+        self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
+                         [s.name for s in model._static_subsystems_allprocs])
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        self.assertEqual(['C1', 'C2', 'C3'], order_list)
+
+        order_list[:] = []
+
+        # Big boy rules
+        model.set_order(['indeps', 'C2', 'C1', 'C3'])
+
+        prob.setup(check=False)
+        prob.run_model()
+        self.assertEqual(['C2', 'C1', 'C3'], order_list)
+
+        # Extra
+        with self.assertRaises(ValueError) as cm:
+            model.set_order(['indeps', 'C2', 'junk', 'C1', 'C3'])
+
+        self.assertEqual(str(cm.exception),
+                         ": subsystem(s) ['junk'] found in subsystem order but don't exist.")
+
+        # Missing
+        with self.assertRaises(ValueError) as cm:
+            model.set_order(['indeps', 'C2', 'C3'])
+
+        self.assertEqual(str(cm.exception),
+                         ": ['C1'] expected in subsystem order and not found.")
+
+        # Extra and Missing
+        with self.assertRaises(ValueError) as cm:
+            model.set_order(['indeps', 'C2', 'junk', 'C1', 'junk2'])
+
+        self.assertEqual(str(cm.exception),
+                         ": ['C3'] expected in subsystem order and not found.\n"
+                         ": subsystem(s) ['junk', 'junk2'] found in subsystem order but don't exist.")
+
+        # Dupes
+        with self.assertRaises(ValueError) as cm:
+            model.set_order(['indeps', 'C2', 'C1', 'C3', 'C1'])
+
+        self.assertEqual(str(cm.exception),
+                         ": Duplicate name(s) found in subsystem order list: ['C1']")
 
 
 class TestGroupMPI(unittest.TestCase):
@@ -628,30 +854,27 @@ class TestConnect(unittest.TestCase):
             prob.setup(check=False)
 
     def test_connect_units_with_unitless(self):
-        msg = "Units must be specified for both or neither side of " + \
-              "connection in '': " + \
-              "'src.x2' has units 'degC' but 'tgt.x' is unitless."
-
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
-        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', units={'x2': 'degC'}))
-        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x'))
+        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', x2={'units': 'degC'}))
+        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', x={'units': 'unitless'}))
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
 
-        with assertRaisesRegex(self, RuntimeError, msg):
+        msg = "Output 'src.x2' with units of 'degC' is connected to input 'tgt.x' which has no units."
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             prob.setup(check=False)
+            self.assertEqual(str(w[-1].message), msg)
 
     def test_connect_incompatible_units(self):
-        msg = "Output and input units are not compatible for " + \
-              "connection in '': " + \
-              "'src.x2' has units 'degC' but 'tgt.x' has units 'm'."
+        msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'tgt.x'."
 
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
-        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', units={'x2': 'degC'}))
-        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', units={'x': 'm'}))
+        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1', x2={'units': 'degC'}))
+        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', x={'units': 'm'}))
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
@@ -659,6 +882,47 @@ class TestConnect(unittest.TestCase):
         with assertRaisesRegex(self, RuntimeError, msg):
             prob.setup(check=False)
 
+    def test_connect_units_with_nounits(self):
+        prob = Problem(Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        prob.model.add_subsystem('src', ExecComp('x2 = 2 * x1'))
+        prob.model.add_subsystem('tgt', ExecComp('y = 3 * x', x={'units': 'degC'}))
+
+        prob.model.connect('px1.x1', 'src.x1')
+        prob.model.connect('src.x2', 'tgt.x')
+        prob.model.suppress_solver_output = True
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            prob.setup(check=False)
+
+            self.assertEqual(str(w[-1].message),
+                             "Input 'tgt.x' with units of 'degC' is "
+                             "connected to output 'src.x2' which has no units.")
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['tgt.y'], 600.)
+
+    def test_connect_units_with_nounits_prom(self):
+        prob = Problem(Group())
+        prob.model.add_subsystem('px1', IndepVarComp('x', 100.0), promotes_outputs=['x'])
+        prob.model.add_subsystem('src', ExecComp('y = 2 * x'), promotes=['x', 'y'])
+        prob.model.add_subsystem('tgt', ExecComp('z = 3 * y', y={'units': 'degC'}), promotes=['y'])
+
+        prob.model.suppress_solver_output = True
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            prob.setup(check=False)
+
+            self.assertEqual(str(w[-1].message),
+                             "Input 'tgt.y' with units of 'degC' is "
+                             "connected to output 'src.y' which has no units.")
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['tgt.z'], 600.)
 
 if __name__ == "__main__":
     unittest.main()

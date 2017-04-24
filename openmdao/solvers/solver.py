@@ -1,10 +1,10 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 
 from __future__ import division, print_function
-import numpy
+import numpy as np
 
-from openmdao.utils.generalized_dict import OptionsDictionary
-from openmdao.jacobians.global_jacobian import GlobalJacobian
+from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 
 
 class Solver(object):
@@ -28,6 +28,9 @@ class Solver(object):
         number of iterations for the current invocation of the solver.
     options : <OptionsDictionary>
         options dictionary.
+    supports : <OptionsDictionary>
+        options dictionary describing what features are supported by this
+        solver.
     """
 
     SOLVER = 'base_solver'
@@ -48,14 +51,18 @@ class Solver(object):
         self._iter_count = 0
 
         self.options = OptionsDictionary()
-        self.options.declare('maxiter', type_=int, value=10,
+        self.options.declare('maxiter', type_=int, default=10,
                              desc='maximum number of iterations')
-        self.options.declare('atol', value=1e-10,
+        self.options.declare('atol', default=1e-10,
                              desc='absolute error tolerance')
-        self.options.declare('rtol', value=1e-10,
+        self.options.declare('rtol', default=1e-10,
                              desc='relative error tolerance')
-        self.options.declare('iprint', type_=int, value=1,
+        self.options.declare('iprint', type_=int, default=1,
                              desc='whether to print output')
+
+        # What the solver supports.
+        self.supports = OptionsDictionary()
+        self.supports.declare('gradients', type_=bool, default=False)
 
         self._declare_options()
         self.options.update(kwargs)
@@ -82,7 +89,7 @@ class Solver(object):
         self._system = system
         self._depth = depth
 
-    def _mpi_print(self, iteration, res, res0):
+    def _mpi_print(self, iteration, abs_res, rel_res):
         """
         Print residuals from an iteration.
 
@@ -90,10 +97,10 @@ class Solver(object):
         ----------
         iteration : int
             iteration counter, 0-based.
-        res : float
-            current residual norm.
-        res0 : float
-            initial residual norm.
+        abs_res : float
+            current absolute residual norm.
+        rel_res : float
+            current relative residual norm.
         """
         if (self.options['iprint'] and self._system.comm.rank == 0 and
                 not self._system._suppress_solver_output):
@@ -117,7 +124,7 @@ class Solver(object):
 
             print_str = ' ' * depth + '-' * self._depth
             print_str += sys_name + solver_name
-            print_str += ' %3d | %.9g %.9g' % (iteration, res, res0)
+            print_str += ' %3d | %.9g %.9g' % (iteration, abs_res, rel_res)
             print(print_str)
 
     def _run_iterator(self):
@@ -137,16 +144,16 @@ class Solver(object):
         atol = self.options['atol']
         rtol = self.options['rtol']
 
-        norm0, norm = self._iter_initialize()
         self._iter_count = 0
-        self._mpi_print(self._iter_count, norm / norm0, norm0)
+        norm0, norm = self._iter_initialize()
+        self._mpi_print(self._iter_count, norm, norm / norm0)
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
             self._iter_execute()
-            norm = self._iter_get_norm()
             self._iter_count += 1
-            self._mpi_print(self._iter_count, norm / norm0, norm)
-        fail = (numpy.isinf(norm) or numpy.isnan(norm) or
+            norm = self._iter_get_norm()
+            self._mpi_print(self._iter_count, norm, norm / norm0)
+        fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
         return fail, norm, norm / norm0
 
@@ -185,6 +192,17 @@ class Solver(object):
         Perform any required linearization operations such as matrix factorization.
         """
         pass
+
+    def _linearize_children(self):
+        """
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.t.
+
+        Returns
+        -------
+        boolean
+            Flag for indicating child linerization
+        """
+        return True
 
     def solve(self):
         """
@@ -244,7 +262,7 @@ class NonlinearSolver(Solver):
         float
             error at the first iteration.
         """
-        if self.options['maxiter'] > 1:
+        if self.options['maxiter'] > 0:
             norm = self._iter_get_norm()
         else:
             norm = 1.0
@@ -332,13 +350,8 @@ class LinearSolver(Solver):
             norm.
         """
         system = self._system
-        var_inds = [
-            system._var_allprocs_range['output'][0],
-            system._var_allprocs_range['output'][1],
-            system._var_allprocs_range['output'][0],
-            system._var_allprocs_range['output'][1],
-        ]
-        system._apply_linear(self._vec_names, self._mode, var_inds)
+        scope_out, scope_in = system._get_scope()
+        system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
 
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
@@ -370,8 +383,8 @@ class BlockLinearSolver(LinearSolver):
         float
             error at the first iteration.
         """
-        if isinstance(self._system._jacobian, GlobalJacobian):
+        if isinstance(self._system._jacobian, AssembledJacobian):
             raise RuntimeError("A block linear solver '%s' is being used with "
-                               "a GlobalJacobian in system '%s'" %
+                               "an AssembledJacobian in system '%s'" %
                                (self.SOLVER, self._system.pathname))
         return super(BlockLinearSolver, self)._iter_initialize()

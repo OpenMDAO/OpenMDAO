@@ -32,8 +32,10 @@ import numpy as np
 
 from openmdao.api import IndepVarComp
 from openmdao.test_suite.groups.parametric_group import ParametericTestGroup
-from openmdao.test_suite.components.cycle_comps import PSI, ExplicitCycleComp, ExplicitFirstComp,\
-    ExplicitLastComp
+from openmdao.test_suite.components.cycle_comps import PSI, \
+    ExplicitCycleComp, ExplicitFirstComp, ExplicitLastComp
+from openmdao.test_suite.components.deprecated_cycle_comps import \
+    DeprecatedCycleComp, DeprecatedFirstComp, DeprecatedLastComp
 
 
 class CycleGroup(ParametericTestGroup):
@@ -41,11 +43,9 @@ class CycleGroup(ParametericTestGroup):
     Group with a cycle. Derivatives and values are known.
     """
 
-    def __init__(self, **kwargs):
-        super(CycleGroup, self).__init__(**kwargs)
-
+    def initialize(self):
         self.default_params.update({
-            'component_class': ['explicit'],
+            'component_class': ['explicit', 'deprecated'],
             'connection_type': ['implicit', 'explicit'],
             'partial_type': ['array', 'sparse', 'aij'],
             'finite_difference': [False, True],
@@ -54,33 +54,26 @@ class CycleGroup(ParametericTestGroup):
             'var_shape': [(2, 3), (3,)],
         })
 
-    def _initialize_metadata(self):
-        self.metadata.declare('num_comp', type_=int, value=2,
+        self.metadata.declare('num_comp', type_=int, default=2,
                               desc='Total number of components')
-        self.metadata.declare('num_var', type_=int, value=1,
+        self.metadata.declare('num_var', type_=int, default=1,
                               desc='Number of variables per component')
-        self.metadata.declare('var_shape', value=(3,),
+        self.metadata.declare('var_shape', default=(3,),
                               desc='Shape of each variable')
-        self.metadata.declare('connection_type', type_=str, value='explicit',
+        self.metadata.declare('connection_type', type_=str, default='explicit',
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
-        self.metadata.declare('component_class', type_=str, value='explicit',
-                              values=['explicit'],
+        self.metadata.declare('component_class', type_=str, default='explicit',
+                              values=['explicit', 'deprecated'],
                               desc='Component class to instantiate')
-        self.metadata.declare('jacobian_type', value='matvec',
-                              values=['matvec', 'dense', 'sparse-coo',
-                                      'sparse-csr'],
-                              desc='method of assembling derivatives')
-        self.metadata.declare('partial_type', value='array',
+        self.metadata.declare('partial_type', default='array',
                               values=['array', 'sparse', 'aij'],
                               desc='type of partial derivatives')
-        self.metadata.declare('finite_difference', value=False,
+        self.metadata.declare('finite_difference', default=False,
                               type_=bool,
                               desc='If the derivatives should be finite differenced.')
 
-    def initialize(self):
-        self._initialize_metadata()
-
+    def initialize_subsystems(self):
         num_comp = self.metadata['num_comp']
         if num_comp < 2:
             raise ValueError('Number of components must be at least 2.')
@@ -100,6 +93,10 @@ class CycleGroup(ParametericTestGroup):
             first_class = ExplicitFirstComp
             middle_class = ExplicitCycleComp
             last_class = ExplicitLastComp
+        elif comp_class == 'deprecated':
+            first_class = DeprecatedFirstComp
+            middle_class = DeprecatedCycleComp
+            last_class = DeprecatedLastComp
         else:
             raise ValueError('Should not happen or else metadata dict is broken.')
 
@@ -115,10 +112,10 @@ class CycleGroup(ParametericTestGroup):
             (theta_name, 'psi_comp.psi'): -1. / (num_comp - 1),
         }
 
-        expected_theta = (2*np.pi - PSI) / (num_comp - 1)
+        expected_theta = (2 * np.pi - PSI) / (num_comp - 1)
         self.expected_values = {
             theta_name: expected_theta,
-            'last.x_norm2': 0.5*self.size,
+            'last.x_norm2': 0.5 * self.size,
         }
 
     def _generate_components(self, conn_type, first_class, middle_class, last_class, num_comp):
@@ -132,7 +129,8 @@ class CycleGroup(ParametericTestGroup):
             'jacobian_type': self.metadata['jacobian_type'],
             'partial_type': self.metadata['partial_type'],
             'connection_type': conn_type,
-            'finite_difference': self.metadata['finite_difference']
+            'finite_difference': self.metadata['finite_difference'],
+            'num_comp': self.metadata['num_comp']
         }
 
         self.add_subsystem('psi_comp', IndepVarComp('psi', PSI))
@@ -143,11 +141,11 @@ class CycleGroup(ParametericTestGroup):
         idx = 0
 
         first_comp = first_class(index=idx, **comp_args)
+        first_comp._init_parameterized()
         self.add_subsystem(first_name, first_comp,
                            promotes_inputs=first_comp._cycle_promotes_in,
                            promotes_outputs=first_comp._cycle_promotes_out)
         prev_name = first_name
-
 
         connection_variables = [('y_{0}'.format(i), 'x_{0}'.format(i)) for i in range(num_var)]
         connection_variables.append(('theta_out', 'theta'))
@@ -156,6 +154,7 @@ class CycleGroup(ParametericTestGroup):
         for idx in range(1, num_comp - 1):
             current_name = 'middle_{0}'.format(idx)
             middle_comp = middle_class(index=idx, **comp_args)
+            middle_comp._init_parameterized()
             self.add_subsystem(current_name, middle_comp,
                                promotes_inputs=middle_comp._cycle_promotes_in,
                                promotes_outputs=middle_comp._cycle_promotes_out)
@@ -167,6 +166,7 @@ class CycleGroup(ParametericTestGroup):
 
         # Final Subsystem
         last_comp = last_class(index=idx+1, **comp_args)
+        last_comp._init_parameterized()
         self.add_subsystem(last_name, last_comp,
                            promotes_inputs=last_comp._cycle_promotes_in,
                            promotes_outputs=last_comp._cycle_promotes_out)
