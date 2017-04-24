@@ -1,5 +1,7 @@
 """Define the NewtonSolver class."""
 
+from __future__ import print_function
+
 from openmdao.solvers.solver import NonlinearSolver
 
 
@@ -78,12 +80,14 @@ class NewtonSolver(NonlinearSolver):
         super(NewtonSolver, self)._setup_solvers(system, depth)
 
         if self.ln_solver is not None:
+            self.ln_solver._solver_info = self._solver_info
             self.ln_solver._setup_solvers(self._system, self._depth + 1)
             self._ln_solver_from_parent = False
         else:
             self.ln_solver = system.ln_solver
 
         if self.linesearch is not None:
+            self.linesearch._solver_info = self._solver_info
             self.linesearch._setup_solvers(self._system, self._depth + 1)
 
     def _iter_get_norm(self):
@@ -126,22 +130,50 @@ class NewtonSolver(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
+        self._solver_info.prefix += '|  '
 
         # Hybrid newton support.
         if self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']:
+
+            self._solver_info.prefix += '+  '
+
             for isub, subsys in enumerate(system._subsystems_allprocs):
                 system._transfer('nonlinear', 'fwd', isub)
 
                 if subsys in system._subsystems_myproc:
                     subsys._solve_nonlinear()
+
+            self._solver_info.prefix = self._solver_info.prefix[:-3]
+
             system._apply_nonlinear()
+
 
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0
         system._linearize()
 
         self.ln_solver.solve(['linear'], 'fwd')
+
         if self.linesearch:
             self.linesearch.solve()
         else:
             system._outputs += system._vectors['output']['linear']
+
+        self._solver_info.prefix = self._solver_info.prefix[:-3]
+
+    def _mpi_print_header(self):
+        """
+        Print header text before solving.
+        """
+        if (self.options['iprint'] and self._system.comm.rank == 0 and
+            not self._system._suppress_solver_output):
+
+            pathname = self._system.pathname
+            if pathname:
+                nchar = len(pathname)
+                prefix = self._solver_info.prefix
+                header = prefix + "\n"
+                header += prefix + nchar*"=" + "\n"
+                header += prefix + pathname + "\n"
+                header += prefix+ nchar*"="
+                print(header)

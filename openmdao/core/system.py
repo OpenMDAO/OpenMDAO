@@ -12,15 +12,16 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
+from openmdao.solvers.solver import SolverInfo
+from openmdao.proc_allocators.default_allocator import DefaultAllocator
 
-from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.units import convert_units
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
 from openmdao.utils.mpi import MPI
+from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.units import convert_units
 
 
 class System(object):
@@ -550,7 +551,7 @@ class System(object):
 
         # Same situation with solvers, partials, and Jacobians.
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
-        self._setup_solvers(recurse=recurse)
+        self._setup_solvers(recurse=recurse, solver_info=SolverInfo())
         self._setup_partials(recurse=recurse)
         self._setup_jacobians(recurse=recurse)
 
@@ -922,7 +923,7 @@ class System(object):
         """
         self._transfers = {}
 
-    def _setup_solvers(self, recurse=True):
+    def _setup_solvers(self, recurse=True, solver_info=None):
         """
         Perform setup in all solvers.
 
@@ -930,15 +931,19 @@ class System(object):
         ----------
         recurse : bool
             Whether to call this method in subsystems.
+        _solver_info : <SolverInfo>
+            Object to store some formatting for iprint.
         """
         if self._nl_solver is not None:
+            self._nl_solver._solver_info = solver_info
             self._nl_solver._setup_solvers(self, 0)
         if self._ln_solver is not None:
+            self._ln_solver._solver_info = solver_info
             self._ln_solver._setup_solvers(self, 0)
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                subsys._setup_solvers(recurse)
+                subsys._setup_solvers(recurse=recurse, solver_info=solver_info)
 
     def _setup_partials(self, recurse=True):
         """

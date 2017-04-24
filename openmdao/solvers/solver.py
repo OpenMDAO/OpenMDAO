@@ -7,6 +7,19 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 
 
+class SolverInfo(object):
+    """
+    Communal object for storing some formatting for solver iprint.
+
+    Attributes
+    ----------
+    prefix : <System>
+        Prefix to prepend during this iprint.
+    """
+    def __init__(self):
+        self.prefix = ""
+
+
 class Solver(object):
     """
     Base solver class.
@@ -17,19 +30,21 @@ class Solver(object):
     Attributes
     ----------
     _system : <System>
-        pointer to the owning system.
+        Pointer to the owning system.
     _depth : int
-        how many subsolvers deep this solver is (0 means not a subsolver).
+        How many subsolvers deep this solver is (0 means not a subsolver).
     _vec_names : [str, ...]
-        list of right-hand-side (RHS) vector names.
+        List of right-hand-side (RHS) vector names.
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
-        number of iterations for the current invocation of the solver.
+        Number of iterations for the current invocation of the solver.
+    _solver_info : <SolverInfo>
+        Object to store some formatting for iprint.
     options : <OptionsDictionary>
-        options dictionary.
+        Options dictionary.
     supports : <OptionsDictionary>
-        options dictionary describing what features are supported by this
+        Options dictionary describing what features are supported by this
         solver.
     """
 
@@ -49,6 +64,7 @@ class Solver(object):
         self._vec_names = None
         self._mode = 'fwd'
         self._iter_count = 0
+        self._solver_info = None
 
         self.options = OptionsDictionary()
         self.options.declare('maxiter', type_=int, default=10,
@@ -104,28 +120,22 @@ class Solver(object):
         """
         if (self.options['iprint'] and self._system.comm.rank == 0 and
                 not self._system._suppress_solver_output):
-            rawname = self._system.name
-            name_len = 10
-            if len(rawname) > name_len:
-                sys_name = rawname[:name_len]
-            else:
-                sys_name = rawname + ' ' * (name_len - len(rawname))
 
+            prefix = self._solver_info.prefix
             solver_name = self.SOLVER
-            name_len = 12
-            if len(solver_name) > name_len:
-                solver_name = solver_name[:name_len]
-            else:
-                solver_name = solver_name.ljust(name_len)
 
-            depth = self._system.pathname.count('.')
-            if self._system.pathname != '':
-                depth += 1
+            if prefix.endswith('precon:'):
+                solver_name = solver_name[3:]
 
-            print_str = ' ' * depth + '-' * self._depth
-            print_str += sys_name + solver_name
-            print_str += ' %3d | %.9g %.9g' % (iteration, abs_res, rel_res)
+            print_str = prefix + solver_name
+            print_str += ' %d ; %.9g %.9g' % (iteration, abs_res, rel_res)
             print(print_str)
+
+    def _mpi_print_header(self):
+        """
+        Print header text before solving.
+        """
+        pass
 
     def _run_iterator(self):
         """
@@ -143,6 +153,8 @@ class Solver(object):
         maxiter = self.options['maxiter']
         atol = self.options['atol']
         rtol = self.options['rtol']
+
+        self._mpi_print_header()
 
         self._iter_count = 0
         norm0, norm = self._iter_initialize()

@@ -230,6 +230,7 @@ class PetscKSP(LinearSolver):
         super(PetscKSP, self)._setup_solvers(system, depth)
 
         if self.precon is not None:
+            self.precon._solver_info = self._solver_info
             self.precon._setup_solvers(self._system, self._depth + 1)
 
     def mult(self, mat, in_vec, result):
@@ -392,7 +393,9 @@ class PetscKSP(LinearSolver):
             b_vec.set_data(_get_petsc_vec_array(in_vec))
 
             # call the preconditioner
+            self._solver_info.prefix += '| precon:'
             self.precon.solve([vec_name], mode)
+            self._solver_info.prefix = self._solver_info.prefix[:-9]
 
             # stuff resulting value of x vector into result for KSP
             x_vec.get_data(result.array)
