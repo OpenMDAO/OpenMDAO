@@ -7,6 +7,8 @@ from shutil import rmtree
 from tempfile import mkdtemp
 import time
 
+import cPickle
+
 import sqlite3
 import numpy as np
 
@@ -119,7 +121,7 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
     for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, constraints_expected in expected:
         iter_coord = format_iteration_coordinate(coord)
 
-        # from the database, get the actual data recorded 
+        # from the database, get the actual data recorded
         db_cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
         row_actual  = db_cur.fetchone()
         counter, iteration_coordinate, timestamp, success, msg, desvars_actual, responses_actual, objectives_actual, constraints_actual = row_actual
@@ -150,52 +152,49 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
 
         return
 
-def _assertMetadataRecorded(test, db_cur, expected):
+def _assertMetadataRecorded(test, db_cur):
     # sentinel = object()
 
-    db_cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
-    row_actual  = db_cur.fetchone()
+    db_cur.execute("SELECT format_version FROM metadata")
+    row  = db_cur.fetchone()
+
+    format_version_actual = row[0]
+    format_version_expected = format_version
 
     # this always gets recorded
-    test.assertEqual( format_version, db['format_version'])
+    test.assertEqual( format_version_actual, format_version_expected)
 
-    return # TODO_RECORDER remove this
+    return
+
+def _assertDriverMetadataRecorded(test, db_cur, expected):
+
+    db_cur.execute("SELECT model_viewer_data FROM driver_metadata")
+    row = db_cur.fetchone()
 
     if expected is None:
-        test.assertEqual(1,len(list(db.keys()))) # one since format_version is always recorded
+        test.assertEqual(None,row)
         return
 
-    test.assertEquals(5, len(list(db.keys())))
+    model_viewer_data = cPickle.loads(str(row[0]))
 
-    test.assertTrue(isinstance(db['system_metadata'], OrderedDict ))
+    test.assertTrue(isinstance(model_viewer_data, dict ) )
 
-    pairings = zip(expected, (db[x] for x in ('Parameters', 'Unknowns')))
+    test.assertEqual(2, len( model_viewer_data))
 
-    for expected, actual in pairings:
-        # If len(actual) == len(expected) and actual <= expected, then
-        # actual == expected.
-        test.assertEqual(len(expected), len(actual))
+    test.assertTrue(isinstance(model_viewer_data['connections_list'], list ) )
 
-        for key, val in expected:
-            found_val = actual.get(key, sentinel)
+    test.assertEqual(expected['connections_list_length'], len( model_viewer_data['connections_list']))
+    test.assertEqual(expected['tree_length'], len( model_viewer_data['tree']))
+    tr = model_viewer_data['tree']
+    test.assertEqual(set(['name', 'type', 'subsystem_type', 'children']), set(tr.keys()))
+    test.assertEqual(expected['tree_children_length'], len( model_viewer_data['tree']['children']))
 
-            if found_val is sentinel:
-                test.fail("Did not find key '{0}'".format(key))
+    cl = model_viewer_data['connections_list']
+    for c in cl:
+        # test.assertEqual(set(['src', 'tgt']), set(c.keys()))
+        test.assertTrue(set(c.keys()).issubset(set(['src', 'tgt', 'cycle_arrows'])))
 
-            for mkey, mval in iteritems(val):
-                mfound_val = found_val[mkey]
-
-                if isinstance(mfound_val, _ByObjWrapper):
-                    mfound_val = mfound_val.val
-
-                if isinstance(mval, _ByObjWrapper):
-                    mval = mval.val
-
-                try:
-                    assert_allclose(mval, mfound_val)
-                except TypeError:
-                    test.assertEqual(mval, mfound_val)
-
+    return
 
 class TestSqliteRecorder(unittest.TestCase):
     def setUp(self):
@@ -209,9 +208,9 @@ class TestSqliteRecorder(unittest.TestCase):
         self.eps = 1e-5
 
     def tearDown(self):
-        return
+        return #TODO_RECORDER - remove this
         try:
-            # rmtree(self.dir)
+            rmtree(self.dir)
             pass
         except OSError as e:
             # If directory already deleted, keep going
@@ -224,10 +223,16 @@ class TestSqliteRecorder(unittest.TestCase):
         _assertIterationDataRecorded(self, cur, expected, tolerance)
         con.close()
 
-    def assertMetadataRecorded(self, expected):
+    def assertMetadataRecorded(self ):
         con = sqlite3.connect(self.filename, detect_types=sqlite3.PARSE_DECLTYPES)
         cur = con.cursor()
-        _assertMetadataRecorded(self, cur, expected)
+        _assertMetadataRecorded(self, cur)
+        con.close()
+
+    def assertDriverMetadataRecorded(self, expected_driver_metadata ):
+        con = sqlite3.connect(self.filename, detect_types=sqlite3.PARSE_DECLTYPES)
+        cur = con.cursor()
+        _assertDriverMetadataRecorded(self, cur, expected_driver_metadata)
         con.close()
 
     def setup_sellar_model(self):
@@ -323,11 +328,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_constraints = {
                             "con_cmp1.con1": [-22.42830237,],
-                            "con_cmp2.con2": [-11.94151185,],  
+                            "con_cmp2.con2": [-11.94151185,],
                             }
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, None, expected_constraints),), self.eps)
-
 
 
     def test_basic(self):
@@ -349,6 +353,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
 
         prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+
 
     def test_simple_driver_recording(self):
 
@@ -406,8 +411,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, expected_objectives, expected_constraints),), self.eps)
 
 
-    def qqqtest_driver_records_metadata(self):
-
+    def test_driver_records_metadata(self):
         self.setup_sellar_model()
 
         self.recorder.options['record_metadata'] = True
@@ -416,4 +420,26 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
 
-        self.assertMetadataRecorded((expected_params, expected_unknowns, expected_resids))
+        self.assertMetadataRecorded()
+
+        expected_driver_metadata = {
+            'connections_list_length': 11,
+            'tree_length': 4,
+            'tree_children_length': 7,
+        }
+        self.assertDriverMetadataRecorded(expected_driver_metadata)
+
+
+    def test_driver_doesnt_record_metadata(self):
+        self.setup_sellar_model()
+
+        self.recorder.options['record_metadata'] = False
+        self.prob.driver.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+
+        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+
+        expected_driver_metadata = None
+        self.assertMetadataRecorded()
+        self.assertDriverMetadataRecorded(expected_driver_metadata)
+
