@@ -207,10 +207,10 @@ class AssembledJacobian(Jacobian):
         sizes = system._var_sizes
         iproc = system.comm.rank
         out_size = np.sum(sizes['output'][iproc, :])
-        in_size = np.sum(sizes['input'][iproc, :])
 
         int_mtx._build(out_size, out_size)
         if ext_mtx._submats:
+            in_size = np.sum(sizes['input'][iproc, :])
             ext_mtx._build(out_size, in_size)
         else:
             ext_mtx = None
@@ -243,6 +243,7 @@ class AssembledJacobian(Jacobian):
                                     include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
                 res_offset = self._get_var_range(res_abs_name, 'output')[0]
+                res_shape = abs2meta_out[res_abs_name]['shape']
 
                 for in_abs_name in s._var_abs_names['input']:
                     abs_key = (res_abs_name, in_abs_name)
@@ -252,8 +253,7 @@ class AssembledJacobian(Jacobian):
                         info, shape = self._subjacs_info[abs_key]
                     else:
                         info = SUBJAC_META_DEFAULTS
-                        shape = (np.prod(abs2meta_out[res_abs_name]['shape']),
-                                 np.prod(abs2meta_in[in_abs_name]['shape']))
+                        shape = (res_shape, np.prod(abs2meta_in[in_abs_name]['shape']))
 
                     if in_abs_name not in system._conn_global_abs_in2out:
                         ext_mtx._add_submat(
@@ -264,9 +264,9 @@ class AssembledJacobian(Jacobian):
         sizes = system._var_sizes
         iproc = system.comm.rank
         out_size = np.sum(sizes['output'][iproc, :])
-        in_size = np.sum(sizes['input'][iproc, :])
 
         if ext_mtx._submats:
+            in_size = np.sum(sizes['input'][iproc, :])
             ext_mtx._build(out_size, in_size)
         else:
             ext_mtx = None
