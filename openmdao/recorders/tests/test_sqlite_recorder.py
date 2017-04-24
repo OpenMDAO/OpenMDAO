@@ -72,8 +72,6 @@ from openmdao.test_suite.groups.parallel_groups import ConvergeDiverge
 from openmdao.api import NonlinearBlockGS
 
 
-
-
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -106,9 +104,9 @@ def run_driver(problem):
 
 
 def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
-    '''
+    """
         expected can be from multiple cases
-    '''
+    """
 
     # Check to see if we have the right number of cases
     # need the number of records in the table
@@ -263,7 +261,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
     #     self.prob.setup(check=False)
 
-    def qqqtest_only_desvars_recorded(self):
+    def test_only_desvars_recorded(self):
 
         self.setup_sellar_model()
 
@@ -286,7 +284,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, None, None),), self.eps)
 
 
-    def qqqtest_only_objectives_recorded(self):
+    def test_only_objectives_recorded(self):
 
         self.setup_sellar_model()
 
@@ -307,7 +305,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, expected_objectives, None),), self.eps)
 
-    def qqqtest_only_constraints_recorded(self):
+    def test_only_constraints_recorded(self):
 
         self.setup_sellar_model()
 
@@ -332,7 +330,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
 
 
-    def qqqtest_basic(self):
+    def test_basic(self):
         prob = Problem()
         prob.model = model = ConvergeDiverge()
 
@@ -408,7 +406,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, expected_objectives, expected_constraints),), self.eps)
 
 
-    def test_driver_records_metadata(self):
+    def qqqtest_driver_records_metadata(self):
 
         self.setup_sellar_model()
 

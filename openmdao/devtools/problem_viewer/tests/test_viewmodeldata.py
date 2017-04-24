@@ -85,8 +85,6 @@ class TestViewModelData(unittest.TestCase):
         """
         Test that an n2 html file is generated from a sqlite file.
         """
-        print (os.path.isfile(self.sqlite_db_filename))
-
         p = Problem()
         p.model = SellarStateConnection()
         r = SqliteRecorder(self.sqlite_db_filename2)
