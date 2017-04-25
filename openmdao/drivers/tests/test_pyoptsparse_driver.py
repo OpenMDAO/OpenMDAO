@@ -13,7 +13,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
-OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
