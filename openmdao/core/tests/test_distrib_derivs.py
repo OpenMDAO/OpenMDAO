@@ -2,22 +2,24 @@
 
 from __future__ import print_function
 
+import unittest
 import numpy
 
 from openmdao.api import ParallelGroup, Group, Problem, IndepVarComp, \
-    ExecComp, LinearGaussSeidel
-from openmdao.core.mpi_wrap import MPI
-from openmdao.test.mpi_util import MPITestCase
-from openmdao.test.util import assert_rel_error
-from openmdao.util.array_util import evenly_distrib_idxs
+    ExecComp, LinearBlockGS
+from openmdao.utils.mpi import MPI
+from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.devtools.testutil import assert_rel_error
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 if MPI:
-    from openmdao.core.petsc_impl import PetscImpl as impl
     rank = MPI.COMM_WORLD.rank
 else:
-    from openmdao.core.basic_impl import BasicImpl as impl
     rank = 0
-
 
 class DistribExecComp(ExecComp):
     """An ExecComp that uses 2 procs and
@@ -27,7 +29,7 @@ class DistribExecComp(ExecComp):
         super(DistribExecComp, self).__init__(exprs, **kwargs)
         self.arr_size = arr_size
 
-    def setup_distrib(self):
+    def initialize_variables(self):
         """ component declares the local sizes and sets initial values
         for all distributed inputs and outputs. Returns a dict of
         index arrays keyed to variable names.
@@ -51,7 +53,7 @@ class DistribExecComp(ExecComp):
         return (2, 2)
 
 
-class MPITests1(MPITestCase):
+class MPITests1(unittest.TestCase):
 
     N_PROCS = 1
 
@@ -66,11 +68,11 @@ class MPITests1(MPITestCase):
                                  y=numpy.zeros(size),
                                  z=numpy.zeros(size)))
 
-        prob = Problem(impl=impl)
-        prob.root = group
-        prob.root.ln_solver = LinearGaussSeidel()
-        prob.root.connect('P.x', 'C1.x')
-        prob.root.connect('C1.y', 'C2.y')
+        prob = Problem()
+        prob.model = group
+        prob.model.ln_solver = LinearBlockGS()
+        prob.model.connect('P.x', 'C1.x')
+        prob.model.connect('C1.y', 'C2.y')
 
         try:
             prob.setup(check=False)
@@ -83,7 +85,7 @@ class MPITests1(MPITestCase):
                 self.fail("Exception expected")
 
 
-class MPITests2(MPITestCase):
+class MPITests2(unittest.TestCase):
 
     N_PROCS = 2
 
@@ -98,11 +100,11 @@ class MPITests2(MPITestCase):
                                  y=numpy.zeros(size),
                                  z=numpy.zeros(size)))
 
-        prob = Problem(impl=impl)
-        prob.root = group
-        prob.root.ln_solver = LinearGaussSeidel()
-        prob.root.connect('P.x', 'C1.x')
-        prob.root.connect('C1.y', 'C2.y')
+        prob = Problem()
+        prob.model = group
+        prob.model.ln_solver = LinearBlockGS()
+        prob.model.connect('P.x', 'C1.x')
+        prob.model.connect('C1.y', 'C2.y')
 
         prob.setup(check=False)
         prob.run()
@@ -115,8 +117,8 @@ class MPITests2(MPITestCase):
 
     def test_fan_out_grouped(self):
         size = 3
-        prob = Problem(impl=impl)
-        prob.root = root = Group()
+        prob = Problem()
+        prob.model = root = Group()
         root.add('P', IndepVarComp('x', numpy.ones(size, dtype=float)))
         root.add('C1', DistribExecComp(['y=3.0*x'], arr_size=size,
                                        x=numpy.zeros(size, dtype=float),
@@ -142,8 +144,8 @@ class MPITests2(MPITestCase):
         root.connect("C1.y", "sub.C3.x")
         root.connect("P.x", "C1.x")
 
-        root.ln_solver = LinearGaussSeidel()
-        root.sub.ln_solver = LinearGaussSeidel()
+        root.ln_solver = LinearBlockGS()
+        root.sub.ln_solver = LinearBlockGS()
 
         prob.setup(check=False)
         prob.run()
@@ -159,8 +161,8 @@ class MPITests2(MPITestCase):
     def test_fan_in_grouped(self):
         size = 3
 
-        prob = Problem(impl=impl)
-        prob.root = root = Group()
+        prob = Problem()
+        prob.model = root = Group()
 
         root.add('P1', IndepVarComp('x', numpy.ones(size, dtype=float)))
         root.add('P2', IndepVarComp('x', numpy.ones(size, dtype=float)))
@@ -186,8 +188,8 @@ class MPITests2(MPITestCase):
         root.connect("P2.x", "sub.C2.x")
         root.connect("C3.y", "C4.x")
 
-        root.ln_solver = LinearGaussSeidel()
-        root.sub.ln_solver = LinearGaussSeidel()
+        root.ln_solver = LinearBlockGS()
+        root.sub.ln_solver = LinearBlockGS()
 
         prob.setup(check=False)
         prob.run()
@@ -211,11 +213,11 @@ class MPITests2(MPITestCase):
                                  y=numpy.zeros(size),
                                  z=numpy.zeros(size)))
 
-        prob = Problem(impl=impl)
-        prob.root = group
-        prob.root.ln_solver = LinearGaussSeidel()
-        prob.root.connect('P.x', 'C1.x')
-        prob.root.connect('C1.y', 'C2.y')
+        prob = Problem()
+        prob.model = group
+        prob.model.ln_solver = LinearBlockGS()
+        prob.model.connect('P.x', 'C1.x')
+        prob.model.connect('C1.y', 'C2.y')
 
         prob.driver.add_desvar('P.x')
         prob.driver.add_objective('C1.y')

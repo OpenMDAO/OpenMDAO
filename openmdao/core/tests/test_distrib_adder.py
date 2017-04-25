@@ -1,17 +1,18 @@
+
+import unittest
 import numpy as np
 
 from openmdao.api import Component, Problem, Group, IndepVarComp
 
-from openmdao.core.mpi_wrap import MPI
-from openmdao.util.array_util import evenly_distrib_idxs
-from openmdao.test.mpi_util import MPITestCase
+from openmdao.utils.mpi import MPI
+from openmdao.utils.array_utils import evenly_distrib_idxs
 
-if MPI:
-    from openmdao.core.petsc_impl import PetscImpl as impl
-else:
-    from openmdao.api import BasicImpl as impl
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
-from openmdao.test.util import assert_rel_error
+from openmdao.devtools.testutil import assert_rel_error
 
 
 class DistributedAdder(Component):
@@ -88,19 +89,19 @@ class Summer(Component):
 
 
 
-class DistributedAdderTest(MPITestCase):
+class DistributedAdderTest(unittest.TestCase):
 
     N_PROCS = 10
 
     def test_distributed_adder(self):
         size = 1000000 #how many items in the array
 
-        prob = Problem(impl=impl)
-        prob.root = Group()
+        prob = Problem(vector_class=PETScVector, check=False)
+        prob.model = Group()
 
-        prob.root.add('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
-        prob.root.add('plus', DistributedAdder(size), promotes=['x', 'y'])
-        prob.root.add('summer', Summer(size), promotes=['y', 'sum'])
+        prob.model.add('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
+        prob.model.add('plus', DistributedAdder(size), promotes=['x', 'y'])
+        prob.model.add('summer', Summer(size), promotes=['y', 'sum'])
 
         prob.setup(check=False)
 

@@ -2,6 +2,9 @@
 Utils for dealing with arrays.
 """
 
+import numpy as np
+
+
 def evenly_distrib_idxs(num_divisions, arr_size):
     """
     Return evenly distributed entries for the given array size.
@@ -12,9 +15,9 @@ def evenly_distrib_idxs(num_divisions, arr_size):
 
     Parameters
     ----------
-    num_divisions: int
+    num_divisions : int
         Number of parts to divide the array into.
-    arr_size: int
+    arr_size : int
         Number of entries in the array.
 
     Returns
@@ -35,27 +38,3 @@ def evenly_distrib_idxs(num_divisions, arr_size):
     offsets[1:] = np.cumsum(sizes)[:-1]
 
     return sizes, offsets
-
-def to_slice(idxs):
-    """Convert an index array to a slice if possible. Otherwise,
-    return the index array. Indices are assumed to be sorted in
-    ascending order.
-    """
-    if len(idxs) == 1:
-        return slice(idxs[0], idxs[0]+1)
-    elif len(idxs) == 0:
-        return idxs
-
-    stride = idxs[1]-idxs[0]
-
-    if stride <= 0:
-        return idxs
-
-    #make sure stride is consistent throughout the array
-    if any(idxs[1:]-idxs[:-1] != stride):
-        return idxs
-
-    # set the upper bound to idxs[-1]+stride instead of idxs[-1]+1 because
-    # later, we compare upper and lower bounds when collapsing slices
-    return slice(idxs[0], idxs[-1]+stride, stride)
-
