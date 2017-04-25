@@ -117,24 +117,3 @@ def tree(system, include_solvers=True, stream=sys.stdout):
             if s.ln_solver is not None:
                 stream.write("%s %s ln_solver\n" % (indent, type(s.ln_solver).__name__))
 
-def num_systems(root):
-    """
-    Return the number of Groups and Components in the tree starting at root.
-
-    Parameters
-    ----------
-    root: <System>
-        The root of the tree.
-
-    Returns
-    -------
-    int, int
-        Number of groups and components.
-    """
-    ngroups = ncomps = 0
-    for s in root.system_iter(recurse=True, include_self=True):
-        if isinstance(s, Group):
-            ngroups += 1
-        else:
-            ncomps += 1
-    return ngroups, ncomps
