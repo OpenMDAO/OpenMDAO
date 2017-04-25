@@ -153,7 +153,6 @@ class SqliteRecorder(BaseRecorder):
                 desvars_array = np.zeros((1,), dtype=dtype_tuples)
 
                 for name, value in iteritems(desvars_values):
-                    # break # TODO_RECORDERS - remove
                     desvars_array[name] = value
 
         if self.options['record_responses']:
@@ -167,7 +166,6 @@ class SqliteRecorder(BaseRecorder):
                 responses_array = np.zeros((1,), dtype=dtype_tuples)
 
                 for name, value in iteritems(responses_values):
-                    # break # TODO_RECORDERS - remove
                     responses_array[name] = value
 
         if self.options['record_objectives']:
@@ -181,7 +179,6 @@ class SqliteRecorder(BaseRecorder):
                 objectives_array = np.zeros((1,), dtype=dtype_tuples)
 
                 for name, value in iteritems(objectives_values):
-                    # break # TODO_RECORDERS - remove
                     objectives_array[name] = value
 
         if self.options['record_constraints']:
@@ -197,7 +194,6 @@ class SqliteRecorder(BaseRecorder):
                 constraints_array = np.zeros((1,), dtype=dtype_tuples)
 
                 for name, value in iteritems(constraints_values):
-                    # break # TODO_RECORDERS - remove
                     constraints_array[name] = value
 
         desvars_blob = array_to_blob(desvars_array)

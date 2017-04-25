@@ -31,11 +31,12 @@ class SqliteCaseReader(BaseCaseReader):
                 raise IOError('File does not contain a valid '
                               'sqlite database ({0})'.format(filename))
 
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        cur.execute("SELECT format_version FROM metadata")
-        row = cur.fetchone()
-        self.format_version = row[0]
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT format_version FROM metadata")
+            row = cur.fetchone()
+            self.format_version = row[0]
+        con.close()
 
         self._load()
 
@@ -58,10 +59,11 @@ class SqliteCaseReader(BaseCaseReader):
             The version of the format assumed when loading the file.
         """
         if self.format_version in (1,):
-            con = sqlite3.connect(self.filename, detect_types=sqlite3.PARSE_DECLTYPES)
-            cur = con.cursor()
-            cur.execute("SELECT iteration_coordinate FROM driver_iterations")
-            rows = cur.fetchall()
+            with sqlite3.connect(self.filename) as con:
+                cur = con.cursor()
+                cur.execute("SELECT iteration_coordinate FROM driver_iterations")
+                rows = cur.fetchall()
+            con.close()
 
             self._case_keys = [coord[0] for coord in rows]
             # returns something like this [(u'rank0:SLSQP|1',), (u'rank0:SLSQP|2',),
@@ -85,35 +87,25 @@ class SqliteCaseReader(BaseCaseReader):
             An instance of Case populated with data from the
             specified case/iteration.
         """
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-
         if isinstance(case_id, int):
             # If case_id is an integer, assume the user
             # wants a case as an index
-
             iteration_coordinate = self._case_keys[case_id]  # handles negative indices for example
-
-            _case_id = self._case_keys[case_id]
-            # cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=
-            # :iteration_coordinate", {"iteration_coordinate": case_id})
-            cur.execute("SELECT * FROM driver_iterations WHERE "
-                        "iteration_coordinate=:iteration_coordinate",
-                        {"iteration_coordinate": _case_id})
-
-            # cur.execute("SELECT * FROM driver_iterations WHERE id=:id", {"id": _case_id})
         else:
             # Otherwise assume we were given the case string identifier
+            iteration_coordinate = case_id
+
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
             cur.execute("SELECT * FROM driver_iterations WHERE "
                         "iteration_coordinate=:iteration_coordinate",
-                        {"iteration_coordinate": case_id})
-            # _case_id = case_id
+                        {"iteration_coordinate": iteration_coordinate})
+            # Initialize the Case object from the iterations data
+            row = cur.fetchone()
+        con.close()
 
-        # Initialize the Case object from the iterations data
-        row = cur.fetchone()
         counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, \
             objectives_blob, constraints_blob = row
-
 
         desvars_array = blob_to_array(desvars_blob)
         responses_array = blob_to_array(responses_blob)
