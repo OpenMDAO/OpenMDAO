@@ -45,8 +45,9 @@ class BaseRecorder(object):
         self.options.declare('record_metadata', type_=bool, desc='Record metadata', default=True)
         self.options.declare('includes', type_=list, default=['*'],
                              desc='Patterns for variables to include in recording')
-        self.options.declare('excludes', type_=list, desc='Patterns for vars to exclude in recording '
-                                               '(processed post-includes)', default=[])
+        self.options.declare('excludes', type_=list, default=[],
+                             desc='Patterns for vars to exclude in recording '
+                                  '(processed post-includes)')
 
         # Old options that will be deprecated
         self.options.declare('record_unknowns', type_=bool, default=False,
@@ -128,22 +129,26 @@ class BaseRecorder(object):
             excl = self.options['excludes']
 
             if self.options['record_inputs']:
-                myinputs = [n for n in object_requesting_recording._inputs._names if self._check_path(n, incl, excl)]
+                myinputs = [n for n in object_requesting_recording._inputs._names
+                            if self._check_path(n, incl, excl)]
             if self.options['record_outputs']:
-                myoutputs = [n for n in object_requesting_recording._outputs._names if self._check_path(n, incl, excl)]
+                myoutputs = [n for n in object_requesting_recording._outputs._names
+                             if self._check_path(n, incl, excl)]
                 if self.options['record_residuals']:
                     myresiduals = myoutputs  # outputs and residuals have same names
             elif self.options['record_residuals']:
-                myresiduals = [n for n in object_requesting_recording._residuals._names if self._check_path(n, incl, excl)]
+                myresiduals = [n for n in object_requesting_recording._residuals._names
+                               if self._check_path(n, incl, excl)]
 
             # if self.options['record_derivs']:
-            #     myinputs = [n for n in object_requesting_recording._derivs._names if self._check_path(n, incl, excl)]
+            #     myinputs = [n for n in object_requesting_recording._derivs._names
+            #                 if self._check_path(n, incl, excl)]
 
             self._filtered_system = {
                 'i': myinputs,
                 'o': myoutputs,
                 'r': myresiduals
-                #'d': myderivatives
+                # 'd': myderivatives
             }
 
         if (isinstance(object_requesting_recording, Driver)):
@@ -152,16 +157,20 @@ class BaseRecorder(object):
             excl = self.options['excludes']
 
             if self.options['record_desvars']:
-                mydesvars = [n for n in object_requesting_recording._designvars if self._check_path(n, incl, excl)]
+                mydesvars = [n for n in object_requesting_recording._designvars
+                             if self._check_path(n, incl, excl)]
 
             if self.options['record_objectives']:
-                myobjectives = [n for n in object_requesting_recording._objectives if self._check_path(n, incl, excl)]
+                myobjectives = [n for n in object_requesting_recording._objectives
+                                if self._check_path(n, incl, excl)]
 
             if self.options['record_constraints']:
-                myconstraints = [n for n in object_requesting_recording._constraints if self._check_path(n, incl, excl)]
+                myconstraints = [n for n in object_requesting_recording._constraints
+                                 if self._check_path(n, incl, excl)]
 
             if self.options['record_responses']:
-                myresponses = [n for n in object_requesting_recording._responses if self._check_path(n, incl, excl)]
+                myresponses = [n for n in object_requesting_recording._responses
+                               if self._check_path(n, incl, excl)]
 
             self._filtered_driver = {
                 'des': mydesvars,
@@ -192,9 +201,6 @@ class BaseRecorder(object):
         #         'obj': my,
         #         'con': my
         #     }
-        print("FILTERED SYSTEM", self._filtered_system)
-        print("FILTERED DRIVER", self._filtered_driver)
-        # print("FILTERED SOLVER", self._filtered_solver)
 
         # TODO still need to ACTUALLY RECORD THEM now that filtered.
 
@@ -202,7 +208,6 @@ class BaseRecorder(object):
         """
         Return True if `path` should be recorded.
         """
-        print("In check path ", path)
         # First see if it's included
         for pattern in includes:
             if fnmatchcase(path, pattern):

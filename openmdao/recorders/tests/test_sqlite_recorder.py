@@ -1,97 +1,31 @@
 """ Unit test for the SqliteRecorder. """
 
+import cPickle
 import errno
 import os
-import unittest
 from shutil import rmtree
+from six import iteritems
+import sqlite3
 from tempfile import mkdtemp
 import time
-
-import cPickle
-
-import sqlite3
-import numpy as np
-
-
-
-# TODO_RECORDER: move to a separate file
-def adapt_array(arr):
-    """
-    http://stackoverflow.com/a/31312102/190597 (SoulNibbler).
-    """
-    out = io.BytesIO()
-    np.save(out, arr)
-    out.seek(0)
-    return sqlite3.Binary(out.read())
-
-
-def convert_array(text):
-    """
-    Utility function for numpy structured arrays.
-    """
-    out = io.BytesIO(text)
-    out.seek(0)
-    return np.load(out)
-
-
-# Converts np.array to TEXT when inserting
-sqlite3.register_adapter(np.ndarray, adapt_array)
-
-# Converts TEXT to np.array when selecting
-sqlite3.register_converter("array", convert_array)
-
-
-from openmdao.devtools.testutil import assert_rel_error
-
-
-from six import iteritems, iterkeys
-
-from collections import OrderedDict
-
-from sqlitedict import SqliteDict
+import unittest
 
 import numpy as np
-from numpy.testing import assert_allclose
 
+from openmdao.api import NonlinearBlockGS, SqliteRecorder, Group, IndepVarComp, ExecComp
 from openmdao.core.problem import Problem
-from openmdao.api import SqliteRecorder
-from openmdao.utils.record_util import format_iteration_coordinate
-
-from openmdao.recorders.sqlite_recorder import format_version
-
-from openmdao.test_suite.components.sellar import SellarDerivatives
-import warnings
-
-
-from openmdao.api import Group, IndepVarComp, ExecComp
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
+from openmdao.utils.record_util import format_iteration_coordinate
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-
-from openmdao.test_suite.groups.parallel_groups import ConvergeDiverge
-
-from openmdao.api import NonlinearBlockGS
-
+from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
+from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.test_suite.components.paraboloid import Paraboloid
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
-
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
-
-# Test that pyoptsparse SLSQP is a viable option
-# try:
-#     import pyoptsparse.pySLSQP.slsqp as slsqp
-# except ImportError:
-#     slsqp = None
-#
-# try:
-#     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-# except ImportError:
-#     pyOptSparseDriver = None
 
 optimizers = {'pyoptsparse': pyOptSparseDriver}
 # optimizers = {'scipy': ScipyOptimizer,
@@ -110,13 +44,6 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
         expected can be from multiple cases
     """
 
-    # Check to see if we have the right number of cases
-    # need the number of records in the table
-    # db_cur.execute("SELECT Count(*) FROM driver_iterations")
-    # row = db_cur.fetchone()
-    # num_cases_in_db = row[0]
-    # test.assertEquals(num_cases_in_db, len(expected))
-
     # iterate through the cases
     for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, constraints_expected in expected:
         iter_coord = format_iteration_coordinate(coord)
@@ -124,7 +51,13 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
         # from the database, get the actual data recorded
         db_cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
         row_actual  = db_cur.fetchone()
-        counter, iteration_coordinate, timestamp, success, msg, desvars_actual, responses_actual, objectives_actual, constraints_actual = row_actual
+
+        counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, objectives_blob, constraints_blob = row_actual
+
+        desvars_actual = blob_to_array(desvars_blob)
+        responses_actual = blob_to_array(responses_blob)
+        objectives_actual = blob_to_array(objectives_blob)
+        constraints_actual = blob_to_array(constraints_blob)
 
         # Does the timestamp make sense?
         test.assertTrue( t0 <= timestamp and timestamp <= t1)
@@ -140,20 +73,18 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
             ):
 
             if expected is None:
-                test.assertIsNone(actual)
+                test.assertEqual(actual, np.array(None, dtype=object))
             else:
                 # Check to see if the number of values in actual and expected match
                 test.assertEqual(len(actual[0]), len(expected))
                 for key, value in iteritems(expected):
                     # Check to see if the keys in the actual and expected match
-                    test.assertTrue(key in actual[0].dtype.names) # TODO_RECORDER - need better way. Error message tells you nothing
+                    test.assertTrue(key in actual[0].dtype.names, '{} variable not found in actual data from recorder'.format(key))
                     # Check to see if the values in actual and expected match
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
-
         return
 
 def _assertMetadataRecorded(test, db_cur):
-    # sentinel = object()
 
     db_cur.execute("SELECT format_version FROM metadata")
     row  = db_cur.fetchone()
@@ -191,7 +122,6 @@ def _assertDriverMetadataRecorded(test, db_cur, expected):
 
     cl = model_viewer_data['connections_list']
     for c in cl:
-        # test.assertEqual(set(['src', 'tgt']), set(c.keys()))
         test.assertTrue(set(c.keys()).issubset(set(['src', 'tgt', 'cycle_arrows'])))
 
     return
@@ -200,15 +130,10 @@ class TestSqliteRecorder(unittest.TestCase):
     def setUp(self):
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
-        # self.tablename_metadata = 'metadata'
-        self.tablename_iterations = 'iterations'
-        # self.tablename_derivs = 'derivs'
         self.recorder = SqliteRecorder(self.filename)
-        print(self.filename)
         self.eps = 1e-5
 
     def tearDown(self):
-        return #TODO_RECORDER - remove this
         try:
             rmtree(self.dir)
             pass
@@ -218,19 +143,19 @@ class TestSqliteRecorder(unittest.TestCase):
                 raise e
 
     def assertIterationDataRecorded(self, expected, tolerance):
-        con = sqlite3.connect(self.filename, detect_types=sqlite3.PARSE_DECLTYPES)
+        con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertIterationDataRecorded(self, cur, expected, tolerance)
         con.close()
 
     def assertMetadataRecorded(self ):
-        con = sqlite3.connect(self.filename, detect_types=sqlite3.PARSE_DECLTYPES)
+        con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertMetadataRecorded(self, cur)
         con.close()
 
     def assertDriverMetadataRecorded(self, expected_driver_metadata ):
-        con = sqlite3.connect(self.filename, detect_types=sqlite3.PARSE_DECLTYPES)
+        con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertDriverMetadataRecorded(self, cur, expected_driver_metadata)
         con.close()
@@ -249,23 +174,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.setup(check=False)
 
-    def setup_sellar_model(self): #TODO_RECORDER - remove this ?
-        self.prob = Problem()
-        self.prob.model = model = SellarDerivatives()
-
-        optimizer = 'pyoptsparse'
-        self.prob.driver = optimizers[optimizer]()
-
-        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-                                   upper=np.array([10.0, 10.0]))
-        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
-        self.prob.model.add_objective('obj')
-        self.prob.model.add_constraint('con1', upper=0.0)
-        self.prob.model.add_constraint('con2', upper=0.0)
-        self.prob.model.suppress_solver_output = True
-
-        self.prob.setup(check=False)
-
     def test_only_desvars_recorded(self):
 
         self.setup_sellar_model()
@@ -278,7 +186,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         t0, t1 = run_driver(self.prob)
 
-        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+        self.prob.cleanup()
 
         coordinate = [0, 'Driver', (1, )]
 
@@ -287,7 +195,6 @@ class TestSqliteRecorder(unittest.TestCase):
                             }
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, None, None),), self.eps)
-
 
     def test_only_objectives_recorded(self):
 
@@ -301,12 +208,11 @@ class TestSqliteRecorder(unittest.TestCase):
 
         t0, t1 = run_driver(self.prob)
 
-        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+        self.prob.cleanup()
 
         coordinate = [0, 'Driver', (1, )]
 
-        expected_objectives = {"obj_cmp.obj": [28.58830817,],  # {'obj_cmp.obj': array([ 28.58830817])}
-                            }
+        expected_objectives = {"obj_cmp.obj": [28.58830817,]}
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, expected_objectives, None),), self.eps)
 
@@ -322,7 +228,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         t0, t1 = run_driver(self.prob)
 
-        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+        self.prob.cleanup()
 
         coordinate = [0, 'Driver', (1, )]
 
@@ -332,27 +238,6 @@ class TestSqliteRecorder(unittest.TestCase):
                             }
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, None, expected_constraints),), self.eps)
-
-
-    # def test_basic(self):
-    #     prob = Problem()
-    #     prob.model = model = ConvergeDiverge()
-    #
-    #     prob.driver.add_recorder(self.recorder)
-    #     self.recorder.options['record_desvars'] = True
-    #     self.recorder.options['record_responses'] = True
-    #     self.recorder.options['record_objectives'] = True
-    #     self.recorder.options['record_constraints'] = True
-    #
-    #     model.add_design_var('z')
-    #     model.add_objective('obj')
-    #     model.add_constraint('con1', lower=0)
-    #     model.suppress_solver_output = True
-    #
-    #     prob.setup(check=False)
-    #     prob.run_driver()
-    #
-    #     prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
 
 
     def test_simple_driver_recording(self):
@@ -394,7 +279,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup(check=False)
         t0, t1 = run_driver(prob)
 
-        prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+        prob.cleanup()
 
         coordinate = [0, 'SLSQP', (4, )]
 
@@ -418,10 +303,9 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
-        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+        self.prob.cleanup()
 
         self.assertMetadataRecorded()
-
         expected_driver_metadata = {
             'connections_list_length': 11,
             'tree_length': 4,
@@ -437,10 +321,10 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
-        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+        self.prob.cleanup()
 
-        expected_driver_metadata = None
         self.assertMetadataRecorded()
+        expected_driver_metadata = None
         self.assertDriverMetadataRecorded(expected_driver_metadata)
 
     # def test_driver_records_includes(self):
@@ -456,12 +340,16 @@ class TestSqliteRecorder(unittest.TestCase):
     #     self.prob.setup(check=False)
     #     self.prob.run()
     #     self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+    #
+    #     self.assertMetadataRecorded()
+    #
+    #     expected_driver_metadata = {
+    #         'connections_list_length': 11,
+    #         'tree_length': 4,
+    #         'tree_children_length': 7,
+    #     }
+    #     self.assertDriverMetadataRecorded(expected_driver_metadata)
+    # TODO_RECORDERS Need to add tests for solvers and systems
 
-        # self.assertMetadataRecorded()
-        #
-        # expected_driver_metadata = {
-        #     'connections_list_length': 11,
-        #     'tree_length': 4,
-        #     'tree_children_length': 7,
-        # }
-        # self.assertDriverMetadataRecorded(expected_driver_metadata)
+if __name__ == "__main__":
+    unittest.main()
