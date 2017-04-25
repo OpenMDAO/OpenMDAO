@@ -249,22 +249,22 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.setup(check=False)
 
-    # def setup_sellar_model(self): #TODO_RECORDER - remove this ?
-    #     self.prob = Problem()
-    #     self.prob.model = model = SellarDerivatives()
+    def setup_sellar_model(self): #TODO_RECORDER - remove this ?
+        self.prob = Problem()
+        self.prob.model = model = SellarDerivatives()
 
-    #     optimizer = 'pyoptsparse'
-    #     self.prob.driver = optimizers[optimizer]()
+        optimizer = 'pyoptsparse'
+        self.prob.driver = optimizers[optimizer]()
 
-    #     self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-    #                                upper=np.array([10.0, 10.0]))
-    #     self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
-    #     self.prob.model.add_objective('obj')
-    #     self.prob.model.add_constraint('con1', upper=0.0)
-    #     self.prob.model.add_constraint('con2', upper=0.0)
-    #     self.prob.model.suppress_solver_output = True
+        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                   upper=np.array([10.0, 10.0]))
+        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
+        self.prob.model.add_objective('obj')
+        self.prob.model.add_constraint('con1', upper=0.0)
+        self.prob.model.add_constraint('con2', upper=0.0)
+        self.prob.model.suppress_solver_output = True
 
-    #     self.prob.setup(check=False)
+        self.prob.setup(check=False)
 
     def test_only_desvars_recorded(self):
 
@@ -334,25 +334,25 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, None, expected_constraints),), self.eps)
 
 
-    def test_basic(self):
-        prob = Problem()
-        prob.model = model = ConvergeDiverge()
-
-        prob.driver.add_recorder(self.recorder)
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
-
-        model.add_design_var('z')
-        model.add_objective('obj')
-        model.add_constraint('con1', lower=0)
-        model.suppress_solver_output = True
-
-        prob.setup(check=False)
-        prob.run_driver()
-
-        prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+    # def test_basic(self):
+    #     prob = Problem()
+    #     prob.model = model = ConvergeDiverge()
+    #
+    #     prob.driver.add_recorder(self.recorder)
+    #     self.recorder.options['record_desvars'] = True
+    #     self.recorder.options['record_responses'] = True
+    #     self.recorder.options['record_objectives'] = True
+    #     self.recorder.options['record_constraints'] = True
+    #
+    #     model.add_design_var('z')
+    #     model.add_objective('obj')
+    #     model.add_constraint('con1', lower=0)
+    #     model.suppress_solver_output = True
+    #
+    #     prob.setup(check=False)
+    #     prob.run_driver()
+    #
+    #     prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
 
 
     def test_simple_driver_recording(self):
@@ -443,3 +443,25 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertMetadataRecorded()
         self.assertDriverMetadataRecorded(expected_driver_metadata)
 
+    # def test_driver_records_includes(self):
+    #     self.setup_sellar_model()
+    #
+    #     self.recorder.options['includes'] = ['*']
+    #     self.recorder.options['excludes'] = ['obj_cmp*']
+    #     # print ("INCLUDES", self.recorder.options['includes'])
+    #     # print ("EXCLUDES", self.recorder.options['excludes'])
+    #
+    #     self.prob.driver.add_recorder(self.recorder)
+    #     self.prob.model.add_recorder(self.recorder)
+    #     self.prob.setup(check=False)
+    #     self.prob.run()
+    #     self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+
+        # self.assertMetadataRecorded()
+        #
+        # expected_driver_metadata = {
+        #     'connections_list_length': 11,
+        #     'tree_length': 4,
+        #     'tree_children_length': 7,
+        # }
+        # self.assertDriverMetadataRecorded(expected_driver_metadata)
