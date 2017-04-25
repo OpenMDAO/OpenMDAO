@@ -21,7 +21,6 @@ from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
-
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -41,9 +40,9 @@ def run_driver(problem):
 
 
 def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
-    '''
+    """
         expected can be from multiple cases
-    '''
+    """
 
     # iterate through the cases
     for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, constraints_expected in expected:
@@ -295,8 +294,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, expected_objectives, expected_constraints),), self.eps)
 
-    def test_driver_records_metadata(self):
 
+    def test_driver_records_metadata(self):
         self.setup_sellar_model()
 
         self.recorder.options['record_metadata'] = True

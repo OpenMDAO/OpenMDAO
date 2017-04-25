@@ -61,8 +61,8 @@ This argument is named as such because :code:`ref0` represents the physical valu
   --            --            10003.2         3.2
   ============  ============  ==============  ================
 
-Residual scaling works the same way with :code:`res_ref` and :code:`res_ref0`.
-In explicit components, both :code:`res_ref` and :code:`res_ref0` default to :code:`ref` and :code:`ref0`, respectively.
+Residual scaling works the same way with :code:`res_ref`, though there is no offset for residuals.
+In explicit components, :code:`res_ref` defaults to :code:`ref`.
 
 Using scaling with units
 ------------------------
@@ -88,7 +88,7 @@ For instance, if :code:`ref=10001.` and :code:`units='Pa'`, then a scaled value 
 
       residual scaling is separate and independent of output scaling in implicit components.
       In explicit components, the requested output scaling is applied to the residuals as well
-      unless :code:`res_ref` and :code:`res_ref0` are also specified.
+      unless :code:`res_ref` is also specified.
 
 Specifying a scaler on an output
 --------------------------------

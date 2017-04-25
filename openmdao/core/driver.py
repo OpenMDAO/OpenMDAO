@@ -2,10 +2,9 @@
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, update_local_meta
+from openmdao.utils.options_dictionary import OptionsDictionary
 from six import iteritems
-# import openmdao.devtools.problem_viewer.problem_viewer
 
 
 class Driver(object):
@@ -55,21 +54,21 @@ class Driver(object):
 
         # What the driver supports.
         self.supports = OptionsDictionary()
-        self.supports.declare('inequality_constraints', type_=bool, value=False)
-        self.supports.declare('equality_constraints', type_=bool, value=False)
-        self.supports.declare('linear_constraints', type_=bool, value=False)
-        self.supports.declare('two_sided_constraints', type_=bool, value=False)
-        self.supports.declare('multiple_objectives', type_=bool, value=False)
-        self.supports.declare('integer_design_vars', type_=bool, value=False)
-        self.supports.declare('gradients', type_=bool, value=False)
-        self.supports.declare('active_set', type_=bool, value=False)
+        self.supports.declare('inequality_constraints', type_=bool, default=False)
+        self.supports.declare('equality_constraints', type_=bool, default=False)
+        self.supports.declare('linear_constraints', type_=bool, default=False)
+        self.supports.declare('two_sided_constraints', type_=bool, default=False)
+        self.supports.declare('multiple_objectives', type_=bool, default=False)
+        self.supports.declare('integer_design_vars', type_=bool, default=False)
+        self.supports.declare('gradients', type_=bool, default=False)
+        self.supports.declare('active_set', type_=bool, default=False)
 
         self.iter_count = 0
         self.metadata = None
         self._model_viewer_data = None
 
         # TODO, support these in Openmdao blue
-        self.supports.declare('integer_design_vars', type_=bool, value=False)
+        self.supports.declare('integer_design_vars', type_=bool, default=False)
 
         self.fail = False
 
@@ -111,7 +110,7 @@ class Driver(object):
         self._objs = model.get_objectives(recurse=True)
         self._cons = model.get_constraints(recurse=True)
 
-        self._rec_mgr.startup()
+        self._rec_mgr.startup(self)
         if (self._rec_mgr._recorders):
             self._model_viewer_data = _get_viewer_data(problem)
         self._rec_mgr.record_metadata(self)

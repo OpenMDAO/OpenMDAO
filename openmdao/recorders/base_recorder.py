@@ -8,6 +8,7 @@ from six import StringIO
 
 from openmdao.utils.generalized_dict import OptionsDictionary
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.core.system import System
 
 import warnings
 
@@ -86,22 +87,17 @@ class BaseRecorder(object):
 
         # global counter that is used in iteration coordinate
         self._counter = 0
+        self._filtered = {}
 
-    def startup(self):
+    def startup(self, object_requesting_recording):
         """
         Prepare for a new run.
 
         Args
         ----
-        group : `Group`
-            Group that owns this recorder.
+        object_requesting_recording :
+            Object to which this recorder is attached.
         """
-        myinputs = myoutputs = myresiduals = set()
-
-        check = self._check_path
-        incl = self.options['includes']
-        excl = self.options['excludes']
-
         # Deprecated options here, but need to preserve backward compatibility if possible.
         if self.options['record_params']:
             warn_deprecation("record_params is deprecated, please use record_inputs.")
@@ -118,21 +114,28 @@ class BaseRecorder(object):
             # set option to what the user intended.
             self.options['record_residuals'] = True
 
-        # Compute the inclusion lists for recording
-        # if self.options['record_inputs']:
-        #     myinputs = [n for n in group.inputs if check(n, incl, excl)]
-        # if self.options['record_outputs']:
-        #     myoutputs = [n for n in group.outputs if check(n, incl, excl)]
-        #     if self.options['record_residuals']:
-        #         myresiduals = myoutputs # outputs and residuals have same names
-        # elif self.options['record_residuals']:
-        #     myresiduals = [n for n in group.residuals if check(n, incl, excl)]
-        #
-        # self._filtered[group.pathname] = {
-        #     'p': myinputs,
-        #     'u': myoutputs,
-        #     'r': myresiduals
-        # }
+        # Compute the inclusion lists if this recorder is owned by a System
+
+        if (isinstance(object_requesting_recording, System)):
+            myinputs = myoutputs = myresiduals = set()
+            incl = self.options['includes']
+            excl = self.options['excludes']
+
+            if self.options['record_inputs']:
+                myinputs = [n for n in owner._inputs if _check_path(n, incl, excl)]
+            if self.options['record_outputs']:
+                myoutputs = [n for n in owner._outputs if _check_path(n, incl, excl)]
+                if self.options['record_residuals']:
+                    myresiduals = myoutputs  # outputs and residuals have same names
+            elif self.options['record_residuals']:
+                myresiduals = [n for n in owner._residuals if _check_path(n, incl, excl)]
+
+            self._filtered[object_requesting_recording.pathname] = {
+                'i': myinputs,
+                'o': myoutputs,
+                'r': myresiduals
+            }
+            # TODO still need to ACTUALLY RECORD THEM now that filtered.
 
     def _check_path(self, path, includes, excludes):
         """

@@ -90,11 +90,11 @@ class SqliteRecorder(BaseRecorder):
         self.con.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, solver_options BLOB,"
                          " solver_class TEXT)")
 
-    def startup(self):
+    def startup(self, object_requesting_recording):
         """
         Startup.
         """
-        super(SqliteRecorder, self).startup()
+        super(SqliteRecorder, self).startup(object_requesting_recording)
         self._counter = 0
 
     def record_iteration(self, object_requesting_recording, metadata):
@@ -217,7 +217,7 @@ class SqliteRecorder(BaseRecorder):
         if isinstance(object_requesting_recording, System):
             dtype_tuples = []
 
-            # go through the recording options of Solver to construct the entry to be inserted.
+            # go through the recording options of System to construct the entry to be inserted.
             if self.options['record_inputs']:
                 inputs = object_requesting_recording._inputs
                 if inputs:

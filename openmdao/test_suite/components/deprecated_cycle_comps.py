@@ -38,7 +38,36 @@ class DeprecatedCycleComp(Component):
         return 'Deprecated Cycle Component'
 
     def __init__(self, **kwargs):
-        super(DeprecatedCycleComp, self).__init__(**kwargs)
+        super(DeprecatedCycleComp, self).__init__()
+
+        self.metadata.declare('jacobian_type', default='matvec',
+                              values=['matvec', 'dense', 'sparse-coo', 'sparse-csr',
+                                      'sparse-csc'],
+                              desc='method of assembling derivatives')
+        self.metadata.declare('partial_type', default='array',
+                              values=['array', 'sparse', 'aij'],
+                              desc='type of partial derivatives')
+        self.metadata.declare('num_var', type_=int, default=1,
+                              desc='Number of variables per component')
+        self.metadata.declare('var_shape', type_=tuple, default=(3,),
+                              desc='Shape of each variable')
+        self.metadata.declare('index', type_=int,
+                              desc='Index of the component. Used for testing implicit connections')
+        self.metadata.declare('connection_type', type_=str, default='explicit',
+                              values=['explicit', 'implicit'],
+                              desc='How to connect variables.')
+        self.metadata.declare('num_comp', type_=int, default=2,
+                              desc='Total number of components')
+
+        if 'finite_difference' in kwargs:
+            if kwargs.get('finite_difference'):
+                raise unittest.SkipTest('Finite Difference not supported.')
+            del kwargs['finite_difference']
+
+        self.metadata.update(kwargs)
+
+        if self.metadata['jacobian_type'] == 'matvec':
+            self.apply_linear = self.jac_vec
 
         if self.metadata['jacobian_type'] not in ['matvec', 'dense']:
             raise unittest.SkipTest('only matvec and dense jacobians are supported')
@@ -65,22 +94,7 @@ class DeprecatedCycleComp(Component):
             self._cycle_names['theta_out'] = 'theta_out'
             self._cycle_promotes_in = self._cycle_promotes_out = []
 
-        self.metadata.declare('jacobian_type', value='matvec',
-                              values=['matvec', 'dense', 'sparse-coo', 'sparse-csr',
-                                      'sparse-csc'],
-                              desc='method of assembling derivatives')
-        self.metadata.declare('partial_type', value='array',
-                              values=['array', 'sparse', 'aij'],
-                              desc='type of partial derivatives')
-        self.metadata.declare('num_var', type_=int, value=1,
-                              desc='Number of variables per component')
-        self.metadata.declare('var_shape', type_=tuple, value=(3,),
-                              desc='Shape of each variable')
-        self.metadata.declare('index', type_=int,
-                              desc='Index of the component. Used for testing implicit connections')
-        self.metadata.declare('connection_type', type_=str, value='explicit',
-                              values=['explicit', 'implicit'],
-                              desc='How to connect variables.')
+
 
         self.angle_param = 'theta'
 
@@ -95,6 +109,9 @@ class DeprecatedCycleComp(Component):
         self.add_param(self._cycle_names['theta'], val=1.)
         self.add_output(self._cycle_names['theta_out'], shape=(1,))
 
+    def _init_parameterized(self):
+        pass
+
     def solve_nonlinear(self, inputs, outputs, residuals):
         theta = inputs[self._cycle_names['theta']]
         A = _compute_A(self.size, theta)
@@ -103,7 +120,8 @@ class DeprecatedCycleComp(Component):
         self._vector_to_outputs(y, outputs)
         outputs[self._cycle_names['theta_out']] = theta
 
-    def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+    def jac_vec(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+        # Turned into apply_linear for matvec tests.
         if self.metadata['jacobian_type'] == 'matvec':
             angle_param = self._cycle_names[self.angle_param]
             x = self._inputs_to_vector(inputs)
@@ -268,7 +286,8 @@ class DeprecatedLastComp(DeprecatedFirstComp):
 
             return partials
 
-    def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+    def jac_vec(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+        # Turned into apply_linear for matvec tests.
         if self.metadata['jacobian_type'] == 'matvec':
             k = self.metadata['num_comp']
             num_var = self.metadata['num_var']

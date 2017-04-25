@@ -7,7 +7,7 @@ import json
 from shutil import rmtree
 from tempfile import mkdtemp
 
-from openmdao.api import Problem
+from openmdao.core.problem import Problem
 from openmdao.test_suite.components.sellar import SellarStateConnection
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data, view_model
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
@@ -58,9 +58,7 @@ class TestViewModelData(unittest.TestCase):
         p.model = SellarStateConnection()
         r = SqliteRecorder(self.sqlite_db_filename)
         p.driver.add_recorder(r)
-        # running setup should get us what we want in the recorder.
         p.setup(check=False)
-        # close the recorder so we can read out of it.
         r.close()
 
         model_viewer_data = _get_viewer_data(self.sqlite_db_filename)
@@ -87,14 +85,11 @@ class TestViewModelData(unittest.TestCase):
         """
         Test that an n2 html file is generated from a sqlite file.
         """
-        print (os.path.isfile(self.sqlite_db_filename))
-
         p = Problem()
         p.model = SellarStateConnection()
         r = SqliteRecorder(self.sqlite_db_filename2)
         p.driver.add_recorder(r)
         p.setup(check=False)
-        # close the recorder so we can read out of it.
         r.close()
         view_model(self.sqlite_db_filename2, outfile=self.sqlite_html_filename, show_browser=False)
 
