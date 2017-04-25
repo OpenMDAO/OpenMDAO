@@ -46,12 +46,14 @@ class DirectSolver(LinearSolver):
         """
         system = self._system
 
-        if system._owns_assembled_jac:
+        if system._owns_assembled_jac or system._views_assembled_jac:
+            ranges = system._jacobian._view_ranges[system.pathname]
             mtx = system._jacobian._int_mtx
             # Perform dense or sparse lu factorization
             if isinstance(mtx, DenseMatrix):
+                matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
                 np.set_printoptions(precision=3)
-                self._lup = scipy.linalg.lu_factor(mtx._matrix)
+                self._lup = scipy.linalg.lu_factor(matrix)
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
                 np.set_printoptions(precision=3)
                 self._lu = scipy.sparse.linalg.splu(mtx._matrix)
@@ -138,25 +140,29 @@ class DirectSolver(LinearSolver):
 
         for vec_name in self._vec_names:
             self._vec_name = vec_name
+            d_residuals = system._vectors['residual'][vec_name]
+            d_outputs = system._vectors['output'][vec_name]
 
             # assign x and b vectors based on mode
             if self._mode == 'fwd':
-                x_vec = system._vectors['output'][vec_name]
-                b_vec = system._vectors['residual'][vec_name]
+                x_vec = d_outputs
+                b_vec = d_residuals
                 trans_lu = 0
                 trans_splu = 'N'
             elif self._mode == 'rev':
-                x_vec = system._vectors['residual'][vec_name]
-                b_vec = system._vectors['output'][vec_name]
+                x_vec = d_residuals
+                b_vec = d_outputs
                 trans_lu = 1
                 trans_splu = 'T'
 
-            b_data = b_vec.get_data()
-            if system._owns_assembled_jac and isinstance(system._jacobian._int_mtx,
-                                                         (COOMatrix, CSRMatrix)):
-                x_data = self._lu.solve(b_data, trans_splu)
-            else:
-                x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
-            x_vec.set_data(x_data)
+            with system._unscaled_context(
+                    outputs=[d_outputs], residuals=[d_residuals]):
+                b_data = b_vec.get_data()
+                if ((system._owns_assembled_jac or system._views_assembled_jac) and
+                        isinstance(system._jacobian._int_mtx, (COOMatrix, CSRMatrix))):
+                    x_data = self._lu.solve(b_data, trans_splu)
+                else:
+                    x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
+                x_vec.set_data(x_data)
 
         return False, 0., 0.

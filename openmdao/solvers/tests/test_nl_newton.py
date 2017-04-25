@@ -8,7 +8,7 @@ from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
     NewtonSolver, ExecComp, ScipyIterativeSolver, ImplicitComponent, \
     DirectSolver, DenseJacobian
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.test_suite.components.double_sellar import DoubleSellar
+from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarNoDerivatives, SellarDerivatives, \
      SellarStateConnection
@@ -325,7 +325,7 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
-    def test_solve_subsystems_assembled_jac_top(self):
+    def test_solve_subsystems_basic_dense_jac(self):
         prob = Problem()
         model = prob.model = DoubleSellar()
         model.jacobian = DenseJacobian()
@@ -343,12 +343,178 @@ class TestNewton(unittest.TestCase):
         model.nl_solver = NewtonSolver()
         model.ln_solver = ScipyIterativeSolver()
 
+        model.nl_solver.options['solve_subsystems'] = True
+
         prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
         assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
         assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
+    def test_solve_subsystems_basic_dense_jac_scaling(self):
+        prob = Problem()
+        model = prob.model = DoubleSellar(units=None, scaling=True)
+        model.jacobian = DenseJacobian()
+
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
+    def test_solve_subsystems_basic_dense_jac_units_scaling(self):
+        prob = Problem()
+        model = prob.model = DoubleSellar(units=True, scaling=True)
+        model.jacobian = DenseJacobian()
+
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.0533333333, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.0533333333, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
+    def test_solve_subsystems_assembled_jac_top(self):
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+        model.jacobian = DenseJacobian()
+
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = ScipyIterativeSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = DirectSolver()
+        model.nl_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
+    def test_solve_subsystems_assembled_jac_top_implicit(self):
+        prob = Problem()
+        model = prob.model = DoubleSellarImplicit()
+        model.jacobian = DenseJacobian()
+
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+        model.nl_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
+    def test_solve_subsystems_assembled_jac_top_implicit_scaling(self):
+        prob = Problem()
+        model = prob.model = DoubleSellarImplicit(scaling=True)
+        model.jacobian = DenseJacobian()
+
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+        model.nl_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
+    def test_solve_subsystems_assembled_jac_top_implicit_scaling_units(self):
+        prob = Problem()
+        model = prob.model = DoubleSellarImplicit(units=True, scaling=True)
+        model.jacobian = DenseJacobian()
+
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+        model.nl_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.053333333, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.053333333, .00001)
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_subgroup(self):
@@ -619,7 +785,7 @@ class TestNewtonFeatures(unittest.TestCase):
 
     def test_feature_max_sub_solves(self):
         prob = Problem()
-        model = prob.model = DoubleSellar()
+        model = prob.model = DoubleSellarImplicit()
 
         g1 = model.get_subsystem('g1')
         g1.nl_solver = NewtonSolver()
