@@ -153,6 +153,7 @@ class Solver(object):
         maxiter = self.options['maxiter']
         atol = self.options['atol']
         rtol = self.options['rtol']
+        iprint = self.options['iprint']
 
         self._mpi_print_header()
 
@@ -167,6 +168,16 @@ class Solver(object):
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
+
+        if fail:
+            if iprint > -1:
+                print(self._solver_info.prefix + self.SOLVER + ' Failed to Converge')
+        elif iprint == 1:
+            print(self._solver_info.prefix + self.SOLVER + \
+                  ' Converged in {} iterations'.format(self._iter_count))
+        elif iprint == 2:
+            print(self._solver_info.prefix + self.SOLVER + ' Converged')
+
         return fail, norm, norm / norm0
 
     def _iter_initialize(self):

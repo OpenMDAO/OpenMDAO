@@ -165,7 +165,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Print header text before solving.
         """
-        if (self.options['iprint'] and self._system.comm.rank == 0 and
+        if (self.options['iprint'] > 0 and self._system.comm.rank == 0 and
             not self._system._suppress_solver_output):
 
             pathname = self._system.pathname
