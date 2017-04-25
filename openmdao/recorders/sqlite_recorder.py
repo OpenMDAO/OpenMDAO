@@ -166,8 +166,8 @@ class SqliteRecorder(BaseRecorder):
                     desvars_array[name] = value
 
         if self.options['record_responses']:
-            # responses_values = object_requesting_recording.get_response_values()
-            responses_values = self._filtered_driver['res']
+            responses_values = object_requesting_recording.get_response_values()
+            # responses_values = self._filtered_driver['res']
             if responses_values:
                 dtype_tuples = []
                 for name, value in iteritems(responses_values):

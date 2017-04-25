@@ -161,11 +161,11 @@ class BaseRecorder(object):
                              if self._check_path(n, incl, excl)]
 
             if self.options['record_objectives']:
-                myobjectives = [n for n in object_requesting_recording._objectives
+                myobjectives = [n for n in object_requesting_recording._objs
                                 if self._check_path(n, incl, excl)]
 
             if self.options['record_constraints']:
-                myconstraints = [n for n in object_requesting_recording._constraints
+                myconstraints = [n for n in object_requesting_recording._cons
                                  if self._check_path(n, incl, excl)]
 
             if self.options['record_responses']:
@@ -201,8 +201,6 @@ class BaseRecorder(object):
         #         'obj': my,
         #         'con': my
         #     }
-
-        # TODO still need to ACTUALLY RECORD THEM now that filtered.
 
     def _check_path(self, path, includes, excludes):
         """
