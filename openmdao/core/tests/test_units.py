@@ -8,7 +8,7 @@ from six.moves import cStringIO, range
 
 import numpy as np
 
-from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp
+from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp, DenseJacobian, DirectSolver
 from openmdao.api import ExecComp
 from openmdao.devtools.testutil import assert_rel_error
 
@@ -157,6 +157,39 @@ class UnitConvGroupImplicitConns(Group):
 
 class TestUnitConversion(unittest.TestCase):
     """ Testing automatic unit conversion."""
+
+    def test_basic_dense_jac(self):
+        """Test that output values and total derivatives are correct."""
+        prob = Problem(model=UnitConvGroup())
+
+        prob.model.jacobian = DenseJacobian()
+        prob.model.ln_solver = DirectSolver()
+        # Check the outputs after running to test the unit conversions
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
+
+        assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
+        assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
+        assert_rel_error(self, prob['tgtC.x3'], 100.0, 1e-6)
+        assert_rel_error(self, prob['tgtK.x3'], 373.15, 1e-6)
+
+        # Check the total derivatives in forward mode
+        wrt = ['px1.x1']
+        of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+
+        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+        assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+
+        # Check the total derivatives in reverse mode
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+
+        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+        assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
     def test_dangling_input_w_units(self):
         prob = Problem(model=Group())
