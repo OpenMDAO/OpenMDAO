@@ -10,13 +10,13 @@ from six.moves import range
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
-from openmdao.api import IndepVarComp, Group, Problem, DirectSolver, \
+from openmdao.api import IndepVarComp, Group, Problem, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
-                         NewtonSolver, ScipyIterativeSolver, DenseJacobian, \
+                         NewtonSolver, ScipyIterativeSolver, \
                          DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarImplicitDis1, SellarImplicitDis2
+from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
 class MyExplicitComp(ExplicitComponent):
