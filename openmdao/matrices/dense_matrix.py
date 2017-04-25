@@ -1,9 +1,8 @@
 """Define the DenseMatrix class."""
 from __future__ import division, print_function
 import numpy as np
-from scipy.sparse import coo_matrix, csr_matrix
 
-from openmdao.matrices.matrix import Matrix, _compute_index_map
+from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
 
 
 class DenseMatrix(Matrix):
@@ -27,7 +26,7 @@ class DenseMatrix(Matrix):
         metadata = self._metadata
 
         for key in submats:
-            info, irow, icol, src_indices, shape = submats[key]
+            info, irow, icol, src_indices, shape, factor = submats[key]
             rows = info['rows']
             cols = info['cols']
             val = info['value']
@@ -39,11 +38,11 @@ class DenseMatrix(Matrix):
                 if src_indices is None:
                     icol2 = icol + ncols
                     metadata[key] = (slice(irow, irow2),
-                                     slice(icol, icol2), np.ndarray)
+                                     slice(icol, icol2), np.ndarray, factor)
                 else:
                     metadata[key] = (slice(irow, irow2),
-                                     src_indices + icol, np.ndarray)
-            elif isinstance(val, (coo_matrix, csr_matrix)):
+                                     src_indices + icol, np.ndarray, factor)
+            elif isinstance(val, sparse_types):
                 jac = val.tocoo()
                 if src_indices is None:
                     irows = irow + jac.row
@@ -56,7 +55,7 @@ class DenseMatrix(Matrix):
                     revidxs = np.argsort(idxs)
                     irows, icols = irows[revidxs], icols[revidxs]
 
-                metadata[key] = (irows, icols, type(val))
+                metadata[key] = (irows, icols, type(val), factor)
             elif rows is not None:
                 if src_indices is None:
                     irows = rows + irow
@@ -68,7 +67,7 @@ class DenseMatrix(Matrix):
                     revidxs = np.argsort(idxs)
                     irows, icols = irows[revidxs], icols[revidxs]
 
-                metadata[key] = (irows, icols, list)
+                metadata[key] = (irows, icols, list, factor)
 
     def _update_submat(self, key, jac):
         """
@@ -81,7 +80,7 @@ class DenseMatrix(Matrix):
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
-        irows, icols, jac_type = self._metadata[key]
+        irows, icols, jac_type, factor = self._metadata[key]
         if not isinstance(jac, jac_type):
             raise TypeError("Jacobian entry for %s is of different type (%s) than "
                             "the type (%s) used at init time." % (key,
@@ -89,10 +88,13 @@ class DenseMatrix(Matrix):
                                                                   jac_type.__name__))
         if isinstance(jac, np.ndarray):
             self._matrix[irows, icols] = jac
-        elif isinstance(jac, (coo_matrix, csr_matrix)):
+        elif isinstance(jac, sparse_types):
             self._matrix[irows, icols] = jac.data
         elif isinstance(jac, list):
             self._matrix[irows, icols] = jac[0]
+
+        if factor is not None:
+            self._matrix[irows, icols] *= factor
 
     def _prod(self, in_vec, mode, ranges):
         """
@@ -116,8 +118,11 @@ class DenseMatrix(Matrix):
         # group that owns the AssembledJacobian, we need to use only
         # the part of the matrix that is relevant to the lower level
         # system.
-        rstart, rend, cstart, cend = ranges
-        mat = self._matrix[rstart:rend, cstart:cend]
+        if ranges is None:
+            mat = self._matrix
+        else:
+            rstart, rend, cstart, cend = ranges
+            mat = self._matrix[rstart:rend, cstart:cend]
         if mode == 'fwd':
             return mat.dot(in_vec)
         else:  # rev
