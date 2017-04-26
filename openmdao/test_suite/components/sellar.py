@@ -25,22 +25,35 @@ class SellarDis1(ExplicitComponent):
     Component containing Discipline 1 -- no derivatives version.
     """
 
-    def __init__(self):
+    def __init__(self, units=None, scaling=None):
         super(SellarDis1, self).__init__()
         self.execution_count = 0
+        self._units = units
+        self._scaling = scaling
 
     def initialize_variables(self):
+
+        if self._units:
+            units = 'ft'
+        else:
+            units = None
+
+        if self._scaling:
+            ref = .1
+        else:
+            ref = 1.
+
         # Global Design Variable
-        self.add_input('z', val=np.zeros(2))
+        self.add_input('z', val=np.zeros(2), units=units)
 
         # Local Design Variable
-        self.add_input('x', val=0.)
+        self.add_input('x', val=0., units=units)
 
         # Coupling parameter
-        self.add_input('y2', val=1.0)
+        self.add_input('y2', val=1.0, units=units)
 
         # Coupling output
-        self.add_output('y1', val=1.0)
+        self.add_output('y1', val=1.0, units=units, ref=ref)
 
     def compute(self, inputs, outputs):
         """
@@ -77,19 +90,31 @@ class SellarDis2(ExplicitComponent):
     Component containing Discipline 2 -- no derivatives version.
     """
 
-    def __init__(self):
+    def __init__(self, units=None, scaling=None):
         super(SellarDis2, self).__init__()
         self.execution_count = 0
+        self._units = units
+        self._scaling = scaling
 
     def initialize_variables(self):
+        if self._units:
+            units = 'inch'
+        else:
+            units = None
+
+        if self._scaling:
+            ref = .18
+        else:
+            ref = 1.
+
         # Global Design Variable
-        self.add_input('z', val=np.zeros(2))
+        self.add_input('z', val=np.zeros(2), units=units)
 
         # Coupling parameter
-        self.add_input('y1', val=1.0)
+        self.add_input('y1', val=1.0, units=units)
 
         # Coupling output
-        self.add_output('y2', val=1.0)
+        self.add_output('y2', val=1.0, units=units, ref=ref)
 
     def compute(self, inputs, outputs):
         """
@@ -322,22 +347,34 @@ class SellarImplicitDis1(ImplicitComponent):
     Component containing Discipline 1 -- no derivatives version.
     """
 
-    def __init__(self):
+    def __init__(self, units=None, scaling=None):
         super(SellarImplicitDis1, self).__init__()
         self.execution_count = 0
+        self._units = units
+        self._scaling = scaling
 
     def initialize_variables(self):
+        if self._units:
+            units = 'ft'
+        else:
+            units = None
+
+        if self._scaling is None:
+            ref = 1.
+        else:
+            ref = .1
+
         # Global Design Variable
-        self.add_input('z', val=np.zeros(2))
+        self.add_input('z', val=np.zeros(2), units=units)
 
         # Local Design Variable
-        self.add_input('x', val=0.)
+        self.add_input('x', val=0., units=units)
 
         # Coupling parameter
-        self.add_input('y2', val=1.0)
+        self.add_input('y2', val=1.0, units=units)
 
         # Coupling output
-        self.add_output('y1', val=1.0)
+        self.add_output('y1', val=1.0, units=units, ref=ref)
 
     def apply_nonlinear(self, inputs, outputs, resids):
         """
@@ -369,19 +406,31 @@ class SellarImplicitDis2(ImplicitComponent):
     Component containing Discipline 2 -- implicit version.
     """
 
-    def __init__(self):
+    def __init__(self, units=None, scaling=None):
         super(SellarImplicitDis2, self).__init__()
         self.execution_count = 0
+        self._units = units
+        self._scaling = scaling
 
     def initialize_variables(self):
+        if self._units:
+            units = 'inch'
+        else:
+            units = None
+
+        if self._scaling is None:
+            ref = 1.0
+        else:
+            ref = .18
+
         # Global Design Variable
-        self.add_input('z', val=np.zeros(2))
+        self.add_input('z', val=np.zeros(2), units=units)
 
         # Coupling parameter
-        self.add_input('y1', val=1.0)
+        self.add_input('y1', val=1.0, units=units)
 
         # Coupling output
-        self.add_output('y2', val=1.0)
+        self.add_output('y2', val=1.0, units=units, ref=ref)
 
     def apply_nonlinear(self, inputs, outputs, resids):
         """
@@ -414,4 +463,3 @@ class SellarImplicitDis2(ImplicitComponent):
         J['y2', 'y1'] = -.5*y1**-.5
         J['y2', 'z'] = -np.array([[1.0, 1.0]])
         J['y2', 'y2'] = 1.0
-

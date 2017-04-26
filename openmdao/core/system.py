@@ -977,19 +977,21 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._jacobian_changed = False
+        self._views_assembled_jac = False
+
         if jacobian is not None:
             # this means that somewhere above us is an AssembledJacobian. If
             # we have a nonlinear solver that uses derivatives, this is
             # currently an error if the AssembledJacobian is not a DenseJacobian.
             # In a future story we'll add support for sparse AssembledJacobians.
-            if (self._nl_solver is not None and
-                self._nl_solver.supports['gradients'] and not
-                    isinstance(jacobian, DenseJacobian)):
-                raise RuntimeError("System '%s' has a solver of type '%s'"
-                                   "but a sparse AssembledJacobian has been set in a "
-                                   "higher level system." %
-                                   (self.pathname,
-                                    self._nl_solver.__class__.__name__))
+            if self._nl_solver is not None and self._nl_solver.supports['gradients']:
+                if not isinstance(jacobian, DenseJacobian):
+                    raise RuntimeError("System '%s' has a solver of type '%s'"
+                                       "but a sparse AssembledJacobian has been set in a "
+                                       "higher level system." %
+                                       (self.pathname,
+                                        self._nl_solver.__class__.__name__))
+                self._views_assembled_jac = True
             self._owns_assembled_jac = False
 
         if self._owns_assembled_jac:
@@ -1024,6 +1026,10 @@ class System(object):
         if self._owns_assembled_jac:
             self._jacobian._system = self
             self._jacobian._initialize()
+
+            for s in self.system_iter(local=True, recurse=True):
+                if s._views_assembled_jac:
+                    self._jacobian._init_view(s)
 
     def set_initial_values(self):
         """
@@ -1250,7 +1256,9 @@ class System(object):
         for vec_type in ['output', 'residual']:
             for vec in self._vectors[vec_type].values():
                 self._scale_vec(vec, vec_type, 'norm')
+
         yield
+
         for vec_type in ['output', 'residual']:
             for vec in self._vectors[vec_type].values():
                 self._scale_vec(vec, vec_type, 'phys')

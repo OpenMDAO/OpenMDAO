@@ -39,14 +39,14 @@ class CSCMatrix(COOMatrix):
         revidxs = np.argsort(srtidxs)
 
         metadata = self._metadata
-        for key, (ind1, ind2, idxs, jac_type) in iteritems(metadata):
+        for key, (ind1, ind2, idxs, jac_type, factor) in iteritems(metadata):
             if idxs is None:
-                metadata[key] = (revidxs[ind1:ind2], jac_type)
+                metadata[key] = (revidxs[ind1:ind2], jac_type, factor)
             else:
                 # apply the reverse index to each part of revidxs so that
                 # we can avoid copying the index array during updates.
                 metadata[key] = (revidxs[ind1:ind2][np.argsort(idxs)],
-                                 jac_type)
+                                 jac_type, factor)
 
         # data array for the CSC should be the same as for the COO since
         # it was already in sorted order.

@@ -10,6 +10,7 @@ from openmdao.recorders.case import Case
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import is_valid_sqlite3_db
 
+
 class SqliteCaseReader(BaseCaseReader):
     """
     A CaseReader specific to files created with SqliteRecorder.

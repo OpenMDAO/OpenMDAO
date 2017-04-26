@@ -14,21 +14,31 @@ from openmdao.core.system import System
 from openmdao.solvers.solver import Solver
 from openmdao.utils.record_util import format_iteration_coordinate
 
+
 def array_to_blob(array):
-    '''Convert a numpy array to something that can be written
+    """
+    Make numpy array in to BLOB type.
+
+    Convert a numpy array to something that can be written
     to a BLOB field in sqlite
-    '''
+    """
     out = io.BytesIO()
     np.save(out, array)
     out.seek(0)
     return sqlite3.Binary(out.read())
 
+
 def blob_to_array(blob):
+    """
+    Convert sqlite BLOB to numpy array.
+    """
     out = io.BytesIO(blob)
     out.seek(0)
     return np.load(out)
 
+
 format_version = 1
+
 
 class SqliteRecorder(BaseRecorder):
     """
@@ -84,9 +94,8 @@ class SqliteRecorder(BaseRecorder):
 
         self.con.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                          "model_viewer_data BLOB)")
-        self.con.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
-                         "input_scale_factor REAL, output_scale_factor REAL, "
-                         "residual_scale_factor REAL)")
+        self.con.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY,"
+                         " scaling_factors BLOB)")
         self.con.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, solver_options BLOB,"
                          " solver_class TEXT)")
 
@@ -144,6 +153,7 @@ class SqliteRecorder(BaseRecorder):
         # we want to write to sqlite
         if self.options['record_desvars']:
             desvars_values = object_requesting_recording.get_design_var_values()
+            # desvars_values = self._filtered_driver['des']
             if desvars_values:
                 dtype_tuples = []
                 for name, value in iteritems(desvars_values):
@@ -157,6 +167,7 @@ class SqliteRecorder(BaseRecorder):
 
         if self.options['record_responses']:
             responses_values = object_requesting_recording.get_response_values()
+            # responses_values = self._filtered_driver['res']
             if responses_values:
                 dtype_tuples = []
                 for name, value in iteritems(responses_values):
@@ -183,8 +194,6 @@ class SqliteRecorder(BaseRecorder):
 
         if self.options['record_constraints']:
             constraints_values = object_requesting_recording.get_constraint_values()
-            print('constraints_values', constraints_values)
-
             if constraints_values:
                 dtype_tuples = []
                 for name, value in iteritems(constraints_values):
@@ -209,7 +218,6 @@ class SqliteRecorder(BaseRecorder):
                                                      responses_blob, objectives_blob,
                                                      constraints_blob))
 
-
     def record_iteration_system(self, object_requesting_recording, metadata):
         """
         Record an iteration using system options.
@@ -219,31 +227,26 @@ class SqliteRecorder(BaseRecorder):
 
             # go through the recording options of System to construct the entry to be inserted.
             if self.options['record_inputs']:
-                inputs = object_requesting_recording._inputs
-                if inputs:
-                    for name, value in iteritems(design_vars):
+                if self._filtered_system['i']:
+                    for name, value in iteritems(self._filtered_system['i']):
                         tple = ('input.' + name, '({},)f8'.format(len(value)))
                         dtype_tuples.append(tple)
 
             if self.options['record_outputs']:
-                outputs = object_requesting_recording._outputs
-                if outputs:
-                    for name, value in iteritems(ouputs):
+                if self._filtered_system['o']:
+                    for name, value in iteritems(self._filtered_system['o']):
                         tple = ('output.' + name, '({},)f8'.format(len(value)))
                         dtype_tuples.append(tple)
 
             if self.options['record_residuals']:
-                residuals = object_requesting_recording._residuals
-                if residuals:
-                    for name, value in iteritems(residuals):
+                if self._filtered_system['r']:
+                    for name, value in iteritems(self._filtered_system['o']):
                         tple = ('residual.' + name, '({},)f8'.format(len(value)))
                         dtype_tuples.append(tple)
 
             if self.options['record_derivatives']:
-                derivatives = object_requesting_recording._derivatves
-                # TODO_RECORDERS: MAKE THIS EXIST?
-                if derivatives:
-                    for name, value in iteritems(derivatives):
+                if self._filtered_system['d']:
+                    for name, value in iteritems(self._filtered_system['d']):
                         tple = ('derivative.' + name, '({},)f8'.format(len(value)))
                         dtype_tuples.append(tple)
 
@@ -266,7 +269,6 @@ class SqliteRecorder(BaseRecorder):
                 for name, value in iteritems(derivatives):
                     system_values['derivative.' + name] = value
 
-            print("SYSTEM VALUES:", system_values)
             # Write this mega array to the database
             self.con.execute("INSERT INTO system_iterations(iteration_coordinate, timestamp, "
                              "success, msg, system_values) VALUES(?,?,?,?,?)",
@@ -337,7 +339,6 @@ class SqliteRecorder(BaseRecorder):
             for name, value in iteritems(residuals):
                 solver_values['residual.' + name] = value
 
-        print("SOLVER VALUES:", solver_values)
         # Write this mega array to the database
         with self.con:
             self.con.execute("INSERT INTO solver_iterations(iteration_coordinate, timestamp, "
@@ -373,12 +374,12 @@ class SqliteRecorder(BaseRecorder):
         """
         Record system metadata.
         """
-        self.con.execute("INSERT INTO system_metadata(id, scaling_factor_input, "
-                         "scaling_factor_output, scaling_factor_residual) VALUES(?,?,?,?)",
+        scaling_factors = cPickle.dumps(object_requesting_recording._scaling_vecs,
+                                        cPickle.HIGHEST_PROTOCOL)
+
+        self.con.execute("INSERT INTO system_metadata(id, scaling_factors) VALUES(?,?)",
                          (object_requesting_recording.pathname,
-                          object_requesting_recording._scaling_to_phys['input'],
-                          object_requesting_recording._scaling_to_phys['output']),
-                         object_requesting_recording._scaling_to_phys['residual'])
+                          sqlite3.Binary(scaling_factors)))
 
     def record_metadata_solver(self, object_requesting_recording):
         """

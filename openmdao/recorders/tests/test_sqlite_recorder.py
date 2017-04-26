@@ -239,6 +239,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, None, expected_constraints),), self.eps)
 
+
     def test_simple_driver_recording(self):
 
         if OPT is None:
@@ -325,6 +326,28 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_driver_metadata = None
         self.assertDriverMetadataRecorded(expected_driver_metadata)
 
+    # def test_driver_records_includes(self):
+    #     self.setup_sellar_model()
+    #
+    #     self.recorder.options['includes'] = ['*']
+    #     self.recorder.options['excludes'] = ['obj_cmp*']
+    #     # print ("INCLUDES", self.recorder.options['includes'])
+    #     # print ("EXCLUDES", self.recorder.options['excludes'])
+    #
+    #     self.prob.driver.add_recorder(self.recorder)
+    #     self.prob.model.add_recorder(self.recorder)
+    #     self.prob.setup(check=False)
+    #     self.prob.run()
+    #     self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+    #
+    #     self.assertMetadataRecorded()
+    #
+    #     expected_driver_metadata = {
+    #         'connections_list_length': 11,
+    #         'tree_length': 4,
+    #         'tree_children_length': 7,
+    #     }
+    #     self.assertDriverMetadataRecorded(expected_driver_metadata)
     # TODO_RECORDERS Need to add tests for solvers and systems
     def test_record_system(self):
         self.setup_sellar_model()
