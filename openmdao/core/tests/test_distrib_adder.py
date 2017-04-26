@@ -96,14 +96,14 @@ class DistributedAdderTest(unittest.TestCase):
     def test_distributed_adder(self):
         size = 1000000 #how many items in the array
 
-        prob = Problem(vector_class=PETScVector, check=False)
+        prob = Problem()
         prob.model = Group()
 
         prob.model.add('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add('plus', DistributedAdder(size), promotes=['x', 'y'])
         prob.model.add('summer', Summer(size), promotes=['y', 'sum'])
 
-        prob.setup(check=False)
+        prob.setup(vector_class=PETScVector, check=False)
 
         prob['x'] = np.ones(size)
 

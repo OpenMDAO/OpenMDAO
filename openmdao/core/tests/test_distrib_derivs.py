@@ -34,6 +34,17 @@ class DistribExecComp(ExecComp):
         for all distributed inputs and outputs. Returns a dict of
         index arrays keyed to variable names.
         """
+        outs = set()
+        allvars = set()
+        exprs = self._exprs
+        kwargs = self._kwargs
+
+        # find all of the variables and which ones are outputs
+        for expr in exprs:
+            lhs, _ = expr.split('=', 1)
+            outs.update(self._parse_for_out_vars(lhs))
+            allvars.update(self._parse_for_vars(expr))
+
         comm = self.comm
         rank = comm.rank
 
@@ -41,6 +52,13 @@ class DistribExecComp(ExecComp):
         start = offsets[rank]
         end = start + sizes[rank]
 
+        for name, meta in kwargs.items():
+            if not isinstance(meta, dict):
+                kwargs[name] = {}
+            if name in outs:
+                pass
+            else:  # input
+                kwargs[name]...
         for n, m in self._init_unknowns_dict.items():
             self.set_var_indices(n, val=numpy.ones(sizes[rank], float),
                                  src_indices=numpy.arange(start, end, dtype=int))
@@ -145,7 +163,7 @@ class MPITests2(unittest.TestCase):
         root.connect("P.x", "C1.x")
 
         root.ln_solver = LinearBlockGS()
-        root.sub.ln_solver = LinearBlockGS()
+        sub.ln_solver = LinearBlockGS()
 
         prob.setup(check=False)
         prob.run()
@@ -189,7 +207,7 @@ class MPITests2(unittest.TestCase):
         root.connect("C3.y", "C4.x")
 
         root.ln_solver = LinearBlockGS()
-        root.sub.ln_solver = LinearBlockGS()
+        sub.ln_solver = LinearBlockGS()
 
         prob.setup(check=False)
         prob.run()
@@ -205,13 +223,13 @@ class MPITests2(unittest.TestCase):
     def test_src_indices_error(self):
         size = 3
         group = Group()
-        group.add('P', IndepVarComp('x', numpy.ones(size)))
-        group.add('C1', DistribExecComp(['y=2.0*x'], arr_size=size,
-                                        x=numpy.zeros(size),
-                                        y=numpy.zeros(size)))
-        group.add('C2', ExecComp(['z=3.0*y'],
-                                 y=numpy.zeros(size),
-                                 z=numpy.zeros(size)))
+        P = group.add('P', IndepVarComp('x', numpy.ones(size)))
+        C1 = group.add('C1', DistribExecComp(['y=2.0*x'], arr_size=size,
+                                             x=numpy.zeros(size),
+                                             y=numpy.zeros(size)))
+        C2 = group.add('C2', ExecComp(['z=3.0*y'],
+                                      y=numpy.zeros(size),
+                                      z=numpy.zeros(size)))
 
         prob = Problem()
         prob.model = group
@@ -219,8 +237,8 @@ class MPITests2(unittest.TestCase):
         prob.model.connect('P.x', 'C1.x')
         prob.model.connect('C1.y', 'C2.y')
 
-        prob.driver.add_desvar('P.x')
-        prob.driver.add_objective('C1.y')
+        P.add_design_var('x', lower=0., upper=100.)
+        C1.add_objective('y')
 
         try:
             prob.setup(check=False)
