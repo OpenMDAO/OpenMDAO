@@ -1094,7 +1094,7 @@ class Group(System):
         """
         with self.jacobian_context() as J:
             # Use global Jacobian
-            if self._owns_assembled_jac:
+            if self._owns_assembled_jac or self._views_assembled_jac:
                 for vec_name in vec_names:
                     with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                         d_inputs, d_outputs, d_residuals = vecs
@@ -1154,7 +1154,7 @@ class Group(System):
                 subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
 
             # Update jacobian
-            if self._owns_assembled_jac:
+            if self._owns_assembled_jac or self._views_assembled_jac:
                 J._update()
 
         if self._nl_solver is not None and do_nl:

@@ -7,11 +7,8 @@ import unittest
 
 import numpy as np
 
-from openmdao.core.group import Group
-from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.core.problem import Problem
+from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, DenseJacobian, NewtonSolver, ExecComp, ParallelGroup
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.solvers.ln_direct import DirectSolver
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec, \
      TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
