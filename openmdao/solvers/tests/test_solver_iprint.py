@@ -37,14 +37,14 @@ class TestSolverPrint(unittest.TestCase):
         newton = prob.model.nl_solver = NewtonSolver()
         ln_scipy = prob.model.ln_solver = ScipyIterativeSolver()
 
-        newton.options['maxiter'] = 2
+        newton.options['maxiter'] = 1
         prob.setup(check=False)
 
         prob['y1'] = 10000
         prob['y2'] = -26
 
         newton.options['iprint'] = 0
-        ln_scipy.options['iprint'] = -1
+        ln_scipy.options['iprint'] = 0
 
         prob.run_model()
 
@@ -110,7 +110,7 @@ class TestSolverPrint(unittest.TestCase):
         g2.ln_solver = PetscKSP()
         g2.ln_solver.precon = PetscKSP()
 
-        model.suppress_solver_output = False
+        prob.set_solver_print(level=2)
 
         prob.setup(check=False)
         prob.run_model()
@@ -135,7 +135,7 @@ class TestSolverPrint(unittest.TestCase):
         g1.nl_solver = NonlinearBlockGS()
         g2.nl_solver = NonlinearBlockGS()
 
-        model.suppress_solver_output = False
+        prob.set_solver_print(level=2)
 
         prob.setup(check=False)
         prob.run_model()
@@ -162,7 +162,7 @@ class TestSolverPrint(unittest.TestCase):
         g1.nl_solver = NonlinearBlockJac()
         g2.nl_solver = NonlinearBlockJac()
 
-        model.suppress_solver_output = False
+        prob.set_solver_print(level=2)
 
         prob.setup(check=False)
         prob.run_model()

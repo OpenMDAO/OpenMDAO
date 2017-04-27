@@ -43,7 +43,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.model.connect('p1.x1', 'comp.x1')
         prob.model.connect('p2.x2', 'comp.x2')
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()
@@ -89,7 +89,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.model.connect('p1.x1', 'comp.x1')
         prob.model.connect('p2.x2', 'comp.x2')
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()
@@ -250,7 +250,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.model.add_subsystem('pt', PassThrough("foo", "bar", val=np.ones(4)), promotes=['*'])
         p.model.add_subsystem('pt2', PassThrough("foo2", "bar2", val=np.ones(4)), promotes=['*'])
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
 
         p.setup()
         p.run_model()
@@ -276,7 +276,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.model.connect('p1.x', 'comp.x')
         prob.model.connect('p2.y', 'comp.y')
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()
@@ -308,7 +308,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.model.connect('p1.rhs', 'comp.rhs')
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()
@@ -358,7 +358,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.model.connect('p1.x', 'comp.x')
         prob.model.connect('p2.dummy', 'comp.dummy')
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()

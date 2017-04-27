@@ -31,7 +31,7 @@ class TestParallelGroups(unittest.TestCase):
         wrt=['iv.x']
 
         prob.setup(vector_class=PETScVector, check=False, mode='fwd')
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
@@ -57,7 +57,7 @@ class TestParallelGroups(unittest.TestCase):
         #prob = Problem(FanOutGroupedVarSets())
 
         #prob.setup(vector_class=PETScVector, check=False, mode='fwd')
-        #prob.model.suppress_solver_output = True
+        #prob.set_solver_print(level=0)
         #prob.run_model()
 
         #J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
@@ -84,7 +84,7 @@ class TestParallelGroups(unittest.TestCase):
         prob = Problem()
         prob.model = FanInGrouped()
         prob.setup(vector_class=PETScVector, check=False, mode='fwd')
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         indep_list = ['iv.x1', 'iv.x2']
@@ -114,7 +114,7 @@ class TestParallelGroups(unittest.TestCase):
         prob = Problem()
         prob.model = Diamond()
         prob.setup(vector_class=PETScVector, check=False, mode='fwd')
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, prob['c4.y1'], 46.0, 1e-6)
@@ -142,7 +142,7 @@ class TestParallelGroups(unittest.TestCase):
         prob = Problem()
         prob.model = ConvergeDiverge()
         prob.setup(vector_class=PETScVector, check=False, mode='fwd')
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)

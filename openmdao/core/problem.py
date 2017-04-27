@@ -46,6 +46,8 @@ class Problem(object):
         the model once.
     _use_ref_vector : bool
         If True, allocate vectors to store ref. values.
+    _solver_print_cache : list
+        Allows solver iprints to be set to requested values after setup calls.
     """
 
     def __init__(self, model=None, comm=None, use_ref_vector=True, root=None):
@@ -88,6 +90,7 @@ class Problem(object):
         self.driver = Driver()
 
         self._use_ref_vector = use_ref_vector
+        self._solver_print_cache = []
 
     def __getitem__(self, name):
         """
@@ -253,6 +256,10 @@ class Problem(object):
         model._setup(comm, vector_class, 'full')
         self.driver._setup_driver(self)
 
+        # Now that setup has been called, we can set the iprints.
+        for items in self._solver_print_cache:
+            self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
+
         if check:
             check_config(self, logger)
 
@@ -327,7 +334,7 @@ class Problem(object):
             comps = [model.get_subsystem(c_name) for c_name in comps]
 
         current_mode = self._mode
-        current_suppresion = model.suppress_solver_output
+        self.set_solver_print(level=0)
 
         # This is a defaultdict of (defaultdict of dicts).
         partials_data = defaultdict(lambda: defaultdict(dict))
@@ -338,7 +345,6 @@ class Problem(object):
 
         # Analytic Jacobians
         for mode in ('fwd', 'rev'):
-            model.suppress_solver_output = True
             model._inputs.set_vec(input_cache)
             model._outputs.set_vec(output_cache)
             # Make sure we're in a valid state
@@ -538,7 +544,6 @@ class Problem(object):
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
-        model.suppress_solver_output = current_suppresion
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, global_options)
@@ -820,6 +825,28 @@ class Problem(object):
                                 raise RuntimeError("unsupported return format")
 
         return totals
+
+    def set_solver_print(self, level=2, depth=1e99, type_='all'):
+        """
+        Control printing for solvers and subsolvers in the model.
+
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        depth : int
+            How deep to recurse. For example, you can set this to 0 if you only want
+            to print the top level linear and nonlinear solver messages. Default
+            prints everything.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        """
+        if (level, depth, type_) not in self._solver_print_cache:
+            self._solver_print_cache.append((level, depth, type_))
+
+        self.model._set_solver_print(level=level, depth=depth, type_=type_)
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,

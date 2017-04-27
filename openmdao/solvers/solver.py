@@ -16,7 +16,11 @@ class SolverInfo(object):
     prefix : <System>
         Prefix to prepend during this iprint.
     """
+
     def __init__(self):
+        """
+        Initialize.
+        """
         self.prefix = ""
 
 
@@ -40,7 +44,7 @@ class Solver(object):
     _iter_count : int
         Number of iterations for the current invocation of the solver.
     _solver_info : <SolverInfo>
-        Object to store some formatting for iprint.
+        Object to store some formatting for iprint that is shared across all solvers.
     options : <OptionsDictionary>
         Options dictionary.
     supports : <OptionsDictionary>
@@ -49,6 +53,7 @@ class Solver(object):
     """
 
     SOLVER = 'base_solver'
+    _solver_info = SolverInfo()
 
     def __init__(self, **kwargs):
         """
@@ -64,7 +69,6 @@ class Solver(object):
         self._vec_names = None
         self._mode = 'fwd'
         self._iter_count = 0
-        self._solver_info = None
 
         self.options = OptionsDictionary()
         self.options.declare('maxiter', type_=int, default=10,
@@ -105,6 +109,21 @@ class Solver(object):
         self._system = system
         self._depth = depth
 
+    def _set_solver_print(self, level=2, type_='all'):
+        """
+        Control printing for solvers and subsolvers in the model.
+
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        """
+        self.options['iprint'] = level
+
     def _mpi_print(self, iteration, abs_res, rel_res):
         """
         Print residuals from an iteration.
@@ -118,8 +137,7 @@ class Solver(object):
         rel_res : float
             current relative residual norm.
         """
-        if (self.options['iprint'] and self._system.comm.rank == 0 and
-                not self._system._suppress_solver_output):
+        if (self.options['iprint'] == 2 and self._system.comm.rank == 0):
 
             prefix = self._solver_info.prefix
             solver_name = self.SOLVER
@@ -171,9 +189,10 @@ class Solver(object):
 
         if fail:
             if iprint > -1:
-                print(self._solver_info.prefix + self.SOLVER + ' Failed to Converge')
+                msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
+                print(self._solver_info.prefix + self.SOLVER + msg)
         elif iprint == 1:
-            print(self._solver_info.prefix + self.SOLVER + \
+            print(self._solver_info.prefix + self.SOLVER +
                   ' Converged in {} iterations'.format(self._iter_count))
         elif iprint == 2:
             print(self._solver_info.prefix + self.SOLVER + ' Converged')

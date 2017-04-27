@@ -56,7 +56,7 @@ class TestNewton(unittest.TestCase):
         mda.nl_solver = NewtonSolver()
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -114,7 +114,7 @@ class TestNewton(unittest.TestCase):
         prob.model.ln_solver = LinearBlockGS()
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = False
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -138,7 +138,7 @@ class TestNewton(unittest.TestCase):
         prob.model.nl_solver = NewtonSolver()
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -153,7 +153,7 @@ class TestNewton(unittest.TestCase):
         prob = Problem()
         prob.model = SellarStateConnection()
         prob.model.nl_solver = NewtonSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.setup(check=False)
         prob.run_model()
 
@@ -177,7 +177,7 @@ class TestNewton(unittest.TestCase):
         # prob.model.deriv_options['type'] = 'fd'
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -201,7 +201,7 @@ class TestNewton(unittest.TestCase):
         # The good solver
         prob.model.nl_solver.ln_solver = ScipyIterativeSolver()
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.setup(check=False)
         prob.run_model()
 
@@ -228,7 +228,7 @@ class TestNewton(unittest.TestCase):
         # The good solver
         prob.model.nl_solver.ln_solver = DirectSolver()
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.setup(check=False)
         prob.run_model()
 
@@ -291,7 +291,7 @@ class TestNewton(unittest.TestCase):
         prob.setup(check=False)
         prob['comp.z'] = -4.93191510182
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, prob['comp.z'], -4.93191510182, .00001)
@@ -592,7 +592,7 @@ class TestNewton(unittest.TestCase):
         model.nl_solver.options['maxiter'] = 5
         model.nl_solver.options['solve_subsystems'] = True
         model.nl_solver.options['max_sub_solves'] = 0
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup()
         prob.run_model()
@@ -625,7 +625,7 @@ class TestNewton(unittest.TestCase):
         model.nl_solver.options['maxiter'] = 5
         model.nl_solver.options['solve_subsystems'] = True
         model.nl_solver.options['max_sub_solves'] = 5
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup()
         prob.run_model()
@@ -658,7 +658,7 @@ class TestNewton(unittest.TestCase):
         model.nl_solver.options['maxiter'] = 5
         model.nl_solver.options['solve_subsystems'] = True
         model.nl_solver.options['max_sub_solves'] = 1
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup()
         prob.run_model()
@@ -703,7 +703,7 @@ class TestNewton(unittest.TestCase):
 
         root.nl_solver = NewtonSolver()
         root.nl_solver.options['maxiter'] = 1
-        root.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup()
         prob.run_model()

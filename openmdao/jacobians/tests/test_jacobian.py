@@ -222,7 +222,7 @@ class TestJacobian(unittest.TestCase):
         top.nl_solver.ln_solver = ScipyIterativeSolver(maxiter=100)
         top.ln_solver = ScipyIterativeSolver(
             maxiter=200, atol=1e-10, rtol=1e-10)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
 
@@ -292,7 +292,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.add_subsystem('C1', comp)
         prob.setup(check=False)
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
         prob.model.run_apply_nonlinear()
         prob.model.run_linearize()
@@ -314,7 +314,7 @@ class TestJacobian(unittest.TestCase):
         d1 = prob.model.get_subsystem('d1')
 
         d1.jacobian = DenseJacobian()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()
@@ -338,7 +338,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.connect('indep.x', 'C2.a')
         prob.model.connect('C1.c', 'C2.b')
         prob.model.connect('C2.d', 'C3.a')
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.setup(check=False)
         prob.run_model()
         assert_rel_error(self, prob['C3.ee'], 8.0, 0000.1)

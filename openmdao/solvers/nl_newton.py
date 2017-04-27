@@ -80,15 +80,34 @@ class NewtonSolver(NonlinearSolver):
         super(NewtonSolver, self)._setup_solvers(system, depth)
 
         if self.ln_solver is not None:
-            self.ln_solver._solver_info = self._solver_info
             self.ln_solver._setup_solvers(self._system, self._depth + 1)
             self._ln_solver_from_parent = False
         else:
             self.ln_solver = system.ln_solver
 
         if self.linesearch is not None:
-            self.linesearch._solver_info = self._solver_info
             self.linesearch._setup_solvers(self._system, self._depth + 1)
+
+    def _set_solver_print(self, level=2, type_='all'):
+        """
+        Control printing for solvers and subsolvers in the model.
+
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        """
+        super(NewtonSolver, self)._set_solver_print(level=level, type_=type_)
+
+        if self.ln_solver is not None and type_ != 'NL':
+            self.ln_solver._set_solver_print(level=level, type_=type_)
+
+        if self.linesearch is not None:
+            self.linesearch._set_solver_print(level=level, type_=type_)
 
     def _iter_get_norm(self):
         """
@@ -147,7 +166,6 @@ class NewtonSolver(NonlinearSolver):
 
             system._apply_nonlinear()
 
-
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0
         system._linearize()
@@ -165,15 +183,14 @@ class NewtonSolver(NonlinearSolver):
         """
         Print header text before solving.
         """
-        if (self.options['iprint'] > 0 and self._system.comm.rank == 0 and
-            not self._system._suppress_solver_output):
+        if (self.options['iprint'] > 0 and self._system.comm.rank == 0):
 
             pathname = self._system.pathname
             if pathname:
                 nchar = len(pathname)
                 prefix = self._solver_info.prefix
                 header = prefix + "\n"
-                header += prefix + nchar*"=" + "\n"
+                header += prefix + nchar * "=" + "\n"
                 header += prefix + pathname + "\n"
-                header += prefix+ nchar*"="
+                header += prefix + nchar * "="
                 print(header)

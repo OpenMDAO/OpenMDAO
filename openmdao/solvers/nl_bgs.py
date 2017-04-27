@@ -28,15 +28,14 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         Print header text before solving.
         """
-        if (self.options['iprint'] > 0 and self._system.comm.rank == 0 and
-            not self._system._suppress_solver_output):
+        if (self.options['iprint'] > 0 and self._system.comm.rank == 0):
 
             pathname = self._system.pathname
             if pathname:
                 nchar = len(pathname)
                 prefix = self._solver_info.prefix
                 header = prefix + "\n"
-                header += prefix + nchar*"=" + "\n"
+                header += prefix + nchar * "=" + "\n"
                 header += prefix + pathname + "\n"
-                header += prefix+ nchar*"="
+                header += prefix + nchar * "="
                 print(header)
