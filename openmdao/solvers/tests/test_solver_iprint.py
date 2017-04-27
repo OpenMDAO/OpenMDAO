@@ -29,6 +29,7 @@ class TestSolverPrint(unittest.TestCase):
         newton.options['iprint'] = -1
         ln_scipy.options['iprint'] = -1
         prob.run_model()
+        print('done')
 
     def test_feature_iprint_0(self):
 
@@ -168,6 +169,107 @@ class TestSolverPrint(unittest.TestCase):
         prob.run_model()
 
         print('hey')
+
+    def test_feature_set_solver_print1(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
+
+        sub1 = model.add_subsystem('sub1', Group())
+        sub2 = sub1.add_subsystem('sub2', Group())
+        g1 = sub2.add_subsystem('g1', SubSellar())
+        g2 = model.add_subsystem('g2', SubSellar())
+
+        model.connect('pz.z', 'sub1.sub2.g1.z')
+        model.connect('sub1.sub2.g1.y2', 'g2.x')
+        model.connect('g2.y2', 'sub1.sub2.g1.x')
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 0
+
+        g1.nl_solver = NewtonSolver()
+        g1.ln_solver = PetscKSP()
+
+        g2.nl_solver = NewtonSolver()
+        g2.ln_solver = PetscKSP()
+        g2.ln_solver.precon = PetscKSP()
+
+        prob.set_solver_print(level=2)
+
+        prob.setup(check=False)
+        prob.run_model()
+
+    def test_feature_set_solver_print2(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
+
+        sub1 = model.add_subsystem('sub1', Group())
+        sub2 = sub1.add_subsystem('sub2', Group())
+        g1 = sub2.add_subsystem('g1', SubSellar())
+        g2 = model.add_subsystem('g2', SubSellar())
+
+        model.connect('pz.z', 'sub1.sub2.g1.z')
+        model.connect('sub1.sub2.g1.y2', 'g2.x')
+        model.connect('g2.y2', 'sub1.sub2.g1.x')
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 0
+
+        g1.nl_solver = NewtonSolver()
+        g1.ln_solver = PetscKSP()
+
+        g2.nl_solver = NewtonSolver()
+        g2.ln_solver = PetscKSP()
+        g2.ln_solver.precon = PetscKSP()
+
+        prob.set_solver_print(level=2)
+        prob.set_solver_print(level=0, type_='LN')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+    def test_feature_set_solver_print3(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
+
+        sub1 = model.add_subsystem('sub1', Group())
+        sub2 = sub1.add_subsystem('sub2', Group())
+        g1 = sub2.add_subsystem('g1', SubSellar())
+        g2 = model.add_subsystem('g2', SubSellar())
+
+        model.connect('pz.z', 'sub1.sub2.g1.z')
+        model.connect('sub1.sub2.g1.y2', 'g2.x')
+        model.connect('g2.y2', 'sub1.sub2.g1.x')
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 0
+
+        g1.nl_solver = NewtonSolver()
+        g1.ln_solver = PetscKSP()
+
+        g2.nl_solver = NewtonSolver()
+        g2.ln_solver = PetscKSP()
+        g2.ln_solver.precon = PetscKSP()
+
+        prob.set_solver_print(level=0)
+        prob.set_solver_print(level=2, depth=2)
+
+        prob.setup(check=False)
+        prob.run_model()
 
 if __name__ == "__main__":
     unittest.main()
