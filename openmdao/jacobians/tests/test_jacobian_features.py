@@ -217,42 +217,6 @@ class TestJacobianFeatures(unittest.TestCase):
             problem.setup(check=False)
         self.assertEquals(str(ex.exception), error_msg)
 
-    def test_const_jacobian(self):
-        model = Group()
-        comp = IndepVarComp()
-        for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),
-                          ('y3', np.ones(2)), ('z', np.ones((2, 2)))):
-            comp.add_output(name, val)
-        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
-
-        problem = Problem(model=model)
-        model.suppress_solver_output = True
-        model.ln_solver = ScipyIterativeSolver()
-        model.jacobian = COOJacobian()
-        model.add_subsystem('simple', SimpleCompConst(),
-                            promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
-        problem.setup(check=False)
-        problem.run_model()
-        totals = problem.compute_total_derivs(['f', 'g'],
-                                              ['x', 'y1', 'y2', 'y3', 'z'])
-(??)
-
-        jacobian = {}
-        jacobian['f', 'x'] = 1.
-        jacobian['f', 'z'] = np.ones((1, 4))
-        jacobian['f', 'y1'] = np.zeros((1, 2))
-        jacobian['f', 'y2'] = np.zeros((1, 2))
-        jacobian['f', 'y3'] = np.zeros((1, 2))
-
-        jacobian['g', 'y1'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
-        jacobian['g', 'y2'] = [[1, 0], [0, 1], [1, 0], [0, 1]]
-        jacobian['g', 'y3'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
-
-        jacobian['g', 'x'] = [[1], [0], [0], [1]]
-        jacobian['g', 'z'] = np.zeros((4, 4))
-
-        assert_rel_error(self, totals, jacobian)
-
     @parameterized.expand(
         itertools.product([1e-6, 1e-8],  # Step size
                           ['forward', 'central', 'backward'],  # FD Form
@@ -270,7 +234,7 @@ class TestJacobianFeatures(unittest.TestCase):
         totals = problem.compute_total_derivs(['f', 'g'],
                                               ['x', 'y1', 'y2', 'y3', 'z'])
         jacobian = {}
-        jacobian['f', 'x'] = 1.
+        jacobian['f', 'x'] = [[1.]]
         jacobian['f', 'z'] = np.ones((1, 4))
         jacobian['f', 'y1'] = np.zeros((1, 2))
         jacobian['f', 'y2'] = np.zeros((1, 2))
@@ -296,7 +260,7 @@ class TestJacobianFeatures(unittest.TestCase):
         totals = problem.compute_total_derivs(['f', 'g'],
                                               ['x', 'y1', 'y2', 'y3', 'z'])
         jacobian = {}
-        jacobian['f', 'x'] = 1.
+        jacobian['f', 'x'] = [[1.]]
         jacobian['f', 'z'] = np.ones((1, 4))
         jacobian['f', 'y1'] = np.zeros((1, 2))
         jacobian['f', 'y2'] = np.zeros((1, 2))
@@ -340,23 +304,60 @@ class TestJacobianFeatures(unittest.TestCase):
         p.run_model()
         totals = p.compute_total_derivs(['flow:T', 'flow:P'], ['T', 'P'])
         expected_totals = {
-            ('flow:T', 'T'): 9/5,
-            ('flow:P', 'T'): 0.,
-            ('flow:T', 'P'): 0.,
-            ('flow:P', 'P'): 14.50377,
+            ('flow:T', 'T'): [[9/5]],
+            ('flow:P', 'T'): [[0.]],
+            ('flow:T', 'P'): [[0.]],
+            ('flow:P', 'P'): [[14.50377]],
         }
         assert_rel_error(self, totals, expected_totals, 1e-6)
 
         expected_subjacs = {
-            ('units.flow:T', 'units.T'): -1.,
-            ('units.flow:P', 'units.T'): 0.,
-            ('units.flow:T', 'units.P'): 0.,
-            ('units.flow:P', 'units.P'): -1.,
+            ('units.flow:T', 'units.T'): [[-1.]],
+            ('units.flow:P', 'units.T'): [[0.]],
+            ('units.flow:T', 'units.P'): [[0.]],
+            ('units.flow:P', 'units.P'): [[-1.]],
         }
 
         jac = units._jacobian._subjacs
         for deriv, val in iteritems(expected_subjacs):
             assert_rel_error(self, jac[deriv], val, 1e-6)
+
+class TestJacobianForDocs(unittest.TestCase):
+    def test_const_jacobian(self):
+        model = Group()
+        comp = IndepVarComp()
+        for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),
+                          ('y3', np.ones(2)), ('z', np.ones((2, 2)))):
+            comp.add_output(name, val)
+        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
+
+        problem = Problem(model=model)
+        model.suppress_solver_output = True
+        model.ln_solver = ScipyIterativeSolver()
+        model.jacobian = COOJacobian()
+        model.add_subsystem('simple', SimpleCompConst(),
+                            promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
+        problem.setup(check=False)
+        problem.run_model()
+        totals = problem.compute_total_derivs(['f', 'g'],
+                                              ['x', 'y1', 'y2', 'y3', 'z'])
+        jacobian = {}
+        jacobian['f', 'x'] = [[1.]]
+        jacobian['f', 'z'] = np.ones((1, 4))
+        jacobian['f', 'y1'] = np.zeros((1, 2))
+        jacobian['f', 'y2'] = np.zeros((1, 2))
+        jacobian['f', 'y3'] = np.zeros((1, 2))
+
+        jacobian['g', 'y1'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+        jacobian['g', 'y2'] = [[1, 0], [0, 1], [1, 0], [0, 1]]
+        jacobian['g', 'y3'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+
+        jacobian['g', 'x'] = [[1], [0], [0], [1]]
+        jacobian['g', 'z'] = np.zeros((4, 4))
+
+        assert_rel_error(self, totals, jacobian)
+        import pprint
+        pprint.pprint(totals)
 
 if __name__ == '__main__':
     unittest.main()
