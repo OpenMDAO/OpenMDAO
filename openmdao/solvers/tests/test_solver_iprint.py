@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver, Group, PetscKSP, \
-                         IndepVarComp, NonlinearBlockGS, NonlinearBlockJac
+                         IndepVarComp, NonlinearBlockGS, NonlinearBlockJac, LinearBlockGS
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -105,11 +105,12 @@ class TestSolverPrint(unittest.TestCase):
         model.nl_solver.options['max_sub_solves'] = 0
 
         g1.nl_solver = NewtonSolver()
-        g1.ln_solver = PetscKSP()
+        g1.ln_solver = LinearBlockGS()
 
         g2.nl_solver = NewtonSolver()
-        g2.ln_solver = PetscKSP()
-        g2.ln_solver.precon = PetscKSP()
+        g2.ln_solver = ScipyIterativeSolver()
+        g2.ln_solver.precon = LinearBlockGS()
+        g2.ln_solver.precon.options['maxiter'] = 2
 
         prob.set_solver_print(level=2)
 
@@ -192,11 +193,12 @@ class TestSolverPrint(unittest.TestCase):
         model.nl_solver.options['max_sub_solves'] = 0
 
         g1.nl_solver = NewtonSolver()
-        g1.ln_solver = PetscKSP()
+        g1.ln_solver = LinearBlockGS()
 
         g2.nl_solver = NewtonSolver()
-        g2.ln_solver = PetscKSP()
-        g2.ln_solver.precon = PetscKSP()
+        g2.ln_solver = ScipyIterativeSolver()
+        g2.ln_solver.precon = LinearBlockGS()
+        g2.ln_solver.precon.options['maxiter'] = 2
 
         prob.set_solver_print(level=2)
 
@@ -225,14 +227,15 @@ class TestSolverPrint(unittest.TestCase):
         model.nl_solver.options['max_sub_solves'] = 0
 
         g1.nl_solver = NewtonSolver()
-        g1.ln_solver = PetscKSP()
+        g1.ln_solver = LinearBlockGS()
 
         g2.nl_solver = NewtonSolver()
-        g2.ln_solver = PetscKSP()
-        g2.ln_solver.precon = PetscKSP()
+        g2.ln_solver = ScipyIterativeSolver()
+        g2.ln_solver.precon = LinearBlockGS()
+        g2.ln_solver.precon.options['maxiter'] = 2
 
         prob.set_solver_print(level=2)
-        prob.set_solver_print(level=0, type_='LN')
+        prob.set_solver_print(level=-1, type_='LN')
 
         prob.setup(check=False)
         prob.run_model()
@@ -259,11 +262,12 @@ class TestSolverPrint(unittest.TestCase):
         model.nl_solver.options['max_sub_solves'] = 0
 
         g1.nl_solver = NewtonSolver()
-        g1.ln_solver = PetscKSP()
+        g1.ln_solver = LinearBlockGS()
 
         g2.nl_solver = NewtonSolver()
-        g2.ln_solver = PetscKSP()
-        g2.ln_solver.precon = PetscKSP()
+        g2.ln_solver = ScipyIterativeSolver()
+        g2.ln_solver.precon = LinearBlockGS()
+        g2.ln_solver.precon.options['maxiter'] = 2
 
         prob.set_solver_print(level=0)
         prob.set_solver_print(level=2, depth=2)

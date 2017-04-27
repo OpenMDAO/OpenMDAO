@@ -65,8 +65,10 @@ To print everything, just call `set_solver_print` with a level of "2".
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_set_solver_print1
 
 To print everything for nonlinear solvers, and nothing for the linear solvers, first turn everything
-on, and then call `set_solver_print` again to set a level of "0" on just the linear solvers. You can
-call this method multiple times to combine the effects.
+on, and then call `set_solver_print` again to set a level of "-1" on just the linear solvers, so that we
+suppress everything including the messages when the linear block Gauss-Seidel solver hits the maximum
+iteration limit. You can call the `set_solver_print` method multiple times to stack different solver
+print types in your model.
 
 .. embed-test::
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_set_solver_print2
