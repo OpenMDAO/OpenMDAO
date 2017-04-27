@@ -51,8 +51,8 @@ iprint = 2: Print the residual for every solver iteration
 .. embed-test::
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_iprint_2
 
-Controling Solver Output in Large Models
-----------------------------------------
+Controlling Solver Output in Large Models
+-----------------------------------------
 
 When you have a large model with multiple solvers, it is easier to use a shortcut method that
 recurses over the entire model. The `set_solver_print` method on `problem` can be used to

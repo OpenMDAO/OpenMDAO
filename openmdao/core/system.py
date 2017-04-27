@@ -14,7 +14,6 @@ import numpy as np
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
-from openmdao.solvers.solver import SolverInfo
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 
 from openmdao.utils.general_utils import \
