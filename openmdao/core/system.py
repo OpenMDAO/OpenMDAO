@@ -12,15 +12,15 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
+from openmdao.proc_allocators.default_allocator import DefaultAllocator
 
-from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.units import convert_units
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, ensure_compatible
 from openmdao.utils.mpi import MPI
+from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.units import convert_units
 
 
 class System(object):
@@ -158,9 +158,6 @@ class System(object):
         Nonlinear solver to be used for solve_nonlinear.
     _ln_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
-    _suppress_solver_output : boolean
-        Flag that turns off all solver output for this System and all
-        of its descendants if False.
     #
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
@@ -263,7 +260,6 @@ class System(object):
 
         self._nl_solver = None
         self._ln_solver = None
-        self._suppress_solver_output = False
 
         self._jacobian = DictionaryJacobian()
         self._jacobian._system = self
@@ -938,7 +934,7 @@ class System(object):
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                subsys._setup_solvers(recurse)
+                subsys._setup_solvers(recurse=recurse)
 
     def _setup_partials(self, recurse=True):
         """
@@ -1403,23 +1399,40 @@ class System(object):
         """
         self._ln_solver = solver
 
-    @property
-    def suppress_solver_output(self):
+    def _set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
-        Get the value of the global toggle to disable solver printing.
-        """
-        return self._suppress_solver_output
+        Control printing for solvers and subsolvers in the model.
 
-    @suppress_solver_output.setter
-    def suppress_solver_output(self, value):
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        depth : int
+            How deep to recurse. For example, you can set this to 0 if you only want
+            to print the top level linear and nonlinear solver messages. Default
+            prints everything.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        Recursively set the solver print suppression toggle.
-        """
-        self._suppress_solver_output = value
-        # loop over _subsystems_allprocs here because _subsystems_myprocs
-        # is empty until setup
+        if self.ln_solver is not None and type_ != 'NL':
+            self.ln_solver._set_solver_print(level=level, type_=type_)
+        if self.nl_solver is not None and type_ != 'LN':
+            self.nl_solver._set_solver_print(level=level, type_=type_)
+
         for subsys in self._subsystems_allprocs:
-            subsys.suppress_solver_output = value
+
+            current_depth = subsys.pathname.count('.')
+            if current_depth >= depth:
+                continue
+
+            subsys._set_solver_print(level=level, depth=depth - current_depth, type_=type_)
+
+            if subsys.ln_solver is not None and type_ != 'NL':
+                subsys.ln_solver._set_solver_print(level=level, type_=type_)
+            if subsys.nl_solver is not None and type_ != 'LN':
+                subsys.nl_solver._set_solver_print(level=level, type_=type_)
 
     @property
     def proc_allocator(self):

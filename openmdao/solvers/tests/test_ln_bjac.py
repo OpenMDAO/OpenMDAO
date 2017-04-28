@@ -30,7 +30,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
                             promotes=['length', 'width', 'area'])
 
         model.ln_solver = LinearBlockJac()
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.model.jacobian = AssembledJacobian()
         prob.setup(check=False, mode='fwd')
@@ -58,7 +58,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
                             promotes=['length', 'width', 'area'])
 
         model.ln_solver = LinearBlockJac()
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob['width'] = 2.0
@@ -90,7 +90,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
                             promotes=['length', 'width', 'area'])
 
         model.ln_solver = LinearBlockJac()
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob['width'] = 2.0
@@ -123,7 +123,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
                             promotes=['length', 'width', 'area'])
 
         model.ln_solver = LinearBlockJac()
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob['width'] = 2.0
@@ -155,7 +155,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         prob = Problem()
         model = prob.model = group
         model.ln_solver = LinearBlockJac()
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -179,7 +179,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         prob = Problem()
         prob.model = FanOut()
         prob.model.ln_solver = LinearBlockJac()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -200,7 +200,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         prob = Problem()
         prob.model = FanOutGrouped()
         prob.model.ln_solver = LinearBlockJac()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -221,7 +221,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         prob = Problem()
         prob.model = FanIn()
         prob.model.ln_solver = LinearBlockJac()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -245,7 +245,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         prob = Problem()
         prob.model = FanInGrouped()
         prob.model.ln_solver = LinearBlockJac()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -269,7 +269,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         prob = Problem()
         prob.model = ConvergeDivergeFlat()
         prob.model.ln_solver = LinearBlockJac()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -322,7 +322,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         prob = Problem()
         prob.model = ConvergeDivergeGroups()
         prob.model.ln_solver = LinearBlockJac()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -347,7 +347,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         prob = Problem()
         prob.model = DiamondFlat()
         prob.model.ln_solver = LinearBlockJac()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -372,7 +372,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         prob = Problem()
         prob.model = Diamond()
         prob.model.ln_solver = LinearBlockJac()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -397,7 +397,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         prob = Problem()
         prob.model = SellarDerivativesGrouped()
         prob.model.ln_solver = LinearBlockJac()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         mda = prob.model.get_subsystem('mda')
         mda.nl_solver.options['atol'] = 1e-12
@@ -437,7 +437,7 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         prob = Problem()
         prob.model = SellarStateConnection()
         prob.model.ln_solver = LinearBlockJac()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.model.nl_solver.options['atol'] = 1e-12
 

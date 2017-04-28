@@ -44,7 +44,7 @@ class TestPetscKSP(unittest.TestCase):
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -74,7 +74,7 @@ class TestPetscKSP(unittest.TestCase):
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -102,7 +102,7 @@ class TestPetscKSP(unittest.TestCase):
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -128,7 +128,7 @@ class TestPetscKSP(unittest.TestCase):
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -194,7 +194,7 @@ class TestPetscKSP(unittest.TestCase):
         p.model.ln_solver.options['maxiter'] = 1
         p.setup(vector_class=PETScVector, check=False)
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
 
         # forward
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()

@@ -17,7 +17,7 @@ class TestLNRunOnceSolver(unittest.TestCase):
         prob.model = ConvergeDivergeGroups()
 
         prob.model.ln_solver = LNRunOnce()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         g1 = prob.model.get_subsystem('g1')
         g2 = g1.get_subsystem('g2')
@@ -25,9 +25,6 @@ class TestLNRunOnceSolver(unittest.TestCase):
         g1.ln_solver = LNRunOnce()
         g2.ln_solver = LNRunOnce()
         g3.ln_solver = LNRunOnce()
-        g1.suppress_solver_output = True
-        g2.suppress_solver_output = True
-        g3.suppress_solver_output = True
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()

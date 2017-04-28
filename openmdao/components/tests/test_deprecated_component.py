@@ -201,7 +201,7 @@ class DepCompTestCase(unittest.TestCase):
         prob.model.connect('px.x', 'comp.x')
         prob.model.connect('py.y', 'comp.y')
         prob.model.ln_solver = ScipyGMRES()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -243,7 +243,7 @@ class DepCompTestCase(unittest.TestCase):
         prob.model.connect('px.x', 'comp.x')
         prob.model.connect('py.y', 'comp.y')
         prob.model.ln_solver = ScipyGMRES()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -283,7 +283,7 @@ class DepCompTestCase(unittest.TestCase):
 
         prob.model.ln_solver = ScipyGMRES()
         prob.model.nl_solver = NewtonSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.model.connect('p1.x', 'comp.x')
 
@@ -338,7 +338,7 @@ class DepCompTestCase(unittest.TestCase):
 
         prob.model.ln_solver = ScipyGMRES()
         prob.model.nl_solver = NLRunOnce()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.model.connect('p1.x', 'comp.x')
 
@@ -385,7 +385,7 @@ class DepCompTestCase(unittest.TestCase):
 
         prob.model.ln_solver = ScipyGMRES()
         prob.model.nl_solver = NewtonSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.model.connect('p1.x', 'comp.x')
 
@@ -431,7 +431,7 @@ class DepCompTestCase(unittest.TestCase):
 
         prob.model.ln_solver = ScipyGMRES()
         prob.model.nl_solver = NewtonSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.model.connect('p1.x', 'comp.x')
 

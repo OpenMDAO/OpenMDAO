@@ -232,6 +232,24 @@ class PetscKSP(LinearSolver):
         if self.precon is not None:
             self.precon._setup_solvers(self._system, self._depth + 1)
 
+    def _set_solver_print(self, level=2, type_='all'):
+        """
+        Control printing for solvers and subsolvers in the model.
+
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        """
+        super(PetscKSP, self)._set_solver_print(level=level, type_=type_)
+
+        if self.precon is not None and type_ != 'NL':
+            self.precon._set_solver_print(level=level, type_=type_)
+
     def mult(self, mat, in_vec, result):
         """
         Apply Jacobian matrix (KSP Callback).
@@ -392,7 +410,9 @@ class PetscKSP(LinearSolver):
             b_vec.set_data(_get_petsc_vec_array(in_vec))
 
             # call the preconditioner
+            self._solver_info.prefix += '| precon:'
             self.precon.solve([vec_name], mode)
+            self._solver_info.prefix = self._solver_info.prefix[:-9]
 
             # stuff resulting value of x vector into result for KSP
             x_vec.get_data(result.array)
