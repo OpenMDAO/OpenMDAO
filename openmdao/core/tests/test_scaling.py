@@ -741,6 +741,47 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][1], 0.0)
             assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][1], -1.0/(11.0 - 18.0))
 
+    def test_scale_array_bug1(self):
+        # Tests a bug when you have two connections with different sizes (code was using a
+        # stale value for the size).
+
+        class ExpCompArrayScale(TestExplCompArrayDense):
+
+            def initialize_variables(self):
+                self.add_input('lengths', val=np.ones((2, 2)))
+                self.add_input('widths', val=np.ones((1, 3)))
+                self.add_output('areas', val=np.ones((2, 2)), ref=np.array([[2.0, 3.0], [5.0, 7.0]]),
+                                ref0=np.array([[1.1, 1.2], [1.3, 1.4]]))
+                self.add_output('stuff', val=np.ones((1, 3)), ref=np.array([[11.0, 13.0, 19.0]]),
+                                ref0=np.array([[1.1, 1.2, 1.4]]))
+                self.add_output('total_volume', val=1.)
+
+            def compute(self, inputs, outputs):
+                """ Don't need to do much."""
+                #super(ExpCompArrayScale, self).compute(inputs, outputs)
+                outputs['stuff'] = inputs['widths'] * 2
+                outputs['areas'] = inputs['lengths'] * 2
+
+                outputs['total_volume'] = np.sum(outputs['areas']) + np.sum(outputs['stuff'])
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
+        model.add_subsystem('p2', IndepVarComp('x', np.ones((1, 3))))
+        model.add_subsystem('comp1', ExpCompArrayScale())
+        model.add_subsystem('comp2', ExpCompArrayScale())
+        model.connect('p1.x', 'comp1.lengths')
+        model.connect('p2.x', 'comp1.widths')
+        model.connect('comp1.areas', 'comp2.lengths')
+        model.connect('comp1.stuff', 'comp2.widths')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp1.total_volume'], 14.)
+        assert_rel_error(self, prob['comp2.total_volume'], 28.)
+
     def test_feature1(self):
 
         prob = Problem()
