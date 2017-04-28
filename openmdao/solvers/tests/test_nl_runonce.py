@@ -16,7 +16,7 @@ class TestNLRunOnceSolver(unittest.TestCase):
         prob = Problem()
         prob.model = ConvergeDivergeGroups()
         prob.model.ln_solver = ScipyIterativeSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.model.nl_solver = NLRunOnce()
         g1 = prob.model.get_subsystem('g1')

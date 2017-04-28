@@ -21,7 +21,7 @@ class TestDriver(unittest.TestCase):
         model.add_design_var('z')
         model.add_objective('obj')
         model.add_constraint('con1', lower=0)
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_driver()
@@ -43,7 +43,7 @@ class TestDriver(unittest.TestCase):
         model.add_design_var('z', ref=5.0, ref0=3.0)
         model.add_objective('obj')
         model.add_constraint('con1', lower=0)
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
 
@@ -63,7 +63,7 @@ class TestDriver(unittest.TestCase):
         model.add_design_var('z')
         model.add_objective('obj')
         model.add_constraint('con1', lower=0, ref=2.0, ref0=3.0)
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()
@@ -80,7 +80,7 @@ class TestDriver(unittest.TestCase):
         model.add_design_var('z')
         model.add_objective('obj', ref=2.0, ref0=3.0)
         model.add_constraint('con1', lower=0)
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()
@@ -97,7 +97,7 @@ class TestDriver(unittest.TestCase):
         model.add_design_var('z', ref=2.0, ref0=0.0)
         model.add_objective('obj', ref=1.0, ref0=0.0)
         model.add_constraint('con1', lower=0, ref=2.0, ref0=0.0)
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()

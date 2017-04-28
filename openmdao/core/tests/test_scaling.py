@@ -229,7 +229,7 @@ class TestScaling(unittest.TestCase):
         prob = Problem(group)
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob['sys1.old_length'] = 3.e5
         assert_rel_error(self, prob['sys1.old_length'], 3.e5)
@@ -251,7 +251,7 @@ class TestScaling(unittest.TestCase):
 
         prob = Problem(model=group)
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.run_model()
         assert_rel_error(self, prob['c1.distance'], 1.0)  # units: km
@@ -273,7 +273,7 @@ class TestScaling(unittest.TestCase):
             prob.model.nl_solver = NewtonSolver(maxiter=2, atol=1e-5, rtol=0)
             prob.model.nl_solver.ln_solver = ScipyIterativeSolver(maxiter=1)
 
-            prob.model.suppress_solver_output = True
+            prob.set_solver_print(level=0)
 
             prob.setup(check=False)
             result = prob.run_model()
@@ -354,7 +354,7 @@ class TestScaling(unittest.TestCase):
         model.nl_solver = NonlinearBlockGS()
         model.nl_solver.options['maxiter'] = 1
 
-        model._suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()
@@ -387,7 +387,7 @@ class TestScaling(unittest.TestCase):
         model.nl_solver = NonlinearBlockGS()
         model.nl_solver.options['maxiter'] = 1
 
-        model._suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()
@@ -416,7 +416,7 @@ class TestScaling(unittest.TestCase):
         model.nl_solver = NonlinearBlockGS()
         model.nl_solver.options['maxiter'] = 1
 
-        model._suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()
@@ -447,7 +447,7 @@ class TestScaling(unittest.TestCase):
         model.nl_solver = NonlinearBlockGS()
         model.nl_solver.options['maxiter'] = 1
 
-        model._suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()

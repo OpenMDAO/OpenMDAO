@@ -287,7 +287,7 @@ class TestBoundsCheckLineSearchArrayBounds(unittest.TestCase):
         top.model.nl_solver.options['maxiter'] = 10
         top.model.ln_solver = ScipyIterativeSolver()
 
-        top.model.suppress_solver_output = True
+        top.set_solver_print(level=0)
         top.setup(check=False)
 
         self.top = top
@@ -379,7 +379,7 @@ class TestArmijoGoldsteinLineSearchArrayBounds(unittest.TestCase):
         top.model.nl_solver.options['maxiter'] = 10
         top.model.ln_solver = ScipyIterativeSolver()
 
-        top.model.suppress_solver_output = True
+        top.set_solver_print(level=0)
         top.setup(check=False)
 
         self.top = top

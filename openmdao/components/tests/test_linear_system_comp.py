@@ -36,7 +36,7 @@ class TestLinearSystem(unittest.TestCase):
         lingrp = prob.model.get_subsystem('lingrp')
         lingrp.ln_solver = ScipyIterativeSolver()
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, prob['lin.x'], x, .0001)
@@ -64,7 +64,7 @@ class TestLinearSystem(unittest.TestCase):
             prob.model.connect('p2.b', 'lin.b')
 
             prob.setup(check=False)
-            prob.model.suppress_solver_output = True
+            prob.set_solver_print(level=0)
 
             prob.run_model()
             prob.model.run_linearize()

@@ -204,7 +204,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.run_model()
 
         self.assertEqual(p['comp1.a'], 2)
@@ -218,7 +218,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('comp2', ExecComp('y=2*foo'), promotes_inputs=['foo'])
         p.setup()
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.run_model()
 
         self.assertEqual(p['foo'], 5)
@@ -265,7 +265,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.run_model()
 
         self.assertEqual(p['a'], 2)
@@ -283,7 +283,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.run_model()
 
         self.assertEqual(p['a'], 2)
@@ -330,7 +330,7 @@ class TestGroup(unittest.TestCase):
         s = p.model.get_subsystem('')
         self.assertEqual(s, None)
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.run_model()
 
         self.assertEqual(p['group1.comp1.x'],  5.0)
@@ -355,7 +355,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('C1', ExecComp('y=sum(x)', x={'value': np.zeros(5), 'units': 'inch'},
                                              y={'units': 'inch'}))
         p.model.connect('indep.x', 'C1.x')
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.setup()
         p.run_model()
         assert_rel_error(self, p['indep.x'], np.ones(5))
@@ -369,7 +369,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('C2', ExecComp('y=sum(x)*4.0', x=np.zeros(5)))
         p.model.add_subsystem('C3', ExecComp('y=sum(x)*6.0', x=np.zeros(5)))
         p.model.connect('indep.x', ['C1.x', 'C2.x', 'C3.x'])
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.setup()
         p.run_model()
         assert_rel_error(self, p['C1.y'], 10.)
@@ -409,7 +409,7 @@ class TestGroup(unittest.TestCase):
         # connect C2.x to the last 2 entries of indep.x
         p.model.connect('indep.x', 'C2.x', src_indices=[3, 4])
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.setup()
         p.run_model()
         assert_rel_error(self, p['C1.x'], np.ones(3))
@@ -427,7 +427,7 @@ class TestGroup(unittest.TestCase):
                         src_indices=[[(0,0), (3,1)],
                                      [(2,1), (1,1)]])
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.setup()
         p.run_model()
         assert_rel_error(self, p['C1.x'], np.array([[0., 10.],
@@ -498,7 +498,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('C1', MyComp1(), promotes_inputs=['x'])
         p.model.add_subsystem('C2', MyComp2(), promotes_inputs=['x'])
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.setup()
         p.run_model()
         assert_rel_error(self, p['C1.x'], np.ones(3))
@@ -531,7 +531,7 @@ class TestGroup(unittest.TestCase):
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.setup()
         p.run_model()
         assert_rel_error(self, p['C1.x'],
@@ -555,7 +555,7 @@ class TestGroup(unittest.TestCase):
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.setup()
         p.run_model()
         assert_rel_error(self, p['C1.x'], 10.)
@@ -625,7 +625,7 @@ class TestGroup(unittest.TestCase):
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.setup(check=False)
         p.run_model()
         assert_rel_error(self, p['C1.x'],
@@ -644,7 +644,7 @@ class TestGroup(unittest.TestCase):
         model.add_subsystem('C2', ReportOrderComp(order_list))
         model.add_subsystem('C3', ReportOrderComp(order_list))
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
                          [s.name for s in model._static_subsystems_allprocs])
@@ -678,7 +678,7 @@ class TestGroup(unittest.TestCase):
         model.connect('indeps.x', 'C1.x')
         model.connect('C1.y', 'C2.x')
         model.connect('C2.y', 'C3.x')
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
                          [s.name for s in model._static_subsystems_allprocs])
@@ -755,7 +755,7 @@ class TestGroupMPI(unittest.TestCase):
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.setup(PETScVector)
         p.run_model()
         if p.model.comm.rank == 0:
@@ -890,7 +890,7 @@ class TestConnect(unittest.TestCase):
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -910,7 +910,7 @@ class TestConnect(unittest.TestCase):
         prob.model.add_subsystem('src', ExecComp('y = 2 * x'), promotes=['x', 'y'])
         prob.model.add_subsystem('tgt', ExecComp('z = 3 * y', y={'units': 'degC'}), promotes=['y'])
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
