@@ -9,7 +9,7 @@ from six import iteritems
 from parameterized import parameterized
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, \
-                         COOJacobian, ScipyIterativeSolver
+                         COOJacobian, ScipyIterativeSolver, DirectSolver, DenseJacobian
 
 from openmdao.devtools.testutil import assert_rel_error
 
@@ -58,7 +58,17 @@ class SimpleCompGlob(SimpleComp):
         self.declare_partials('g', 'y[13]', val=[[1, 0], [1, 0], [0, 1], [0, 1]])
 
 
-class SimpleCompConst(SimpleComp):
+class SimpleCompConst(ExplicitComponent):
+    def initialize_variables(self):
+        self.add_input('x', shape=1)
+        self.add_input('y1', shape=2)
+        self.add_input('y2', shape=2)
+        self.add_input('y3', shape=2)
+        self.add_input('z', shape=(2, 2))
+
+        self.add_output('f', shape=1)
+        self.add_output('g', shape=(2, 2))
+
     def initialize_partials(self):
         self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
         self.declare_partials('g', 'z', dependent=False)
@@ -333,31 +343,66 @@ class TestJacobianForDocs(unittest.TestCase):
 
         problem = Problem(model=model)
         model.suppress_solver_output = True
-        model.ln_solver = ScipyIterativeSolver()
-        model.jacobian = COOJacobian()
+        model.ln_solver = DirectSolver()
+        model.jacobian = DenseJacobian()
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
         problem.run_model()
         totals = problem.compute_total_derivs(['f', 'g'],
                                               ['x', 'y1', 'y2', 'y3', 'z'])
-        jacobian = {}
-        jacobian['f', 'x'] = [[1.]]
-        jacobian['f', 'z'] = np.ones((1, 4))
-        jacobian['f', 'y1'] = np.zeros((1, 2))
-        jacobian['f', 'y2'] = np.zeros((1, 2))
-        jacobian['f', 'y3'] = np.zeros((1, 2))
 
-        jacobian['g', 'y1'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
-        jacobian['g', 'y2'] = [[1, 0], [0, 1], [1, 0], [0, 1]]
-        jacobian['g', 'y3'] = [[1, 0], [1, 0], [0, 1], [0, 1]]
+        assert_rel_error(self, totals['f', 'x'], 1.)
+        assert_rel_error(self, totals['f', 'z'], np.ones((1, 4)))
+        assert_rel_error(self, totals['f', 'y1'], np.zeros((1, 2)))
+        assert_rel_error(self, totals['f', 'y2'], np.zeros((1, 2)))
+        assert_rel_error(self, totals['f', 'y3'], np.zeros((1, 2)))
+        assert_rel_error(self, totals['g', 'x'], [[1], [0], [0], [1]])
+        assert_rel_error(self, totals['g', 'z'], np.zeros((4, 4)))
+        assert_rel_error(self, totals['g', 'y1'], [[1, 0], [1, 0], [0, 1], [0, 1]])
+        assert_rel_error(self, totals['g', 'y2'], [[1, 0], [0, 1], [1, 0], [0, 1]])
+        assert_rel_error(self, totals['g', 'y3'], [[1, 0], [1, 0], [0, 1], [0, 1]])
 
-        jacobian['g', 'x'] = [[1], [0], [0], [1]]
-        jacobian['g', 'z'] = np.zeros((4, 4))
+    def test_sparse_jacobian(self):
+        class SparsePartialComp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x', shape=(4,))
+                self.add_output('f', shape=(2,))
 
-        assert_rel_error(self, totals, jacobian)
-        import pprint
-        pprint.pprint(totals)
+            def initialize_partials(self):
+                self.declare_partials(of='f', wrt='x',
+                                      rows=[0,1,1,1], cols=[0,1,2,3], val=np.zeros(4))
+
+            def compute_partial_derivs(self, inputs, outputs, partials):
+                pd = partials['f', 'x']
+
+                # Corresponds to the (0, 0) entry
+                pd[0] = 1.
+
+                # (1,1) entry
+                pd[1] = 2.
+
+                # (1, 2) entry
+                pd[2] = 3.
+
+                # (1, 3) entry
+                pd[3] = 4
+
+        model = Group()
+        comp = IndepVarComp()
+        comp.add_output('x', np.ones(4))
+
+        model.add_subsystem('input', comp)
+        model.add_subsystem('example', SparsePartialComp())
+
+        model.connect('input.x', 'example.x')
+
+        problem = Problem(model=model)
+        problem.setup(check=False)
+        problem.run_model()
+        totals = problem.compute_total_derivs(['example.f'], ['input.x'])
+
+        assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
 
 if __name__ == '__main__':
     unittest.main()

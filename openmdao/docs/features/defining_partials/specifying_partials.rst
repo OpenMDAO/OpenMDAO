@@ -4,32 +4,26 @@ Specifying Partial Derivatives
 If you know additional information about the structure of partial derivatives in your component,
 say if an output does not depend on a particular input, you can use the :code:`declare_partials()`
 method to inform the framework. This will allow the framework to be more efficient in terms of
-memory and computation (if using a sparse :code:`AssembledJacobian`).
+memory and computation (especially if using a sparse :code:`AssembledJacobian`).
 
 .. automethod:: openmdao.core.component.Component.declare_partials
     :noindex:
 
-Examples
---------
+Usage
+-----
 
-If two variables do not depend on each other, you can specify that they are not dependent.
+1. Specifying that a variable does not depend on another.
 
 .. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.SimpleCompDependence.initialize_partials
 
-----
-
-In addition to specifying specific variables, glob patterns may also be used
-(see https://docs.python.org/3.6/library/fnmatch.html).
+2. Specifying variables using glob patterns (see https://docs.python.org/3.6/library/fnmatch.html).
 
 .. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.SimpleCompGlob.initialize_partials
 
-----
-
-If a particular partial derivative is constant, we can use the :code:`val` argument to specify what
-that value. This derivative then does not need to be calculated in :code:`compute_jacobian`. This
-value can take many forms:
+3. Using the :code:`val` argument to set a constant partial derivative. Note that if the :code:`val` arugment is used,
+then the partial derivative does not need to be calculated in :code:`compute_partial_derivs`.
 
 * Scalar [see :math:`\displaystyle\frac{\partial f}{\partial x}`]
 * Dense Array [see :math:`\displaystyle\frac{\partial f}{\partial z}`]
@@ -45,9 +39,5 @@ value can take many forms:
 .. embed-test::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_const_jacobian
 
-----
+.. tags:: Partial Derivatives
 
-tmp
-
-Related Features
-----------------

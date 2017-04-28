@@ -60,12 +60,22 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
 
     # array values
     else:
-        actual = np.array(actual, copy=False, ndmin=1)
-        desired = np.array(desired, copy=False, ndmin=1)
+        actual = np.array(actual, copy=False)
+        desired = np.array(desired, copy=False)
         if actual.shape != desired.shape:
-            test_case.fail(
-                'actual and desired have differing shapes.'
-                ' actual {}, desired {}'.format(actual.shape, desired.shape))
+            actual_shape = actual.shape
+            desired_shape = desired.shape
+
+            # Handle corner case where scalars are converted to 0d arrays.
+            if actual_shape == ():
+                actual.shape = [1] * len(desired_shape)
+            elif desired_shape == ():
+                actual.shape = [1] * len(desired_shape)
+
+            if actual.shape != desired.shape:
+                test_case.fail(
+                    'actual and desired have differing shapes.'
+                    ' actual {}, desired {}'.format(actual.shape, desired.shape))
         if not np.all(np.isnan(actual) == np.isnan(desired)):
             test_case.fail('actual and desired values have non-matching nan'
                            ' values')

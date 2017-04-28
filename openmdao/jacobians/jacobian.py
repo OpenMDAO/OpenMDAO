@@ -3,6 +3,8 @@ from __future__ import division
 import numpy as np
 from six.moves import range
 
+from scipy.sparse import issparse
+
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.name_maps import key2abs_key
 from openmdao.matrices.matrix import sparse_types
@@ -122,7 +124,13 @@ class Jacobian(object):
         """
         abs_key = key2abs_key(self._system, key)
         if abs_key in self._subjacs:
-            return self._subjacs[abs_key]
+            subjac = self._subjacs[abs_key]
+            if isinstance(subjac, list):
+                # Sparse AIJ format
+                return subjac[0]
+            if issparse(subjac):
+                return subjac.data
+            return subjac
         else:
             msg = 'Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(key[0], key[1]))

@@ -68,6 +68,7 @@ Defining partial derivatives
    :maxdepth: 1
 
    features/defining_partials/specifying_partials
+   features/defining_partials/sparse_partials
 
 Solvers (nonlinear and linear)
 ================================
