@@ -879,9 +879,9 @@ class System(object):
                         ref0 = ref0[src_indices]
                 else:
                     if not np.isscalar(ref):
-                        ref = ref.reshape(shape)
+                        ref = ref.reshape(shape_out)
                     if not np.isscalar(ref0):
-                        ref0 = ref0.reshape(shape)
+                        ref0 = ref0.reshape(shape_out)
 
                 # Compute scaling arrays for inputs using a0 and a1
                 # Example:
