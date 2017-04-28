@@ -2,7 +2,7 @@
 import unittest
 import numpy as np
 
-from openmdao.api import Component, Problem, Group, IndepVarComp
+from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
 
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
@@ -15,7 +15,7 @@ except ImportError:
 from openmdao.devtools.testutil import assert_rel_error
 
 
-class DistributedAdder(Component):
+class DistributedAdder(ExplicitComponent):
     """
     Distributes the work of adding 10 to every item in the param vector
     """
@@ -25,17 +25,13 @@ class DistributedAdder(Component):
 
         self.local_size = self.size = int(size)
 
-        #NOTE: we declare the variables at full size so that the component will work in serial too
-        self.add_param('x', shape=size)
-        self.add_output('y', shape=size)
-
     def get_req_procs(self):
         """
         min/max number of procs that this component can use
         """
-        return (1,self.size)
+        return (1, self.size)
 
-    def setup_distrib(self):
+    def initialize_variables(self):
         """
         specify the local sizes of the variables and which specific indices this specific
         distributed component will handle. Indices do NOT need to be sequential or
@@ -53,22 +49,20 @@ class DistributedAdder(Component):
         start = local_offset
         end = local_offset + local_size
 
-        self.set_var_indices('x', val=np.zeros(local_size, float),
-            src_indices=np.arange(start, end, dtype=int))
-        self.set_var_indices('y', val=np.zeros(local_size, float),
-            src_indices=np.arange(start, end, dtype=int))
+        self.add_input('x', val=np.zeros(local_size, float),
+                       src_indices=np.arange(start, end, dtype=int))
+        self.add_output('y', val=np.zeros(local_size, float))
+            #src_indices=np.arange(start, end, dtype=int))
 
-        #quit()
-
-    def solve_nonlinear(self, params, unknowns, resids):
+    def compute(self, inputs, outputs):
 
         #NOTE: Each process will get just its local part of the vector
         #print('process {0:d}: {1}'.format(self.comm.rank, params['x'].shape))
 
-        unknowns['y'] = params['x'] + 10
+        outputs['y'] = inputs['x'] + 10
 
 
-class Summer(Component):
+class Summer(ExplicitComponent):
     """
     Agreggation component that collects all the values from the distributed
     vector addition and computes a total
@@ -79,12 +73,12 @@ class Summer(Component):
 
         #NOTE: this component depends on the full y array, so OpenMDAO
         #      will automatically gather all the values for it
-        self.add_param('y', val=np.zeros(size))
+        self.add_input('y', val=np.zeros(size))
         self.add_output('sum', shape=1)
 
-    def solve_nonlinear(self, params, unknowns, resids):
+    def compute(self, inputs, outputs):
 
-        unknowns['sum'] = np.sum(params['y'])
+        outputs['sum'] = np.sum(inputs['y'])
 
 
 
@@ -99,21 +93,21 @@ class DistributedAdderTest(unittest.TestCase):
         prob = Problem()
         prob.model = Group()
 
-        prob.model.add('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
-        prob.model.add('plus', DistributedAdder(size), promotes=['x', 'y'])
-        prob.model.add('summer', Summer(size), promotes=['y', 'sum'])
+        prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
+        prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
+        prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
 
         prob.setup(vector_class=PETScVector, check=False)
 
         prob['x'] = np.ones(size)
 
-        prob.run()
+        prob.run_driver()
 
         #expected answer is 11
         assert_rel_error(self, prob['sum']/size, 11.0, 1.e-6)
 
 
 
-if __name__ == '__main__':
-    from openmdao.test.mpi_util import mpirun_tests
+if __name__ == "__main__":
+    from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()

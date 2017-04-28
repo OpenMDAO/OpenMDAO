@@ -7,6 +7,7 @@ from six import iteritems, itervalues
 from six.moves import range
 
 from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
+from openmdao.utils.mpi import any_proc_is_true
 
 
 class PETScTransfer(DefaultTransfer):
@@ -26,7 +27,7 @@ class PETScTransfer(DefaultTransfer):
         out_inds = self._out_inds
 
         for key in in_inds:
-            if len(in_inds[key]) > 0:
+            if any_proc_is_true(self._comm, len(in_inds[key]) > 0):
                 in_set_name, out_set_name = key
 
                 in_indexset = PETSc.IS().createGeneral(
@@ -58,13 +59,17 @@ class PETScTransfer(DefaultTransfer):
                 in_set_name, out_set_name = key
                 in_petsc = self._in_vec._petsc[in_set_name]
                 out_petsc = self._out_vec._petsc[out_set_name]
+                print out_petsc.array, '-->',
                 self._transfers[key].scatter(out_petsc, in_petsc, addv=False, mode=False)
+                print in_petsc.array
         elif mode == 'rev':
             for key in self._transfers:
                 in_set_name, out_set_name = key
                 in_petsc = self._in_vec._petsc[in_set_name]
                 out_petsc = self._out_vec._petsc[out_set_name]
+                print 'd_inputs', in_petsc.array, '-->',
                 self._transfers[key].scatter(in_petsc, out_petsc, addv=True, mode=True)
+                print 'd_outputs', out_petsc.array
 
 
 class PETScVector(DefaultVector):

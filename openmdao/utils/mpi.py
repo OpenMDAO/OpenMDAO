@@ -132,37 +132,36 @@ class FakeComm(object):
         self.size = 1
 
 
-def any_proc_is_true(comm, val):
-    """
-    Return True if val is True in any proc in the given comm.
-
-    Parameters
-    ----------
-    comm : MPI communicator
-        expr will be evaluated in all processes in the communicator.
-    val : bool
-        Value being tested.
-
-    Returns
-    -------
-    bool
-        True if val evaluates to True in any process in comm.
-    """
-    any_true = numpy.array(0, dtype=int)
-
-    if trace:
-        debug("Allreduce for any_proc_is_true")
-    # some mpi versions don't support Allreduce with boolean types
-    # and logical operators, so just use ints and MPI.SUM instead.
-    comm.Allreduce(numpy.array(1 if val else 0, dtype=int),
-                   any_true, op=MPI.SUM)
-    if trace:
-        debug("Allreduce DONE")
-
-    return any_true > 0
-
-
 if MPI:
+    def any_proc_is_true(comm, val):
+        """
+        Return True if val is True in any proc in the given comm.
+
+        Parameters
+        ----------
+        comm : MPI communicator
+            expr will be evaluated in all processes in the communicator.
+        val : bool
+            Value being tested.
+
+        Returns
+        -------
+        bool
+            True if val evaluates to True in any process in comm.
+        """
+        any_true = numpy.array(0, dtype=int)
+
+        if trace:
+            debug("Allreduce for any_proc_is_true")
+        # some mpi versions don't support Allreduce with boolean types
+        # and logical operators, so just use ints and MPI.SUM instead.
+        comm.Allreduce(numpy.array(1 if val else 0, dtype=int),
+                       any_true, op=MPI.SUM)
+        if trace:
+            debug("Allreduce DONE")
+
+        return any_true > 0
+
     def mpirun_tests():
         """
         Run individual tests under MPI.
@@ -196,6 +195,24 @@ if MPI:
             unittest.main()
 else:
     mpirun_tests = unittest.main
+
+    def any_proc_is_true(comm, val):
+        """
+        Return True if val is True in any proc in the given comm.
+
+        Parameters
+        ----------
+        comm : MPI communicator or FakeComm
+            expr will be evaluated in all processes in the communicator.
+        val : bool
+            Value being tested.
+
+        Returns
+        -------
+        bool
+            True if val evaluates to True in any process in comm.
+        """
+        return bool(val)
 
 
 if os.environ.get('USE_PROC_FILES'):
