@@ -265,6 +265,7 @@ class pyOptSparseDriver(Driver):
             opt.setOption(option, value)
 
         self.opt_prob = opt_prob
+        self.opt = opt
 
         # Execute the optimization problem
         if self.options['gradient method'] == 'pyopt_fd':
