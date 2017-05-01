@@ -565,6 +565,9 @@ class System(object):
         if setup_mode == 'full':
             self.set_initial_values()
 
+        self._rec_mgr.startup(self)
+        self._rec_mgr.record_metadata(self)
+
     def _setup_procs(self, pathname, comm):
         """
         Distribute processors and assign pathnames.
@@ -633,9 +636,6 @@ class System(object):
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
-
-        self._rec_mgr.startup(self)
-        self._rec_mgr.record_metadata(self)
 
     def _setup_var_index_maps(self, recurse=True):
         """

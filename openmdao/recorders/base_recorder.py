@@ -182,29 +182,6 @@ class BaseRecorder(object):
                 'res': myresponses
             }
 
-        # if (isinstance(object_requesting_recording, Solver)):
-        #     mydesvars = myobjectives = myconstraints = set()
-        #     incl = self.options['includes']
-        #     excl = self.options['excludes']
-        #
-        #     if self.options['record_']:
-        #         my_ = [n for n in object_requesting_recording._ if
-        #                      self._check_path(n, incl, excl)]
-        #
-        #     if self.options['record_']:
-        #         my_ = [n for n in object_requesting_recording._ if
-        #                         self._check_path(n, incl, excl)]
-        #
-        #     if self.options['record_']:
-        #         my = [n for n in object_requesting_recording._ if
-        #                          self._check_path(n, incl, excl)]
-        #
-        #     self._filtered_solver = {
-        #         'des': my,
-        #         'obj': my,
-        #         'con': my
-        #     }
-
     def _check_path(self, path, includes, excludes):
         """
         Return True if `path` should be recorded.
@@ -220,24 +197,6 @@ class BaseRecorder(object):
 
         # Did not match anything in includes.
         return False
-
-    def _get_pathname(self, iteration_coordinate):
-        """
-        Convert iteration coord.
-
-        Change coordinate to key to index _filtered to retrieve names of variables to be recorded.
-        """
-        return '.'.join(iteration_coordinate[5::2])
-
-    def _filter_vector(self, vecwrapper, key, iteration_coordinate):
-        """
-        Return a dict that is a subset of the given vecwrapper to be recorded.
-        """
-        if not vecwrapper:
-            return vecwrapper
-
-        pathname = self._get_pathname(iteration_coordinate)
-        return {n: vecwrapper[n] for n in self._filtered[pathname][key]}
 
     def record_metadata(self, object_requesting_recording):
         """

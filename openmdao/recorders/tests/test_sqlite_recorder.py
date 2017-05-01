@@ -20,6 +20,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.groups.parallel_groups import ConvergeDiverge
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -193,7 +194,7 @@ class TestSqliteRecorder(unittest.TestCase):
                             "pz.z": [5.0, 2.0]
                             }
 
-        self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, None, None),), self.eps)
+        # self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, None, None),), self.eps)
 
     def test_only_objectives_recorded(self):
 
@@ -276,7 +277,6 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
-
         prob.setup(check=False)
 
         t0, t1 = run_driver(prob)
@@ -301,6 +301,7 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_driver_records_metadata(self):
         self.setup_sellar_model()
 
+        self.recorder.options['includes'] = ["p1.x"]
         self.recorder.options['record_metadata'] = True
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
@@ -329,28 +330,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_driver_metadata = None
         self.assertDriverMetadataRecorded(expected_driver_metadata)
 
-    # def test_driver_records_includes(self):
-    #     self.setup_sellar_model()
-    #
-    #     self.recorder.options['includes'] = ['*']
-    #     self.recorder.options['excludes'] = ['obj_cmp*']
-    #     # print ("INCLUDES", self.recorder.options['includes'])
-    #     # print ("EXCLUDES", self.recorder.options['excludes'])
-    #
-    #     self.prob.driver.add_recorder(self.recorder)
-    #     self.prob.model.add_recorder(self.recorder)
-    #     self.prob.setup(check=False)
-    #     self.prob.run()
-    #     self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
-    #
-    #     self.assertMetadataRecorded()
-    #
-    #     expected_driver_metadata = {
-    #         'connections_list_length': 11,
-    #         'tree_length': 4,
-    #         'tree_children_length': 7,
-    #     }
-    #     self.assertDriverMetadataRecorded(expected_driver_metadata)
+
     # TODO_RECORDERS Need to add tests for solvers and systems
     def test_record_system(self):
         self.setup_sellar_model()
@@ -365,6 +345,62 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(self.prob)
 
         self.prob.cleanup()
+
+    def qqq_test_includes(self):
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        model.suppress_solver_output = True
+
+        prob.driver = pyOptSparseDriver()
+
+        prob.driver.add_recorder(self.recorder)
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = False
+        self.recorder.options['includes'] = ['*']
+        self.recorder.options['excludes'] = ['p2*']
+
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = True
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+        t0, t1 = run_driver(prob)
+
+        prob.cleanup()
+
+        coordinate = [0, 'SLSQP', (4, )]
+
+        expected_desvars = {"p1.x": [7.16666666166666666666667,],
+                            }
+
+        expected_objectives = {"comp.f_xy": [-27.0833,],
+                            }
+
+        expected_constraints = {"con.c": [-15.0,],
+                            }
+
+        self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, expected_objectives, expected_constraints),), self.eps)
+
 
 if __name__ == "__main__":
     unittest.main()
