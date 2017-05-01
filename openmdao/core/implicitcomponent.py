@@ -203,6 +203,21 @@ class ImplicitComponent(Component):
         """
         pass
 
+    def guess_nonlinear(self, inputs, outputs):
+        """
+        Provide initial guess for states.
+
+        Override this method to set the initial guess for states.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        """
+        pass
+
     def apply_linear(self, inputs, outputs,
                      d_inputs, d_outputs, d_residuals, mode):
         r"""

@@ -5,7 +5,8 @@ from six.moves import cStringIO
 
 import unittest
 
-from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp
+from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, \
+                         ScipyIterativeSolver
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -138,6 +139,41 @@ class TestImplCompSimple(unittest.TestCase):
 
         self.assertTrue('comp2.x' in content)
         self.assertTrue('comp3.x' in content)
+
+    def test_guess_nonlinear(self):
+
+        class ImpWithInitial(TestImplCompSimpleLinearize):
+
+            def solve_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def guess_nonlinear(self, inputs, outputs):
+                # Solution at -1 and 3. Default value takes us to -1 solution. Here
+                # we set it to a value that will tke us to the 3 solution.
+                outputs['x'] = 5.0
+
+        group = Group()
+
+        group.add_subsystem('pa', IndepVarComp('a', 1.0))
+        group.add_subsystem('pb', IndepVarComp('b', 1.0))
+        group.add_subsystem('pc', IndepVarComp('c', 1.0))
+        group.add_subsystem('comp2', ImpWithInitial())
+        group.connect('pa.a', 'comp2.a')
+        group.connect('pb.b', 'comp2.b')
+        group.connect('pc.c', 'comp2.c')
+
+        prob = Problem(model=group)
+        group.nl_solver = NewtonSolver()
+        group.ln_solver = ScipyIterativeSolver()
+
+        prob.setup(check=False)
+
+        prob['pa.a'] = 1.
+        prob['pb.b'] = -4.
+        prob['pc.c'] = 3.
+        prob.run_model()
+        assert_rel_error(self, prob['comp2.x'], 3.)
 
 if __name__ == '__main__':
     unittest.main()
