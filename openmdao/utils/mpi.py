@@ -12,8 +12,6 @@ import numpy
 import six
 from six import PY3
 
-trace = os.environ.get('OPENMDAO_TRACE')
-
 
 def _redirect_streams(to_fd):
     """
@@ -151,14 +149,10 @@ if MPI:
         """
         any_true = numpy.array(0, dtype=int)
 
-        if trace:
-            debug("Allreduce for any_proc_is_true")
         # some mpi versions don't support Allreduce with boolean types
         # and logical operators, so just use ints and MPI.SUM instead.
         comm.Allreduce(numpy.array(1 if val else 0, dtype=int),
                        any_true, op=MPI.SUM)
-        if trace:
-            debug("Allreduce DONE")
 
         return any_true > 0
 
