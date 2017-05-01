@@ -1,6 +1,7 @@
 """Various debugging functions."""
 
 import sys
+import os
 
 from six.moves import zip_longest
 from openmdao.core.group import Group
@@ -116,4 +117,3 @@ def tree(system, include_solvers=True, stream=sys.stdout):
                 stream.write("%s %s nl_solver\n" % (indent, type(s.nl_solver).__name__))
             if s.ln_solver is not None:
                 stream.write("%s %s ln_solver\n" % (indent, type(s.ln_solver).__name__))
-

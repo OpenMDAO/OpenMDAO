@@ -197,6 +197,9 @@ class Vector(object):
         """
         return abs_name in self._names
 
+    def __str__(self):
+        return str(self._data)
+
     def __iter__(self):
         """
         Yield an iterator over variables involved in the current mat-vec product (relative names).
