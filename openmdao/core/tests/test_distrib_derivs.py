@@ -65,6 +65,7 @@ class DistribExecComp(ExecComp):
         return (2, 2)
 
 
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class MPITests1(unittest.TestCase):
 
     N_PROCS = 1
@@ -96,6 +97,7 @@ class MPITests1(unittest.TestCase):
                 self.fail("Exception expected")
 
 
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class MPITests2(unittest.TestCase):
 
     N_PROCS = 2

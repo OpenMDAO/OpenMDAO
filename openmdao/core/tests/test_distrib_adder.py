@@ -83,6 +83,7 @@ class Summer(ExplicitComponent):
 
 
 
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class DistributedAdderTest(unittest.TestCase):
 
     N_PROCS = 10
