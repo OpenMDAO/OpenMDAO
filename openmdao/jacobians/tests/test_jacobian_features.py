@@ -247,7 +247,7 @@ class TestJacobianFeatures(unittest.TestCase):
                                               ['x', 'y1', 'y2', 'y3', 'z'])
 
         jacobian = {}
-        jacobian['f', 'x'] = 1.
+        jacobian['f', 'x'] = [[1.]]
         jacobian['f', 'z'] = np.ones((1, 4))
         jacobian['f', 'y1'] = np.zeros((1, 2))
         jacobian['f', 'y2'] = np.zeros((1, 2))
@@ -387,7 +387,7 @@ class TestJacobianForDocs(unittest.TestCase):
         totals = problem.compute_total_derivs(['f', 'g'],
                                               ['x', 'y1', 'y2', 'y3', 'z'])
 
-        assert_rel_error(self, totals['f', 'x'], 1.)
+        assert_rel_error(self, totals['f', 'x'], [[1.]])
         assert_rel_error(self, totals['f', 'z'], np.ones((1, 4)))
         assert_rel_error(self, totals['f', 'y1'], np.zeros((1, 2)))
         assert_rel_error(self, totals['f', 'y2'], np.zeros((1, 2)))

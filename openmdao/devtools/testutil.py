@@ -2,6 +2,7 @@
 
 import numpy as np
 from math import isnan
+from six import raise_from
 
 
 def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
@@ -44,8 +45,7 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
                 error = max(error, new_error)
             except test_case.failureException as exception:
                 msg = '{}: '.format(key) + str(exception)
-                raise test_case.failureException(msg)
-
+                raise_from(test_case.failureException(msg), None)
 
     elif isinstance(actual, float) and isinstance(desired, float):
         if isnan(actual) and not isnan(desired):
@@ -63,19 +63,9 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
         actual = np.array(actual, copy=False)
         desired = np.array(desired, copy=False)
         if actual.shape != desired.shape:
-            actual_shape = actual.shape
-            desired_shape = desired.shape
-
-            # Handle corner case where scalars are converted to 0d arrays.
-            if actual_shape == ():
-                actual.shape = [1] * len(desired_shape)
-            elif desired_shape == ():
-                actual.shape = [1] * len(desired_shape)
-
-            if actual.shape != desired.shape:
-                test_case.fail(
-                    'actual and desired have differing shapes.'
-                    ' actual {}, desired {}'.format(actual.shape, desired.shape))
+            test_case.fail(
+                'actual and desired have differing shapes.'
+                ' actual {}, desired {}'.format(actual.shape, desired.shape))
         if not np.all(np.isnan(actual) == np.isnan(desired)):
             test_case.fail('actual and desired values have non-matching nan'
                            ' values')

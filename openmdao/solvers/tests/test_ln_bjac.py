@@ -413,12 +413,12 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         of = ['obj', 'con1', 'con2']
 
         Jbase = {}
-        Jbase['con1', 'x'] = -0.98061433
-        Jbase['con1', 'z'] = np.array([-9.61002285, -0.78449158])
-        Jbase['con2', 'x'] = 0.09692762
-        Jbase['con2', 'z'] = np.array([1.94989079, 1.0775421 ])
-        Jbase['obj', 'x'] = 2.98061392
-        Jbase['obj', 'z'] = np.array([9.61001155, 1.78448534])
+        Jbase['con1', 'x'] = [[-0.98061433]]
+        Jbase['con1', 'z'] = np.array([[-9.61002285, -0.78449158]])
+        Jbase['con2', 'x'] = [[0.09692762]]
+        Jbase['con2', 'z'] = np.array([[1.94989079, 1.0775421]])
+        Jbase['obj', 'x'] = [[2.98061392]]
+        Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
 
         J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
         for key, val in iteritems(Jbase):
@@ -452,12 +452,12 @@ class TestLinearBlockJacSolver(unittest.TestCase):
         of = ['obj', 'con1', 'con2']
 
         Jbase = {}
-        Jbase['con1', 'x'] = -0.98061433
-        Jbase['con1', 'z'] = np.array([-9.61002285, -0.78449158])
-        Jbase['con2', 'x'] = 0.09692762
-        Jbase['con2', 'z'] = np.array([1.94989079, 1.0775421 ])
-        Jbase['obj', 'x'] = 2.98061392
-        Jbase['obj', 'z'] = np.array([9.61001155, 1.78448534])
+        Jbase['con1', 'x'] = [[-0.98061433]]
+        Jbase['con1', 'z'] = np.array([[-9.61002285, -0.78449158]])
+        Jbase['con2', 'x'] = [[0.09692762]]
+        Jbase['con2', 'z'] = np.array([[1.94989079, 1.0775421]])
+        Jbase['obj', 'x'] = [[2.98061392]]
+        Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
 
         J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
         for key, val in iteritems(Jbase):

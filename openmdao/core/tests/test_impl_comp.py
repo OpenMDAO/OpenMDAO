@@ -123,12 +123,12 @@ class TestImplCompSimple(unittest.TestCase):
             wrt=['comp1.a', 'comp1.b', 'comp1.c'],
             of=['comp2.x', 'comp3.x']
         )
-        assert_rel_error(self, total_derivs['comp2.x', 'comp1.a'], -4.5)
-        assert_rel_error(self, total_derivs['comp2.x', 'comp1.b'], -1.5)
-        assert_rel_error(self, total_derivs['comp2.x', 'comp1.c'], -0.5)
-        assert_rel_error(self, total_derivs['comp3.x', 'comp1.a'], -4.5)
-        assert_rel_error(self, total_derivs['comp3.x', 'comp1.b'], -1.5)
-        assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], -0.5)
+        assert_rel_error(self, total_derivs['comp2.x', 'comp1.a'], [[-4.5]])
+        assert_rel_error(self, total_derivs['comp2.x', 'comp1.b'], [[-1.5]])
+        assert_rel_error(self, total_derivs['comp2.x', 'comp1.c'], [[-0.5]])
+        assert_rel_error(self, total_derivs['comp3.x', 'comp1.a'], [[-4.5]])
+        assert_rel_error(self, total_derivs['comp3.x', 'comp1.b'], [[-1.5]])
+        assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], [[-0.5]])
 
         # Piggyback testing of list_states
 

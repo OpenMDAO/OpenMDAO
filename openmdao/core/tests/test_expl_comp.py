@@ -76,10 +76,10 @@ class TestExplCompSimple(unittest.TestCase):
             wrt=['comp1.length', 'comp1.width'],
             of=['comp2.area', 'comp3.area']
         )
-        assert_rel_error(self, total_derivs['comp2.area', 'comp1.length'], 2.)
-        assert_rel_error(self, total_derivs['comp3.area', 'comp1.length'], 2.)
-        assert_rel_error(self, total_derivs['comp2.area', 'comp1.width'], 3.)
-        assert_rel_error(self, total_derivs['comp3.area', 'comp1.width'], 3.)
+        assert_rel_error(self, total_derivs['comp2.area', 'comp1.length'], [[2.]])
+        assert_rel_error(self, total_derivs['comp3.area', 'comp1.length'], [[2.]])
+        assert_rel_error(self, total_derivs['comp2.area', 'comp1.width'], [[3.]])
+        assert_rel_error(self, total_derivs['comp3.area', 'comp1.width'], [[3.]])
 
         # Piggyback testing of list_states
 
