@@ -115,20 +115,37 @@ class Driver(object):
             self._model_viewer_data = _get_viewer_data(problem)
         self._rec_mgr.record_metadata(self)
 
-    def get_design_var_values(self):
+    def get_design_var_values(self, filter=None):
         """
         Return the design variable values.
 
         This is called to gather the initial design variable state.
+
+        Parameters
+        ----------
+        filter : list
+            List of desvar names used by recorders to
+            filter by includes/excludes.
 
         Returns
         -------
         dict
            Dictionary containing values of each design variable.
         """
+        designvars = {}
+
+        if filter:
+            # pull out designvars of those names into filtered dict.
+            for inc in filter:
+                designvars[inc] = self._designvars[inc]
+
+        else:
+            # use all the designvars
+            designvars = self._designvars
+
         vec = self._problem.model._outputs._views_flat
         dv_dict = {}
-        for name, meta in iteritems(self._designvars):
+        for name, meta in iteritems(designvars):
             scaler = meta['scaler']
             adder = meta['adder']
             val = vec[name].copy()
@@ -166,9 +183,15 @@ class Driver(object):
 
         self._problem.model._outputs._views_flat[name][:] = value
 
-    def get_response_values(self):
+    def get_response_values(self, filter=None):
         """
         Return response values.
+
+        Parameters
+        ----------
+        filter : list
+            List of response names used by recorders to
+            filter by includes/excludes.
 
         Returns
         -------
@@ -178,18 +201,35 @@ class Driver(object):
         # TODO: finish this method when we have a driver that requires is.
         pass
 
-    def get_objective_values(self):
+    def get_objective_values(self, filter=None):
         """
         Return objective values.
+
+        Parameters
+        ----------
+        filter : list
+            List of objective names used by recorders to
+            filter by includes/excludes.
 
         Returns
         -------
         dict
            Dictionary containing values of each objective.
         """
+        objectives = {}
+
+        if filter:
+            # pull out objectives of those names into filtered dict.
+            for inc in filter:
+                objectives[inc] = self._objs[inc]
+
+        else:
+            # use all the objectives
+            objectives = self._objs
+
         vec = self._problem.model._outputs._views_flat
         obj_dict = {}
-        for name, meta in iteritems(self._objs):
+        for name, meta in iteritems(objectives):
             scaler = meta['scaler']
             adder = meta['adder']
             val = vec[name].copy()
@@ -204,7 +244,7 @@ class Driver(object):
 
         return obj_dict
 
-    def get_constraint_values(self, ctype='all', lintype='all'):
+    def get_constraint_values(self, ctype='all', lintype='all', filter=None):
         """
         Return constraint values.
 
@@ -218,15 +258,30 @@ class Driver(object):
             Default is 'all'. Optionally return just the linear constraints
             with 'linear' or the nonlinear constraints with 'nonlinear'.
 
+        filter : list
+            List of objective names used by recorders to
+            filter by includes/excludes.
+
         Returns
         -------
         dict
            Dictionary containing values of each constraint.
         """
+        constraints = {}
+
+        if filter is not None:
+            # pull out objectives of those names into filtered dict.
+            for inc in filter:
+                constraints[inc] = self._cons[inc]
+
+        else:
+            # use all the objectives
+            constraints = self._cons
+
         vec = self._problem.model._outputs._views_flat
         con_dict = {}
 
-        for name, meta in iteritems(self._cons):
+        for name, meta in iteritems(constraints):
 
             if lintype == 'linear' and meta['linear'] is False:
                 continue
@@ -253,7 +308,6 @@ class Driver(object):
             # TODO: Need to get the allgathered values? Like:
             # cons[name] = self._get_distrib_var(name, meta, 'constraint')
             con_dict[name] = val
-
         return con_dict
 
     def run(self):
@@ -271,7 +325,6 @@ class Driver(object):
         # Metadata Setup
         self.iter_count += 1
         metadata = self.metadata = create_local_meta(None, 'Driver')
-        # system.ln_solver.local_meta = metadata  # TODO_RECORDER - is this needed?
         update_local_meta(metadata, (self.iter_count,))
 
         failure_flag = self._problem.model._solve_nonlinear()

@@ -152,8 +152,12 @@ class SqliteRecorder(BaseRecorder):
         # used for the dtypes in the creation of the numpy structured array
         # we want to write to sqlite
         if self.options['record_desvars']:
-            desvars_values = object_requesting_recording.get_design_var_values()
-            # desvars_values = self._filtered_driver['des']
+            if (self._filtered_driver):
+                desvars_values = \
+                    object_requesting_recording.get_design_var_values(self._filtered_driver['des'])
+            else:
+                desvars_values = object_requesting_recording.get_design_var_values()
+
             if desvars_values:
                 dtype_tuples = []
                 for name, value in iteritems(desvars_values):
@@ -166,8 +170,12 @@ class SqliteRecorder(BaseRecorder):
                     desvars_array[name] = value
 
         if self.options['record_responses']:
-            responses_values = object_requesting_recording.get_response_values()
-            # responses_values = self._filtered_driver['res']
+            if (self._filtered_driver):
+                responses_values = \
+                    object_requesting_recording.get_response_values(self._filtered_driver['res'])
+            else:
+                responses_values = object_requesting_recording.get_response_values()
+
             if responses_values:
                 dtype_tuples = []
                 for name, value in iteritems(responses_values):
@@ -180,7 +188,12 @@ class SqliteRecorder(BaseRecorder):
                     responses_array[name] = value
 
         if self.options['record_objectives']:
-            objectives_values = object_requesting_recording.get_objective_values()
+            if (self._filtered_driver):
+                objectives_values = \
+                    object_requesting_recording.get_objective_values(self._filtered_driver['obj'])
+            else:
+                objectives_values = object_requesting_recording.get_objective_values()
+
             if objectives_values:
                 dtype_tuples = []
                 for name, value in iteritems(objectives_values):
@@ -193,7 +206,12 @@ class SqliteRecorder(BaseRecorder):
                     objectives_array[name] = value
 
         if self.options['record_constraints']:
-            constraints_values = object_requesting_recording.get_constraint_values()
+            if (self._filtered_driver):
+                constraints_values = \
+                    object_requesting_recording.get_constraint_values(self._filtered_driver['con'])
+            else:
+                constraints_values = object_requesting_recording.get_constraint_values()
+
             if constraints_values:
                 dtype_tuples = []
                 for name, value in iteritems(constraints_values):
