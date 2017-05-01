@@ -90,8 +90,7 @@ class MPITests1(unittest.TestCase):
             prob.setup(vector_class=PETScVector, check=False)
         except Exception as err:
             self.assertEqual(str(err),
-                             "This problem was given 1 MPI processes, "
-                             "but it requires between 2 and 2.")
+                             "C1 needs 2 MPI processes, but was given only 1.")
         else:
             if MPI:
                 self.fail("Exception expected")
@@ -218,11 +217,8 @@ class MPITests2(unittest.TestCase):
         assert_rel_error(self, J['C4.y', 'P1.x'], numpy.eye(size)*-6.0, 1e-6)
         assert_rel_error(self, J['C4.y', 'P2.x'], numpy.eye(size)*35.0, 1e-6)
 
-        import os
-        if os.environ.get("WING_DEBUG"):
-            import wingdbstub
         prob.setup(vector_class=PETScVector, check=False, mode='rev')
-        
+
         from openmdao.devtools.debug import dump_dist_idxs
         dump_dist_idxs(prob)
 
@@ -235,6 +231,7 @@ class MPITests2(unittest.TestCase):
         assert_rel_error(self, J['C4.y', 'P2.x'], numpy.eye(size)*35.0, 1e-6)
 
     def test_src_indices_error(self):
+        raise unittest.SkipTest("figure out API for determining distributed vars first")
         size = 3
         group = Group()
         P = group.add_subsystem('P', IndepVarComp('x', numpy.ones(size)))

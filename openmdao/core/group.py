@@ -67,8 +67,9 @@ class Group(System):
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
         """
-        super(Group, self)._setup_procs(pathname, comm)
-        subsystems_proc_range = self._subsystems_proc_range
+        self.pathname = pathname
+        self.comm = comm
+        self._subsystems_proc_range = subsystems_proc_range = []
 
         self._subsystems_allprocs = []
         self._manual_connections = {}
