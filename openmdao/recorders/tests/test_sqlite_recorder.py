@@ -172,8 +172,6 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.model.add_constraint('con1')
         self.prob.model.add_constraint('con2')
 
-        self.prob.setup(check=False)
-
     def test_only_desvars_recorded(self):
 
         self.setup_sellar_model()
@@ -183,6 +181,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_objectives'] = False
         self.recorder.options['record_constraints'] = False
         self.prob.driver.add_recorder(self.recorder)
+        self.prob.setup(check=False)
 
         t0, t1 = run_driver(self.prob)
 
@@ -205,6 +204,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_objectives'] = True
         self.recorder.options['record_constraints'] = False
         self.prob.driver.add_recorder(self.recorder)
+        self.prob.setup(check=False)
 
         t0, t1 = run_driver(self.prob)
 
@@ -225,6 +225,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_objectives'] = False
         self.recorder.options['record_constraints'] = True
         self.prob.driver.add_recorder(self.recorder)
+        self.prob.setup(check=False)
 
         t0, t1 = run_driver(self.prob)
 
@@ -277,6 +278,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup(check=False)
+
         t0, t1 = run_driver(prob)
 
         prob.cleanup()
@@ -313,6 +315,7 @@ class TestSqliteRecorder(unittest.TestCase):
         }
         self.assertDriverMetadataRecorded(expected_driver_metadata)
 
+    def test_driver_doesnt_record_metadata(self):
 
         self.setup_sellar_model()
 

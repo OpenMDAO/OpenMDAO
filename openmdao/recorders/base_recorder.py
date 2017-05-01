@@ -129,16 +129,19 @@ class BaseRecorder(object):
             excl = self.options['excludes']
 
             if self.options['record_inputs']:
-                myinputs = [n for n in object_requesting_recording._inputs._names
-                            if self._check_path(n, incl, excl)]
+                if object_requesting_recording._inputs:
+                    myinputs = [n for n in object_requesting_recording._inputs._names
+                                if self._check_path(n, incl, excl)]
             if self.options['record_outputs']:
-                myoutputs = [n for n in object_requesting_recording._outputs._names
-                             if self._check_path(n, incl, excl)]
+                if object_requesting_recording._outputs:
+                    myoutputs = [n for n in object_requesting_recording._outputs._names
+                                 if self._check_path(n, incl, excl)]
                 if self.options['record_residuals']:
                     myresiduals = myoutputs  # outputs and residuals have same names
             elif self.options['record_residuals']:
-                myresiduals = [n for n in object_requesting_recording._residuals._names
-                               if self._check_path(n, incl, excl)]
+                if object_requesting_recording._residuals:
+                    myresiduals = [n for n in object_requesting_recording._residuals._names
+                                   if self._check_path(n, incl, excl)]
 
             # if self.options['record_derivs']:
             #     myinputs = [n for n in object_requesting_recording._derivs._names
