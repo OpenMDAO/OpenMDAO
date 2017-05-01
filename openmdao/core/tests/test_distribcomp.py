@@ -153,7 +153,7 @@ class DistribOverlappingInputComp(ExplicitComponent):
 
 
 class DistribInputDistribOutputComp(ExplicitComponent):
-    """Uses 2 procs and takes input var slices and has output var slices as well"""
+    """Uses 2 procs and takes input var slices."""
     def __init__(self, arr_size=11):
         super(DistribInputDistribOutputComp, self).__init__()
         self.arr_size = arr_size
