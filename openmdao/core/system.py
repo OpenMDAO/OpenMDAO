@@ -323,7 +323,8 @@ class System(object):
         reconf = np.any([subsys._reconfigured for subsys in self._subsystems_myproc])
 
         # See if any subsystem on this or any other processor has configured
-        reconf = self.comm.allreduce(reconf) > 0
+        if self.comm.size > 1:
+            reconf = self.comm.allreduce(reconf) > 0
 
         if reconf:
             # Perform an update setup
