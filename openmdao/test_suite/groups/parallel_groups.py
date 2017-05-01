@@ -132,7 +132,10 @@ class FanInGrouped(Group):
 class FanInGrouped2(Group):
     """
     Topology where two components in a Group feed a single component
-    outside of that Group.
+    outside of that Group. This is slightly different than FanInGrouped
+    in that it has two different IndepVarComps.  This configuration
+    is used to test a reverse indexing MPI bug that does not appear
+    when using FanInGrouped.
     """
 
     def __init__(self):

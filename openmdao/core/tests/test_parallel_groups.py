@@ -82,10 +82,6 @@ class TestParallelGroups(unittest.TestCase):
     def test_fan_in_grouped(self):
 
         prob = Problem()
-        import os
-        if os.environ.get("WING_DEBUG"):
-            import wingdbstub
-
         prob.model = FanInGrouped2()
         prob.setup(vector_class=PETScVector, check=False, mode='fwd')
         prob.model.suppress_solver_output = True
@@ -97,19 +93,16 @@ class TestParallelGroups(unittest.TestCase):
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
-        #J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
-        #assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
-        #assert_rel_error(self, J['c3.y', 'p2.x'][0][0], 35.0, 1e-6)
+        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
+        assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'p2.x'][0][0], 35.0, 1e-6)
 
-        #assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
+        assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
         prob.setup(vector_class=PETScVector, check=False, mode='rev')
         prob.run_model()
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
-        
-        from openmdao.devtools.debug import dump_dist_idxs
-        dump_dist_idxs(prob)
 
         J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list)
         assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
