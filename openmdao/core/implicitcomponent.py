@@ -159,7 +159,7 @@ class ImplicitComponent(Component):
                     approximation.compute_approximations(self, jac=J)
                 self.linearize(self._inputs, self._outputs, J)
 
-            if self._owns_assembled_jac:
+            if self._owns_assembled_jac or self._views_assembled_jac:
                 J._update()
 
         if self._nl_solver is not None and do_nl:

@@ -1,6 +1,10 @@
 """Define the base Matrix class."""
 from __future__ import division
 import numpy as np
+from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
+
+# scipy sparse types allowed to be subjacs
+sparse_types = (csr_matrix, csc_matrix, coo_matrix)
 
 
 class Matrix(object):
@@ -35,7 +39,7 @@ class Matrix(object):
         self._submats = {}
         self._metadata = {}
 
-    def _add_submat(self, key, info, irow, icol, src_indices, shape):
+    def _add_submat(self, key, info, irow, icol, src_indices, shape, factor=None):
         """
         Declare a sub-jacobian.
 
@@ -54,8 +58,10 @@ class Matrix(object):
             connects to.
         shape : tuple
             Shape of the specified submatrix.
+        factor : float or None
+            Unit conversion factor.
         """
-        self._submats[key] = (info, irow, icol, src_indices, shape)
+        self._submats[key] = (info, irow, icol, src_indices, shape, factor)
 
     def _build(self, num_rows, num_cols):
         """

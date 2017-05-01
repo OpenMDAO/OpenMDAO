@@ -16,9 +16,9 @@ class TestVarSets(unittest.TestCase):
         group = TestImplicitGroup(lnSolverClass=ScipyIterativeSolver,
                                   nlSolverClass=NonlinearBlockGS,
                                   use_varsets=True)
-        group.suppress_solver_output = True
 
         p = Problem(group)
+        p.set_solver_print(level=0)
         p.setup(check=False)
         self.p = p
 
@@ -26,9 +26,9 @@ class TestVarSets(unittest.TestCase):
         group = TestImplicitGroup(lnSolverClass=ScipyIterativeSolver,
                                   nlSolverClass=NonlinearBlockGS,
                                   use_varsets=False)
-        group.suppress_solver_output = True
 
         p = Problem(group)
+        p.set_solver_print(level=0)
         p.setup(check=False)
         self.p_no_varsets = p
 

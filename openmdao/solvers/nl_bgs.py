@@ -31,7 +31,28 @@ class NonlinearBlockGS(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
+
+        self._solver_info.prefix += '|  '
+
         for isub, subsys in enumerate(system._subsystems_myproc):
             system._transfer('nonlinear', 'fwd', isub)
             subsys._solve_nonlinear()
             system._check_reconf_update()
+
+        self._solver_info.prefix = self._solver_info.prefix[:-3]
+
+    def _mpi_print_header(self):
+        """
+        Print header text before solving.
+        """
+        if (self.options['iprint'] > 0 and self._system.comm.rank == 0):
+
+            pathname = self._system.pathname
+            if pathname:
+                nchar = len(pathname)
+                prefix = self._solver_info.prefix
+                header = prefix + "\n"
+                header += prefix + nchar * "=" + "\n"
+                header += prefix + pathname + "\n"
+                header += prefix + nchar * "="
+                print(header)

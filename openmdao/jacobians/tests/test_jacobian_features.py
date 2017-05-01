@@ -142,7 +142,7 @@ class TestJacobianFeatures(unittest.TestCase):
         model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
 
         self.problem = Problem(model=model)
-        model.suppress_solver_output = True
+        self.problem.set_solver_print(level=0)
         model.ln_solver = ScipyIterativeSolver()
         model.jacobian = COOJacobian()
 
@@ -226,7 +226,7 @@ class TestJacobianFeatures(unittest.TestCase):
         model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
 
         problem = Problem(model=model)
-        model.suppress_solver_output = True
+        problem.set_solver_print(level=0)
         model.ln_solver = ScipyIterativeSolver()
         model.jacobian = COOJacobian()
         model.add_subsystem('simple', SimpleCompConst(),

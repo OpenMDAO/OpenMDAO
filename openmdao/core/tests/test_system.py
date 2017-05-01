@@ -22,7 +22,7 @@ class TestSystem(unittest.TestCase):
         model.add_subsystem('Sink', ExecComp('c=2*b'), promotes=['b'])
 
         p = Problem(model=model)
-        model.suppress_solver_output = True
+        p.set_solver_print(level=0)
 
         # Test pre-setup errors
         with self.assertRaises(Exception) as cm:
@@ -109,7 +109,7 @@ class TestSystem(unittest.TestCase):
         p = Problem(model=model)
         p.setup()
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
         p.run_model()
 
         msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"

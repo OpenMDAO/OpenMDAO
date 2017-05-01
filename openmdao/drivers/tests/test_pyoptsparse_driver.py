@@ -13,7 +13,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
-OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
@@ -38,7 +38,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -68,7 +68,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -99,7 +99,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -131,7 +131,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -161,7 +161,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -191,7 +191,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -218,7 +218,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -247,7 +247,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('obj', ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
                             promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -275,7 +275,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('obj', ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
                             promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -317,7 +317,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.connect('comp1.y', 'con1.x')
         model.connect('comp2.y', 'con2.x')
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -355,7 +355,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
@@ -386,7 +386,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -422,7 +422,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -453,7 +453,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -492,7 +492,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -520,7 +520,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
@@ -555,7 +555,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
@@ -587,7 +587,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -616,7 +616,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -647,7 +647,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -678,7 +678,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -707,7 +707,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -738,7 +738,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -769,7 +769,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -793,7 +793,7 @@ class TestPyoptSparse(unittest.TestCase):
         prob = Problem()
         model = prob.model = Group()
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -822,7 +822,7 @@ class TestPyoptSparse(unittest.TestCase):
         prob = Problem()
         model = prob.model = Group()
 
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])

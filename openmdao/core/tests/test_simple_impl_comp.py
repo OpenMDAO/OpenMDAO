@@ -91,7 +91,7 @@ class Test(unittest.TestCase):
 
     def test_apply_linear(self):
         root = self.p.model
-        root.suppress_solver_output = True
+        self.p.set_solver_print(level=0)
 
         d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
@@ -107,7 +107,7 @@ class Test(unittest.TestCase):
 
     def test_solve_linear(self):
         root = self.p.model
-        root.suppress_solver_output = True
+        self.p.set_solver_print(level=0)
 
         d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 

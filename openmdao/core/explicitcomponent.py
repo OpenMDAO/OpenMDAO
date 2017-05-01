@@ -279,7 +279,7 @@ class ExplicitComponent(Component):
                 # re-negate the jacobian
                 self._negate_jac()
 
-            if self._owns_assembled_jac:
+            if self._owns_assembled_jac or self._views_assembled_jac:
                 J._update()
 
     def compute(self, inputs, outputs):

@@ -94,7 +94,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob.model.nl_solver = NonlinearBlockGS()
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -123,7 +123,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob.model.nl_solver.options['err_on_maxiter'] = True
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         try:
             prob.run_model()
@@ -161,7 +161,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         root.connect('g2.y2', 'g1.x')
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.run_model()
 
@@ -203,7 +203,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         root.ln_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         # Will be True in one group and False in the other, depending on
         # where it cuts.
