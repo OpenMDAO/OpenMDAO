@@ -109,11 +109,15 @@ class Component(System):
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
+        self._design_vars = {}
+        self._responses = {}
 
         self._static_mode = False
         self._var_rel2data_io.update(self._static_var_rel2data_io)
         for type_ in ['input', 'output']:
             self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
+        self._design_vars.update(self._static_design_vars)
+        self._responses.update(self._static_responses)
         self.initialize_variables()
         self._static_mode = True
 

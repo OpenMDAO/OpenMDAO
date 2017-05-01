@@ -32,9 +32,18 @@ class NLRunOnce(NonlinearSolver):
             relative error.
         """
         system = self._system
-        for isub, subsys in enumerate(system._subsystems_allprocs):
-            system._transfer('nonlinear', 'fwd', isub)
-            if subsys in system._subsystems_myproc:
+
+        # If this is a parallel group, transfer all at once then run each subsystem.
+        if len(system._subsystems_myproc) != len(system._subsystems_allprocs):
+            system._transfer('nonlinear', 'fwd')
+            for subsys in system._subsystems_myproc:
                 subsys._solve_nonlinear()
+            system._check_reconf_update()
+        # If this is not a parallel group, transfer for each subsystem just prior to running it.
+        else:
+            for isub, subsys in enumerate(system._subsystems_myproc):
+                system._transfer('nonlinear', 'fwd', isub)
+                subsys._solve_nonlinear()
+                system._check_reconf_update()
 
         return False, 0.0, 0.0
