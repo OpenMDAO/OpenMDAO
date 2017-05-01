@@ -219,14 +219,9 @@ class MPITests2(unittest.TestCase):
 
         prob.setup(vector_class=PETScVector, check=False, mode='rev')
 
-        from openmdao.devtools.debug import dump_dist_idxs
-        dump_dist_idxs(prob)
-
         prob.run_driver()
 
-
         J = prob.compute_total_derivs(of=['C4.y'], wrt=['P1.x', 'P2.x'])
-        print J
         assert_rel_error(self, J['C4.y', 'P1.x'], numpy.eye(size)*-6.0, 1e-6)
         assert_rel_error(self, J['C4.y', 'P2.x'], numpy.eye(size)*35.0, 1e-6)
 
