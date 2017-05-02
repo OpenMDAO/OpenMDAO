@@ -86,10 +86,10 @@ class Summer(ExplicitComponent):
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class DistributedAdderTest(unittest.TestCase):
 
-    N_PROCS = 10
+    N_PROCS = 3
 
     def test_distributed_adder(self):
-        size = 1000000 #how many items in the array
+        size = 100000 #how many items in the array
 
         prob = Problem()
         prob.model = Group()
