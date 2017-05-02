@@ -135,6 +135,8 @@ class TestSqliteRecorder(unittest.TestCase):
         self.eps = 1e-5
 
     def tearDown(self):
+        print('self.filename', self.filename)
+        return
         try:
             rmtree(self.dir)
             pass
@@ -335,11 +337,21 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_system(self):
         self.setup_sellar_model()
 
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = False
-        self.recorder.options['record_objectives'] = False
-        self.recorder.options['record_constraints'] = False
+        self.recorder.options['record_inputs'] = True
+        self.recorder.options['record_outputs'] = True
+        self.recorder.options['record_residuals'] = True
+        self.recorder.options['record_metadata'] = True
         self.prob.model.add_recorder(self.recorder)
+
+        d1 = self.prob.model.get_subsystem('d1')
+        d1.add_recorder(self.recorder)
+
+        obj_cmp = self.prob.model.get_subsystem('obj_cmp')
+        obj_cmp.add_recorder(self.recorder)
+
+        # self.prob['d1'].add_recorder(self.recorder)
+        # self.prob.model.obj_cmp.add_recorder(self.recorder)
+        # self.prob.model.pz.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
         t0, t1 = run_driver(self.prob)

@@ -1079,9 +1079,9 @@ class Group(System):
         float
             absolute error.
         """
+        result = self._nl_solver.solve()
         super(Group, self)._solve_nonlinear()
-
-        return self._nl_solver.solve()
+        return result
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
@@ -1140,7 +1140,9 @@ class Group(System):
         float
             absolute error.
         """
-        return self._ln_solver.solve(vec_names, mode)
+        result = self._ln_solver.solve(vec_names, mode)
+        super(Group, self)._solve_linear()
+        return result
 
     def _linearize(self, do_nl=True, do_ln=True):
         """
