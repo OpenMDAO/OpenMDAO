@@ -251,7 +251,7 @@ class ExplicitComponent(Component):
                 elif mode == 'rev':
                     d_residuals.set_vec(d_outputs)
 
-        super(ExplicitComponent, self)._solve_linear()
+        super(ExplicitComponent, self)._solve_linear(vec_names, mode)
 
         return False, 0., 0.
 
