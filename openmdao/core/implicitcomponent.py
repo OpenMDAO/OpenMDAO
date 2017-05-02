@@ -119,7 +119,7 @@ class ImplicitComponent(Component):
         """
         if self._ln_solver is not None:
             result = self._ln_solver.solve(vec_names, mode)
-            super(ImplicitComponent, self)._solve_nonlinear()
+            super(ImplicitComponent, self)._solve_linear(vec_names, mode)
             return result
         else:
             failed = False
@@ -142,7 +142,7 @@ class ImplicitComponent(Component):
                 abs_errors.append(result[1])
                 rel_errors.append(result[2])
 
-            super(ImplicitComponent, self)._solve_linear()
+            super(ImplicitComponent, self)._solve_linear(vec_names, mode)
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 

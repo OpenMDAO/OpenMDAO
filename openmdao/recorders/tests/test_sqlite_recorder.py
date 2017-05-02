@@ -85,6 +85,51 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
 
+def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
+    """
+        expected can be from multiple cases
+    """
+
+    # iterate through the cases
+    for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, constraints_expected in expected:
+        iter_coord = format_iteration_coordinate(coord)
+
+        # from the database, get the actual data recorded
+        db_cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
+        row_actual  = db_cur.fetchone()
+
+        counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, objectives_blob, constraints_blob = row_actual
+
+        desvars_actual = blob_to_array(desvars_blob)
+        responses_actual = blob_to_array(responses_blob)
+        objectives_actual = blob_to_array(objectives_blob)
+        constraints_actual = blob_to_array(constraints_blob)
+
+        # Does the timestamp make sense?
+        test.assertTrue( t0 <= timestamp and timestamp <= t1)
+
+        test.assertEqual(success, 1)
+        test.assertEqual(msg, '')
+
+        for vartype, actual, expected in (
+            ('desvars', desvars_actual, desvars_expected),
+            ('responses', responses_actual, responses_expected),
+            ('objectives', objectives_actual, objectives_expected),
+            ('constraints', constraints_actual, constraints_expected),
+            ):
+
+            if expected is None:
+                test.assertEqual(actual, np.array(None, dtype=object))
+            else:
+                # Check to see if the number of values in actual and expected match
+                test.assertEqual(len(actual[0]), len(expected))
+                for key, value in iteritems(expected):
+                    # Check to see if the keys in the actual and expected match
+                    test.assertTrue(key in actual[0].dtype.names, '{} variable not found in actual data from recorder'.format(key))
+                    # Check to see if the values in actual and expected match
+                    assert_rel_error(test, actual[0][key], expected[key], tolerance)
+        return
+
 def _assertMetadataRecorded(test, db_cur):
 
     db_cur.execute("SELECT format_version FROM metadata")
@@ -357,6 +402,21 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(self.prob)
 
         self.prob.cleanup()
+
+        coordinate = [0, 'obj_cmp', (6, )]
+
+        expected_inputs = {"p1.x": [7.16666666166666666666667,],
+                            "p2.y": [-7.833333333333334,]
+                            }
+
+        expected_outputs = {"comp.f_xy": [-27.0833,],
+                            }
+
+        expected_residuals = {"con.c": [-15.0,],
+                            }
+
+        # self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),), self.eps)
+
 
     def qqq_test_includes(self):
         if OPT is None:

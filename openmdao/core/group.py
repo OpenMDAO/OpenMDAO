@@ -1135,7 +1135,7 @@ class Group(System):
             absolute error.
         """
         result = self._ln_solver.solve(vec_names, mode)
-        super(Group, self)._solve_linear()
+        super(Group, self)._solve_linear(vec_names, mode)
         return result
 
     def _linearize(self, do_nl=True, do_ln=True):

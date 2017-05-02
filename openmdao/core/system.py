@@ -2126,7 +2126,7 @@ class System(object):
 
         # TODO_RECORDERS
         self.iter_count += 1
-        metadata = self.metadata = create_local_meta(None, self.pathname)
+        metadata = create_local_meta(None, self.pathname)
         update_local_meta(metadata, (self.iter_count,))
         self._rec_mgr.record_iteration(self, metadata)
 
