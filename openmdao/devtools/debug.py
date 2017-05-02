@@ -1,6 +1,10 @@
 """Various debugging functions."""
 
+from __future__ import print_function
+
 import sys
+
+from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
 
 from six.moves import zip_longest
 from openmdao.core.group import Group
@@ -117,3 +121,53 @@ def tree(system, include_solvers=True, stream=sys.stdout):
             if s.ln_solver is not None:
                 stream.write("%s %s ln_solver\n" % (indent, type(s.ln_solver).__name__))
 
+def max_mem_usage():
+    """
+    Returns
+    -------
+    The max memory used by this process and its children, in MB.
+    """
+    denom = 1024.
+    if sys.platform == 'darwin':
+        denom *= denom
+    total = getrusage(RUSAGE_SELF).ru_maxrss / denom
+    total += getrusage(RUSAGE_CHILDREN).ru_maxrss / denom
+    return total
+
+try:
+    import psutil
+
+    def mem_usage(msg='', out=sys.stdout):
+        """
+        Returns
+        -------
+        The current memory used by this process (and it's children?), in MB.
+        """
+        denom = 1024. * 1024.
+        p = psutil.Process(os.getpid())
+        mem = p.memory_info().rss / denom
+        if msg:
+            print(msg,"%6.3f MB" % mem, file=out)
+        return mem
+
+    def diff_mem(fn):
+        """
+        This gives the difference in memory before and after the
+        decorated function is called. Requires psutil to be installed.
+        """
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            startmem = mem_usage()
+            ret = fn(*args, **kwargs)
+            maxmem = mem_usage()
+            diff = maxmem - startmem
+            if diff > 0.0:
+                if args and hasattr(args[0], 'pathname'):
+                    name = args[0].pathname
+                else:
+                    name = ''
+                print(name,"%s added %5.3f MB (total: %6.3f)" % (fn.__name__, diff, maxmem))
+            return ret
+        return wrapper
+except ImportError:
+    pass

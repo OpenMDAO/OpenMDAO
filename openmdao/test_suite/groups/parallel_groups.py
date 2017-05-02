@@ -129,6 +129,33 @@ class FanInGrouped(Group):
         self.connect("iv.x1", "sub.c1.x")
         self.connect("iv.x2", "sub.c2.x")
 
+class FanInGrouped2(Group):
+    """
+    Topology where two components in a Group feed a single component
+    outside of that Group. This is slightly different than FanInGrouped
+    in that it has two different IndepVarComps.  This configuration
+    is used to test a reverse indexing MPI bug that does not appear
+    when using FanInGrouped.
+    """
+
+    def __init__(self):
+        super(FanInGrouped2, self).__init__()
+
+        p1 = self.add_subsystem('p1', IndepVarComp('x', 1.0))
+        p2 = self.add_subsystem('p2', IndepVarComp('x', 1.0))
+
+        self.sub = self.add_subsystem('sub', ParallelGroup())
+        self.sub.add_subsystem('c1', ExecComp(['y=-2.0*x']))
+        self.sub.add_subsystem('c2', ExecComp(['y=5.0*x']))
+
+        self.add_subsystem('c3', ExecComp(['y=3.0*x1+7.0*x2']))
+
+        self.connect("sub.c1.y", "c3.x1")
+        self.connect("sub.c2.y", "c3.x2")
+
+        self.connect("p1.x", "sub.c1.x")
+        self.connect("p2.x", "sub.c2.x")
+
 
 class DiamondFlat(Group):
     """
