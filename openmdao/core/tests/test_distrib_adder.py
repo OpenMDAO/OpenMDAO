@@ -83,12 +83,13 @@ class Summer(ExplicitComponent):
 
 
 
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class DistributedAdderTest(unittest.TestCase):
 
-    N_PROCS = 10
+    N_PROCS = 3
 
     def test_distributed_adder(self):
-        size = 1000000 #how many items in the array
+        size = 100000 #how many items in the array
 
         prob = Problem()
         prob.model = Group()
@@ -106,6 +107,8 @@ class DistributedAdderTest(unittest.TestCase):
         #expected answer is 11
         assert_rel_error(self, prob['sum']/size, 11.0, 1.e-6)
 
+        #from openmdao.devtools.debug import max_mem_usage
+        #print "Max mem:", max_mem_usage()
 
 
 if __name__ == "__main__":

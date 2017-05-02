@@ -73,8 +73,8 @@ install:
 - pip install -e .
 
 script:
-- testflo . --pre_announce  -m "ptest*"
-- testflo .
+- testflo . --pre_announce -m "ptest*"
+- testflo . --pre_announce
 #after tests, need to cd down so that conf.py can be found for doc build
 - cd openmdao/docs
 - make all
