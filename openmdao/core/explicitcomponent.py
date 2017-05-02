@@ -181,6 +181,8 @@ class ExplicitComponent(Component):
             self._residuals.set_const(0.0)
             failed = self.compute(self._inputs, self._outputs)
 
+        super(ExplicitComponent, self)._solve_nonlinear()
+
         return bool(failed), 0., 0.
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
@@ -246,6 +248,8 @@ class ExplicitComponent(Component):
                     d_outputs.set_vec(d_residuals)
                 elif mode == 'rev':
                     d_residuals.set_vec(d_outputs)
+
+        super(ExplicitComponent, self)._solve_linear()
 
         return False, 0., 0.
 

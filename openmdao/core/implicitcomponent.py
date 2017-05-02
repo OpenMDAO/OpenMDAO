@@ -50,10 +50,14 @@ class ImplicitComponent(Component):
             relative error.
         """
         if self._nl_solver is not None:
-            return self._nl_solver.solve()
+            result = self._nl_solver.solve()
+            super(ImplicitComponent, self)._solve_nonlinear()
+            return result
         else:
             with self._unscaled_context(outputs=[self._outputs]):
                 result = self.solve_nonlinear(self._inputs, self._outputs)
+
+            super(ImplicitComponent, self)._solve_nonlinear()
 
             if result is None:
                 return False, 0., 0.
@@ -114,7 +118,9 @@ class ImplicitComponent(Component):
             relative error.
         """
         if self._ln_solver is not None:
-            return self._ln_solver.solve(vec_names, mode)
+            result = self._ln_solver.solve(vec_names, mode)
+            super(ImplicitComponent, self)._solve_nonlinear()
+            return result
         else:
             failed = False
             abs_errors = []
@@ -135,6 +141,8 @@ class ImplicitComponent(Component):
                 failed = failed or result[0]
                 abs_errors.append(result[1])
                 rel_errors.append(result[2])
+
+            super(ImplicitComponent, self)._solve_linear()
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
