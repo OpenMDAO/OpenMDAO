@@ -240,14 +240,11 @@ class SqliteRecorder(BaseRecorder):
         """
         Record an iteration using system options.
         """
-
         inputs_array = None
         outputs_array = None
         residuals_array = None
 
         inputs, outputs, residuals = object_requesting_recording.get_nonlinear_vectors()
-
-        # inputs_data = inputs.get_data()
 
         if inputs:
             dtype_tuples = []
@@ -286,65 +283,14 @@ class SqliteRecorder(BaseRecorder):
         self.con.execute("INSERT INTO system_iterations(iteration_coordinate, timestamp, "
                          "success, msg, inputs , outputs , residuals ) "
                          "VALUES(?,?,?,?,?,?,?)", (format_iteration_coordinate(metadata['coord']),
-                                                     metadata['timestamp'], metadata['success'],
-                                                     metadata['msg'], inputs_blob,
-                                                     outputs_blob, residuals_blob
-                                                     ))
-
-
-        # if isinstance(object_requesting_recording, System): # TODO_RECORDERS DO we need this? We already know it is a System, right?
-        #     dtype_tuples = []
-        #
-        #     # go through the recording options of System to construct the entry to be inserted.
-        #     if self.options['record_inputs']:
-        #
+                                                   metadata['timestamp'], metadata['success'],
+                                                   metadata['msg'], inputs_blob,
+                                                   outputs_blob, residuals_blob))
         #         if self._filtered_system['i']:
         #             for name, value in iteritems(self._filtered_system['i']):
         #                 tple = ('input.' + name, '({},)f8'.format(len(value)))
         #                 dtype_tuples.append(tple)
         #
-        #     if self.options['record_outputs']:
-        #         if self._filtered_system['o']:
-        #             for name, value in iteritems(self._filtered_system['o']):
-        #                 tple = ('output.' + name, '({},)f8'.format(len(value)))
-        #                 dtype_tuples.append(tple)
-        #
-        #     if self.options['record_residuals']:
-        #         if self._filtered_system['r']:
-        #             for name, value in iteritems(self._filtered_system['o']):
-        #                 tple = ('residual.' + name, '({},)f8'.format(len(value)))
-        #                 dtype_tuples.append(tple)
-        #
-        #     if self.options['record_derivatives']:
-        #         if self._filtered_system['d']:
-        #             for name, value in iteritems(self._filtered_system['d']):
-        #                 tple = ('derivative.' + name, '({},)f8'.format(len(value)))
-        #                 dtype_tuples.append(tple)
-        #
-        #     # Create the mega array that we will write to the database
-        #     # All of this needs to be looked into to be optimized !!
-        #     system_values = np.zeros((1,), dtype=dtype_tuples)
-        #
-        #     # Write the actual values to this array
-        #     # Wish we didn't have to loop through this twice
-        #     if self.options['record_inputs'] and inputs:
-        #         for name, value in iteritems(inputs):
-        #             system_values['input.' + name] = value
-        #     if self.options['record_outputs'] and outputs:
-        #         for name, value in iteritems(outputs):
-        #             system_values['output.' + name] = value
-        #     if self.options['record_residuals'] and residuals:
-        #         for name, value in iteritems(residuals):
-        #             system_values['residual.' + name] = value
-        #     if self.options['record_derivatives'] and derivatives:
-        #         for name, value in iteritems(derivatives):
-        #             system_values['derivative.' + name] = value
-        #
-        #     # Write this mega array to the database
-        #     self.con.execute("INSERT INTO system_iterations(iteration_coordinate, timestamp, "
-        #                      "success, msg, system_values) VALUES(?,?,?,?,?)",
-        #                      (metadata['coord'], metadata['timestamp'], metadata['success'],
-        #                       metadata['msg'], system_values))
 
     def record_iteration_solver(self, object_requesting_recording, metadata):
         """

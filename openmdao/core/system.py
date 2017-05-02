@@ -53,6 +53,9 @@ class System(object):
         MPI communicator object.
     metadata : <OptionsDictionary>
         Dictionary of user-defined arguments.
+    iter_count : int
+        Int that holds the number of times this system has iterated
+        in a recording run.
     #
     _mpi_proc_allocator : <ProcAllocator>
         Object that distributes procs among subsystems.
@@ -2190,15 +2193,6 @@ class System(object):
         with self._scaled_context_all():
             result = self._solve_linear(vec_names, mode)
 
-        # TODO_RECORDERS
-        #  The _apply_linear and _solve_linear methods work with
-        #  d_inputs, d_outputs, and d_residuals,
-        #  each one is associated with a vecname.
-        #  These would be (System._vectors['inputs'][vec_name], etc.). In terms of the list of
-        #  vec_names, there is always a 'linear', and depending on the problem, there may be others
-        # component-level solve_nonlinear and solve_linear recording
-        # (wouldn't hurt to also make it work generally with any type of system at this point).
-
         return result
 
     def run_linearize(self, do_nl=True, do_ln=True):
@@ -2272,24 +2266,7 @@ class System(object):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
-        # TODO_RECORDERS
-        # Systems, no matter the type, should be able to save inputs, outputs, and
-        # residuals (System._vectors['inputs']['nonlinear'], etc.) after _apply_nonlinear &
-        # solve_nonlinear calls.  component-level solve_nonlinear and solve_linear recording
-        # (wouldn't hurt to also make it work generally with any
-        # type of system at this point).
-
-        # TODO_RECORDERS
         metadata = None  # ??? Is this correct?
         self._rec_mgr.record_iteration(self, metadata)
 
