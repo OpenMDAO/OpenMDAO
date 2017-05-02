@@ -90,7 +90,7 @@ class TestProblem(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         prob.setup(check=False, mode='fwd')
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         of = ['f_xy']
@@ -120,7 +120,7 @@ class TestProblem(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         prob.setup(check=False, mode='fwd')
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         of = ['f_xy']

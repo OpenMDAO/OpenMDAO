@@ -24,6 +24,7 @@ from openmdao.solvers.ls_backtracking import ArmijoGoldstein
 from openmdao.solvers.ls_backtracking import BacktrackingLineSearch
 from openmdao.solvers.ls_backtracking import BoundsCheck
 from openmdao.solvers.nl_bgs import NonlinearBlockGS
+from openmdao.solvers.nl_bjac import NonlinearBlockJac
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.solvers.nl_runonce import NLRunOnce
 

@@ -109,11 +109,15 @@ class Component(System):
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
+        self._design_vars = {}
+        self._responses = {}
 
         self._static_mode = False
         self._var_rel2data_io.update(self._static_var_rel2data_io)
         for type_ in ['input', 'output']:
             self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
+        self._design_vars.update(self._static_design_vars)
+        self._responses.update(self._static_responses)
         self.initialize_variables()
         self._static_mode = True
 
@@ -260,7 +264,7 @@ class Component(System):
             Shape of this variable, only required if src_indices not provided and
             val is not an array. Default is None.
         src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
-            The indices of the source variable to transfer data from.
+            The global indices of the source variable to transfer data from.
             If val is given as an array_like object, the shapes of val and
             src_indices must match. A value of None implies this input depends
             on all entries of source. Default is None.

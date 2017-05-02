@@ -52,7 +52,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
             prob = Problem(model=ImplComp4Test())
             prob.model.nl_solver = NewtonSolver()
             prob.model.ln_solver = DirectSolver()
-            prob.model.suppress_solver_output = True
+            prob.set_solver_print(level=0)
 
             if jac == 'dict':
                 pass

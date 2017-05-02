@@ -8,6 +8,23 @@ from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 
 
+class SolverInfo(object):
+    """
+    Communal object for storing some formatting for solver iprint.
+
+    Attributes
+    ----------
+    prefix : <System>
+        Prefix to prepend during this iprint.
+    """
+
+    def __init__(self):
+        """
+        Initialize.
+        """
+        self.prefix = ""
+
+
 class Solver(object):
     """
     Base solver class.
@@ -18,25 +35,28 @@ class Solver(object):
     Attributes
     ----------
     _system : <System>
-        pointer to the owning system.
+        Pointer to the owning system.
     _depth : int
-        how many subsolvers deep this solver is (0 means not a subsolver).
+        How many subsolvers deep this solver is (0 means not a subsolver).
     _vec_names : [str, ...]
-        list of right-hand-side (RHS) vector names.
+        List of right-hand-side (RHS) vector names.
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
-        number of iterations for the current invocation of the solver.
+        Number of iterations for the current invocation of the solver.
     _rec_mgr : list of recorders
         list of recorders that have been added to this system.
+    _solver_info : <SolverInfo>
+        Object to store some formatting for iprint that is shared across all solvers.
     options : <OptionsDictionary>
-        options dictionary.
+        Options dictionary.
     supports : <OptionsDictionary>
-        options dictionary describing what features are supported by this
+        Options dictionary describing what features are supported by this
         solver.
     """
 
     SOLVER = 'base_solver'
+    _solver_info = SolverInfo()
 
     def __init__(self, **kwargs):
         """
@@ -107,6 +127,21 @@ class Solver(object):
         self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
 
+    def _set_solver_print(self, level=2, type_='all'):
+        """
+        Control printing for solvers and subsolvers in the model.
+
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        """
+        self.options['iprint'] = level
+
     def _mpi_print(self, iteration, abs_res, rel_res):
         """
         Print residuals from an iteration.
@@ -120,30 +155,23 @@ class Solver(object):
         rel_res : float
             current relative residual norm.
         """
-        if (self.options['iprint'] and self._system.comm.rank == 0 and
-                not self._system._suppress_solver_output):
-            rawname = self._system.name
-            name_len = 10
-            if len(rawname) > name_len:
-                sys_name = rawname[:name_len]
-            else:
-                sys_name = rawname + ' ' * (name_len - len(rawname))
+        if (self.options['iprint'] == 2 and self._system.comm.rank == 0):
 
+            prefix = self._solver_info.prefix
             solver_name = self.SOLVER
-            name_len = 12
-            if len(solver_name) > name_len:
-                solver_name = solver_name[:name_len]
-            else:
-                solver_name = solver_name.ljust(name_len)
 
-            depth = self._system.pathname.count('.')
-            if self._system.pathname != '':
-                depth += 1
+            if prefix.endswith('precon:'):
+                solver_name = solver_name[3:]
 
-            print_str = ' ' * depth + '-' * self._depth
-            print_str += sys_name + solver_name
-            print_str += ' %3d | %.9g %.9g' % (iteration, abs_res, rel_res)
+            print_str = prefix + solver_name
+            print_str += ' %d ; %.9g %.9g' % (iteration, abs_res, rel_res)
             print(print_str)
+
+    def _mpi_print_header(self):
+        """
+        Print header text before solving.
+        """
+        pass
 
     def _run_iterator(self):
         """
@@ -161,6 +189,9 @@ class Solver(object):
         maxiter = self.options['maxiter']
         atol = self.options['atol']
         rtol = self.options['rtol']
+        iprint = self.options['iprint']
+
+        self._mpi_print_header()
 
         self._iter_count = 0
         norm0, norm = self._iter_initialize()
@@ -182,6 +213,17 @@ class Solver(object):
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
+
+        if fail:
+            if iprint > -1:
+                msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
+                print(self._solver_info.prefix + self.SOLVER + msg)
+        elif iprint == 1:
+            print(self._solver_info.prefix + self.SOLVER +
+                  ' Converged in {} iterations'.format(self._iter_count))
+        elif iprint == 2:
+            print(self._solver_info.prefix + self.SOLVER + ' Converged')
+
         return fail, norm, norm / norm0
 
     def _iter_initialize(self):

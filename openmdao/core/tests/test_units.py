@@ -270,7 +270,7 @@ class TestUnitConversion(unittest.TestCase):
                 #assert_rel_error(self, val2['rel error'][2], 0.0, 1e-6)
 
         #stream = cStringIO()
-        #conv = prob.root.list_unit_conv(stream=stream)
+        #conv = prob.model.list_unit_conv(stream=stream)
         #self.assertTrue((('src.x2', 'tgtF.x2'), ('degC', 'degF')) in conv)
         #self.assertTrue((('src.x2', 'tgtK.x2'), ('degC', 'degK')) in conv)
 
@@ -351,21 +351,21 @@ class TestUnitConversion(unittest.TestCase):
     #def test_basic_force_fd_comps(self):
 
         #prob = Problem()
-        #prob.root = Group()
-        #prob.root.add('src', SrcComp())
-        #prob.root.add('tgtF', TgtCompF())
-        #prob.root.add('tgtC', TgtCompC())
-        #prob.root.add('tgtK', TgtCompK())
-        #prob.root.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        #prob.root.connect('x1', 'src.x1')
-        #prob.root.connect('src.x2', 'tgtF.x2')
-        #prob.root.connect('src.x2', 'tgtC.x2')
-        #prob.root.connect('src.x2', 'tgtK.x2')
+        #prob.model = Group()
+        #prob.model.add('src', SrcComp())
+        #prob.model.add('tgtF', TgtCompF())
+        #prob.model.add('tgtC', TgtCompC())
+        #prob.model.add('tgtK', TgtCompK())
+        #prob.model.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
+        #prob.model.connect('x1', 'src.x1')
+        #prob.model.connect('src.x2', 'tgtF.x2')
+        #prob.model.connect('src.x2', 'tgtC.x2')
+        #prob.model.connect('src.x2', 'tgtK.x2')
 
-        #prob.root.src.deriv_options['type'] = 'fd'
-        #prob.root.tgtF.deriv_options['type'] = 'fd'
-        #prob.root.tgtC.deriv_options['type'] = 'fd'
-        #prob.root.tgtK.deriv_options['type'] = 'fd'
+        #prob.model.src.deriv_options['type'] = 'fd'
+        #prob.model.tgtF.deriv_options['type'] = 'fd'
+        #prob.model.tgtC.deriv_options['type'] = 'fd'
+        #prob.model.tgtK.deriv_options['type'] = 'fd'
 
         #prob.setup(check=False)
         #prob.run()
@@ -376,7 +376,7 @@ class TestUnitConversion(unittest.TestCase):
         #assert_rel_error(self, prob['tgtK.x3'], 373.15, 1e-6)
 
         ## Make sure we don't convert equal units
-        #self.assertEqual(prob.root.inputs.metadata('tgtC.x2').get('unit_conv'),
+        #self.assertEqual(prob.model.inputs.metadata('tgtC.x2').get('unit_conv'),
                          #None)
 
         #indep_list = ['x1']
@@ -418,7 +418,7 @@ class TestUnitConversion(unittest.TestCase):
                 #assert_rel_error(self, val2['rel error'][2], 0.0, 1e-6)
 
         #stream = cStringIO()
-        #conv = prob.root.list_unit_conv(stream=stream)
+        #conv = prob.model.list_unit_conv(stream=stream)
         #self.assertTrue((('src.x2', 'tgtF.x2'), ('degC', 'degF')) in conv)
         #self.assertTrue((('src.x2', 'tgtK.x2'), ('degC', 'degK')) in conv)
 
@@ -523,18 +523,18 @@ class TestUnitConversion(unittest.TestCase):
     #def test_basic_grouped(self):
 
         #prob = Problem()
-        #prob.root = Group()
-        #sub1 = prob.root.add('sub1', Group())
-        #sub2 = prob.root.add('sub2', Group())
+        #prob.model = Group()
+        #sub1 = prob.model.add('sub1', Group())
+        #sub2 = prob.model.add('sub2', Group())
         #sub1.add('src', SrcComp())
         #sub2.add('tgtF', TgtCompF())
         #sub2.add('tgtC', TgtCompC())
         #sub2.add('tgtK', TgtCompK())
-        #prob.root.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        #prob.root.connect('x1', 'sub1.src.x1')
-        #prob.root.connect('sub1.src.x2', 'sub2.tgtF.x2')
-        #prob.root.connect('sub1.src.x2', 'sub2.tgtC.x2')
-        #prob.root.connect('sub1.src.x2', 'sub2.tgtK.x2')
+        #prob.model.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
+        #prob.model.connect('x1', 'sub1.src.x1')
+        #prob.model.connect('sub1.src.x2', 'sub2.tgtF.x2')
+        #prob.model.connect('sub1.src.x2', 'sub2.tgtC.x2')
+        #prob.model.connect('sub1.src.x2', 'sub2.tgtK.x2')
 
         #prob.setup(check=False)
         #prob.run()
@@ -545,7 +545,7 @@ class TestUnitConversion(unittest.TestCase):
         #assert_rel_error(self, prob['sub2.tgtK.x3'], 373.15, 1e-6)
 
         ## Make sure we don't convert equal units
-        #self.assertEqual(prob.root.sub2.inputs.metadata('tgtC.x2').get('unit_conv'),
+        #self.assertEqual(prob.model.sub2.inputs.metadata('tgtC.x2').get('unit_conv'),
                          #None)
 
         #indep_list = ['x1']
@@ -572,47 +572,47 @@ class TestUnitConversion(unittest.TestCase):
         #assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         #stream = cStringIO()
-        #conv = prob.root.sub1.list_unit_conv(stream=stream)
+        #conv = prob.model.sub1.list_unit_conv(stream=stream)
         #self.assertTrue(len(conv) == 0)
 
 
     #def test_list_unit_connections_sub(self):
 
         #prob = Problem()
-        #prob.root = Group()
-        #sub1 = prob.root.add('sub1', Group())
-        #sub2 = prob.root.add('sub2', Group())
+        #prob.model = Group()
+        #sub1 = prob.model.add('sub1', Group())
+        #sub2 = prob.model.add('sub2', Group())
         #sub1.add('src', SrcComp())
         #sub1.add('tgtF', TgtCompF())
         #sub2.add('tgtC', TgtCompC())
         #sub2.add('tgtK', TgtCompK())
-        #prob.root.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        #prob.root.connect('x1', 'sub1.src.x1')
-        #prob.root.connect('sub1.src.x2', 'sub1.tgtF.x2')
-        #prob.root.connect('sub1.src.x2', 'sub2.tgtC.x2')
-        #prob.root.connect('sub1.src.x2', 'sub2.tgtK.x2')
+        #prob.model.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
+        #prob.model.connect('x1', 'sub1.src.x1')
+        #prob.model.connect('sub1.src.x2', 'sub1.tgtF.x2')
+        #prob.model.connect('sub1.src.x2', 'sub2.tgtC.x2')
+        #prob.model.connect('sub1.src.x2', 'sub2.tgtK.x2')
 
         #prob.setup(check=False)
         #prob.run()
 
         #stream = cStringIO()
-        #conv = prob.root.sub1.list_unit_conv(stream=stream)
+        #conv = prob.model.sub1.list_unit_conv(stream=stream)
         #self.assertTrue((('src.x2', 'tgtF.x2'), ('degC', 'degF')) in conv)
 
     #def test_basic_grouped_bug_from_pycycle(self):
 
         #prob = Problem()
-        #root = prob.root = Group()
-        #sub1 = prob.root.add('sub1', Group(), promotes=['x2'])
+        #root = prob.model = Group()
+        #sub1 = prob.model.add('sub1', Group(), promotes=['x2'])
         #sub1.add('src', SrcComp(), promotes = ['x2'])
         #root.add('tgtF', TgtCompFMulti())
         #root.add('tgtC', TgtCompC())
         #root.add('tgtK', TgtCompK())
-        #prob.root.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        #prob.root.connect('x1', 'sub1.src.x1')
-        #prob.root.connect('x2', 'tgtF.x2')
-        #prob.root.connect('x2', 'tgtC.x2')
-        #prob.root.connect('x2', 'tgtK.x2')
+        #prob.model.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
+        #prob.model.connect('x1', 'sub1.src.x1')
+        #prob.model.connect('x2', 'tgtF.x2')
+        #prob.model.connect('x2', 'tgtC.x2')
+        #prob.model.connect('x2', 'tgtK.x2')
 
         #prob.setup(check=False)
         #prob.run()
@@ -648,15 +648,15 @@ class TestUnitConversion(unittest.TestCase):
     #def test_basic_grouped_grouped_implicit(self):
 
         #prob = Problem()
-        #root = prob.root = Group()
-        #sub1 = prob.root.add('sub1', Group(), promotes=['x2'])
-        #sub2 = prob.root.add('sub2', Group(), promotes=['x2'])
+        #root = prob.model = Group()
+        #sub1 = prob.model.add('sub1', Group(), promotes=['x2'])
+        #sub2 = prob.model.add('sub2', Group(), promotes=['x2'])
         #sub1.add('src', SrcComp(), promotes = ['x2'])
         #sub2.add('tgtF', TgtCompFMulti(), promotes=['x2'])
         #sub2.add('tgtC', TgtCompC(), promotes=['x2'])
         #sub2.add('tgtK', TgtCompK(), promotes=['x2'])
-        #prob.root.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        #prob.root.connect('x1', 'sub1.src.x1')
+        #prob.model.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
+        #prob.model.connect('x1', 'sub1.src.x1')
 
         #prob.setup(check=False)
         #prob.run()
@@ -776,10 +776,10 @@ class TestUnitConversion(unittest.TestCase):
                                         #dw_B[k, :]
 
         #prob = Problem()
-        #root = prob.root = Group()
-        #prob.root.add('comp', Attitude_Angular(n=5), promotes=['*'])
-        #prob.root.add('p1', IndepVarComp('O_BI', np.ones((3, 3, 5))), promotes=['*'])
-        #prob.root.add('p2', IndepVarComp('Odot_BI', np.ones((3, 3, 5))), promotes=['*'])
+        #root = prob.model = Group()
+        #prob.model.add('comp', Attitude_Angular(n=5), promotes=['*'])
+        #prob.model.add('p1', IndepVarComp('O_BI', np.ones((3, 3, 5))), promotes=['*'])
+        #prob.model.add('p2', IndepVarComp('Odot_BI', np.ones((3, 3, 5))), promotes=['*'])
 
         #prob.setup(check=False)
         #prob.run()
@@ -838,7 +838,7 @@ class TestUnitConversion(unittest.TestCase):
         ## outscope vars could sometimes cause a problem even absent any units.
 
         #prob = Problem()
-        #root = prob.root = Group()
+        #root = prob.model = Group()
         #root.add('p1', IndepVarComp('xx', 3.0))
         #root.add('c1', ExecComp(['y1=0.5*x + 0.1*xx', 'y2=0.3*x - 1.0*xx']))
         #root.add('c2', ExecComp(['y=0.5*x']))
@@ -885,7 +885,7 @@ class TestUnitConversion(unittest.TestCase):
         ## iterations.
 
         #prob = Problem()
-        #root = prob.root = Group()
+        #root = prob.model = Group()
         #root.add('p1', IndepVarComp('xx', 3.0))
         #root.add('c1', ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
         #root.add('c2', ExecComp(['y=0.5*x']))
@@ -923,7 +923,7 @@ class TestUnitConversion(unittest.TestCase):
         ## iterations.
 
         #prob = Problem()
-        #root = prob.root = Group()
+        #root = prob.model = Group()
         #root.add('p1', IndepVarComp('xx', 3.0))
         #root.add('c1', ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
         #root.add('c2', ExecComp(['y=0.5*x']))
@@ -1003,7 +1003,7 @@ class TestUnitConversion(unittest.TestCase):
                         #self.dx2count += 1
 
         #prob = Problem()
-        #root = prob.root = Group()
+        #root = prob.model = Group()
         #root.add('p1', IndepVarComp('xx', 3.0))
         #root.add('c1', ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
         #root.add('c2', ExecComp(['y=0.5*x']))
@@ -1044,7 +1044,7 @@ class TestUnitConversion(unittest.TestCase):
         ## iterations.
 
         #prob = Problem()
-        #root = prob.root = Group()
+        #root = prob.model = Group()
         #root.add('p1', IndepVarComp('xx', 3.0))
         #root.add('c1', ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
         #root.add('c2', ExecComp(['y=0.5*x']))
@@ -1086,7 +1086,7 @@ class TestUnitConversion(unittest.TestCase):
         ## Make sure preconditioners also work
 
         #prob = Problem()
-        #root = prob.root = Group()
+        #root = prob.model = Group()
         #root.add('p1', IndepVarComp('xx', 3.0))
         #root.add('c1', ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
         #root.add('c2', ExecComp(['y=0.5*x']))
@@ -1158,14 +1158,14 @@ class TestUnitConversion(unittest.TestCase):
     #def test_basic(self):
 
         #prob = Problem()
-        #prob.root = Group()
-        #prob.root.add('src', PBOSrcComp())
-        #prob.root.add('tgtF', PBOTgtCompF())
-        #prob.root.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        #prob.root.connect('x1', 'src.x1')
-        #prob.root.connect('src.x2', 'tgtF.x2')
+        #prob.model = Group()
+        #prob.model.add('src', PBOSrcComp())
+        #prob.model.add('tgtF', PBOTgtCompF())
+        #prob.model.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
+        #prob.model.connect('x1', 'src.x1')
+        #prob.model.connect('src.x2', 'tgtF.x2')
 
-        #prob.root.deriv_options['type'] = 'fd'
+        #prob.model.deriv_options['type'] = 'fd'
 
         #prob.setup(check=False)
         #prob.run()
@@ -1181,7 +1181,7 @@ class TestUnitConversion(unittest.TestCase):
         #assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
 
         #stream = cStringIO()
-        #conv = prob.root.list_unit_conv(stream=stream)
+        #conv = prob.model.list_unit_conv(stream=stream)
         #self.assertTrue((('src.x2', 'tgtF.x2'), ('degC', 'degF')) in conv)
 
 

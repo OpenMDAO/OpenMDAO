@@ -42,7 +42,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
 
         p = Problem(group)
         p.setup(check=False)
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -70,7 +70,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
 
         p = Problem(group)
         p.setup(check=False)
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -98,7 +98,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
                             promotes=['length', 'width', 'area'])
 
         model.ln_solver = ScipyIterativeSolver()
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob['width'] = 2.0
@@ -130,7 +130,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
                             promotes=['length', 'width', 'area'])
 
         model.ln_solver = ScipyIterativeSolver()
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob['width'] = 2.0
@@ -163,7 +163,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
                             promotes=['length', 'width', 'area'])
 
         model.ln_solver = ScipyIterativeSolver()
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob['width'] = 2.0
@@ -195,7 +195,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         prob = Problem()
         model = prob.model = group
         model.ln_solver = ScipyIterativeSolver()
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -219,7 +219,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         prob = Problem()
         prob.model = FanOut()
         prob.model.ln_solver = ScipyIterativeSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -240,7 +240,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         prob = Problem()
         prob.model = FanOutGrouped()
         prob.model.ln_solver = ScipyIterativeSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -261,7 +261,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         prob = Problem()
         prob.model = FanIn()
         prob.model.ln_solver = ScipyIterativeSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -285,7 +285,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         prob = Problem()
         prob.model = FanInGrouped()
         prob.model.ln_solver = ScipyIterativeSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -309,7 +309,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         prob = Problem()
         prob.model = ConvergeDivergeFlat()
         prob.model.ln_solver = ScipyIterativeSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -362,7 +362,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         prob = Problem()
         prob.model = ConvergeDivergeGroups()
         prob.model.ln_solver = ScipyIterativeSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -387,7 +387,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         prob = Problem()
         prob.model = DiamondFlat()
         prob.model.ln_solver = ScipyIterativeSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -412,7 +412,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         prob = Problem()
         prob.model = Diamond()
         prob.model.ln_solver = ScipyIterativeSolver()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -436,7 +436,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivativesGrouped()
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         mda = prob.model.get_subsystem('mda')
         mda.nl_solver.options['atol'] = 1e-12
@@ -479,7 +479,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
 
         p = Problem(group)
         p.setup(check=False)
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -545,7 +545,7 @@ class TestScipyIterativeSolver(unittest.TestCase):
         p.model.ln_solver.options['maxiter'] = 1
         p.setup(check=False)
 
-        p.model.suppress_solver_output = True
+        p.set_solver_print(level=0)
 
         # forward
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
@@ -587,7 +587,7 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
                             promotes=['length', 'width', 'area'])
 
         model.ln_solver = ScipyIterativeSolver()
-        model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob['width'] = 2.0
