@@ -66,7 +66,7 @@ The implementation of each method will be illustrated using a simple implicit co
 
   [Optional] This method allows the user to calculate and specify an initial guess for implicit states. It is called prior to every call to
   `solve_nonlinear`, so it is useful for when you would like to "reset" the initial conditions on an inner nested solve whenever an outer
-  loop solver or driver change other values. Since it is a hook for custom code, you could also use it to monitor variables in the input,
+  loop solver or driver changes other values. Since it is a hook for custom code, you could also use it to monitor variables in the input,
   output, or residual vectors and change the initial guess when some condition is met. Here is a simple example where we use NewtonSolver to
   find one of the roots of a second order quadratic equation. Which root you get depends on the initial guess.
 
