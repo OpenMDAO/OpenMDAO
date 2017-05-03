@@ -91,19 +91,18 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
     """
 
     # iterate through the cases
-    for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, constraints_expected in expected:
+    for coord, (t0, t1), inputs_expected, outputs_expected, residuals_expected in expected:
         iter_coord = format_iteration_coordinate(coord)
 
         # from the database, get the actual data recorded
-        db_cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
+        db_cur.execute("SELECT * FROM system_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
         row_actual  = db_cur.fetchone()
 
-        counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, objectives_blob, constraints_blob = row_actual
+        counter, iteration_coordinate, timestamp, success, msg, inputs_blob, outputs_blob, residuals_blob = row_actual
 
-        desvars_actual = blob_to_array(desvars_blob)
-        responses_actual = blob_to_array(responses_blob)
-        objectives_actual = blob_to_array(objectives_blob)
-        constraints_actual = blob_to_array(constraints_blob)
+        inputs_actual = blob_to_array(inputs_blob)
+        outputs_actual = blob_to_array(outputs_blob)
+        residuals_actual = blob_to_array(residuals_blob)
 
         # Does the timestamp make sense?
         test.assertTrue( t0 <= timestamp and timestamp <= t1)
@@ -112,10 +111,9 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
         test.assertEqual(msg, '')
 
         for vartype, actual, expected in (
-            ('desvars', desvars_actual, desvars_expected),
-            ('responses', responses_actual, responses_expected),
-            ('objectives', objectives_actual, objectives_expected),
-            ('constraints', constraints_actual, constraints_expected),
+            ('inputs', inputs_actual, inputs_expected),
+            ('outputs', outputs_actual, outputs_expected),
+            ('residuals', residuals_actual, residuals_expected),
             ):
 
             if expected is None:
@@ -194,6 +192,12 @@ class TestSqliteRecorder(unittest.TestCase):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertIterationDataRecorded(self, cur, expected, tolerance)
+        con.close()
+
+    def assertSystemIterationDataRecorded(self, expected, tolerance):
+        con = sqlite3.connect(self.filename)
+        cur = con.cursor()
+        _assertSystemIterationDataRecorded(self, cur, expected, tolerance)
         con.close()
 
     def assertMetadataRecorded(self ):
@@ -377,8 +381,6 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_driver_metadata = None
         self.assertDriverMetadataRecorded(expected_driver_metadata)
 
-
-    # TODO_RECORDERS Need to add tests for solvers and systems
     def test_record_system(self):
         self.setup_sellar_model()
 
@@ -388,10 +390,11 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_metadata'] = True
         self.prob.model.add_recorder(self.recorder)
 
-        d1 = self.prob.model.get_subsystem('d1')
+        d1 = self.prob.model.get_subsystem('d1') # an instance of SellarDis1withDerivatives
+                                                 # which is an ExplicitComponent
         d1.add_recorder(self.recorder)
 
-        obj_cmp = self.prob.model.get_subsystem('obj_cmp')
+        obj_cmp = self.prob.model.get_subsystem('obj_cmp') # an ExecComp
         obj_cmp.add_recorder(self.recorder)
 
         # self.prob['d1'].add_recorder(self.recorder)
@@ -405,18 +408,23 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'obj_cmp', (6, )]
 
-        expected_inputs = {"p1.x": [7.16666666166666666666667,],
-                            "p2.y": [-7.833333333333334,]
+        expected_inputs = {
+                            "obj_cmp.z": [5.0, 2.0],
+                            "obj_cmp.y1": [25.58830236333575,],
+                            "obj_cmp.x": [1.0,],
+                            "obj_cmp.y2": [12.058488149964944,],
                             }
 
-        expected_outputs = {"comp.f_xy": [-27.0833,],
+        expected_outputs = {"obj_cmp.obj": [28.588308158491817,],
                             }
 
-        expected_residuals = {"con.c": [-15.0,],
+        expected_residuals = {"obj_cmp.obj": [0.0,],
                             }
 
-        # self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),), self.eps)
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),), self.eps)
 
+
+    # TODO_RECORDERS : need to test recording of ImplicitComponent
 
     def qqq_test_includes(self):
         if OPT is None:

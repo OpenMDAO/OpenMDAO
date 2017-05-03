@@ -2267,7 +2267,9 @@ class System(object):
         mode : str
             'fwd' or 'rev'.
         """
-        metadata = None  # ??? Is this correct?
+        self.iter_count += 1
+        metadata = create_local_meta(None, self.pathname)
+        update_local_meta(metadata, (self.iter_count,))
         self._rec_mgr.record_iteration(self, metadata)
 
     def _linearize(self, do_nl=True, do_ln=True):
