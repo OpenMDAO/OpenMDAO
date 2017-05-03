@@ -2202,13 +2202,6 @@ class System(object):
         # Reconfigure if needed.
         self._check_reconf()
 
-        # Execute guess_nonlinear if specified.
-        with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-            try:
-                self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
-            except AttributeError:
-                pass
-
         return False, 0., 0.
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
