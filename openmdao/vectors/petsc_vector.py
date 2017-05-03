@@ -7,6 +7,7 @@ from six import iteritems, itervalues
 from six.moves import range
 
 from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
+from openmdao.utils.mpi import MPI
 
 
 class PETScTransfer(DefaultTransfer):
@@ -25,8 +26,22 @@ class PETScTransfer(DefaultTransfer):
         in_inds = self._in_inds
         out_inds = self._out_inds
 
-        for key in in_inds:
-            if len(in_inds[key]) > 0:
+        lens = np.empty(len(in_inds), dtype=int)
+        for i, key in enumerate(in_inds):
+            lens[i] = len(in_inds[key])
+
+        if self._comm.size > 1:
+            lensums = np.empty(len(in_inds), dtype=int)
+            self._comm.Allreduce(lens, lensums, op=MPI.SUM)
+        else:
+            lensums = lens
+
+        for i, key in enumerate(in_inds):
+            # if lensums[i] > 0, then at least one proc in the comm is transferring
+            # data for the given key.  That means that all procs in the comm
+            # must particiipate in the collective Scatter call, so we construct
+            # a Scatter here even if it's empty.
+            if lensums[i] > 0:
                 in_set_name, out_set_name = key
 
                 in_indexset = PETSc.IS().createGeneral(
