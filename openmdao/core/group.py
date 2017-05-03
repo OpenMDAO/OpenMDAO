@@ -67,8 +67,9 @@ class Group(System):
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
         """
-        super(Group, self)._setup_procs(pathname, comm)
-        subsystems_proc_range = self._subsystems_proc_range
+        self.pathname = pathname
+        self.comm = comm
+        self._subsystems_proc_range = subsystems_proc_range = []
 
         self._subsystems_allprocs = []
         self._manual_connections = {}
@@ -673,11 +674,12 @@ class Group(System):
 
         # Loop through all explicit / implicit connections owned by this system
         for abs_in, abs_out in iteritems(self._conn_abs_in2out):
-            idx_in = allprocs_abs2idx_in[abs_in]
-            idx_out = allprocs_abs2idx_out[abs_out]
 
             # Only continue if the input exists on this processor
-            if abs_in in abs_names_in:
+            if abs_in in abs2meta_in:
+
+                idx_in = allprocs_abs2idx_in[abs_in]
+                idx_out = allprocs_abs2idx_out[abs_out]
 
                 # Get meta
                 meta_in = abs2meta_in[abs_in]
@@ -745,10 +747,10 @@ class Group(System):
                 key = (set_name_in, set_name_out)
                 xfer_in[key].append(input_inds)
                 xfer_out[key].append(output_inds)
-                if abs_in in abs2isub['input']:
-                    isub = abs2isub['input'][abs_in]
-                    fwd_xfer_in[isub][key].append(input_inds)
-                    fwd_xfer_out[isub][key].append(output_inds)
+
+                isub = abs2isub['input'][abs_in]
+                fwd_xfer_in[isub][key].append(input_inds)
+                fwd_xfer_out[isub][key].append(output_inds)
                 if abs_out in abs2isub['output']:
                     isub = abs2isub['output'][abs_out]
                     rev_xfer_in[isub][key].append(input_inds)
