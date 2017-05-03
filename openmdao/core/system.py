@@ -2195,11 +2195,19 @@ class System(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         float
-            relative error.
+            Relative error.
         float
-            absolute error.
+            Absolute error.
         """
+        # Reconfigure if needed.
         self._check_reconf()
+
+        # Execute guess_nonlinear if specified.
+        with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+            try:
+                self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+            except AttributeError:
+                pass
 
         return False, 0., 0.
 

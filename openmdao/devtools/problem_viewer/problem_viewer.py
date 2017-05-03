@@ -225,24 +225,27 @@ def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_brows
 
     if isinstance(problem_or_filename, Problem):
         model_viewer_data = _get_viewer_data(problem_or_filename)
-    else:
-        # Do not know file type. Try opening to see what works
-        file_type = None
-        if is_valid_sqlite3_db(problem_or_filename):
-            db = SqliteDict(filename=problem_or_filename, flag='r', tablename='metadata')
-            file_type = "sqlite"
-        else:
-            try:
-                hdf = h5py.File(problem_or_filename, 'r')
-                file_type = 'hdf5'
-            except:
-                raise ValueError("The given filename is not one of the supported file formats: sqlite or hdf5")
 
-        if file_type == "sqlite":
-            model_viewer_data = db['model_viewer_data']
-        elif file_type == "hdf5":
-            metadata = hdf.get('metadata', None)
-            model_viewer_data = pickle.loads(metadata.get('model_viewer_data').value)
+    # NOTE: Commenting this out because some commits broke this code. With this change, view_model
+    # still works for problems.
+    #else:
+        ## Do not know file type. Try opening to see what works
+        #file_type = None
+        #if is_valid_sqlite3_db(problem_or_filename):
+            #db = SqliteDict(filename=problem_or_filename, flag='r', tablename='metadata')
+            #file_type = "sqlite"
+        #else:
+            #try:
+                #hdf = h5py.File(problem_or_filename, 'r')
+                #file_type = 'hdf5'
+            #except:
+                #raise ValueError("The given filename is not one of the supported file formats: sqlite or hdf5")
+
+        #if file_type == "sqlite":
+            #model_viewer_data = db['model_viewer_data']
+        #elif file_type == "hdf5":
+            #metadata = hdf.get('metadata', None)
+            #model_viewer_data = pickle.loads(metadata.get('model_viewer_data').value)
 
 
     tree_json = json.dumps(model_viewer_data['tree'])

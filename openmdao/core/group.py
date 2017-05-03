@@ -1077,18 +1077,6 @@ class Group(System):
         float
             absolute error.
         """
-        # TODO: Find a way to get rid of this scatter.
-        for isub, subsys in enumerate(self._subsystems_allprocs):
-            self._transfer('nonlinear', 'fwd', isub)
-
-        # Execute guess_nonlinear on implicit components.
-        for subsys in self._subsystems_myproc:
-            with subsys._unscaled_context(outputs=[subsys._outputs]):
-                try:
-                    subsys.guess_nonlinear(subsys._inputs, subsys._outputs)
-                except AttributeError:
-                    pass
-
         super(Group, self)._solve_nonlinear()
 
         return self._nl_solver.solve()

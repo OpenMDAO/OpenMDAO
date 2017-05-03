@@ -203,7 +203,7 @@ class ImplicitComponent(Component):
         """
         pass
 
-    def guess_nonlinear(self, inputs, outputs):
+    def guess_nonlinear(self, inputs, outputs, residuals):
         """
         Provide initial guess for states.
 
@@ -215,6 +215,8 @@ class ImplicitComponent(Component):
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
+        residuals : Vector
+            unscaled, dimensional residuals written to via residuals[key]
         """
         pass
 
