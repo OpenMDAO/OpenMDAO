@@ -55,6 +55,9 @@ class PETScTransfer(DefaultTransfer):
 
                 transfers[key] = transfer
 
+        del self._out_inds
+        del self._in_inds
+
     def __call__(self, in_vec, out_vec, mode='fwd'):
         """
         Perform transfer.
