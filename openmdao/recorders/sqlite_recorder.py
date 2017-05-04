@@ -161,7 +161,7 @@ class SqliteRecorder(BaseRecorder):
             if desvars_values:
                 dtype_tuples = []
                 for name, value in iteritems(desvars_values):
-                    tple = (name, '({},)f8'.format(len(value)))
+                    tple = (name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
                 desvars_array = np.zeros((1,), dtype=dtype_tuples)
@@ -179,7 +179,7 @@ class SqliteRecorder(BaseRecorder):
             if responses_values:
                 dtype_tuples = []
                 for name, value in iteritems(responses_values):
-                    tple = (name, '({},)f8'.format(len(value)))
+                    tple = (name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
                 responses_array = np.zeros((1,), dtype=dtype_tuples)
@@ -197,7 +197,7 @@ class SqliteRecorder(BaseRecorder):
             if objectives_values:
                 dtype_tuples = []
                 for name, value in iteritems(objectives_values):
-                    tple = (name, '({},)f8'.format(len(value)))
+                    tple = (name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
                 objectives_array = np.zeros((1,), dtype=dtype_tuples)
@@ -215,7 +215,7 @@ class SqliteRecorder(BaseRecorder):
             if constraints_values:
                 dtype_tuples = []
                 for name, value in iteritems(constraints_values):
-                    tple = (name, '({},)f8'.format(len(value)))
+                    tple = (name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
                 constraints_array = np.zeros((1,), dtype=dtype_tuples)
@@ -331,28 +331,28 @@ class SqliteRecorder(BaseRecorder):
             abs_errors = object_requesting_recording.get_abs_error()
             if abs_errors:
                 for name, value in iteritems(abs_errors):
-                    tple = ('abs_error.' + name, '({},)f8'.format(len(value)))
+                    tple = ('abs_error.' + name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
         if self.options['record_rel_error']:
             rel_errors = object_requesting_recording.get_rel_error()
             if rel_errors:
                 for name, value in iteritems(rel_errors):
-                    tple = ('rel_error.' + name, '({},)f8'.format(len(value)))
+                    tple = ('rel_error.' + name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
         if self.options['record_output']:
             outputs = object_requesting_recording.get_output()
             if outputs:
                 for name, value in iteritems(outputs):
-                    tple = ('output.' + name, '({},)f8'.format(len(value)))
+                    tple = ('output.' + name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
         if self.options['record_solver_residuals']:
             residuals = object_requesting_recording.get_residuals()
             if residuals:
                 for name, value in iteritems(residuals):
-                    tple = ('residual.' + name, '({},)f8'.format(len(value)))
+                    tple = ('residual.' + name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
         # Create the mega array that we will write to the database
@@ -378,7 +378,7 @@ class SqliteRecorder(BaseRecorder):
             residuals = object_requesting_recording.get_residuals()
 
             for name, value in iteritems(residuals):
-                tple = ('residual.' + name, '({},)f8'.format(len(value)))
+                tple = ('residual.' + name, '{}f8'.format(value.shape))
                 dtype_tuples.append(tple)
             solver_values = np.zeros((1,), dtype=dtype_tuples)
             for name, value in iteritems(residuals):
