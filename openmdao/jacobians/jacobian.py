@@ -1,7 +1,6 @@
 """Define the base Jacobian class."""
 from __future__ import division
 import numpy as np
-from six.moves import range
 
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.name_maps import key2abs_key

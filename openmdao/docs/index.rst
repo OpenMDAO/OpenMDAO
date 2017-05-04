@@ -60,6 +60,7 @@ Grouping components for more complex models
     features/grouping_components/connect
     features/grouping_components/set_order
     features/grouping_components/src_indices
+    features/grouping_components/parallel_group
 
 
 Defining partial derivatives

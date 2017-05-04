@@ -19,13 +19,11 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
-from openmdao.vectors.default_vector import DefaultVector
 
-from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
-from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.mpi import FakeComm
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
+from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])

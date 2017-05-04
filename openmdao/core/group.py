@@ -1,8 +1,6 @@
 """Define the Group class."""
 from __future__ import division
 
-import sys
-
 from six import iteritems, string_types
 from six.moves import range
 from itertools import product, chain
