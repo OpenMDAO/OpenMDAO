@@ -264,7 +264,7 @@ class SqliteRecorder(BaseRecorder):
             for name, value in iteritems(filtered_ins):
                 inputs_array[name] = value
 
-        #Outputs
+        # Outputs
         if outputs:
             filtered_outs = {}
 
@@ -318,7 +318,6 @@ class SqliteRecorder(BaseRecorder):
                                                    metadata['timestamp'], metadata['success'],
                                                    metadata['msg'], inputs_blob,
                                                    outputs_blob, residuals_blob))
-
 
     def record_iteration_solver(self, object_requesting_recording, metadata):
         """

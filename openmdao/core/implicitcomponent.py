@@ -49,7 +49,13 @@ class ImplicitComponent(Component):
         float
             relative error.
         """
+        # Reconfigure if needed.
         super(ImplicitComponent, self)._solve_nonlinear()
+
+        # Execute guess_nonlinear if specified.
+        if overrides_method('guess_nonlinear', self, ImplicitComponent):
+            with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+                self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
 
         if self._nl_solver is not None:
             result = self._nl_solver.solve()
@@ -208,6 +214,23 @@ class ImplicitComponent(Component):
         -------
         None or bool or (bool, float, float)
             The bool is the failure flag; and the two floats are absolute and relative error.
+        """
+        pass
+
+    def guess_nonlinear(self, inputs, outputs, residuals):
+        """
+        Provide initial guess for states.
+
+        Override this method to set the initial guess for states.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        residuals : Vector
+            unscaled, dimensional residuals written to via residuals[key]
         """
         pass
 
