@@ -5,7 +5,8 @@ from six.moves import cStringIO
 
 import unittest
 
-from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp
+from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, \
+                         ScipyIterativeSolver
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -138,6 +139,116 @@ class TestImplCompSimple(unittest.TestCase):
 
         self.assertTrue('comp2.x' in content)
         self.assertTrue('comp3.x' in content)
+
+    def test_guess_nonlinear(self):
+
+        class ImpWithInitial(TestImplCompSimpleLinearize):
+
+            def solve_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Solution at 1 and 3. Default value takes us to -1 solution. Here
+                # we set it to a value that will tke us to the 3 solution.
+                outputs['x'] = 5.0
+
+
+        group = Group()
+
+        group.add_subsystem('pa', IndepVarComp('a', 1.0))
+        group.add_subsystem('pb', IndepVarComp('b', 1.0))
+        group.add_subsystem('pc', IndepVarComp('c', 1.0))
+        group.add_subsystem('comp2', ImpWithInitial())
+        group.connect('pa.a', 'comp2.a')
+        group.connect('pb.b', 'comp2.b')
+        group.connect('pc.c', 'comp2.c')
+
+        prob = Problem(model=group)
+        group.nl_solver = NewtonSolver()
+        group.nl_solver.options['solve_subsystems'] = True
+        group.nl_solver.options['max_sub_solves'] = 1
+        group.ln_solver = ScipyIterativeSolver()
+
+        prob.setup(check=False)
+
+        prob['pa.a'] = 1.
+        prob['pb.b'] = -4.
+        prob['pc.c'] = 3.
+        prob.run_model()
+        assert_rel_error(self, prob['comp2.x'], 3.)
+
+    def test_guess_nonlinear_feature(self):
+
+        class ImpWithInitial(TestImplCompSimpleLinearize):
+
+            def initialize_variables(self):
+                self.add_input('a', val=1.)
+                self.add_input('b', val=1.)
+                self.add_input('c', val=1.)
+                self.add_output('x', val=0.)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+                residuals['x'] = a * x ** 2 + b * x + c
+
+            def solve_nonlinear(self, inputs, outputs):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                outputs['x'] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / 2 / a
+
+            def linearize(self, inputs, outputs, partials):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+
+                partials['x', 'a'] = x ** 2
+                partials['x', 'b'] = x
+                partials['x', 'c'] = 1.0
+                partials['x', 'x'] = 2 * a * x + b
+
+                self.inv_jac = 1.0 / (2 * a * x + b)
+
+            def solve_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Solution at 1 and 3. Default value takes us to -1 solution. Here
+                # we set it to a value that will tke us to the 3 solution.
+                outputs['x'] = 5.0
+
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('pa', IndepVarComp('a', 1.0))
+        model.add_subsystem('pb', IndepVarComp('b', 1.0))
+        model.add_subsystem('pc', IndepVarComp('c', 1.0))
+        model.add_subsystem('comp2', ImpWithInitial())
+        model.connect('pa.a', 'comp2.a')
+        model.connect('pb.b', 'comp2.b')
+        model.connect('pc.c', 'comp2.c')
+
+        model.nl_solver = NewtonSolver()
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 1
+        model.ln_solver = ScipyIterativeSolver()
+
+        prob.setup(check=False)
+
+        prob['pa.a'] = 1.
+        prob['pb.b'] = -4.
+        prob['pc.c'] = 3.
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp2.x'], 3.)
 
 if __name__ == '__main__':
     unittest.main()
