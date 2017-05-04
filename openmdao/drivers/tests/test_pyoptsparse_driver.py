@@ -8,6 +8,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
+from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 
@@ -845,6 +846,30 @@ class TestPyoptSparse(unittest.TestCase):
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
+    def test_sellar_mdf(self):
+
+        prob = Problem()
+        model = prob.model = SellarDerivativesGrouped()
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['print_results'] = False
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_driver()
+
+        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
+        assert_rel_error(self, prob['x'], 0.0, 1e-3)
 
 if __name__ == "__main__":
     unittest.main()
