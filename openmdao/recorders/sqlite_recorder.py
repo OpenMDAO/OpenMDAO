@@ -240,40 +240,72 @@ class SqliteRecorder(BaseRecorder):
         """
         Record an iteration using system options.
         """
-        inputs_array = None
-        outputs_array = None
-        residuals_array = None
-
         inputs, outputs, residuals = object_requesting_recording.get_nonlinear_vectors()
 
+        # Inputs
         if inputs:
+            filtered_ins = {}
+
+            if 'i' in self._filtered_system:
+                # pull out input names into filtered dict.
+                for inc in self._filtered_system['i']:
+                    if inc in inputs._names:
+                        filtered_ins[inc] = inputs._names[inc]
+            else:
+                # use all the inputs
+                filtered_ins = inputs._names
+
             dtype_tuples = []
-            for name, value in iteritems(inputs._names):
+            for name, value in iteritems(filtered_ins):
                 tple = (name, '({},)f8'.format(len(value)))
                 dtype_tuples.append(tple)
 
             inputs_array = np.zeros((1,), dtype=dtype_tuples)
-            for name, value in iteritems(inputs._names):
+            for name, value in iteritems(filtered_ins):
                 inputs_array[name] = value
 
+        #Outputs
         if outputs:
+            filtered_outs = {}
+
+            if 'o' in self._filtered_system:
+                # pull out designvars of those names into filtered dict.
+                for inc in self._filtered_system['o']:
+                    if inc in outputs._names:
+                        filtered_outs[inc] = outputs._names[inc]
+            else:
+                # use all the inputs
+                filtered_outs = outputs._names
+
             dtype_tuples = []
-            for name, value in iteritems(outputs._names):
+            for name, value in iteritems(filtered_outs):
                 tple = (name, '({},)f8'.format(len(value)))
                 dtype_tuples.append(tple)
 
             outputs_array = np.zeros((1,), dtype=dtype_tuples)
-            for name, value in iteritems(outputs._names):
+            for name, value in iteritems(filtered_outs):
                 outputs_array[name] = value
 
         if residuals:
+
+            filtered_resids = {}
+
+            if 'r' in self._filtered_system:
+                # pull out designvars of those names into filtered dict.
+                for inc in self._filtered_system['r']:
+                    if inc in inputs._names:
+                        filtered_resids[inc] = residuals._names[inc]
+            else:
+                # use all the inputs
+                filtered_resids = residuals._names
+
             dtype_tuples = []
-            for name, value in iteritems(residuals._names):
+            for name, value in iteritems(filtered_resids):
                 tple = (name, '({},)f8'.format(len(value)))
                 dtype_tuples.append(tple)
 
             residuals_array = np.zeros((1,), dtype=dtype_tuples)
-            for name, value in iteritems(residuals._names):
+            for name, value in iteritems(filtered_resids):
                 residuals_array[name] = value
 
         inputs_blob = array_to_blob(inputs_array)
@@ -286,11 +318,7 @@ class SqliteRecorder(BaseRecorder):
                                                    metadata['timestamp'], metadata['success'],
                                                    metadata['msg'], inputs_blob,
                                                    outputs_blob, residuals_blob))
-        #         if self._filtered_system['i']:
-        #             for name, value in iteritems(self._filtered_system['i']):
-        #                 tple = ('input.' + name, '({},)f8'.format(len(value)))
-        #                 dtype_tuples.append(tple)
-        #
+
 
     def record_iteration_solver(self, object_requesting_recording, metadata):
         """

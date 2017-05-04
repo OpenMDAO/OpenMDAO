@@ -388,6 +388,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_outputs'] = True
         self.recorder.options['record_residuals'] = True
         self.recorder.options['record_metadata'] = True
+        self.recorder.options['includes'] = ['*']
         self.prob.model.add_recorder(self.recorder)
 
         d1 = self.prob.model.get_subsystem('d1') # an instance of SellarDis1withDerivatives
@@ -426,7 +427,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
     # TODO_RECORDERS : need to test recording of ImplicitComponent
 
-    def qqq_test_includes(self):
+    def test_includes(self):
         if OPT is None:
             raise unittest.SkipTest("pyoptsparse is not installed")
 
