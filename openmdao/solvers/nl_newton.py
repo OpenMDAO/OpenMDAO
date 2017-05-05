@@ -175,8 +175,6 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch:
             self.linesearch.solve()
         else:
-            print('res', system._residuals.get_data())
-            print('d_out', system._vectors['output']['linear'].get_data())
             system._outputs += system._vectors['output']['linear']
 
         self._solver_info.prefix = self._solver_info.prefix[:-3]
