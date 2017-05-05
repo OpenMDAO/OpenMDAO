@@ -7,11 +7,24 @@ given an MPI communicator of sufficient size.  Adding subsystems to a ParallelGr
 to a normal Group.  For example:
 
 
-.. embed-code::
-  openmdao.test_suite.groups.parallel_groups.initialize_variables.FanInGrouped
+.. embed-test::
+  openmdao.core.tests.test_parallel_groups.TestParallelGroups.test_fan_in_grouped_feature
 
 
-In this example, components *c1* and *c2* will be executed in parallel.
+In this example, components *c1* and *c2* will be executed in parallel, provided that the ParallelGroup is given 2
+MPI processes.  If the name of the python file containing our example were `my_par_model.py`, we could run it under
+MPI and give it 2 processes using the following command:
+
+
+.. code-block:: console
+
+  mpirun -n 2 python my_par_model.py
+
+
+.. note::
+
+  This will only work if you've installed the mpi4py and petsc4py python packages, which are not installed by default
+  in OpenMDAO.
 
 
 
