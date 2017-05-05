@@ -127,7 +127,7 @@ class LinearSystemComp(ImplicitComponent):
 
         elif partial_type == "sparse":
 
-            J['x', 'A'] = (np.tile(x, size), self.dx_da_rows, self.dx_da_cols)
+            J['x', 'A'] = np.tile(x, size)
             # J['x', 'A'].set_data(np.tile(x, size))
             J['x', 'x'] = inputs['A']
 

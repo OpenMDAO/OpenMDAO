@@ -46,15 +46,26 @@ class MyExplicitComp(ExplicitComponent):
     def compute_partial_derivs(self, inputs, outputs, partials):
         x = inputs['x']
         y = inputs['y']
-        partials['f', 'x'] = self._jac_type(np.array([
+        jac1 = self._jac_type(np.array([
             [2.0*x[0] - 6.0 + x[1], 2.0*x[1] + 8.0 + x[0]],
             [(2.0*x[0] - 6.0 + x[1])*3., (2.0*x[1] + 8.0 + x[0])*3.]
         ]))
 
-        partials['f', 'y'] = self._jac_type(np.array([
+        if isinstance(jac1, list):
+            jac1 = jac1[0]
+
+
+        partials['f', 'x'] = jac1
+
+        jac2 = self._jac_type(np.array([
             [17.-y[1], 2.-y[0]],
             [(17.-y[1])*3., (2.-y[0])*3.]
         ]))
+
+        if isinstance(jac2, list):
+            jac2 = jac2[0]
+
+        partials['f', 'y'] = jac2
 
 class MyExplicitComp2(ExplicitComponent):
     def __init__(self, jac_type):
@@ -87,11 +98,16 @@ class MyExplicitComp2(ExplicitComponent):
     def compute_partial_derivs(self, inputs, outputs, partials):
         w = inputs['w']
         z = inputs['z']
-        partials['f', 'w'] = self._jac_type(np.array([[
+        jac = self._jac_type(np.array([[
             2.0*w[0] - 10.0,
             2.0*w[1] + 2.0,
             6.
         ]]))
+
+        if isinstance(jac, list):
+            jac = jac[0]
+
+        partials['f', 'w'] = jac
 
 class ExplicitSetItemComp(ExplicitComponent):
     def __init__(self, dtype, value, shape, constructor):

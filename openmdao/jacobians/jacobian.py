@@ -165,8 +165,11 @@ class Jacobian(object):
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
         if not issparse(subjac):
-            subjac_info = self._subjacs_info[abs_key][0]
-            rows = subjac_info['rows']
+            if abs_key not in self._subjacs_info:
+                rows = None
+            else:
+                subjac_info = self._subjacs_info[abs_key][0]
+                rows = subjac_info['rows']
             if rows is None:
                 # Dense subjac
                 shape = self._abs_key2shape(abs_key)
