@@ -15,6 +15,10 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
     ln_solver_class = DirectSolver
 
+    # DirectSolver doesn't iterate.
+    def test_solve_linear_maxiter(self):
+        pass
+
     def test_solve_on_subsystem(self):
         """solve an implicit system with DirectSolver attached to a subsystem"""
 

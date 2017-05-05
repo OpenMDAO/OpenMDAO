@@ -97,8 +97,8 @@ class TestProblem(unittest.TestCase):
         wrt = ['x', 'y']
         derivs = prob.compute_total_derivs(of=of, wrt=wrt)
 
-        assert_rel_error(self, derivs['f_xy', 'x'], -6.0, 1e-6)
-        assert_rel_error(self, derivs['f_xy', 'y'], 8.0, 1e-6)
+        assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
+        assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()

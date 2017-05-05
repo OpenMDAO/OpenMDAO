@@ -398,7 +398,7 @@ class TestJacobianForDocs(unittest.TestCase):
         assert_rel_error(self, totals['g', 'y2'], [[1, 0], [0, 1], [1, 0], [0, 1]])
         assert_rel_error(self, totals['g', 'y3'], [[1, 0], [1, 0], [0, 1], [0, 1]])
 
-    def test_sparse_jacobian(self):
+    def test_sparse_jacobian_in_place(self):
         class SparsePartialComp(ExplicitComponent):
             def initialize_variables(self):
                 self.add_input('x', shape=(4,))
@@ -406,7 +406,7 @@ class TestJacobianForDocs(unittest.TestCase):
 
             def initialize_partials(self):
                 self.declare_partials(of='f', wrt='x',
-                                      rows=[0,1,1,1], cols=[0,1,2,3], val=np.zeros(4))
+                                      rows=[0,1,1,1], cols=[0,1,2,3])
 
             def compute_partial_derivs(self, inputs, outputs, partials):
                 pd = partials['f', 'x']
@@ -438,6 +438,37 @@ class TestJacobianForDocs(unittest.TestCase):
         totals = problem.compute_total_derivs(['example.f'], ['input.x'])
 
         assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
+
+    def test_sparse_jacobian(self):
+        class SparsePartialComp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x', shape=(4,))
+                self.add_output('f', shape=(2,))
+
+            def initialize_partials(self):
+                self.declare_partials(of='f', wrt='x',
+                                      rows=[0,1,1,1], cols=[0,1,2,3])
+
+            def compute_partial_derivs(self, inputs, outputs, partials):
+                # Corresponds to the [(0,0), (1,1), (1,2), (1,3)] entries.
+                partials['f', 'x'] = [1., 2., 3., 4.]
+
+        model = Group()
+        comp = IndepVarComp()
+        comp.add_output('x', np.ones(4))
+
+        model.add_subsystem('input', comp)
+        model.add_subsystem('example', SparsePartialComp())
+
+        model.connect('input.x', 'example.x')
+
+        problem = Problem(model=model)
+        problem.setup(check=False)
+        problem.run_model()
+        totals = problem.compute_total_derivs(['example.f'], ['input.x'])
+
+        assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
+
 
 if __name__ == '__main__':
     unittest.main()
