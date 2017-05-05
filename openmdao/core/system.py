@@ -2195,10 +2195,11 @@ class System(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         float
-            relative error.
+            Relative error.
         float
-            absolute error.
+            Absolute error.
         """
+        # Reconfigure if needed.
         self._check_reconf()
 
         return False, 0., 0.
