@@ -159,8 +159,7 @@ class DirectSolver(LinearSolver):
             if system._owns_assembled_jac or system._views_assembled_jac:
                 with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                     b_data = b_vec.get_data()
-                    if ((system._owns_assembled_jac or system._views_assembled_jac) and
-                            isinstance(system._jacobian._int_mtx, (COOMatrix, CSRMatrix))):
+                    if (isinstance(system._jacobian._int_mtx, (COOMatrix, CSRMatrix))):
                         x_data = self._lu.solve(b_data, trans_splu)
                     else:
                         x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
@@ -169,11 +168,7 @@ class DirectSolver(LinearSolver):
             # MVP-generated jacobians are scaled.
             else:
                 b_data = b_vec.get_data()
-                if ((system._owns_assembled_jac or system._views_assembled_jac) and
-                        isinstance(system._jacobian._int_mtx, (COOMatrix, CSRMatrix))):
-                    x_data = self._lu.solve(b_data, trans_splu)
-                else:
-                    x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
+                x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
                 x_vec.set_data(x_data)
 
         return False, 0., 0.
