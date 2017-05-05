@@ -79,8 +79,7 @@ class Test(unittest.TestCase):
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0 * np.ones(2))
         assert_rel_error(self, p['z'], 9.0)
-        assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones(2))
-        print(p['x'], p['y'], p['z'], totals['y', 'x'].flatten())
+        assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones(2, 1))
 
     def test_reconf_group(self):
         p = Problem()
@@ -99,15 +98,13 @@ class Test(unittest.TestCase):
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0)
         assert_rel_error(self, p['z'], 9.0)
-        assert_rel_error(self, totals['y', 'x'], 2.0)
-        print(p['x'], p['y'], p['z'], totals['y', 'x'].flatten())
+        assert_rel_error(self, totals['y', 'x'], [[2.0]])
 
         # This tests for a bug in which inputs from sources outside the reconfiguring system
         # are zero-ed out during the execution following the reconfiguration (prior to updates)
         # because the scaling vectors for those external-source inputs are all zero.
         # The solution is to initialize the multiplier in the scaling vector to 1.
         assert_rel_error(self, p.model.get_subsystem('s2')._inputs['x'], 3.0)
-        print(p.model.get_subsystem('s2')._inputs['x'])
 
 
 if __name__ == '__main__':

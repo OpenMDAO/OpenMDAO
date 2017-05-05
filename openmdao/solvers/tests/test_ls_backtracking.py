@@ -182,15 +182,15 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['px.x'] = 2.0
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.y'][ind], 4.666666, 1e-4)
-            assert_rel_error(self, top['comp.z'][ind], 1.333333, 1e-4)
+            assert_rel_error(self, top['comp.y'][ind], [4.666666], 1e-4)
+            assert_rel_error(self, top['comp.z'][ind], [1.333333], 1e-4)
 
         # Run without a line search at x=0.5
         top['px.x'] = 0.5
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.y'][ind], 5.833333, 1e-4)
-            assert_rel_error(self, top['comp.z'][ind], 2.666666, 1e-4)
+            assert_rel_error(self, top['comp.y'][ind], [5.833333], 1e-4)
+            assert_rel_error(self, top['comp.z'][ind], [2.666666], 1e-4)
 
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
@@ -209,7 +209,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], 1.5, 1e-8)
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
         # Test upper bounds: should go to the minimum upper bound and stall
         top['px.x'] = 0.5
@@ -217,7 +217,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['comp.z'] = 2.4
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], 2.5, 1e-8)
+            assert_rel_error(self, top['comp.z'][ind], [2.5], 1e-8)
 
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
@@ -236,7 +236,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], 1.5, 1e-8)
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
         # Test upper bounds: should go to the upper bound and stall
         top['px.x'] = 0.5
@@ -244,7 +244,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
         top['comp.z'] = 2.4
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], self.ub[ind], 1e-8)
+            assert_rel_error(self, top['comp.z'][ind], [self.ub[ind]], 1e-8)
 
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
@@ -307,7 +307,7 @@ class TestBoundsCheckLineSearchArrayBounds(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], 1.5, 1e-8)
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
         # Test upper bounds: should go to the minimum upper bound and stall
         top['px.x'] = 0.5
@@ -315,7 +315,7 @@ class TestBoundsCheckLineSearchArrayBounds(unittest.TestCase):
         top['comp.z'] = 2.4
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], 2.5, 1e-8)
+            assert_rel_error(self, top['comp.z'][ind], [2.5], 1e-8)
 
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
@@ -331,7 +331,7 @@ class TestBoundsCheckLineSearchArrayBounds(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], 1.5, 1e-8)
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
         # Test upper bounds: should go to the upper bound and stall
         top['px.x'] = 0.5
@@ -339,7 +339,7 @@ class TestBoundsCheckLineSearchArrayBounds(unittest.TestCase):
         top['comp.z'] = 2.4
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], self.ub[ind], 1e-8)
+            assert_rel_error(self, top['comp.z'][ind], [self.ub[ind]], 1e-8)
 
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
@@ -400,7 +400,7 @@ class TestArmijoGoldsteinLineSearchArrayBounds(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], 1.5, 1e-8)
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
         # Test upper bounds: should go to the minimum upper bound and stall
         top['px.x'] = 0.5
@@ -408,7 +408,7 @@ class TestArmijoGoldsteinLineSearchArrayBounds(unittest.TestCase):
         top['comp.z'] = 2.4
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], 2.5, 1e-8)
+            assert_rel_error(self, top['comp.z'][ind], [2.5], 1e-8)
 
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
@@ -424,7 +424,7 @@ class TestArmijoGoldsteinLineSearchArrayBounds(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], 1.5, 1e-8)
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
         # Test upper bounds: should go to the upper bound and stall
         top['px.x'] = 0.5
@@ -432,7 +432,7 @@ class TestArmijoGoldsteinLineSearchArrayBounds(unittest.TestCase):
         top['comp.z'] = 2.4
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], self.ub[ind], 1e-8)
+            assert_rel_error(self, top['comp.z'][ind], [self.ub[ind]], 1e-8)
 
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
@@ -506,9 +506,9 @@ class TestFeatureBacktrackingLineSearch(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
 
-        assert_rel_error(self, top['comp.z'][0], 1.5, 1e-8)
-        assert_rel_error(self, top['comp.z'][1], 1.5, 1e-8)
-        assert_rel_error(self, top['comp.z'][2], 1.5, 1e-8)
+        assert_rel_error(self, top['comp.z'][0], [1.5], 1e-8)
+        assert_rel_error(self, top['comp.z'][1], [1.5], 1e-8)
+        assert_rel_error(self, top['comp.z'][2], [1.5], 1e-8)
 
     def test_feature_boundscheck_vector(self):
         top = Problem()
@@ -532,9 +532,9 @@ class TestFeatureBacktrackingLineSearch(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
 
-        assert_rel_error(self, top['comp.z'][0], 1.5, 1e-8)
-        assert_rel_error(self, top['comp.z'][1], 1.5, 1e-8)
-        assert_rel_error(self, top['comp.z'][2], 1.5, 1e-8)
+        assert_rel_error(self, top['comp.z'][0], [1.5], 1e-8)
+        assert_rel_error(self, top['comp.z'][1], [1.5], 1e-8)
+        assert_rel_error(self, top['comp.z'][2], [1.5], 1e-8)
 
     def test_feature_boundscheck_wall(self):
         top = Problem()
@@ -558,9 +558,9 @@ class TestFeatureBacktrackingLineSearch(unittest.TestCase):
         top['comp.z'] = 2.4
         top.run_model()
 
-        assert_rel_error(self, top['comp.z'][0], 2.6, 1e-8)
-        assert_rel_error(self, top['comp.z'][1], 2.5, 1e-8)
-        assert_rel_error(self, top['comp.z'][2], 2.65, 1e-8)
+        assert_rel_error(self, top['comp.z'][0], [2.6], 1e-8)
+        assert_rel_error(self, top['comp.z'][1], [2.5], 1e-8)
+        assert_rel_error(self, top['comp.z'][2], [2.65], 1e-8)
 
     def test_feature_boundscheck_scalar(self):
         top = Problem()

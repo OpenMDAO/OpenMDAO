@@ -108,12 +108,5 @@ class TestLinearSystem(unittest.TestCase):
         lin_sys_comp = LinearSystemComp(size=3, partial_type="sparse")
         check_derivs(lin_sys_comp)
 
-
-
-
-
-
-
-
 if __name__ == "__main__":
     unittest.main()
