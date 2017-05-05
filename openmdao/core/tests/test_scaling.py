@@ -8,6 +8,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp
 from openmdao.api import NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS, DirectSolver
+from openmdao.api import AssembledJacobian
 
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
@@ -835,6 +836,26 @@ class TestScaling(unittest.TestCase):
 
         model.nl_solver = NewtonSolver()
         model.ln_solver = DirectSolver()
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y'], 2.0)
+
+        # Now, let's try with an AssembledJacobian.
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 6.0))
+        model.add_subsystem('comp', SimpleComp())
+
+        model.connect('p1.x', 'comp.x')
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = DirectSolver()
+
+        model.jacobian = AssembledJacobian()
 
         prob.setup(check=False)
         prob.run_model()
