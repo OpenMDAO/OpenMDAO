@@ -17,7 +17,7 @@ from openmdao.solvers.solver import NonlinearSolver
 
 class BoundsCheck(NonlinearSolver):
     """
-    Bounds check only.
+    Bounds enforcement only.
 
     Not so much a linesearch; just check the bounds and if they are violated, then pull back to a
     non-violating point and evaluate.
