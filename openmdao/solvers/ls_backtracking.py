@@ -252,23 +252,6 @@ class ArmijoGoldsteinLS(FlatLS):
         # take us to zero, and our "runs" are the same, and we can just compare the
         # "rise".
         while self._iter_count < maxiter and (norm0 - norm) < c * self.alpha * norm0:
-            system = self._system
-
-            # Hybrid newton support.
-            if self._do_subsolve and self._iter_count > 0:
-
-                self._solver_info.prefix += '+  '
-
-                for isub, subsys in enumerate(system._subsystems_allprocs):
-                    system._transfer('nonlinear', 'fwd', isub)
-
-                    if subsys in system._subsystems_myproc:
-                        subsys._solve_nonlinear()
-
-                self._solver_info.prefix = self._solver_info.prefix[:-3]
-
-                system._apply_nonlinear()
-
             self._iter_execute()
             self._iter_count += 1
             norm = self._iter_get_norm()

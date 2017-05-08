@@ -268,6 +268,41 @@ class TestFlatLSArrayBounds(unittest.TestCase):
         for ind in range(3):
             self.assertTrue(2.4 <= top['comp.z'][ind] <= self.ub[ind])
 
+    def test_with_subsolves(self):
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 4
+        ls = model.nl_solver.linesearch = FlatLS(bound_enforcement='vector')
+
+        # This is pretty bogus, but it ensures that we get a few LS iterations.
+        ls.options['rtol'] = 1e-5
+
+        #prob.set_solver_print(level=2)
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
+
 
 class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
 
@@ -473,9 +508,11 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         model.nl_solver.options['solve_subsystems'] = True
         model.nl_solver.options['max_sub_solves'] = 4
         ls = model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
-        ls.options['c'] = .1
 
-        prob.set_solver_print(level=2)
+        # This is pretty bogus, but it ensures that we get a few LS iterations.
+        ls.options['c'] = 100.0
+
+        prob.set_solver_print(level=0)
 
         prob.setup()
         prob.run_model()
@@ -484,6 +521,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
         assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
 
 class TestFeatureLineSearch(unittest.TestCase):
 
