@@ -12,3 +12,4 @@ openmdao/docs/_srcdocs/packages/
 openmdao/docs/_srcdocs/index.rst
 *testflo_report.out
 openmdao/docs/tags/
+*.out

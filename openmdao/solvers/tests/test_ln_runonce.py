@@ -63,8 +63,8 @@ class TestLNRunOnceSolver(unittest.TestCase):
         wrt = ['x', 'y']
         derivs = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
 
-        assert_rel_error(self, derivs['f_xy']['x'], -6.0, 1e-6)
-        assert_rel_error(self, derivs['f_xy']['y'], 8.0, 1e-6)
+        assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
+        assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
 
 if __name__ == "__main__":
     unittest.main()
