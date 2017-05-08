@@ -12,23 +12,19 @@ also happen in more complicated problems where a full Newton step happens to tak
 even to an area where the residual norm is worse than the initial point. Specifying a line_search can
 help alleviate these problems and improve robustness of your Newton solve.
 
-There are three different backtracking line-search algorithms in OpenMDAO:
+There are two different backtracking line-search algorithms in OpenMDAO:
 
 BoundsEnforceLS
   Only checks bounds and backtracks to point that satisfies them.
 
-FlatLS
-  Checks bounds and backtracks to point that satisfies them. From there, further backtracking is performed until the termination criteria are satisfied; these
-  criteria include a relative and absolute tolerance and an iteration maximum.
-
 ArmijoGoldsteinLS
   Checks bounds and backtracks to point that satisfies them. From there, further backtracking is performed until the termination criteria are satisfied.
-  The main termination criteria is the AmijoGoldstein condition, which checks for a sufficient decrease from the initial point by measuring the
+  The main termination criteria is the Amijo-Goldstein condition, which checks for a sufficient decrease from the initial point by measuring the
   slope. There is also an iteration maximum.
 
 The following examples use a Newton solver on a component `ImplCompTwoStates` with an implicit output
 'z' that has an upper bound of 2.5 and a lower bound of 1.5. This example shows how to specify a line search
-(which in this case is the `FlatLS`.):
+(which in this case is the `AmijoGoldsteinLS`.):
 
 .. embed-test::
     openmdao.solvers.tests.test_ls_backtracking.TestFeatureLineSearch.test_feature_boundscheck_basic
@@ -101,13 +97,6 @@ Control Options
 - maxiter
 
   The "maxiter" option is a termination criteria that specifies the maximum number of backtracking steps to allow.
-
-- rtol
-
-  The "rtol" option is a termination criterion used by only the `FlatLS`. It specifies the residual
-  norm (with respect to the residual at the initial point) that is used to terminate backtracking. Note that you
-  probably don't want a very small value here, as backtracking is not capable of solving your whole nonlinear problem; it
-  is meant to get around problem iterations.
 
 - alpha
 

@@ -2,8 +2,6 @@
 A few different backtracking line search subsolvers.
 
 BoundsEnforceLS - Only checks bounds and enforces them by one of three methods.
-FlatLS -- Checks bounds and also backtracks but terminates using atol and rtol like
-                          other nonlinear solvers.
 ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condition.
 
 """
@@ -98,9 +96,9 @@ class BoundsEnforceLS(NonlinearSolver):
         return fail, norm, norm / norm0
 
 
-class FlatLS(NonlinearSolver):
+class ArmijoGoldsteinLS(NonlinearSolver):
     """
-    Backtracking line search.
+    Backtracking line search that terminates using the Armijo-Goldstein condition..
 
     Attributes
     ----------
@@ -111,7 +109,7 @@ class FlatLS(NonlinearSolver):
         Number of iterations for the current invocation of the solver.
     """
 
-    SOLVER = 'LS: BKTKG'
+    SOLVER = 'LS: AG'
 
     def __init__(self, **kwargs):
         """
@@ -122,28 +120,10 @@ class FlatLS(NonlinearSolver):
         **kwargs : dict
             Options dictionary.
         """
-        super(FlatLS, self).__init__(**kwargs)
+        super(ArmijoGoldsteinLS, self).__init__(**kwargs)
 
         # Parent solver sets this to control whether to solve subsystems.
         self._do_subsolve = False
-
-    def _declare_options(self):
-        """
-        Declare options before kwargs are processed in the init method.
-        """
-        opt = self.options
-        opt['maxiter'] = 5
-        opt['rtol'] = 0.95
-        opt.declare(
-            'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
-            desc="If this is set to 'vector', the entire vector is backtracked together " +
-                 "when a bound is violated. If this is set to 'scalar', only the violating " +
-                 "entries are set to the bound and then the backtracking occurs on the vector " +
-                 "as a whole. If this is set to 'wall', only the violating entries are set " +
-                 "to the bound, and then the backtracking follows the wall - i.e., the " +
-                 "violating entries do not change during the line search.")
-        opt.declare('rho', default=0.5, lower=0.0, upper=1.0, desc="Backtracking multiplier.")
-        opt.declare('alpha', default=1.0, desc="Initial line search step.")
 
     def _iter_initialize(self):
         """
@@ -178,6 +158,28 @@ class FlatLS(NonlinearSolver):
         norm = self._iter_get_norm()
         return norm0, norm
 
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super(ArmijoGoldsteinLS, self)._declare_options()
+        opt = self.options
+        opt['maxiter'] = 5
+        opt.declare('c', default=0.1, desc="Slope parameter for line of sufficient decrease. The "
+                    "larger the step, the more decrease is required to terminate the line search. "
+                    "This parameter is 'c' in: '||res_k|| < ||res_0|| (1 - c * alpha)' for the "
+                    "termination criterion.")
+        opt.declare(
+            'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
+            desc="If this is set to 'vector', the entire vector is backtracked together " +
+                 "when a bound is violated. If this is set to 'scalar', only the violating " +
+                 "entries are set to the bound and then the backtracking occurs on the vector " +
+                 "as a whole. If this is set to 'wall', only the violating entries are set " +
+                 "to the bound, and then the backtracking follows the wall - i.e., the " +
+                 "violating entries do not change during the line search.")
+        opt.declare('rho', default=0.5, lower=0.0, upper=1.0, desc="Backtracking multiplier.")
+        opt.declare('alpha', default=1.0, desc="Initial line search step.")
+
     def _iter_execute(self):
         """
         Perform the operations in the iteration loop.
@@ -204,25 +206,6 @@ class FlatLS(NonlinearSolver):
         u.add_scal_vec(-self.alpha, du)
         self.alpha *= self.options['rho']
         u.add_scal_vec(self.alpha, du)
-
-
-class ArmijoGoldsteinLS(FlatLS):
-    """
-    Backtracking line search that terminates using the Armijo-Goldstein condition..
-    """
-
-    SOLVER = 'LS: AG'
-
-    def _declare_options(self):
-        """
-        Declare options before kwargs are processed in the init method.
-        """
-        super(ArmijoGoldsteinLS, self)._declare_options()
-        opt = self.options
-        opt.declare('c', default=0.1, desc="Slope parameter for line of sufficient decrease. The "
-                    "larger the step, the more decrease is required to terminate the line search. "
-                    "This parameter is 'c' in: '||res_k|| < ||res_0|| (1 - c * alpha)' for the "
-                    "termination criterion.")
 
     def _run_iterator(self):
         """

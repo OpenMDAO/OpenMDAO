@@ -104,7 +104,7 @@ let's set up a problem that has implicit bounds on one of its states.
 
 In this component, the state "z" is only valid between 1.5 and 2.5, while the other state is valid
 everywhere. You can verify that if NewtonSolver is used with no backtracking specified, the solution
-violates the bounds on "z".  Here, we specify :ref:`FlatLS <usr_openmdao.solvers.ls_backtracking.py>`
+violates the bounds on "z".  Here, we specify :ref:`ArmijoGoldsteinLS <usr_openmdao.solvers.ls_backtracking.py>`
 as our line search algorithm, and we get a solution on the lower bounds for "z".
 
 .. embed-test::
