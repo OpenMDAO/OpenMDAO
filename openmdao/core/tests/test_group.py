@@ -44,6 +44,16 @@ class BranchGroup(Group):
         g3.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
 
 
+class SetOrderGroup(Group):
+    def initialize_subsystems(self):
+        self.add_subsystem('C1', ExecComp('y=2.0*x'))
+        self.add_subsystem('C2', ExecComp('y=2.0*x'))
+        self.add_subsystem('C3', ExecComp('y=2.0*x'))
+        self.set_order(['C1', 'C3', 'C2'])
+        self.connect('C1.y', 'C3.x')
+        self.connect('C3.y', 'C2.x')
+
+
 class ReportOrderComp(ExplicitComponent):
     def __init__(self, order_list):
         super(ReportOrderComp, self).__init__()
@@ -725,6 +735,16 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          ": Duplicate name(s) found in subsystem order list: ['C1']")
+
+    def test_set_order_init_subsystems(self):
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('indeps', IndepVarComp('x', 1.))
+        model.add_subsystem('G1', SetOrderGroup())
+        prob.setup(check=False)
+        prob.run_model()
+
+        # this test passes if it doesn't raise an exception
 
 
 class TestGroupMPI(unittest.TestCase):
