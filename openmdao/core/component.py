@@ -19,10 +19,13 @@ from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
-from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation
 from openmdao.utils.name_maps import rel_name2abs_name, rel_key2abs_key, abs_key2rel_key
+
+
+# Object to represent default value for `add_output`.
+_NotSet = object()
 
 
 class Component(System):
@@ -345,6 +348,8 @@ class Component(System):
             'type': 'input', 'metadata': metadata}
         var_rel_names['input'].append(name)
 
+        return metadata
+
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
         """
@@ -478,6 +483,8 @@ class Component(System):
             'my_idx': len(self._var_rel_names['output']),
             'type': 'output', 'metadata': metadata}
         var_rel_names['output'].append(name)
+
+        return metadata
 
     def approx_partials(self, of, wrt, method='fd', **kwargs):
         """
