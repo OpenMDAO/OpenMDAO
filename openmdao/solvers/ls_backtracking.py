@@ -1,10 +1,10 @@
 """
 A few different backtracking line search subsolvers.
 
-BoundsCheck - Only checks bounds and enforces them by one of three methods.
-BacktrackingLineSearch -- Checks bounds and also backtracks but terminates using atol and rtol like
+BoundsEnforceLS - Only checks bounds and enforces them by one of three methods.
+FlatLS -- Checks bounds and also backtracks but terminates using atol and rtol like
                           other nonlinear solvers.
-ArmijoGoldstein -- Like above, but terminates with the ArmijoGoldstein condition.
+ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condition.
 
 """
 
@@ -15,15 +15,37 @@ import numpy as np
 from openmdao.solvers.solver import NonlinearSolver
 
 
-class BoundsCheck(NonlinearSolver):
+class BoundsEnforceLS(NonlinearSolver):
     """
     Bounds enforcement only.
 
     Not so much a linesearch; just check the bounds and if they are violated, then pull back to a
     non-violating point and evaluate.
+
+    Attributes
+    ----------
+    _do_subsolve : bool
+        Flag used by parent solver to tell the line search whether to solve subsystems while
+        backtracking.
+    _iter_count : int
+        Number of iterations for the current invocation of the solver.
     """
 
     SOLVER = 'LS: BCHK'
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Options dictionary.
+        """
+        super(BoundsEnforceLS, self).__init__(**kwargs)
+
+        # Parent solver sets this to control whether to solve subsystems.
+        self._do_subsolve = False
 
     def _declare_options(self):
         """
@@ -76,12 +98,34 @@ class BoundsCheck(NonlinearSolver):
         return fail, norm, norm / norm0
 
 
-class BacktrackingLineSearch(NonlinearSolver):
+class FlatLS(NonlinearSolver):
     """
     Backtracking line search.
+
+    Attributes
+    ----------
+    _do_subsolve : bool
+        Flag used by parent solver to tell the line search whether to solve subsystems while
+        backtracking.
+    _iter_count : int
+        Number of iterations for the current invocation of the solver.
     """
 
     SOLVER = 'LS: BKTKG'
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Options dictionary.
+        """
+        super(FlatLS, self).__init__(**kwargs)
+
+        # Parent solver sets this to control whether to solve subsystems.
+        self._do_subsolve = False
 
     def _declare_options(self):
         """
@@ -142,12 +186,27 @@ class BacktrackingLineSearch(NonlinearSolver):
         u = system._outputs
         du = system._vectors['output']['linear']
 
+        # Hybrid newton support.
+        if self._do_subsolve and self._iter_count > 0:
+
+            self._solver_info.prefix += '+  '
+
+            for isub, subsys in enumerate(system._subsystems_allprocs):
+                system._transfer('nonlinear', 'fwd', isub)
+
+                if subsys in system._subsystems_myproc:
+                    subsys._solve_nonlinear()
+
+            self._solver_info.prefix = self._solver_info.prefix[:-3]
+
+            system._apply_nonlinear()
+
         u.add_scal_vec(-self.alpha, du)
         self.alpha *= self.options['rho']
         u.add_scal_vec(self.alpha, du)
 
 
-class ArmijoGoldstein(BacktrackingLineSearch):
+class ArmijoGoldsteinLS(FlatLS):
     """
     Backtracking line search that terminates using the Armijo-Goldstein condition..
     """
@@ -158,7 +217,7 @@ class ArmijoGoldstein(BacktrackingLineSearch):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(ArmijoGoldstein, self)._declare_options()
+        super(ArmijoGoldsteinLS, self)._declare_options()
         opt = self.options
         opt.declare('c', default=0.1, desc="Slope parameter for line of sufficient decrease. The "
                     "larger the step, the more decrease is required to terminate the line search. "
@@ -193,6 +252,23 @@ class ArmijoGoldstein(BacktrackingLineSearch):
         # take us to zero, and our "runs" are the same, and we can just compare the
         # "rise".
         while self._iter_count < maxiter and (norm0 - norm) < c * self.alpha * norm0:
+            system = self._system
+
+            # Hybrid newton support.
+            if self._do_subsolve and self._iter_count > 0:
+
+                self._solver_info.prefix += '+  '
+
+                for isub, subsys in enumerate(system._subsystems_allprocs):
+                    system._transfer('nonlinear', 'fwd', isub)
+
+                    if subsys in system._subsystems_myproc:
+                        subsys._solve_nonlinear()
+
+                self._solver_info.prefix = self._solver_info.prefix[:-3]
+
+                system._apply_nonlinear()
+
             self._iter_execute()
             self._iter_count += 1
             norm = self._iter_get_norm()

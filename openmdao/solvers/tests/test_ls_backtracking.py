@@ -5,23 +5,24 @@ import unittest
 
 from six.moves import range
 
-from openmdao.api import Problem, Group, IndepVarComp
-from openmdao.solvers.ls_backtracking import BacktrackingLineSearch, ArmijoGoldstein, \
-                                             BoundsCheck
+from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
+from openmdao.devtools.testutil import assert_rel_error
+from openmdao.solvers.ls_backtracking import FlatLS, ArmijoGoldsteinLS, \
+     BoundsEnforceLS
 from openmdao.solvers.nl_newton import NewtonSolver
 from openmdao.solvers.ln_scipy import ScipyIterativeSolver
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompOneState, ImplCompTwoStates, ImplCompTwoStatesArrays
 
 
-class TestBacktrackingLineSearch(unittest.TestCase):
+class TestFlatLS(unittest.TestCase):
 
     def test_options(self):
-        """Verify that the BacktrackingLineSearch options are declared."""
+        """Verify that the FlatLS options are declared."""
 
         group = Group()
-        group.nl_solver = BacktrackingLineSearch()
+        group.nl_solver = FlatLS()
 
         assert(group.nl_solver.options['bound_enforcement'] == 'vector')
         assert(group.nl_solver.options['rho'] == 0.5)
@@ -37,7 +38,7 @@ class TestBacktrackingLineSearch(unittest.TestCase):
 
         root.nl_solver = NewtonSolver()
         root.ln_solver = ScipyIterativeSolver()
-        ls = root.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9)
+        ls = root.nl_solver.linesearch = FlatLS(rtol=0.9)
         ls.options['maxiter'] = 100
         ls.options['alpha'] = 10.0
 
@@ -49,7 +50,7 @@ class TestBacktrackingLineSearch(unittest.TestCase):
         assert_rel_error(self, top['comp.y'], .3968459, .0001)
 
 
-class TestBacktrackingLineSearchBounds(unittest.TestCase):
+class TestFlatLSBounds(unittest.TestCase):
 
     def setUp(self):
         top = Problem()
@@ -84,8 +85,7 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
     def test_linesearch_bounds_vector(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
-                                                                     bound_enforcement='vector')
+        ls = top.model.nl_solver.linesearch = FlatLS(rtol=0.9, bound_enforcement='vector')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
 
@@ -109,8 +109,7 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
     def test_linesearch_bounds_wall(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
-                                                                     bound_enforcement='wall')
+        ls = top.model.nl_solver.linesearch = FlatLS(rtol=0.9, bound_enforcement='wall')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
 
@@ -134,8 +133,7 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
     def test_linesearch_bounds_scalar(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
-                                                                     bound_enforcement='scalar')
+        ls = top.model.nl_solver.linesearch = FlatLS(rtol=0.9, bound_enforcement='scalar')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
 
@@ -157,7 +155,7 @@ class TestBacktrackingLineSearchBounds(unittest.TestCase):
         self.assertTrue(2.4 <= top['comp.z'] <= 2.5)
 
 
-class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
+class TestFlatLSArrayBounds(unittest.TestCase):
 
     def setUp(self):
         top = Problem()
@@ -195,8 +193,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
-                                                                     bound_enforcement='vector')
+        ls = top.model.nl_solver.linesearch = FlatLS(rtol=0.9, bound_enforcement='vector')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
 
@@ -222,8 +219,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
-                                                                     bound_enforcement='wall')
+        ls = top.model.nl_solver.linesearch = FlatLS(rtol=0.9, bound_enforcement='wall')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
 
@@ -249,8 +245,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch(rtol=0.9,
-                                                                     bound_enforcement='scalar')
+        ls = top.model.nl_solver.linesearch = FlatLS(rtol=0.9, bound_enforcement='scalar')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
 
@@ -274,7 +269,7 @@ class TestBacktrackingLineSearchArrayBounds(unittest.TestCase):
             self.assertTrue(2.4 <= top['comp.z'][ind] <= self.ub[ind])
 
 
-class TestBoundsCheckLineSearchArrayBounds(unittest.TestCase):
+class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
 
     def setUp(self):
         top = Problem()
@@ -296,7 +291,7 @@ class TestBoundsCheckLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = BoundsCheck(bound_enforcement='vector')
+        ls = top.model.nl_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -320,7 +315,7 @@ class TestBoundsCheckLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = BoundsCheck(bound_enforcement='wall')
+        ls = top.model.nl_solver.linesearch = BoundsEnforceLS(bound_enforcement='wall')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -344,7 +339,7 @@ class TestBoundsCheckLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = BoundsCheck(bound_enforcement='scalar')
+        ls = top.model.nl_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -366,7 +361,7 @@ class TestBoundsCheckLineSearchArrayBounds(unittest.TestCase):
             self.assertTrue(2.4 <= top['comp.z'][ind] <= self.ub[ind])
 
 
-class TestArmijoGoldsteinLineSearchArrayBounds(unittest.TestCase):
+class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
 
     def setUp(self):
         top = Problem()
@@ -388,7 +383,7 @@ class TestArmijoGoldsteinLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = ArmijoGoldstein(bound_enforcement='vector')
+        ls = top.model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
         ls.options['c'] = .1
 
         # Setup again because we assigned a new linesearch
@@ -413,7 +408,7 @@ class TestArmijoGoldsteinLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = ArmijoGoldstein(bound_enforcement='wall')
+        ls = top.model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -437,7 +432,7 @@ class TestArmijoGoldsteinLineSearchArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = ArmijoGoldstein(bound_enforcement='scalar')
+        ls = top.model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='scalar')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -458,8 +453,39 @@ class TestArmijoGoldsteinLineSearchArrayBounds(unittest.TestCase):
         for ind in range(3):
             self.assertTrue(2.4 <= top['comp.z'][ind] <= self.ub[ind])
 
+    def test_with_subsolves(self):
+        prob = Problem()
+        model = prob.model = DoubleSellar()
 
-class TestFeatureBacktrackingLineSearch(unittest.TestCase):
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 4
+        ls = model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls.options['c'] = .1
+
+        prob.set_solver_print(level=2)
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
+class TestFeatureLineSearch(unittest.TestCase):
 
     def test_feature_specification(self):
         top = Problem()
@@ -472,7 +498,7 @@ class TestFeatureBacktrackingLineSearch(unittest.TestCase):
         top.model.nl_solver.options['maxiter'] = 10
         top.model.ln_solver = ScipyIterativeSolver()
 
-        ls = top.model.nl_solver.linesearch = BacktrackingLineSearch()
+        ls = top.model.nl_solver.linesearch = FlatLS()
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
         ls.options['rtol'] = 0.9
@@ -496,7 +522,7 @@ class TestFeatureBacktrackingLineSearch(unittest.TestCase):
         top.model.nl_solver.options['maxiter'] = 10
         top.model.ln_solver = ScipyIterativeSolver()
 
-        ls = top.model.nl_solver.linesearch = BoundsCheck()
+        ls = top.model.nl_solver.linesearch = BoundsEnforceLS()
 
         top.setup(check=False)
 
@@ -521,7 +547,7 @@ class TestFeatureBacktrackingLineSearch(unittest.TestCase):
         top.model.nl_solver.options['maxiter'] = 10
         top.model.ln_solver = ScipyIterativeSolver()
 
-        ls = top.model.nl_solver.linesearch = BoundsCheck()
+        ls = top.model.nl_solver.linesearch = BoundsEnforceLS()
         ls.options['bound_enforcement'] = 'vector'
 
         top.setup(check=False)
@@ -547,7 +573,7 @@ class TestFeatureBacktrackingLineSearch(unittest.TestCase):
         top.model.nl_solver.options['maxiter'] = 10
         top.model.ln_solver = ScipyIterativeSolver()
 
-        ls = top.model.nl_solver.linesearch = BoundsCheck()
+        ls = top.model.nl_solver.linesearch = BoundsEnforceLS()
         ls.options['bound_enforcement'] = 'wall'
 
         top.setup(check=False)
@@ -573,7 +599,7 @@ class TestFeatureBacktrackingLineSearch(unittest.TestCase):
         top.model.nl_solver.options['maxiter'] = 10
         top.model.ln_solver = ScipyIterativeSolver()
 
-        ls = top.model.nl_solver.linesearch = BoundsCheck()
+        ls = top.model.nl_solver.linesearch = BoundsEnforceLS()
         ls.options['bound_enforcement'] = 'scalar'
 
         top.setup(check=False)

@@ -151,7 +151,7 @@ class NewtonSolver(NonlinearSolver):
         system = self._system
         self._solver_info.prefix += '|  '
         do_subsolve = self.options['solve_subsystems'] and \
-                      self._iter_count <= self.options['max_sub_solves']
+            (self._iter_count <= self.options['max_sub_solves'])
 
         # Hybrid newton support.
         if do_subsolve:
@@ -175,7 +175,8 @@ class NewtonSolver(NonlinearSolver):
         self.ln_solver.solve(['linear'], 'fwd')
 
         if self.linesearch:
-            self.linesearch.solve(subsolve=do_subsolve)
+            self.linesearch._do_subsolve = do_subsolve
+            self.linesearch.solve()
         else:
             system._outputs += system._vectors['output']['linear']
 

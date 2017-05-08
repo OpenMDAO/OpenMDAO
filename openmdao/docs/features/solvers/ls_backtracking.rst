@@ -14,24 +14,24 @@ help alleviate these problems and improve robustness of your Newton solve.
 
 There are three different backtracking line-search algorithms in OpenMDAO:
 
-BoundsCheck
+BoundsEnforceLS
   Only checks bounds and backtracks to point that satisfies them.
 
-BacktrackingLineSearch
+FlatLS
   Checks bounds and backtracks to point that satisfies them. From there, further backtracking is performed until the termination criteria are satisfied; these
   criteria include a relative and absolute tolerance and an iteration maximum.
 
-ArmijoGoldstein
+ArmijoGoldsteinLS
   Checks bounds and backtracks to point that satisfies them. From there, further backtracking is performed until the termination criteria are satisfied.
   The main termination criteria is the AmijoGoldstein condition, which checks for a sufficient decrease from the initial point by measuring the
   slope. There is also an iteration maximum.
 
 The following examples use a Newton solver on a component `ImplCompTwoStates` with an implicit output
 'z' that has an upper bound of 2.5 and a lower bound of 1.5. This example shows how to specify a line search
-(which in this case is the `BacktrackingLineSearch`.):
+(which in this case is the `FlatLS`.):
 
 .. embed-test::
-    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_boundscheck_basic
+    openmdao.solvers.tests.test_ls_backtracking.TestFeatureLineSearch.test_feature_boundscheck_basic
 
 Bound Enforcement
 -----------------
@@ -59,7 +59,7 @@ With "wall" bounds enforcement, only the variables that violate their bounds are
 remaining values are kept at the Newton-stepped point. Further backtracking only occurs in the direction of the non-violating
 variables, so that it will move along the wall.
 
-Note: when using the `BoundsCheck` line search, the `scalar` and `wall` methods are exactly the same because no further
+Note: when using the `BoundsEnforceLS` line search, the `scalar` and `wall` methods are exactly the same because no further
 backtracking is performed.
 
 .. image:: BT3.jpg
@@ -74,7 +74,7 @@ Here are a few examples of this option:
   computed gradient.
 
 .. embed-test::
-    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_boundscheck_vector
+    openmdao.solvers.tests.test_ls_backtracking.TestFeatureLineSearch.test_feature_boundscheck_vector
 
 - bound_enforcement: scalar
 
@@ -83,7 +83,7 @@ Here are a few examples of this option:
   are the ones that violate their upper or lower bounds. The backtracking continues along the modified gradient.
 
 .. embed-test::
-    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_boundscheck_scalar
+    openmdao.solvers.tests.test_ls_backtracking.TestFeatureLineSearch.test_feature_boundscheck_scalar
 
 - bound_enforcement: wall
 
@@ -93,7 +93,7 @@ Here are a few examples of this option:
   direction that follows the boundary of the violated output bounds.
 
 .. embed-test::
-    openmdao.solvers.tests.test_ls_backtracking.TestFeatureBacktrackingLineSearch.test_feature_boundscheck_wall
+    openmdao.solvers.tests.test_ls_backtracking.TestFeatureLineSearch.test_feature_boundscheck_wall
 
 Control Options
 ---------------
@@ -104,7 +104,7 @@ Control Options
 
 - rtol
 
-  The "rtol" option is a termination criterion used by only the `BacktrackingLineSearch`. It specifies the residual
+  The "rtol" option is a termination criterion used by only the `FlatLS`. It specifies the residual
   norm (with respect to the residual at the initial point) that is used to terminate backtracking. Note that you
   probably don't want a very small value here, as backtracking is not capable of solving your whole nonlinear problem; it
   is meant to get around problem iterations.
@@ -122,7 +122,7 @@ Control Options
 
 - c
 
-  In the `ArmijoGoldstein`, the "c" option is a multiplier on the slope check. Setting it to a smaller value means a more
+  In the `ArmijoGoldsteinLS`, the "c" option is a multiplier on the slope check. Setting it to a smaller value means a more
   gentle slope will satisfy the condition and terminate.
 
 .. tags:: linesearch, backtracking
