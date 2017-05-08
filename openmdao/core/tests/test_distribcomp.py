@@ -322,6 +322,9 @@ class MPITests(unittest.TestCase):
         size = 15
 
         class DistribComp(ExplicitComponent):
+            def __init__(self, size):
+                self.size = size
+                super(DistribComp, self).__init__()
 
             def compute(self, inputs, outputs):
                 outputs['outvec'] = inputs['invec'] * 2.0
@@ -330,7 +333,7 @@ class MPITests(unittest.TestCase):
                 comm = self.comm
                 rank = comm.rank
 
-                sizes, offsets = evenly_distrib_idxs(comm.size, size)
+                sizes, offsets = evenly_distrib_idxs(comm.size, self.size)
                 start = offsets[rank]
                 end = start + sizes[rank]
 
