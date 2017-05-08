@@ -2086,10 +2086,10 @@ class System(object):
             for uname in states:
                 stream.write("%s\n" % uname)
                 stream.write("Value: ")
-                stream.write(str(outputs[uname]))
+                stream.write(str(outputs._names[uname]))
                 stream.write('\n')
                 stream.write("Residual: ")
-                stream.write(str(resids[uname]))
+                stream.write(str(resids._names[uname]))
                 stream.write('\n\n')
         else:
             stream.write("\nNo states in %s.\n" % pathname)
