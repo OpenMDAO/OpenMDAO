@@ -135,6 +135,7 @@ class MPITests2(unittest.TestCase):
         size = 3
         prob = Problem()
         prob.model = root = Group()
+        import wingdbstub
         root.add_subsystem('P', IndepVarComp('x', numpy.ones(size, dtype=float)))
         root.add_subsystem('C1', DistribExecComp(['y=3.0*x'], arr_size=size,
                                                  x=numpy.zeros(size, dtype=float),

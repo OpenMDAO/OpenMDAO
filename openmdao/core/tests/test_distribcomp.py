@@ -316,6 +316,47 @@ class MPITests(unittest.TestCase):
 
         self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
+    def test_distribcomp_feature(self):
+        from openmdao.utils.array_utils import evenly_distrib_idxs
+
+        size = 15
+
+        class DistribComp(ExplicitComponent):
+
+            def compute(self, inputs, outputs):
+                outputs['outvec'] = inputs['invec'] * 2.0
+
+            def initialize_variables(self):
+                comm = self.comm
+                rank = comm.rank
+
+                sizes, offsets = evenly_distrib_idxs(comm.size, size)
+                start = offsets[rank]
+                end = start + sizes[rank]
+
+                self.add_input('invec', np.ones(sizes[rank], float),
+                               src_indices=np.arange(start, end, dtype=int))
+                self.add_output('outvec', np.ones(sizes[rank], float))
+
+            def get_req_procs(self):
+                return (2, 2)
+
+
+        p = Problem(model=Group())
+        top = p.model
+        C1 = top.add_subsystem("C1", InOutArrayComp(size))
+        C2 = top.add_subsystem("C2", DistribComp(size))
+        C3 = top.add_subsystem("C3", DistribGatherComp(size))
+        top.connect('C1.outvec', 'C2.invec')
+        top.connect('C2.outvec', 'C3.invec')
+        p.setup(vector_class=PETScVector, check=False)
+
+        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+
+        p.run_model()
+
+        self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
+
     def test_noncontiguous_idxs(self):
         # take even input indices in 0 rank and odd ones in 1 rank
         size = 11

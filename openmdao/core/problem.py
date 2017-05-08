@@ -734,9 +734,6 @@ class Problem(object):
                     irange = range(end - start)
                     loc_size = end - start
                     dup = True
-                # else:  # distributed full var
-                #     irange = range(total_size)
-                #     loc_size = end - start
 
                 for idx in irange:
 
