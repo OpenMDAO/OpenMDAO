@@ -224,7 +224,7 @@ class TestExecComp(unittest.TestCase):
 
         C1._linearize()
 
-        assert_rel_error(self, C1.jacobian[('y','x')], -2.0, 0.00001)
+        assert_rel_error(self, C1.jacobian[('y','x')], [[-2.0]], 0.00001)
 
     def test_complex_step2(self):
         prob = Problem(Group())
@@ -237,13 +237,13 @@ class TestExecComp(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_total_derivs(['comp.y'], ['p1.x'], return_format='flat_dict')
-        assert_rel_error(self, J['comp.y', 'p1.x'], np.array([6.0]), 0.00001)
+        assert_rel_error(self, J['comp.y', 'p1.x'], np.array([[6.0]]), 0.00001)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
         J = prob.compute_total_derivs(['comp.y'], ['p1.x'], return_format='flat_dict')
-        assert_rel_error(self, J['comp.y', 'p1.x'], np.array([6.0]), 0.00001)
+        assert_rel_error(self, J['comp.y', 'p1.x'], np.array([[6.0]]), 0.00001)
 
     def test_abs_complex_step(self):
         prob = Problem(model=Group())
@@ -258,15 +258,15 @@ class TestExecComp(unittest.TestCase):
         # any negative C1.x should give a 2.0 derivative for dy/dx
         C1._inputs['x'] = -1.0e-10
         C1._linearize()
-        assert_rel_error(self, C1.jacobian['y','x'], 2.0, 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], [[2.0]], 0.00001)
 
         C1._inputs['x'] = 3.0
         C1._linearize()
-        assert_rel_error(self, C1.jacobian['y','x'], -2.0, 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], [[-2.0]], 0.00001)
 
         C1._inputs['x'] = 0.0
         C1._linearize()
-        assert_rel_error(self, C1.jacobian['y','x'], -2.0, 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], [[-2.0]], 0.00001)
 
     def test_abs_array_complex_step(self):
         prob = Problem(model=Group())

@@ -571,10 +571,8 @@ class Component(System):
             val = val.astype(safe_dtype, copy=False)
 
         if rows is not None:
-            if isinstance(rows, (list, tuple, Iterable)):
-                rows = np.array(rows, dtype=int)
-            if isinstance(cols, (list, tuple, Iterable)):
-                cols = np.array(cols, dtype=int)
+            rows = np.array(rows, dtype=int, copy=False)
+            cols = np.array(cols, dtype=int, copy=False)
 
             if rows.shape != cols.shape:
                 raise ValueError('rows and cols must have the same shape,'
@@ -583,6 +581,9 @@ class Component(System):
             if val is not None and val.shape != (1,) and rows.shape != val.shape:
                 raise ValueError('If rows and cols are specified, val must be a scalar or have the '
                                  'same shape, val: {}, rows/cols: {}'.format(val.shape, rows.shape))
+
+            if val is None:
+                val = np.zeros_like(rows, dtype=float)
 
         pattern_matches = self._find_partial_matches(of, wrt)
 

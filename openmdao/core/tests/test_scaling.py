@@ -7,7 +7,8 @@ from six import assertRaisesRegex
 import numpy as np
 
 from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp
-from openmdao.api import NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
+from openmdao.api import NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS, DirectSolver
+from openmdao.api import AssembledJacobian
 
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
@@ -342,11 +343,18 @@ class TestScaling(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = 2.0*(inputs['x'] + 1.0)
 
+            def compute_partial_derivs(self, inputs, outputs, partials):
+                """
+                Jacobian for Sellar discipline 1.
+                """
+                partials['y', 'x'] = 2.0
+
+
         # Baseline - all should be equal.
 
         prob = Problem()
         model = prob.model = Group()
-        model.add_subsystem('p1', Simple())
+        p1 = model.add_subsystem('p1', Simple())
         model.add_subsystem('p2', Simple())
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
@@ -370,6 +378,11 @@ class TestScaling(unittest.TestCase):
             out2 = model.get_subsystem('p2')._outputs.get_data()[0]
 
             self.assertEqual(res1, out1 - 2.0*(out2 + 1.0))
+
+        # Jacobian is unscaled
+        prob.model.run_linearize()
+        deriv = p1._jacobian._subjacs
+        assert_rel_error(self, deriv['p1.y', 'p1.x'], -2.0)
 
         # Scale the outputs only.
         # Residual scaling uses output scaling by default.
@@ -402,6 +415,11 @@ class TestScaling(unittest.TestCase):
 
             self.assertEqual(res1a, (res1)/(ref))
 
+        # Jacobian is unscaled
+        prob.model.run_linearize()
+        deriv = p1._jacobian._subjacs
+        assert_rel_error(self, deriv['p1.y', 'p1.x'], -2.0)
+
         # Scale the residual
 
         res_ref = 4.0
@@ -430,6 +448,11 @@ class TestScaling(unittest.TestCase):
             res1a = model.get_subsystem('p1')._residuals.get_data()[0]
 
             self.assertEqual(res1a, res1/res_ref)
+
+        # Jacobian is unscaled
+        prob.model.run_linearize()
+        deriv = p1._jacobian._subjacs
+        assert_rel_error(self, deriv['p1.y', 'p1.x'], -2.0)
 
         # Simultaneously scale the residual and output with different values
 
@@ -461,6 +484,11 @@ class TestScaling(unittest.TestCase):
             res1a = model.get_subsystem('p1')._residuals.get_data()[0]
 
             self.assertEqual(res1a, (res1)/(res_ref))
+
+        # Jacobian is unscaled
+        prob.model.run_linearize()
+        deriv = p1._jacobian._subjacs
+        assert_rel_error(self, deriv['p1.y', 'p1.x'], -2.0)
 
     def test_scale_array_with_float(self):
 
@@ -781,6 +809,58 @@ class TestScaling(unittest.TestCase):
 
         assert_rel_error(self, prob['comp1.total_volume'], 14.)
         assert_rel_error(self, prob['comp2.total_volume'], 28.)
+
+    def test_newton_resid_scaling(self):
+
+        class SimpleComp(ImplicitComponent):
+
+            def initialize_variables(self):
+                self.add_input('x', val=6.0)
+                self.add_output('y', val=1.0, ref=100.0, res_ref=10.1)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['y'] = 3.0*outputs['y'] - inputs['x']
+
+            def linearize(self, inputs, outputs, jacobian):
+
+                jacobian['y', 'x'] = -1.0
+                jacobian['y', 'y'] = 3.0
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 6.0))
+        model.add_subsystem('comp', SimpleComp())
+
+        model.connect('p1.x', 'comp.x')
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = DirectSolver()
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y'], 2.0)
+
+        # Now, let's try with an AssembledJacobian.
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 6.0))
+        model.add_subsystem('comp', SimpleComp())
+
+        model.connect('p1.x', 'comp.x')
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = DirectSolver()
+
+        model.jacobian = AssembledJacobian()
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y'], 2.0)
 
     def test_feature1(self):
 
