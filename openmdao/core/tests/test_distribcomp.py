@@ -336,7 +336,10 @@ class MPITests(unittest.TestCase):
                 super(DistribComp, self).__init__()
 
             def compute(self, inputs, outputs):
-                outputs['outvec'] = inputs['invec'] * 2.0
+                if self.comm.rank == 0:
+                    outputs['outvec'] = inputs['invec'] * 2.0
+                else:
+                    outputs['outvec'] = inputs['invec'] * 3.0
 
             def initialize_variables(self):
                 comm = self.comm
@@ -355,7 +358,7 @@ class MPITests(unittest.TestCase):
                 return 2, 5
 
         class GatherComp(ExplicitComponent):
-            """Uses 2 procs gathers a distrib output into a full input"""
+            """Uses 2 procs. Gathers a distrib output into a full input"""
 
             def __init__(self, size):
                 super(GatherComp, self).__init__()
@@ -370,15 +373,20 @@ class MPITests(unittest.TestCase):
         top.add_subsystem("indep", IndepVarComp('x', np.zeros(size)))
         top.add_subsystem("C2", DistribComp(size))
         top.add_subsystem("C3", GatherComp(size))
+
         top.connect('indep.x', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(vector_class=PETScVector, check=False)
+
+        p.setup(vector_class=PETScVector)
 
         p['indep.x'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
-        self.assertTrue(all(p['C3.outvec'] == np.array(range(size, 0, -1), float)*2.))
+        expected = np.array(range(size, 0, -1), float)
+        expected[:8] *= 2.0
+        expected[8:] *= 3.0
+        self.assertTrue(all(p['C3.outvec'] == expected))
 
     def test_noncontiguous_idxs(self):
         # take even input indices in 0 rank and odd ones in 1 rank
