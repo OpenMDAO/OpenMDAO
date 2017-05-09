@@ -49,7 +49,9 @@ class SetOrderGroup(Group):
         self.add_subsystem('C1', ExecComp('y=2.0*x'))
         self.add_subsystem('C2', ExecComp('y=2.0*x'))
         self.add_subsystem('C3', ExecComp('y=2.0*x'))
+
         self.set_order(['C1', 'C3', 'C2'])
+
         self.connect('C1.y', 'C3.x')
         self.connect('C3.y', 'C2.x')
 
