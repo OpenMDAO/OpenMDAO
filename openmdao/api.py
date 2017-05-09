@@ -13,6 +13,7 @@ from openmdao.components.deprecated_component import Component
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.linear_system_comp import LinearSystemComp
 from openmdao.components.meta_model import MetaModel
+from openmdao.components.multifi_meta_model import MultiFiMetaModel
 
 # Solvers
 from openmdao.solvers.ln_bgs import LinearBlockGS

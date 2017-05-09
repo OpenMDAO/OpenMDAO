@@ -1,16 +1,8 @@
 import numpy as np
 import unittest
 
-from openmdao.api import Group, Problem, MetaModel, MultiFiMetaModel, IndepVarComp, \
-     ResponseSurface, FloatKrigingSurrogate, KrigingSurrogate, MultiFiSurrogateModel
-from openmdao.core.component import _NotSet
+from openmdao.api import Group, Problem, MultiFiMetaModel, MultiFiSurrogateModel
 
-#from openmdao.api import
-
-from openmdao.test.util import assert_rel_error
-
-from six.moves import cStringIO
-from re import findall
 
 class MockSurrogate(MultiFiSurrogateModel):
 
@@ -33,11 +25,11 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
     def test_inputs_wrt_nfidelity(self):
         mm = MultiFiMetaModel(nfi=3)
 
-        mm.add_param('x', 0.)
+        mm.add_input('x', 0.)
         mm.add_output('y', 0.)
 
         prob = Problem(Group())
-        prob.root.add('mm', mm)
+        prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
         self.assertEqual(prob['mm.train:x'], [])
@@ -51,12 +43,12 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         mm = MultiFiMetaModel()
 
-        mm.add_param('x', 0.)
+        mm.add_input('x', 0.)
         surr = MockSurrogate()
-        mm.add_output('y', 0., surrogate = surr)
+        mm.add_output('y', 0., surrogate=surr)
 
         prob = Problem(Group())
-        prob.root.add('mm', mm)
+        prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
         prob['mm.train:x'] = [0.0, 0.4, 1.0]
@@ -78,12 +70,12 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
     def test_one_dim_bi_fidelity_training(self):
 
         mm = MultiFiMetaModel(nfi=2)
-        mm.add_param('x', 0.)
+        mm.add_input('x', 0.)
         surr = MockSurrogate()
-        mm.add_output('y', 0., surrogate = surr)
+        mm.add_output('y', 0., surrogate=surr)
 
         prob = Problem(Group())
-        prob.root.add('mm', mm)
+        prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
         prob['mm.train:x']= [0.0, 0.4, 1.0]
@@ -109,15 +101,15 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
     def test_two_dim_bi_fidelity_training(self):
         mm = MultiFiMetaModel(nfi=2)
-        mm.add_param('x1', 0.)
-        mm.add_param('x2', 0.)
+        mm.add_input('x1', 0.)
+        mm.add_input('x2', 0.)
         surr_y1 = MockSurrogate()
         surr_y2 = MockSurrogate()
-        mm.add_output('y1', 0., surrogate = surr_y1)
-        mm.add_output('y2', 0., surrogate = surr_y2)
+        mm.add_output('y1', 0., surrogate=surr_y1)
+        mm.add_output('y2', 0., surrogate=surr_y2)
 
         prob = Problem(Group())
-        prob.root.add('mm', mm)
+        prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
         prob['mm.train:x1']     = [1.0, 2.0, 3.0]
@@ -149,13 +141,13 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
     def test_multifidelity_warm_start(self):
         mm = MultiFiMetaModel(nfi=2)
-        mm.add_param('x', 0.)
+        mm.add_input('x', 0.)
         surr = MockSurrogate()
-        mm.add_output('y', 0., surrogate = surr)
+        mm.add_output('y', 0., surrogate=surr)
         mm.warm_restart=True
 
         prob = Problem(Group())
-        prob.root.add('mm', mm)
+        prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
         prob['mm.train:x']     = [0.0, 0.4, 1.0]

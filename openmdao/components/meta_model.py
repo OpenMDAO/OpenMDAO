@@ -124,6 +124,9 @@ class MetaModel(ExplicitComponent):
             training data for this variable. Optional, can be set
             by the problem later.
         """
+        surrogate = kwargs.get('surrogate')
+        if surrogate:
+            kwargs.pop('surrogate')
 
         metadata = super(MetaModel, self).add_output(name, val, **kwargs)
 
@@ -134,7 +137,8 @@ class MetaModel(ExplicitComponent):
         training_data = [] if training_data is None else training_data
         super(MetaModel, self).add_input('train:'+name, val=training_data)
 
-        if metadata.get('surrogate'):
+        if surrogate:
+            metadata['surrogate'] = surrogate
             metadata['default_surrogate'] = False
         else:
             metadata['default_surrogate'] = True
@@ -368,32 +372,6 @@ class MetaModel(ExplicitComponent):
                 surrogate.train(self._training_input, self._training_output[name])
 
         self.train = False
-
-    def _get_fd_inputs(self):
-        """
-        Get the list of inputs that are needed to perform a
-        finite difference on this `Component`.
-
-        Returns
-        -------
-        list of str
-            List of names of inputs for this `Component` .
-        """
-        return [k for k, acc in iteritems(self._inputs._dat)
-                   if not (acc.pbo or k.startswith('train'))]
-
-    def _get_fd_outputs(self):
-        """
-        Get the list of outputs that are needed to perform a
-        finite difference on this `Component`.
-
-        Returns
-        -------
-        list of str
-            List of names of outputs for this `Component`.
-        """
-        return [k for k, acc in iteritems(self._outputs._dat)
-                   if not (acc.pbo or k.startswith('train'))]
 
     def _metadata(self, name):
         return self._static_var_rel2data_io[name]['metadata']

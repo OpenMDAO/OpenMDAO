@@ -29,8 +29,8 @@ class MultiFiMetaModel(MetaModel):
     Thus given the initialization::
 
     >>> mm = MultiFiMetaModel(nfi=2)`
-    >>> mm.add_param('x1', 0.)
-    >>> mm.add_param('x2', 0.)
+    >>> mm.add_input('x1', 0.)
+    >>> mm.add_input('x2', 0.)
     >>> mm.add_ouput('y1', 0.)
     >>> mm.add_ouput('y2', 0.)
 
@@ -92,17 +92,16 @@ class MultiFiMetaModel(MetaModel):
         self._training_input = nfi*[np.zeros(0)]
         self._input_sizes = nfi*[0]
 
-    def add_param(self, name, val=_NotSet, **kwargs):
-        super(MultiFiMetaModel, self).add_param(name, val, **kwargs)
+    def add_input(self, name, val=_NotSet, **kwargs):
+        super(MultiFiMetaModel, self).add_input(name, val, **kwargs)
         self._input_sizes[0]=self._input_size
 
         # Add train:<invar>_fi<n>
         for fi in range(self._nfi):
             if fi > 0:
                 name_with_fi = 'train:'+_get_name_fi(name, fi)
-                super(MetaModel, self).add_param(name_with_fi, val=[], pass_by_obj=True)
-                self._input_sizes[fi]+=self._init_params_dict[name]['size']
-
+                metadata = super(MetaModel, self).add_input(name_with_fi, val=[])
+                self._input_sizes[fi] += metadata['shape'][0]
 
     def add_output(self, name, val=_NotSet, **kwargs):
         super(MultiFiMetaModel, self).add_output(name, val, **kwargs)
@@ -112,7 +111,7 @@ class MultiFiMetaModel(MetaModel):
         for fi in range(self._nfi):
             if fi > 0:
                 name_with_fi = 'train:'+_get_name_fi(name, fi)
-                super(MetaModel, self).add_param(name_with_fi, val=[], pass_by_obj=True)
+                super(MetaModel, self).add_input(name_with_fi, val=[])
 
     def _train(self):
         """Override MetaModel _train method to take into account multi-fidelity
@@ -125,10 +124,10 @@ class MultiFiMetaModel(MetaModel):
             return
 
         num_sample = self._nfi*[None]
-        for name, sz in self._surrogate_param_names:
+        for name, sz in self._surrogate_input_names:
             for fi in range(self._nfi):
                 name = _get_name_fi(name, fi)
-                val = self.params['train:' + name]
+                val = self._inputs['train:' + name]
                 if num_sample[fi] is None:
                     num_sample[fi] = len(val)
                 elif len(val) != num_sample[fi]:
@@ -141,7 +140,7 @@ class MultiFiMetaModel(MetaModel):
         for name, shape in self._surrogate_output_names:
             for fi in range(self._nfi):
                 name = _get_name_fi(name, fi)
-                val = self.params['train:' + name]
+                val = self._inputs['train:' + name]
                 if len(val) != num_sample[fi]:
                     msg = "MetaModel: Each variable must have the same number" \
                           " of training points. Expected {0} but found {1} " \
@@ -169,11 +168,11 @@ class MultiFiMetaModel(MetaModel):
 
         # add training data for each input
         idx = self._nfi*[0]
-        for name, sz in self._surrogate_param_names:
+        for name, sz in self._surrogate_input_names:
             for fi in range(self._nfi):
                 if num_sample[fi] > 0:
                     name = _get_name_fi(name, fi)
-                    val = self.params['train:' + name]
+                    val = self._inputs['train:' + name]
                     if isinstance(val[0], float):
                         new_inputs[fi][:, idx[fi]] = val
                         idx[fi] += 1
@@ -204,7 +203,7 @@ class MultiFiMetaModel(MetaModel):
                         self._training_output[name].extend(outputs)
                         new_outputs = outputs
 
-                    val = self.params['train:' + name_fi]
+                    val = self._inputs['train:' + name_fi]
 
                     if isinstance(val[0], float):
                         new_outputs[fi][:, 0] = val
