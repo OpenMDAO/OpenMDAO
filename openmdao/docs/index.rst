@@ -69,6 +69,8 @@ Defining partial derivatives
 
    features/defining_partials/specifying_partials
    features/defining_partials/sparse_partials
+   features/defining_partials/approximating_partials
+   features/defining_partials/checking_partials
 
 Solvers (nonlinear and linear)
 ================================

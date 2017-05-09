@@ -63,6 +63,49 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertFalse(lines[y_wrt_x1_line+8].endswith('*'),
                         msg='Error flag not expected in output but displayed')
 
+    def test_feature_incorrect_jacobian(self):
+        class MyComp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+
+                self.add_output('y', 5.5)
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
+
+            def compute_partial_derivs(self, inputs, outputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([4.0])
+                J['y', 'x2'] = np.array([40])
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('comp', MyComp())
+
+        prob.model.connect('p1.x1', 'comp.x1')
+        prob.model.connect('p2.x2', 'comp.x2')
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partial_derivs()
+
+        x1_error = data['comp']['y', 'x1']['abs error']
+        assert_rel_error(self, x1_error.forward, 1., 1e-8)
+        assert_rel_error(self, x1_error.reverse, 1., 1e-8)
+
+        x2_error = data['comp']['y', 'x2']['rel error']
+        assert_rel_error(self, x2_error.forward, 9., 1e-8)
+        assert_rel_error(self, x2_error.reverse, 9., 1e-8)
+
     def test_missing_entry(self):
         class MyComp(ExplicitComponent):
             def initialize_variables(self):
