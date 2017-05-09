@@ -1,14 +1,17 @@
 """ Metamodel provides basic Meta Modeling capability."""
 
+from __future__ import print_function
+
 import sys
 import numpy as np
 from copy import deepcopy
 
-from openmdao.core.component import Component, _NotSet
+from openmdao.api import ExplicitComponent
+from openmdao.core.component import _NotSet
 from six import iteritems
 
 
-class MetaModel(Component):
+class MetaModel(ExplicitComponent):
     """
     Class that creates a reduced order model for outputs from
     inputs. Each output may have it's own surrogate model.
@@ -96,6 +99,7 @@ class MetaModel(Component):
 
         metadata = super(MetaModel, self).add_input(name, val, **kwargs)
 
+        print('add_input()', name, metadata['shape'])
         input_size = metadata['shape'][0]
         self._surrogate_input_names.append((name, input_size))
         self._input_size += input_size
@@ -147,7 +151,7 @@ class MetaModel(Component):
         # did not have a surrogate specified
         if self.default_surrogate is not None:
             for name, shape in self._surrogate_output_names:
-                metadata = self._static_var_rel2data_io[name]['metadata']
+                metadata = self._metadata(name)
                 if metadata.get('default_surrogate'):
                     surrogate = deepcopy(self.default_surrogate)
                     metadata['surrogate'] = surrogate
@@ -172,7 +176,7 @@ class MetaModel(Component):
         if self.default_surrogate is None:
             no_sur = []
             for name, shape in self._surrogate_output_names:
-                surrogate = self._var_rel2data_io[name].get('surrogate')
+                surrogate = self._metadata(name).get('surrogate')
                 if surrogate is None:
                     no_sur.append(name)
             if len(no_sur) > 0:
@@ -183,7 +187,7 @@ class MetaModel(Component):
                        % no_sur)
                 out_stream.write(msg)
 
-    def solve_nonlinear(self, inputs, outputs):
+    def compute(self, inputs, outputs):
         """
         Predict outputs.
         If the training flag is set, train the metamodel first.
@@ -197,20 +201,22 @@ class MetaModel(Component):
         """
         # Train first
         if self.train:
+            print("training...")
             self._train()
 
         # Now Predict for current inputs
-        inputs = self._inputs_to_inputs(inputs)
+        inputs = self._vec_to_array(inputs)
 
+        print('compute() inputs:', inputs)
         for name, shape in self._surrogate_output_names:
-            surrogate = self._var_rel2data_io[name].get('surrogate')
+            surrogate = self._metadata(name).get('surrogate')
             if surrogate:
                 outputs[name] = surrogate.predict(inputs)
             else:
                 raise RuntimeError("Metamodel '%s': No surrogate specified for output '%s'"
                                    % (self.pathname, name))
 
-    def _inputs_to_inputs(self, inputs, out=None):
+    def _vec_to_array(self, vec, out=None):
         """
         Converts from a dictionary of inputs to the ndarray input.
         """
@@ -218,25 +224,27 @@ class MetaModel(Component):
         array_real = True
 
         if out is None:
-            inputs = np.zeros(self._input_size)
+            arr = np.zeros(self._input_size)
         else:
-            inputs = out
+            arr = out
 
         idx = 0
         for name, sz in self._surrogate_input_names:
-            val = inputs[name]
+            print('_vec_to_array() surrogate_input_name:', name, sz)
+            val = vec[name]
             if isinstance(val, list):
                 val = np.array(val)
             if isinstance(val, np.ndarray):
                 if array_real and np.issubdtype(val.dtype, complex):
                     array_real = False
                     inputs = inputs.astype(complex)
-                inputs[idx:idx + sz] = val.flat
+                    arr[idx:idx + sz] = val.flat
                 idx += sz
             else:
-                inputs[idx] = val
+                arr[idx] = val
                 idx += 1
-        return inputs
+
+        return arr
 
     def linearize(self, inputs, outputs, J):
         """
@@ -262,10 +270,10 @@ class MetaModel(Component):
         """
 
         jac = {}
-        inputs = self._inputs_to_inputs(inputs)
+        inputs = self._vec_to_array(inputs)
 
         for uname, _ in self._surrogate_output_names:
-            surrogate = self._var_rel2data_io[uname].get('surrogate')
+            surrogate = self._metadata(name).get('surrogate')
             sjac = surrogate.linearize(inputs)
 
             idx = 0
@@ -282,7 +290,7 @@ class MetaModel(Component):
 
         num_sample = None
         for name, sz in self._surrogate_input_names:
-            val = self.inputs['train:' + name]
+            val = self._inputs['train:' + name]
             if num_sample is None:
                 num_sample = len(val)
             elif len(val) != num_sample:
@@ -293,7 +301,7 @@ class MetaModel(Component):
                 raise RuntimeError(msg)
 
         for name, shape in self._surrogate_output_names:
-            val = self.inputs['train:' + name]
+            val = self._inputs['train:' + name]
             if len(val) != num_sample:
                 msg = "MetaModel: Each variable must have the same number" \
                       " of training points. Expected {0} but found {1} " \
@@ -318,7 +326,7 @@ class MetaModel(Component):
         if num_sample > 0:
             idx = 0
             for name, sz in self._surrogate_input_names:
-                val = self.inputs['train:' + name]
+                val = self._inputs['train:' + name]
                 if isinstance(val[0], float):
                     new_input[:, idx] = val
                     idx += 1
@@ -345,7 +353,7 @@ class MetaModel(Component):
                     self._training_output[name] = outputs
                     new_output = outputs
 
-                val = self.inputs['train:' + name]
+                val = self._inputs['train:' + name]
 
                 if isinstance(val[0], float):
                     new_output[:, 0] = val
@@ -355,7 +363,7 @@ class MetaModel(Component):
                             v = np.array(v)
                         new_output[row_idx, :] = v.flat
 
-            surrogate = self._var_rel2data_io[name].get('surrogate')
+            surrogate = self._metadata(name).get('surrogate')
             if surrogate is not None:
                 surrogate.train(self._training_input, self._training_output[name])
 
@@ -371,7 +379,7 @@ class MetaModel(Component):
         list of str
             List of names of inputs for this `Component` .
         """
-        return [k for k, acc in iteritems(self.inputs._dat)
+        return [k for k, acc in iteritems(self._inputs._dat)
                    if not (acc.pbo or k.startswith('train'))]
 
     def _get_fd_outputs(self):
@@ -384,5 +392,8 @@ class MetaModel(Component):
         list of str
             List of names of outputs for this `Component`.
         """
-        return [k for k, acc in iteritems(self.outputs._dat)
+        return [k for k, acc in iteritems(self._outputs._dat)
                    if not (acc.pbo or k.startswith('train'))]
+
+    def _metadata(self, name):
+        return self._static_var_rel2data_io[name]['metadata']
