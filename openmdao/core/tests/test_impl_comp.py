@@ -140,6 +140,38 @@ class TestImplCompSimple(unittest.TestCase):
         self.assertTrue('comp2.x' in content)
         self.assertTrue('comp3.x' in content)
 
+    def test_subgroup_list_states(self):
+        group = Group()
+        group.add_subsystem('comp1', IndepVarComp([('a', 1.0), ('b', 1.0), ('c', 1.0)]))
+        sub = group.add_subsystem('sub', Group())
+        sub.add_subsystem('comp2', TestImplCompSimpleLinearize())
+        sub.add_subsystem('comp3', TestImplCompSimpleJacVec())
+        group.connect('comp1.a', 'sub.comp2.a')
+        group.connect('comp1.b', 'sub.comp2.b')
+        group.connect('comp1.c', 'sub.comp2.c')
+        group.connect('comp1.a', 'sub.comp3.a')
+        group.connect('comp1.b', 'sub.comp3.b')
+        group.connect('comp1.c', 'sub.comp3.c')
+
+        prob = Problem(model=group)
+        prob.setup(check=False)
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+        prob.run_model()
+        assert_rel_error(self, prob['sub.comp2.x'], 3.)
+        assert_rel_error(self, prob['sub.comp2.x'], 3.)
+
+        # Piggyback testing of list_states
+
+        stream = cStringIO()
+        sub.list_states(stream=stream)
+        content = stream.getvalue()
+
+        self.assertTrue('comp2.x' in content)
+        self.assertTrue('comp3.x' in content)
+
     def test_guess_nonlinear(self):
 
         class ImpWithInitial(TestImplCompSimpleLinearize):
