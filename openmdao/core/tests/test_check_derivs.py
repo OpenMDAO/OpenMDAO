@@ -106,6 +106,47 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_rel_error(self, x2_error.forward, 9., 1e-8)
         assert_rel_error(self, x2_error.reverse, 9., 1e-8)
 
+    def test_component_only(self):
+        class MyComp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+
+                self.add_output('y', 5.5)
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
+
+            def compute_partial_derivs(self, inputs, outputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([4.0])
+                J['y', 'x2'] = np.array([40])
+
+        prob = Problem()
+        prob.model = MyComp()
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        string_stream = StringIO()
+
+        data = prob.check_partial_derivs(out_stream=string_stream)
+
+        lines = string_stream.getvalue().split("\n")
+
+        y_wrt_x1_line = lines.index("  : 'y' wrt 'x1'")
+
+        self.assertTrue(lines[y_wrt_x1_line+6].endswith('*'),
+                        msg='Error flag expected in output but not displayed')
+        self.assertTrue(lines[y_wrt_x1_line+7].endswith('*'),
+                        msg='Error flag expected in output but not displayed')
+        self.assertFalse(lines[y_wrt_x1_line+8].endswith('*'),
+                        msg='Error flag not expected in output but displayed')
+
     def test_missing_entry(self):
         class MyComp(ExplicitComponent):
             def initialize_variables(self):
