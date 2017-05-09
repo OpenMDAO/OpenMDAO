@@ -5,7 +5,7 @@ import time
 
 import numpy as np
 
-from openmdao.api import Problem, ExplicitComponent, Group
+from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 import six
@@ -42,6 +42,7 @@ class InOutArrayComp(ExplicitComponent):
     def __init__(self, arr_size=10):
         super(InOutArrayComp, self).__init__()
         self.delay = 0.01
+        self.arr_size = arr_size
 
         self.add_input('invec', np.ones(arr_size, float))
         self.add_output('outvec', np.ones(arr_size, float))
@@ -50,6 +51,9 @@ class InOutArrayComp(ExplicitComponent):
         time.sleep(self.delay)
         outputs['outvec'] = inputs['invec'] * 2.
 
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        partials['outvec', 'invec'] = np.eye(self.arr_size) * 2.
+
 
 class DistribCompSimple(ExplicitComponent):
     """Uses 2 procs but takes full input vars"""
@@ -57,6 +61,7 @@ class DistribCompSimple(ExplicitComponent):
     def __init__(self, arr_size=10):
         super(DistribCompSimple, self).__init__()
 
+        self.arr_size = arr_size
         self.add_input('invec', np.ones(arr_size, float))
         self.add_output('outvec', np.ones(arr_size, float))
 
@@ -75,6 +80,9 @@ class DistribCompSimple(ExplicitComponent):
             outputs['outvec'] = both[0, :] + both[1, :]
         else:
             outputs['outvec'] = inputs['invec'] * 0.75
+
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        partials['outvec', 'invec'] = np.eye(self.arr_size) * 0.75
 
     def get_req_procs(self):
         return (2, 2)
@@ -106,6 +114,9 @@ class DistribInputComp(ExplicitComponent):
                        src_indices=np.arange(start, end, dtype=int))
         self.add_output('outvec', np.ones(self.arr_size, float))
 
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        partials['outvec', 'invec'] = np.eye(self.arr_size) * 2.0
+
     def get_req_procs(self):
         return (2, 2)
 
@@ -126,6 +137,11 @@ class DistribOverlappingInputComp(ExplicitComponent):
             outs = inputs['invec'] * 2.0
             outputs['outvec'][:8] = outs[:8]
             outputs['outvec'][4:11] += outs[4:11]
+
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        partials['outvec', 'invec'] = J = np.eye(self.arr_size) * 2.0
+        J[4:11, :] += 2.0
+
 
     def initialize_variables(self):
         """ component declares the local sizes and sets initial values
@@ -161,11 +177,11 @@ class DistribInputDistribOutputComp(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
 
+    def compute_partial_derivs(self, inputs, outputs, partials):
+        partials['outvec', 'invec'] = np.eye(self.arr_size) * 2.0
+
     def initialize_variables(self):
-        """ component declares the local sizes and sets initial values
-        for all distributed inputs and outputs. Returns a dict of
-        index arrays keyed to variable names.
-        """
+
         comm = self.comm
         rank = comm.rank
 
@@ -193,10 +209,6 @@ class DistribNoncontiguousComp(ExplicitComponent):
         outputs['outvec'] = inputs['invec']*2.0
 
     def initialize_variables(self):
-        """ component declares the local sizes and sets initial values
-        for all distributed inputs and outputs. Returns a dict of
-        index arrays keyed to variable names.
-        """
 
         comm = self.comm
         rank = comm.rank
@@ -208,7 +220,7 @@ class DistribNoncontiguousComp(ExplicitComponent):
         self.add_output('outvec', np.ones(len(idxs), float))
 
     def get_req_procs(self):
-        return (2, 2)
+        return 2, 2
 
 
 class DistribGatherComp(ExplicitComponent):
@@ -227,10 +239,7 @@ class DistribGatherComp(ExplicitComponent):
             outputs['outvec'] = inputs['invec']
 
     def initialize_variables(self):
-        """ component declares the local sizes and sets initial values
-        for all distributed inputs and outputs. Returns a dict of
-        index arrays keyed to variable names.
-        """
+
         comm = self.comm
         rank = comm.rank
 
@@ -245,11 +254,11 @@ class DistribGatherComp(ExplicitComponent):
         self.add_output('outvec', np.ones(self.arr_size, float))
 
     def get_req_procs(self):
-        return (2, 2)
+        return 2, 2
 
 
 class NonDistribGatherComp(ExplicitComponent):
-    """Uses 2 procs gathers a distrib input into a full output"""
+    """Uses 2 procs gathers a distrib output into a full input"""
     def __init__(self, size):
         super(NonDistribGatherComp, self).__init__()
         self.add_input('invec', np.ones(size, float))
@@ -333,6 +342,7 @@ class MPITests(unittest.TestCase):
                 comm = self.comm
                 rank = comm.rank
 
+                # this results in 8 entries for proc 0 and 7 entries for proc 1 when using 2 processes.
                 sizes, offsets = evenly_distrib_idxs(comm.size, self.size)
                 start = offsets[rank]
                 end = start + sizes[rank]
@@ -342,23 +352,33 @@ class MPITests(unittest.TestCase):
                 self.add_output('outvec', np.ones(sizes[rank], float))
 
             def get_req_procs(self):
-                return (2, 2)
+                return 2, 5
 
+        class GatherComp(ExplicitComponent):
+            """Uses 2 procs gathers a distrib output into a full input"""
+
+            def __init__(self, size):
+                super(GatherComp, self).__init__()
+                self.add_input('invec', np.ones(size, float))
+                self.add_output('outvec', np.ones(size, float))
+
+            def compute(self, inputs, outputs):
+                outputs['outvec'] = inputs['invec']
 
         p = Problem(model=Group())
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(size))
-        C2 = top.add_subsystem("C2", DistribComp(size))
-        C3 = top.add_subsystem("C3", DistribGatherComp(size))
-        top.connect('C1.outvec', 'C2.invec')
+        top.add_subsystem("indep", IndepVarComp('x', np.zeros(size)))
+        top.add_subsystem("C2", DistribComp(size))
+        top.add_subsystem("C3", GatherComp(size))
+        top.connect('indep.x', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
         p.setup(vector_class=PETScVector, check=False)
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['indep.x'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
-        self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
+        self.assertTrue(all(p['C3.outvec'] == np.array(range(size, 0, -1), float)*2.))
 
     def test_noncontiguous_idxs(self):
         # take even input indices in 0 rank and odd ones in 1 rank

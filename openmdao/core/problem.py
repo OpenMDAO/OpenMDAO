@@ -719,7 +719,6 @@ class Problem(object):
                 in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
                 start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
                 end = np.sum(model._var_sizes['output'][:iproc + 1, in_var_idx])
-                total_size = np.sum(model._var_sizes['output'][:, in_var_idx])
 
                 if input_name in input_vois:
                     in_idxs = input_vois[input_name]['indices']
