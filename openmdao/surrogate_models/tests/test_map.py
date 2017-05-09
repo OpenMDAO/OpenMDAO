@@ -1,8 +1,9 @@
-from openmdao.api import Group, Problem, Component, MetaModel, NearestNeighbor
+from openmdao.api import Group, Problem, MetaModel, NearestNeighbor
 from openmdao.devtools.testutil import assert_rel_error
 
 import numpy as np
 import unittest
+
 
 class CompressorMap(Group):
 
@@ -11,9 +12,9 @@ class CompressorMap(Group):
 
         compmap = self.add('compmap', MetaModel())
 
-        compmap.add_param('Nc', val=1.0)
-        compmap.add_param('Rline', val=2.0)
-        compmap.add_param('alpha', val=0.0)
+        compmap.add_input('Nc', val=1.0)
+        compmap.add_input('Rline', val=2.0)
+        compmap.add_input('alpha', val=0.0)
 
         compmap.add_output('PR', val=1.0, surrogate=NearestNeighbor(interpolant_type='linear'))
         compmap.add_output('eff', val=1.0, surrogate=NearestNeighbor(interpolant_type='linear'))
@@ -24,7 +25,7 @@ class TestMap(unittest.TestCase):
 
     def test_comp_map(self):
         p = Problem()
-        p.root = CompressorMap()
+        p.model = CompressorMap()
         p.setup(check=False)
 
         Nc = np.array([0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1])

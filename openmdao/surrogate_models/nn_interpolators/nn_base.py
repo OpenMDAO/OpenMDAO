@@ -1,7 +1,10 @@
+"""Define the NNBase class."""
+
 import numpy as np
 
 from math import ceil
 from scipy.spatial import cKDTree
+
 
 class NNBase(object):
     """
@@ -10,11 +13,10 @@ class NNBase(object):
 
     def __init__(self, training_points, training_values, num_leaves=2):
         """
-        Initialize the nearest neighbor interpolant by scaling input to the
-        unit hypercube.
+        Initialize nearest neighbor interpolant by scaling input to the unit hypercube.
 
-        Args
-        ----
+        Parameters
+        ----------
         training_points : ndarray
             ndarray of shape (num_points x independent dims) containing
             training inpit locations.

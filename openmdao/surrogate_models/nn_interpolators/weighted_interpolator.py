@@ -1,14 +1,26 @@
+"""Define the WeightedInterpolator class."""
+
 import numpy as np
 
 from openmdao.surrogate_models.nn_interpolators.nn_base import NNBase
 
 
 class WeightedInterpolator(NNBase):
-    # Weighted Neighbor Interpolation
+    """
+    Weighted Neighbor Interpolation.
+    """
 
     @staticmethod
     def _get_weights(ndist, dist_eff):
+        """
+        Get weights.
 
+        Parameters
+        ----------
+        ndist :
+
+        dist_eff :
+        """
         # Find the weighted neighbors per defined formula for distance effect
         dist = np.power(ndist, dist_eff)
 
@@ -25,7 +37,17 @@ class WeightedInterpolator(NNBase):
         return weights
 
     def __call__(self, prediction_points, n=5, dist_eff=0):
+        """
+        Do interpolation.
 
+        Parameters
+        ----------
+        prediction_points : array
+
+        n :  int
+
+        dist_eff : int
+        """
         if self._ntpts < n:
             raise ValueError('WeightedInterpolant does not have sufficient '
                              'training data to use n={0}, only {1} points'
@@ -40,7 +62,7 @@ class WeightedInterpolator(NNBase):
             prediction_points.shape = (1, prediction_points.shape[0])
 
         normalized_pts = (prediction_points - self._tpm) / self._tpr
-        nppts = normalized_pts.shape[0]
+
         # Find them neigbors
         # KData query takes (data, #ofneighbors) to determine closest
         # training points to predicted data
@@ -65,7 +87,17 @@ class WeightedInterpolator(NNBase):
         return predz
 
     def gradient(self, prediction_points, n=5, dist_eff=0):
+        """
+        Find the gradient at each location of a set of supplied predicted points.
 
+        Parameters
+        ----------
+        prediction_points : array
+
+        n: int
+
+        dist_eff : int
+        """
         if self._ntpts < n:
             raise ValueError('WeightedInterpolant does not have sufficient '
                              'training data to use n={0}, only {1} points'
@@ -95,7 +127,8 @@ class WeightedInterpolator(NNBase):
         dimdiff = normalized_pts - self._tp[nloc]
 
         weights = np.power(ndist, -dist_eff)
-        dweights = -dist_eff * np.power(ndist[..., np.newaxis], -(dist_eff + 2)) * dimdiff
+        dweights = -dist_eff * \
+            np.power(ndist[..., np.newaxis], -(dist_eff + 2)) * dimdiff
 
         weight_sum = np.sum(weights, axis=1)
 
@@ -103,7 +136,7 @@ class WeightedInterpolator(NNBase):
 
         gradient = (weight_sum * np.einsum('ikj,ikl->ilj', dweights, vals)
                     - (np.einsum('ij,ijk->ik', weights, vals)[..., np.newaxis]
-                    * np.sum(dweights, axis=1))) / np.power(weight_sum, 2)
+                       * np.sum(dweights, axis=1))) / np.power(weight_sum, 2)
 
         grad = gradient * (self._tvr[..., np.newaxis] / self._tpr)
 

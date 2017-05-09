@@ -1,4 +1,4 @@
-""" Metamodel provides basic Meta Modeling capability."""
+"""Metamodel provides basic Meta Modeling capability."""
 
 from __future__ import print_function
 
@@ -8,13 +8,13 @@ from copy import deepcopy
 
 from openmdao.api import ExplicitComponent
 from openmdao.core.component import _NotSet
-from six import iteritems
 
 
 class MetaModel(ExplicitComponent):
     """
-    Class that creates a reduced order model for outputs from
-    inputs. Each output may have it's own surrogate model.
+    Class that creates a reduced order model for outputs from inputs.
+
+    Each output may have it's own surrogate model.
     Training inputs and outputs are automatically created with
     'train:' prepended to the corresponding inputeter/output name.
 
@@ -54,6 +54,9 @@ class MetaModel(ExplicitComponent):
     """
 
     def __init__(self):
+        """
+        Initialize all attributes.
+        """
         super(MetaModel, self).__init__()
 
         # This surrogate will be used for all outputs that don't have
@@ -84,8 +87,8 @@ class MetaModel(ExplicitComponent):
         """
         Add an input to this component and a corresponding training input.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : string
             Name of the input.
 
@@ -96,7 +99,6 @@ class MetaModel(ExplicitComponent):
             training data for this variable. Optional, can be set
             by the problem later.
         """
-
         metadata = super(MetaModel, self).add_input(name, val, **kwargs)
 
         print('add_input()', name, metadata['shape'])
@@ -105,14 +107,14 @@ class MetaModel(ExplicitComponent):
         self._input_size += input_size
 
         training_data = [] if training_data is None else training_data
-        super(MetaModel, self).add_input('train:'+name, val=training_data)
+        super(MetaModel, self).add_input('train:' + name, val=training_data)
 
     def add_output(self, name, val=_NotSet, training_data=None, **kwargs):
-        """ 
+        """
         Add an output to this component and a corresponding training output.
 
-        Args
-        ----
+        Parameters
+        ----------
         name : string
             Name of the variable output.
 
@@ -135,7 +137,7 @@ class MetaModel(ExplicitComponent):
         self._training_output[name] = np.zeros(0)
 
         training_data = [] if training_data is None else training_data
-        super(MetaModel, self).add_input('train:'+name, val=training_data)
+        super(MetaModel, self).add_input('train:' + name, val=training_data)
 
         if surrogate:
             metadata['surrogate'] = surrogate
@@ -145,11 +147,9 @@ class MetaModel(ExplicitComponent):
 
     def _setup_vars(self, recurse=True):
         """
-        Returns our inputs and outputs dictionaries,
-        re-keyed to use absolute variable names.
+        Return our inputs and outputs dictionaries re-keyed to use absolute variable names.
 
-        Also instantiates surrogates for the output variables
-        that use the default surrogate.
+        Also instantiates surrogates for the output variables that use the default surrogate.
         """
         # create an instance of the default surrogate for outputs that
         # did not have a surrogate specified
@@ -167,14 +167,12 @@ class MetaModel(ExplicitComponent):
 
     def check_setup(self, out_stream=sys.stdout):
         """
-        Write a report to the given stream indicating any potential problems found
-        with the current configuration of this ``MetaModel``.
+        Write a report of any potential problems found with the current configuration.
 
-        inputs
+        Parameters
         ----------
         out_stream : a file-like object, optional
         """
-
         # All outputs must have surrogates assigned
         # either explicitly or through the default surrogate
         if self.default_surrogate is None:
@@ -194,12 +192,14 @@ class MetaModel(ExplicitComponent):
     def compute(self, inputs, outputs):
         """
         Predict outputs.
+
         If the training flag is set, train the metamodel first.
 
-        inputs
+        Parameters
         ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
+
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
@@ -222,9 +222,8 @@ class MetaModel(ExplicitComponent):
 
     def _vec_to_array(self, vec, out=None):
         """
-        Converts from a dictionary of inputs to the ndarray input.
+        Convert from a dictionary of inputs to the ndarray input.
         """
-
         array_real = True
 
         if out is None:
@@ -252,11 +251,10 @@ class MetaModel(ExplicitComponent):
 
     def linearize(self, inputs, outputs, J):
         """
-        Returns the Jacobian as a dictionary whose keys are tuples of the form
-         ('output', 'input') and whose values are ndarrays.
+        Compute jacobian.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : `VecWrapper`
             `VecWrapper` containing inputs. (p)
 
@@ -266,23 +264,22 @@ class MetaModel(ExplicitComponent):
         resids : `VecWrapper`
             `VecWrapper` containing residuals. (r)
 
-        Returns
-        -------
+        Return
+        ------
         dict
             Dictionary whose keys are tuples of the form ('output', 'input')
             and whose values are ndarrays.
         """
-
         jac = {}
         inputs = self._vec_to_array(inputs)
 
         for uname, _ in self._surrogate_output_names:
-            surrogate = self._metadata(name).get('surrogate')
+            surrogate = self._metadata(uname).get('surrogate')
             sjac = surrogate.linearize(inputs)
 
             idx = 0
             for pname, sz in self._surrogate_input_names:
-                jac[(uname, pname)] = sjac[:, idx:idx+sz]
+                jac[(uname, pname)] = sjac[:, idx:idx + sz]
                 idx += sz
 
         return jac
@@ -291,7 +288,6 @@ class MetaModel(ExplicitComponent):
         """
         Train the metamodel, if necessary, using the provided training data.
         """
-
         num_sample = None
         for name, sz in self._surrogate_input_names:
             val = self._inputs['train:' + name]
@@ -338,7 +334,7 @@ class MetaModel(ExplicitComponent):
                     for row_idx, v in enumerate(val):
                         if not isinstance(v, np.ndarray):
                             v = np.array(v)
-                        new_input[row_idx, idx:idx+sz] = v.flat
+                        new_input[row_idx, idx:idx + sz] = v.flat
 
         # add training data for each output
         for name, shape in self._surrogate_output_names:
@@ -369,7 +365,8 @@ class MetaModel(ExplicitComponent):
 
             surrogate = self._metadata(name).get('surrogate')
             if surrogate is not None:
-                surrogate.train(self._training_input, self._training_output[name])
+                surrogate.train(self._training_input,
+                                self._training_output[name])
 
         self.train = False
 

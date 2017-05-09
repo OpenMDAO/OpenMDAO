@@ -1,20 +1,27 @@
+"""Define the MultiFiMetaModel class."""
+
 import numpy as np
 
 from openmdao.components.meta_model import MetaModel
 from openmdao.core.component import _NotSet
 
 # generate variable names taking into account fidelity level
+
+
 def _get_name_fi(name, fi_index):
-    if fi_index>0:
-        return "%s_fi%d" % (name, fi_index+1)
+    if fi_index > 0:
+        return "%s_fi%d" % (name, fi_index + 1)
     else:
         return name
 
+
 class MultiFiMetaModel(MetaModel):
-    """ Class that generalizes the MetaModel class to be able to train surrogates
-    with multi-fidelity training inputs. For a given number of levels of fidelity
-    **nfi** (given at initialization) the corresponding training input variables
-    *train:<invar>_fi<2..nfi>* and *train:<outvar>_fi<2..nfi>* are automatically created
+    """
+    Generalize MetaModel to be able to train surrogates with multi-fidelity training inputs.
+
+    For a given number of levels of fidelity **nfi** (given at initialization)
+    the corresponding training input variables *train:<invar>_fi<2..nfi>* and
+    *train:<outvar>_fi<2..nfi>* are automatically created
     besides the given *train:<invar>* and *train:<outvar>* variables.
     Note the index starts at 2, the index 1 is omitted considering
     the simple name *<var>* is equivalent to *<var>_fi1* which is intended
@@ -84,46 +91,123 @@ class MultiFiMetaModel(MetaModel):
     """
 
     def __init__(self, nfi=1):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        nfi : number of levels of fidelity
+        """
         super(MultiFiMetaModel, self).__init__()
 
         self._nfi = nfi
 
         # generalize MetaModel training inputs to a list of training inputs
-        self._training_input = nfi*[np.zeros(0)]
-        self._input_sizes = nfi*[0]
+        self._training_input = nfi * [np.zeros(0)]
+        self._input_sizes = nfi * [0]
 
     def add_input(self, name, val=_NotSet, **kwargs):
+        """
+        Add an input variable to the component.
+
+        Parameters
+        ----------
+        name : str
+            name of the variable in this component's namespace.
+        val : float or list or tuple or ndarray or Iterable
+            The initial value of the variable being added in user-defined units.
+            Default is 1.0.
+        shape : int or tuple or list or None
+            Shape of this variable, only required if src_indices not provided and
+            val is not an array. Default is None.
+        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
+            The global indices of the source variable to transfer data from.
+            If val is given as an array_like object, the shapes of val and
+            src_indices must match. A value of None implies this input depends
+            on all entries of source. Default is None.
+        units : str or None
+            Units in which this input variable will be provided to the component
+            during execution. Default is None, which means it is unitless.
+        desc : str
+            description of the variable
+        var_set : hashable object
+            For advanced users only. ID or color for this variable, relevant for
+            reconfigurability. Default is 0.
+        """
         super(MultiFiMetaModel, self).add_input(name, val, **kwargs)
-        self._input_sizes[0]=self._input_size
+        self._input_sizes[0] = self._input_size
 
         # Add train:<invar>_fi<n>
         for fi in range(self._nfi):
             if fi > 0:
-                name_with_fi = 'train:'+_get_name_fi(name, fi)
-                metadata = super(MetaModel, self).add_input(name_with_fi, val=[])
+                name_with_fi = 'train:' + _get_name_fi(name, fi)
+                metadata = super(MetaModel, self).add_input(
+                    name_with_fi, val=[])
                 self._input_sizes[fi] += metadata['shape'][0]
 
     def add_output(self, name, val=_NotSet, **kwargs):
+        """
+        Add an output variable to the component.
+
+        Parameters
+        ----------
+        name : str
+            name of the variable in this component's namespace.
+        val : float or list or tuple or ndarray
+            The initial value of the variable being added in user-defined units. Default is 1.0.
+        shape : int or tuple or list or None
+            Shape of this variable, only required if val is not an array.
+            Default is None.
+        units : str or None
+            Units in which the output variables will be provided to the component during execution.
+            Default is None, which means it has no units.
+        res_units : str or None
+            Units in which the residuals of this output will be given to the user when requested.
+            Default is None, which means it has no units.
+        desc : str
+            description of the variable.
+        lower : float or list or tuple or ndarray or Iterable or None
+            lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            consistent with the shape arg (if given), or (3) an array_like matching the shape of
+            val, if val is array_like. A value of None means this output has no lower bound.
+            Default is None.
+        upper : float or list or tuple or ndarray or or Iterable None
+            upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            consistent with the shape arg (if given), or (3) an array_like matching the shape of
+            val, if val is array_like. A value of None means this output has no upper bound.
+            Default is None.
+        ref : float
+            Scaling parameter. The value in the user-defined units of this output variable when
+            the scaled value is 1. Default is 1.
+        ref0 : float
+            Scaling parameter. The value in the user-defined units of this output variable when
+            the scaled value is 0. Default is 0.
+        res_ref : float
+            Scaling parameter. The value in the user-defined res_units of this output's residual
+            when the scaled value is 1. Default is 1.
+        var_set : hashable object
+            For advanced users only. ID or color for this variable, relevant for reconfigurability.
+            Default is 0.
+        """
         super(MultiFiMetaModel, self).add_output(name, val, **kwargs)
-        self._training_output[name]=self._nfi*[np.zeros(0)]
+        self._training_output[name] = self._nfi * [np.zeros(0)]
 
         # Add train:<outvar>_fi<n>
         for fi in range(self._nfi):
             if fi > 0:
-                name_with_fi = 'train:'+_get_name_fi(name, fi)
+                name_with_fi = 'train:' + _get_name_fi(name, fi)
                 super(MetaModel, self).add_input(name_with_fi, val=[])
 
     def _train(self):
-        """Override MetaModel _train method to take into account multi-fidelity
-        input data. Basicall
         """
-
-        if self._nfi==1:
+        Override MetaModel _train method to take into account multi-fidelity input data.
+        """
+        if self._nfi == 1:
             # shortcut: fallback to base class behaviour immediatly
             super(MultiFiMetaModel, self)._train()
             return
 
-        num_sample = self._nfi*[None]
+        num_sample = self._nfi * [None]
         for name, sz in self._surrogate_input_names:
             for fi in range(self._nfi):
                 name = _get_name_fi(name, fi)
@@ -150,8 +234,8 @@ class MultiFiMetaModel(MetaModel):
 
         if self.warm_restart:
             inputs = []
-            new_inputs = self._nfi*[None]
-            num_old_pts = self._nfi*[0]
+            new_inputs = self._nfi * [None]
+            num_old_pts = self._nfi * [0]
             for fi in range(self._nfi):
                 num_old_pts[fi] = self._training_input[fi].shape[0]
                 inputs.append(np.zeros((num_sample[fi] + num_old_pts[fi],
@@ -167,7 +251,7 @@ class MultiFiMetaModel(MetaModel):
         self._training_input = inputs
 
         # add training data for each input
-        idx = self._nfi*[0]
+        idx = self._nfi * [0]
         for name, sz in self._surrogate_input_names:
             for fi in range(self._nfi):
                 if num_sample[fi] > 0:
@@ -180,11 +264,12 @@ class MultiFiMetaModel(MetaModel):
                         for row_idx, v in enumerate(val):
                             if not isinstance(v, np.ndarray):
                                 v = np.array(v)
-                            new_inputs[fi][row_idx, idx[fi]:idx[fi]+sz] = v.flat
+                            new_inputs[fi][row_idx, idx[
+                                fi]:idx[fi] + sz] = v.flat
 
         # add training data for each output
-        outputs=self._nfi*[None]
-        new_outputs=self._nfi*[None]
+        outputs = self._nfi * [None]
+        new_outputs = self._nfi * [None]
         for name, shape in self._surrogate_output_names:
             for fi in range(self._nfi):
                 name_fi = _get_name_fi(name, fi)
@@ -194,7 +279,8 @@ class MultiFiMetaModel(MetaModel):
                         outputs[fi] = np.zeros((num_sample[fi] + num_old_pts[fi],
                                                 output_size))
                         if num_old_pts[fi] > 0:
-                            outputs[fi][:num_old_pts[fi], :] = self._training_output[name][fi]
+                            outputs[fi][:num_old_pts[fi],
+                                        :] = self._training_output[name][fi]
                         self._training_output[name][fi] = outputs[fi]
                         new_outputs[fi] = outputs[fi][num_old_pts[fi]:, :]
                     else:

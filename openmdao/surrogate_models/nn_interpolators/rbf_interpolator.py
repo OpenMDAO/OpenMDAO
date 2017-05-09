@@ -1,3 +1,5 @@
+"""Define the RBFInterpolator class."""
+
 import numpy as np
 
 from openmdao.surrogate_models.nn_interpolators.nn_base import NNBase
@@ -7,9 +9,24 @@ from scipy.sparse.linalg import spsolve
 
 
 class RBFInterpolator(NNBase):
-    # Compactly Supported Radial Basis Function
+    """
+    Compactly Supported Radial Basis Function.
+    """
+
     def _find_R(self, npp, T, loc):
+        """
+        Find R.
+
+        Parameters
+        ----------
+        npp : int
+
+        T : int
+
+        loc : int
+        """
         R = np.zeros((npp, self._ntpts), dtype="float")
+
         # Choose type of CRBF R matrix
         if self.comp == -1:
             # Comp #1 - a
@@ -137,6 +154,17 @@ class RBFInterpolator(NNBase):
         return R
 
     def _find_dR(self, PrdPts, ploc, pdist):
+        """
+        Find dR.
+
+        Parameters
+        ----------
+        PrdPts : ndarray
+
+        ploc : ndarray
+
+        pdist : ndarray
+        """
         T = (pdist[:, :-1] / pdist[:, -1:])
         # Solve for the gradient analytically
         # The first quantity needed is dRp/dt
@@ -198,13 +226,14 @@ class RBFInterpolator(NNBase):
                     dRp_poly = [5., 1., 0.]
                     # dRp = frnt * (T + (5. * T * T))
                 elif self.comp == 3:
-                    frnt = np.power(1. - T,  7.) / -1008.
+                    frnt = np.power(1. - T, 7.) / -1008.
                     dRp_poly = [16., 7., 1., 0.]
                     # dRp = frnt * (T + (7. * T * T) + (16. * T * T * T))
                 elif self.comp == 4:
                     frnt = np.power(1. - T, 9.) / -221760.
                     dRp_poly = [231., 159., 45., 5., 0.]
-                    # dRp = frnt * ((5. * T) + (45. * T * T) + (159. * T * T * T) + (231. * T * T * T * T))
+                    # dRp = frnt * ((5. * T) + (45. * T * T) + (159. * T * T * T)
+                    #                        + (231. * T * T * T * T))
             elif dims <= 6:
                 if self.comp == 0:
                     frnt = 1.
@@ -225,7 +254,8 @@ class RBFInterpolator(NNBase):
                 elif self.comp == 4:
                     frnt = np.power(1. - T, 10.) / -411840.
                     dRp_poly = [320., 197., 50., 5., 0.]
-                    # dRp = frnt * ((5. * T) + (50. * T * T) + (197. * T * T * T) + (320. * T * T * T * T))
+                    # dRp = frnt * ((5. * T) + (50. * T * T) + (197. * T * T * T)
+                    #                        + (320. * T * T * T * T))
             else:
                 # Although not listed, this is ideally for 8 dim or less
                 if self.comp == 0:
@@ -247,12 +277,13 @@ class RBFInterpolator(NNBase):
                 elif self.comp == 4:
                     frnt = np.power(1. - T, 11.) / -720720.
                     dRp_poly = [429., 239., 55., 5., 0.]
-                    # dRp = frnt * ((5. * T) + (55. * T * T) + (239. * T * T * T) + (429. * T * T * T * T))
+                    # dRp = frnt * ((5. * T) + (55. * T * T) + (239. * T * T * T)
+                    #                        + (429. * T * T * T * T))
 
         dRp = frnt * np.polyval(dRp_poly, T)
 
         # dt/dx becomes unstable at the training points, so perturb T slightly.
-        zero_idx = np.where(T==0.0)
+        zero_idx = np.where(T == 0.0)
         T[zero_idx] += 1.0e-11
 
         # Now need dt/dx
@@ -261,16 +292,31 @@ class RBFInterpolator(NNBase):
         dtx = (xpi - (np.square(T) * xpm)) / (np.square(pdist[:, -1:, :]) * T)
 
         # The gradient then is the summation across neighs of w*df/dt*dt/dx
-        grad = np.einsum('ijk,ijk,ijl...->ilk...', dRp, dtx, self.weights[ploc[:, :-1]])
+        grad = np.einsum('ijk,ijk,ijl...->ilk...', dRp,
+                         dtx, self.weights[ploc[:, :-1]])
 
         return grad.reshape((PrdPts.shape[0], self._dep_dims, self._indep_dims))
 
     def __init__(self, training_points, training_values, num_leaves=2, n=5, comp=2):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        training_points : ndarray
+
+        training_values : ndarray
+
+        num_leaves : int
+
+        n : int
+
+        comp : int
+        """
         super(RBFInterpolator, self).__init__(training_points, training_values, num_leaves)
 
         if self._ntpts < n:
-            raise ValueError('RBFInterpolator only given {0} training points, '
-                             'but requested n={1}.'
+            raise ValueError('RBFInterpolator only given {0} training points, but requested n={1}.'
                              .format(self._ntpts, n))
 
         # Comp is an arbitrary value that picks a function to use
@@ -287,7 +333,13 @@ class RBFInterpolator(NNBase):
         self.weights = weights
 
     def __call__(self, prediction_points):
+        """
+        Do interpolation.
 
+        Parameters
+        ----------
+        prediction_points : ndarray
+        """
         if len(prediction_points.shape) == 1:
             # Reshape vector to n x 1 array
             prediction_points.shape = (1, prediction_points.shape[0])
@@ -307,14 +359,21 @@ class RBFInterpolator(NNBase):
         Tp = ndist[:, :-1] / ndist[:, -1:]
 
         Rp = self._find_R(nppts, Tp, nloc)
-        predz = ((np.dot(Rp, self.weights[..., 0]) * self._tvr) + self._tvm).reshape(nppts, self._dep_dims)
+        predz = ((np.dot(Rp, self.weights[..., 0]) * self._tvr) +
+                 self._tvm).reshape(nppts, self._dep_dims)
 
         self._pt_cache = (normalized_pts, ndist, nloc)
 
         return predz
 
     def gradient(self, prediction_points):
+        """
+        Find the gradient at each location of a set of supplied predicted points.
 
+        Parameters
+        ----------
+        prediction_points : ndarray
+        """
         if len(prediction_points.shape) == 1:
             # Reshape vector to n x 1 array
             prediction_points.shape = (1, prediction_points.shape[0])
@@ -329,6 +388,6 @@ class RBFInterpolator(NNBase):
 
         # Find Gradient
         grad = self._find_dR(normalized_pts[:, np.newaxis, :], ploc,
-                           pdist[:, :, np.newaxis]) * (self._tvr[..., np.newaxis] / self._tpr)
+                             pdist[:, :, np.newaxis]) * (self._tvr[..., np.newaxis] / self._tpr)
 
         return grad

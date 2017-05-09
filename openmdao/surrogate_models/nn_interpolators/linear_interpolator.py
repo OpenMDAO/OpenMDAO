@@ -1,3 +1,5 @@
+"""Define the LinearInterpolator class."""
+
 import numpy as np
 
 from openmdao.surrogate_models.nn_interpolators.nn_base import NNBase
@@ -6,11 +8,17 @@ from six.moves import range
 
 class LinearInterpolator(NNBase):
     """
-    Interpolates values by forming a hyperplane between the points closest to
-    the prescribed inputs.
+    Interpolate values by forming a hyperplane between the points closest to the prescribed inputs.
     """
 
     def _find_hyperplane(self, nloc):
+        """
+        Find hyperplane.
+
+        Parameters
+        ----------
+        nloc : number of locations
+        """
         # Extra Inputs for Finding the normal are found below
         # Number of row vectors needed always dimensions - 1
         indep_dims = self._indep_dims
@@ -49,9 +57,13 @@ class LinearInterpolator(NNBase):
         return normal, pc
 
     def __call__(self, prediction_points):
-        # This method uses linear interpolation by defining a plane with
-        # a set number of nearest neighbors to the predicted
+        """
+        Do linear interpolation by defining plane with set number of nearest neighbors to predicted.
 
+        Parameters
+        ----------
+        prediction_points : array
+        """
         if len(prediction_points.shape) == 1:
             # Reshape vector to n x 1 array
             prediction_points.shape = (1, prediction_points.shape[0])
@@ -87,9 +99,13 @@ class LinearInterpolator(NNBase):
         return predictions
 
     def gradient(self, PredPoints):
-        # Extra method to find the gradient at each location of a set of
-        # supplied predicted points.
+        """
+        Find the gradient at each location of a set of supplied predicted points.
 
+        Parameters
+        ----------
+        PredPoints : ndarray
+        """
         if len(PredPoints.shape) == 1:
             # Reshape vector to n x 1 array
             PredPoints.shape = (1, PredPoints.shape[0])
@@ -97,14 +113,16 @@ class LinearInterpolator(NNBase):
         normPredPts = (PredPoints - self._tpm) / self._tpr
         nppts = normPredPts.shape[0]
         gradient = np.zeros((nppts, self._dep_dims, self._indep_dims), dtype="float")
+
         # Linear interp only uses as many neighbors as it has dimensions
         dims = self._indep_dims + 1
+
         # Find the neighbors
         if self._pt_cache is not None and \
                 np.allclose(self._pt_cache[0], normPredPts):
             ndist, nloc = self._pt_cache[1:]
         else:
-                ndist, nloc = self._KData.query(normPredPts.real, dims)
+            ndist, nloc = self._KData.query(normPredPts.real, dims)
 
         normal, pc = self._find_hyperplane(nloc)
         if np.any(normal[:, -1, :]) == 0:
@@ -112,4 +130,5 @@ class LinearInterpolator(NNBase):
         gradient[:] = (-normal[:, :-1, :] / normal[:, -1, :]).squeeze().T
 
         grad = gradient * (self._tvr[:, np.newaxis] / self._tpr)
+
         return grad

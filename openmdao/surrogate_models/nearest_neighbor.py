@@ -1,5 +1,8 @@
-# Based off of the N-Dimensional Interpolation library by Stephen Marone.
-# https://github.com/SMarone/NDInterp
+"""
+Surrogate model based on the N-Dimensional Interpolation library by Stephen Marone.
+
+https://github.com/SMarone/NDInterp
+"""
 
 from collections import OrderedDict
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
@@ -17,9 +20,7 @@ _interpolators = OrderedDict([('linear', LinearInterpolator),
 
 class NearestNeighbor(SurrogateModel):
     """
-    Surrogate model that approximates values using a nearest neighbor
-    approximation. `interpolant_type` argument must be one of 'linear',
-    'weighted', or 'rbf'.
+    Surrogate model that approximates values using a nearest neighbor approximation.
 
     Args
     ----
@@ -31,9 +32,21 @@ class NearestNeighbor(SurrogateModel):
     kwargs :
         Additional keyword arguments to be passed to the constructor for the
         interpolant.
-
     """
+
     def __init__(self, interpolant_type='rbf', **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+
+        interpolant_type : str
+            must be one of 'linear', 'weighted', or 'rbf'.
+
+        **kwargs : dict
+            keyword arguments
+        """
         super(NearestNeighbor, self).__init__()
 
         if interpolant_type not in _interpolators.keys():
@@ -52,8 +65,8 @@ class NearestNeighbor(SurrogateModel):
         """
         Train the surrogate model with the given set of inputs and outputs.
 
-        Args
-        ----
+        Parameters
+        ----------
         x : array-like
             Training input locations
 
@@ -61,15 +74,15 @@ class NearestNeighbor(SurrogateModel):
             Model responses at given inputs.
         """
         super(NearestNeighbor, self).train(x, y)
-        self.interpolant = _interpolators[self.interpolant_type](x, y, **self.interpolant_init_args)
+        self.interpolant = _interpolators[self.interpolant_type](
+            x, y, **self.interpolant_init_args)
 
     def predict(self, x, **kwargs):
         """
-        Calculates a predicted value of the response based on the current
-        trained model for the supplied list of inputs.
+        Calculate a predicted value of the response based on the current trained model.
 
-        Args
-        ----
+        Parameters
+        ----------
         x : array-like
             Point(s) at which the surrogate is evaluated.
 
@@ -81,10 +94,10 @@ class NearestNeighbor(SurrogateModel):
 
     def linearize(self, x, **kwargs):
         """
-        Calculates the jacobian of the interpolant at the requested point.
+        Calculate the jacobian of the interpolant at the requested point.
 
-        Args
-        ----
+        Parameters
+        ----------
         x : array-like
             Point at which the surrogate Jacobian is evaluated.
 
