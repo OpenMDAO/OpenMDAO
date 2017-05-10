@@ -241,72 +241,73 @@ class SqliteRecorder(BaseRecorder):
         Record an iteration using system options.
         """
         inputs, outputs, residuals = object_requesting_recording.get_nonlinear_vectors()
+        inputs_array = outputs_array = residuals_array = None
 
         # Inputs
-        if inputs:
-            filtered_ins = {}
-
+        if self.options['record_inputs'] and inputs:
+            ins = {}
             if 'i' in self._filtered_system:
-                # pull out input names into filtered dict.
-                for inc in self._filtered_system['i']:
-                    if inc in inputs._names:
-                        filtered_ins[inc] = inputs._names[inc]
+                # use filtered inputs
+                for inp in self._filtered_system['i']:
+                    if inp in inputs._names:
+                        ins[inp] = inputs._names[inp]
             else:
                 # use all the inputs
-                filtered_ins = inputs._names
+                ins = inputs._names
 
             dtype_tuples = []
-            for name, value in iteritems(filtered_ins):
+            for name, value in iteritems(ins):
                 tple = (name, '({},)f8'.format(len(value)))
                 dtype_tuples.append(tple)
 
             inputs_array = np.zeros((1,), dtype=dtype_tuples)
-            for name, value in iteritems(filtered_ins):
+            for name, value in iteritems(ins):
                 inputs_array[name] = value
 
         # Outputs
-        if outputs:
-            filtered_outs = {}
+        if self.options['record_outputs'] and outputs:
+            outs = {}
 
             if 'o' in self._filtered_system:
-                # pull out designvars of those names into filtered dict.
-                for inc in self._filtered_system['o']:
-                    if inc in outputs._names:
-                        filtered_outs[inc] = outputs._names[inc]
+                # use outputs from filtered list.
+                for out in self._filtered_system['o']:
+                    if out in outputs._names:
+                        outs[out] = outputs._names[out]
             else:
-                # use all the inputs
-                filtered_outs = outputs._names
+                # use all the outputs
+                outs = outputs._names
 
             dtype_tuples = []
-            for name, value in iteritems(filtered_outs):
+            for name, value in iteritems(outs):
                 tple = (name, '({},)f8'.format(len(value)))
                 dtype_tuples.append(tple)
 
             outputs_array = np.zeros((1,), dtype=dtype_tuples)
-            for name, value in iteritems(filtered_outs):
+            for name, value in iteritems(outs):
                 outputs_array[name] = value
 
-        if residuals:
-
-            filtered_resids = {}
+        # Residuals
+        if self.options['record_residuals'] and residuals:
+            resids = {}
 
             if 'r' in self._filtered_system:
-                # pull out designvars of those names into filtered dict.
-                for inc in self._filtered_system['r']:
-                    if inc in inputs._names:
-                        filtered_resids[inc] = residuals._names[inc]
+                # use filtered residuals
+                for res in self._filtered_system['r']:
+                    if res in residuals._names:
+                        resids[res] = residuals._names[res]
             else:
-                # use all the inputs
-                filtered_resids = residuals._names
+                # use all the residuals
+                resids = residuals._names
 
             dtype_tuples = []
-            for name, value in iteritems(filtered_resids):
-                tple = (name, '({},)f8'.format(len(value)))
-                dtype_tuples.append(tple)
+            if resids:
+                for name, value in iteritems(resids):
+                    tple = (name, '({},)f8'.format(len(value)))
+                    dtype_tuples.append(tple)
 
-            residuals_array = np.zeros((1,), dtype=dtype_tuples)
-            for name, value in iteritems(filtered_resids):
-                residuals_array[name] = value
+                residuals_array = np.zeros((1,), dtype=dtype_tuples)
+                for name, value in iteritems(resids):
+                    residuals_array[name] = value
 
         inputs_blob = array_to_blob(inputs_array)
         outputs_blob = array_to_blob(outputs_array)

@@ -96,7 +96,7 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
 
         # from the database, get the actual data recorded
         db_cur.execute("SELECT * FROM system_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
-        row_actual  = db_cur.fetchone()
+        row_actual = db_cur.fetchone()
 
         counter, iteration_coordinate, timestamp, success, msg, inputs_blob, outputs_blob, residuals_blob = row_actual
 
@@ -245,7 +245,7 @@ class TestSqliteRecorder(unittest.TestCase):
                             "pz.z": [5.0, 2.0]
                             }
 
-        # self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, None, None),), self.eps)
+        self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, None, None),), self.eps)
 
     def test_only_objectives_recorded(self):
 
@@ -291,7 +291,6 @@ class TestSqliteRecorder(unittest.TestCase):
                             }
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, None, expected_constraints),), self.eps)
-
 
     def test_simple_driver_recording(self):
 
@@ -348,7 +347,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, expected_objectives, expected_constraints),), self.eps)
 
-
     def test_driver_records_metadata(self):
         self.setup_sellar_model()
 
@@ -388,19 +386,16 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_outputs'] = True
         self.recorder.options['record_residuals'] = True
         self.recorder.options['record_metadata'] = True
-        self.recorder.options['includes'] = ['*']
-        self.prob.model.add_recorder(self.recorder)
 
-        d1 = self.prob.model.get_subsystem('d1') # an instance of SellarDis1withDerivatives
-                                                 # which is an ExplicitComponent
+        self.prob.model.add_recorder(self.recorder)
+        self.eps = .0001
+
+        d1 = self.prob.model.get_subsystem('d1')    # an instance of SellarDis1withDerivatives
         d1.add_recorder(self.recorder)
 
         obj_cmp = self.prob.model.get_subsystem('obj_cmp') # an ExecComp
         obj_cmp.add_recorder(self.recorder)
 
-        # self.prob['d1'].add_recorder(self.recorder)
-        # self.prob.model.obj_cmp.add_recorder(self.recorder)
-        # self.prob.model.pz.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
         t0, t1 = run_driver(self.prob)
@@ -421,11 +416,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_residuals = {"obj_cmp.obj": [0.0,],
                             }
-
-        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),), self.eps)
-
-
-    # TODO_RECORDERS : need to test recording of ImplicitComponent
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
+                                                 expected_residuals),), self.eps)
 
     def test_includes(self):
         if OPT is None:
@@ -450,7 +442,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_desvars'] = True
         self.recorder.options['record_responses'] = True
         self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = False
+        self.recorder.options['record_constraints'] = True
         self.recorder.options['includes'] = ['*']
         self.recorder.options['excludes'] = ['p2*']
 
@@ -471,7 +463,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'SLSQP', (4, )]
 
-        expected_desvars = {"p1.x": [7.16666666166666666666667,],
+        expected_desvars = {"p1.x": [7.16666666166666666666667, ]
                             }
 
         expected_objectives = {"comp.f_xy": [-27.0833,],
