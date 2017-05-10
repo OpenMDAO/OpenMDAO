@@ -112,6 +112,11 @@ class ExplicitComponent(Component):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
         """
         if res_ref is None:
             res_ref = ref

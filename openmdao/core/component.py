@@ -279,6 +279,11 @@ class Component(System):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for
             reconfigurability. Default is 0.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
         """
         if inspect.stack()[1][3] == '__init__':
             warn_deprecation("In the future, the 'add_input' method must be "
@@ -394,6 +399,11 @@ class Component(System):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
         """
         if inspect.stack()[1][3] == '__init__':
             warn_deprecation("In the future, the 'add_output' method must be "

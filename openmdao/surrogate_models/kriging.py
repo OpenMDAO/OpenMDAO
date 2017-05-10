@@ -95,9 +95,8 @@ class KrigingSurrogate(SurrogateModel):
         self.Y_mean, self.Y_std = Y_mean, Y_std
 
         def _calcll(thetas):
-            """Callback function."""
-            loglike = self._calculate_reduced_likelihood_params(np.exp(thetas))[
-                0]
+            """Calculate loglike (callback function)."""
+            loglike = self._calculate_reduced_likelihood_params(np.exp(thetas))[0]
             return -loglike
 
         bounds = [(np.log(1e-5), np.log(1e5)) for _ in range(self.n_dims)]

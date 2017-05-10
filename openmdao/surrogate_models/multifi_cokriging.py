@@ -79,9 +79,8 @@ def squared_exponential_correlation(theta, d):
         theta, dx --> r(theta, dx) = exp(  sum  - theta_i * (dx_i)^2 )
                                           i = 1
 
-    Args
-    ----
-
+    Parameters
+    ----------
     theta: array_like
         An array with shape 1 (isotropic) or n (anisotropic) giving the
         autocorrelation parameter(s).
@@ -93,7 +92,6 @@ def squared_exponential_correlation(theta, d):
 
     Returns
     -------
-
     r: array_like
         An array with shape (n_eval, ) containing the values of the
         autocorrelation model.
@@ -118,9 +116,8 @@ def l1_cross_distances(X, Y=None):
     """
     Compute the nonzero componentwise L1 cross-distances between the vectors in X and Y.
 
-    Args
-    ----
-
+    Parameters
+    ----------
     X: array_like
         An array with shape (n_samples_X, n_features)
 
@@ -129,7 +126,6 @@ def l1_cross_distances(X, Y=None):
 
     Returns
     -------
-
     D: array with shape (n_samples * (n_samples - 1) / 2, n_features)
         The array of componentwise L1 cross-distances.
 
@@ -321,7 +317,6 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-
         X: list of double array_like elements
             A list of arrays with the input at which observations were made, from lowest
             fidelity to highest fidelity. Designs must be nested
@@ -488,7 +483,7 @@ class MultiFiCoKriging(object):
         Yt = solve_triangular(C, y, lower=True)
         try:
             Q, G = linalg.qr(Ft, econ=True)
-        except:
+        except TypeError:   # qr() got an unexpected keyword argument 'econ'
             # DeprecationWarning: qr econ argument will be removed after scipy
             # 0.7. The economy transform will then be available through the
             # mode='economic' argument.
@@ -587,7 +582,6 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-
         X: array_like
             An array with shape (n_eval, n_features) giving the point(s) at
             which the prediction(s) should be made.
@@ -598,7 +592,6 @@ class MultiFiCoKriging(object):
 
         Returns
         -------
-
         y: array_like
             An array with shape (n_eval, ) with the Best Linear Unbiased
             Prediction at X. If all_levels is set to True, an array

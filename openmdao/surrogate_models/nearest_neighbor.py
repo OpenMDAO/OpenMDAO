@@ -21,17 +21,6 @@ _interpolators = OrderedDict([('linear', LinearInterpolator),
 class NearestNeighbor(SurrogateModel):
     """
     Surrogate model that approximates values using a nearest neighbor approximation.
-
-    Args
-    ----
-
-    interpolant_type : str
-        One of 'linear', 'weighted', or 'rbf'. Determines the type of
-        interpolant used.
-
-    kwargs :
-        Additional keyword arguments to be passed to the constructor for the
-        interpolant.
     """
 
     def __init__(self, interpolant_type='rbf', **kwargs):
@@ -40,7 +29,6 @@ class NearestNeighbor(SurrogateModel):
 
         Parameters
         ----------
-
         interpolant_type : str
             must be one of 'linear', 'weighted', or 'rbf'.
 
