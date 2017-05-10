@@ -327,7 +327,7 @@ class Problem(object):
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
-        all_comps = model.system_iter(typ=Component)
+        all_comps = model.system_iter(typ=Component, include_self=True)
         if comps is None:
             comps = [comp for comp in all_comps]
         else:
