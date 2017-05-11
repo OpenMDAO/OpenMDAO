@@ -61,7 +61,7 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
     # array values
     else:
         actual = np.array(actual, copy=False)
-        desired = np.atleast_1d(np.array(desired, copy=False))
+        desired = np.atleast_1d(desired)
         if actual.shape != desired.shape:
             test_case.fail(
                 'actual and desired have differing shapes.'
