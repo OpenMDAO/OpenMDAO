@@ -3,12 +3,13 @@ from __future__ import print_function
 import unittest
 import time
 
+import six
 import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
-import six
+from openmdao.devtools.testutil import assert_rel_error
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -362,6 +363,9 @@ class MPITests(unittest.TestCase):
 
             def __init__(self, size):
                 super(GatherComp, self).__init__()
+                self.size = size
+
+            def initialize_variables(self):
                 self.add_input('invec', np.ones(size, float))
                 self.add_output('outvec', np.ones(size, float))
 
@@ -386,7 +390,7 @@ class MPITests(unittest.TestCase):
         expected = np.array(range(size, 0, -1), float)
         expected[:8] *= 2.0
         expected[8:] *= 3.0
-        self.assertTrue(all(p['C3.outvec'] == expected))
+        assert_rel_error(self, p['C3.outvec'], expected)
 
     def test_noncontiguous_idxs(self):
         # take even input indices in 0 rank and odd ones in 1 rank

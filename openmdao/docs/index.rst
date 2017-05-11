@@ -63,6 +63,15 @@ Grouping components for more complex models
     features/grouping_components/parallel_group
 
 
+Distributed Components
+======================
+
+.. toctree::
+   :maxdepth: 1
+
+   features/distributed_comps
+
+
 Defining partial derivatives
 ================================
 
