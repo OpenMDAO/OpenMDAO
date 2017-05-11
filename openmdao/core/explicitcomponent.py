@@ -5,8 +5,8 @@ from __future__ import division
 import inspect
 
 import numpy as np
-from six import iteritems, itervalues
-from itertools import product, chain
+from six import itervalues
+from itertools import product
 
 from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method

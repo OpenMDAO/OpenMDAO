@@ -2,14 +2,11 @@
 
 from __future__ import division
 
-from six.moves import range
-
-import sys
 import inspect
 
 from fnmatch import fnmatchcase
 import numpy as np
-from itertools import product, chain
+from itertools import product
 from six import string_types, iteritems, itervalues
 from scipy.sparse import issparse
 from copy import deepcopy
