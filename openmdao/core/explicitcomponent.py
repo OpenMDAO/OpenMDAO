@@ -5,11 +5,13 @@ from __future__ import division
 import inspect
 
 import numpy as np
-from six import iteritems, itervalues
+from six import itervalues
+from itertools import product
 
 from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 
 
 class ExplicitComponent(Component):
@@ -149,12 +151,23 @@ class ExplicitComponent(Component):
         Set subjacobian info into our jacobian.
         """
         with self.jacobian_context() as J:
-            for abs_key, meta in iteritems(self._subjacs_info):
-                J._set_partials_meta(abs_key, meta, meta['type'] == 'input')
+            outputs = self._var_abs_names['output']
+            inputs = self._var_abs_names['input']
 
-                method = meta.get('method', False)
-                if method and meta['dependent']:
-                    self._approx_schemes[method].add_approximation(abs_key, meta)
+            for wrt_name, wrt_vars in (('output', outputs), ('input', inputs)):
+                for abs_key in product(outputs, wrt_vars):
+                    meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
+                    dependent = meta['dependent']
+                    if meta['value'] is None and dependent:
+                        out_size = np.product(self._var_abs2meta['output'][abs_key[0]]['shape'])
+                        in_size = np.product(self._var_abs2meta[wrt_name][abs_key[1]]['shape'])
+                        meta['value'] = np.zeros((out_size, in_size))
+
+                    J._set_partials_meta(abs_key, meta, wrt_name == 'input')
+
+                    method = meta.get('method', False)
+                    if method and dependent:
+                        self._approx_schemes[method].add_approximation(abs_key, meta)
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()
