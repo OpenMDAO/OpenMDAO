@@ -128,8 +128,6 @@ class Jacobian(object):
             if isinstance(subjac, list):
                 # Sparse AIJ format
                 return subjac[0]
-            if issparse(subjac):
-                return subjac.data
             return subjac
         else:
             msg = 'Variable name pair ("{}", "{}") not found.'
