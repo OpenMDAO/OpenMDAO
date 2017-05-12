@@ -47,7 +47,7 @@ setup(name='openmdao',
           'openmdao.devtools': ['*.wpr', '*.html'],
           'openmdao.devtools.problem_viewer': ['*.css', '*.js', '*.template',
                                                '*.woff'],
-          #'openmdao.units': ['unit_library.ini'],
+          'openmdao.utils': ['unit_library.ini'],
       },
       install_requires=[
         'six', 'numpydoc', #'numpy>=1.9.2',
