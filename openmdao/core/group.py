@@ -1070,6 +1070,8 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._apply_nonlinear()
 
+        self.record_iteration()
+
     def _solve_nonlinear(self):
         """
         Compute outputs. The model is assumed to be in a scaled state.
@@ -1084,7 +1086,7 @@ class Group(System):
             absolute error.
         """
         result = self._nl_solver.solve()
-        super(Group, self)._solve_nonlinear()
+        self.record_iteration()
         return result
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
@@ -1124,6 +1126,8 @@ class Group(System):
                     for vec_name in vec_names:
                         self._transfer(vec_name, mode)
 
+        self.record_iteration()
+
     def _solve_linear(self, vec_names, mode):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
@@ -1145,7 +1149,7 @@ class Group(System):
             absolute error.
         """
         result = self._ln_solver.solve(vec_names, mode)
-        super(Group, self)._solve_linear(vec_names, mode)
+        self.record_iteration()
         return result
 
     def _linearize(self, do_nl=True, do_ln=True):

@@ -388,7 +388,6 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_metadata'] = True
 
         self.prob.model.add_recorder(self.recorder)
-        self.eps = .0001
 
         d1 = self.prob.model.get_subsystem('d1')    # an instance of SellarDis1withDerivatives
         d1.add_recorder(self.recorder)
@@ -406,12 +405,12 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_inputs = {
                             "obj_cmp.z": [5.0, 2.0],
-                            "obj_cmp.y1": [25.58830236333575,],
+                            "obj_cmp.y1": [25.54548589,],
                             "obj_cmp.x": [1.0,],
-                            "obj_cmp.y2": [12.058488149964944,],
+                            "obj_cmp.y2": [12.05425424,],
                             }
 
-        expected_outputs = {"obj_cmp.obj": [28.588308158491817,],
+        expected_outputs = {"obj_cmp.obj": [28.54549171,],
                             }
 
         expected_residuals = {"obj_cmp.obj": [0.0,],
@@ -474,6 +473,38 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, expected_objectives, expected_constraints),), self.eps)
 
+    def qqq_test_record_solver(self):
+        self.setup_sellar_model()
 
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        self.prob.model.nl_solver = NonlinearBlockGS()
+        self.prob.model._nl_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        coordinate = [0, 'obj_cmp', (6, )]
+
+        expected_abs_error = {
+
+                            }
+
+        expected_rel_error = {
+                            }
+
+        expected_solver_residuals = {
+                            }
+
+        expected_ouput = {
+                    }
+
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
+                                                 expected_solver_residuals, expected_ouput),), self.eps)
 if __name__ == "__main__":
     unittest.main()

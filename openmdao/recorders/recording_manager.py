@@ -58,7 +58,7 @@ class RecordingManager(object):
         for recorder in self._recorders:
             recorder.close()
 
-    def record_iteration(self, object_requesting_recording, metadata):
+    def record_iteration(self, object_requesting_recording, metadata, method=None):
         """
         Call record_iteration for all recorders.
 
@@ -77,7 +77,7 @@ class RecordingManager(object):
             metadata['timestamp'] = time.time()
 
         for recorder in self._recorders:
-            recorder.record_iteration(object_requesting_recording, metadata)
+            recorder.record_iteration(object_requesting_recording, metadata, method)
 
     def record_metadata(self, object_requesting_recording):
         """

@@ -10,6 +10,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.core.system import System
 from openmdao.core.driver import Driver
+from openmdao.solvers.solver import Solver
 
 import warnings
 
@@ -180,6 +181,29 @@ class BaseRecorder(object):
                 'obj': myobjectives,
                 'con': myconstraints,
                 'res': myresponses
+            }
+
+        if (isinstance(object_requesting_recording, Solver)):
+            myabserr = myrelerr = myderivs = set()
+            incl = self.options['includes']
+            excl = self.options['excludes']
+
+            if self.options['record_abs_error']:
+                myabserr = [n for n in object_requesting_recording.get_abs_err()  #NOT REALLLLLY
+                             if self._check_path(n, incl, excl)]
+
+            if self.options['record_rel_error']:
+                myrelerr = [n for n in object_requesting_recording.get_rel_err()  #NOT REALLLLLY
+                             if self._check_path(n, incl, excl)]
+
+            if self.options['record_derivatives']:
+                myderivs = [n for n in object_requesting_recording.get_derivs()  #NOT REALLLLLY
+                             if self._check_path(n, incl, excl)]
+
+            self._filtered_solver = {
+                'ae': myabserr,
+                're': myrelerr,
+                'r': myderivs
             }
 
     def _check_path(self, path, includes, excludes):

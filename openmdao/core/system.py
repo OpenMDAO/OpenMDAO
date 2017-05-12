@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from collections import namedtuple, OrderedDict, Iterable
 from fnmatch import fnmatchcase
 import sys
+import inspect
 from itertools import product
 
 from six import iteritems, string_types
@@ -2231,11 +2232,6 @@ class System(object):
         float
             Absolute error.
         """
-        self.iter_count += 1
-        metadata = create_local_meta(None, self.pathname)
-        update_local_meta(metadata, (self.iter_count,))
-        self._rec_mgr.record_iteration(self, metadata)
-
         # Reconfigure if needed.
         self._check_reconf()
 
@@ -2268,10 +2264,7 @@ class System(object):
         mode : str
             'fwd' or 'rev'.
         """
-        self.iter_count += 1
-        metadata = create_local_meta(None, self.pathname)
-        update_local_meta(metadata, (self.iter_count,))
-        self._rec_mgr.record_iteration(self, metadata)
+        pass
 
     def _linearize(self, do_nl=True, do_ln=True):
         """
@@ -2348,3 +2341,13 @@ class System(object):
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
+
+    def record_iteration(self):
+        """
+        
+        :return: 
+        """
+        self.iter_count += 1
+        metadata = create_local_meta(None, self.pathname)
+        update_local_meta(metadata, (self.iter_count,))
+        self._rec_mgr.record_iteration(self, metadata, inspect.stack()[1][3])

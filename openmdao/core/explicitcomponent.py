@@ -163,6 +163,8 @@ class ExplicitComponent(Component):
             self._residuals -= self._outputs
             self._outputs += self._residuals
 
+        self.record_iteration()
+
     def _solve_nonlinear(self):
         """
         Compute outputs. The model is assumed to be in a scaled state.
@@ -183,7 +185,7 @@ class ExplicitComponent(Component):
             self._residuals.set_const(0.0)
             failed = self.compute(self._inputs, self._outputs)
 
-        super(ExplicitComponent, self)._solve_nonlinear()
+        self.record_iteration()
 
         return bool(failed), 0., 0.
 
@@ -219,6 +221,7 @@ class ExplicitComponent(Component):
                     self.compute_jacvec_product(self._inputs, self._outputs,
                                                 d_inputs, d_residuals, mode)
                     d_residuals *= -1.0
+        self.record_iteration()
 
     def _solve_linear(self, vec_names, mode):
         """
@@ -251,7 +254,7 @@ class ExplicitComponent(Component):
                 elif mode == 'rev':
                     d_residuals.set_vec(d_outputs)
 
-        super(ExplicitComponent, self)._solve_linear(vec_names, mode)
+        self.record_iteration()
 
         return False, 0., 0.
 
