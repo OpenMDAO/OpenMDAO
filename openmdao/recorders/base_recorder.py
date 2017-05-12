@@ -189,16 +189,16 @@ class BaseRecorder(object):
             excl = self.options['excludes']
 
             if self.options['record_abs_error']:
-                myabserr = [n for n in object_requesting_recording.get_abs_err()  #NOT REALLLLLY
-                             if self._check_path(n, incl, excl)]
+                myabserr = [n for n in object_requesting_recording.get_abs_err()
+                            if self._check_path(n, incl, excl)]
 
             if self.options['record_rel_error']:
-                myrelerr = [n for n in object_requesting_recording.get_rel_err()  #NOT REALLLLLY
-                             if self._check_path(n, incl, excl)]
+                myrelerr = [n for n in object_requesting_recording.get_rel_err()
+                            if self._check_path(n, incl, excl)]
 
             if self.options['record_derivatives']:
-                myderivs = [n for n in object_requesting_recording.get_derivs()  #NOT REALLLLLY
-                             if self._check_path(n, incl, excl)]
+                myderivs = [n for n in object_requesting_recording.get_derivs()
+                            if self._check_path(n, incl, excl)]
 
             self._filtered_solver = {
                 'ae': myabserr,

@@ -2344,8 +2344,7 @@ class System(object):
 
     def record_iteration(self):
         """
-        
-        :return: 
+        Record an iteration of the current System.
         """
         self.iter_count += 1
         metadata = create_local_meta(None, self.pathname)

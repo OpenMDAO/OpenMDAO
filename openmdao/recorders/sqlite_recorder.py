@@ -240,8 +240,10 @@ class SqliteRecorder(BaseRecorder):
         """
         Record an iteration using system options.
         """
-        if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear', '_solve_nonlinear']:
-            raise ValueError("method must not be one of: '_apply_linear, _apply_nonlinear, _solve_linear, _solve_nonlinear'")
+        if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
+                          '_solve_nonlinear']:
+            raise ValueError("method must not be one of: '_apply_linear, "
+                             "_apply_nonlinear, _solve_linear, _solve_nonlinear'")
 
         if 'nonlinear' in method:
             inputs, outputs, residuals = object_requesting_recording.get_nonlinear_vectors()
