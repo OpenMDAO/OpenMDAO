@@ -2,9 +2,6 @@
 
 from __future__ import division
 
-from six.moves import range
-
-import sys
 import inspect
 
 from fnmatch import fnmatchcase
@@ -511,23 +508,21 @@ class Component(System):
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
-            wrt_pattern, wrt_out, wrt_in = wrt_bundle
+            wrt_pattern, wrt_matches = wrt_bundle
             if not of_matches:
                 raise ValueError('No matches were found for of="{}"'.format(of_pattern))
-            if not (wrt_out or wrt_in):
+            if not wrt_matches:
                 raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
 
-            for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
-                for rel_key in product(of_matches, wrt_matches):
-                    meta_changes = {
-                        'method': method,
-                        'type': type_
-                    }
-                    abs_key = rel_key2abs_key(self, rel_key)
-                    meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
-                    meta.update(meta_changes)
-                    meta.update(kwargs)
-                    self._subjacs_info[abs_key] = meta
+            for rel_key in product(of_matches, wrt_matches):
+                meta_changes = {
+                    'method': method,
+                }
+                abs_key = rel_key2abs_key(self, rel_key)
+                meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
+                meta.update(meta_changes)
+                meta.update(kwargs)
+                self._subjacs_info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):
@@ -591,33 +586,31 @@ class Component(System):
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
-            wrt_pattern, wrt_out, wrt_in = wrt_bundle
+            wrt_pattern, wrt_matches = wrt_bundle
             if not of_matches:
                 raise ValueError('No matches were found for of="{}"'.format(of_pattern))
-            if not (wrt_out or wrt_in):
+            if not wrt_matches:
                 raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
 
             make_copies = (multiple_items
                            or len(of_matches) > 1
-                           or (len(wrt_in) + len(wrt_out)) > 1)
+                           or len(wrt_matches) > 1)
             # Setting this to true means that future loop iterations (i.e. if there are multiple
             # items in either of or wrt) will make copies.
             multiple_items = True
 
-            for type_, wrt_matches in [('output', wrt_out), ('input', wrt_in)]:
-                for rel_key in product(of_matches, wrt_matches):
-                    meta_changes = {
-                        'rows': rows,
-                        'cols': cols,
-                        'value': deepcopy(val) if make_copies else val,
-                        'dependent': dependent,
-                        'type': type_
-                    }
-                    abs_key = rel_key2abs_key(self, rel_key)
-                    meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
-                    meta.update(meta_changes)
-                    self._check_partials_meta(abs_key, meta)
-                    self._subjacs_info[abs_key] = meta
+            for rel_key in product(of_matches, wrt_matches):
+                meta_changes = {
+                    'rows': rows,
+                    'cols': cols,
+                    'value': deepcopy(val) if make_copies else val,
+                    'dependent': dependent
+                }
+                abs_key = rel_key2abs_key(self, rel_key)
+                meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
+                meta.update(meta_changes)
+                self._check_partials_meta(abs_key, meta)
+                self._subjacs_info[abs_key] = meta
 
     def _find_partial_matches(self, of, wrt):
         """
@@ -643,8 +636,8 @@ class Component(System):
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         glob_patterns = {'*', '?', '['}
-        outs = self._var_allprocs_prom2abs_list['output']
-        ins = self._var_allprocs_prom2abs_list['input']
+        outs = list(self._var_allprocs_prom2abs_list['output'].keys())
+        ins = list(self._var_allprocs_prom2abs_list['input'].keys())
 
         def find_matches(pattern, var_list):
             if glob_patterns.intersection(pattern):
@@ -654,8 +647,7 @@ class Component(System):
             return []
 
         of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
-        wrt_pattern_matches = [(pattern, find_matches(pattern, outs), find_matches(pattern, ins))
-                               for pattern in wrt_list]
+        wrt_pattern_matches = [(pattern, find_matches(pattern, outs + ins)) for pattern in wrt_list]
         return of_pattern_matches, wrt_pattern_matches
 
     def _check_partials_meta(self, abs_key, meta):
