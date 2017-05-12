@@ -936,7 +936,11 @@ class Group(System):
         # Make sure the new_order is valid. It must contain all subsystems
         # in this model.
         newset = set(new_order)
-        olddict = {s.name: s for s in self._static_subsystems_allprocs}
+        if self._static_mode:
+            subsystems = self._static_subsystems_allprocs
+        else:
+            subsystems = self._subsystems_allprocs
+        olddict = {s.name: s for s in subsystems}
         oldset = set(olddict)
 
         if oldset != newset:
@@ -960,7 +964,7 @@ class Group(System):
             raise ValueError("%s: Duplicate name(s) found in subsystem order list: %s" %
                              (self.pathname, sorted(dupes)))
 
-        self._static_subsystems_allprocs = [olddict[name] for name in new_order]
+        subsystems[:] = [olddict[name] for name in new_order]
 
     def get_req_procs(self):
         """

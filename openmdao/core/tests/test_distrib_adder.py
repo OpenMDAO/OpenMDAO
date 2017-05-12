@@ -89,7 +89,7 @@ class DistributedAdderTest(unittest.TestCase):
     N_PROCS = 3
 
     def test_distributed_adder(self):
-        size = 100000 #how many items in the array
+        size = 100 #how many items in the array
 
         prob = Problem()
         prob.model = Group()

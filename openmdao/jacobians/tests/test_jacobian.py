@@ -46,15 +46,26 @@ class MyExplicitComp(ExplicitComponent):
     def compute_partial_derivs(self, inputs, outputs, partials):
         x = inputs['x']
         y = inputs['y']
-        partials['f', 'x'] = self._jac_type(np.array([
+        jac1 = self._jac_type(np.array([
             [2.0*x[0] - 6.0 + x[1], 2.0*x[1] + 8.0 + x[0]],
             [(2.0*x[0] - 6.0 + x[1])*3., (2.0*x[1] + 8.0 + x[0])*3.]
         ]))
 
-        partials['f', 'y'] = self._jac_type(np.array([
+        if isinstance(jac1, list):
+            jac1 = jac1[0]
+
+
+        partials['f', 'x'] = jac1
+
+        jac2 = self._jac_type(np.array([
             [17.-y[1], 2.-y[0]],
             [(17.-y[1])*3., (2.-y[0])*3.]
         ]))
+
+        if isinstance(jac2, list):
+            jac2 = jac2[0]
+
+        partials['f', 'y'] = jac2
 
 class MyExplicitComp2(ExplicitComponent):
     def __init__(self, jac_type):
@@ -87,11 +98,16 @@ class MyExplicitComp2(ExplicitComponent):
     def compute_partial_derivs(self, inputs, outputs, partials):
         w = inputs['w']
         z = inputs['z']
-        partials['f', 'w'] = self._jac_type(np.array([[
+        jac = self._jac_type(np.array([[
             2.0*w[0] - 10.0,
             2.0*w[1] + 2.0,
             6.
         ]]))
+
+        if isinstance(jac, list):
+            jac = jac[0]
+
+        partials['f', 'w'] = jac
 
 class ExplicitSetItemComp(ExplicitComponent):
     def __init__(self, dtype, value, shape, constructor):
@@ -275,16 +291,17 @@ class TestJacobian(unittest.TestCase):
     ]
 
     shapes = [
-        ('scalar', lambda x: x),
-        ('1D_array', lambda x: np.array([x + i for i in range(5)])),
-        ('2D_array', lambda x: np.array([[x + i + 2 * j for i in range(3)] for j in range(3)]))
+        ('scalar', lambda x: x, (1, 1)),
+        ('1D_array', lambda x: np.array([x + i for i in range(5)]), (5, 1)),
+        ('2D_array', lambda x: np.array([[x + i + 2 * j for i in range(3)] for j in range(3)]),
+         (3, 3))
     ]
 
     @parameterized.expand(itertools.product(dtypes, shapes), testcase_func_name=
-        lambda f, n, p: '_'.join(['test_jacobian_set_item', p.args[0][0], p.args[1][0]]))
+    lambda f, n, p: '_'.join(['test_jacobian_set_item', p.args[0][0], p.args[1][0]]))
     def test_jacobian_set_item(self, dtypes, shapes):
 
-        shape, constructor = shapes
+        shape, constructor, expected_shape = shapes
         dtype, value = dtypes
 
         prob = Problem(model=Group())
@@ -304,7 +321,7 @@ class TestJacobian(unittest.TestCase):
         self.assertEqual(len(jac_out.shape), 2)
         expected_dtype = np.promote_types(dtype, float)
         self.assertEqual(jac_out.dtype, expected_dtype)
-        assert_rel_error(self, jac_out.squeeze(), expected, 1e-15)
+        assert_rel_error(self, jac_out, np.atleast_2d(expected).reshape(expected_shape), 1e-15)
 
     def test_component_assembled_jac(self):
         prob = Problem()
