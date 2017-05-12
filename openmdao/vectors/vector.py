@@ -72,7 +72,6 @@ class Vector(object):
         self._iproc = system.comm.rank
         self._views = {}
         self._views_flat = {}
-        self._idxs = {}
 
         # self._names will either be equivalent to self._views or to the
         # set of variables relevant to the current matvec product.
@@ -251,7 +250,7 @@ class Vector(object):
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
-            return self._views[abs_name][self._idxs[abs_name]]
+            return self._views[abs_name]
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
