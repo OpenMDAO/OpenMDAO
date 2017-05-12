@@ -340,7 +340,7 @@ class MPITests(unittest.TestCase):
                 if self.comm.rank == 0:
                     outputs['outvec'] = inputs['invec'] * 2.0
                 else:
-                    outputs['outvec'] = inputs['invec'] * 3.0
+                    outputs['outvec'] = inputs['invec'] * -3.0
 
             def initialize_variables(self):
                 comm = self.comm
@@ -356,41 +356,54 @@ class MPITests(unittest.TestCase):
                 self.add_output('outvec', np.ones(sizes[rank], float))
 
             def get_req_procs(self):
+                # require min of 2 processes, max of 5
                 return 2, 5
 
-        class GatherComp(ExplicitComponent):
-            """Uses 2 procs. Gathers a distrib output into a full input"""
+        class Summer(ExplicitComponent):
+            """Sums a distributed input."""
 
             def __init__(self, size):
-                super(GatherComp, self).__init__()
+                super(Summer, self).__init__()
                 self.size = size
 
             def initialize_variables(self):
-                self.add_input('invec', np.ones(size, float))
-                self.add_output('outvec', np.ones(size, float))
+                # this results in 8 entries for proc 0 and 7 entries for proc 1
+                # when using 2 processes.
+                sizes, offsets = evenly_distrib_idxs(self.comm.size, self.size)
+                start = offsets[rank]
+                end = start + sizes[rank]
+
+                # NOTE: you must specify src_indices here for the input. Otherwise,
+                #       you'll connect the input to [0:local_input_size] of the
+                #       full distributed output!
+                self.add_input('invec', np.ones(sizes[self.comm.rank], float),
+                               src_indices=np.arange(start, end, dtype=int))
+                self.add_output('out', 0.0)
 
             def compute(self, inputs, outputs):
-                outputs['outvec'] = inputs['invec']
+                out = np.zeros(1)
+                self.comm.Allreduce(np.sum(self._inputs['invec']), out, op=MPI.SUM)
+                self._outputs['out'] = out[0]
 
         p = Problem(model=Group())
         top = p.model
         top.add_subsystem("indep", IndepVarComp('x', np.zeros(size)))
         top.add_subsystem("C2", DistribComp(size))
-        top.add_subsystem("C3", GatherComp(size))
+        top.add_subsystem("C3", Summer(size))
 
         top.connect('indep.x', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
 
         p.setup(vector_class=PETScVector)
 
-        p['indep.x'] = np.array(range(size, 0, -1), float)
+        p['indep.x'] = np.ones(size)
 
         p.run_model()
 
-        expected = np.array(range(size, 0, -1), float)
+        expected = np.ones(size)
         expected[:8] *= 2.0
-        expected[8:] *= 3.0
-        assert_rel_error(self, p['C3.outvec'], expected)
+        expected[8:] *= -3.0
+        assert_rel_error(self, p['C3.out'], np.sum(expected))
 
     def test_noncontiguous_idxs(self):
         # take even input indices in 0 rank and odd ones in 1 rank
