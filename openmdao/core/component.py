@@ -32,8 +32,6 @@ class Component(System):
     _matrix_free : Bool
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian.
-    distributed : Bool
-        This is True if the component is a distributed component.
     _var_rel2data_io : dict
         Dictionary mapping relative names to dicts with keys (prom, rel, my_idx, type_, metadata).
         This is only needed while adding inputs and outputs. During setup, these are used to
@@ -61,7 +59,6 @@ class Component(System):
         self._approx_schemes = OrderedDict()
 
         self._matrix_free = False
-        self.distributed = False
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}

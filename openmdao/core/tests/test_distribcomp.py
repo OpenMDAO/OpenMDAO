@@ -52,9 +52,6 @@ class InOutArrayComp(ExplicitComponent):
         time.sleep(self.delay)
         outputs['outvec'] = inputs['invec'] * 2.
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
-        partials['outvec', 'invec'] = np.eye(self.arr_size) * 2.
-
 
 class DistribCompSimple(ExplicitComponent):
     """Uses 2 procs but takes full input vars"""
@@ -81,9 +78,6 @@ class DistribCompSimple(ExplicitComponent):
             outputs['outvec'] = both[0, :] + both[1, :]
         else:
             outputs['outvec'] = inputs['invec'] * 0.75
-
-    def compute_partial_derivs(self, inputs, outputs, partials):
-        partials['outvec', 'invec'] = np.eye(self.arr_size) * 0.75
 
     def get_req_procs(self):
         return (2, 2)
@@ -115,9 +109,6 @@ class DistribInputComp(ExplicitComponent):
                        src_indices=np.arange(start, end, dtype=int))
         self.add_output('outvec', np.ones(self.arr_size, float))
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
-        partials['outvec', 'invec'] = np.eye(self.arr_size) * 2.0
-
     def get_req_procs(self):
         return (2, 2)
 
@@ -138,11 +129,6 @@ class DistribOverlappingInputComp(ExplicitComponent):
             outs = inputs['invec'] * 2.0
             outputs['outvec'][:8] = outs[:8]
             outputs['outvec'][4:11] += outs[4:11]
-
-    def compute_partial_derivs(self, inputs, outputs, partials):
-        partials['outvec', 'invec'] = J = np.eye(self.arr_size) * 2.0
-        J[4:11, :] += 2.0
-
 
     def initialize_variables(self):
         """ component declares the local sizes and sets initial values
@@ -177,9 +163,6 @@ class DistribInputDistribOutputComp(ExplicitComponent):
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
-
-    def compute_partial_derivs(self, inputs, outputs, partials):
-        partials['outvec', 'invec'] = np.eye(self.arr_size) * 2.0
 
     def initialize_variables(self):
 
