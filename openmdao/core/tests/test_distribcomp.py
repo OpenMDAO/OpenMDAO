@@ -364,9 +364,11 @@ class MPITests(unittest.TestCase):
                 self.add_output('out', 0.0)
 
             def compute(self, inputs, outputs):
-                out = np.zeros(1)
-                self.comm.Allreduce(np.sum(self._inputs['invec']), out, op=MPI.SUM)
-                self._outputs['out'] = out[0]
+                data = np.zeros(1)
+                data[0] = np.sum(self._inputs['invec'])
+                total = np.zeros(1)
+                self.comm.Allreduce(data, total, op=MPI.SUM)
+                self._outputs['out'] = total[0]
 
         p = Problem(model=Group())
         top = p.model
