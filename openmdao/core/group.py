@@ -1085,6 +1085,15 @@ class Group(System):
         """
         super(Group, self)._solve_nonlinear()
 
+        # Execute guess_nonlinear if specified.
+        # We need to call this early enough so that any solver that needs initial guesses has
+        # them.
+        # TODO: It is pointless to run this ahead of non-iterative solvers.
+        for sub in self.system_iter(recurse=True):
+            if hasattr(sub, 'guess_nonlinear'):
+                with sub._unscaled_context(outputs=[sub._outputs], residuals=[sub._residuals]):
+                    sub.guess_nonlinear(sub._inputs, sub._outputs, sub._residuals)
+
         return self._nl_solver.solve()
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
