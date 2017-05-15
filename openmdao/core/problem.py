@@ -489,7 +489,7 @@ class Problem(object):
                                 elif sparse.issparse(deriv_value):
                                     deriv_value = deriv_value.todense()
 
-                            partials_data[c_name][rel_key][jac_key] = deriv_value
+                            partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
                     if explicit:
                         comp._negate_jac()
