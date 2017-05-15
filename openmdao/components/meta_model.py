@@ -100,16 +100,16 @@ class MetaModel(ExplicitComponent):
             by the problem later.
         """
         metadata = super(MetaModel, self).add_input(name, val, **kwargs)
-
-        print('add_input()', name, metadata['shape'])
         input_size = metadata['shape'][0]
         self._surrogate_input_names.append((name, input_size))
         self._input_size += input_size
 
-        training_data = [] if training_data is None else training_data
-        super(MetaModel, self).add_input('train:' + name, val=training_data)
+        train_name = 'train:%s' % name
+        self.metadata.declare(train_name, desc='Training data for %s' % name)
+        if training_data is not None:
+            self.metadata[train_name] = training_data
 
-    def add_output(self, name, val=_NotSet, training_data=None, **kwargs):
+    def add_output(self, name, val=_NotSet, training_data=None, num_training_points=None, **kwargs):
         """
         Add an output to this component and a corresponding training output.
 
@@ -126,9 +126,7 @@ class MetaModel(ExplicitComponent):
             training data for this variable. Optional, can be set
             by the problem later.
         """
-        surrogate = kwargs.get('surrogate')
-        if surrogate:
-            kwargs.pop('surrogate')
+        surrogate = kwargs.pop('surrogate', None)
 
         metadata = super(MetaModel, self).add_output(name, val, **kwargs)
 
@@ -136,14 +134,16 @@ class MetaModel(ExplicitComponent):
         self._surrogate_output_names.append((name, output_shape))
         self._training_output[name] = np.zeros(0)
 
-        training_data = [] if training_data is None else training_data
-        super(MetaModel, self).add_input('train:' + name, val=training_data)
-
         if surrogate:
             metadata['surrogate'] = surrogate
             metadata['default_surrogate'] = False
         else:
             metadata['default_surrogate'] = True
+
+        train_name = 'train:%s' % name
+        self.metadata.declare(train_name, desc='Training data for %s' % name)
+        if training_data is not None:
+            self.metadata[train_name] = training_data
 
     def _setup_vars(self, recurse=True):
         """
@@ -165,13 +165,14 @@ class MetaModel(ExplicitComponent):
 
         return super(MetaModel, self)._setup_vars()
 
-    def check_setup(self, out_stream=sys.stdout):
+    def check_config(self, logger):
         """
-        Write a report of any potential problems found with the current configuration.
+        Perform optional error checks.
 
         Parameters
         ----------
-        out_stream : a file-like object, optional
+        logger : object
+            The object that manages logging output.
         """
         # All outputs must have surrogates assigned
         # either explicitly or through the default surrogate
@@ -187,7 +188,7 @@ class MetaModel(ExplicitComponent):
                        "Either specify a default_surrogate, or specify a "
                        "surrogate model for all outputs."
                        % no_sur)
-                out_stream.write(msg)
+                logger.error(msg)
 
     def compute(self, inputs, outputs):
         """
@@ -205,13 +206,11 @@ class MetaModel(ExplicitComponent):
         """
         # Train first
         if self.train:
-            print("training...")
             self._train()
 
         # Now Predict for current inputs
         inputs = self._vec_to_array(inputs)
 
-        print('compute() inputs:', inputs)
         for name, shape in self._surrogate_output_names:
             surrogate = self._metadata(name).get('surrogate')
             if surrogate:
@@ -233,7 +232,6 @@ class MetaModel(ExplicitComponent):
 
         idx = 0
         for name, sz in self._surrogate_input_names:
-            print('_vec_to_array() surrogate_input_name:', name, sz)
             val = vec[name]
             if isinstance(val, list):
                 val = np.array(val)
@@ -241,7 +239,7 @@ class MetaModel(ExplicitComponent):
                 if array_real and np.issubdtype(val.dtype, complex):
                     array_real = False
                     inputs = inputs.astype(complex)
-                    arr[idx:idx + sz] = val.flat
+                arr[idx:idx + sz] = val.flat
                 idx += sz
             else:
                 arr[idx] = val
@@ -249,40 +247,29 @@ class MetaModel(ExplicitComponent):
 
         return arr
 
-    def linearize(self, inputs, outputs, J):
+    def compute_partial_derivs(self, inputs, outputs, partials):
         """
-        Compute jacobian.
+        Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
 
         Parameters
         ----------
-        inputs : `VecWrapper`
-            `VecWrapper` containing inputs. (p)
-
-        outputs : `VecWrapper`
-            `VecWrapper` containing outputs and states. (u)
-
-        resids : `VecWrapper`
-            `VecWrapper` containing residuals. (r)
-
-        Return
-        ------
-        dict
-            Dictionary whose keys are tuples of the form ('output', 'input')
-            and whose values are ndarrays.
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
         """
-        jac = {}
-        inputs = self._vec_to_array(inputs)
+        arr = self._vec_to_array(inputs)
 
         for uname, _ in self._surrogate_output_names:
             surrogate = self._metadata(uname).get('surrogate')
-            sjac = surrogate.linearize(inputs)
+            sjac = surrogate.linearize(arr)
 
             idx = 0
             for pname, sz in self._surrogate_input_names:
-                jac[(uname, pname)] = sjac[:, idx:idx + sz]
+                partials[(uname, pname)] = sjac[:, idx:idx + sz]
                 idx += sz
-
-        return jac
 
     def _train(self):
         """
@@ -290,7 +277,7 @@ class MetaModel(ExplicitComponent):
         """
         num_sample = None
         for name, sz in self._surrogate_input_names:
-            val = self._inputs['train:' + name]
+            val = self.metadata['train:' + name]
             if num_sample is None:
                 num_sample = len(val)
             elif len(val) != num_sample:
@@ -301,7 +288,7 @@ class MetaModel(ExplicitComponent):
                 raise RuntimeError(msg)
 
         for name, shape in self._surrogate_output_names:
-            val = self._inputs['train:' + name]
+            val = self.metadata['train:' + name]
             if len(val) != num_sample:
                 msg = "MetaModel: Each variable must have the same number" \
                       " of training points. Expected {0} but found {1} " \
@@ -326,7 +313,7 @@ class MetaModel(ExplicitComponent):
         if num_sample > 0:
             idx = 0
             for name, sz in self._surrogate_input_names:
-                val = self._inputs['train:' + name]
+                val = self.metadata['train:' + name]
                 if isinstance(val[0], float):
                     new_input[:, idx] = val
                     idx += 1
@@ -353,7 +340,7 @@ class MetaModel(ExplicitComponent):
                     self._training_output[name] = outputs
                     new_output = outputs
 
-                val = self._inputs['train:' + name]
+                val = self.metadata['train:' + name]
 
                 if isinstance(val[0], float):
                     new_output[:, 0] = val
