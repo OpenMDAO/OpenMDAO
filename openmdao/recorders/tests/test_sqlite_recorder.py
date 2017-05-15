@@ -18,7 +18,7 @@ from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
-from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import ConvergeDiverge
 
@@ -472,6 +472,46 @@ class TestSqliteRecorder(unittest.TestCase):
                             }
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, expected_objectives, expected_constraints),), self.eps)
+
+    def test_record_system_with_hierarchy(self):
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+
+        prob = Problem()
+        model = prob.model = SellarDerivativesGrouped()
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = True
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        self.recorder.options['record_inputs'] = True
+        self.recorder.options['record_outputs'] = True
+        self.recorder.options['record_residuals'] = True
+        self.recorder.options['record_metadata'] = True
+
+        prob.model.add_recorder(self.recorder)
+
+        pz = prob.model.get_subsystem('pz')
+        pz.add_recorder(self.recorder)
+
+        mda = prob.model.get_subsystem('mda')
+        d1 = mda.get_subsystem('d1')
+        d1.add_recorder(self.recorder)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_driver()
+        prob.cleanup()
 
     def qqq_test_record_solver(self):
         self.setup_sellar_model()

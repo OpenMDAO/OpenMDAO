@@ -253,7 +253,7 @@ class SqliteRecorder(BaseRecorder):
         inputs_array = outputs_array = residuals_array = None
 
         # Inputs
-        if self.options['record_inputs'] and inputs:
+        if self.options['record_inputs'] and inputs._names:
             ins = {}
             if 'i' in self._filtered_system:
                 # use filtered inputs
@@ -274,7 +274,7 @@ class SqliteRecorder(BaseRecorder):
                 inputs_array[name] = value
 
         # Outputs
-        if self.options['record_outputs'] and outputs:
+        if self.options['record_outputs'] and outputs._names:
             outs = {}
 
             if 'o' in self._filtered_system:
@@ -296,7 +296,7 @@ class SqliteRecorder(BaseRecorder):
                 outputs_array[name] = value
 
         # Residuals
-        if self.options['record_residuals'] and residuals:
+        if self.options['record_residuals'] and residuals._names:
             resids = {}
 
             if 'r' in self._filtered_system:
