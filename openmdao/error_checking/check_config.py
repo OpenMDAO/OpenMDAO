@@ -163,7 +163,7 @@ def _check_dataflow(group, logger):
 
     if cycles:
         logger.warning("Group '%s' has the following cycles: %s" %
-                       (system.pathname, cycles))
+                       (group.pathname, cycles))
         for i, cycle in enumerate(cycles):
             # keep track of cycles so we can detect when a system in
             # one cycle is out of order with a system in a different cycle.
