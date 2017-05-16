@@ -1,7 +1,6 @@
 """Define the base Jacobian class."""
 from __future__ import division
 import numpy as np
-from six.moves import range
 
 from scipy.sparse import issparse
 
@@ -86,7 +85,7 @@ class Jacobian(object):
         jac = self._subjacs[abs_key]
 
         if isinstance(jac, np.ndarray):
-            self._subjacs[abs_key] = val * jac
+            self._subjacs[abs_key] *= val
         elif isinstance(jac, sparse_types):
             self._subjacs[abs_key].data *= val  # DOK not supported
         elif len(jac) == 3:
@@ -163,6 +162,10 @@ class Jacobian(object):
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
         if not issparse(subjac):
+            # np.promote_types will choose the smallest dtype that can contain both arguments
+            subjac = np.atleast_1d(subjac)
+            safe_dtype = np.promote_types(subjac.dtype, float)
+            subjac = subjac.astype(safe_dtype, copy=False)
             if abs_key not in self._subjacs_info:
                 rows = None
             else:
@@ -171,28 +174,32 @@ class Jacobian(object):
             if rows is None:
                 # Dense subjac
                 shape = self._abs_key2shape(abs_key)
-                subjac = np.atleast_2d(subjac).reshape(shape)
+                subjac = np.atleast_2d(subjac)
+                if subjac.shape == (1, 1):
+                    subjac = subjac[0, 0] * np.ones(shape, dtype=safe_dtype)
+                else:
+                    subjac = subjac.reshape(shape)
 
-                # np.promote_types will choose the smallest dtype that can contain both arguments
-                safe_dtype = np.promote_types(subjac.dtype, float)
-                subjac = subjac.astype(safe_dtype, copy=False)
+                if abs_key in self._subjacs and self._subjacs[abs_key].shape == shape:
+                    np.copyto(self._subjacs[abs_key], subjac)
+                else:
+                    self._subjacs[abs_key] = subjac
             else:
                 # Sparse subjac
-                subjac = np.atleast_1d(subjac)
                 if subjac.shape == (1,):
-                    subjac = subjac[0] * np.ones(rows.shape, dtype=subjac.dtype)
+                    subjac = subjac[0] * np.ones(rows.shape, dtype=safe_dtype)
 
                 if subjac.shape != rows.shape:
                     raise ValueError("Sub-jacobian for key %s has "
                                      "the wrong size (%d), expected (%d)." %
                                      (abs_key, len(subjac), len(rows)))
 
-                # np.promote_types will choose the smallest dtype that can contain both
-                # arguments
-                safe_dtype = np.promote_types(subjac.dtype, float)
-                subjac = [subjac.astype(safe_dtype, copy=False), rows, subjac_info['cols']]
-
-        self._subjacs[abs_key] = subjac
+                if abs_key in self._subjacs and subjac.shape == self._subjacs[abs_key][0].shape:
+                    np.copyto(self._subjacs[abs_key][0], subjac)
+                else:
+                    self._subjacs[abs_key] = [subjac, rows, subjac_info['cols']]
+        else:
+            self._subjacs[abs_key] = subjac
 
     def _iter_abs_keys(self):
         """

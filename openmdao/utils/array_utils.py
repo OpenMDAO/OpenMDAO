@@ -28,13 +28,13 @@ def evenly_distrib_idxs(num_divisions, arr_size):
     """
     base = arr_size // num_divisions
     leftover = arr_size % num_divisions
-    sizes = np.ones(num_divisions, dtype="int") * base
+    sizes = np.full(num_divisions, base, dtype=int)
 
     # evenly distribute the remainder across size-leftover procs,
     # instead of giving the whole remainder to one proc
     sizes[:leftover] += 1
 
-    offsets = np.zeros(num_divisions, dtype="int")
+    offsets = np.zeros(num_divisions, dtype=int)
     offsets[1:] = np.cumsum(sizes)[:-1]
 
     return sizes, offsets
