@@ -6,8 +6,6 @@ from openmdao.api import Group, Problem, MetaModel, IndepVarComp, ResponseSurfac
 from openmdao.devtools.testutil import assert_rel_error
 
 from openmdao.devtools.testutil import TestLogger
-from six.moves import cStringIO
-from re import findall
 
 
 class TestMetaModel(unittest.TestCase):
@@ -48,8 +46,7 @@ class TestMetaModel(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']),
-                         .0001)
+        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
 
     def test_sin_metamodel_preset_data(self):
         # preset training data
@@ -87,11 +84,10 @@ class TestMetaModel(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']),
-                         .0001)
+        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
 
+    @unittest.skip('not currently supported')
     def test_sin_metamodel_obj_return(self):
-
         # create a MetaModel for Sin and add it to a Problem
         sin_mm = MetaModel()
         sin_mm.add_input('x', 0.)
@@ -103,6 +99,7 @@ class TestMetaModel(unittest.TestCase):
         # check that missing surrogate is detected in check_setup
         testlogger = TestLogger()
         prob.setup(logger=testlogger)
+
         msg = ("No default surrogate model is defined and the "
                "following outputs do not have a surrogate model:\n"
                "['f_x']\n"
@@ -126,7 +123,7 @@ class TestMetaModel(unittest.TestCase):
 
         prob.run_model()
         assert_rel_error(self, prob['sin_mm.f_x'][0], np.sin(2.1), 1e-4) # mean
-        self.assertTrue(self, prob['sin_mm.f_x'][1] < 1e-5) #std deviation
+        self.assertTrue(self, prob['sin_mm.f_x'][1] < 1e-5) # std deviation
 
     def test_basics(self):
         # create a metamodel component
@@ -236,7 +233,6 @@ class TestMetaModel(unittest.TestCase):
         assert_rel_error(self, prob['mm.y2'], 4.0, .00001)
 
     def test_vector_inputs(self):
-
         mm = MetaModel()
         mm.add_input('x', np.zeros(4))
         mm.add_output('y1', 0.)
@@ -320,7 +316,6 @@ class TestMetaModel(unittest.TestCase):
         assert_rel_error(self, prob['mm.y'], np.array([1.0, 7.0]), .00001)
 
     def test_unequal_training_inputs(self):
-
         mm = MetaModel()
         mm.add_input('x', 0.)
         mm.add_input('y', 0.)
@@ -398,7 +393,7 @@ class TestMetaModel(unittest.TestCase):
         assert_rel_error(self, Jf[0][0], -1., 1.e-3)
         assert_rel_error(self, Jr[0][0], -1., 1.e-3)
 
-        # TODO: complex step not supported yet in check_partial_derivs
+        # TODO: complex step not currently supported in check_partial_derivs
         # data = prob.check_partial_derivs(global_options={'method': 'cs'})
 
         abs_errors = data['mm'][('f', 'x')]['abs error']
