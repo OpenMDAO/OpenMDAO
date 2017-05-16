@@ -1,8 +1,5 @@
 """Metamodel provides basic Meta Modeling capability."""
 
-from __future__ import print_function
-
-import sys
 import numpy as np
 from copy import deepcopy
 
@@ -219,7 +216,11 @@ class MetaModel(ExplicitComponent):
         for name, shape in self._surrogate_output_names:
             surrogate = self._metadata(name).get('surrogate')
             if surrogate:
-                outputs[name] = surrogate.predict(inputs)
+                predicted = surrogate.predict(inputs)
+                if isinstance(predicted, np.ndarray) and len(predicted.shape) > 1:
+                    outputs[name] = predicted[0]
+                else:
+                    outputs[name] = predicted
             else:
                 raise RuntimeError("Metamodel '%s': No surrogate specified for output '%s'"
                                    % (self.pathname, name))
@@ -307,7 +308,6 @@ class MetaModel(ExplicitComponent):
             if num_old_pts > 0:
                 inputs[:num_old_pts, :] = self._training_input
             new_input = inputs[num_old_pts:, :]
-
         else:
             inputs = np.zeros((num_sample, self._input_size))
             new_input = inputs
