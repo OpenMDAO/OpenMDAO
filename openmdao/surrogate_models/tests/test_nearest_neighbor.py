@@ -28,7 +28,7 @@ class TestLinearInterpolator1D(unittest.TestCase):
     def test_training(self):
         for x0, y0 in zip(self.x, self.y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_rel_error(self, mu, [y0], 1e-9)
 
     def test_prediction(self):
         test_x = np.array([[0.5], [1.5], [2.5]])
@@ -36,7 +36,7 @@ class TestLinearInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_rel_error(self, mu, [y0], 1e-9)
 
     def test_bulk_prediction(self):
         test_x = np.array([[0.5], [1.5], [2.5]])
@@ -50,7 +50,7 @@ class TestLinearInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_deriv):
             jac = self.surrogate.linearize(x0)
-            assert_rel_error(self, jac, y0, 1e-9)
+            assert_rel_error(self, jac, [y0], 1e-9)
 
     def test_pt_cache(self):
         test_x = np.array([[0.5]])
@@ -79,7 +79,7 @@ class TestLinearInterpolatorND(unittest.TestCase):
     def test_training(self):
         for x0, y0 in zip(self.x, self.y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_rel_error(self, mu, [y0], 1e-9)
 
     def test_prediction(self):
         test_x = np.array([[1., 0.5],
@@ -99,7 +99,7 @@ class TestLinearInterpolatorND(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_rel_error(self, mu, [y0], 1e-9)
 
     def test_bulk_prediction(self):
         test_x = np.array([[1., 0.5],
@@ -157,7 +157,7 @@ class TestWeightedInterpolator1D(unittest.TestCase):
     def test_training(self):
         for x0, y0 in zip(self.x, self.y):
             mu = self.surrogate.predict(x0, n=3)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_rel_error(self, mu, [y0], 1e-9)
 
     def test_prediction(self):
         test_x = np.array([[0.5], [1.5], [2.5]])
@@ -165,7 +165,7 @@ class TestWeightedInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_y):
             mu = self.surrogate.predict(x0, n=3)
-            assert_rel_error(self, mu, y0, 1e-8)
+            assert_rel_error(self, mu, [y0], 1e-8)
 
     def test_bulk_prediction(self):
 
@@ -181,7 +181,9 @@ class TestWeightedInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_deriv):
             jac = self.surrogate.linearize(x0, n=3)
-            assert_rel_error(self, jac, y0, 1e-6)
+            print('y0:', y0)
+            print('jac:', jac)
+            assert_rel_error(self, jac, [y0], 1e-6)
 
     def test_pt_cache(self):
         test_x = np.array([[0.5]])
@@ -210,7 +212,7 @@ class TestWeightedInterpolatorND(unittest.TestCase):
     def test_training(self):
         for x0, y0 in zip(self.x, self.y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_rel_error(self, mu, [y0], 1e-9)
 
     def test_prediction(self):
         test_x = np.array([[1., 0.5],
@@ -237,7 +239,7 @@ class TestWeightedInterpolatorND(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_y):
             mu = self.surrogate.predict(x0, n=5, dist_eff=3)
-            assert_rel_error(self, mu, y0, 1e-6)
+            assert_rel_error(self, mu, [y0], 1e-6)
 
     def test_bulk_prediction(self):
         test_x = np.array([[1., 0.5],
@@ -294,7 +296,7 @@ class TestRBFInterpolator1D(unittest.TestCase):
     def test_training(self):
         for x0, y0 in zip(self.x, self.y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_rel_error(self, mu, [y0], 1e-9)
 
     def test_prediction(self):
         test_x = np.array([[0.5], [1.5], [2.5]])
@@ -302,7 +304,7 @@ class TestRBFInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-8)
+            assert_rel_error(self, mu, [y0], 1e-8)
 
     def test_bulk_prediction(self):
 
@@ -318,7 +320,7 @@ class TestRBFInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_deriv):
             jac = self.surrogate.linearize(x0)
-            assert_rel_error(self, jac, y0, 1e-6)
+            assert_rel_error(self, jac, [y0], 1e-6)
 
     def test_pt_cache(self):
         test_x = np.array([[0.5]])
@@ -347,7 +349,7 @@ class TestRBFInterpolatorND(unittest.TestCase):
     def test_training(self):
         for x0, y0 in zip(self.x, self.y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_rel_error(self, mu, [y0], 1e-9)
 
     def test_prediction(self):
         test_x = np.array([[1., 0.5],
@@ -372,7 +374,7 @@ class TestRBFInterpolatorND(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-6)
+            assert_rel_error(self, mu, [y0], 1e-6)
 
     def test_bulk_prediction(self):
         test_x = np.array([[1., 0.5],
