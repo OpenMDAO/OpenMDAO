@@ -181,8 +181,6 @@ class TestWeightedInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_deriv):
             jac = self.surrogate.linearize(x0, n=3)
-            print('y0:', y0)
-            print('jac:', jac)
             assert_rel_error(self, jac, [y0], 1e-6)
 
     def test_pt_cache(self):
