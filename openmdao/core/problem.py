@@ -19,13 +19,11 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
-from openmdao.vectors.default_vector import DefaultVector
 
-from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
-from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.mpi import FakeComm
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
+from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
@@ -489,7 +487,7 @@ class Problem(object):
                                 elif sparse.issparse(deriv_value):
                                     deriv_value = deriv_value.todense()
 
-                            partials_data[c_name][rel_key][jac_key] = deriv_value
+                            partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
                     if explicit:
                         comp._negate_jac()
@@ -720,7 +718,6 @@ class Problem(object):
                 in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
                 start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
                 end = np.sum(model._var_sizes['output'][:iproc + 1, in_var_idx])
-                total_size = np.sum(model._var_sizes['output'][:, in_var_idx])
 
                 if input_name in input_vois:
                     in_idxs = input_vois[input_name]['indices']
@@ -735,9 +732,6 @@ class Problem(object):
                     irange = range(end - start)
                     loc_size = end - start
                     dup = True
-                # else:  # distributed full var
-                #     irange = range(total_size)
-                #     loc_size = end - start
 
                 for idx in irange:
 

@@ -1,5 +1,4 @@
 """Define the CSCmatrix class."""
-from __future__ import division
 
 import numpy as np
 from scipy.sparse import coo_matrix

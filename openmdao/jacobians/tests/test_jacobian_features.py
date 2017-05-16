@@ -367,6 +367,38 @@ class TestJacobianFeatures(unittest.TestCase):
         for deriv, val in iteritems(expected_subjacs):
             assert_rel_error(self, jac[deriv], val, 1e-6)
 
+    def test_reference(self):
+        class TmpComp(ExplicitComponent):
+
+            def initialize(self):
+                self.A = np.ones((3, 3))
+
+            def initialize_variables(self):
+                self.add_output('y', shape=(3,))
+                self.add_output('z', shape=(3,))
+                self.add_input('x', shape=(3,), units='degF')
+
+            def compute_partial_derivs(self, inputs, outputs, partials):
+                partials['y', 'x'] = self.A
+                partials['z', 'x'] = self.A
+
+        p = Problem()
+        model = p.model = Group()
+        indep = model.add_subsystem('indep', IndepVarComp(), promotes=['*'])
+
+        indep.add_output('x', val=100., shape=(3,), units='degK')
+
+        model.add_subsystem('comp', TmpComp(), promotes=['*'])
+
+        p.setup()
+        p.run_model()
+        totals = p.compute_total_derivs(['y', 'z'], ['x'])
+        expected_totals = {
+            ('y', 'x'): 9/5 * np.ones((3, 3)),
+            ('z', 'x'): 9/5 * np.ones((3, 3)),
+        }
+        assert_rel_error(self, totals, expected_totals, 1e-6)
+
 
 class TestJacobianForDocs(unittest.TestCase):
     def test_const_jacobian(self):

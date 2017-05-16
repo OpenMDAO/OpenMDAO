@@ -18,7 +18,7 @@ from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation
-from openmdao.utils.name_maps import rel_name2abs_name, rel_key2abs_key, abs_key2rel_key
+from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 
 # Object to represent default value for `add_output`.
