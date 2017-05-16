@@ -100,7 +100,8 @@ class MetaModel(ExplicitComponent):
             by the problem later.
         """
         metadata = super(MetaModel, self).add_input(name, val, **kwargs)
-        input_size = metadata['shape'][0]
+        input_size = metadata['value'].size
+
         self._surrogate_input_names.append((name, input_size))
         self._input_size += input_size
 

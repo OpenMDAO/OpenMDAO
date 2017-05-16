@@ -48,9 +48,8 @@ class TestMetaModel(unittest.TestCase):
 
         prob.run_model()
 
-        self.assertAlmostEqual(prob['sin_mm.f_x'],
-                               .5*np.sin(prob['sin_mm.x']),
-                               places=4)
+        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']),
+                         .0001)
 
     def test_sin_metamodel_preset_data(self):
         # preset training data
@@ -88,9 +87,8 @@ class TestMetaModel(unittest.TestCase):
 
         prob.run_model()
 
-        self.assertAlmostEqual(prob['sin_mm.f_x'],
-                               .5*np.sin(prob['sin_mm.x']),
-                               places=4)
+        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']),
+                         .0001)
 
     def test_sin_metamodel_obj_return(self):
 
