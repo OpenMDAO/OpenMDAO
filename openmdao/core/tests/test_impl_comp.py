@@ -1,9 +1,10 @@
 """Simple example demonstrating how to implement an implicit component."""
 from __future__ import division
 
-from six.moves import cStringIO
-
 import unittest
+
+from six.moves import cStringIO
+import numpy as np
 
 from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, \
                          ScipyIterativeSolver
@@ -207,6 +208,10 @@ class TestImplCompSimple(unittest.TestCase):
         prob['pa.a'] = 1.
         prob['pb.b'] = -4.
         prob['pc.c'] = 3.
+
+        # Making sure that guess_nonlinear is called early enough to eradicate this.
+        prob['comp2.x'] = np.NaN
+
         prob.run_model()
         assert_rel_error(self, prob['comp2.x'], 3.)
 
