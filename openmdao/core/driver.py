@@ -137,7 +137,7 @@ class Driver(object):
         dict
            Dictionary containing values of each response.
         """
-        # TODO: finish this method when we have a driver that requires is.
+        # TODO: finish this method when we have a driver that requires it.
         pass
 
     def get_objective_values(self):
@@ -154,7 +154,11 @@ class Driver(object):
         for name, meta in iteritems(self._objs):
             scaler = meta['scaler']
             adder = meta['adder']
-            val = vec[name].copy()
+            index = meta['index']
+            if index is None:
+                val = vec[name].copy()
+            else:
+                val = vec[name][index]
 
             # Scale objectives
             if adder is not None:
@@ -204,7 +208,12 @@ class Driver(object):
 
             scaler = meta['scaler']
             adder = meta['adder']
-            val = vec[name].copy()
+            indices = meta['indices']
+
+            if indices is None:
+                val = vec[name].copy()
+            else:
+                val = vec[name][indices]
 
             # Scale objectives
             if adder is not None:

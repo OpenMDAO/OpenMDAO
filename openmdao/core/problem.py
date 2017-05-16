@@ -719,10 +719,15 @@ class Problem(object):
                 start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
                 end = np.sum(model._var_sizes['output'][:iproc + 1, in_var_idx])
 
+                in_idxs = None
                 if input_name in input_vois:
-                    in_idxs = input_vois[input_name]['indices']
-                else:
-                    in_idxs = None
+                    in_voi_meta = input_vois[input_name]
+                    if 'indices' in in_voi_meta:
+                        in_idxs = in_voi_meta['indices']
+                    elif 'index' in in_voi_meta:
+                        in_idxs = in_voi_meta['index']
+                        if in_idxs is not None:
+                            in_idxs = np.array([in_idxs], dtype=int)
 
                 dup = False
                 if in_idxs is not None:
@@ -762,10 +767,15 @@ class Problem(object):
                         for oname_count, output_name in enumerate(output_names):
                             out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
                             deriv_val = doutputs._views_flat[output_name]
+                            out_idxs = None
                             if output_name in output_vois:
-                                out_idxs = output_vois[output_name]['indices']
-                            else:
-                                out_idxs = None
+                                out_voi_meta = output_vois[output_name]
+                                if 'indices' in out_voi_meta:
+                                    out_idxs = out_voi_meta['indices']
+                                elif 'index' in out_voi_meta:
+                                    out_idxs = out_voi_meta['index']
+                                    if out_idxs is not None:
+                                        out_idxs = np.array([out_idxs], dtype=int)
 
                             if out_idxs is not None:
                                 oidxs = np.logical_and(out_idxs >= start,
