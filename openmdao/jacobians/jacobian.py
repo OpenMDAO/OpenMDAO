@@ -183,7 +183,7 @@ class Jacobian(object):
                 if abs_key in self._subjacs and self._subjacs[abs_key].shape == shape:
                     np.copyto(self._subjacs[abs_key], subjac)
                 else:
-                    self._subjacs[abs_key] = subjac
+                    self._subjacs[abs_key] = subjac.copy()
             else:
                 # Sparse subjac
                 if subjac.shape == (1,):
@@ -197,7 +197,7 @@ class Jacobian(object):
                 if abs_key in self._subjacs and subjac.shape == self._subjacs[abs_key][0].shape:
                     np.copyto(self._subjacs[abs_key][0], subjac)
                 else:
-                    self._subjacs[abs_key] = [subjac, rows, subjac_info['cols']]
+                    self._subjacs[abs_key] = [subjac.copy(), rows, subjac_info['cols']]
         else:
             self._subjacs[abs_key] = subjac
 
@@ -273,6 +273,6 @@ class Jacobian(object):
 
         val = meta['value']
         if val is not None:
-            if negate:
-                val *= -1.
             self._set_abs(abs_key, val)
+            if negate:
+                self._multiply_subjac(abs_key, -1.0)
