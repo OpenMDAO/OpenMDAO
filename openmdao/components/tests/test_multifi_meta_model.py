@@ -32,27 +32,26 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        self.assertEqual(prob['mm.train:x'], [])
-        self.assertEqual(prob['mm.train:x_fi2'], [])
-        self.assertEqual(prob['mm.train:x_fi3'], [])
-        self.assertEqual(prob['mm.train:y'], [])
-        self.assertEqual(prob['mm.train:y_fi2'], [])
-        self.assertEqual(prob['mm.train:y_fi3'], [])
+        self.assertEqual(mm.metadata['train:x'], None)
+        self.assertEqual(mm.metadata['train:x_fi2'], None)
+        self.assertEqual(mm.metadata['train:x_fi3'], None)
+        self.assertEqual(mm.metadata['train:y'], None)
+        self.assertEqual(mm.metadata['train:y_fi2'], None)
+        self.assertEqual(mm.metadata['train:y_fi3'], None)
 
     def test_one_dim_one_fidelity_training(self):
-
         mm = MultiFiMetaModel()
+        surr = MockSurrogate()
 
         mm.add_input('x', 0.)
-        surr = MockSurrogate()
         mm.add_output('y', 0., surrogate=surr)
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        prob['mm.train:x'] = [0.0, 0.4, 1.0]
-        prob['mm.train:y'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.metadata['train:x'] = [0.0, 0.4, 1.0]
+        mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195]
 
         expected_xtrain=[np.array([ [0.0], [0.4], [1.0] ])]
         expected_ytrain=[np.array([ [3.02720998], [0.11477697], [15.82973195] ])]
@@ -68,21 +67,21 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr.xpredict, expected_xpredict)
 
     def test_one_dim_bi_fidelity_training(self):
-
         mm = MultiFiMetaModel(nfi=2)
-        mm.add_input('x', 0.)
         surr = MockSurrogate()
+
+        mm.add_input('x', 0.)
         mm.add_output('y', 0., surrogate=surr)
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        prob['mm.train:x']= [0.0, 0.4, 1.0]
-        prob['mm.train:x_fi2'] = [0.1, 0.2, 0.3, 0.5, 0.6,
+        mm.metadata['train:x']= [0.0, 0.4, 1.0]
+        mm.metadata['train:x_fi2'] = [0.1, 0.2, 0.3, 0.5, 0.6,
                                   0.7, 0.8, 0.9, 0.0, 0.4, 1.0]
-        prob['mm.train:y'] = [3.02720998, 0.11477697, 15.82973195]
-        prob['mm.train:y_fi2'] = [-9.32828839, -8.31986355, -7.00778837,
+        mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.metadata['train:y_fi2'] = [-9.32828839, -8.31986355, -7.00778837,
                                   -4.54535129, -4.0747189 , -5.30287702,
                                   -4.47456522, 1.85597517, -8.48639501,
                                   -5.94261151, 7.91486597]
@@ -101,10 +100,11 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
     def test_two_dim_bi_fidelity_training(self):
         mm = MultiFiMetaModel(nfi=2)
-        mm.add_input('x1', 0.)
-        mm.add_input('x2', 0.)
         surr_y1 = MockSurrogate()
         surr_y2 = MockSurrogate()
+
+        mm.add_input('x1', 0.)
+        mm.add_input('x2', 0.)
         mm.add_output('y1', 0., surrogate=surr_y1)
         mm.add_output('y2', 0., surrogate=surr_y2)
 
@@ -112,14 +112,14 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        prob['mm.train:x1']     = [1.0, 2.0, 3.0]
-        prob['mm.train:x1_fi2'] = [1.1, 2.1, 3.1, 1.0, 2.0, 3.0]
-        prob['mm.train:x2']     = [1.0, 2.0, 3.0]
-        prob['mm.train:x2_fi2'] = [2.1, 2.2, 2.3, 1.0, 2.0, 3.0]
-        prob['mm.train:y1']     = [0.0, 0.1, 0.2]
-        prob['mm.train:y1_fi2'] = [3.0, 3.1, 3.3, 3.4, 3.5 ,3.6]
-        prob['mm.train:y2']     = [4.0, 4.0, 4.0]
-        prob['mm.train:y2_fi2'] = [4.0, 4.1, 4.3, 4.4, 4.5 ,4.6]
+        mm.metadata['train:x1']     = [1.0, 2.0, 3.0]
+        mm.metadata['train:x1_fi2'] = [1.1, 2.1, 3.1, 1.0, 2.0, 3.0]
+        mm.metadata['train:x2']     = [1.0, 2.0, 3.0]
+        mm.metadata['train:x2_fi2'] = [2.1, 2.2, 2.3, 1.0, 2.0, 3.0]
+        mm.metadata['train:y1']     = [0.0, 0.1, 0.2]
+        mm.metadata['train:y1_fi2'] = [3.0, 3.1, 3.3, 3.4, 3.5 ,3.6]
+        mm.metadata['train:y2']     = [4.0, 4.0, 4.0]
+        mm.metadata['train:y2_fi2'] = [4.0, 4.1, 4.3, 4.4, 4.5 ,4.6]
 
         prob.run()
         expected_xtrain=[np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]),
@@ -141,19 +141,21 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
     def test_multifidelity_warm_start(self):
         mm = MultiFiMetaModel(nfi=2)
-        mm.add_input('x', 0.)
         surr = MockSurrogate()
+
+        mm.add_input('x', 0.)
         mm.add_output('y', 0., surrogate=surr)
+
         mm.warm_restart=True
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        prob['mm.train:x']     = [0.0, 0.4, 1.0]
-        prob['mm.train:x_fi2'] = [0.1, 0.2, 0.3, 0.5, 0.6]
-        prob['mm.train:y']     = [1.0, 1.4, 2.0]
-        prob['mm.train:y_fi2'] = [1.1, 1.2, 1.3, 1.5, 1.6]
+        mm.metadata['train:x']     = [0.0, 0.4, 1.0]
+        mm.metadata['train:x_fi2'] = [0.1, 0.2, 0.3, 0.5, 0.6]
+        mm.metadata['train:y']     = [1.0, 1.4, 2.0]
+        mm.metadata['train:y_fi2'] = [1.1, 1.2, 1.3, 1.5, 1.6]
 
         prob.run()
         expected_xtrain=[np.array([[0.0], [0.4], [1.0]]),
@@ -167,10 +169,10 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr.ytrain[1], expected_ytrain[1])
 
         # Test adding only one lowest fidelity sample
-        prob['mm.train:x'] = []
-        prob['mm.train:y'] = []
-        prob['mm.train:x_fi2'] = [2.0]
-        prob['mm.train:y_fi2'] = [1.0]
+        mm.metadata['train:x'] = []
+        mm.metadata['train:y'] = []
+        mm.metadata['train:x_fi2'] = [2.0]
+        mm.metadata['train:y_fi2'] = [1.0]
         mm.train=True
 
         prob.run()
@@ -185,10 +187,10 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr.ytrain[1], expected_ytrain[1])
 
         # Test adding high and low fidelity points
-        prob['mm.train:x']     = [3.0]
-        prob['mm.train:x_fi2'] = [3.0]
-        prob['mm.train:y']     = [4.0]
-        prob['mm.train:y_fi2'] = [4.0]
+        mm.metadata['train:x']     = [3.0]
+        mm.metadata['train:x_fi2'] = [3.0]
+        mm.metadata['train:y']     = [4.0]
+        mm.metadata['train:y_fi2'] = [4.0]
 
         mm.train = True
         prob.run()

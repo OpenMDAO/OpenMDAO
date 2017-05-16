@@ -110,6 +110,8 @@ class MetaModel(ExplicitComponent):
         if training_data is not None:
             self.metadata[train_name] = training_data
 
+        return metadata
+
     def add_output(self, name, val=_NotSet, training_data=None, num_training_points=None, **kwargs):
         """
         Add an output to this component and a corresponding training output.
@@ -145,6 +147,8 @@ class MetaModel(ExplicitComponent):
         self.metadata.declare(train_name, desc='Training data for %s' % name)
         if training_data is not None:
             self.metadata[train_name] = training_data
+
+        return metadata
 
     def _setup_vars(self, recurse=True):
         """

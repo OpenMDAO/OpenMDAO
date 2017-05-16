@@ -31,8 +31,8 @@ class TestKrigingSurrogate(unittest.TestCase):
 
         for x0, y0 in zip(x, y):
             mu, sigma = surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
-            assert_rel_error(self, sigma, 0, 1e-5)
+            assert_rel_error(self, mu, [y0], 1e-9)
+            assert_rel_error(self, sigma, [[0]], 1e-5)
 
     def test_1d_predictor(self):
         x = np.array([[0.0], [2.0], [3.0], [4.0], [6.0]])
@@ -44,8 +44,8 @@ class TestKrigingSurrogate(unittest.TestCase):
         new_x = np.array([3.5])
         mu, sigma = surrogate.predict(new_x)
 
-        assert_rel_error(self, mu, branin_1d(new_x), 1e-1)
-        assert_rel_error(self, sigma, 0.07101449, 1e-2)
+        assert_rel_error(self, mu, [[branin_1d(new_x)]], 1e-1)
+        assert_rel_error(self, sigma, [[0.07101449]], 1e-2)
 
     def test_1d_ill_conditioned(self):
         # Test for least squares solver utilization when ill-conditioned
@@ -56,7 +56,7 @@ class TestKrigingSurrogate(unittest.TestCase):
         new_x = np.array([0.5])
         mu, sigma = surrogate.predict(new_x)
         self.assertTrue(sigma < 1.e-5)
-        assert_rel_error(self, mu, np.sin(0.5), 1e-5)
+        assert_rel_error(self, mu, [[np.sin(0.5)]], 1e-5)
 
     def test_2d(self):
 
@@ -69,13 +69,13 @@ class TestKrigingSurrogate(unittest.TestCase):
 
         for x0, y0 in zip(x, y):
             mu, sigma = surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
-            assert_rel_error(self, sigma, 0, 1e-4)
+            assert_rel_error(self, mu, [y0], 1e-9)
+            assert_rel_error(self, sigma, [[0]], 1e-4)
 
         mu, sigma = surrogate.predict([5., 5.])
 
-        assert_rel_error(self, mu, 16.72, 1e-1)
-        assert_rel_error(self, sigma, 15.27, 1e-2)
+        assert_rel_error(self, mu, [[16.72]], 1e-1)
+        assert_rel_error(self, sigma, [[15.27]], 1e-2)
 
     def test_no_training_data(self):
         surrogate = KrigingSurrogate()
@@ -110,8 +110,8 @@ class TestKrigingSurrogate(unittest.TestCase):
 
         for x0, y0 in zip(x, y):
             mu, sigma = surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
-            assert_rel_error(self, sigma, 0, 1e-6)
+            assert_rel_error(self, mu, [y0], 1e-9)
+            assert_rel_error(self, sigma, [[0]], 1e-6)
 
     def test_vector_output(self):
         surrogate = KrigingSurrogate(nugget=0., eval_rmse=True)
@@ -123,8 +123,8 @@ class TestKrigingSurrogate(unittest.TestCase):
 
         for x0, y0 in zip(x, y):
             mu, sigma = surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
-            assert_rel_error(self, sigma, 0, 1e-6)
+            assert_rel_error(self, mu, [y0], 1e-9)
+            assert_rel_error(self, sigma, [[0, 0]], 1e-6)
 
     def test_scalar_derivs(self):
         surrogate = KrigingSurrogate(nugget=0.)

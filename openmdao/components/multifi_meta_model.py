@@ -134,16 +134,17 @@ class MultiFiMetaModel(MetaModel):
             For advanced users only. ID or color for this variable, relevant for
             reconfigurability. Default is 0.
         """
-        super(MultiFiMetaModel, self).add_input(name, val, **kwargs)
+        metadata = super(MultiFiMetaModel, self).add_input(name, val, **kwargs)
+        input_size = metadata['value'].size
+
         self._input_sizes[0] = self._input_size
 
         # Add train:<invar>_fi<n>
         for fi in range(self._nfi):
             if fi > 0:
                 name_with_fi = 'train:' + _get_name_fi(name, fi)
-                metadata = super(MetaModel, self).add_input(
-                    name_with_fi, val=[])
-                self._input_sizes[fi] += metadata['shape'][0]
+                self.metadata.declare(name_with_fi, desc='Training data for %s' % name_with_fi)
+                self._input_sizes[fi] += input_size
 
     def add_output(self, name, val=_NotSet, **kwargs):
         """
@@ -196,7 +197,7 @@ class MultiFiMetaModel(MetaModel):
         for fi in range(self._nfi):
             if fi > 0:
                 name_with_fi = 'train:' + _get_name_fi(name, fi)
-                super(MetaModel, self).add_input(name_with_fi, val=[])
+                self.metadata.declare(name_with_fi, desc='Training data for %s' % name_with_fi)
 
     def _train(self):
         """
@@ -211,7 +212,7 @@ class MultiFiMetaModel(MetaModel):
         for name, sz in self._surrogate_input_names:
             for fi in range(self._nfi):
                 name = _get_name_fi(name, fi)
-                val = self._inputs['train:' + name]
+                val = self.metadata['train:' + name]
                 if num_sample[fi] is None:
                     num_sample[fi] = len(val)
                 elif len(val) != num_sample[fi]:
@@ -224,7 +225,7 @@ class MultiFiMetaModel(MetaModel):
         for name, shape in self._surrogate_output_names:
             for fi in range(self._nfi):
                 name = _get_name_fi(name, fi)
-                val = self._inputs['train:' + name]
+                val = self.metadata['train:' + name]
                 if len(val) != num_sample[fi]:
                     msg = "MetaModel: Each variable must have the same number" \
                           " of training points. Expected {0} but found {1} " \
@@ -256,7 +257,7 @@ class MultiFiMetaModel(MetaModel):
             for fi in range(self._nfi):
                 if num_sample[fi] > 0:
                     name = _get_name_fi(name, fi)
-                    val = self._inputs['train:' + name]
+                    val = self.metadata['train:' + name]
                     if isinstance(val[0], float):
                         new_inputs[fi][:, idx[fi]] = val
                         idx[fi] += 1
@@ -289,7 +290,7 @@ class MultiFiMetaModel(MetaModel):
                         self._training_output[name].extend(outputs)
                         new_outputs = outputs
 
-                    val = self._inputs['train:' + name_fi]
+                    val = self.metadata['train:' + name_fi]
 
                     if isinstance(val[0], float):
                         new_outputs[fi][:, 0] = val
@@ -299,7 +300,7 @@ class MultiFiMetaModel(MetaModel):
                                 v = np.array(v)
                             new_outputs[fi][row_idx, :] = v.flat
 
-            surrogate = self._init_unknowns_dict[name].get('surrogate')
+            surrogate = self._metadata(name).get('surrogate')
             if surrogate is not None:
                 surrogate.train_multifi(self._training_input,
                                         self._training_output[name])
