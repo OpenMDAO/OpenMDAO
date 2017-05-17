@@ -110,6 +110,17 @@ Drivers (optimizers and DOE)
 Saving your data
 ================================
 
+
+Surrogate models
+================
+
+.. toctree::
+   :maxdepth: 1
+
+   features/surrogate
+   features/surrogate/single_output
+   features/surrogate/mult_outputs
+
 Visualization
 ================================
 
