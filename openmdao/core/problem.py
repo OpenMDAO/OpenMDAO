@@ -738,7 +738,7 @@ class Problem(object):
                     loc_size = end - start
                     dup = True
 
-                for idx in irange:
+                for loc_idx, idx in enumerate(irange):
 
                     # Maybe we don't need to clean up so much at the beginning,
                     # since we clean this every time.
@@ -749,13 +749,11 @@ class Problem(object):
                     # of the specified indices are within the range of interest
                     # for this proc.
                     if start <= idx < end:
-                        loc_idx = idx - start
-                        flat_view[loc_idx] = 1.0
+                        flat_view[idx - start] = 1.0
                         store = True
                     elif dup:
                         # var is duplicated so we don't loop over the full
                         # distributed size
-                        loc_idx = idx
                         store = True
                     else:
                         store = False
@@ -780,7 +778,8 @@ class Problem(object):
                             if out_idxs is not None:
                                 oidxs = np.logical_and(out_idxs >= start,
                                                        out_idxs < end)
-                                deriv_val = deriv_val[oidxs]
+                                out_idxs = out_idxs[oidxs]
+                                deriv_val = deriv_val[out_idxs]
                             len_val = len(deriv_val)
 
                             if nproc > 1:  # var is duplicated

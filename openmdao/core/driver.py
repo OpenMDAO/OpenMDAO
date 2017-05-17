@@ -93,7 +93,11 @@ class Driver(object):
         for name, meta in iteritems(self._designvars):
             scaler = meta['scaler']
             adder = meta['adder']
-            val = vec[name].copy()
+            indices = meta['indices']
+            if indices is None:
+                val = vec[name].copy()
+            else:
+                val = vec[name][indices]
 
             # Scale design variable values
             if adder is not None:
@@ -119,6 +123,9 @@ class Driver(object):
         meta = self._designvars[name]
         scaler = meta['scaler']
         adder = meta['adder']
+        indices = meta['indices']
+        if indices is None:
+            indices = slice(None)
 
         # Scale design variable values
         if scaler is not None:
@@ -126,7 +133,7 @@ class Driver(object):
         if adder is not None:
             value -= adder
 
-        self._problem.model._outputs._views_flat[name][:] = value
+        self._problem.model._outputs._views_flat[name][indices] = value
 
     def get_response_values(self):
         """

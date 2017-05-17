@@ -1600,7 +1600,7 @@ class System(object):
             Value of design var that scales to 0.0 in the driver.
         indices : iter of int, optional
             If a param is an array, these indicate which entries are of
-            interest for this particular response.
+            interest for this particular design variable.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
@@ -1651,6 +1651,9 @@ class System(object):
         dvs['adder'] = None if adder == 0.0 else adder
         dvs['ref'] = ref
         dvs['ref0'] = ref0
+        if indices is not None:
+            dvs['size'] = len(indices)
+            indices = np.atleast_1d(indices)
         dvs['indices'] = indices
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
@@ -1785,9 +1788,15 @@ class System(object):
             resp['upper'] = upper
             resp['equals'] = equals
             resp['linear'] = linear
+            if indices is not None:
+                resp['size'] = len(indices)
+                indices = np.atleast_1d(indices)
             resp['indices'] = indices
+
         else:  # 'obj'
             resp['index'] = index
+            if index is not None:
+                resp['size'] = 1
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
@@ -1916,14 +1925,14 @@ class System(object):
         # Size them all
         vec = self._outputs._views_flat
         for name, data in iteritems(out):
-
-            # Depending on where the designvar was added, the name in the
-            # vectors might be relative instead of absolute. Lucky we have
-            # both.
-            if name in vec:
-                out[name]['size'] = vec[name].size
-            else:
-                out[name]['size'] = vec[out[name]['name']].size
+            if 'size' not in data:
+                # Depending on where the designvar was added, the name in the
+                # vectors might be relative instead of absolute. Lucky we have
+                # both.
+                if name in vec:
+                    data['size'] = vec[name].size
+                else:
+                    data['size'] = vec[out[name]['name']].size
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -1970,7 +1979,8 @@ class System(object):
         # Size them all
         vec = self._outputs._views_flat
         for name in out:
-            out[name]['size'] = vec[name].size
+            if 'size' not in out[name]:
+                out[name]['size'] = vec[name].size
 
         if recurse:
             for subsys in self._subsystems_myproc:
