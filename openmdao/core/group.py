@@ -1,8 +1,6 @@
 """Define the Group class."""
 from __future__ import division
 
-import sys
-
 from six import iteritems, string_types
 from six.moves import range
 from itertools import product, chain
@@ -83,8 +81,6 @@ class Group(System):
         self._responses.update(self._static_responses)
         self.initialize_subsystems()
         self._static_mode = True
-
-        nsub = len(self._subsystems_allprocs)
 
         req_procs = [s.get_req_procs() for s in self._subsystems_allprocs]
         # Call the load balancing algorithm
@@ -184,8 +180,6 @@ class Group(System):
         subsystems_var_range_byset = self._subsystems_var_range_byset
 
         nsub_allprocs = len(self._subsystems_allprocs)
-        num_var = self._num_var
-        num_var_byset = self._num_var_byset
 
         # Here, we count the number of variables (total and by varset) in each subsystem.
         # We do this so that we can compute the offset when we recurse into each subsystem.
@@ -529,8 +523,6 @@ class Group(System):
         abs_in2out = self._conn_abs_in2out
 
         global_abs_in2out = self._conn_global_abs_in2out
-        abs_names_in = self._var_allprocs_abs_names['input']
-        abs_names_out = self._var_allprocs_abs_names['output']
         pathname = self.pathname
 
         # Recursion
@@ -660,7 +652,6 @@ class Group(System):
                     rev_xfer_in[isub][key] = []
                     rev_xfer_out[isub][key] = []
 
-        abs_names_in = self._var_abs_names['input']
         abs2meta_in = self._var_abs2meta['input']
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         allprocs_abs2idx_in = self._var_allprocs_abs2idx['input']
@@ -678,9 +669,6 @@ class Group(System):
             # Only continue if the input exists on this processor
             if abs_in in abs2meta_in:
 
-                idx_in = allprocs_abs2idx_in[abs_in]
-                idx_out = allprocs_abs2idx_out[abs_out]
-
                 # Get meta
                 meta_in = abs2meta_in[abs_in]
                 meta_out = allprocs_abs2meta_out[abs_out]
@@ -688,8 +676,6 @@ class Group(System):
                 # Get varset info
                 set_name_in = meta_in['var_set']
                 set_name_out = meta_out['var_set']
-                iset_in = set2iset_in[set_name_in]
-                iset_out = set2iset_out[set_name_out]
                 idx_byset_in = allprocs_abs2idx_byset_in[abs_in]
                 idx_byset_out = allprocs_abs2idx_byset_out[abs_out]
 
@@ -1085,6 +1071,17 @@ class Group(System):
         float
             absolute error.
         """
+        super(Group, self)._solve_nonlinear()
+
+        # Execute guess_nonlinear if specified.
+        # We need to call this early enough so that any solver that needs initial guesses has
+        # them.
+        # TODO: It is pointless to run this ahead of non-iterative solvers.
+        for sub in self.system_iter(recurse=True):
+            if hasattr(sub, 'guess_nonlinear'):
+                with sub._unscaled_context(outputs=[sub._outputs], residuals=[sub._residuals]):
+                    sub.guess_nonlinear(sub._inputs, sub._outputs, sub._residuals)
+
         result = self._nl_solver.solve()
         self.record_iteration()
         return result
