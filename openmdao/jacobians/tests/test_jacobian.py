@@ -417,6 +417,32 @@ class TestJacobian(unittest.TestCase):
         assert_rel_error(self, prob['G1.C1.y'], 50.0)
         assert_rel_error(self, prob['G1.C2.y'], 243.0)
 
+    def test_declare_partial_reference(self):
+        # Test for a bug where declare partial is given an array reference
+        # that compute also uses and could get corrupted
+
+        class Comp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x', val=1.0, shape=2)
+                self.add_output('y', val=1.0, shape=2)
+            def initialize_partials(self):
+                self.val = 2 * np.ones(2)
+                self.rows = np.arange(2)
+                self.cols = np.arange(2)
+                self.declare_partials(
+                    'y', 'x', val=self.val, rows=self.rows, cols=self.cols)
+            def compute(self, inputs, outputs):
+                outputs['y'][:] = 0.
+                np.add.at(
+                    outputs['y'], self.rows,
+                    self.val * inputs['x'][self.cols])
+
+        prob = Problem(model=Comp())
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['y'], 2 * np.ones(2))
+
     def test_sparse_jac_with_subsolver_error(self):
         prob = Problem()
         indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', 1.0))

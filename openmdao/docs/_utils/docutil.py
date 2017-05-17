@@ -300,6 +300,8 @@ def get_unit_test_source_and_run_outputs(method_path):
     method_name = method_path.split('.')[-1]
     test_module = importlib.import_module(module_path)
     cls = getattr(test_module, class_name)
+    N_PROCS = getattr(cls, 'N_PROCS', 1)
+    use_mpi =  N_PROCS > 1
     meth = getattr(cls, method_name)
     class_source_code = inspect.getsource(cls)
 
@@ -362,7 +364,22 @@ def get_unit_test_source_and_run_outputs(method_path):
         with os.fdopen(fd, 'w') as tmp:
             tmp.write(code_to_run)
             tmp.close()
-        run_outputs = subprocess.check_output(['python', code_to_run_path], stderr=subprocess.STDOUT)
+        if use_mpi:
+            env = os.environ.copy()
+            env['USE_PROC_FILES'] = '1'
+            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', code_to_run_path],
+                                 env=env)
+            p.wait()
+            multi_out_blocks = []
+            for i in range(N_PROCS):
+                with open('%d.out' % i) as f:
+                    multi_out_blocks.append(extract_output_blocks(f.read()))
+                os.remove('%d.out' % i)
+            output_blocks = []
+            for i in range(len(multi_out_blocks[0])):
+                output_blocks.append('\n'.join(["(rank %d) %s" % (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
+        else:
+            run_outputs = subprocess.check_output(['python', code_to_run_path], stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         # Get a traceback like this:
         # Traceback (most recent call last):
@@ -382,6 +399,10 @@ def get_unit_test_source_and_run_outputs(method_path):
             failed = True
             # print("Running of embedded test " + method_path + " in docs failed due to: " + e.output.decode('utf-8'))
             # raise
+    except Exception as err:
+        run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(method_path,
+                                                                                         str(err))
+        failed = True
     finally:
         os.remove(code_to_run_path)
 
@@ -406,25 +427,26 @@ def split_source_into_input_blocks(src):
     '''
     rb = RedBaron(src)
     in_code_blocks = []
-    in_code_block = ""
+    in_code_block = []
     # group code until the first print, then repeat
     for r in rb:
         line = r.dumps()
         if not line.endswith('\n'):
             line += '\n'
-        in_code_block += line
+        in_code_block.append(line)
         if r.type == 'print' or \
             ( len(r.value) == 3 and \
             (r.type, r.value[0].type, r.value[1].type, r.value[2].type) == \
                 ('atomtrailers', 'name', 'name', 'call') and \
                 r.value[1].value in ['run_model', 'run_driver', 'setup'] ):
             # stop and make an input code block
+            in_code_block = ''.join(in_code_block)
             in_code_block = remove_leading_trailing_whitespace_lines(in_code_block)
             in_code_blocks.append(in_code_block)
-            in_code_block = ""
+            in_code_block = []
 
     if in_code_block: # If anything left over
-        in_code_blocks.append(in_code_block)
+        in_code_blocks.append(''.join(in_code_block))
 
     return in_code_blocks
 
@@ -434,7 +456,7 @@ def insert_output_start_stop_indicators(src):
     '''
     rb = RedBaron(src)
 
-    src_with_out_start_stop_indicators = ''
+    src_with_out_start_stop_indicators = []
     input_block_number = 0
     for r in rb:
         line = r.dumps()
@@ -443,18 +465,18 @@ def insert_output_start_stop_indicators(src):
             line += '\n'
         if r.type == 'print':
             # src_with_out_start_stop_indicators += 'print("<<<<<{}")'.format(input_block_number) + '\n'
-            src_with_out_start_stop_indicators += line
-            src_with_out_start_stop_indicators += 'print(">>>>>{}")'.format(input_block_number) + '\n'
+            src_with_out_start_stop_indicators.append(line)
+            src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
         elif len(r.value) == 3 and \
             (r.type, r.value[0].type, r.value[1].type, r.value[2].type) == \
                 ('atomtrailers', 'name', 'name', 'call') and \
                 r.value[1].value in ['run_model', 'run_driver', 'setup']:
-            src_with_out_start_stop_indicators += line
-            src_with_out_start_stop_indicators += 'print(">>>>>{}")'.format(input_block_number) + '\n'
+            src_with_out_start_stop_indicators.append(line)
+            src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
         else:
-            src_with_out_start_stop_indicators += line
+            src_with_out_start_stop_indicators.append(line)
         input_block_number += 1
-    return src_with_out_start_stop_indicators
+    return ''.join(src_with_out_start_stop_indicators)
 
 def clean_up_empty_output_blocks(input_blocks, output_blocks):
     '''Some of the blocks do not generate output. We only want to have
@@ -483,13 +505,13 @@ def extract_output_blocks(run_output):
     # Look for start and end lines that look like this:
     #  <<<<<4
     #  >>>>>4
-    output_block = ''
+    output_block = []
     for line in run_output.splitlines():
         if line.startswith('>>>>>'):
-            output_blocks.append(output_block)
-            output_block = ''
+            output_blocks.append('\n'.join(output_block))
+            output_block = []
         else:
-            output_block += line + '\n'
+            output_block.append(line)
 
     return output_blocks
 
@@ -515,6 +537,8 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
         pass
     test_module = importlib.import_module(module_path)
     cls = getattr(test_module, class_name)
+    N_PROCS = getattr(cls, 'N_PROCS', 1)
+    use_mpi =  N_PROCS > 1
     meth = getattr(cls, method_name)
     class_source_code = inspect.getsource(cls)
 
@@ -589,7 +613,22 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
         with os.fdopen(fd, 'w') as tmp:
             tmp.write(code_to_run)
             tmp.close()
-        run_outputs = subprocess.check_output(['python', code_to_run_path], stderr=subprocess.STDOUT)
+        if use_mpi:
+            env = os.environ.copy()
+            env['USE_PROC_FILES'] = '1'
+            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', code_to_run_path],
+                                 env=env)
+            p.wait()
+            multi_out_blocks = []
+            for i in range(N_PROCS):
+                with open('%d.out' % i) as f:
+                    multi_out_blocks.append(extract_output_blocks(f.read()))
+                os.remove('%d.out' % i)
+            output_blocks = []
+            for i in range(len(multi_out_blocks[0])):
+                output_blocks.append('\n'.join(["(rank %d) %s" % (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
+        else:
+            run_outputs = subprocess.check_output(['python', code_to_run_path], stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         # Get a traceback like this:
         # Traceback (most recent call last):
@@ -609,10 +648,14 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
             failed = True
             # print("Running of embedded test " + method_path + " in docs failed due to: " + e.output.decode('utf-8'))
             # raise
+    except Exception as err:
+        run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(method_path,
+                                                                                         str(err))
+        failed = True
     finally:
         os.remove(code_to_run_path)
 
-    if PY3 and not isinstance(run_outputs, str):
+    if PY3 and not use_mpi and not isinstance(run_outputs, str):
         run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
 
     if not skipped and not failed:
@@ -624,7 +667,8 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
         #####################
         ### 6. Extract from run_outputs, the Out blocks -> output_blocks ###
         #####################
-        output_blocks = extract_output_blocks(run_outputs)
+        if not use_mpi:
+            output_blocks = extract_output_blocks(run_outputs)
 
         # Need to deal with the cases when there is no outputblock for a given input block
         # Merge an input block with the previous block and throw away the output block

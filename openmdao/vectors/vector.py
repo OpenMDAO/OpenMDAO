@@ -207,13 +207,12 @@ class Vector(object):
         """
         system = self._system
         type_ = self._typ
-
-        abs_names_t = system._var_abs_names[type_]
+        idx = len(system.pathname) + 1 if system.pathname else 0
 
         iter_list = []
         for abs_name in system._var_abs_names[type_]:
             if abs_name in self._names:
-                rel_name = abs_name[len(system.pathname) + 1:]
+                rel_name = abs_name[idx:]
                 iter_list.append(rel_name)
         return iter(iter_list)
 

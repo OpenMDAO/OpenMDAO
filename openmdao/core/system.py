@@ -2,7 +2,7 @@
 from __future__ import division
 
 from contextlib import contextmanager
-from collections import namedtuple, OrderedDict, Iterable
+from collections import OrderedDict, Iterable
 from fnmatch import fnmatchcase
 import sys
 import inspect
@@ -18,15 +18,12 @@ from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobi
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 
 from openmdao.utils.general_utils import \
-    determine_adder_scaler, format_as_float_or_array, ensure_compatible
+    determine_adder_scaler, format_as_float_or_array
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.record_util import create_local_meta, update_local_meta
-
-# This is for storing various data mapped to var pathname
-PathData = namedtuple("PathData", ['name', 'idx', 'myproc_idx', 'typ'])
 
 
 class System(object):
