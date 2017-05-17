@@ -748,6 +748,8 @@ class Problem(object):
                     # totals to zeros instead of None in those cases when none
                     # of the specified indices are within the range of interest
                     # for this proc.
+                    if idx < 0:
+                        idx += end
                     if start <= idx < end:
                         flat_view[idx - start] = 1.0
                         store = True
@@ -776,9 +778,6 @@ class Problem(object):
                                         out_idxs = np.array([out_idxs], dtype=int)
 
                             if out_idxs is not None:
-                                oidxs = np.logical_and(out_idxs >= start,
-                                                       out_idxs < end)
-                                out_idxs = out_idxs[oidxs]
                                 deriv_val = deriv_val[out_idxs]
                             len_val = len(deriv_val)
 
