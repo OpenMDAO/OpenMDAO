@@ -10,7 +10,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.core.system import System
 from openmdao.core.driver import Driver
-from openmdao.solvers.solver import Solver
+from openmdao.solvers.solver import Solver, NonlinearSolver
 
 import warnings
 
@@ -82,7 +82,7 @@ class BaseRecorder(object):
                              desc='Set to True to record absolute error at the solver level')
         self.options.declare('record_rel_error', type_=bool, default=True,
                              desc='Set to True to record relative error at the solver level')
-        self.options.declare('record_output', type_=bool, default=False,
+        self.options.declare('record_solver_output', type_=bool, default=False,
                              desc='Set to True to record output at the solver level')
         self.options.declare('record_solver_residuals', type_=bool, default=False,
                              desc='Set to True to record residuals at the solver level')
@@ -184,26 +184,29 @@ class BaseRecorder(object):
             }
 
         if (isinstance(object_requesting_recording, Solver)):
-            myabserr = myrelerr = myderivs = set()
+            myoutputs = myresiduals = set()
             incl = self.options['includes']
             excl = self.options['excludes']
 
-            if self.options['record_abs_error']:
-                myabserr = [n for n in object_requesting_recording.get_abs_err()
-                            if self._check_path(n, incl, excl)]
+            if self.options['record_solver_residuals']:
+                if isinstance(object_requesting_recording, NonlinearSolver):
+                    residuals = object_requesting_recording._system._residuals
+                else:  # it's a LinearSolver
+                    residuals = object_requesting_recording._system._vectors['residuals']
+                myresiduals = [n for n in residuals
+                               if self._check_path(n, incl, excl)]
 
-            if self.options['record_rel_error']:
-                myrelerr = [n for n in object_requesting_recording.get_rel_err()
-                            if self._check_path(n, incl, excl)]
-
-            if self.options['record_derivatives']:
-                myderivs = [n for n in object_requesting_recording.get_derivs()
-                            if self._check_path(n, incl, excl)]
+            if self.options['record_solver_output']:
+                if isinstance(object_requesting_recording, NonlinearSolver):
+                    outputs = object_requesting_recording._system._outputs
+                else:  # it's a LinearSolver
+                    outputs = object_requesting_recording._system._vectors['outputs']
+                myoutputs = [n for n in outputs
+                             if self._check_path(n, incl, excl)]
 
             self._filtered_solver = {
-                'ae': myabserr,
-                're': myrelerr,
-                'r': myderivs
+                'out': myoutputs,
+                'res': myresiduals
             }
 
     def _check_path(self, path, includes, excludes):
@@ -233,8 +236,7 @@ class BaseRecorder(object):
         """
         raise NotImplementedError()
 
-    # TODO_RECORDER: change the signature to match what we decided to do with sqlite, hdf5,...
-    def record_iteration(self, object_requesting_recording, metadata):
+    def record_iteration(self, object_requesting_recording, metadata, **kwargs):
         """
         Write the provided data.
 
@@ -253,7 +255,6 @@ class BaseRecorder(object):
             Dictionary containing execution metadata (e.g. iteration coordinate).
         """
         self._counter += 1
-        # raise NotImplementedError()
 
     def close(self):
         """

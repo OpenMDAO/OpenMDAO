@@ -85,6 +85,7 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
 
+
 def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
     """
         expected can be from multiple cases
@@ -127,6 +128,52 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
                     # Check to see if the values in actual and expected match
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
+
+
+def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
+    """
+        expected can be from multiple cases
+    """
+
+    # iterate through the cases
+    for coord, (t0, t1), expected_abs_error, expected_rel_error, expected_output, \
+        expected_solver_residuals in expected:
+
+        iter_coord = format_iteration_coordinate(coord)
+
+        # from the database, get the actual data recorded
+        db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
+        row_actual = db_cur.fetchone()
+
+        counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, output_blob, residuals_blob = row_actual
+
+        output_actual = blob_to_array(output_blob)
+        residuals_actual = blob_to_array(residuals_blob)
+        # Does the timestamp make sense?
+        test.assertTrue( t0 <= timestamp and timestamp <= t1)
+
+        test.assertEqual(success, 1)
+        test.assertEqual(msg, '')
+        test.assertEqual(abs_err, expected_abs_error)
+        test.assertEqual(rel_err, expected_rel_error)
+
+        for vartype, actual, expected in (
+                ('outputs', output_actual, expected_output),
+                ('residuals', residuals_actual, expected_solver_residuals),
+            ):
+
+            if expected is None:
+                test.assertEqual(actual, np.array(None, dtype=object))
+            else:
+                # Check to see if the number of values in actual and expected match
+                test.assertEqual(len(actual[0]), len(expected))
+                for key, value in iteritems(expected):
+                    # Check to see if the keys in the actual and expected match
+                    test.assertTrue(key in actual[0].dtype.names, '{} variable not found in actual data from recorder'.format(key))
+                    # Check to see if the values in actual and expected match
+                    assert_rel_error(test, actual[0][key], expected[key], tolerance)
+        return
+
 
 def _assertMetadataRecorded(test, db_cur):
 
@@ -198,6 +245,12 @@ class TestSqliteRecorder(unittest.TestCase):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertSystemIterationDataRecorded(self, cur, expected, tolerance)
+        con.close()
+
+    def assertSolverIterationDataRecorded(self, expected, tolerance):
+        con = sqlite3.connect(self.filename)
+        cur = con.cursor()
+        _assertSolverIterationDataRecorded(self, cur, expected, tolerance)
         con.close()
 
     def assertMetadataRecorded(self ):
@@ -513,12 +566,12 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-    def qqq_test_record_solver(self):
+    def test_record_solver(self):
         self.setup_sellar_model()
 
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
-        self.recorder.options['record_output'] = True
+        self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
         self.prob.model.nl_solver = NonlinearBlockGS()
         self.prob.model._nl_solver.add_recorder(self.recorder)
@@ -529,22 +582,34 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'obj_cmp', (6, )]
+        coordinate = [0, 'NonlinearBlockGS', (7, )]
 
-        expected_abs_error = {
+        expected_abs_error = 1.31880284470753394998e-10
 
-                            }
+        expected_rel_error = 3.6299074030587596e-12
 
-        expected_rel_error = {
-                            }
+        #make this a dict with the names in the actual _names
+        expected_solver_output = {
+            "con_cmp1.con1": [-22.42830237000701],
+            "d1.y1": [25.58830237000701],
+            "con_cmp2.con2": [-11.941511849375644],
+            "pz.z": [5.0, 2.0],
+            "obj_cmp.obj": [28.588308165163074],
+            "d2.y2": [12.058488150624356],
+            "px.x": [1.0]
+        }
 
         expected_solver_residuals = {
-                            }
+            "con_cmp1.con1": [0.0],
+            "d1.y1": [1.318802844707534e-10],
+            "con_cmp2.con2": [0.0],
+            "pz.z": [0.0, 0.0],
+            "obj_cmp.obj": [0.0],
+            "d2.y2": [0.0],
+            "px.x": [0.0]
+        }
 
-        expected_ouput = {
-                    }
-
-        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
-                                                 expected_solver_residuals, expected_ouput),), self.eps)
+        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
+                                                 expected_solver_output, expected_solver_residuals),), self.eps)
 if __name__ == "__main__":
     unittest.main()

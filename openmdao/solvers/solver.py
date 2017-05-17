@@ -6,6 +6,7 @@ import numpy as np
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.utils.record_util import create_local_meta, update_local_meta
 
 
 class SolverInfo(object):
@@ -50,6 +51,8 @@ class Solver(object):
         Object to store some formatting for iprint that is shared across all solvers.
     options : <OptionsDictionary>
         Options dictionary.
+    metadata : dict
+        Dictionary holding data about this solver.
     supports : <OptionsDictionary>
         Options dictionary describing what features are supported by this
         solver.
@@ -90,6 +93,7 @@ class Solver(object):
         self._declare_options()
         self.options.update(kwargs)
 
+        self.metadata = {}
         self._rec_mgr = RecordingManager()
 
     def add_recorder(self, recorder):
@@ -207,8 +211,9 @@ class Solver(object):
             #  The most basic mode would store just the absolute error and relative error.
             #  A second mode would store the full outputs and residuals.
 
-            metadata = None  # TODO_RECORDERS put actual metadata here
-            self._rec_mgr.record_iteration(self, metadata)
+            metadata = self.metadata = create_local_meta(None, type(self).__name__)
+            update_local_meta(metadata, (self._iter_count,))
+            self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or

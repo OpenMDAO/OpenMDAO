@@ -11,7 +11,7 @@ import sqlite3
 from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
-from openmdao.solvers.solver import Solver
+from openmdao.solvers.solver import Solver, NonlinearSolver
 from openmdao.utils.record_util import format_iteration_coordinate
 
 
@@ -90,7 +90,7 @@ class SqliteRecorder(BaseRecorder):
                          "inputs BLOB, outputs BLOB, residuals BLOB)")
         self.con.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
                          "iteration_coordinate TEXT, timestamp REAL, success INT, msg TEXT, "
-                         "solver_values array)")
+                         "abs_err REAL, rel_err REAL, solver_output BLOB, solver_residuals BLOB)")
 
         self.con.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                          "model_viewer_data BLOB)")
@@ -106,7 +106,7 @@ class SqliteRecorder(BaseRecorder):
         super(SqliteRecorder, self).startup(object_requesting_recording)
         self._counter = 0
 
-    def record_iteration(self, object_requesting_recording, metadata, method=None):
+    def record_iteration(self, object_requesting_recording, metadata, **kwargs):
         """
         Store the provided data in the sqlite file using the iteration coordinate for the key.
         """
@@ -117,10 +117,11 @@ class SqliteRecorder(BaseRecorder):
             self.record_iteration_driver(object_requesting_recording, metadata)
 
         elif isinstance(object_requesting_recording, System):
-            self.record_iteration_system(object_requesting_recording, metadata, method)
+            self.record_iteration_system(object_requesting_recording, metadata, kwargs['method'])
 
         elif isinstance(object_requesting_recording, Solver):
-            self.record_iteration_solver(object_requesting_recording, metadata)
+            self.record_iteration_solver(object_requesting_recording, metadata, kwargs['abs'],
+                                         kwargs['rel'])
 
         else:
             print ("YOU CAN'T ATTACH A RECORDER TO THIS OBJECT")
@@ -329,77 +330,69 @@ class SqliteRecorder(BaseRecorder):
                                                    metadata['msg'], inputs_blob,
                                                    outputs_blob, residuals_blob))
 
-    def record_iteration_solver(self, object_requesting_recording, metadata):
+    def record_iteration_solver(self, object_requesting_recording, metadata, absolute=None,
+                                relative=None):
         """
         Record an iteration using solver options.
         """
-        dtype_tuples = []
+        outputs_array = residuals_array = None
 
         # Go through the recording options of Solver to construct the entry to be inserted.
         if self.options['record_abs_error']:
-            abs_errors = object_requesting_recording.get_abs_error()
-            if abs_errors:
-                for name, value in iteritems(abs_errors):
-                    tple = ('abs_error.' + name, '{}f8'.format(value.shape))
-                    dtype_tuples.append(tple)
+            abs_error = absolute
+        else:
+            abs_error = 0.0
 
         if self.options['record_rel_error']:
-            rel_errors = object_requesting_recording.get_rel_error()
-            if rel_errors:
-                for name, value in iteritems(rel_errors):
-                    tple = ('rel_error.' + name, '{}f8'.format(value.shape))
+            rel_error = relative
+        else:
+            rel_error = 0.0
+
+        if self.options['record_solver_output']:
+            dtype_tuples = []
+
+            if isinstance(object_requesting_recording, NonlinearSolver):
+                outputs = object_requesting_recording._system._outputs
+            else:  # it's a LinearSolver
+                outputs = object_requesting_recording._system._vectors['outputs']
+
+            if outputs._names:
+                for name, value in iteritems(outputs._names):
+                    tple = (name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
-        if self.options['record_output']:
-            outputs = object_requesting_recording.get_output()
-            if outputs:
-                for name, value in iteritems(outputs):
-                    tple = ('output.' + name, '{}f8'.format(value.shape))
-                    dtype_tuples.append(tple)
+                outputs_array = np.zeros((1,), dtype=dtype_tuples)
+
+                for name, value in iteritems(outputs._names):
+                    outputs_array[name] = value
 
         if self.options['record_solver_residuals']:
-            residuals = object_requesting_recording.get_residuals()
-            if residuals:
-                for name, value in iteritems(residuals):
-                    tple = ('residual.' + name, '{}f8'.format(value.shape))
+            dtype_tuples = []
+
+            if isinstance(object_requesting_recording, NonlinearSolver):
+                residuals = object_requesting_recording._system._residuals
+            else:  # it's a LinearSolver
+                residuals = object_requesting_recording._system._vectors['residuals']
+
+            if residuals._names:
+                for name, value in iteritems(residuals._names):
+                    tple = (name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
-        # Create the mega array that we will write to the database
-        # All of this needs to be looked into to be optimized !!
-        solver_values = np.zeros((1,), dtype=dtype_tuples)
+                residuals_array = np.zeros((1,), dtype=dtype_tuples)
+                for name, value in iteritems(residuals._names):
+                    residuals_array[name] = value
 
-        # Write the actual values to this array
-        # Wish we didn't have to loop through this twice
-        if self.options['record_abs_error'] and abs_errors:
-            for name, value in iteritems(abs_errors):
-                solver_values['abs_error.' + name] = value
-        if self.options['record_rel_error'] and rel_errors:
-            for name, value in iteritems(rel_errors):
-                solver_values['rel_error.' + name] = value
-        if self.options['record_output'] and outputs:
-            for name, value in iteritems(outputs):
-                solver_values['output.' + name] = value
-        if self.options['record_solver_residuals'] and residuals:
-            for name, value in iteritems(residuals):
-                solver_values['residual.' + name] = value
+        outputs_blob = array_to_blob(outputs_array)
+        residuals_blob = array_to_blob(residuals_array)
 
-        if self.options['record_solver_residuals']:
-            residuals = object_requesting_recording.get_residuals()
-
-            for name, value in iteritems(residuals):
-                tple = ('residual.' + name, '{}f8'.format(value.shape))
-                dtype_tuples.append(tple)
-            solver_values = np.zeros((1,), dtype=dtype_tuples)
-            for name, value in iteritems(residuals):
-                solver_values['residual.' + name] = value
-
-        # Write this mega array to the database
-        with self.con:
-            self.con.execute("INSERT INTO solver_iterations(iteration_coordinate, timestamp, "
-                             "success, msg, solver_values) "
-                             "VALUES(?,?,?,?,?)", (metadata['coord'], metadata['timestamp'],
-                                                   metadata['success'], metadata['msg'],
-                                                   solver_values))
+        self.con.execute("INSERT INTO solver_iterations(iteration_coordinate, timestamp, "
+                         "success, msg, abs_err, rel_err, solver_output, solver_residuals) "
+                         "VALUES(?,?,?,?,?,?,?,?)", (format_iteration_coordinate(metadata['coord']),
+                                                     metadata['timestamp'],
+                                                     metadata['success'], metadata['msg'],
+                                                     abs_error, rel_error,
+                                                     outputs_blob, residuals_blob))
 
     def record_metadata(self, object_requesting_recording):
         """
