@@ -38,6 +38,14 @@ class TestMetaModel(unittest.TestCase):
         self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate),
                         'sin_mm.f_x should get the default surrogate')
 
+        # check error message when no training data is provided
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+
+        msg = ("MetaModel: The following training data sets must be "
+               "provided as metadata for sin_mm: ['train:x', 'train:f_x']")
+        self.assertEqual(str(cm.exception), msg)
+
         # train the surrogate and check predicted value
         sin_mm.metadata['train:x'] = np.linspace(0,10,20)
         sin_mm.metadata['train:f_x'] = .5*np.sin(sin_mm.metadata['train:x'])

@@ -281,9 +281,14 @@ class MetaModel(ExplicitComponent):
         """
         Train the metamodel, if necessary, using the provided training data.
         """
+        missing_training_data = []
         num_sample = None
         for name, sz in self._surrogate_input_names:
-            val = self.metadata['train:' + name]
+            train_name = 'train:' + name
+            val = self.metadata[train_name]
+            if val is None:
+                missing_training_data.append(train_name)
+                continue
             if num_sample is None:
                 num_sample = len(val)
             elif len(val) != num_sample:
@@ -294,13 +299,23 @@ class MetaModel(ExplicitComponent):
                 raise RuntimeError(msg)
 
         for name, shape in self._surrogate_output_names:
-            val = self.metadata['train:' + name]
+            train_name = 'train:' + name
+            val = self.metadata[train_name]
+            if val is None:
+                missing_training_data.append(train_name)
+                continue
             if len(val) != num_sample:
                 msg = "MetaModel: Each variable must have the same number" \
                       " of training points. Expected {0} but found {1} " \
                       "points for '{2}'." \
                     .format(num_sample, len(val), name)
                 raise RuntimeError(msg)
+
+        if len(missing_training_data) > 0:
+            msg = "MetaModel: The following training data sets must be " \
+                  "provided as metadata for %s: " % self.pathname + \
+                  str(missing_training_data)
+            raise RuntimeError(msg)
 
         if self.warm_restart:
             num_old_pts = self._training_input.shape[0]
