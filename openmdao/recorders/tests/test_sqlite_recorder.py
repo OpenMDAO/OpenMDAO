@@ -588,7 +588,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_rel_error = 3.6299074030587596e-12
 
-        #make this a dict with the names in the actual _names
         expected_solver_output = {
             "con_cmp1.con1": [-22.42830237000701],
             "d1.y1": [25.58830237000701],
