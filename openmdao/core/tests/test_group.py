@@ -419,7 +419,8 @@ class TestGroup(unittest.TestCase):
         p.model.connect('indep.x', 'C1.x', src_indices=[0, 1, 2])
 
         # connect C2.x to the last 2 entries of indep.x
-        p.model.connect('indep.x', 'C2.x', src_indices=[3, 4])
+        # use -2 (same as 3 in this case) to show that negative indices work.
+        p.model.connect('indep.x', 'C2.x', src_indices=[-2, 4])
 
         p.set_solver_print(level=0)
         p.setup()
@@ -434,9 +435,9 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('indep', IndepVarComp('x', np.arange(12).reshape((4,3))))
         p.model.add_subsystem('C1', ExecComp('y=numpy.sum(x)*2.0', x=np.zeros((2,2))))
 
-        # connect C1.x to entries (0,0), (3,1), (2,1), (1,1) of indep.x
+        # connect C1.x to entries (0,0), (-1,1), (2,1), (1,1) of indep.x
         p.model.connect('indep.x', 'C1.x',
-                        src_indices=[[(0,0), (3,1)],
+                        src_indices=[[(0,0), (-1,1)],
                                      [(2,1), (1,1)]])
 
         p.set_solver_print(level=0)

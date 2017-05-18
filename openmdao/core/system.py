@@ -21,6 +21,7 @@ from openmdao.utils.general_utils import \
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
+from openmdao.utils.array_utils import convert_neg
 
 
 class System(object):
@@ -951,7 +952,8 @@ class System(object):
                         else:
                             entries = [list(range(x)) for x in shape_in]
                             cols = np.vstack(src_indices[i] for i in product(*entries))
-                            dimidxs = [cols[:, i] for i in range(cols.shape[1])]
+                            dimidxs = [convert_neg(cols[:, i], shape_out[i])
+                                       for i in range(cols.shape[1])]
                             src_indices = np.ravel_multi_index(dimidxs, shape_out)
                     if not np.isscalar(ref):
                         ref = ref[src_indices]

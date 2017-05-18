@@ -14,6 +14,7 @@ from openmdao.solvers.nl_runonce import NLRunOnce
 from openmdao.solvers.ln_runonce import LNRunOnce
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
+from openmdao.utils.array_utils import convert_neg
 from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 
 
@@ -693,9 +694,12 @@ class Group(System):
                     if len(shape_out) == 1:
                         src_indices = src_indices.flatten()
                     else:
+                        # TODO: this duplicates code found
+                        # in System._setup_scaling.
                         entries = [list(range(x)) for x in shape_in]
                         cols = np.vstack(src_indices[i] for i in product(*entries))
-                        dimidxs = [cols[:, i] for i in range(cols.shape[1])]
+                        dimidxs = [convert_neg(cols[:, i], shape_out[i])
+                                   for i in range(cols.shape[1])]
                         src_indices = np.ravel_multi_index(dimidxs, shape_out)
 
                 # 1. Compute the output indices

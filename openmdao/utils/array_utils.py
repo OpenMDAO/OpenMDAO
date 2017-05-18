@@ -38,3 +38,25 @@ def evenly_distrib_idxs(num_divisions, arr_size):
     offsets[1:] = np.cumsum(sizes)[:-1]
 
     return sizes, offsets
+
+
+def convert_neg(arr, dim):
+    """
+    Convert any negative indices into their positive equivalent.
+
+    Parameters
+    ----------
+    arr : ndarray
+        Array having negative indices converted.
+    dim : int
+        Dimension of the array.
+
+    Returns
+    -------
+    ndarray
+        The converted array.
+    """
+    negs = arr < 0
+    if np.any(negs):
+        arr[negs] += dim
+    return arr
