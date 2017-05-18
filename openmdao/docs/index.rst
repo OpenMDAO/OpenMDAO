@@ -94,6 +94,15 @@ Solvers (nonlinear and linear)
    features/solvers/ln_bjac
    features/solvers/ls_backtracking
 
+Drivers
+=======
+
+.. toctree::
+   :maxdepth: 1
+
+   features/drivers/add_vois
+
+
 Running your models
 ================================
 

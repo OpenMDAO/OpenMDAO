@@ -1600,7 +1600,8 @@ class System(object):
             Value of design var that scales to 0.0 in the driver.
         indices : iter of int, optional
             If a param is an array, these indicate which entries are of
-            interest for this particular design variable.
+            interest for this particular design variable.  These may be
+            positive or negative integers.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
@@ -1826,7 +1827,8 @@ class System(object):
             is second in precedence.
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
-            interest for this particular response.
+            interest for this particular response.  These may be positive or
+            negative integers.
         linear : bool
             Set to True if constraint is linear. Default is False.
 
@@ -1855,7 +1857,8 @@ class System(object):
             Value of response variable that scales to 0.0 in the driver.
         index : int, optional
             If variable is an array, this indicates which entriy is of
-            interest for this particular response.
+            interest for this particular response. This may be a positive
+            or negative integer.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
