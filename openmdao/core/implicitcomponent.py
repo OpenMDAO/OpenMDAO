@@ -52,11 +52,6 @@ class ImplicitComponent(Component):
         # Reconfigure if needed.
         super(ImplicitComponent, self)._solve_nonlinear()
 
-        # Execute guess_nonlinear if specified.
-        if overrides_method('guess_nonlinear', self, ImplicitComponent):
-            with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-                self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
-
         if self._nl_solver is not None:
             return self._nl_solver.solve()
         else:

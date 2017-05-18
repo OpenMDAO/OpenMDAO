@@ -59,6 +59,46 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
         assert_rel_error(self, prob['y'], -7.833334, 1e-6)
 
+    def test_simple_paraboloid_upper_indices(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        size = 3
+        model.add_subsystem('p1', IndepVarComp('x', np.array([50.0]*size)))
+        model.add_subsystem('p2', IndepVarComp('y', np.array([50.0]*size)))
+        model.add_subsystem('comp', ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                             x=np.zeros(size), y=np.zeros(size),
+                                             f_xy=np.zeros(size)))
+        model.add_subsystem('con', ExecComp('c = - x + y',
+                                            c=np.zeros(size), x=np.zeros(size),
+                                            y=np.zeros(size)))
+        
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+        model.connect('p1.x', 'con.x')
+        model.connect('p2.y', 'con.y')
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = False
+
+        model.add_design_var('p1.x', indices=[1], lower=-50.0, upper=50.0)
+        model.add_design_var('p2.y', indices=[1], lower=-50.0, upper=50.0)
+        model.add_objective('comp.f_xy', index=1)
+        model.add_constraint('con.c', indices=[1], upper=-15.0)
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['p1.x'], np.array([50., 7.16667, 50.]), 1e-6)
+        assert_rel_error(self, prob['p2.y'], np.array([50., -7.833334, 50.]), 1e-6)
+
     def test_simple_paraboloid_lower(self):
 
         prob = Problem()

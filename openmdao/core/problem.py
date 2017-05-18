@@ -19,13 +19,11 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
-from openmdao.vectors.default_vector import DefaultVector
 
-from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
-from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.mpi import FakeComm
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
+from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
@@ -321,7 +319,7 @@ class Problem(object):
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
-        all_comps = model.system_iter(typ=Component)
+        all_comps = model.system_iter(typ=Component, include_self=True)
         if comps is None:
             comps = [comp for comp in all_comps]
         else:
@@ -489,7 +487,7 @@ class Problem(object):
                                 elif sparse.issparse(deriv_value):
                                     deriv_value = deriv_value.todense()
 
-                            partials_data[c_name][rel_key][jac_key] = deriv_value
+                            partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
                     if explicit:
                         comp._negate_jac()
@@ -536,8 +534,7 @@ class Problem(object):
                 abs_key = rel_key2abs_key(comp, rel_key)
                 # Since all partials for outputs for explicit comps are declared, assume anything
                 # missing is an input deriv.
-                if (explicit and (abs_key not in subjac_info or
-                                  subjac_info[abs_key]['type'] == 'input')):
+                if explicit and abs_key[1] in comp._var_abs_names['input']:
                     partials_data[c_name][rel_key][jac_key] = -partial
                 else:
                     partials_data[c_name][rel_key][jac_key] = partial
@@ -721,12 +718,16 @@ class Problem(object):
                 in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
                 start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
                 end = np.sum(model._var_sizes['output'][:iproc + 1, in_var_idx])
-                total_size = np.sum(model._var_sizes['output'][:, in_var_idx])
 
+                in_idxs = None
                 if input_name in input_vois:
-                    in_idxs = input_vois[input_name]['indices']
-                else:
-                    in_idxs = None
+                    in_voi_meta = input_vois[input_name]
+                    if 'indices' in in_voi_meta:
+                        in_idxs = in_voi_meta['indices']
+                    elif 'index' in in_voi_meta:
+                        in_idxs = in_voi_meta['index']
+                        if in_idxs is not None:
+                            in_idxs = np.array([in_idxs], dtype=int)
 
                 dup = False
                 if in_idxs is not None:
@@ -736,11 +737,8 @@ class Problem(object):
                     irange = range(end - start)
                     loc_size = end - start
                     dup = True
-                # else:  # distributed full var
-                #     irange = range(total_size)
-                #     loc_size = end - start
 
-                for idx in irange:
+                for loc_idx, idx in enumerate(irange):
 
                     # Maybe we don't need to clean up so much at the beginning,
                     # since we clean this every time.
@@ -750,14 +748,14 @@ class Problem(object):
                     # totals to zeros instead of None in those cases when none
                     # of the specified indices are within the range of interest
                     # for this proc.
+                    if idx < 0:
+                        idx += end
                     if start <= idx < end:
-                        loc_idx = idx - start
-                        flat_view[loc_idx] = 1.0
+                        flat_view[idx - start] = 1.0
                         store = True
                     elif dup:
                         # var is duplicated so we don't loop over the full
                         # distributed size
-                        loc_idx = idx
                         store = True
                     else:
                         store = False
@@ -769,15 +767,18 @@ class Problem(object):
                         for oname_count, output_name in enumerate(output_names):
                             out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
                             deriv_val = doutputs._views_flat[output_name]
+                            out_idxs = None
                             if output_name in output_vois:
-                                out_idxs = output_vois[output_name]['indices']
-                            else:
-                                out_idxs = None
+                                out_voi_meta = output_vois[output_name]
+                                if 'indices' in out_voi_meta:
+                                    out_idxs = out_voi_meta['indices']
+                                elif 'index' in out_voi_meta:
+                                    out_idxs = out_voi_meta['index']
+                                    if out_idxs is not None:
+                                        out_idxs = np.array([out_idxs], dtype=int)
 
                             if out_idxs is not None:
-                                oidxs = np.logical_and(out_idxs >= start,
-                                                       out_idxs < end)
-                                deriv_val = deriv_val[oidxs]
+                                deriv_val = deriv_val[out_idxs]
                             len_val = len(deriv_val)
 
                             if nproc > 1:  # var is duplicated

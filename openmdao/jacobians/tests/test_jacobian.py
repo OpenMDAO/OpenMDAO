@@ -291,16 +291,17 @@ class TestJacobian(unittest.TestCase):
     ]
 
     shapes = [
-        ('scalar', lambda x: x),
-        ('1D_array', lambda x: np.array([x + i for i in range(5)])),
-        ('2D_array', lambda x: np.array([[x + i + 2 * j for i in range(3)] for j in range(3)]))
+        ('scalar', lambda x: x, (1, 1)),
+        ('1D_array', lambda x: np.array([x + i for i in range(5)]), (5, 1)),
+        ('2D_array', lambda x: np.array([[x + i + 2 * j for i in range(3)] for j in range(3)]),
+         (3, 3))
     ]
 
     @parameterized.expand(itertools.product(dtypes, shapes), testcase_func_name=
-        lambda f, n, p: '_'.join(['test_jacobian_set_item', p.args[0][0], p.args[1][0]]))
+    lambda f, n, p: '_'.join(['test_jacobian_set_item', p.args[0][0], p.args[1][0]]))
     def test_jacobian_set_item(self, dtypes, shapes):
 
-        shape, constructor = shapes
+        shape, constructor, expected_shape = shapes
         dtype, value = dtypes
 
         prob = Problem(model=Group())
@@ -320,7 +321,7 @@ class TestJacobian(unittest.TestCase):
         self.assertEqual(len(jac_out.shape), 2)
         expected_dtype = np.promote_types(dtype, float)
         self.assertEqual(jac_out.dtype, expected_dtype)
-        assert_rel_error(self, jac_out.squeeze(), expected, 1e-15)
+        assert_rel_error(self, jac_out, np.atleast_2d(expected).reshape(expected_shape), 1e-15)
 
     def test_component_assembled_jac(self):
         prob = Problem()
@@ -415,6 +416,32 @@ class TestJacobian(unittest.TestCase):
 
         assert_rel_error(self, prob['G1.C1.y'], 50.0)
         assert_rel_error(self, prob['G1.C2.y'], 243.0)
+
+    def test_declare_partial_reference(self):
+        # Test for a bug where declare partial is given an array reference
+        # that compute also uses and could get corrupted
+
+        class Comp(ExplicitComponent):
+            def initialize_variables(self):
+                self.add_input('x', val=1.0, shape=2)
+                self.add_output('y', val=1.0, shape=2)
+            def initialize_partials(self):
+                self.val = 2 * np.ones(2)
+                self.rows = np.arange(2)
+                self.cols = np.arange(2)
+                self.declare_partials(
+                    'y', 'x', val=self.val, rows=self.rows, cols=self.cols)
+            def compute(self, inputs, outputs):
+                outputs['y'][:] = 0.
+                np.add.at(
+                    outputs['y'], self.rows,
+                    self.val * inputs['x'][self.cols])
+
+        prob = Problem(model=Comp())
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['y'], 2 * np.ones(2))
 
     def test_sparse_jac_with_subsolver_error(self):
         prob = Problem()

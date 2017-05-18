@@ -382,7 +382,7 @@ class TestScaling(unittest.TestCase):
         # Jacobian is unscaled
         prob.model.run_linearize()
         deriv = p1._jacobian._subjacs
-        assert_rel_error(self, deriv['p1.y', 'p1.x'], -2.0)
+        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[-2.0]])
 
         # Scale the outputs only.
         # Residual scaling uses output scaling by default.
@@ -418,7 +418,7 @@ class TestScaling(unittest.TestCase):
         # Jacobian is unscaled
         prob.model.run_linearize()
         deriv = p1._jacobian._subjacs
-        assert_rel_error(self, deriv['p1.y', 'p1.x'], -2.0)
+        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[-2.0]])
 
         # Scale the residual
 
@@ -452,7 +452,7 @@ class TestScaling(unittest.TestCase):
         # Jacobian is unscaled
         prob.model.run_linearize()
         deriv = p1._jacobian._subjacs
-        assert_rel_error(self, deriv['p1.y', 'p1.x'], -2.0)
+        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[-2.0]])
 
         # Simultaneously scale the residual and output with different values
 
@@ -488,7 +488,7 @@ class TestScaling(unittest.TestCase):
         # Jacobian is unscaled
         prob.model.run_linearize()
         deriv = p1._jacobian._subjacs
-        assert_rel_error(self, deriv['p1.y', 'p1.x'], -2.0)
+        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[-2.0]])
 
     def test_scale_array_with_float(self):
 

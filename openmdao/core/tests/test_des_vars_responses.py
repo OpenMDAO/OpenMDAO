@@ -72,9 +72,9 @@ class TestDesVarsResponses(unittest.TestCase):
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
-        prob.model.add_response('obj', type="obj")
-        prob.model.add_response('con1', type="con")
-        prob.model.add_response('con2', type="con")
+        prob.model.add_response('obj', type_="obj")
+        prob.model.add_response('con1', type_="con")
+        prob.model.add_response('con2', type_="con")
 
         prob.setup(check=False)
 
@@ -509,7 +509,8 @@ class TestObjectiveOnModel(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup(check=False)
 
-        self.assertEqual(str(context.exception), "Output not found for response 'junk' in system ''.")
+        self.assertEqual(str(context.exception),
+                         "Output not found for response 'junk' in system ''.")
 
     def test_objective_affine_and_scaleradder(self):
 
@@ -518,12 +519,12 @@ class TestObjectiveOnModel(unittest.TestCase):
         prob.model = SellarDerivatives()
         prob.model.nl_solver = NonlinearBlockGS()
 
-        with self.assertRaises(RuntimeError) as context:
+        with self.assertRaises(TypeError) as context:
             prob.model.add_objective('con1', lower=-100, upper=100, ref=1.0,
                                       scaler=0.5)
 
-        self.assertEqual(str(context.exception), 'Bounds may not be set '
-                                                 'on objectives')
+        self.assertEqual(str(context.exception),
+                         "add_objective() got an unexpected keyword argument 'lower'")
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_objective('con1', ref=0.0, scaler=0.5)
@@ -592,33 +593,19 @@ class TestObjectiveOnModel(unittest.TestCase):
         self.assertEqual(str(context.exception), 'The name argument should '
                                                  'be a string, got 42')
 
-    def test_objective_invalid_indices(self):
+    def test_objective_invalid_index(self):
 
         prob = Problem()
 
         prob.model = SellarDerivatives()
         prob.model.nl_solver = NonlinearBlockGS()
 
-        with self.assertRaises(ValueError) as context:
-            prob.model.add_objective('obj', indices='foo')
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_objective('obj', index='foo')
 
-        self.assertEqual(str(context.exception), 'If specified, indices must '
-                                                 'be a sequence of integers.')
+        self.assertEqual(str(context.exception), 'If specified, index must be an int.')
 
-        with self.assertRaises(ValueError) as context:
-            prob.model.add_objective('obj', indices=1)
-
-        self.assertEqual(str(context.exception), 'If specified, indices must '
-                                                 'be a sequence of integers.')
-
-        with self.assertRaises(ValueError) as context:
-            prob.model.add_objective('obj', indices=[1, 'k'])
-
-        self.assertEqual(str(context.exception), 'If specified, indices must '
-                                                 'be a sequence of integers.')
-
-        # passing an iterator for indices should be valid
-        prob.model.add_objective('obj', indices=range(2))
+        prob.model.add_objective('obj', index=1)
 
 
 if __name__ == '__main__':

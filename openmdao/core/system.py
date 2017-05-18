@@ -2,7 +2,7 @@
 from __future__ import division
 
 from contextlib import contextmanager
-from collections import namedtuple, OrderedDict, Iterable
+from collections import OrderedDict, Iterable
 from fnmatch import fnmatchcase
 import sys
 from itertools import product
@@ -17,7 +17,7 @@ from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobi
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 
 from openmdao.utils.general_utils import \
-    determine_adder_scaler, format_as_float_or_array, ensure_compatible
+    determine_adder_scaler, format_as_float_or_array
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
@@ -1582,8 +1582,7 @@ class System(object):
                     yield sub
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
-                       ref0=None, indices=None, adder=None, scaler=None,
-                       **kwargs):
+                       ref0=None, indices=None, adder=None, scaler=None):
         r"""
         Add a design variable to this system.
 
@@ -1601,16 +1600,13 @@ class System(object):
             Value of design var that scales to 0.0 in the driver.
         indices : iter of int, optional
             If a param is an array, these indicate which entries are of
-            interest for this particular response.
+            interest for this particular design variable.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        **kwargs : optional
-            Keyword arguments that are saved as metadata for the
-            design variable.
 
         Notes
         -----
@@ -1641,8 +1637,6 @@ class System(object):
         lower = (lower + adder) * scaler
         upper = (upper + adder) * scaler
 
-        meta = kwargs if kwargs else None
-
         if self._static_mode:
             design_vars = self._static_design_vars
         else:
@@ -1657,12 +1651,14 @@ class System(object):
         dvs['adder'] = None if adder == 0.0 else adder
         dvs['ref'] = ref
         dvs['ref0'] = ref0
+        if indices is not None:
+            dvs['size'] = len(indices)
+            indices = np.atleast_1d(indices)
         dvs['indices'] = indices
-        dvs['metadata'] = meta
 
-    def add_response(self, name, type, lower=None, upper=None, equals=None,
-                     ref=None, ref0=None, indices=None, adder=None, scaler=None,
-                     linear=False, **kwargs):
+    def add_response(self, name, type_, lower=None, upper=None, equals=None,
+                     ref=None, ref0=None, indices=None, index=None,
+                     adder=None, scaler=None, linear=False):
         r"""
         Add a response variable to this system.
 
@@ -1670,7 +1666,7 @@ class System(object):
         ----------
         name : string
             Name of the response variable in the system.
-        type : string
+        type_ : string
             The type of response. Supported values are 'con' and 'obj'
         lower : float or ndarray, optional
             Lower boundary for the variable
@@ -1685,6 +1681,9 @@ class System(object):
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
+        index : int, optional
+            If variable is an array, this indicates which entry is of
+            interest for this particular response.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
@@ -1693,9 +1692,6 @@ class System(object):
             is second in precedence.
         linear : bool
             Set to True if constraint is linear. Default is False.
-        **kwargs : optional
-            Keyword arguments that are saved as metadata for the
-            design variable.
 
         Notes
         -----
@@ -1710,9 +1706,9 @@ class System(object):
                             'got {0}'.format(name))
 
         # Type must be a string and one of 'con' or 'obj'
-        if not isinstance(type, string_types):
+        if not isinstance(type_, string_types):
             raise TypeError('The type argument should be a string')
-        elif type not in ('con', 'obj'):
+        elif type_ not in ('con', 'obj'):
             raise ValueError('The type must be one of \'con\' or \'obj\': '
                              'Got \'{0}\' instead'.format(name))
 
@@ -1773,8 +1769,6 @@ class System(object):
         if equals is not None:
             equals = (equals + adder) * scaler
 
-        meta = kwargs if kwargs else None
-
         if self._static_mode:
             responses = self._static_responses
         else:
@@ -1787,25 +1781,26 @@ class System(object):
         resp['adder'] = None if adder == 0.0 else adder
         resp['ref'] = ref
         resp['ref0'] = ref0
-        resp['indices'] = indices
-        resp['metadata'] = meta
-        resp['type'] = type
+        resp['type'] = type_
 
-        if type == 'con':
+        if type_ == 'con':
             resp['lower'] = lower
             resp['upper'] = upper
             resp['equals'] = equals
             resp['linear'] = linear
+            if indices is not None:
+                resp['size'] = len(indices)
+                indices = np.atleast_1d(indices)
+            resp['indices'] = indices
 
-        elif type == 'obj':
-            pass
-        else:
-            raise ValueError('Unrecognized type for response.  Expected'
-                             ' one of [\'obj\', \'con\']:  ({0})'.format(type))
+        else:  # 'obj'
+            resp['index'] = index
+            if index is not None:
+                resp['size'] = 1
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
-                       indices=None, linear=False, **kwargs):
+                       indices=None, linear=False):
         r"""
         Add a constraint variable to this system.
 
@@ -1834,9 +1829,6 @@ class System(object):
             interest for this particular response.
         linear : bool
             Set to True if constraint is linear. Default is False.
-        **kwargs : optional
-            Keyword arguments that are saved as metadata for the
-            design variable.
 
         Notes
         -----
@@ -1844,14 +1836,12 @@ class System(object):
         The argument :code:`ref0` represents the physical value when the scaled value is 0.
         The argument :code:`ref` represents the physical value when the scaled value is 1.
         """
-        meta = kwargs if kwargs else None
-
-        self.add_response(name=name, type='con', lower=lower, upper=upper,
+        self.add_response(name=name, type_='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
-                          ref0=ref0, indices=indices, linear=linear, metadata=meta)
+                          ref0=ref0, indices=indices, linear=linear)
 
-    def add_objective(self, name, ref=None, ref0=None, indices=None,
-                      adder=None, scaler=None, **kwargs):
+    def add_objective(self, name, ref=None, ref0=None, index=None,
+                      adder=None, scaler=None):
         r"""
         Add a response variable to this system.
 
@@ -1863,8 +1853,8 @@ class System(object):
             Value of response variable that scales to 1.0 in the driver.
         ref0 : float or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
-        indices : sequence of int, optional
-            If variable is an array, these indicate which entries are of
+        index : int, optional
+            If variable is an array, this indicates which entriy is of
             interest for this particular response.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
@@ -1872,9 +1862,6 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        **kwargs : optional
-            Keyword arguments that are saved as metadata for the
-            design variable.
 
         Notes
         -----
@@ -1901,11 +1888,10 @@ class System(object):
 
             scaler = \frac{1}{ref + adder}
         """
-        meta = kwargs if kwargs else None
-        if 'lower' in kwargs or 'upper' in kwargs or 'equals' in kwargs:
-            raise RuntimeError('Bounds may not be set on objectives')
-        self.add_response(name, type='obj', scaler=scaler, adder=adder,
-                          ref=ref, ref0=ref0, indices=indices, metadata=meta)
+        if index is not None and not isinstance(index, int):
+            raise TypeError('If specified, index must be an int.')
+        self.add_response(name, type_='obj', scaler=scaler, adder=adder,
+                          ref=ref, ref0=ref0, index=index)
 
     def get_design_vars(self, recurse=True):
         """
@@ -1939,14 +1925,14 @@ class System(object):
         # Size them all
         vec = self._outputs._views_flat
         for name, data in iteritems(out):
-
-            # Depending on where the designvar was added, the name in the
-            # vectors might be relative instead of absolute. Lucky we have
-            # both.
-            if name in vec:
-                out[name]['size'] = vec[name].size
-            else:
-                out[name]['size'] = vec[out[name]['name']].size
+            if 'size' not in data:
+                # Depending on where the designvar was added, the name in the
+                # vectors might be relative instead of absolute. Lucky we have
+                # both.
+                if name in vec:
+                    data['size'] = vec[name].size
+                else:
+                    data['size'] = vec[out[name]['name']].size
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -1993,7 +1979,8 @@ class System(object):
         # Size them all
         vec = self._outputs._views_flat
         for name in out:
-            out[name]['size'] = vec[name].size
+            if 'size' not in out[name]:
+                out[name]['size'] = vec[name].size
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -2086,10 +2073,10 @@ class System(object):
             for uname in states:
                 stream.write("%s\n" % uname)
                 stream.write("Value: ")
-                stream.write(str(outputs[uname]))
+                stream.write(str(outputs._views[uname]))
                 stream.write('\n')
                 stream.write("Residual: ")
-                stream.write(str(resids[uname]))
+                stream.write(str(resids._views[uname]))
                 stream.write('\n\n')
         else:
             stream.write("\nNo states in %s.\n" % pathname)

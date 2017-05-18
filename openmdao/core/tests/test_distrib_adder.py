@@ -20,10 +20,10 @@ class DistributedAdder(ExplicitComponent):
     Distributes the work of adding 10 to every item in the param vector
     """
 
-    def __init__(self, size=100):
+    def __init__(self, size):
         super(DistributedAdder, self).__init__()
 
-        self.local_size = self.size = int(size)
+        self.local_size = self.size = size
 
     def get_req_procs(self):
         """
@@ -44,7 +44,7 @@ class DistributedAdder(ExplicitComponent):
         #       up as evenly as possible
         sizes, offsets = evenly_distrib_idxs(comm.size, self.size)
         local_size, local_offset = sizes[rank], offsets[rank]
-        self.local_size = int(local_size)
+        self.local_size = local_size
 
         start = local_offset
         end = local_offset + local_size
@@ -52,14 +52,13 @@ class DistributedAdder(ExplicitComponent):
         self.add_input('x', val=np.zeros(local_size, float),
                        src_indices=np.arange(start, end, dtype=int))
         self.add_output('y', val=np.zeros(local_size, float))
-            #src_indices=np.arange(start, end, dtype=int))
 
     def compute(self, inputs, outputs):
 
         #NOTE: Each process will get just its local part of the vector
         #print('process {0:d}: {1}'.format(self.comm.rank, params['x'].shape))
 
-        outputs['y'] = inputs['x'] + 10
+        outputs['y'] = inputs['x'] + 10.
 
 
 class Summer(ExplicitComponent):
@@ -68,19 +67,18 @@ class Summer(ExplicitComponent):
     vector addition and computes a total
     """
 
-    def __init__(self, size=100):
+    def __init__(self, size):
         super(Summer, self).__init__()
+        self.size = size
 
+    def initialize_variables(self):
         #NOTE: this component depends on the full y array, so OpenMDAO
         #      will automatically gather all the values for it
-        self.add_input('y', val=np.zeros(size))
-        self.add_output('sum', shape=1)
+        self.add_input('y', val=np.zeros(self.size))
+        self.add_output('sum', 0.0, shape=1)
 
     def compute(self, inputs, outputs):
-
         outputs['sum'] = np.sum(inputs['y'])
-
-
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
@@ -89,14 +87,14 @@ class DistributedAdderTest(unittest.TestCase):
     N_PROCS = 3
 
     def test_distributed_adder(self):
-        size = 100000 #how many items in the array
+        size = 100 #how many items in the array
 
         prob = Problem()
         prob.model = Group()
 
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
-        prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
+        summer = prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
 
         prob.setup(vector_class=PETScVector, check=False)
 
@@ -104,11 +102,14 @@ class DistributedAdderTest(unittest.TestCase):
 
         prob.run_driver()
 
-        #expected answer is 11
-        assert_rel_error(self, prob['sum']/size, 11.0, 1.e-6)
+        inp = summer._inputs['y']
+        for i in range(size):
+            diff = 11.0 - inp[i]
+            if diff > 1.e-6 or diff < -1.e-6:
+                raise RuntimeError("Summer input y[%d] is %f but should be 11.0" %
+                                    (i, inp[i]))
 
-        #from openmdao.devtools.debug import max_mem_usage
-        #print "Max mem:", max_mem_usage()
+        assert_rel_error(self, prob['sum'], 11.0 * size, 1.e-6)
 
 
 if __name__ == "__main__":
