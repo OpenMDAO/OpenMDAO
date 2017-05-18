@@ -1697,7 +1697,7 @@
                     alert("error: there is a target that has children.");
                     return;
                 }
-                AddLeaves(tgtObj.parent, tgtObjArrayHideParams); //contaminate
+                AddLeaves(tgtObj.parentComponent, tgtObjArrayHideParams); //contaminate
                 for (var obj = tgtObj.parent; obj != null; obj = obj.parent) {
                     tgtObjArrayParamView.push(obj);
                     tgtObjArrayHideParams.push(obj);
@@ -1767,11 +1767,9 @@
                         }
                     }
                     if(showParams && srcObj.type === "param"){
-                        var srcParentComponent = (srcObj.originalParent) ? srcObj.originalParent : srcObj.parent;
                         for (var j = si+1; j < d3RightTextNodesArrayZoomed.length; ++j) {
                             var tgtObj = d3RightTextNodesArrayZoomed[j];
-                            var tgtParentComponent = (tgtObj.originalParent) ? tgtObj.originalParent : tgtObj.parent;
-                            if(srcParentComponent !== tgtParentComponent) break;
+                            if(srcObj.parentComponent !== tgtObj.parentComponent) break;
                             if(tgtObj.type === "unknown"){
                                 var ti = j;
                                 matrix[si + "_" + ti] = {"r": si, "c": ti, "obj": srcObj, "id": srcObj.id + "_" + tgtObj.id};
