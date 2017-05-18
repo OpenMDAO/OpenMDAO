@@ -1,5 +1,7 @@
 """Define the NewtonSolver class."""
 
+from __future__ import print_function
+
 from openmdao.solvers.solver import NonlinearSolver
 
 
@@ -86,6 +88,27 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system, self._depth + 1)
 
+    def _set_solver_print(self, level=2, type_='all'):
+        """
+        Control printing for solvers and subsolvers in the model.
+
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        """
+        super(NewtonSolver, self)._set_solver_print(level=level, type_=type_)
+
+        if self.ln_solver is not None and type_ != 'NL':
+            self.ln_solver._set_solver_print(level=level, type_=type_)
+
+        if self.linesearch is not None:
+            self.linesearch._set_solver_print(level=level, type_=type_)
+
     def _iter_get_norm(self):
         """
         Return the norm of the residual.
@@ -126,14 +149,23 @@ class NewtonSolver(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
+        self._solver_info.prefix += '|  '
+        do_subsolve = self.options['solve_subsystems'] and \
+            (self._iter_count <= self.options['max_sub_solves'])
 
         # Hybrid newton support.
-        if self.options['solve_subsystems'] and self._iter_count <= self.options['max_sub_solves']:
+        if do_subsolve:
+
+            self._solver_info.prefix += '+  '
+
             for isub, subsys in enumerate(system._subsystems_allprocs):
                 system._transfer('nonlinear', 'fwd', isub)
 
                 if subsys in system._subsystems_myproc:
                     subsys._solve_nonlinear()
+
+            self._solver_info.prefix = self._solver_info.prefix[:-3]
+
             system._apply_nonlinear()
 
         system._vectors['residual']['linear'].set_vec(system._residuals)
@@ -141,7 +173,27 @@ class NewtonSolver(NonlinearSolver):
         system._linearize()
 
         self.ln_solver.solve(['linear'], 'fwd')
+
         if self.linesearch:
+            self.linesearch._do_subsolve = do_subsolve
             self.linesearch.solve()
         else:
             system._outputs += system._vectors['output']['linear']
+
+        self._solver_info.prefix = self._solver_info.prefix[:-3]
+
+    def _mpi_print_header(self):
+        """
+        Print header text before solving.
+        """
+        if (self.options['iprint'] > 0 and self._system.comm.rank == 0):
+
+            pathname = self._system.pathname
+            if pathname:
+                nchar = len(pathname)
+                prefix = self._solver_info.prefix
+                header = prefix + "\n"
+                header += prefix + nchar * "=" + "\n"
+                header += prefix + pathname + "\n"
+                header += prefix + nchar * "="
+                print(header)

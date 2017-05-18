@@ -9,7 +9,6 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
-from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.units import get_conversion
 
 SUBJAC_META_DEFAULTS = {

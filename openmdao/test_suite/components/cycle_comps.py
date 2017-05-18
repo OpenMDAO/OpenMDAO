@@ -203,6 +203,11 @@ class ExplicitCycleComp(ExplicitComponent):
                 d_inputs[theta_name] += dtheta_out
 
     def make_jacobian_entry(self, A, pd_type):
+        if pd_type == 'aij':
+            return self.make_sub_jacobian(A, pd_type)[0]
+        return self.make_sub_jacobian(A, pd_type)
+
+    def make_sub_jacobian(self, A, pd_type):
         if pd_type == 'array':
             return A
         if pd_type == 'sparse':
@@ -223,7 +228,7 @@ class ExplicitCycleComp(ExplicitComponent):
         raise ValueError('Unknown partial_type: {}'.format(pd_type))
 
     def _array2kwargs(self, arr, pd_type):
-        jac = self.make_jacobian_entry(arr, pd_type)
+        jac = self.make_sub_jacobian(arr, pd_type)
         if pd_type == 'aij':
             return {'val': jac[0], 'rows': jac[1], 'cols': jac[2]}
         else:

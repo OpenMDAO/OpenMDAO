@@ -19,13 +19,11 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
-from openmdao.vectors.default_vector import DefaultVector
 
-from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
-from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.mpi import FakeComm
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
+from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
@@ -46,6 +44,8 @@ class Problem(object):
         the model once.
     _use_ref_vector : bool
         If True, allocate vectors to store ref. values.
+    _solver_print_cache : list
+        Allows solver iprints to be set to requested values after setup calls.
     """
 
     def __init__(self, model=None, comm=None, use_ref_vector=True, root=None):
@@ -88,6 +88,7 @@ class Problem(object):
         self.driver = Driver()
 
         self._use_ref_vector = use_ref_vector
+        self._solver_print_cache = []
 
     def __getitem__(self, name):
         """
@@ -253,6 +254,10 @@ class Problem(object):
         model._setup(comm, vector_class, 'full')
         self.driver._setup_driver(self)
 
+        # Now that setup has been called, we can set the iprints.
+        for items in self._solver_print_cache:
+            self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
+
         if check:
             check_config(self, logger)
 
@@ -314,7 +319,7 @@ class Problem(object):
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
-        all_comps = model.system_iter(typ=Component)
+        all_comps = model.system_iter(typ=Component, include_self=True)
         if comps is None:
             comps = [comp for comp in all_comps]
         else:
@@ -327,7 +332,7 @@ class Problem(object):
             comps = [model.get_subsystem(c_name) for c_name in comps]
 
         current_mode = self._mode
-        current_suppresion = model.suppress_solver_output
+        self.set_solver_print(level=0)
 
         # This is a defaultdict of (defaultdict of dicts).
         partials_data = defaultdict(lambda: defaultdict(dict))
@@ -338,7 +343,6 @@ class Problem(object):
 
         # Analytic Jacobians
         for mode in ('fwd', 'rev'):
-            model.suppress_solver_output = True
             model._inputs.set_vec(input_cache)
             model._outputs.set_vec(output_cache)
             # Make sure we're in a valid state
@@ -483,7 +487,7 @@ class Problem(object):
                                 elif sparse.issparse(deriv_value):
                                     deriv_value = deriv_value.todense()
 
-                            partials_data[c_name][rel_key][jac_key] = deriv_value
+                            partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
                     if explicit:
                         comp._negate_jac()
@@ -530,15 +534,13 @@ class Problem(object):
                 abs_key = rel_key2abs_key(comp, rel_key)
                 # Since all partials for outputs for explicit comps are declared, assume anything
                 # missing is an input deriv.
-                if (explicit and (abs_key not in subjac_info or
-                                  subjac_info[abs_key]['type'] == 'input')):
+                if explicit and abs_key[1] in comp._var_abs_names['input']:
                     partials_data[c_name][rel_key][jac_key] = -partial
                 else:
                     partials_data[c_name][rel_key][jac_key] = partial
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
-        model.suppress_solver_output = current_suppresion
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, global_options)
@@ -716,7 +718,6 @@ class Problem(object):
                 in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
                 start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
                 end = np.sum(model._var_sizes['output'][:iproc + 1, in_var_idx])
-                total_size = np.sum(model._var_sizes['output'][:, in_var_idx])
 
                 if input_name in input_vois:
                     in_idxs = input_vois[input_name]['indices']
@@ -731,9 +732,6 @@ class Problem(object):
                     irange = range(end - start)
                     loc_size = end - start
                     dup = True
-                # else:  # distributed full var
-                #     irange = range(total_size)
-                #     loc_size = end - start
 
                 for idx in irange:
 
@@ -820,6 +818,28 @@ class Problem(object):
                                 raise RuntimeError("unsupported return format")
 
         return totals
+
+    def set_solver_print(self, level=2, depth=1e99, type_='all'):
+        """
+        Control printing for solvers and subsolvers in the model.
+
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        depth : int
+            How deep to recurse. For example, you can set this to 0 if you only want
+            to print the top level linear and nonlinear solver messages. Default
+            prints everything.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        """
+        if (level, depth, type_) not in self._solver_print_cache:
+            self._solver_print_cache.append((level, depth, type_))
+
+        self.model._set_solver_print(level=level, depth=depth, type_=type_)
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,

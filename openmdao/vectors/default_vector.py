@@ -262,7 +262,6 @@ class DefaultVector(Vector):
 
         self._views = self._names = views
         self._views_flat = views_flat
-        self._idxs = idxs
 
     def _clone_data(self):
         """

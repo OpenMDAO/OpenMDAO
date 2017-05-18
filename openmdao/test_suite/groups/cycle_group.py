@@ -108,8 +108,8 @@ class CycleGroup(ParametericTestGroup):
         self.total_of = ['last.x_norm2', theta_name]
         self.total_wrt = ['psi_comp.psi']
         self.expected_totals = {
-            ('last.x_norm2', 'psi_comp.psi'): 0.,
-            (theta_name, 'psi_comp.psi'): -1. / (num_comp - 1),
+            ('last.x_norm2', 'psi_comp.psi'): [[0.]],
+            (theta_name, 'psi_comp.psi'): [[-1. / (num_comp - 1)]],
         }
 
         expected_theta = (2 * np.pi - PSI) / (num_comp - 1)

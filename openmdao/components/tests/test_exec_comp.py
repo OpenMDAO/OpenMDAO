@@ -66,7 +66,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 45.0, 0.00001)
@@ -80,7 +80,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 3.0, 0.00001)
@@ -95,7 +95,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('y' in C1._outputs)
         self.assertTrue('pi' not in C1._inputs)
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 2 * math.pi, 0.00001)
@@ -111,7 +111,7 @@ class TestExecComp(unittest.TestCase):
 
         prob.setup(check=False)
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 4.0, 0.00001)
@@ -125,7 +125,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], math.sin(2.0), 0.00001)
@@ -141,7 +141,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 2.0, 0.00001)
@@ -157,7 +157,7 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], np.array([2.,1.]), 0.00001)
@@ -173,7 +173,7 @@ class TestExecComp(unittest.TestCase):
         prob.model.connect('p1.x', 'comp.x')
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         data = prob.check_partial_derivs(out_stream=None)
@@ -196,7 +196,7 @@ class TestExecComp(unittest.TestCase):
         prob.model.connect('p1.x', 'comp.x')
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         data = prob.check_partial_derivs(out_stream=None)
@@ -217,40 +217,40 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)
 
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 5.0, 0.00001)
 
         C1._linearize()
 
-        assert_rel_error(self, C1.jacobian[('y','x')], -2.0, 0.00001)
+        assert_rel_error(self, C1.jacobian[('y','x')], [[-2.0]], 0.00001)
 
     def test_complex_step2(self):
         prob = Problem(Group())
         prob.model.add_subsystem('p1', IndepVarComp('x', 2.0))
         prob.model.add_subsystem('comp', ExecComp('y=x*x + x*2.0'))
         prob.model.connect('p1.x', 'comp.x')
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
         J = prob.compute_total_derivs(['comp.y'], ['p1.x'], return_format='flat_dict')
-        assert_rel_error(self, J['comp.y', 'p1.x'], np.array([6.0]), 0.00001)
+        assert_rel_error(self, J['comp.y', 'p1.x'], np.array([[6.0]]), 0.00001)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
         J = prob.compute_total_derivs(['comp.y'], ['p1.x'], return_format='flat_dict')
-        assert_rel_error(self, J['comp.y', 'p1.x'], np.array([6.0]), 0.00001)
+        assert_rel_error(self, J['comp.y', 'p1.x'], np.array([[6.0]]), 0.00001)
 
     def test_abs_complex_step(self):
         prob = Problem(model=Group())
         C1 = prob.model.add_subsystem('C1', ExecComp('y=2.0*abs(x)', x=-2.0))
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], 4.0, 0.00001)
@@ -258,15 +258,15 @@ class TestExecComp(unittest.TestCase):
         # any negative C1.x should give a 2.0 derivative for dy/dx
         C1._inputs['x'] = -1.0e-10
         C1._linearize()
-        assert_rel_error(self, C1.jacobian['y','x'], 2.0, 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], [[2.0]], 0.00001)
 
         C1._inputs['x'] = 3.0
         C1._linearize()
-        assert_rel_error(self, C1.jacobian['y','x'], -2.0, 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], [[-2.0]], 0.00001)
 
         C1._inputs['x'] = 0.0
         C1._linearize()
-        assert_rel_error(self, C1.jacobian['y','x'], -2.0, 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], [[-2.0]], 0.00001)
 
     def test_abs_array_complex_step(self):
         prob = Problem(model=Group())
@@ -274,7 +274,7 @@ class TestExecComp(unittest.TestCase):
                                                      x=np.ones(3)*-2.0, y=np.zeros(3)))
 
         prob.setup(check=False)
-        prob.model.suppress_solver_output = True
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, C1._outputs['y'], np.ones(3)*4.0, 0.00001)

@@ -2,7 +2,7 @@
 from __future__ import division
 
 from contextlib import contextmanager
-from collections import namedtuple, OrderedDict, Iterable
+from collections import OrderedDict, Iterable
 from fnmatch import fnmatchcase
 import sys
 from itertools import product
@@ -12,15 +12,15 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
+from openmdao.proc_allocators.default_allocator import DefaultAllocator
 
+from openmdao.utils.general_utils import \
+    determine_adder_scaler, format_as_float_or_array
+from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
-from openmdao.utils.general_utils import \
-    determine_adder_scaler, format_as_float_or_array, ensure_compatible
-from openmdao.utils.mpi import MPI
 
 
 class System(object):
@@ -158,9 +158,6 @@ class System(object):
         Nonlinear solver to be used for solve_nonlinear.
     _ln_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
-    _suppress_solver_output : boolean
-        Flag that turns off all solver output for this System and all
-        of its descendants if False.
     #
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
@@ -186,6 +183,13 @@ class System(object):
         List of subsystems that stores all subsystems added outside of initialize_subsystems.
     _static_manual_connections : dict
         Dictionary that stores all explicit connections added outside of initialize_subsystems.
+    _static_design_vars : dict of dict
+        Driver design variables added outside of initialize_subsystems.
+    _static_responses : dict of dict
+        Driver responses added outside of initialize_subsystems.
+    #
+    _reconfigured : bool
+        If True, this system has reconfigured, and the immediate parent should update.
     """
 
     def __init__(self, **kwargs):
@@ -263,7 +267,6 @@ class System(object):
 
         self._nl_solver = None
         self._ln_solver = None
-        self._suppress_solver_output = False
 
         self._jacobian = DictionaryJacobian()
         self._jacobian._system = self
@@ -277,9 +280,73 @@ class System(object):
         self._static_mode = True
         self._static_subsystems_allprocs = []
         self._static_manual_connections = {}
+        self._static_design_vars = {}
+        self._static_responses = {}
+
+        self._reconfigured = False
 
         self.initialize()
         self.metadata.update(kwargs)
+
+    def _check_reconf(self):
+        """
+        Check if this systems wants to reconfigure and if so, perform the reconfiguration.
+        """
+        reconf = self.reconfigure()
+
+        if reconf:
+            with self._unscaled_context_all():
+                # Backup input values
+                old = {'input': self._inputs, 'output': self._outputs}
+
+                # Perform reconfiguration
+                self.setup('reconf')
+
+                new = {'input': self._inputs, 'output': self._outputs}
+
+                # Reload input and output values where possible
+                for type_ in ['input', 'output']:
+                    for abs_name, old_view in iteritems(old[type_]._views_flat):
+                        if abs_name in new[type_]._views_flat:
+                            new_view = new[type_]._views_flat[abs_name]
+
+                            if len(old_view) == len(new_view):
+                                new_view[:] = old_view
+
+            self._reconfigured = True
+
+    def _check_reconf_update(self):
+        """
+        Check if any subsystem has reconfigured and if so, perform the necessary update setup.
+        """
+        # See if any local subsystem has reconfigured
+        reconf = np.any([subsys._reconfigured for subsys in self._subsystems_myproc])
+
+        # See if any subsystem on this or any other processor has configured
+        if self.comm.size > 1:
+            reconf = self.comm.allreduce(reconf) > 0
+
+        if reconf:
+            # Perform an update setup
+            with self._unscaled_context_all():
+                self.setup('update')
+
+            # Reset the _reconfigured attribute to False
+            for subsys in self._subsystems_myproc:
+                subsys._reconfigured = False
+
+            self._reconfigured = True
+
+    def reconfigure(self):
+        """
+        Perform reconfiguration.
+
+        Returns
+        -------
+        bool
+            If True, reconfiguration is to be performed.
+        """
+        return False
 
     def initialize(self):
         """
@@ -554,8 +621,8 @@ class System(object):
         self._setup_partials(recurse=recurse)
         self._setup_jacobians(recurse=recurse)
 
-        # Full setup means we're are (nearly) starting from scratch, so reset to initial values.
-        if setup_mode == 'full':
+        # If full or reconf setup, reset this system's variables to initial values.
+        if setup_mode in ('full', 'reconf'):
             self.set_initial_values()
 
     def _setup_procs(self, pathname, comm):
@@ -827,6 +894,15 @@ class System(object):
                 vecs[key][vec_name] = vector_class(
                     vec_name, type_, self, root_vectors[key][vec_name], resize=resize)
 
+                # This is necessary because scaling will not be set for inputs
+                # whose source is outside of this system. The units and scaling
+                # for those sources are not available, so those components of the
+                # scaling vectors will just be 0. That will zero out input values
+                # during transfers, so the multiplier must be 1 by default.
+                if resize:
+                    if '1' in key[1]:
+                        vecs[key][vec_name].set_const(1.)
+
             for abs_name, meta in iteritems(self._var_abs2meta['output']):
                 shape = meta['shape']
                 ref = meta['ref']
@@ -883,9 +959,9 @@ class System(object):
                         ref0 = ref0[src_indices]
                 else:
                     if not np.isscalar(ref):
-                        ref = ref.reshape(shape)
+                        ref = ref.reshape(shape_out)
                     if not np.isscalar(ref0):
-                        ref0 = ref0.reshape(shape)
+                        ref0 = ref0.reshape(shape_out)
 
                 # Compute scaling arrays for inputs using a0 and a1
                 # Example:
@@ -938,7 +1014,7 @@ class System(object):
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                subsys._setup_solvers(recurse)
+                subsys._setup_solvers(recurse=recurse)
 
     def _setup_partials(self, recurse=True):
         """
@@ -1239,6 +1315,19 @@ class System(object):
             self._scale_vec(vec, 'residual', 'norm')
 
     @contextmanager
+    def _unscaled_context_all(self):
+        """
+        Context manager that temporarily puts all vectors and Jacobians in an unscaled state.
+        """
+        for vec_type in ['output', 'residual']:
+            for vec in self._vectors[vec_type].values():
+                self._scale_vec(vec, vec_type, 'phys')
+        yield
+        for vec_type in ['output', 'residual']:
+            for vec in self._vectors[vec_type].values():
+                self._scale_vec(vec, vec_type, 'norm')
+
+    @contextmanager
     def _scaled_context_all(self):
         """
         Context manager that temporarily puts all vectors and Jacobians in a scaled state.
@@ -1403,23 +1492,40 @@ class System(object):
         """
         self._ln_solver = solver
 
-    @property
-    def suppress_solver_output(self):
+    def _set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
-        Get the value of the global toggle to disable solver printing.
-        """
-        return self._suppress_solver_output
+        Control printing for solvers and subsolvers in the model.
 
-    @suppress_solver_output.setter
-    def suppress_solver_output(self, value):
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        depth : int
+            How deep to recurse. For example, you can set this to 0 if you only want
+            to print the top level linear and nonlinear solver messages. Default
+            prints everything.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        Recursively set the solver print suppression toggle.
-        """
-        self._suppress_solver_output = value
-        # loop over _subsystems_allprocs here because _subsystems_myprocs
-        # is empty until setup
+        if self.ln_solver is not None and type_ != 'NL':
+            self.ln_solver._set_solver_print(level=level, type_=type_)
+        if self.nl_solver is not None and type_ != 'LN':
+            self.nl_solver._set_solver_print(level=level, type_=type_)
+
         for subsys in self._subsystems_allprocs:
-            subsys.suppress_solver_output = value
+
+            current_depth = subsys.pathname.count('.')
+            if current_depth >= depth:
+                continue
+
+            subsys._set_solver_print(level=level, depth=depth - current_depth, type_=type_)
+
+            if subsys.ln_solver is not None and type_ != 'NL':
+                subsys.ln_solver._set_solver_print(level=level, type_=type_)
+            if subsys.nl_solver is not None and type_ != 'LN':
+                subsys.nl_solver._set_solver_print(level=level, type_=type_)
 
     @property
     def proc_allocator(self):
@@ -1512,7 +1618,7 @@ class System(object):
         The argument :code:`ref0` represents the physical value when the scaled value is 0.
         The argument :code:`ref` represents the physical value when the scaled value is 1.
         """
-        if name in self._design_vars:
+        if name in self._design_vars or name in self._static_design_vars:
             msg = "Design Variable '{}' already exists."
             raise RuntimeError(msg.format(name))
 
@@ -1536,7 +1642,14 @@ class System(object):
         upper = (upper + adder) * scaler
 
         meta = kwargs if kwargs else None
-        self._design_vars[name] = dvs = OrderedDict()
+
+        if self._static_mode:
+            design_vars = self._static_design_vars
+        else:
+            design_vars = self._design_vars
+
+        design_vars[name] = dvs = OrderedDict()
+
         dvs['name'] = name
         dvs['upper'] = upper
         dvs['lower'] = lower
@@ -1603,7 +1716,7 @@ class System(object):
             raise ValueError('The type must be one of \'con\' or \'obj\': '
                              'Got \'{0}\' instead'.format(name))
 
-        if name in self._responses:
+        if name in self._responses or name in self._static_responses:
             typemap = {'con': 'Constraint', 'obj': 'Objective'}
             msg = '{0} \'{1}\' already exists.'.format(typemap[type], name)
             raise RuntimeError(msg.format(name))
@@ -1661,7 +1774,14 @@ class System(object):
             equals = (equals + adder) * scaler
 
         meta = kwargs if kwargs else None
-        self._responses[name] = resp = OrderedDict()
+
+        if self._static_mode:
+            responses = self._static_responses
+        else:
+            responses = self._responses
+
+        responses[name] = resp = OrderedDict()
+
         resp['name'] = name
         resp['scaler'] = None if scaler == 1.0 else scaler
         resp['adder'] = None if adder == 0.0 else adder
@@ -1966,10 +2086,10 @@ class System(object):
             for uname in states:
                 stream.write("%s\n" % uname)
                 stream.write("Value: ")
-                stream.write(str(outputs[uname]))
+                stream.write(str(outputs._views[uname]))
                 stream.write('\n')
                 stream.write("Residual: ")
-                stream.write(str(resids[uname]))
+                stream.write(str(resids._views[uname]))
                 stream.write('\n\n')
         else:
             stream.write("\nNo states in %s.\n" % pathname)
@@ -2075,11 +2195,14 @@ class System(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         float
-            relative error.
+            Relative error.
         float
-            absolute error.
+            Absolute error.
         """
-        pass
+        # Reconfigure if needed.
+        self._check_reconf()
+
+        return False, 0., 0.
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """

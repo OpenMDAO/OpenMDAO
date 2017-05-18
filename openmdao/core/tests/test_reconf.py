@@ -61,8 +61,7 @@ class Test(unittest.TestCase):
         assert_rel_error(self, p['x'], 2.0)
         assert_rel_error(self, p['y'], 4.0)
         assert_rel_error(self, p['z'], 6.0)
-        assert_rel_error(self, totals['y', 'x'], 2.0)
-        print(p['x'], p['y'], p['z'], totals['y', 'x'].flatten())
+        assert_rel_error(self, totals['y', 'x'], [[2.0]])
 
         # Now run the setup method on the root system; size of y = 2
         p.model.setup()
@@ -72,8 +71,7 @@ class Test(unittest.TestCase):
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0 * np.ones(2))
         assert_rel_error(self, p['z'], 9.0)
-        assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones(2))
-        print(p['x'], p['y'], p['z'], totals['y', 'x'].flatten())
+        assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones((2, 1)))
 
         # Now reconfigure from c2 and update in root; size of y = 3; the value of x is preserved
         p.model.get_subsystem('c2').setup('reconf')
@@ -83,8 +81,7 @@ class Test(unittest.TestCase):
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0 * np.ones(3))
         assert_rel_error(self, p['z'], 9.0)
-        assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones(3))
-        print(p['x'], p['y'], p['z'], totals['y', 'x'].flatten())
+        assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones((3, 1)))
 
         # Now reconfigure from c3 and update in root; size of y = 3; the value of x is preserved
         p.model.get_subsystem('c3').setup('reconf')
@@ -94,8 +91,7 @@ class Test(unittest.TestCase):
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0 * np.ones(3))
         assert_rel_error(self, p['z'], 9.0)
-        assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones(3))
-        print(p['x'], p['y'], p['z'], totals['y', 'x'].flatten())
+        assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones((3, 1)))
 
         # Finally, setup reconf from root; size of y = 4
         # Since we are at the root, calling setup('full') and setup('reconf') have the same effect.
@@ -107,8 +103,7 @@ class Test(unittest.TestCase):
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0 * np.ones(4))
         assert_rel_error(self, p['z'], 9.0)
-        assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones(4))
-        print(p['x'], p['y'], p['z'], totals['y', 'x'].flatten())
+        assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones((4, 1)))
 
 
 if __name__ == '__main__':

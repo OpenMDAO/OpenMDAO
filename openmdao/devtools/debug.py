@@ -8,7 +8,7 @@ import os
 from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
 
 from six.moves import zip_longest
-from openmdao.core.group import Group
+
 
 def dump_dist_idxs(problem, stream=sys.stdout):  # pragma: no cover
     """Print out the distributed idxs for each variable in input and output vecs.

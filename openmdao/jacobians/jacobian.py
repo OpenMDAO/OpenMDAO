@@ -1,7 +1,8 @@
 """Define the base Jacobian class."""
 from __future__ import division
 import numpy as np
-from six.moves import range
+
+from scipy.sparse import issparse
 
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.name_maps import key2abs_key
@@ -84,7 +85,7 @@ class Jacobian(object):
         jac = self._subjacs[abs_key]
 
         if isinstance(jac, np.ndarray):
-            self._subjacs[abs_key] = val * jac
+            self._subjacs[abs_key] *= val
         elif isinstance(jac, sparse_types):
             self._subjacs[abs_key].data *= val  # DOK not supported
         elif len(jac) == 3:
@@ -122,7 +123,11 @@ class Jacobian(object):
         """
         abs_key = key2abs_key(self._system, key)
         if abs_key in self._subjacs:
-            return self._subjacs[abs_key]
+            subjac = self._subjacs[abs_key]
+            if isinstance(subjac, list):
+                # Sparse AIJ format
+                return subjac[0]
+            return subjac
         else:
             msg = 'Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(key[0], key[1]))
@@ -156,26 +161,45 @@ class Jacobian(object):
         subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        if np.isscalar(subjac) or isinstance(subjac, np.ndarray):
-            shape = self._abs_key2shape(abs_key)
-            subjac = np.atleast_2d(subjac).reshape(shape)
+        if not issparse(subjac):
             # np.promote_types will choose the smallest dtype that can contain both arguments
+            subjac = np.atleast_1d(subjac)
             safe_dtype = np.promote_types(subjac.dtype, float)
             subjac = subjac.astype(safe_dtype, copy=False)
-        elif isinstance(subjac, sparse_types):
-            pass
-        elif isinstance(subjac, (tuple, list)):
-            if len(subjac) != 3:
-                raise ValueError("Sub-jacobian of type '%s' for key %s has "
-                                 "the wrong size (%d)." %
-                                 (type(subjac).__name__, prom_key, len(subjac)))
-            if isinstance(subjac, tuple):
-                subjac = list(subjac)
-        else:
-            raise TypeError("Sub-jacobian of type '%s' for key %s is "
-                            "not supported." % (type(subjac).__name__, prom_key))
+            if abs_key not in self._subjacs_info:
+                rows = None
+            else:
+                subjac_info = self._subjacs_info[abs_key][0]
+                rows = subjac_info['rows']
+            if rows is None:
+                # Dense subjac
+                shape = self._abs_key2shape(abs_key)
+                subjac = np.atleast_2d(subjac)
+                if subjac.shape == (1, 1):
+                    subjac = subjac[0, 0] * np.ones(shape, dtype=safe_dtype)
+                else:
+                    subjac = subjac.reshape(shape)
 
-        self._subjacs[abs_key] = subjac
+                if abs_key in self._subjacs and self._subjacs[abs_key].shape == shape:
+                    np.copyto(self._subjacs[abs_key], subjac)
+                else:
+                    self._subjacs[abs_key] = subjac.copy()
+            else:
+                # Sparse subjac
+                if subjac.shape == (1,):
+                    subjac = subjac[0] * np.ones(rows.shape, dtype=safe_dtype)
+
+                if subjac.shape != rows.shape:
+                    raise ValueError("Sub-jacobian for key %s has "
+                                     "the wrong size (%d), expected (%d)." %
+                                     (abs_key, len(subjac), len(rows)))
+
+                if abs_key in self._subjacs and subjac.shape == self._subjacs[abs_key][0].shape:
+                    np.copyto(self._subjacs[abs_key][0], subjac)
+                else:
+                    self._subjacs[abs_key] = [subjac.copy(), rows, subjac_info['cols']]
+        else:
+            self._subjacs[abs_key] = subjac
 
     def _iter_abs_keys(self):
         """
@@ -249,8 +273,6 @@ class Jacobian(object):
 
         val = meta['value']
         if val is not None:
-            if negate:
-                val *= -1.
-            if meta['rows'] is not None:
-                val = [val, meta['rows'], meta['cols']]
             self._set_abs(abs_key, val)
+            if negate:
+                self._multiply_subjac(abs_key, -1.0)
