@@ -2,13 +2,13 @@ import numpy as np
 import unittest
 
 from openmdao.api import Group, Problem, MetaModel, IndepVarComp, ResponseSurface, \
-    FloatKrigingSurrogate, KrigingSurrogate
+    FloatKrigingSurrogate, KrigingSurrogate, MultiFiCoKrigingSurrogate
 from openmdao.devtools.testutil import assert_rel_error
 
 from openmdao.devtools.testutil import TestLogger
 
 
-class TestMetaModel(unittest.TestCase):
+class MetaModelTestCase(unittest.TestCase):
 
     def test_sin_metamodel(self):
         # create a MetaModel for Sin and add it to a Problem
@@ -312,11 +312,13 @@ class TestMetaModel(unittest.TestCase):
             [[1.0, 1.0], [1.0, 2.0]]
         ]
 
-        mm.metadata['train:y'] = [[3.0, 1.0],
-                                [2.0, 4.0],
-                                [1.0, 7.0],
-                                [6.0, -3.0],
-                                [-2.0, 3.0]]
+        mm.metadata['train:y'] = [
+            [3.0, 1.0],
+            [2.0, 4.0],
+            [1.0, 7.0],
+            [6.0, -3.0],
+            [-2.0, 3.0]
+        ]
 
         prob['mm.x'] = [[1.0, 2.0], [1.0, 1.0]]
         prob.run_model()
@@ -409,6 +411,31 @@ class TestMetaModel(unittest.TestCase):
         for match in abs_errors:
             abs_error = float(match)
             self.assertTrue(abs_error < 1.e-6)
+
+    def test_metamodel_feature(self):
+        # create a MetaModel, specifying surrogates for the outputs
+        trig = MetaModel()
+        trig.add_input('x', 0.)
+        trig.add_output('sin_x', 0., surrogate=FloatKrigingSurrogate())
+        trig.add_output('cos_x', 0.)
+
+        trig.default_surrogate = FloatKrigingSurrogate()
+
+        # provide training data
+        trig.metadata['train:x'] = np.linspace(0,10,20)
+        trig.metadata['train:sin_x'] = .5*np.sin(trig.metadata['train:x'])
+        trig.metadata['train:cos_x'] = .5*np.cos(trig.metadata['train:x'])
+
+        # add it to a Problem, run and check the predicted values
+        prob = Problem()
+        prob.model.add_subsystem('trig', trig)
+        prob.setup(check=False)
+        prob['trig.x'] = 2.1
+        prob.run_model()
+
+        assert_rel_error(self, prob['trig.sin_x'], .5*np.sin(prob['trig.x']), 1e-4)
+        assert_rel_error(self, prob['trig.cos_x'], .5*np.cos(prob['trig.x']), 1e-4)
+
 
 if __name__ == "__main__":
     unittest.main()
