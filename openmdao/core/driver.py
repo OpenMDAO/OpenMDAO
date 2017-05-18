@@ -93,7 +93,11 @@ class Driver(object):
         for name, meta in iteritems(self._designvars):
             scaler = meta['scaler']
             adder = meta['adder']
-            val = vec[name].copy()
+            indices = meta['indices']
+            if indices is None:
+                val = vec[name].copy()
+            else:
+                val = vec[name][indices]
 
             # Scale design variable values
             if adder is not None:
@@ -119,6 +123,9 @@ class Driver(object):
         meta = self._designvars[name]
         scaler = meta['scaler']
         adder = meta['adder']
+        indices = meta['indices']
+        if indices is None:
+            indices = slice(None)
 
         # Scale design variable values
         if scaler is not None:
@@ -126,7 +133,7 @@ class Driver(object):
         if adder is not None:
             value -= adder
 
-        self._problem.model._outputs._views_flat[name][:] = value
+        self._problem.model._outputs._views_flat[name][indices] = value
 
     def get_response_values(self):
         """
@@ -137,7 +144,7 @@ class Driver(object):
         dict
            Dictionary containing values of each response.
         """
-        # TODO: finish this method when we have a driver that requires is.
+        # TODO: finish this method when we have a driver that requires it.
         pass
 
     def get_objective_values(self):
@@ -154,7 +161,11 @@ class Driver(object):
         for name, meta in iteritems(self._objs):
             scaler = meta['scaler']
             adder = meta['adder']
-            val = vec[name].copy()
+            index = meta['index']
+            if index is None:
+                val = vec[name].copy()
+            else:
+                val = vec[name][index]
 
             # Scale objectives
             if adder is not None:
@@ -204,7 +215,12 @@ class Driver(object):
 
             scaler = meta['scaler']
             adder = meta['adder']
-            val = vec[name].copy()
+            indices = meta['indices']
+
+            if indices is None:
+                val = vec[name].copy()
+            else:
+                val = vec[name][indices]
 
             # Scale objectives
             if adder is not None:
