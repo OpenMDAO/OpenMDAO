@@ -405,10 +405,10 @@ class Group(System):
 
         abs_in2out = {}
 
-        if self.pathname == '':
+        if pathname == '':
             path_len = 0
         else:
-            path_len = len(self.pathname) + 1
+            path_len = len(pathname) + 1
 
         # Add implicit connections (only ones owned by this group)
         for prom_name in allprocs_prom2abs_list_out:
@@ -494,8 +494,13 @@ class Group(System):
         # then adding contributions from systems above/below, then allgathering.
         global_abs_in2out.update(abs_in2out)
         for abs_in, abs_out in iteritems(self._conn_parents_abs_in2out):
-            if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
+            # If we are in the loop, that means we are not the root so pathname != ''
+            path_dot = pathname + '.'
+
+            # We need to check the period as well because only the first part might match
+            if abs_in[:len(pathname)+1] == path_dot and abs_out[:len(pathname)+1] == path_dot:
                 global_abs_in2out[abs_in] = abs_out
+
         for subsys in self._subsystems_myproc:
             global_abs_in2out.update(subsys._conn_global_abs_in2out)
 
