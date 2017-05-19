@@ -9,7 +9,7 @@ ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condi
 from math import isnan
 
 import numpy as np
-
+from openmdao.utils.record_util import create_local_meta, update_local_meta
 from openmdao.solvers.solver import NonlinearSolver
 
 
@@ -92,6 +92,10 @@ class BoundsEnforceLS(NonlinearSolver):
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         fail = (np.isinf(norm) or np.isnan(norm))
+
+        metadata = self.metadata = create_local_meta(None, type(self).__name__)
+        update_local_meta(metadata, (self._iter_count,))
+        self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
 
         return fail, norm, norm / norm0
 
@@ -242,5 +246,9 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
+
+        metadata = self.metadata = create_local_meta(None, type(self).__name__)
+        update_local_meta(metadata, (self._iter_count,))
+        self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
 
         return fail, norm, norm / norm0

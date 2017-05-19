@@ -122,7 +122,7 @@ class BaseRecorder(object):
             # set option to what the user intended.
             self.options['record_residuals'] = True
 
-        # Compute the inclusion lists
+        # Compute the inclusion/exclusion lists
 
         if (isinstance(object_requesting_recording, System)):
             myinputs = myoutputs = myresiduals = set()
@@ -192,7 +192,7 @@ class BaseRecorder(object):
                 if isinstance(object_requesting_recording, NonlinearSolver):
                     residuals = object_requesting_recording._system._residuals
                 else:  # it's a LinearSolver
-                    residuals = object_requesting_recording._system._vectors['residuals']
+                    residuals = object_requesting_recording._system._vectors['residual']['linear']
                 myresiduals = [n for n in residuals
                                if self._check_path(n, incl, excl)]
 
@@ -200,7 +200,7 @@ class BaseRecorder(object):
                 if isinstance(object_requesting_recording, NonlinearSolver):
                     outputs = object_requesting_recording._system._outputs
                 else:  # it's a LinearSolver
-                    outputs = object_requesting_recording._system._vectors['outputs']
+                    outputs = object_requesting_recording._system._vectors['output']['linear']
                 myoutputs = [n for n in outputs
                              if self._check_path(n, incl, excl)]
 

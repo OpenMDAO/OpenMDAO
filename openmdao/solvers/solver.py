@@ -207,10 +207,6 @@ class Solver(object):
             self._iter_count += 1
             norm = self._iter_get_norm()
 
-            #  It would depend on the mode and whether it's linear or nonlinear.
-            #  The most basic mode would store just the absolute error and relative error.
-            #  A second mode would store the full outputs and residuals.
-
             metadata = self.metadata = create_local_meta(None, type(self).__name__)
             update_local_meta(metadata, (self._iter_count,))
             self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)

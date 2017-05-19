@@ -610,5 +610,60 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                                                  expected_solver_output, expected_solver_residuals),), self.eps)
+
+    def test_record_linear_solver(self):
+        from openmdao.api import NewtonSolver, DirectSolver
+
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.nl_solver = NewtonSolver()
+        # used for analytic derivatives
+        model.nl_solver.ln_solver = DirectSolver()
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        model.ln_solver.add_recorder(self.recorder)
+
+        prob.setup()
+
+        self.assertIsInstance(model.nl_solver.ln_solver, DirectSolver)
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        coordinate = [0, 'Direct', (3,)]
+
+        expected_abs_error = 1.31880284470753394998e-10
+
+        expected_rel_error = 3.6299074030587596e-12
+
+        expected_solver_output = {
+            "con_cmp1.con1": [-22.42830237000701],
+            "d1.y1": [25.58830237000701],
+            "con_cmp2.con2": [-11.941511849375644],
+            "pz.z": [5.0, 2.0],
+            "obj_cmp.obj": [28.588308165163074],
+            "d2.y2": [12.058488150624356],
+            "px.x": [1.0]
+        }
+
+        expected_solver_residuals = {
+            "con_cmp1.con1": [0.0],
+            "d1.y1": [1.318802844707534e-10],
+            "con_cmp2.con2": [0.0],
+            "pz.z": [0.0, 0.0],
+            "obj_cmp.obj": [0.0],
+            "d2.y2": [0.0],
+            "px.x": [0.0]
+        }
+
+        t0, t1 = run_driver(prob)
+
+        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
+                                                 expected_solver_output, expected_solver_residuals),), self.eps)
+
 if __name__ == "__main__":
     unittest.main()

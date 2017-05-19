@@ -356,14 +356,21 @@ class SqliteRecorder(BaseRecorder):
             else:  # it's a LinearSolver
                 outputs = object_requesting_recording._system._vectors['outputs']
 
-            if outputs._names:
-                for name, value in iteritems(outputs._names):
+            outs = {}
+            if 'out' in self._filtered_solver:
+                for outp in outputs._names:
+                    outs[outp] = outputs._names[outp]
+            else:
+                outs = outputs
+
+            if outs:
+                for name, value in iteritems(outs):
                     tple = (name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
                 outputs_array = np.zeros((1,), dtype=dtype_tuples)
 
-                for name, value in iteritems(outputs._names):
+                for name, value in iteritems(outs):
                     outputs_array[name] = value
 
         if self.options['record_solver_residuals']:
@@ -374,13 +381,20 @@ class SqliteRecorder(BaseRecorder):
             else:  # it's a LinearSolver
                 residuals = object_requesting_recording._system._vectors['residuals']
 
-            if residuals._names:
-                for name, value in iteritems(residuals._names):
+            res = {}
+            if 'res' in self._filtered_solver:
+                for rez in residuals._names:
+                    res[rez] = residuals._names[rez]
+            else:
+                res = residuals
+
+            if res:
+                for name, value in iteritems(res):
                     tple = (name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
                 residuals_array = np.zeros((1,), dtype=dtype_tuples)
-                for name, value in iteritems(residuals._names):
+                for name, value in iteritems(res):
                     residuals_array[name] = value
 
         outputs_blob = array_to_blob(outputs_array)
