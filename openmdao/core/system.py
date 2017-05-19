@@ -21,6 +21,7 @@ from openmdao.utils.general_utils import \
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
+from openmdao.utils.array_utils import convert_neg
 
 
 class System(object):
@@ -951,7 +952,8 @@ class System(object):
                         else:
                             entries = [list(range(x)) for x in shape_in]
                             cols = np.vstack(src_indices[i] for i in product(*entries))
-                            dimidxs = [cols[:, i] for i in range(cols.shape[1])]
+                            dimidxs = [convert_neg(cols[:, i], shape_out[i])
+                                       for i in range(cols.shape[1])]
                             src_indices = np.ravel_multi_index(dimidxs, shape_out)
                     if not np.isscalar(ref):
                         ref = ref[src_indices]
@@ -1600,7 +1602,8 @@ class System(object):
             Value of design var that scales to 0.0 in the driver.
         indices : iter of int, optional
             If a param is an array, these indicate which entries are of
-            interest for this particular design variable.
+            interest for this particular design variable.  These may be
+            positive or negative integers.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
@@ -1826,7 +1829,8 @@ class System(object):
             is second in precedence.
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
-            interest for this particular response.
+            interest for this particular response.  These may be positive or
+            negative integers.
         linear : bool
             Set to True if constraint is linear. Default is False.
 
@@ -1855,7 +1859,8 @@ class System(object):
             Value of response variable that scales to 0.0 in the driver.
         index : int, optional
             If variable is an array, this indicates which entriy is of
-            interest for this particular response.
+            interest for this particular response. This may be a positive
+            or negative integer.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
