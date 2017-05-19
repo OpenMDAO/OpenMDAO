@@ -67,8 +67,11 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
                 'actual and desired have differing shapes.'
                 ' actual {}, desired {}'.format(actual.shape, desired.shape))
         if not np.all(np.isnan(actual) == np.isnan(desired)):
-            test_case.fail('actual and desired values have non-matching nan'
-                           ' values')
+            if actual.size == 1 and desired.size == 1:
+                test_case.fail('actual nan, desired %s' % desired)
+            else:
+                test_case.fail('actual and desired values have non-matching nan'
+                               ' values')
 
         if np.linalg.norm(desired) == 0:
             error = np.linalg.norm(actual)
@@ -76,8 +79,12 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
             error = np.linalg.norm(actual - desired) / np.linalg.norm(desired)
 
         if abs(error) > tolerance:
-            test_case.fail('arrays do not match, rel error %.3e > tol (%.3e)' %
-                           (error, tolerance))
+            if actual.size == 1 and desired.size == 1:
+                test_case.fail('actual %s, desired %s, rel error %s, tolerance %s'
+                               % (actual, desired, error, tolerance))
+            else:
+                test_case.fail('arrays do not match, rel error %.3e > tol (%.3e)' %
+                               (error, tolerance))
 
     return error
 
