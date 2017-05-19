@@ -883,8 +883,8 @@ class Group(System):
             name of the target variable(s) to connect
         src_indices : collection of int optional
             When an input variable connects to some subset of an array output
-            variable, you can specify which indices of the source to be
-            transferred to the input here.
+            variable, you can specify which global indices of the source to be
+            transferred to the input here.  Negative indices are supported.
         """
         # if src_indices argument is given, it should be valid
         if isinstance(src_indices, string_types):

@@ -16,8 +16,8 @@ each component gets part of the array.
 .. embed-test:: openmdao.core.tests.test_group.TestGroup.test_promote_src_indices
 
 2. A distributed component that promotes its input and receives certain
-entries of the source array based on its rank.
-
+entries of the source array based on its rank.  Note that negative indices are
+supported.
 
 .. embed-test:: openmdao.core.tests.test_distribcomp.TestGroupMPI.test_promote_distrib
 
