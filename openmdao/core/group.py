@@ -493,12 +493,13 @@ class Group(System):
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
         global_abs_in2out.update(abs_in2out)
-        for abs_in, abs_out in iteritems(self._conn_parents_abs_in2out):
-            # If we are in the loop, that means we are not the root so pathname != ''
-            path_dot = pathname + '.'
 
+        # This will only be used if we enter the following loop, in which case pathname != ''
+        path_dot = pathname + '.'
+
+        for abs_in, abs_out in iteritems(self._conn_parents_abs_in2out):
             # We need to check the period as well because only the first part might match
-            if abs_in[:len(pathname)+1] == path_dot and abs_out[:len(pathname)+1] == path_dot:
+            if abs_in[:path_len] == path_dot and abs_out[:path_len] == path_dot:
                 global_abs_in2out[abs_in] = abs_out
 
         for subsys in self._subsystems_myproc:
