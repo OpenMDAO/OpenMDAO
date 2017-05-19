@@ -68,7 +68,7 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
                 ' actual {}, desired {}'.format(actual.shape, desired.shape))
         if not np.all(np.isnan(actual) == np.isnan(desired)):
             if actual.size == 1 and desired.size == 1:
-                test_case.fail('actual nan, desired %s' % desired)
+                test_case.fail('actual %s, desired %s' % (actual, desired))
             else:
                 test_case.fail('actual and desired values have non-matching nan'
                                ' values')
