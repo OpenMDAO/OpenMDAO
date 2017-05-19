@@ -227,15 +227,15 @@ class ScipyOptimizer(Driver):
 
         # optimize
         result = minimize(self._objfunc, x_init,
-                          #args=(),
+                          # args=(),
                           method=opt,
                           jac=jac,
-                          #hess=None,
-                          #hessp=None,
+                          # hess=None,
+                          # hessp=None,
                           bounds=bounds,
                           constraints=constraints,
                           tol=self.options['tol'],
-                          #callback=None,
+                          # callback=None,
                           options=self.opt_settings)
 
         self.result = result
@@ -290,9 +290,9 @@ class ScipyOptimizer(Driver):
             print("Exception: %s" % str(msg))
             print(70 * "=", tb, 70 * "=")
 
-        #print("Functions calculated")
-        #print(x_new)
-        #print(f_new)
+        print("Functions calculated")
+        print(x_new)
+        print(f_new)
 
         return f_new
 
@@ -327,11 +327,11 @@ class ScipyOptimizer(Driver):
         meta = self._cons[name]
 
         # Equality constraints
-        bound = meta['equals']
-        if bound is not None:
-            if isinstance(bound, np.ndarray):
-                bound = bound[idx]
-            return bound - cons[name][idx]
+        equals = meta['equals']
+        if equals is not None:
+            if isinstance(equals, np.ndarray):
+                equals = equals[idx]
+            return -(equals - cons[name][idx])
 
         # Note, scipy defines constraints to be satisfied when positive,
         # which is the opposite of OpenMDAO.
@@ -377,9 +377,9 @@ class ScipyOptimizer(Driver):
             print("Exception: %s" % str(msg))
             print(70 * "=", tb, 70 * "=")
 
-        #print("Gradients calculated")
-        #print(x_new)
-        #print(grad[0, :])
+        # print("Gradients calculated")
+        # print(x_new)
+        # print(grad[0, :])
 
         return grad[0, :]
 
@@ -415,13 +415,13 @@ class ScipyOptimizer(Driver):
         meta = self._cons[name]
         grad_idx = self.con_idx[name] + idx + 1
 
-        #print("Constraint Gradient returned")
-        #print(x_new)
-        #print(name, idx, grad[grad_idx, :])
+        # print("Constraint Gradient returned")
+        # print(x_new)
+        # print(name, idx, grad[grad_idx, :])
 
         # Equality constraints
         if meta['equals'] is not None:
-            return -grad[grad_idx, :]
+            return grad[grad_idx, :]
 
         # Note, scipy defines constraints to be satisfied when positive,
         # which is the opposite of OpenMDAO.

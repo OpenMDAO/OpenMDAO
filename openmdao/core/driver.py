@@ -2,6 +2,8 @@
 
 from six import iteritems
 
+import numpy as np
+
 from openmdao.utils.options_dictionary import OptionsDictionary
 
 
@@ -161,11 +163,11 @@ class Driver(object):
         for name, meta in iteritems(self._objs):
             scaler = meta['scaler']
             adder = meta['adder']
-            index = meta['index']
-            if index is None:
+            indices = meta['indices']
+            if indices is None:
                 val = vec[name].copy()
             else:
-                val = vec[name][index]
+                val = vec[name][indices]
 
             # Scale objectives
             if adder is not None:
@@ -265,7 +267,8 @@ class Driver(object):
             Default is None, which uses the driver's desvars.
         return_format : string
             Format to return the derivatives. Default is a 'flat_dict', which
-            returns them in a dictionary whose keys are tuples of form (of, wrt).
+            returns them in a dictionary whose keys are tuples of form (of, wrt). For
+            the scipy optimizer, 'array' is also supported.
         global_names : bool
             Set to True when passing in global names to skip some translation steps.
 
@@ -274,13 +277,16 @@ class Driver(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        derivs = self._problem._compute_total_derivs(of=of, wrt=wrt, return_format=return_format,
-                                                     global_names=global_names)
+        prob = self._problem
 
         if return_format == 'dict':
 
+            derivs = prob._compute_total_derivs(of=of, wrt=wrt, return_format=return_format,
+                                                global_names=global_names)
+
             for okey, oval in iteritems(derivs):
                 for ikey, val in iteritems(oval):
+
                     imeta = self._designvars[ikey]
                     ometa = self._responses[okey]
 
@@ -300,6 +306,58 @@ class Driver(object):
                         val *= 1.0 / iscaler
                     if iadder is not None:
                         val -= iadder
+
+        elif return_format == 'array':
+
+            derivs = prob._compute_total_derivs(of=of, wrt=wrt, return_format='dict',
+                                                global_names=global_names)
+
+            # Use sizes pre-computed in derivs for ease
+            otart = osize = 0
+            istart = isize = 0
+            do_wrt = True
+            Jslices = {}
+            for okey, oval in iteritems(derivs):
+                if do_wrt:
+                    for ikey, val in iteritems(oval):
+                        istart = isize
+                        isize += val.shape[1]
+                        Jslices[ikey] = slice(istart, isize)
+
+                do_wrt = False
+                ostart = osize
+                osize += oval[ikey].shape[0]
+                Jslices[okey] = slice(ostart, osize)
+
+            new_derivs = np.zeros((osize, isize))
+
+            # Apply driver ref/ref0 and position subjac into array jacobian.
+            for okey, oval in iteritems(derivs):
+                for ikey, val in iteritems(oval):
+
+                    imeta = self._designvars[ikey]
+                    ometa = self._responses[okey]
+
+                    iscaler = imeta['scaler']
+                    iadder = imeta['adder']
+                    oscaler = ometa['scaler']
+                    oadder = ometa['adder']
+
+                    # Scale response side
+                    if oadder is not None:
+                        val += oadder
+                    if oscaler is not None:
+                        val *= oscaler
+
+                    # Scale design var side
+                    if iscaler is not None:
+                        val *= 1.0 / iscaler
+                    if iadder is not None:
+                        val -= iadder
+
+                    new_derivs[Jslices[okey], Jslices[ikey]] = val
+
+            derivs = new_derivs
 
         else:
             msg = "Derivative scaling by the driver only supports the 'dict' format at present."
