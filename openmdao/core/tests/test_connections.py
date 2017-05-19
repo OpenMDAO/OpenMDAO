@@ -380,6 +380,22 @@ class TestConnectionsPromoted(unittest.TestCase):
 
         prob.setup(check=False)
 
+    def test_overlapping_system_names(self):
+        # This ensures that _setup_connections does not think g1 and g1a are the same system
+        prob = Problem()
+        model = prob.model = Group()
+
+        g1 = model.add_subsystem('g1', Group())
+        g1a = model.add_subsystem('g1a', Group())
+
+        g1.add_subsystem('c', ExecComp('y=x'))
+        g1a.add_subsystem('c', ExecComp('y=x'))
+
+        model.connect('g1.c.y', 'g1a.c.x')
+        model.connect('g1a.c.y', 'g1.c.x')
+
+        prob.setup(check=True)
+
 
 #class TestUBCS(unittest.TestCase):
 
