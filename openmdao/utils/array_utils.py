@@ -56,7 +56,5 @@ def convert_neg(arr, dim):
     ndarray
         The converted array.
     """
-    negs = arr < 0
-    if np.any(negs):
-        arr[negs] += dim
+    arr[arr < 0] += dim
     return arr
