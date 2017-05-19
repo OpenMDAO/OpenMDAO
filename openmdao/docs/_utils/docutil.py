@@ -508,11 +508,14 @@ def extract_output_blocks(run_output):
     output_block = []
     for line in run_output.splitlines():
         if line.startswith('>>>>>'):
-            output_blocks.append('\n'.join(output_block))
-            output_block = []
+            if output_block:
+                output_blocks.append('\n'.join(output_block))
+                output_block = []
         else:
             output_block.append(line)
 
+    if output_block:
+        output_blocks.append('\n'.join(output_block))
     return output_blocks
 
 def get_unit_test_source_and_run_outputs_in_out(method_path):

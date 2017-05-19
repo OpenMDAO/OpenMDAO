@@ -463,6 +463,45 @@ class MPITests(unittest.TestCase):
             self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class TestGroupMPI(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_promote_distrib(self):
+
+        class MyComp(ExplicitComponent):
+            def initialize_variables(self):
+                # decide what parts of the array we want based on our rank
+                if self.comm.rank == 0:
+                    idxs = [0, 1, 2]
+                else:
+                    # use [3, -1] here rather than [3, 4] just to show that we
+                    # can use negative indices.
+                    idxs = [3, -1]
+
+                self.add_input('x', np.ones(len(idxs)), src_indices=idxs)
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        p = Problem(model=Group())
+
+        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+
+        p.set_solver_print(level=0)
+        p.setup(PETScVector)
+        p.run_model()
+        if p.model.comm.rank == 0:
+            assert_rel_error(self, p['C1.x'], np.ones(3))
+            assert_rel_error(self, p['C1.y'], 6.)
+        else:
+            assert_rel_error(self, p['C1.x'], np.ones(2))
+            assert_rel_error(self, p['C1.y'], 4.)
+
+
 if __name__ == '__main__':
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()

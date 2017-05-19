@@ -750,45 +750,6 @@ class TestGroup(unittest.TestCase):
         # this test passes if it doesn't raise an exception
 
 
-class TestGroupMPI(unittest.TestCase):
-    # FIXME: fix MPI stuff so this can run as an MPI test
-    #N_PROCS = 2
-
-    def test_promote_distrib(self):
-        if PETScVector is None:
-            raise unittest.SkipTest("PETSc is not installed")
-
-        class MyComp(ExplicitComponent):
-            def initialize_variables(self):
-                # decide what parts of the array we want based on our rank
-                if self.comm.rank == 0:
-                    idxs = [0, 1, 2]
-                else:
-                    idxs = [3, 4]
-
-                self.add_input('x', np.ones(len(idxs)), src_indices=idxs)
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])*2.0
-
-        p = Problem(model=Group())
-
-        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
-                              promotes_outputs=['x'])
-        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
-
-        p.set_solver_print(level=0)
-        p.setup(PETScVector)
-        p.run_model()
-        if p.model.comm.rank == 0:
-            assert_rel_error(self, p['C1.x'], np.ones(3))
-            assert_rel_error(self, p['C1.y'], 6.)
-        else:
-            assert_rel_error(self, p['C1.x'], np.ones(2))
-            assert_rel_error(self, p['C1.y'], 4.)
-
-
 class TestConnect(unittest.TestCase):
 
     def setUp(self):
