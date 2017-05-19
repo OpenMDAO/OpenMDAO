@@ -657,6 +657,7 @@ class Problem(object):
         # derivatives that we will return.
         totals = OrderedDict()
         if return_format == 'flat_dict':
+            totals = OrderedDict()
             for okeys in of:
                 for okey in okeys:
                     for ikeys in wrt:
@@ -664,12 +665,33 @@ class Problem(object):
                             totals[(okey, ikey)] = None
 
         elif return_format == 'dict':
+            totals = OrderedDict()
             for okeys in of:
                 for okey in okeys:
                     totals[okey] = OrderedDict()
                     for ikeys in wrt:
                         for ikey in ikeys:
                             totals[okey][ikey] = None
+
+        elif return_format == 'array':
+            usize = 0
+            psize = 0
+
+            Jslices = OrderedDict()
+            for okeys in of:
+                for okey in okeys:
+                    start = usize
+                    usize += self.root.unknowns.metadata(u)['size']
+                    Jslices[u] = slice(start, usize)
+
+            for ikeys in wrt:
+                for ikey in ikeys:
+                    start = psize
+                    psize += unknowns.metadata(p)['size']
+                    Jslices[p] = slice(start, psize)
+
+            totals = np.zeros((usize, psize))
+
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
@@ -827,6 +849,13 @@ class Problem(object):
                                         totals[okey][ikey] = np.zeros((loc_size, len_val))
                                     if store:
                                         totals[okey][ikey][loc_idx, :] = deriv_val
+
+                            elif return_format == 'array':
+                                if fwd:
+                                    J[Jslices[item], Jslices[param].start+i] = deriv_val
+                                else:
+                                    J[Jslices[param].start+i, Jslices[item]] = deriv_val
+
                             else:
                                 raise RuntimeError("unsupported return format")
 
