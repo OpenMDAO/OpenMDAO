@@ -13,10 +13,11 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
 
 
+import openmdao.devtools.trace
+
 class TestProblem(unittest.TestCase):
 
     def test_set_2d_array(self):
-
         prob = Problem(model=Group())
         model = prob.model
         model.add_subsystem(name='indeps',
