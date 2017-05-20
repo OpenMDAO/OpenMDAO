@@ -231,6 +231,53 @@ class Component(System):
                     self.comm.Allgather(
                         sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
 
+            # get distrib shape of outputs (to support negative indexing)
+            for idx, abs_name in enumerate(self._var_abs_names['output']):
+                meta = self._var_abs2meta['output']
+
+    def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
+        """
+        Compute total number and total size of variables in systems before / after this system.
+
+        Parameters
+        ----------
+        ext_num_vars : {'input': (int, int), 'output': (int, int)}
+            Total number of allprocs variables in system before/after this one.
+        ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
+            Same as above, but by var_set name.
+        ext_sizes : {'input': (int, int), 'output': (int, int)}
+            Total size of allprocs variables in system before/after this one.
+        ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
+            Same as above, but by var_set name.
+        """
+        super(Component, self)._setup_global(
+            ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
+
+        # now set global sizes and shapes into metadata for distributed outputs
+        sizes = self._var_sizes['output']
+        meta = self._var_allprocs_abs2meta['output']
+        for idx, abs_name in enumerate(self._var_abs_names['output']):
+            mymeta = meta[abs_name]
+            global_size = np.sum(sizes[:, idx])
+            mymeta['global_size'] = global_size
+            local_shape = mymeta['shape']
+
+            # assume that all but the first dimension of the shape of a
+            # distributed output is the same on all procs
+            high_dims = local_shape[1:]
+            if high_dims:
+                high_size = np.prod(high_dims)
+                dim1 = global_size // high_size
+                if total_size % high_size != 0:
+                    raise RuntimeError("Global size of output '%s' (%s) does not agree "
+                                       "with local shape %s" % (abs_name, global_size,
+                                                                local_shape))
+                global_shape = tuple([dim1]+list(high_dims))
+            else:
+                high_size = 1
+                global_shape = (global_size,)
+            mymeta['global_shape'] = global_shape
+
     def _setup_partials(self, recurse=True):
         """
         Call initialize_partials in components.

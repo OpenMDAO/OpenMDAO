@@ -486,20 +486,22 @@ class TestGroupMPI(unittest.TestCase):
                 outputs['y'] = np.sum(inputs['x'])*2.0
 
         p = Problem(model=Group())
+        
+        #import wingdbstub
 
-        p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
+        p.model.add_subsystem('indep', IndepVarComp('x', np.arange(5, dtype=float)),
                               promotes_outputs=['x'])
-        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+        C1 = p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
 
         p.set_solver_print(level=0)
         p.setup(PETScVector)
         p.run_model()
-        if p.model.comm.rank == 0:
-            assert_rel_error(self, p['C1.x'], np.ones(3))
+        if C1.comm.rank == 0:
+            assert_rel_error(self, p['C1.x'], np.arange(3, dtype=float))
             assert_rel_error(self, p['C1.y'], 6.)
         else:
-            assert_rel_error(self, p['C1.x'], np.ones(2))
-            assert_rel_error(self, p['C1.y'], 4.)
+            assert_rel_error(self, p['C1.x'], np.arange(3, 5, dtype=float))
+            assert_rel_error(self, p['C1.y'], 14.)
 
 
 if __name__ == '__main__':

@@ -311,22 +311,22 @@ class Group(System):
                 allprocs_abs_names[type_] = []
                 allprocs_prom2abs_list[type_] = {}
 
-            for myproc_abs_names, myproc_prom2abs_list, myproc_abs2meta in gathered:
+            myproc_abs_names, myproc_prom2abs_list, myproc_abs2meta = gathered[0]
 
-                for type_ in ['input', 'output']:
+            for type_ in ['input', 'output']:
 
-                    # Assemble in parallel allprocs_abs_names
-                    allprocs_abs_names[type_].extend(myproc_abs_names[type_])
+                # Assemble in parallel allprocs_abs_names
+                allprocs_abs_names[type_].extend(myproc_abs_names[type_])
 
-                    # Assemble in parallel allprocs_abs2meta
-                    allprocs_abs2meta[type_].update(myproc_abs2meta[type_])
+                # Assemble in parallel allprocs_abs2meta
+                allprocs_abs2meta[type_].update(myproc_abs2meta[type_])
 
-                    # Assemble in parallel allprocs_prom2abs_list
-                    for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
-                        if prom_name not in allprocs_prom2abs_list[type_]:
-                            allprocs_prom2abs_list[type_][prom_name] = abs_names_list
-                        else:
-                            allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
+                # Assemble in parallel allprocs_prom2abs_list
+                for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
+                    if prom_name not in allprocs_prom2abs_list[type_]:
+                        allprocs_prom2abs_list[type_][prom_name] = abs_names_list
+                    else:
+                        allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -368,7 +368,6 @@ class Group(System):
                 sizes[type_][proc_slice, var_slice] = subsys._var_sizes[type_]
 
                 for set_name in set2iset[type_]:
-                    proc_slice = slice(*subsystems_proc_range[ind])
                     var_slice = slice(*subsystems_var_range_byset[type_][set_name][ind])
                     sizes_byset[type_][set_name][proc_slice, var_slice] = \
                         subsys._var_sizes_byset[type_][set_name]
@@ -693,18 +692,23 @@ class Group(System):
                 # Read in and process src_indices
                 shape_in = meta_in['shape']
                 shape_out = meta_out['shape']
+                global_shape_out = meta_out['global_shape']
+                global_size_out = meta_out['global_size']
                 src_indices = meta_in['src_indices']
                 if src_indices is None:
                     src_indices = np.arange(np.prod(shape_in), dtype=int)
-                elif src_indices.ndim != 1:
+                elif src_indices.ndim == 1:
+                    src_indices = convert_neg(src_indices, global_size_out)
+                else:
                     if len(shape_out) == 1:
                         src_indices = src_indices.flatten()
+                        src_indices = convert_neg(src_indices, global_size_out)
                     else:
                         # TODO: this duplicates code found
                         # in System._setup_scaling.
                         entries = [list(range(x)) for x in shape_in]
                         cols = np.vstack(src_indices[i] for i in product(*entries))
-                        dimidxs = [convert_neg(cols[:, i], shape_out[i])
+                        dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
                                    for i in range(cols.shape[1])]
                         src_indices = np.ravel_multi_index(dimidxs, shape_out)
 

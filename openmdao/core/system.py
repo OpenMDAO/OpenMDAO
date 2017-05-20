@@ -600,9 +600,9 @@ class System(object):
         # and no recursion is necessary.
         self._setup_vars(recurse=recurse)
         self._setup_var_index_ranges(self._get_initial_var_indices(initial), recurse=recurse)
+        self._setup_var_sizes(recurse=recurse)
         self._setup_var_data(recurse=recurse)
         self._setup_var_index_maps(recurse=recurse)
-        self._setup_var_sizes(recurse=recurse)
         self._setup_global_connections(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
@@ -949,6 +949,7 @@ class System(object):
                     if src_indices.ndim != 1:
                         if len(shape_out) == 1:
                             src_indices = src_indices.flatten()
+                            src_indices = convert_neg(src_indices, src_indices.size)
                         else:
                             entries = [list(range(x)) for x in shape_in]
                             cols = np.vstack(src_indices[i] for i in product(*entries))
