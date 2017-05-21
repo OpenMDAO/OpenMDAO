@@ -78,24 +78,28 @@ class SqliteRecorder(BaseRecorder):
         # isolation_level=None causes autocommit
         self.con = sqlite3.connect(out, isolation_level=None)
 
-        self.con.execute("CREATE TABLE metadata( format_version INT)")
-        self.con.execute("INSERT INTO metadata(format_version) VALUES(?)", (format_version,))
+        self.cursor = self.con.cursor()
 
-        self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, counter INT,"
+        self.cursor.execute("CREATE TABLE metadata( format_version INT)")
+        self.cursor.execute("INSERT INTO metadata(format_version) VALUES(?)", (format_version,))
+
+        # used to keep track of the order of the case records across all three tables
+        self.cursor.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, record_type TEXT, rowid INT)")
+        self.cursor.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, counter INT,"
                          "iteration_coordinate TEXT, timestamp REAL, success INT, msg TEXT, "
                          "desvars BLOB, responses BLOB, objectives BLOB, constraints BLOB)")
-        self.con.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, counter INT, "
+        self.cursor.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, counter INT, "
                          "iteration_coordinate TEXT,  timestamp REAL, success INT, msg TEXT, "
                          "inputs BLOB, outputs BLOB, residuals BLOB)")
-        self.con.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, counter INT, "
+        self.cursor.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, counter INT, "
                          "iteration_coordinate TEXT, timestamp REAL, success INT, msg TEXT, "
                          "abs_err REAL, rel_err REAL, solver_output BLOB, solver_residuals BLOB)")
 
-        self.con.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
+        self.cursor.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                          "model_viewer_data BLOB)")
-        self.con.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY,"
+        self.cursor.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY,"
                          " scaling_factors BLOB)")
-        self.con.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, solver_options BLOB,"
+        self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, solver_options BLOB,"
                          " solver_class TEXT)")
 
     def startup(self, object_requesting_recording):
@@ -228,13 +232,14 @@ class SqliteRecorder(BaseRecorder):
         objectives_blob = array_to_blob(objectives_array)
         constraints_blob = array_to_blob(constraints_array)
 
-        self.con.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, timestamp, "
+        self.cursor.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, timestamp, "
                          "success, msg, desvars , responses , objectives , constraints ) "
                          "VALUES(?,?,?,?,?,?,?,?,?)", (self._counter, format_iteration_coordinate(metadata['coord']),
                                                      metadata['timestamp'], metadata['success'],
                                                      metadata['msg'], desvars_blob,
                                                      responses_blob, objectives_blob,
                                                      constraints_blob))
+        self.con.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",('driver', self.cursor.lastrowid))
 
     def record_iteration_system(self, object_requesting_recording, metadata, method):
         """
@@ -322,12 +327,13 @@ class SqliteRecorder(BaseRecorder):
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
-        self.con.execute("INSERT INTO system_iterations(counter, iteration_coordinate, timestamp, "
+        self.cursor.execute("INSERT INTO system_iterations(counter, iteration_coordinate, timestamp, "
                          "success, msg, inputs , outputs , residuals ) "
                          "VALUES(?,?,?,?,?,?,?,?)", (self._counter, format_iteration_coordinate(metadata['coord']),
                                                    metadata['timestamp'], metadata['success'],
                                                    metadata['msg'], inputs_blob,
                                                    outputs_blob, residuals_blob))
+        self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",('system', self.cursor.lastrowid))
 
     def record_iteration_solver(self, object_requesting_recording, metadata, absolute=None,
                                 relative=None):
@@ -399,13 +405,14 @@ class SqliteRecorder(BaseRecorder):
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
-        self.con.execute("INSERT INTO solver_iterations(counter, iteration_coordinate, timestamp, "
+        self.cursor.execute("INSERT INTO solver_iterations(counter, iteration_coordinate, timestamp, "
                          "success, msg, abs_err, rel_err, solver_output, solver_residuals) "
                          "VALUES(?,?,?,?,?,?,?,?,?)", (self._counter, format_iteration_coordinate(metadata['coord']),
                                                      metadata['timestamp'],
                                                      metadata['success'], metadata['msg'],
                                                      abs_error, rel_error,
                                                      outputs_blob, residuals_blob))
+        self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",('solver', self.cursor.lastrowid))
 
     def record_metadata(self, object_requesting_recording):
         """

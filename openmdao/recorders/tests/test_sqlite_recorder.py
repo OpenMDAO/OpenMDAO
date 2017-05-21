@@ -714,9 +714,12 @@ class TestSqliteRecorder(unittest.TestCase):
         counters_system = set( i[0] for i in cur.fetchall() )
         cur.execute("SELECT counter FROM solver_iterations")
         counters_solver = set( i[0] for i in cur.fetchall() )
+        cur.execute("SELECT COUNT(rowid) FROM global_iterations")
+        global_iterations_records = cur.fetchone()[0]
         con.close()
 
         # Check to see that they make sense
+        self.assertEqual(self.recorder._counter, global_iterations_records )
         self.assertEqual(self.recorder._counter, len(counters_driver) + len(counters_system) + len(counters_solver) )
         self.assertTrue(counters_driver.isdisjoint(counters_system))
         self.assertTrue(counters_driver.isdisjoint(counters_solver))
