@@ -106,6 +106,9 @@ class BaseRecorder(object):
         object_requesting_recording :
             Object to which this recorder is attached.
         """
+
+        self._counter = 0
+
         # Deprecated options here, but need to preserve backward compatibility if possible.
         if self.options['record_params']:
             warn_deprecation("record_params is deprecated, please use record_inputs.")

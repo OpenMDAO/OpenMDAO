@@ -75,20 +75,19 @@ class SqliteRecorder(BaseRecorder):
 
         self.model_viewer_data = None
 
-        self._counter = 0
         # isolation_level=None causes autocommit
         self.con = sqlite3.connect(out, isolation_level=None)
 
         self.con.execute("CREATE TABLE metadata( format_version INT)")
         self.con.execute("INSERT INTO metadata(format_version) VALUES(?)", (format_version,))
 
-        self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
+        self.con.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, counter INT,"
                          "iteration_coordinate TEXT, timestamp REAL, success INT, msg TEXT, "
                          "desvars BLOB, responses BLOB, objectives BLOB, constraints BLOB)")
-        self.con.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
+        self.con.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, counter INT, "
                          "iteration_coordinate TEXT,  timestamp REAL, success INT, msg TEXT, "
                          "inputs BLOB, outputs BLOB, residuals BLOB)")
-        self.con.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
+        self.con.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, counter INT, "
                          "iteration_coordinate TEXT, timestamp REAL, success INT, msg TEXT, "
                          "abs_err REAL, rel_err REAL, solver_output BLOB, solver_residuals BLOB)")
 
@@ -104,7 +103,7 @@ class SqliteRecorder(BaseRecorder):
         Startup.
         """
         super(SqliteRecorder, self).startup(object_requesting_recording)
-        self._counter = 0
+        #TODO_RECORDERS - remove this method if never anything added
 
     def record_iteration(self, object_requesting_recording, metadata, **kwargs):
         """
@@ -229,9 +228,9 @@ class SqliteRecorder(BaseRecorder):
         objectives_blob = array_to_blob(objectives_array)
         constraints_blob = array_to_blob(constraints_array)
 
-        self.con.execute("INSERT INTO driver_iterations(iteration_coordinate, timestamp, "
+        self.con.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, timestamp, "
                          "success, msg, desvars , responses , objectives , constraints ) "
-                         "VALUES(?,?,?,?,?,?,?,?)", (format_iteration_coordinate(metadata['coord']),
+                         "VALUES(?,?,?,?,?,?,?,?,?)", (self._counter, format_iteration_coordinate(metadata['coord']),
                                                      metadata['timestamp'], metadata['success'],
                                                      metadata['msg'], desvars_blob,
                                                      responses_blob, objectives_blob,
@@ -323,9 +322,9 @@ class SqliteRecorder(BaseRecorder):
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
-        self.con.execute("INSERT INTO system_iterations(iteration_coordinate, timestamp, "
+        self.con.execute("INSERT INTO system_iterations(counter, iteration_coordinate, timestamp, "
                          "success, msg, inputs , outputs , residuals ) "
-                         "VALUES(?,?,?,?,?,?,?)", (format_iteration_coordinate(metadata['coord']),
+                         "VALUES(?,?,?,?,?,?,?,?)", (self._counter, format_iteration_coordinate(metadata['coord']),
                                                    metadata['timestamp'], metadata['success'],
                                                    metadata['msg'], inputs_blob,
                                                    outputs_blob, residuals_blob))
@@ -400,9 +399,9 @@ class SqliteRecorder(BaseRecorder):
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
-        self.con.execute("INSERT INTO solver_iterations(iteration_coordinate, timestamp, "
+        self.con.execute("INSERT INTO solver_iterations(counter, iteration_coordinate, timestamp, "
                          "success, msg, abs_err, rel_err, solver_output, solver_residuals) "
-                         "VALUES(?,?,?,?,?,?,?,?)", (format_iteration_coordinate(metadata['coord']),
+                         "VALUES(?,?,?,?,?,?,?,?,?)", (self._counter, format_iteration_coordinate(metadata['coord']),
                                                      metadata['timestamp'],
                                                      metadata['success'], metadata['msg'],
                                                      abs_error, rel_error,
