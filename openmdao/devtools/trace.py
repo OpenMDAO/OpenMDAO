@@ -20,24 +20,37 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.matrix import Matrix
 
+# This maps a simple identifier to a group of classes and possibly corresponding
+# glob patterns for each class.
 _trace_dict = {
+    'all': None,
     'openmdao': (System, Component, Group, Problem),
     'setup': [(s, ['*setup*']) for s in (System, Component, Group, Problem)]
 }
 
 
 def _get_methods(klass, patterns=None):
+    """
+    Return a list of method names for the given class, subject to optional filters.
+
+    Parameters
+    ----------
+    klass : class
+        The class to return method names from.
+    patterns : iter of str, optional
+        Iter of glob patterns specifying methods to keep.
+    """
     methods = getmembers(klass, isroutine)
     if patterns is None:
         return [name for name, method in methods]
-    else:
-        filtered = []
-        for name, _ in methods:
-            for p in patterns:
-                if fnmatchcase(name, p):
-                    filtered.append(name)
-                    break
-        return filtered
+
+    filtered = []
+    for name, _ in methods:
+        for p in patterns:
+            if fnmatchcase(name, p):
+                filtered.append(name)
+                break
+    return filtered
 
 def _get_all_methods(class_patterns):
     """
@@ -77,7 +90,8 @@ def _get_all_methods(class_patterns):
 _active_traces = {}
 _method_counts = {}
 _mem_changes = {}
-_callstack = []
+_callstack = [None]*100
+_registered = False  # prevents multiple atexit registrations
 
 def _trace_calls(frame, event, arg):
     func_name = frame.f_code.co_name
@@ -86,10 +100,9 @@ def _trace_calls(frame, event, arg):
         if 'self' in loc:
             insts = _active_traces[func_name]
             self = loc['self']
-            if isinstance(self, insts):
+            if self is not None and isinstance(self, insts):
+                fullname = '.'.join((self.__class__.__name__, func_name))
                 if event is 'call':
-                    fullname = '.'.join((self.__class__.__name__, func_name))
-
                     if trace_mem:
                         _callstack.append((fullname, mem_usage()))
                     else:
@@ -113,38 +126,60 @@ def _trace_calls(frame, event, arg):
                         _callstack.pop()
 
 def trace_init(trace_type='call'):
-    if trace_type == 'mem':
-        def print_totals():
-            items = sorted(_mem_changes.items(), key=lambda x: x[1])
-            for n, delta in items:
-                if delta > 0.0:
-                    print("%s %g" % (n, delta))
-        import atexit
-        atexit.register(print_totals)
+    global _registered, trace_mem, trace
+    if not _registered:
+        if trace_type == 'mem':
+            trace_mem = True
+            def print_totals():
+                items = sorted(_mem_changes.items(), key=lambda x: x[1])
+                for n, delta in items:
+                    if delta > 0.0:
+                        print("%s %g" % (n, delta))
+            import atexit
+            atexit.register(print_totals)
+            _registered = True
+        else:
+            trace = True
 
-def trace_on(trace_classes=((System, None),)):
+def trace_on(class_group='all'):
     global _active_traces
-    _active_traces = _get_all_methods(trace_classes)
+    _active_traces = _get_all_methods(_trace_dict[class_group])
     sys.setprofile(_trace_calls)
 
 def trace_off():
     sys.setprofile(None)
 
 @contextmanager
-def tracing(trace_type='call', classes='openmdao'):
+def tracing(trace_type='call', class_group='all'):
     trace_init(trace_type)
-    trace_on(classes)
+    trace_on(class_group)
     yield
     trace_off()
 
-# decorator
-def tracefunc(fnc):
-    def wrapped(*args, **kwargs):
-        trace_init(trace_type='call')
-        trace_on((object,))
-        fnc(*args, **kwargs)
-        trace_off()
-    return wrapped
+
+class tracedfunc(object):
+    """
+    Decorator that activates tracing for a particular function.
+
+    Parameters
+    ----------
+    trace_type : str, optional
+        Type of tracing to perform.  Options are ['call', 'mem']
+    class_group : str, optional
+        Identifier of a group of classes that will have their functions traced.
+    """
+    def __init__(self, trace_type='call', class_group='all'):
+        self.trace_type = trace_type
+        self.classes = class_group
+
+    def __call__(self, func):
+        trace_init(trace_type=self.trace_type)
+
+        def wrapped(*args, **kwargs):
+            trace_on(self.classes)
+            func(*args, **kwargs)
+            trace_off()
+        return wrapped
 
 trace = os.environ.get('OPENMDAO_TRACE')
 trace_mem = os.environ.get('OPENMDAO_TRACE_MEM')
