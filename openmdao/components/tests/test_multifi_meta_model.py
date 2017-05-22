@@ -53,16 +53,16 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm.metadata['train:x'] = [0.0, 0.4, 1.0]
         mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195]
 
-        expected_xtrain=[np.array([ [0.0], [0.4], [1.0] ])]
-        expected_ytrain=[np.array([ [3.02720998], [0.11477697], [15.82973195] ])]
+        expected_xtrain=[np.array([[0.0], [0.4], [1.0]])]
+        expected_ytrain=[np.array([[3.02720998], [0.11477697], [15.82973195]])]
 
-        prob.run()
+        prob.run_model()
         np.testing.assert_array_equal(surr.xtrain, expected_xtrain)
         np.testing.assert_array_equal(surr.ytrain, expected_ytrain)
 
         expected_xpredict=0.5
         prob['mm.x'] = expected_xpredict
-        prob.run()
+        prob.run_model()
 
         np.testing.assert_array_equal(surr.xpredict, expected_xpredict)
 
@@ -88,11 +88,11 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         expected_xtrain=[np.array([[0.0], [0.4], [1.0]]),
                          np.array([[0.1], [0.2], [0.3], [0.5], [0.6], [0.7],
                                    [0.8], [0.9], [0.0], [0.4], [1.0]])]
-        expected_ytrain=[np.array([[  3.02720998], [0.11477697], [15.82973195]]),
+        expected_ytrain=[np.array([[ 3.02720998], [0.11477697], [15.82973195]]),
                          np.array([[-9.32828839], [-8.31986355], [-7.00778837], [-4.54535129],
-                                   [-4.0747189], [-5.30287702], [-4.47456522], [1.85597517],
-                                   [-8.48639501], [-5.94261151],  [7.91486597]])]
-        prob.run()
+                                   [-4.0747189],  [-5.30287702], [-4.47456522], [1.85597517],
+                                   [-8.48639501], [-5.94261151], [7.91486597]])]
+        prob.run_model()
         np.testing.assert_array_equal(surr.xtrain[0], expected_xtrain[0])
         np.testing.assert_array_equal(surr.xtrain[1], expected_xtrain[1])
         np.testing.assert_array_equal(surr.ytrain[0], expected_ytrain[0])
@@ -121,7 +121,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm.metadata['train:y2']     = [4.0, 4.0, 4.0]
         mm.metadata['train:y2_fi2'] = [4.0, 4.1, 4.3, 4.4, 4.5 ,4.6]
 
-        prob.run()
+        prob.run_model()
         expected_xtrain=[np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]),
                          np.array([[1.1, 2.1], [2.1, 2.2], [3.1, 2.3],
                                    [1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])]
@@ -157,7 +157,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm.metadata['train:y']     = [1.0, 1.4, 2.0]
         mm.metadata['train:y_fi2'] = [1.1, 1.2, 1.3, 1.5, 1.6]
 
-        prob.run()
+        prob.run_model()
         expected_xtrain=[np.array([[0.0], [0.4], [1.0]]),
                          np.array([[0.1], [0.2], [0.3], [0.5], [0.6]])]
         expected_ytrain=[np.array([[1.0], [1.4], [2.0]]),
@@ -175,7 +175,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm.metadata['train:y_fi2'] = [1.0]
         mm.train=True
 
-        prob.run()
+        prob.run_model()
         expected_xtrain=[np.array([[0.0], [0.4], [1.0]]),
                          np.array([[0.1], [0.2], [0.3], [0.5], [0.6], [2.0]])]
         expected_ytrain=[np.array([[1.0], [1.4], [2.0]]),
@@ -193,7 +193,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm.metadata['train:y_fi2'] = [4.0]
 
         mm.train = True
-        prob.run()
+        prob.run_model()
 
         expected_xtrain=[np.array([[0.0], [0.4], [1.0], [3.0]]),
                          np.array([[0.1], [0.2], [0.3], [0.5], [0.6], [2.0], [3.0]])]

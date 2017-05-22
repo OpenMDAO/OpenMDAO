@@ -11,7 +11,7 @@ from openmdao.devtools.testutil import TestLogger
 class MetaModelTestCase(unittest.TestCase):
 
     def test_sin_metamodel(self):
-        # create a MetaModel for Sin and add it to a Problem
+        # create a MetaModel for sine and add it to a Problem
         sin_mm = MetaModel()
         sin_mm.add_input('x', 0.)
         sin_mm.add_output('f_x', 0.)
@@ -53,6 +53,38 @@ class MetaModelTestCase(unittest.TestCase):
         prob['sin_mm.x'] = 2.1
 
         prob.run_model()
+
+        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
+
+    def test_sin_metamodel_vector(self):
+        # Like simple sin example, but with input of length n instead of scalar
+        # The expected behavior is that the output is also of length n, with
+        # each one being an independent prediction.
+        # Its as if you stamped out n copies of metamodel, ran n scalars
+        # through its input, then muxed all those outputs into one contiguous
+        # array but you skip all the n-copies thing and do it all as an array
+
+        size = 3
+
+        # create a MetaModel for sine
+        sin_mm = MetaModel()
+        sin_mm.add_input('x', np.zeros(size))
+        sin_mm.add_output('f_x', np.zeros(size))
+        sin_mm.default_surrogate = FloatKrigingSurrogate()
+
+        # add it to a Problem
+        prob = Problem(Group())
+        prob.model.add_subsystem('sin_mm', sin_mm)
+        prob.setup(check=False)
+
+        # train the surrogate and check predicted value
+        sin_mm.metadata['train:x'] = np.linspace(0,10,20)
+        sin_mm.metadata['train:f_x'] = .5*np.sin(sin_mm.metadata['train:x'])
+
+        prob['sin_mm.x'] = np.array([2.1, 3.2, 4.3])
+
+        prob.run_model()
+        print("prob['sin_mm.f_x']:", prob['sin_mm.f_x'])
 
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
 
@@ -430,6 +462,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob = Problem()
         prob.model.add_subsystem('trig', trig)
         prob.setup(check=False)
+
         prob['trig.x'] = 2.1
         prob.run_model()
 
