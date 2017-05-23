@@ -144,15 +144,10 @@ class BaseRecorder(object):
                     myresiduals = [n for n in object_requesting_recording._residuals._names
                                    if self._check_path(n, incl, excl)]
 
-            # if self.options['record_derivs']:
-            #     myinputs = [n for n in object_requesting_recording._derivs._names
-            #                 if self._check_path(n, incl, excl)]
-
             self._filtered_system = {
                 'i': myinputs,
                 'o': myoutputs,
                 'r': myresiduals
-                # 'd': myderivatives
             }
 
         if (isinstance(object_requesting_recording, Driver)):
@@ -211,7 +206,22 @@ class BaseRecorder(object):
 
     def _check_path(self, path, includes, excludes):
         """
-        Return True if `path` should be recorded.
+        Calculate whether `path` should be recorded.
+        
+        Parameters
+        ----------
+        path : str
+            path proposed to be recorded
+        includes : list
+            list of things to be included in recording list.
+        excludes : list
+            list of things to be excluded from recording list.
+         
+        Returns
+        -------
+            boolean
+                True if path should be recorded, False if it's been excluded.
+        
         """
         # First see if it's included
         for pattern in includes:

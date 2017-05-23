@@ -21,6 +21,8 @@ def array_to_blob(array):
 
     Convert a numpy array to something that can be written
     to a BLOB field in sqlite
+    
+    TODO: move this to a util file?
     """
     out = io.BytesIO()
     np.save(out, array)
@@ -31,6 +33,8 @@ def array_to_blob(array):
 def blob_to_array(blob):
     """
     Convert sqlite BLOB to numpy array.
+    
+    TODO: move this to a util file?
     """
     out = io.BytesIO(blob)
     out.seek(0)
@@ -44,27 +48,13 @@ class SqliteRecorder(BaseRecorder):
     """
     Recorder that saves cases in a sqlite db.
 
-    Args
-    ----
-    sqlite_dict_args : dict
-        Dictionary lf any additional arguments for the SQL db.
-
-    Options
-    -------
-    options['record_metadata'] :  bool(True)
-        Tells recorder whether to record variable attribute metadata.
-    options['record_outputs'] :  bool(True)
-        Tells recorder whether to record the outputs vector.
-    options['record_inputs'] :  bool(False)
-        Tells recorder whether to record the inputs vector.
-    options['record_residuals'] :  bool(False)
-        Tells recorder whether to record the residuals vector.
-    options['record_derivs'] :  bool(True)
-        Tells recorder whether to record derivatives that are requested by a `Driver`.
-    options['includes'] :  list of strings
-        Patterns for variables to include in recording.
-    options['excludes'] :  list of strings
-        Patterns for variables to exclude in recording (processed after includes).
+    Attributes
+    ----------
+    
+    model_viewer_data : dict
+        Dict that holds the data needed to generate N2 diagram
+    con
+        Connection to the sqlite3 database
     """
 
     def __init__(self, out):
@@ -74,9 +64,6 @@ class SqliteRecorder(BaseRecorder):
         super(SqliteRecorder, self).__init__()
 
         self.model_viewer_data = None
-
-        self._counter = 0
-        # isolation_level=None causes autocommit
         self.con = sqlite3.connect(out, isolation_level=None)
 
         self.con.execute("CREATE TABLE metadata( format_version INT)")
@@ -109,10 +96,18 @@ class SqliteRecorder(BaseRecorder):
     def record_iteration(self, object_requesting_recording, metadata, **kwargs):
         """
         Store the provided data in the sqlite file using the iteration coordinate for the key.
+        
+        Args
+        ----
+        object_requesting_recording: object
+            The item, a System, Solver, or Driver that wants to record an iteration.
+        metadata : dict
+            Dictionary containing execution metadata (e.g. iteration coordinate).
+        **kwargs :
+            Various keyword arguments needed for System or Solver recordings.
         """
         super(SqliteRecorder, self).record_iteration(object_requesting_recording, metadata)
 
-        # Record an iteration from a Driver
         if isinstance(object_requesting_recording, Driver):
             self.record_iteration_driver(object_requesting_recording, metadata)
 
@@ -122,14 +117,19 @@ class SqliteRecorder(BaseRecorder):
         elif isinstance(object_requesting_recording, Solver):
             self.record_iteration_solver(object_requesting_recording, metadata, kwargs['abs'],
                                          kwargs['rel'])
-
         else:
-            print ("YOU CAN'T ATTACH A RECORDER TO THIS OBJECT")
-            # TODO_RECORDER is this the right way to handle this
+            raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """
         Record an iteration using the driver options.
+        
+        Args
+        ----
+        object_requesting_recording: Driver
+            The Driver object that wants to record an iteration.
+        metadata : dict
+            Dictionary containing execution metadata (e.g. iteration coordinate).
         """
         # make a nested numpy named array using the example
         #   http://stackoverflow.com/questions/19201868/how-to-set-dtype-for-nested-numpy-ndarray
@@ -240,6 +240,17 @@ class SqliteRecorder(BaseRecorder):
     def record_iteration_system(self, object_requesting_recording, metadata, method):
         """
         Record an iteration using system options.
+        
+        Args
+        ----
+        object_requesting_recording: System
+            The System object that wants to record an iteration.
+        metadata : dict
+            Dictionary containing execution metadata (e.g. iteration coordinate).
+        method : str
+            The method that called record_iteration. One of '_apply_linear', '_solve_linear',
+            '_apply_nonlinear,' '_solve_nonlinear'. Behavior varies based on from which function
+            record_iteration was called.
         """
         if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
                           '_solve_nonlinear']:
@@ -334,6 +345,19 @@ class SqliteRecorder(BaseRecorder):
                                 relative=None):
         """
         Record an iteration using solver options.
+        
+        Args
+        ----
+        object_requesting_recording: Solver
+            The Solver object that wants to record an iteration.
+        metadata : dict
+            Dictionary containing execution metadata (e.g. iteration coordinate).
+        absolute : float
+            The absolute error of the Solver requesting recording. It is not cached in 
+            the Solver object, so we pass it in here.
+        relative : float
+            The relative error of the Solver requesting recording. It is not cached in 
+            the Solver object, so we pass it in here.    
         """
         outputs_array = residuals_array = None
 
@@ -411,6 +435,11 @@ class SqliteRecorder(BaseRecorder):
     def record_metadata(self, object_requesting_recording):
         """
         Route the record_metadata call to the proper object.
+        
+        Args
+        ----
+        object_requesting_recording: object
+            The object that would like to record its metadata.
         """
         if self.options['record_metadata']:
             if isinstance(object_requesting_recording, Driver):
@@ -423,6 +452,11 @@ class SqliteRecorder(BaseRecorder):
     def record_metadata_driver(self, object_requesting_recording):
         """
         Record driver metadata.
+        
+        Args
+        ----
+        object_requesting_recording: Driver
+            The Driver that would like to record metadata.
         """
         driver_class = type(object_requesting_recording).__name__
         model_viewer_data = cPickle.dumps(object_requesting_recording._model_viewer_data,
@@ -434,6 +468,11 @@ class SqliteRecorder(BaseRecorder):
     def record_metadata_system(self, object_requesting_recording):
         """
         Record system metadata.
+        
+        Args
+        ----
+        object_requesting_recording: System
+            The System that would like to record metadata.
         """
         scaling_factors = cPickle.dumps(object_requesting_recording._scaling_vecs,
                                         cPickle.HIGHEST_PROTOCOL)
@@ -445,6 +484,11 @@ class SqliteRecorder(BaseRecorder):
     def record_metadata_solver(self, object_requesting_recording):
         """
         Record solver metadata.
+        
+        Args
+        ----
+        object_requesting_recording: Solver
+            The Solver that would like to record metadata.
         """
         path = object_requesting_recording._system.pathname
         solver_class = type(object_requesting_recording).__name__
@@ -460,4 +504,4 @@ class SqliteRecorder(BaseRecorder):
         """
         Close `out`.
         """
-        self.con.close()  # Not completely sure if it is this simple.
+        self.con.close()
