@@ -175,7 +175,7 @@ class DistribInputDistribOutputComp(ExplicitComponent):
 
         self.add_input('invec', np.ones(sizes[rank], float),
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_output('outvec', np.ones(sizes[rank], float))
+        self.add_output('outvec', np.ones(sizes[rank], float), distributed=True)
 
     def get_req_procs(self):
         return (2, 2)
@@ -201,7 +201,7 @@ class DistribNoncontiguousComp(ExplicitComponent):
 
         self.add_input('invec', np.ones(len(idxs), float),
                        src_indices=idxs)
-        self.add_output('outvec', np.ones(len(idxs), float))
+        self.add_output('outvec', np.ones(len(idxs), float), distributed=True)
 
     def get_req_procs(self):
         return 2, 2
@@ -336,7 +336,8 @@ class MPITests(unittest.TestCase):
 
                 self.add_input('invec', np.ones(sizes[rank], float),
                                src_indices=np.arange(start, end, dtype=int))
-                self.add_output('outvec', np.ones(sizes[rank], float))
+                self.add_output('outvec', np.ones(sizes[rank], float),
+                                distributed=True)
 
             def get_req_procs(self):
                 # require min of 2 processes, max of 5
@@ -486,7 +487,7 @@ class TestGroupMPI(unittest.TestCase):
                 outputs['y'] = np.sum(inputs['x'])*2.0
 
         p = Problem(model=Group())
-        
+
         #import wingdbstub
 
         p.model.add_subsystem('indep', IndepVarComp('x', np.arange(5, dtype=float)),

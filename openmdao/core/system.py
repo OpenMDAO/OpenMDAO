@@ -799,9 +799,14 @@ class System(object):
         sizes = self._var_sizes['output']
         for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
             mymeta = meta[abs_name]
+            local_shape = mymeta['shape']
+            if not mymeta['distributed']:
+                mymeta['global_size'] = np.prod(local_shape)
+                mymeta['global_shape'] = local_shape
+                continue
+
             global_size = np.sum(sizes[:, idx])
             mymeta['global_size'] = global_size
-            local_shape = mymeta['shape']
 
             # assume that all but the first dimension of the shape of a
             # distributed output is the same on all procs
@@ -971,6 +976,7 @@ class System(object):
 
                 shape_out = meta_out['shape']
                 units_out = meta_out['units']
+                distrib_out = meta_out['distributed']
                 shape_in = meta_in['shape']
                 units_in = meta_in['units']
 
@@ -980,20 +986,31 @@ class System(object):
                 src_indices = meta_in['src_indices']
 
                 if src_indices is not None:
-                    if src_indices.ndim != 1:
-                        if len(shape_out) == 1:
-                            src_indices = src_indices.flatten()
-                            src_indices = convert_neg(src_indices, src_indices.size)
-                        else:
-                            entries = [list(range(x)) for x in shape_in]
-                            cols = np.vstack(src_indices[i] for i in product(*entries))
-                            dimidxs = [convert_neg(cols[:, i], shape_out[i])
-                                       for i in range(cols.shape[1])]
-                            src_indices = np.ravel_multi_index(dimidxs, shape_out)
-                    if not np.isscalar(ref):
-                        ref = ref[src_indices]
-                    if not np.isscalar(ref0):
-                        ref0 = ref0[src_indices]
+                    if not (np.isscalar(ref) and np.isscalar(ref0)):
+                        global_shape_out = meta_out['global_shape']
+                        global_size_out = meta_out['global_size']
+                        if src_indices.ndim != 1:
+                            if len(shape_out) == 1:
+                                src_indices = src_indices.flatten()
+                                src_indices = convert_neg(src_indices, src_indices.size)
+                            else:
+                                entries = [list(range(x)) for x in shape_in]
+                                cols = np.vstack(src_indices[i] for i in product(*entries))
+                                dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
+                                           for i in range(cols.shape[1])]
+                                src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
+
+                        # TODO: if either ref or ref0 are not scalar and the output is
+                        # distributed, we need to do a scatter
+                        # to obtain the values needed due to global src_indices
+                        if distrib_out:
+                            raise RuntimeError("vector scalers with distrib vars "
+                                               "not supported yet.")
+
+                        if not np.isscalar(ref):
+                            ref = ref[src_indices]
+                        if not np.isscalar(ref0):
+                            ref0 = ref0[src_indices]
                 else:
                     if not np.isscalar(ref):
                         ref = ref.reshape(shape_out)

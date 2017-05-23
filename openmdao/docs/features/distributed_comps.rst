@@ -19,6 +19,12 @@ to a distributed output unless your input is equal to the size of the entire
 distributed output.  Otherwise, the assumed *src_indices* will be from 0 to
 1 less than the size of your input, which is probably not what you want.
 
+Also, when adding an output that is distributed, *distibuted=True* should
+be added as an argument to *add_output* so that the framework will treat the
+output as distributed instead of the default behavior where
+the output is duplicated in any MPI process that contains its parent
+component.
+
 The following simple example shows how to create a distributed component that
 distributes its computation evenly across the available processes, up to a
 maximum of 5 processors.  It performs one computation on process 0 and a

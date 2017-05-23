@@ -87,7 +87,7 @@ class Distrib3DComp(ExplicitComponent):
                                         [(2,0), (2,1), (2,2)],
                                         [(3,0), (3,1), (3,2)],
                                         [(4,0), (4,1), (4,2)]])
-            self.add_output('outvec', numpy.zeros((5, 3)))
+            self.add_output('outvec', numpy.zeros((5, 3)), distributed=True)
         else:
             self.add_input('invec', numpy.zeros((4, 3)),
                            src_indices=[[(5,0), (5,1), (5,2)],
@@ -96,7 +96,7 @@ class Distrib3DComp(ExplicitComponent):
                                         # use some negative indices here to
                                         # make sure they work
                                         [(-1,0), (8,1), (-1,2)]])
-            self.add_output('outvec', numpy.zeros((4, 3)))
+            self.add_output('outvec', numpy.zeros((4, 3)), distributed=True)
 
     def compute(self, inputs, outputs):
         if self.comm.rank == 0:
@@ -171,7 +171,7 @@ class MPITests2(unittest.TestCase):
 
         prob = Problem()
 
-        prob.model.add_subsystem('indep', IndepVarComp('x', points))
+        prob.model.add_subsystem('indep', IndepVarComp('x', points, distributed=True))
         prob.model.add_subsystem('comp', Distrib3DComp())
         prob.model.add_subsystem('total', ExecComp('y=x',
                                                    x=numpy.zeros((9,3)),

@@ -156,7 +156,7 @@ class Component(System):
 
         meta_names = {
             'input': ('units', 'shape', 'var_set'),
-            'output': ('units', 'shape', 'var_set', 'ref', 'ref0'),
+            'output': ('units', 'shape', 'var_set', 'ref', 'ref0', 'distributed'),
         }
 
         for type_ in ['input', 'output']:
@@ -342,7 +342,8 @@ class Component(System):
         var_rel_names['input'].append(name)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0,
+                   distributed=False):
         """
         Add an output variable to the component.
 
@@ -385,6 +386,8 @@ class Component(System):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
+        distributed : bool
+            If True, this variable is distributed across multiple processes.
         """
         if inspect.stack()[1][3] == '__init__':
             warn_deprecation("In the future, the 'add_output' method must be "
@@ -460,6 +463,8 @@ class Component(System):
 
         # var_set: taken as is
         metadata['var_set'] = var_set
+
+        metadata['distributed'] = distributed
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
