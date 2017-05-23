@@ -47,7 +47,7 @@ Building components
    features/building_components/implicitcomp
    features/building_components/units
    features/building_components/scaling
-   features/distributed_comps
+   features/building_components/distributed_comps
 
 Grouping components for more complex models
 ===========================================
