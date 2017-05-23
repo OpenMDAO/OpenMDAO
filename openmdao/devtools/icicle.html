@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  margin: auto;
+  position: relative;
+}
+
+rect {
+  stroke: #fff;
+}
+
+#tooltip {
+  position: absolute;
+  text-align: left;
+  padding: 4px;
+  font: 14px sans-serif;
+  background: lightgray;
+  border: 3px;
+  border-radius: 8px;
+  pointer-events: none;
+  -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+  -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.funcpath {
+    font-weight: bold;
+}
+
+.tottime {
+    font-weight: bold;
+}
+
+.totcalls {
+    font-weight: bold;
+}
+
+.loctime {
+    font-weight: bold;
+}
+
+.loccalls {
+    font-weight: bold;
+}
+
+p {
+    line-height: .2em;
+}
+
+td {
+    text-align: left;
+}
+
+h1 {
+    text-align: center;
+}
+
+</style>
+</head>
+<body>
+    <header><h1>$title</h1></header>
+<script type="text/javascript" src="http://d3js.org/d3.v3.js"></script>
+<script>
+
+var width = 960,
+    height = 500;
+
+var x = d3.scale.linear()
+    .range([0, width]);
+
+var y = d3.scale.linear()
+    .range([0, height]);
+
+var color = d3.scale.category20c();
+
+var partition = d3.layout.partition()
+    .value(function(d) { return d.time; });
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var rect = svg.selectAll("rect");
+
+var root = $call_graph_data;
+
+var formatTime = d3.format(".3g");
+var formatTpct = d3.format(".2%")
+var formatCalls = d3.format(",d")
+
+var last_d;
+
+window.onresize = resize;
+
+function resize() {
+    width = window.innerWidth;
+
+    svg.attr("width", width);
+    x = d3.scale.linear()
+        .range([0, width]);
+
+    if (last_d != null) {
+        x.domain([last_d.x, last_d.x + last_d.dx]);
+        y.domain([last_d.y, 1]).range([last_d.y ? 20 : 0, height]);
+    }
+
+    rect.attr("x", function(d) { return x(d.x); })
+        .attr("y", function(d) { return y(d.y); })
+        .attr("width", function(d) { return x(d.x + d.dx) - x(d.x); })
+        .attr("height", function(d) { return y(d.y + d.dy) - y(d.y); });
+}
+
+window.onload = function() {
+    var tooltip = d3.select("#tooltip")
+        .style("display", "none");
+
+    var funcpath = d3.select(".funcpath");
+    var loctime = d3.select(".loctime");
+    var loccalls = d3.select(".loccalls");
+    var tottime = d3.select(".tottime");
+    var totcalls = d3.select(".totcalls");
+
+    rect = rect
+        .data(partition.nodes(root))
+      .enter().append("rect")
+        .attr("x", function(d) { return x(d.x); })
+        .attr("y", function(d) { return y(d.y); })
+        .attr("width", function(d) { return x(d.dx); })
+        .attr("height", function(d) { return y(d.dy); })
+        .attr("fill", function(d) {
+            return color((d.children ? d : d.parent).name);
+        })
+        .on("click", click)
+        .on("mouseover", function(d) {
+            rect.attr("fill", function(dd) {
+                if (d.name == dd.name) {
+                    return "magenta";
+                }
+                else {
+                    return color((dd.children ? dd : dd.parent).name);
+                }
+            });
+             funcpath.text(d.name);
+             loctime.text(formatTime(d.time));
+             tottime.text(formatTime(d.tot_time));
+             loccalls.text(formatCalls(d.count));
+             totcalls.text(formatCalls(d.tot_count));
+             return tooltip.style("display", "inline");
+         })
+        .on("mouseout", function(d) {
+            rect.attr("fill", function(d) {
+                return color((d.children ? d : d.parent).name);
+            })
+             return tooltip.style("display", "none");
+        })
+        .on("mousemove", function(d) {
+            var newx;
+            if (d3.event.layerX < tooltip[0][0].clientWidth/2) {
+                newx = 0;
+            }
+            else if (d3.event.layerX > window.innerWidth-tooltip[0][0].clientWidth/2) {
+                newx = window.innerWidth-tooltip[0][0].clientWidth;
+            }
+            else {
+                newx = d3.event.layerX-tooltip[0][0].clientWidth/2;
+            }
+            return tooltip
+                .style("left", (newx) + "px")
+                .style("top", (d3.event.pageY + 20) + "px");
+        });
+
+    resize();
+};
+
+function click(d) {
+  last_d = d;
+  x.domain([d.x, d.x + d.dx]);
+  y.domain([d.y, 1]).range([d.y ? 20 : 0, height]);
+
+  rect.transition()
+      .duration(750)
+      .attr("x", function(d) { return x(d.x); })
+      .attr("y", function(d) { return y(d.y); })
+      .attr("width", function(d) { return x(d.x + d.dx) - x(d.x); })
+      .attr("height", function(d) { return y(d.y + d.dy) - y(d.y); });
+}
+
+</script>
+
+<div id="tooltip">
+    <table>
+        <tr><td>Function:</td><td class=funcpath></td></tr>
+    </table>
+    <table>
+        <tr><td>Local time:</td><td class=loctime></td><td>Local calls:</td> <td class=loccalls></td></tr>
+        <tr><td>Total time:</td><td class=tottime></td> <td>Total calls:</td> <td class=totcalls></td></tr>
+    </table>
+</div>
+</body>
+</html>
