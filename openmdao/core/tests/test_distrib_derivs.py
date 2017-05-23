@@ -104,16 +104,6 @@ class DistribCoordComp(ExplicitComponent):
         else:
             outputs['outvec'] = inputs['invec'] * 3.0
 
-    def compute_partial_derivs(self, inputs, outputs, jacobian):
-        if self.comm.rank == 0:
-            size = 15
-            mult = 2.
-        else:
-            size = 12
-            mult = 3.
-        derivs = numpy.eye(size) * mult
-        jacobian['outvec', 'invec'] = derivs
-
     def get_req_procs(self):
         return (2, 2)
 
