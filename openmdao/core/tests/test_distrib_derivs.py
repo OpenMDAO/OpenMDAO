@@ -75,7 +75,7 @@ class DistribExecComp(ExecComp):
         return (2, 2)
 
 
-class Distrib3DComp(ExplicitComponent):
+class DistribCoordComp(ExplicitComponent):
     def initialize_variables(self):
         comm = self.comm
         rank = comm.rank
@@ -172,7 +172,7 @@ class MPITests2(unittest.TestCase):
         prob = Problem()
 
         prob.model.add_subsystem('indep', IndepVarComp('x', points, distributed=True))
-        prob.model.add_subsystem('comp', Distrib3DComp())
+        prob.model.add_subsystem('comp', DistribCoordComp())
         prob.model.add_subsystem('total', ExecComp('y=x',
                                                    x=numpy.zeros((9,3)),
                                                    y=numpy.zeros((9,3))))
