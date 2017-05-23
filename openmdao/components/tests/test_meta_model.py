@@ -56,6 +56,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
 
+    @unittest.skip('not currently supported')
     def test_sin_metamodel_vector(self):
         # Like simple sin example, but with input of length n instead of scalar
         # The expected behavior is that the output is also of length n, with
@@ -126,34 +127,16 @@ class MetaModelTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
 
-    @unittest.skip('not currently supported')
-    def test_sin_metamodel_obj_return(self):
-        # create a MetaModel for Sin and add it to a Problem
+    def test_sin_metamodel_rmse(self):
+        # create MetaModel with rmse option to Kriging and add it to a Problem
         sin_mm = MetaModel()
         sin_mm.add_input('x', 0.)
-        sin_mm.add_output('f_x', (0.,0.))
+        sin_mm.add_output('f_x', 0.)
+        sin_mm.default_surrogate = KrigingSurrogate(eval_rmse=True)
 
         prob = Problem(Group())
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        # check that missing surrogate is detected in check_setup
-        testlogger = TestLogger()
-        prob.setup(logger=testlogger)
-
-        msg = ("No default surrogate model is defined and the "
-               "following outputs do not have a surrogate model:\n"
-               "['f_x']\n"
-               "Either specify a default_surrogate, or specify a "
-               "surrogate model for all outputs.")
-        self.assertEqual(len(testlogger.get('error')), 1)
-        self.assertTrue(msg in testlogger.get('error')[0])
-
-        # check that output with no specified surrogate gets the default
-        sin_mm.default_surrogate = KrigingSurrogate(eval_rmse=True)
         prob.setup(check=False)
-        surrogate = sin_mm._metadata('f_x').get('surrogate')
-        self.assertTrue(isinstance(surrogate, KrigingSurrogate),
-                        'sin_mm.f_x should get the default surrogate')
 
         # train the surrogate and check predicted value
         sin_mm.metadata['train:x'] = np.linspace(0,10,20)
@@ -162,8 +145,9 @@ class MetaModelTestCase(unittest.TestCase):
         prob['sin_mm.x'] = 2.1
 
         prob.run_model()
-        assert_rel_error(self, prob['sin_mm.f_x'][0], np.sin(2.1), 1e-4) # mean
-        self.assertTrue(self, prob['sin_mm.f_x'][1] < 1e-5) # std deviation
+
+        assert_rel_error(self, prob['sin_mm.f_x'], np.sin(2.1), 1e-4) # mean
+        self.assertTrue(self, sin_mm._metadata('f_x')['rmse'] < 1e-5) # std deviation
 
     def test_basics(self):
         # create a metamodel component
@@ -356,6 +340,37 @@ class MetaModelTestCase(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['mm.y'], np.array([1.0, 7.0]), .00001)
+
+    def test_2darray_outputs(self):
+        mm = MetaModel()
+        mm.add_input('x', np.zeros((2, 2)))
+        mm.add_output('y', np.zeros((2, 2)))
+        mm.default_surrogate = FloatKrigingSurrogate()
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('mm', mm)
+        prob.setup(check=False)
+
+        mm.metadata['train:x'] = [
+            [[1.0, 1.0], [1.0, 1.0]],
+            [[2.0, 1.0], [1.0, 1.0]],
+            [[1.0, 2.0], [1.0, 1.0]],
+            [[1.0, 1.0], [2.0, 1.0]],
+            [[1.0, 1.0], [1.0, 2.0]]
+        ]
+
+        mm.metadata['train:y'] = [
+            [[3.0, 1.0],[3.0, 1.0]],
+            [[2.0, 4.0],[2.0, 4.0]],
+            [[1.0, 7.0],[1.0, 7.0]],
+            [[6.0, -3.0],[6.0, -3.0]],
+            [[-2.0, 3.0],[-2.0, 3.0]]
+        ]
+
+        prob['mm.x'] = [[1.0, 2.0], [1.0, 1.0]]
+        prob.run_model()
+
+        assert_rel_error(self, prob['mm.y'], np.array([[1.0, 7.0], [1.0, 7.0]]), .00001)
 
     def test_unequal_training_inputs(self):
         mm = MetaModel()

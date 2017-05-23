@@ -633,8 +633,8 @@ class MultiFiCoKriging(object):
             G = self.G[0]
 
             u_ = solve_triangular(G.T, f.T - np.dot(Ft.T, r_t), lower=True)
-            MSE[:, 0] = self.sigma2[0] * (1
-                                          - (r_t**2).sum(axis=0) + (u_**2).sum(axis=0))
+            MSE[:, 0] = self.sigma2[0] * \
+                (1 - (r_t**2).sum(axis=0) + (u_**2).sum(axis=0))
 
         # Calculate recursively kriging mean and variance at level i
         for i in range(1, nlevel):
