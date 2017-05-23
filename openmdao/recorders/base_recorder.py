@@ -106,7 +106,6 @@ class BaseRecorder(object):
         object_requesting_recording :
             Object to which this recorder is attached.
         """
-
         self._counter = 0
 
         # Deprecated options here, but need to preserve backward compatibility if possible.
@@ -210,7 +209,7 @@ class BaseRecorder(object):
     def _check_path(self, path, includes, excludes):
         """
         Calculate whether `path` should be recorded.
-        
+
         Parameters
         ----------
         path : str
@@ -219,12 +218,11 @@ class BaseRecorder(object):
             list of things to be included in recording list.
         excludes : list
             list of things to be excluded from recording list.
-         
+
         Returns
         -------
             boolean
                 True if path should be recorded, False if it's been excluded.
-        
         """
         # First see if it's included
         for pattern in includes:
