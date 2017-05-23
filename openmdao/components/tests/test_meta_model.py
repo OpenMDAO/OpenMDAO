@@ -58,7 +58,7 @@ class MetaModelTestCase(unittest.TestCase):
 
     @unittest.skip('not currently supported')
     def test_sin_metamodel_vector(self):
-        # Like simple sin example, but with input of length n instead of scalar
+        # Like simple sine example, but with input of length n instead of scalar
         # The expected behavior is that the output is also of length n, with
         # each one being an independent prediction.
         # Its as if you stamped out n copies of metamodel, ran n scalars
@@ -78,14 +78,13 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('sin_mm', sin_mm)
         prob.setup(check=False)
 
-        # train the surrogate and check predicted value
+        # train the surrogate with vector input and check predicted value
         sin_mm.metadata['train:x'] = np.linspace(0,10,20)
         sin_mm.metadata['train:f_x'] = .5*np.sin(sin_mm.metadata['train:x'])
 
         prob['sin_mm.x'] = np.array([2.1, 3.2, 4.3])
 
         prob.run_model()
-        print("prob['sin_mm.f_x']:", prob['sin_mm.f_x'])
 
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
 
@@ -128,12 +127,13 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
 
     def test_sin_metamodel_rmse(self):
-        # create MetaModel with rmse option to Kriging and add it to a Problem
+        # create MetaModel with Kriging, using the rmse option
         sin_mm = MetaModel()
         sin_mm.add_input('x', 0.)
         sin_mm.add_output('f_x', 0.)
         sin_mm.default_surrogate = KrigingSurrogate(eval_rmse=True)
 
+        # add it to a Problem
         prob = Problem(Group())
         prob.model.add_subsystem('sin_mm', sin_mm)
         prob.setup(check=False)
