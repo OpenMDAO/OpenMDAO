@@ -386,10 +386,7 @@ class MPITests(unittest.TestCase):
 
         p.run_model()
 
-        expected = np.ones(size)
-        expected[:8] *= 2.0
-        expected[8:] *= -3.0
-        assert_rel_error(self, p['C3.out'], np.sum(expected))
+        assert_rel_error(self, p['C3.out'], -5.)
 
     def test_noncontiguous_idxs(self):
         # take even input indices in 0 rank and odd ones in 1 rank
