@@ -508,9 +508,8 @@ def extract_output_blocks(run_output):
     output_block = []
     for line in run_output.splitlines():
         if line.startswith('>>>>>'):
-            if output_block:
-                output_blocks.append('\n'.join(output_block))
-                output_block = []
+            output_blocks.append('\n'.join(output_block))
+            output_block = []
         else:
             output_block.append(line)
 
