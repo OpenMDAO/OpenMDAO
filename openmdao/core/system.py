@@ -737,6 +737,49 @@ class System(object):
         self._var_sizes = {'input': None, 'output': None}
         self._var_sizes_byset = {'input': {}, 'output': {}}
 
+    def _setup_global_shapes(self):
+        """
+        Compute the global size and shape of all variables on this system.
+        """
+        meta = self._var_allprocs_abs2meta['output']
+
+        if self.comm.size == 1:
+            for abs_name in self._var_allprocs_abs_names['output']:
+                mymeta = meta[abs_name]
+                local_shape = mymeta['shape']
+                mymeta['global_size'] = np.prod(local_shape)
+                mymeta['global_shape'] = local_shape
+            return
+
+        # now set global sizes and shapes into metadata for distributed outputs
+        sizes = self._var_sizes['output']
+        for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
+            mymeta = meta[abs_name]
+            local_shape = mymeta['shape']
+            if not mymeta['distributed']:
+                mymeta['global_size'] = np.prod(local_shape)
+                mymeta['global_shape'] = local_shape
+                continue
+
+            global_size = np.sum(sizes[:, idx])
+            mymeta['global_size'] = global_size
+
+            # assume that all but the first dimension of the shape of a
+            # distributed output is the same on all procs
+            high_dims = local_shape[1:]
+            if high_dims:
+                high_size = np.prod(high_dims)
+                dim1 = global_size // high_size
+                if global_size % high_size != 0:
+                    raise RuntimeError("Global size of output '%s' (%s) does not agree "
+                                       "with local shape %s" % (abs_name, global_size,
+                                                                local_shape))
+                global_shape = tuple([dim1] + list(high_dims))
+            else:
+                high_size = 1
+                global_shape = (global_size,)
+            mymeta['global_shape'] = global_shape
+
     def _setup_global_connections(self, recurse=True):
         """
         Compute dict of all connections between this system's inputs and outputs.
@@ -784,45 +827,6 @@ class System(object):
         self._ext_num_vars_byset = ext_num_vars_byset
         self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
-
-        meta = self._var_allprocs_abs2meta['output']
-
-        if self.comm.size == 1:
-            for abs_name in self._var_allprocs_abs_names['output']:
-                mymeta = meta[abs_name]
-                local_shape = mymeta['shape']
-                mymeta['global_size'] = np.prod(local_shape)
-                mymeta['global_shape'] = local_shape
-            return
-
-        # now set global sizes and shapes into metadata for distributed outputs
-        sizes = self._var_sizes['output']
-        for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
-            mymeta = meta[abs_name]
-            local_shape = mymeta['shape']
-            if not mymeta['distributed']:
-                mymeta['global_size'] = np.prod(local_shape)
-                mymeta['global_shape'] = local_shape
-                continue
-
-            global_size = np.sum(sizes[:, idx])
-            mymeta['global_size'] = global_size
-
-            # assume that all but the first dimension of the shape of a
-            # distributed output is the same on all procs
-            high_dims = local_shape[1:]
-            if high_dims:
-                high_size = np.prod(high_dims)
-                dim1 = global_size // high_size
-                if global_size % high_size != 0:
-                    raise RuntimeError("Global size of output '%s' (%s) does not agree "
-                                       "with local shape %s" % (abs_name, global_size,
-                                                                local_shape))
-                global_shape = tuple([dim1] + list(high_dims))
-            else:
-                high_size = 1
-                global_shape = (global_size,)
-            mymeta['global_shape'] = global_shape
 
     def _setup_vectors(self, root_vectors, excl_out, excl_in, resize=False):
         """

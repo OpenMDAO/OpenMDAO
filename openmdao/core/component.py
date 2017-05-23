@@ -231,6 +231,8 @@ class Component(System):
                     self.comm.Allgather(
                         sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
 
+        self._setup_global_shapes()
+
     def _setup_partials(self, recurse=True):
         """
         Call initialize_partials in components.

@@ -380,6 +380,8 @@ class Group(System):
                     self.comm.Allgather(
                         sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
 
+        self._setup_global_shapes()
+
     def _setup_global_connections(self, recurse=True):
         """
         Compute dict of all connections between this system's inputs and outputs.
