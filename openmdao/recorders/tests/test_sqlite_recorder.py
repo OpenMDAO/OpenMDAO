@@ -53,7 +53,7 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
         db_cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
         row_actual  = db_cur.fetchone()
 
-        counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, objectives_blob, constraints_blob = row_actual
+        counter, global_counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, objectives_blob, constraints_blob = row_actual
 
         desvars_actual = blob_to_array(desvars_blob)
         responses_actual = blob_to_array(responses_blob)
@@ -99,7 +99,7 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
         db_cur.execute("SELECT * FROM system_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
         row_actual = db_cur.fetchone()
 
-        counter, iteration_coordinate, timestamp, success, msg, inputs_blob, outputs_blob, residuals_blob = row_actual
+        counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_blob, outputs_blob, residuals_blob = row_actual
 
         inputs_actual = blob_to_array(inputs_blob)
         outputs_actual = blob_to_array(outputs_blob)
@@ -145,7 +145,7 @@ def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
         db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
         row_actual = db_cur.fetchone()
 
-        counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, output_blob, residuals_blob = row_actual
+        counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, output_blob, residuals_blob = row_actual
 
         output_actual = blob_to_array(output_blob)
         residuals_actual = blob_to_array(residuals_blob)
@@ -566,6 +566,8 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
+        #TODO_RECORDERS - need to test values !!!
+
     def test_record_solver(self):
         self.setup_sellar_model()
 
@@ -664,6 +666,64 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                                                  expected_solver_output, expected_solver_residuals),), self.eps)
+
+    def test_global_counter(self):
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+
+        prob = Problem()
+        model = prob.model = SellarDerivativesGrouped()
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-2 # to speed the test up
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = True
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        self.recorder.options['record_inputs'] = True
+        self.recorder.options['record_outputs'] = True
+        self.recorder.options['record_residuals'] = True
+        self.recorder.options['record_metadata'] = True
+
+        # Add recorders for Driver, System, Solver
+        prob.driver.add_recorder(self.recorder)
+        prob.model.add_recorder(self.recorder)
+        mda = prob.model.get_subsystem('mda')
+        mda.nl_solver.add_recorder(self.recorder)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_driver()
+        prob.cleanup()
+
+        # get global counter values from driver, system, and solver recording
+        con = sqlite3.connect(self.filename)
+        cur = con.cursor()
+        cur.execute("SELECT counter FROM driver_iterations")
+        counters_driver = set( i[0] for i in cur.fetchall() )
+        cur.execute("SELECT counter FROM system_iterations")
+        counters_system = set( i[0] for i in cur.fetchall() )
+        cur.execute("SELECT counter FROM solver_iterations")
+        counters_solver = set( i[0] for i in cur.fetchall() )
+        cur.execute("SELECT COUNT(rowid) FROM global_iterations")
+        global_iterations_records = cur.fetchone()[0]
+        con.close()
+
+        # Check to see that they make sense
+        self.assertEqual(self.recorder._counter, global_iterations_records )
+        self.assertEqual(self.recorder._counter, len(counters_driver) + len(counters_system) + len(counters_solver) )
+        self.assertTrue(counters_driver.isdisjoint(counters_system))
+        self.assertTrue(counters_driver.isdisjoint(counters_solver))
+        self.assertTrue(counters_system.isdisjoint(counters_solver))
 
 if __name__ == "__main__":
     unittest.main()
