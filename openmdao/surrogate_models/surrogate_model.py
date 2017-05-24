@@ -42,6 +42,17 @@ class SurrogateModel(object):
                 .format(type(self).__name__)
             raise RuntimeError(msg)
 
+    def vectorized_predict(self, x):
+        """
+        Calculate predicted values of the response based on the current trained model.
+        
+        Parameters
+        ----------
+        x : array-like
+            Vectorized point(s) at which the surrogate is evaluated. 
+        """
+        pass
+
     def linearize(self, x):
         """
         Calculate the jacobian of the interpolant at the requested point.

@@ -56,38 +56,6 @@ class MetaModelTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
 
-    @unittest.skip('not currently supported')
-    def test_sin_metamodel_vector(self):
-        # Like simple sine example, but with input of length n instead of scalar
-        # The expected behavior is that the output is also of length n, with
-        # each one being an independent prediction.
-        # Its as if you stamped out n copies of metamodel, ran n scalars
-        # through its input, then muxed all those outputs into one contiguous
-        # array but you skip all the n-copies thing and do it all as an array
-
-        size = 3
-
-        # create a MetaModel for sine
-        sin_mm = MetaModel()
-        sin_mm.add_input('x', np.zeros(size))
-        sin_mm.add_output('f_x', np.zeros(size))
-        sin_mm.default_surrogate = FloatKrigingSurrogate()
-
-        # add it to a Problem
-        prob = Problem(Group())
-        prob.model.add_subsystem('sin_mm', sin_mm)
-        prob.setup(check=False)
-
-        # train the surrogate with vector input and check predicted value
-        sin_mm.metadata['train:x'] = np.linspace(0,10,20)
-        sin_mm.metadata['train:f_x'] = .5*np.sin(sin_mm.metadata['train:x'])
-
-        prob['sin_mm.x'] = np.array([2.1, 3.2, 4.3])
-
-        prob.run_model()
-
-        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
-
     def test_sin_metamodel_preset_data(self):
         # preset training data
         x = np.linspace(0,10,200)
@@ -483,6 +451,83 @@ class MetaModelTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['trig.sin_x'], .5*np.sin(prob['trig.x']), 1e-4)
         assert_rel_error(self, prob['trig.cos_x'], .5*np.cos(prob['trig.x']), 1e-4)
+
+    def test_metamodel_feature_vector(self):
+        # Like simple sine example, but with input of length n instead of scalar
+        # The expected behavior is that the output is also of length n, with
+        # each one being an independent prediction.
+        # Its as if you stamped out n copies of metamodel, ran n scalars
+        # through its input, then muxed all those outputs into one contiguous
+        # array but you skip all the n-copies thing and do it all as an array
+
+        size = 3
+
+        # create a vectorized MetaModel for sine
+        trig = MetaModel(vectorize=size)
+        trig.add_input('x', np.zeros(size))
+        trig.add_output('y', np.zeros(size))
+        trig.default_surrogate = FloatKrigingSurrogate()
+
+        # add it to a Problem
+        prob = Problem(Group())
+        prob.model.add_subsystem('trig', trig)
+        prob.setup(check=False)
+
+        # provide training data
+        trig.metadata['train:x'] = np.linspace(0, 10, 20)
+        trig.metadata['train:y'] = 5*np.sin(trig.metadata['train:x'])
+
+        # train the surrogate and check predicted value
+        prob['trig.x'] = np.array([2.1, 3.2, 4.3])
+        prob.run_model()
+        assert_rel_error(self, prob['trig.y'],
+                         np.array(.5*np.sin(prob['trig.x'])),
+                         1e-4)
+
+    def test_metamodel_feature_2d(self):
+        # Like simple sine example, but with input of length n instead of scalar
+        # The expected behavior is that the output is also of length n, with
+        # each one being an independent prediction.
+        # Its as if you stamped out n copies of metamodel, ran n scalars
+        # through its input, then muxed all those outputs into one contiguous
+        # array but you skip all the n-copies thing and do it all as an array
+
+        size = 3
+
+        # create a MetaModel for sine
+        trig = MetaModel()
+        trig.add_input('x', np.zeros(size))
+        trig.add_output('y', np.zeros((size, 2)))
+        trig.default_surrogate = FloatKrigingSurrogate()
+
+        # add it to a Problem
+        prob = Problem(Group())
+        prob.model.add_subsystem('trig', trig)
+        prob.setup(check=False)
+
+        # provide training data in sets of size
+        num_samples = 5
+        vals = np.linspace(0,10,num_samples)
+        trig.metadata['train:x'] = np.zeros((size, num_samples))
+        trig.metadata['train:y'] = np.zeros((size, 2*num_samples))
+
+        for i in range(size):
+            trig.metadata['train:x'][i] = vals
+            trig.metadata['train:y'][i] = np.concatenate((.5*np.sin(vals), .5*np.cos(vals)))
+
+        print('train:x')
+        print(trig.metadata['train:x'])
+        print('train:y')
+        print(trig.metadata['train:y'])
+
+        # train the surrogate with vector input and check predicted value
+        prob['trig.x'] = np.array([2.1, 3.2, 4.3])
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['trig.y'],
+                         np.array(.5*np.sin(prob['trig.x']),.5*np.cos(prob['trig.x'])),
+                         1e-4)
 
 
 if __name__ == "__main__":

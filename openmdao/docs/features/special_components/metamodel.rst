@@ -42,4 +42,15 @@ values. The training step only occurs on the first run.
 .. embed-test::
     openmdao.components.tests.test_meta_model.MetaModelTestCase.test_metamodel_feature
 
+The inputs and outputs of a `MetaModel` are not limited to scalar values. The
+following example illustrates the use of vector inputs and a two-dimensional
+output array to create a `MetaModel` that can provide multiple predictions at once.
+In this case, the ``trig`` component takes three input values and provides the
+corresponding predicted values for the sine and consine functions at those three
+points.
+
+.. embed-test::
+    openmdao.components.tests.test_meta_model.MetaModelTestCase.test_metamodel_feature_2d
+
+
 .. tags:: MetaModel, Examples

@@ -1,10 +1,12 @@
-"""Metamodel provides basic Meta Modeling capability."""
+"""MetaModel provides basic meta modeling capability."""
 
 import numpy as np
 from copy import deepcopy
 
 from openmdao.api import ExplicitComponent
 from openmdao.core.component import _NotSet
+from openmdao.surrogate_models.surrogate_model import SurrogateModel
+from openmdao.utils.class_util import overrides_method
 
 
 class MetaModel(ExplicitComponent):
@@ -18,7 +20,7 @@ class MetaModel(ExplicitComponent):
     For a Float variable, the training data is an array of length m.
     """
 
-    def __init__(self):
+    def __init__(self, default_surrogate=None, vectorize=None):
         """
         Initialize all attributes.
         """
@@ -26,7 +28,10 @@ class MetaModel(ExplicitComponent):
 
         # This surrogate will be used for all outputs that don't have
         # a specific surrogate assigned to them
-        self.default_surrogate = None
+        self.default_surrogate = default_surrogate
+
+        #
+        self._vectorize = vectorize
 
         # keep list of inputs and outputs that are not the training vars
         self._surrogate_input_names = []
@@ -65,7 +70,11 @@ class MetaModel(ExplicitComponent):
             by the problem later.
         """
         metadata = super(MetaModel, self).add_input(name, val, **kwargs)
-        input_size = metadata['value'].size
+
+        if self._vectorize is not None:
+            input_size = metadata['value'][0].size
+        else:
+            input_size = metadata['value'].size
 
         self._surrogate_input_names.append((name, input_size))
         self._input_size += input_size
@@ -98,7 +107,15 @@ class MetaModel(ExplicitComponent):
 
         metadata = super(MetaModel, self).add_output(name, val, **kwargs)
 
-        output_shape = metadata['shape']
+        if self._vectorize is not None:
+            output_shape = metadata['shape'][1:]
+            if len(output_shape) == 0:
+                output_shape = 1
+        else:
+            output_shape = metadata['shape']
+
+        print("output_shape", name, output_shape)
+
         self._surrogate_output_names.append((name, output_shape))
         self._training_output[name] = np.zeros(0)
 
@@ -184,11 +201,26 @@ class MetaModel(ExplicitComponent):
         for name, shape in self._surrogate_output_names:
             surrogate = self._metadata(name).get('surrogate')
             if surrogate:
-                predicted = surrogate.predict(inputs)
-                if isinstance(predicted, tuple):  # rmse option
-                    self._metadata(name)['rmse'] = predicted[1]
-                    predicted = predicted[0]
-                outputs[name] = np.reshape(predicted, outputs[name].shape)
+                if self._vectorize is None or \
+                    overrides_method('vectorized_predict', surrogate, SurrogateModel):
+                    predicted = surrogate.predict(inputs)
+                    if isinstance(predicted, tuple):  # rmse option
+                        self._metadata(name)['rmse'] = predicted[1]
+                        predicted = predicted[0]
+                    outputs[name] = np.reshape(predicted, outputs[name].shape)
+                else:
+                    output_shape = (self._vectorize,)+outputs[name].shape
+                    predicted = np.zeros(output_shape)
+                    rmse = self._metadata(name)['rmse'] = []
+                    print('inputs:', inputs)
+                    for i in range(self._vectorize):
+                        pred_i = surrogate.predict(inputs[i])
+                        predicted[i] = np.reshape(pred_i, outputs[name].shape)
+                        print('predicted:', predicted)
+                        if isinstance(predicted[i], tuple):  # rmse option
+                            rmse.append(predicted[i][1])
+                            predicted[i] = predicted[i][0]
+                    outputs[name] = np.reshape(predicted, output_shape)
             else:
                 raise RuntimeError("Metamodel '%s': No surrogate specified for output '%s'"
                                    % (self.pathname, name))
