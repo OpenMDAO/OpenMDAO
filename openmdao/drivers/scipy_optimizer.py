@@ -56,6 +56,8 @@ class ScipyOptimizer(Driver):
     ----------
     fail : bool
         Flag that indicates failure of most recent optimization.
+    opt_settings : dict
+        Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
     _cons : dict
         Contains all constraint info.
     _designvars : dict
@@ -68,7 +70,6 @@ class ScipyOptimizer(Driver):
         """
         Initialize the ScipyOptimizer.
         """
-
         super(ScipyOptimizer, self).__init__()
 
         # What we support
@@ -96,7 +97,6 @@ class ScipyOptimizer(Driver):
         # The user places optimizer-specific settings in here.
         self.opt_settings = OrderedDict()
 
-        self.metadata = None
         self.result = None
         self.fail = 0
         self.grad_cache = None
@@ -165,7 +165,7 @@ class ScipyOptimizer(Driver):
 
         for name, meta in iteritems(self._designvars):
             size = meta['size']
-            x_init[i:i+size] = desvar_vals[name]
+            x_init[i:i + size] = desvar_vals[name]
             i += size
 
             # Bounds if our optimizer supports them
@@ -243,7 +243,7 @@ class ScipyOptimizer(Driver):
 
         if self.options['disp']:
             print('Optimization Complete')
-            print('-'*35)
+            print('-' * 35)
 
     def _objfunc(self, x_new):
         """
@@ -269,7 +269,7 @@ class ScipyOptimizer(Driver):
             i = 0
             for name, meta in iteritems(self._designvars):
                 size = meta['size']
-                self.set_design_var(name, x_new[i:i+size])
+                self.set_design_var(name, x_new[i:i + size])
                 i += size
 
             self.iter_count += 1
@@ -404,7 +404,6 @@ class ScipyOptimizer(Driver):
         float
             Gradient of the constraint function wrt all params.
         """
-
         if name.startswith('2bl-'):
             name = name[4:]
             dbl_side = True

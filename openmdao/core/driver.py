@@ -138,7 +138,6 @@ class Driver(object):
         if adder is not None:
             desvar[indices] -= adder
 
-
     def get_response_values(self):
         """
         Return response values.
