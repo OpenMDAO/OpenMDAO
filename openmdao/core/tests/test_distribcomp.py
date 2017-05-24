@@ -310,7 +310,9 @@ class MPITests(unittest.TestCase):
         self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
     def test_distribcomp_feature(self):
+        from openmdao.api import Problem, Group, IndepVarComp, PETScVector
         from openmdao.utils.array_utils import evenly_distrib_idxs
+        import numpy as np
 
         size = 15
 
