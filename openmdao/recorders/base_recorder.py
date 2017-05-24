@@ -12,8 +12,6 @@ from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver, NonlinearSolver
 
-import warnings
-
 
 class BaseRecorder(object):
     """
@@ -24,16 +22,32 @@ class BaseRecorder(object):
     options['record_metadata'] :  bool(True)
         Tells recorder whether to record variable attribute metadata.
     options['record_outputs'] :  bool(True)
-        Tells recorder whether to record the outputs vector.
+        Tells recorder whether to record the outputs of a System.
     options['record_inputs'] :  bool(False)
-        Tells recorder whether to record the inputs vector.
+        Tells recorder whether to record the inputs of a System.
     options['record_residuals'] :  bool(False)
-        Tells recorder whether to record the residuals vector.
-    options['record_derivatives'] :  bool(True)
-        Tells recorder whether to record derivatives that are requested by a `Driver`.
-    options['includes'] :  list of strings
+        Tells recorder whether to record the residuals of a System.
+    options['record_derivatives'] :  bool(False)
+        Tells recorder whether to record the derivatives of a System.
+    options['record_desvars'] :  bool(True)
+        Tells recorder whether to record the desvars of a Driver.
+    options['record_responses'] :  bool(False)
+        Tells recorder whether to record the responses of a Driver.
+    options['record_objectives'] :  bool(False)
+        Tells recorder whether to record the objectives of a Driver.
+    options['record_constraints'] :  bool(False)
+        Tells recorder whether to record the constraints of a Driver.
+    options['record_abs_error'] :  bool(True)
+        Tells recorder whether to record the absolute error of a Solver.
+    options['record_rel_error'] :  bool(True)
+        Tells recorder whether to record the relative error of a Solver.
+    options['record_solver_output'] :  bool(False)
+        Tells recorder whether to record the output of a Solver.
+    options['record_solver_derivatives'] :  bool(False)
+        Tells recorder whether to record the derivatives of a Solver.
+    options['includes'] :  list of strings("*")
         Patterns for variables to include in recording.
-    options['excludes'] :  list of strings
+    options['excludes'] :  list of strings('')
         Patterns for variables to exclude in recording (processed after includes).
     """
 
@@ -99,7 +113,7 @@ class BaseRecorder(object):
 
     def startup(self, object_requesting_recording):
         """
-        Prepare for a new run.
+        Prepare for a new run and calculate inclusion lists.
 
         Args
         ----

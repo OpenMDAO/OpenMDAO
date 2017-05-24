@@ -29,8 +29,8 @@ class Driver(object):
         Contains all objective info.
     _responses : dict
         Contains all response info.
-    _rec_mgr : list of recorders
-        list of recorders that have been added to this system.
+    _rec_mgr : <RecordingManager>
+        object that manages all recorders added to this driver
     _model_viewer_data : dict
         structure of model, used to make n2 diagram.
     iter_count : int

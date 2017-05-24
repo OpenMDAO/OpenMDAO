@@ -52,14 +52,16 @@ class SqliteRecorder(BaseRecorder):
     ----------
 
     model_viewer_data : dict
-        Dict that holds the data needed to generate N2 diagram
+        Dict that holds the data needed to generate N2 diagram.
     con
-        Connection to the sqlite3 database
+        Connection to the sqlite3 database.
+    cursor
+        Sqlite3 system cursor via the con.
     """
 
     def __init__(self, out):
         """
-        Initialize.
+        Initialize the SqliteRecorder.
         """
         super(SqliteRecorder, self).__init__()
 
@@ -98,9 +100,9 @@ class SqliteRecorder(BaseRecorder):
         """
         Store the provided data in the sqlite file using the iteration coordinate for the key.
 
-        Args
-        ----
-        object_requesting_recording: object
+        Parameters
+        ----------
+        object_requesting_recording: <object>
             The item, a System, Solver, or Driver that wants to record an iteration.
         metadata : dict
             Dictionary containing execution metadata (e.g. iteration coordinate).
@@ -125,9 +127,9 @@ class SqliteRecorder(BaseRecorder):
         """
         Record an iteration using the driver options.
 
-        Args
-        ----
-        object_requesting_recording: Driver
+        Parameters
+        ----------
+        object_requesting_recording: <Driver>
             The Driver object that wants to record an iteration.
         metadata : dict
             Dictionary containing execution metadata (e.g. iteration coordinate).
@@ -245,9 +247,9 @@ class SqliteRecorder(BaseRecorder):
         """
         Record an iteration using system options.
 
-        Args
-        ----
-        object_requesting_recording: System
+        Parameters
+        ----------
+        object_requesting_recording: <System>
             The System object that wants to record an iteration.
         metadata : dict
             Dictionary containing execution metadata (e.g. iteration coordinate).
@@ -353,9 +355,9 @@ class SqliteRecorder(BaseRecorder):
         """
         Record an iteration using solver options.
 
-        Args
-        ----
-        object_requesting_recording: Solver
+        Parameters
+        ----------
+        object_requesting_recording: <Solver>
             The Solver object that wants to record an iteration.
         metadata : dict
             Dictionary containing execution metadata (e.g. iteration coordinate).
@@ -372,7 +374,7 @@ class SqliteRecorder(BaseRecorder):
         if self.options['record_abs_error']:
             abs_error = absolute
         else:
-            abs_error = 0.0
+            abs_error = 0.0  # Is something else a better default val?
 
         if self.options['record_rel_error']:
             rel_error = relative
@@ -447,9 +449,9 @@ class SqliteRecorder(BaseRecorder):
         """
         Route the record_metadata call to the proper object.
 
-        Args
-        ----
-        object_requesting_recording: object
+        Parameters
+        ----------
+        object_requesting_recording: <object>
             The object that would like to record its metadata.
         """
         if self.options['record_metadata']:
@@ -464,10 +466,10 @@ class SqliteRecorder(BaseRecorder):
         """
         Record driver metadata.
 
-        Args
-        ----
-        object_requesting_recording: Driver
-            The Driver that would like to record metadata.
+        Parameters
+        ----------
+        object_requesting_recording: <Driver>
+            The Driver that would like to record its metadata.
         """
         driver_class = type(object_requesting_recording).__name__
         model_viewer_data = cPickle.dumps(object_requesting_recording._model_viewer_data,
@@ -480,10 +482,10 @@ class SqliteRecorder(BaseRecorder):
         """
         Record system metadata.
 
-        Args
-        ----
-        object_requesting_recording: System
-            The System that would like to record metadata.
+        Parameters
+        ----------
+        object_requesting_recording: <System>
+            The System that would like to record its metadata.
         """
         scaling_factors = cPickle.dumps(object_requesting_recording._scaling_vecs,
                                         cPickle.HIGHEST_PROTOCOL)
@@ -496,10 +498,10 @@ class SqliteRecorder(BaseRecorder):
         """
         Record solver metadata.
 
-        Args
-        ----
-        object_requesting_recording: Solver
-            The Solver that would like to record metadata.
+        Parameters
+        ----------
+        object_requesting_recording: <Solver>
+            The Solver that would like to record its metadata.
         """
         path = object_requesting_recording._system.pathname
         solver_class = type(object_requesting_recording).__name__

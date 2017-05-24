@@ -7,6 +7,13 @@ import time
 class RecordingManager(object):
     """
     Object that routes function calls to all attached recorders.
+
+    Attributes
+    ----------
+    _recorders : list of <BaseRecorder>
+        All of the recorders attached to the current object.
+    rank : int
+        Rank of the iteration coordinate.
     """
 
     def __init__(self):
@@ -18,18 +25,18 @@ class RecordingManager(object):
 
     def __getitem__(self, index):
         """
-        Get stuff.
+        Get a particular recorder in the manager.
         """
         return self._recorders[index]
 
     def __iter__(self):
         """
-        Iterate over stuff.
+        Iterate.
 
         Returns
         -------
-        iter:
-            a recorder
+        iter: <BaseRecorder>
+            a recorder from _recorders
         """
         return iter(self._recorders)
 
@@ -39,36 +46,37 @@ class RecordingManager(object):
 
         Args
         ----
-        recorder : `BaseRecorder`
-           Recorder instance.
+        recorder : <BaseRecorder>
+           Recorder instance to be added to the manager.
         """
         self._recorders.append(recorder)
 
     def startup(self, object_requesting_recording):
         """
-        Initialization during setup.
+        Run startup on each recorder in the manager.
         """
         for recorder in self._recorders:
             recorder.startup(object_requesting_recording)
 
     def close(self):
         """
-        Close all recorders.
+        Close all recorders in the manager.
         """
         for recorder in self._recorders:
             recorder.close()
 
     def record_iteration(self, object_requesting_recording, metadata, **kwargs):
         """
-        Call record_iteration for all recorders.
+        Call record_iteration on all recorders.
 
-        Args
-        ----
-        object_requesting_recording :
-            The thing that needs an iteration of itself recorded.
-
+        Parameters
+        ----------
+        object_requesting_recording : <object>
+            The object that needs an iteration of itself recorded.
         metadata : dict
             Metadata for iteration coordinate
+        **kwargs :
+            Keyword args needed for different versions of record_iteration
         """
         if not self._recorders:
             return
@@ -83,10 +91,10 @@ class RecordingManager(object):
         """
         Call record_metadata for all recorders.
 
-        Args
-        ----
-        object_requesting_recording :
-            The thing that needs its metadata recorded.
+        Parameters
+        ----------
+        object_requesting_recording : <object>
+            The object that needs its metadata recorded.
 
         """
         if not self._recorders:

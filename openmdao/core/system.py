@@ -179,8 +179,8 @@ class System(object):
         dict of all driver design vars added to the system.
     _responses : dict of dict
         dict of all driver responses added to the system.
-    _rec_mgr : list of recorders
-        list of recorders that have been added to this system.
+    _rec_mgr : <RecordingManager>
+        object that manages all recorders added to this system.
     #
     _static_mode : bool
         If true, we are outside of initialize_subsystems and initialize_variables.
@@ -2321,7 +2321,7 @@ class System(object):
 
         Parameters
         ----------
-        recorder : BaseRecorder
+        recorder : <BaseRecorder>
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
@@ -2333,4 +2333,5 @@ class System(object):
         self.iter_count += 1
         metadata = create_local_meta(None, self.pathname)
         update_local_meta(metadata, (self.iter_count,))
+        # send the calling method name into record_iteration, e.g. 'solve_nonlinear'
         self._rec_mgr.record_iteration(self, metadata, method=inspect.stack()[1][3])

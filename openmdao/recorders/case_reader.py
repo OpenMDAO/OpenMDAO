@@ -26,9 +26,3 @@ def CaseReader(filename):
     except IOError:
         # filename not a valid Sqlite database file
         pass
-
-    # try:
-    #     reader = HDF5CaseReader(filename)
-    #     return reader
-    # except IOError:
-    #     raise IOError('Unable to load cases from file {0}'.format(filename))

@@ -45,8 +45,8 @@ class Solver(object):
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
         Number of iterations for the current invocation of the solver.
-    _rec_mgr : list of recorders
-        list of recorders that have been added to this system.
+    _rec_mgr : <RecordingManager>
+        object that manages all recorders added to this solver
     _solver_info : <SolverInfo>
         Object to store some formatting for iprint that is shared across all solvers.
     options : <OptionsDictionary>
@@ -98,12 +98,12 @@ class Solver(object):
 
     def add_recorder(self, recorder):
         """
-        Add a recorder to the driver.
+        Add a recorder to the driver's RecordingManager.
 
         Parameters
         ----------
-        recorder : BaseRecorder
-           A recorder instance.
+        recorder : <BaseRecorder>
+           A recorder instance to be added to RecManager.
         """
         self._rec_mgr.append(recorder)
 
