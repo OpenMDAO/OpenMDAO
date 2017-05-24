@@ -45,6 +45,7 @@ _profile_struct = _ProfData()
 _profile_funcs_dict = OrderedDict()
 _profile_matches = {}
 _call_stack = []
+_timing_stack = []
 
 
 def setup(top, prefix='prof_raw', methods=None, prof_dir=None):
@@ -146,6 +147,7 @@ def _instance_profile(frame, event, arg):
     if event == 'call':
         func_name = frame.f_code.co_name
         if func_name in _profile_matches:
+            ovr = etime()
             loc = frame.f_locals
             if 'self' in loc:
                 self = loc['self']
@@ -155,46 +157,31 @@ def _instance_profile(frame, event, arg):
                     except AttributeError:
                         name = "<%s>" % type(self).__name__
                     print('call', name)
+                    _call_stack.append(name)
+
+                    path = ','.join(_call_stack)
+
+                    if path not in _profile_funcs_dict:
+                        # save the id for this path
+                        _profile_funcs_dict[path] = len(_profile_funcs_dict)
+
     elif event == 'return':
-        pass
+        func_name = frame.f_code.co_name
+        if func_name in _profile_matches:
+            ovr = etime()
+            loc = frame.f_locals
+            if 'self' in loc:
+                self = loc['self']
+                if isinstance(self, _profile_matches[func_name]):
+                    name = _call_stack.pop()
 
-    ovr = etime()
+                start = etime()
 
-    if self.name is None:
-        try:
-            name = fn.__self__.pathname
-        except AttributeError:
-            name = "<%s>" % args[0].__class__.__name__
-
-        name = '.'.join((name, fn.__name__))
-        self.name = name
-    else:
-        name = self.name
-
-    if _call_stack:
-        caller = _call_stack[-1]
-    else:
-        caller = ''
-
-    _call_stack.append(name)
-
-    path = ','.join(_call_stack)
-
-    if path not in _profile_funcs_dict:
-        # save the id for this path
-        _profile_funcs_dict[path] = len(_profile_funcs_dict)
-
-    start = etime()
-    ret = fn(*args[1:], **kwargs)
-    end = etime()
-
-    stack.pop()
-
-    _profile_struct.t = end - start
-    _profile_struct.ovr = start - ovr # keep track of overhead for later subtraction
-    _profile_struct.tstamp = start
-    _profile_struct.id = _profile_funcs_dict[path]
-    _profile_out.write(_profile_struct)
+                _profile_struct.t = etime() - start
+                _profile_struct.ovr = start - ovr # keep track of overhead for later subtraction
+                _profile_struct.tstamp = start
+                _profile_struct.id = _profile_funcs_dict[path]
+                _profile_out.write(_profile_struct)
 
 
 def start():
