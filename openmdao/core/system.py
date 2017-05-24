@@ -21,6 +21,7 @@ from openmdao.utils.general_utils import \
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
+from openmdao.utils.array_utils import convert_neg
 
 
 class System(object):
@@ -736,6 +737,49 @@ class System(object):
         self._var_sizes = {'input': None, 'output': None}
         self._var_sizes_byset = {'input': {}, 'output': {}}
 
+    def _setup_global_shapes(self):
+        """
+        Compute the global size and shape of all variables on this system.
+        """
+        meta = self._var_allprocs_abs2meta['output']
+
+        if self.comm.size == 1:
+            for abs_name in self._var_allprocs_abs_names['output']:
+                mymeta = meta[abs_name]
+                local_shape = mymeta['shape']
+                mymeta['global_size'] = np.prod(local_shape)
+                mymeta['global_shape'] = local_shape
+            return
+
+        # now set global sizes and shapes into metadata for distributed outputs
+        sizes = self._var_sizes['output']
+        for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
+            mymeta = meta[abs_name]
+            local_shape = mymeta['shape']
+            if not mymeta['distributed']:
+                mymeta['global_size'] = np.prod(local_shape)
+                mymeta['global_shape'] = local_shape
+                continue
+
+            global_size = np.sum(sizes[:, idx])
+            mymeta['global_size'] = global_size
+
+            # assume that all but the first dimension of the shape of a
+            # distributed output is the same on all procs
+            high_dims = local_shape[1:]
+            if high_dims:
+                high_size = np.prod(high_dims)
+                dim1 = global_size // high_size
+                if global_size % high_size != 0:
+                    raise RuntimeError("Global size of output '%s' (%s) does not agree "
+                                       "with local shape %s" % (abs_name, global_size,
+                                                                local_shape))
+                global_shape = tuple([dim1] + list(high_dims))
+            else:
+                high_size = 1
+                global_shape = (global_size,)
+            mymeta['global_shape'] = global_shape
+
     def _setup_global_connections(self, recurse=True):
         """
         Compute dict of all connections between this system's inputs and outputs.
@@ -936,6 +980,7 @@ class System(object):
 
                 shape_out = meta_out['shape']
                 units_out = meta_out['units']
+                distrib_out = meta_out['distributed']
                 shape_in = meta_in['shape']
                 units_in = meta_in['units']
 
@@ -945,18 +990,31 @@ class System(object):
                 src_indices = meta_in['src_indices']
 
                 if src_indices is not None:
-                    if src_indices.ndim != 1:
-                        if len(shape_out) == 1:
-                            src_indices = src_indices.flatten()
-                        else:
-                            entries = [list(range(x)) for x in shape_in]
-                            cols = np.vstack(src_indices[i] for i in product(*entries))
-                            dimidxs = [cols[:, i] for i in range(cols.shape[1])]
-                            src_indices = np.ravel_multi_index(dimidxs, shape_out)
-                    if not np.isscalar(ref):
-                        ref = ref[src_indices]
-                    if not np.isscalar(ref0):
-                        ref0 = ref0[src_indices]
+                    if not (np.isscalar(ref) and np.isscalar(ref0)):
+                        global_shape_out = meta_out['global_shape']
+                        global_size_out = meta_out['global_size']
+                        if src_indices.ndim != 1:
+                            if len(shape_out) == 1:
+                                src_indices = src_indices.flatten()
+                                src_indices = convert_neg(src_indices, src_indices.size)
+                            else:
+                                entries = [list(range(x)) for x in shape_in]
+                                cols = np.vstack(src_indices[i] for i in product(*entries))
+                                dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
+                                           for i in range(cols.shape[1])]
+                                src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
+
+                        # TODO: if either ref or ref0 are not scalar and the output is
+                        # distributed, we need to do a scatter
+                        # to obtain the values needed due to global src_indices
+                        if distrib_out:
+                            raise RuntimeError("vector scalers with distrib vars "
+                                               "not supported yet.")
+
+                        if not np.isscalar(ref):
+                            ref = ref[src_indices]
+                        if not np.isscalar(ref0):
+                            ref0 = ref0[src_indices]
                 else:
                     if not np.isscalar(ref):
                         ref = ref.reshape(shape_out)
@@ -1600,7 +1658,8 @@ class System(object):
             Value of design var that scales to 0.0 in the driver.
         indices : iter of int, optional
             If a param is an array, these indicate which entries are of
-            interest for this particular design variable.
+            interest for this particular design variable.  These may be
+            positive or negative integers.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.
@@ -1827,7 +1886,8 @@ class System(object):
             is second in precedence.
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
-            interest for this particular response.
+            interest for this particular response.  These may be positive or
+            negative integers.
         linear : bool
             Set to True if constraint is linear. Default is False.
 
@@ -1856,7 +1916,8 @@ class System(object):
             Value of response variable that scales to 0.0 in the driver.
         index : int, optional
             If variable is an array, this indicates which entriy is of
-            interest for this particular response.
+            interest for this particular response. This may be a positive
+            or negative integer.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value. Adder
             is first in precedence.

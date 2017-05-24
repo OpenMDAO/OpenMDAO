@@ -93,7 +93,8 @@ class IndepVarComp(ExplicitComponent):
                                "instantiation or by calling add_output afterwards.")
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0,
+                   distributed=False):
         """
         Add an independent variable to this component.
 
@@ -136,8 +137,10 @@ class IndepVarComp(ExplicitComponent):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
+        distributed : bool
+            If True, this variable is distributed across multiple processes.
         """
         kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref, 'var_set': var_set}
+                  'res_ref': res_ref, 'var_set': var_set, 'distributed': distributed}
         self._indep_external.append((name, val, kwargs))

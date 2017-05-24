@@ -722,6 +722,7 @@ class Problem(object):
                 # need a vector for clean code, so use _views_flat.
                 flat_view = dinputs._views_flat[input_name]
                 in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
+                in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
                 start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
                 end = np.sum(model._var_sizes['output'][:iproc + 1, in_var_idx])
 
@@ -731,16 +732,21 @@ class Problem(object):
                     if 'indices' in in_voi_meta:
                         in_idxs = in_voi_meta['indices']
 
+                distrib = in_var_meta['distributed']
                 dup = False
                 if in_idxs is not None:
                     irange = in_idxs
                     loc_size = len(in_idxs)
+                elif distrib:
+                    irange = range(in_var_meta['global_size'])
+                    loc_size = end - start
                 else:  # var is duplicated
                     irange = range(end - start)
                     loc_size = end - start
                     dup = True
 
-                for loc_idx, idx in enumerate(irange):
+                loc_idx = -1
+                for idx in irange:
 
                     # Maybe we don't need to clean up so much at the beginning,
                     # since we clean this every time.
@@ -762,6 +768,9 @@ class Problem(object):
                     else:
                         store = False
 
+                    if store:
+                        loc_idx += 1
+
                     model._solve_linear([vecname], mode)
 
                     # Pull out the answers and pack into our data structure.
@@ -779,7 +788,7 @@ class Problem(object):
                                 deriv_val = deriv_val[out_idxs]
                             len_val = len(deriv_val)
 
-                            if nproc > 1:  # var is duplicated
+                            if dup and nproc > 1:
                                 self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
                                     model._var_sizes['output'][:, out_var_idx])[0][0]))
 

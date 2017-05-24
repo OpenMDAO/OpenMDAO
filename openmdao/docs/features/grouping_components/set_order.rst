@@ -1,5 +1,5 @@
 
-Setting the order of Subsystems in a Group
+Setting the Order of Subsystems in a Group
 ------------------------------------------
 
 By default, subsystems are executed in the same order that they were added to
