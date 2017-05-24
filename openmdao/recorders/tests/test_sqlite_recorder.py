@@ -20,7 +20,6 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.groups.parallel_groups import ConvergeDiverge
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -29,7 +28,7 @@ if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 optimizers = {'pyoptsparse': pyOptSparseDriver}
-# optimizers = {'scipy': ScipyOptimizer,
+# optimizers = {'scipy': ScipyOptimizer, }
 
 
 def run_driver(problem):
@@ -217,6 +216,7 @@ def _assertDriverMetadataRecorded(test, db_cur, expected):
         test.assertTrue(set(c.keys()).issubset(set(['src', 'tgt', 'cycle_arrows'])))
 
     return
+
 
 class TestSqliteRecorder(unittest.TestCase):
     def setUp(self):

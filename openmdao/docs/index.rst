@@ -110,6 +110,11 @@ Drivers (optimizers and DOE)
 Saving your data
 ================================
 
+.. toctree::
+   :maxdepth: 1
+
+   features/recording/basic_recording
+
 Visualization
 ================================
 
