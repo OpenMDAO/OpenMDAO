@@ -129,13 +129,15 @@ class Driver(object):
         if indices is None:
             indices = slice(None)
 
+        desvar = self._problem.model._outputs._views_flat[name]
+        desvar[indices] = value
+
         # Scale design variable values
         if scaler is not None:
-            value *= 1.0 / scaler
+            desvar[indices] *= 1.0 / scaler
         if adder is not None:
-            value -= adder
+            desvar[indices] -= adder
 
-        self._problem.model._outputs._views_flat[name][indices] = value
 
     def get_response_values(self):
         """

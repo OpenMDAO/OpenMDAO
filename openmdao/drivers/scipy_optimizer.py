@@ -290,9 +290,9 @@ class ScipyOptimizer(Driver):
             print("Exception: %s" % str(msg))
             print(70 * "=", tb, 70 * "=")
 
-        print("Functions calculated")
-        print(x_new)
-        print(f_new)
+        # print("Functions calculated")
+        # print(x_new)
+        # print(f_new)
 
         return f_new
 
