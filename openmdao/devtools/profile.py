@@ -3,7 +3,7 @@ from __future__ import print_function
 import os
 import sys
 from time import time as etime
-from inspect import getmembers, ismethod, getmro
+from inspect import getmembers, getmro
 from fnmatch import fnmatchcase
 import argparse
 import json
@@ -48,18 +48,12 @@ _call_stack = []
 _timing_stack = []
 
 
-def setup(top, prefix='prof_raw', methods=None, prof_dir=None):
+def setup(prefix='prof_raw', methods=None, prof_dir=None):
     """
     Instruments certain important openmdao methods for profiling.
 
     Args
     ----
-
-    top : object
-        The top object to be profiled. The top object must be an instance
-        of a class that is compatible with the object iterator function.
-        The default object iterator function expects the top object to
-        be a Problem or a System.
 
     prefix : str ('prof_raw')
         Prefix used for the raw profile data. Process rank will be appended
@@ -85,6 +79,8 @@ def setup(top, prefix='prof_raw', methods=None, prof_dir=None):
     from openmdao.core.system import System
     from openmdao.core.driver import Driver
     from openmdao.solvers.solver import Solver
+    from openmdao.jacobians.jacobian import Jacobian
+    from openmdao.matrices.matrix import Matrix
 
     global _profile_prefix, _profile_methods, _profile_matches
     global _profile_setup, _profile_total, _profile_out
@@ -99,32 +95,42 @@ def setup(top, prefix='prof_raw', methods=None, prof_dir=None):
 
     _profile_setup = True
 
-    if methods:
-        _profile_methods = methods
-    else:
+    if methods is None:
         _profile_methods = {
             "*": (System, Jacobian, Matrix, Solver, Driver, Problem),
         }
+    else:
+        _profile_methods = methods
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
     _profile_out = open("%s.%d" % (_profile_prefix, rank), 'wb')
 
     atexit.register(_finalize_profile)
 
-    _profile_matches = collect_methods(methods)
+    _profile_matches = _collect_methods(_profile_methods)
 
 
-def collect_methods(method_dict):
+def _collect_methods(method_dict):
     """
     Iterate over a dict of method name patterns mapped to classes.  Search
     through the classes for anything that matches and return a dict of
     exact name matches and their correspoding classes.
+
+    Parameters
+    ----------
+    method_dict : {pattern1: classes1, ... pattern_n: classes_n}
+        Dict of glob patterns mapped to lists of classes used for isinstance checks
+
+    Returns
+    -------
+    dict
+        Dict of method names and tuples of all classes that matched for that method.
     """
     matches = {}
-    for pattern, classes in iteritems(method_dict.items:
+    for pattern, classes in iteritems(method_dict):
         for class_ in classes:
-            for name, _ in getmembers(class_, ismethod):
-                if pattern == '*' or fnmatchcase(name, pattern):
+            for name, obj in getmembers(class_):
+                if callable(obj) and (pattern == '*' or fnmatchcase(name, pattern)):
                     if name in matches:
                         matches[name].append(class_)
                     else:
@@ -147,52 +153,55 @@ def _instance_profile(frame, event, arg):
     if event == 'call':
         func_name = frame.f_code.co_name
         if func_name in _profile_matches:
-            ovr = etime()
+            #ovr = etime()
             loc = frame.f_locals
             if 'self' in loc:
                 self = loc['self']
                 if isinstance(self, _profile_matches[func_name]):
-                    try:
+                    if 'pathname' in self.__dict__:
                         name = '.'.join([self.pathname, func_name])
-                    except AttributeError:
-                        name = "<%s>" % type(self).__name__
-                    print('call', name)
+                    else:
+                        name = "<%s_%d>.%s" % (type(self).__name__, id(self), func_name)
                     _call_stack.append(name)
-
-                    path = ','.join(_call_stack)
-
-                    if path not in _profile_funcs_dict:
-                        # save the id for this path
-                        _profile_funcs_dict[path] = len(_profile_funcs_dict)
+                    _timing_stack.append(etime())
 
     elif event == 'return':
         func_name = frame.f_code.co_name
         if func_name in _profile_matches:
-            ovr = etime()
+            #ovr = etime()
             loc = frame.f_locals
             if 'self' in loc:
                 self = loc['self']
                 if isinstance(self, _profile_matches[func_name]):
-                    name = _call_stack.pop()
+                    path = ','.join(_call_stack)
+                    if path not in _profile_funcs_dict:
+                        # save the id for this path
+                        _profile_funcs_dict[path] = len(_profile_funcs_dict)
 
-                start = etime()
+                    _call_stack.pop()
+                    start = _timing_stack.pop()
 
-                _profile_struct.t = etime() - start
-                _profile_struct.ovr = start - ovr # keep track of overhead for later subtraction
-                _profile_struct.tstamp = start
-                _profile_struct.id = _profile_funcs_dict[path]
-                _profile_out.write(_profile_struct)
+                    _profile_struct.t = etime() - start
+                    _profile_struct.ovr = 0. #start - ovr # keep track of overhead for later subtraction
+                    _profile_struct.tstamp = start
+                    _profile_struct.id = _profile_funcs_dict[path]
+                    _profile_out.write(_profile_struct)
 
 
 def start():
     """Turn on profiling.
     """
-    global _profile_start
+    global _profile_start, _profile_setup
     if _profile_start is not None:
         print("profiling is already active.")
         return
 
+    if not _profile_setup:
+        setup()  # just do a default setup
+
     _profile_start = etime()
+
+    sys.setprofile(_instance_profile)
 
 def stop():
     """Turn off profiling.
@@ -200,6 +209,8 @@ def stop():
     global _profile_total, _profile_start
     if _profile_start is None:
         return
+
+    sys.setprofile(None)
 
     _profile_total += (etime() - _profile_start)
     _profile_start = None
