@@ -79,7 +79,7 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
             error = np.linalg.norm(actual - desired) / np.linalg.norm(desired)
 
         if abs(error) > tolerance:
-            if actual.size == 1 and desired.size == 1:
+            if actual.size < 10 and desired.size < 10:
                 test_case.fail('actual %s, desired %s, rel error %s, tolerance %s'
                                % (actual, desired, error, tolerance))
             else:

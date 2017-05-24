@@ -175,7 +175,7 @@ class DistribInputDistribOutputComp(ExplicitComponent):
 
         self.add_input('invec', np.ones(sizes[rank], float),
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_output('outvec', np.ones(sizes[rank], float))
+        self.add_output('outvec', np.ones(sizes[rank], float), distributed=True)
 
     def get_req_procs(self):
         return (2, 2)
@@ -201,7 +201,7 @@ class DistribNoncontiguousComp(ExplicitComponent):
 
         self.add_input('invec', np.ones(len(idxs), float),
                        src_indices=idxs)
-        self.add_output('outvec', np.ones(len(idxs), float))
+        self.add_output('outvec', np.ones(len(idxs), float), distributed=True)
 
     def get_req_procs(self):
         return 2, 2
@@ -336,7 +336,8 @@ class MPITests(unittest.TestCase):
 
                 self.add_input('invec', np.ones(sizes[rank], float),
                                src_indices=np.arange(start, end, dtype=int))
-                self.add_output('outvec', np.ones(sizes[rank], float))
+                self.add_output('outvec', np.ones(sizes[rank], float),
+                                distributed=True)
 
             def get_req_procs(self):
                 # require min of 2 processes, max of 5
@@ -385,10 +386,7 @@ class MPITests(unittest.TestCase):
 
         p.run_model()
 
-        expected = np.ones(size)
-        expected[:8] *= 2.0
-        expected[8:] *= -3.0
-        assert_rel_error(self, p['C3.out'], np.sum(expected))
+        assert_rel_error(self, p['C3.out'], -5.)
 
     def test_noncontiguous_idxs(self):
         # take even input indices in 0 rank and odd ones in 1 rank
@@ -461,6 +459,47 @@ class MPITests(unittest.TestCase):
 
         if self.comm.rank == 0:
             self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class TestGroupMPI(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_promote_distrib(self):
+
+        class MyComp(ExplicitComponent):
+            def initialize_variables(self):
+                # decide what parts of the array we want based on our rank
+                if self.comm.rank == 0:
+                    idxs = [0, 1, 2]
+                else:
+                    # use [3, -1] here rather than [3, 4] just to show that we
+                    # can use negative indices.
+                    idxs = [3, -1]
+
+                self.add_input('x', np.ones(len(idxs)), src_indices=idxs)
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        p = Problem(model=Group())
+
+        #import wingdbstub
+
+        p.model.add_subsystem('indep', IndepVarComp('x', np.arange(5, dtype=float)),
+                              promotes_outputs=['x'])
+        C1 = p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+
+        p.set_solver_print(level=0)
+        p.setup(PETScVector)
+        p.run_model()
+        if C1.comm.rank == 0:
+            assert_rel_error(self, p['C1.x'], np.arange(3, dtype=float))
+            assert_rel_error(self, p['C1.y'], 6.)
+        else:
+            assert_rel_error(self, p['C1.x'], np.arange(3, 5, dtype=float))
+            assert_rel_error(self, p['C1.y'], 14.)
 
 
 if __name__ == '__main__':

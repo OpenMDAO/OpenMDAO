@@ -47,7 +47,7 @@ Building components
    features/building_components/implicitcomp
    features/building_components/units
    features/building_components/scaling
-   features/distributed_comps
+   features/building_components/distributed_comps
 
 Grouping components for more complex models
 ===========================================
@@ -93,6 +93,15 @@ Solvers (nonlinear and linear)
    features/solvers/ln_petscksp
    features/solvers/ln_bjac
    features/solvers/ls_backtracking
+
+Drivers
+=======
+
+.. toctree::
+   :maxdepth: 1
+
+   features/drivers/add_vois
+
 
 Running your models
 ================================
