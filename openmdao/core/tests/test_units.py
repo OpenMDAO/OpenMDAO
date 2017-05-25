@@ -36,7 +36,7 @@ class SrcComp(ExplicitComponent):
         """ Pass through."""
         outputs['x2'] = inputs['x1']
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
         partials['x2', 'x1'] = 1.0
 
@@ -52,7 +52,7 @@ class TgtCompF(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
         partials['x3', 'x2'] = 1.0
 
@@ -68,7 +68,7 @@ class TgtCompC(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
         partials['x3', 'x2'] = 1.0
 
@@ -84,7 +84,7 @@ class TgtCompK(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         """ Derivative is 1.0"""
         partials['x3', 'x2'] = 1.0
 
@@ -104,7 +104,7 @@ class TgtCompFMulti(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_partial_derivs(self, inputs, outputs, resids, J):
+    def compute_partials(self, inputs, outputs, resids, J):
         """ Derivative is 1.0"""
         J['_x3', 'x2'] = np.array([1.0])
         J['_x3', '_x2'] = 0.0
@@ -258,7 +258,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.run()
 
         ## Make sure check partials handles conversion
-        #data = prob.check_partial_derivs(out_stream=None)
+        #data = prob.check_partials(out_stream=None)
 
         #for key1, val1 in iteritems(data):
             #for key2, val2 in iteritems(val1):
@@ -406,7 +406,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.run()
 
         ## Make sure check partials handles conversion
-        #data = prob.check_partial_derivs(out_stream=None)
+        #data = prob.check_partials(out_stream=None)
 
         #for key1, val1 in iteritems(data):
             #for key2, val2 in iteritems(val1):
