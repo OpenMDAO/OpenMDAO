@@ -796,9 +796,8 @@ class Problem(object):
                             len_val = len(deriv_val)
 
                             if dup and nproc > 1:
-                                buff = deriv_val.copy()
-                                self.comm.Allreduce(deriv_val, buff, op=MPI.SUM)
-                                deriv_val = buff
+                                self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
+                                    model._var_sizes['output'][:, out_var_idx])[0][0]))
 
                             if return_format == 'flat_dict':
                                 if fwd:

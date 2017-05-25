@@ -672,11 +672,15 @@ class Component(System):
             out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
             if abs_key[1] in self._var_abs2meta['input']:
                 in_size = np.prod(self._var_abs2meta['input'][abs_key[1]]['shape'])
-            elif abs_key[1] in self._var_abs2meta['output']:
+            else:  # assume output
                 in_size = np.prod(self._var_abs2meta['output'][abs_key[1]]['shape'])
+            
+            if in_size == 0 and self.comm.rank != 0:  # 'inactive' component. skip checks
+                return
+
             rows = meta['rows']
             cols = meta['cols']
-            if rows is not None:
+            if not (rows is None or rows.size == 0):
                 if rows.min() < 0:
                     msg = '{}: d({})/d({}): row indices must be non-negative'
                     raise ValueError(msg.format(self.pathname, of, wrt))
