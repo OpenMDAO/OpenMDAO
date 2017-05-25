@@ -22,7 +22,7 @@ _gradient_optimizers = ['CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
 _bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP']
 _constraint_optimizers = ['COBYLA', 'SLSQP']
 _constraint_grad_optimizers = ['SLSQP']
-_eq_constraint_optimizers = ['COBYLA']
+_eq_constraint_optimizers = ['SLSQP']
 
 # These require Hessian or Hessian-vector product, so they are not supported
 # right now.

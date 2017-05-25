@@ -19,7 +19,7 @@ Options
   The "optimize" option lets you choose which optimizer to use. The ScipyOptimizer driver supports all
   of the optimizers in scipy.optimize except for 'dogleg' and 'trust-ncg'. Generally, the optimizers that
   you are most likely to use are "COBYLA" and "SLSQP", as these are the only ones that support constraints.
-  Only COBYLA supports equality constraints, and SLSQP uses gradients provide by OpenMDAO while COBYLA is
+  Only SLSQP supports equality constraints, and SLSQP also uses gradients provide by OpenMDAO while COBYLA is
   gradient-free.
 
   .. embed-test::
