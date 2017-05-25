@@ -43,7 +43,7 @@ class MyExplicitComp(ExplicitComponent):
                            y[0]*17. - y[0]*y[1] + 2.*y[1]
         outputs['f'][1] = outputs['f'][0]*3.0
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         x = inputs['x']
         y = inputs['y']
         jac1 = self._jac_type(np.array([
@@ -95,7 +95,7 @@ class MyExplicitComp2(ExplicitComponent):
         z = inputs['z']
         outputs['f'] = (w[0]-5.0)**2 + (w[1]+1.0)**2 + w[2]*6. + z*7.
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         w = inputs['w']
         z = inputs['z']
         jac = self._jac_type(np.array([[
@@ -138,7 +138,7 @@ class ExplicitSetItemComp(ExplicitComponent):
         self.add_input('in', val=in_val*scale)
         self.add_output('out', val=out_val*scale)
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         partials['out', 'in'] = self._constructor(self._value)
 
 
