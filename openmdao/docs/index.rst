@@ -47,7 +47,6 @@ Building components
    features/building_components/implicitcomp
    features/building_components/units
    features/building_components/scaling
-   features/building_components/distributed_comps
 
 Grouping components for more complex models
 ===========================================
@@ -62,7 +61,6 @@ Grouping components for more complex models
     features/grouping_components/set_order
     features/grouping_components/src_indices
     features/grouping_components/parallel_group
-
 
 Defining partial derivatives
 ================================
@@ -112,6 +110,15 @@ Running your models
    features/running/set_get
    features/running/setup_and_run
    features/running/check_total_derivatives
+
+Specialized components
+======================
+
+.. toctree::
+   :maxdepth: 1
+
+   features/special_components/distributed_comps
+   features/special_components/metamodel
 
 Drivers (optimizers and DOE)
 ================================

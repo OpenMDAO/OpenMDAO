@@ -2257,6 +2257,17 @@ class System(object):
 
         return False, 0., 0.
 
+    def check_config(self, logger):
+        """
+        Perform optional error checks.
+
+        Parameters
+        ----------
+        logger : object
+            The object that manages logging output.
+        """
+        pass
+
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
