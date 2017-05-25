@@ -86,7 +86,7 @@ class DistribCompSimple(ExplicitComponent):
 class DistribInputComp(ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
     def __init__(self, arr_size=11):
-        super(DistribInputComp, self).__init__()
+        super(DistribInputComp, self).__init__(distributed=True)
         self.arr_size = arr_size
 
     def compute(self, inputs, outputs):
@@ -116,7 +116,7 @@ class DistribInputComp(ExplicitComponent):
 class DistribOverlappingInputComp(ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
     def __init__(self, arr_size=11):
-        super(DistribOverlappingInputComp, self).__init__()
+        super(DistribOverlappingInputComp, self).__init__(distributed=True)
         self.arr_size = arr_size
 
     def compute(self, inputs, outputs):
@@ -158,7 +158,7 @@ class DistribOverlappingInputComp(ExplicitComponent):
 class DistribInputDistribOutputComp(ExplicitComponent):
     """Uses 2 procs and takes input var slices."""
     def __init__(self, arr_size=11):
-        super(DistribInputDistribOutputComp, self).__init__()
+        super(DistribInputDistribOutputComp, self).__init__(distributed=True)
         self.arr_size = arr_size
 
     def compute(self, inputs, outputs):
@@ -175,7 +175,7 @@ class DistribInputDistribOutputComp(ExplicitComponent):
 
         self.add_input('invec', np.ones(sizes[rank], float),
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_output('outvec', np.ones(sizes[rank], float), distributed=True)
+        self.add_output('outvec', np.ones(sizes[rank], float))
 
     def get_req_procs(self):
         return (2, 2)
@@ -186,7 +186,7 @@ class DistribNoncontiguousComp(ExplicitComponent):
     var slices as well
     """
     def __init__(self, arr_size=11):
-        super(DistribNoncontiguousComp, self).__init__()
+        super(DistribNoncontiguousComp, self).__init__(distributed=True)
         self.arr_size = arr_size
 
     def compute(self, inputs, outputs):
@@ -201,7 +201,7 @@ class DistribNoncontiguousComp(ExplicitComponent):
 
         self.add_input('invec', np.ones(len(idxs), float),
                        src_indices=idxs)
-        self.add_output('outvec', np.ones(len(idxs), float), distributed=True)
+        self.add_output('outvec', np.ones(len(idxs), float))
 
     def get_req_procs(self):
         return 2, 2
@@ -211,7 +211,7 @@ class DistribGatherComp(ExplicitComponent):
     """Uses 2 procs gathers a distrib input into a full output"""
 
     def __init__(self, arr_size=11):
-        super(DistribGatherComp, self).__init__()
+        super(DistribGatherComp, self).__init__(distributed=True)
         self.arr_size = arr_size
 
     def compute(self, inputs, outputs):
@@ -317,7 +317,7 @@ class MPITests(unittest.TestCase):
         class DistribComp(ExplicitComponent):
             def __init__(self, size):
                 self.size = size
-                super(DistribComp, self).__init__()
+                super(DistribComp, self).__init__(distributed=True)
 
             def compute(self, inputs, outputs):
                 if self.comm.rank == 0:
@@ -336,8 +336,7 @@ class MPITests(unittest.TestCase):
 
                 self.add_input('invec', np.ones(sizes[rank], float),
                                src_indices=np.arange(start, end, dtype=int))
-                self.add_output('outvec', np.ones(sizes[rank], float),
-                                distributed=True)
+                self.add_output('outvec', np.ones(sizes[rank], float))
 
             def get_req_procs(self):
                 # require min of 2 processes, max of 5

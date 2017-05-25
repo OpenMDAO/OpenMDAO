@@ -32,6 +32,9 @@ class Component(System):
     _matrix_free : Bool
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian.
+    _distributed : bool
+        This is True if the component has variables that are distributed across multiple
+        processes.
     _var_rel2data_io : dict
         Dictionary mapping relative names to dicts with keys (prom, rel, my_idx, type_, metadata).
         This is only needed while adding inputs and outputs. During setup, these are used to
@@ -55,10 +58,16 @@ class Component(System):
         **kwargs : dict of keyword arguments
             available here and in all descendants of this system.
         """
+        if 'distributed' in kwargs:
+            distributed = kwargs.pop('distributed')
+        else:
+            distributed = False
+
         super(Component, self).__init__(**kwargs)
         self._approx_schemes = OrderedDict()
 
         self._matrix_free = False
+        self._distributed = distributed
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
@@ -344,8 +353,7 @@ class Component(System):
         var_rel_names['input'].append(name)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0,
-                   distributed=False):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
         """
         Add an output variable to the component.
 
@@ -388,8 +396,6 @@ class Component(System):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
-        distributed : bool
-            If True, this variable is distributed across multiple processes.
         """
         if inspect.stack()[1][3] == '__init__':
             warn_deprecation("In the future, the 'add_output' method must be "
@@ -466,7 +472,7 @@ class Component(System):
         # var_set: taken as is
         metadata['var_set'] = var_set
 
-        metadata['distributed'] = distributed
+        metadata['distributed'] = self._distributed
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:

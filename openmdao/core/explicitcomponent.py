@@ -68,8 +68,7 @@ class ExplicitComponent(Component):
             other_names.append(out_name)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0,
-                   distributed=False):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0):
         """
         Add an output variable to the component.
 
@@ -115,8 +114,6 @@ class ExplicitComponent(Component):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
-        distributed : bool
-            If True, this variable is distributed across multiple processes.
         """
         if res_ref is None:
             res_ref = ref

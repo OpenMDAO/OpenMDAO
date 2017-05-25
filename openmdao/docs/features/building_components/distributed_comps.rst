@@ -19,11 +19,10 @@ to a distributed output unless your input is equal to the size of the entire
 distributed output.  Otherwise, the assumed *src_indices* will be from 0 to
 1 less than the size of your input, which is probably not what you want.
 
-Also, when adding an output that is distributed, *distibuted=True* should
-be added as an argument to *add_output* so that the framework will treat the
-output as distributed instead of the default behavior where
-the output is duplicated in any MPI process that contains its parent
-component.
+Components must either be entirely distributed or not, i.e., if a component
+has any distributed variables, they must all be distributed.  You tell the
+framework that a component is a distributed component by passing
+*distributed=True* into its *__init__* method.
 
 The following simple example shows how to create a distributed component that
 distributes its computation evenly across the available processes, up to a
