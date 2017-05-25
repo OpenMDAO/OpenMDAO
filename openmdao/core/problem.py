@@ -21,7 +21,7 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
 
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.mpi import FakeComm
+from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
@@ -796,8 +796,9 @@ class Problem(object):
                             len_val = len(deriv_val)
 
                             if dup and nproc > 1:
-                                self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
-                                    model._var_sizes['output'][:, out_var_idx])[0][0]))
+                                buff = deriv_val.copy()
+                                self.comm.Allreduce(deriv_val, buff, op=MPI.SUM)
+                                deriv_val = buff
 
                             if return_format == 'flat_dict':
                                 if fwd:
