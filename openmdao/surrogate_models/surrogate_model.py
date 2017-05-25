@@ -45,11 +45,11 @@ class SurrogateModel(object):
     def vectorized_predict(self, x):
         """
         Calculate predicted values of the response based on the current trained model.
-        
+
         Parameters
         ----------
         x : array-like
-            Vectorized point(s) at which the surrogate is evaluated. 
+            Vectorized point(s) at which the surrogate is evaluated.
         """
         pass
 

@@ -3,12 +3,25 @@
 import numpy as np
 
 from openmdao.components.meta_model import MetaModel
-from openmdao.core.component import _NotSet
-
-# generate variable names taking into account fidelity level
 
 
 def _get_name_fi(name, fi_index):
+    """
+    Generate variable name taking into account fidelity level.
+
+    Parameters
+    ----------
+    name : str
+        base name
+
+    fi_index : int
+        fidelity level
+
+    Returns
+    -------
+    str
+        variable name
+    """
     if fi_index > 0:
         return "%s_fi%d" % (name, fi_index + 1)
     else:
@@ -74,7 +87,7 @@ class MultiFiMetaModel(MetaModel):
         self._training_input = nfi * [np.zeros(0)]
         self._input_sizes = nfi * [0]
 
-    def add_input(self, name, val=_NotSet, **kwargs):
+    def add_input(self, name, val=1.0, **kwargs):
         """
         Add an input variable to the component.
 
@@ -114,7 +127,7 @@ class MultiFiMetaModel(MetaModel):
                 self.metadata.declare(name_with_fi, desc='Training data for %s' % name_with_fi)
                 self._input_sizes[fi] += input_size
 
-    def add_output(self, name, val=_NotSet, **kwargs):
+    def add_output(self, name, val=1.0, **kwargs):
         """
         Add an output variable to the component.
 

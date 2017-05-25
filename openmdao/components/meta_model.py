@@ -4,7 +4,6 @@ import numpy as np
 from copy import deepcopy
 
 from openmdao.api import ExplicitComponent
-from openmdao.core.component import _NotSet
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
 
@@ -30,7 +29,13 @@ class MetaModel(ExplicitComponent):
         # a specific surrogate assigned to them
         self.default_surrogate = default_surrogate
 
-        #
+        # all inputs and outputs will have this many independent rows
+        if vectorize and (not isinstance(vectorize, int) or vectorize < 2):
+            raise RuntimeError("Metamodel: The value of the 'vectorize' "
+                               "argument must be an integer greater than "
+                               "one, found '%s'."
+                               % vectorize)
+
         self._vectorize = vectorize
 
         # keep list of inputs and outputs that are not the training vars
@@ -72,6 +77,9 @@ class MetaModel(ExplicitComponent):
         metadata = super(MetaModel, self).add_input(name, val, **kwargs)
 
         if self._vectorize is not None:
+            if metadata['shape'][0] != self._vectorize:
+                raise RuntimeError("Metamodel: First dimension of input '%s' must be %d"
+                                   % (name, self._vectorize))
             input_size = metadata['value'][0].size
         else:
             input_size = metadata['value'].size
@@ -86,7 +94,7 @@ class MetaModel(ExplicitComponent):
 
         return metadata
 
-    def add_output(self, name, val=_NotSet, training_data=None, num_training_points=None, **kwargs):
+    def add_output(self, name, val=1.0, training_data=None, num_training_points=None, **kwargs):
         """
         Add an output to this component and a corresponding training output.
 
@@ -108,13 +116,14 @@ class MetaModel(ExplicitComponent):
         metadata = super(MetaModel, self).add_output(name, val, **kwargs)
 
         if self._vectorize is not None:
+            if metadata['shape'][0] != self._vectorize:
+                raise RuntimeError("Metamodel: First dimension of output '%s' must be %d"
+                                   % (name, self._vectorize))
             output_shape = metadata['shape'][1:]
             if len(output_shape) == 0:
                 output_shape = 1
         else:
             output_shape = metadata['shape']
-
-        print("output_shape", name, output_shape)
 
         self._surrogate_output_names.append((name, output_shape))
         self._training_output[name] = np.zeros(0)
@@ -191,65 +200,115 @@ class MetaModel(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        # Train first
-        if self.train:
+        if self.train:  # train first
             self._train()
 
-        # Now Predict for current inputs
-        inputs = self._vec_to_array(inputs)
+        # predict for current inputs
+        if self._vectorize is None:
+            inputs = self._vec_to_array(inputs)
+        else:
+            inputs = self._vec_to_array2d(inputs)
 
         for name, shape in self._surrogate_output_names:
             surrogate = self._metadata(name).get('surrogate')
-            if surrogate:
-                if self._vectorize is None or \
-                    overrides_method('vectorized_predict', surrogate, SurrogateModel):
+            if surrogate is None:
+                raise RuntimeError("Metamodel '%s': No surrogate specified for output '%s'"
+                                   % (self.pathname, name))
+            else:
+                if self._vectorize is None:
+                    # one input, one prediction
                     predicted = surrogate.predict(inputs)
                     if isinstance(predicted, tuple):  # rmse option
                         self._metadata(name)['rmse'] = predicted[1]
                         predicted = predicted[0]
                     outputs[name] = np.reshape(predicted, outputs[name].shape)
+                elif overrides_method('vectorized_predict', surrogate, SurrogateModel):
+                    # multiple inputs flattened, one prediction of multiple outputs
+                    predicted = surrogate.predict(inputs.flat)
+                    if isinstance(predicted, tuple):  # rmse option
+                        self._metadata(name)['rmse'] = predicted[1]
+                        predicted = predicted[0]
+                    outputs[name] = np.reshape(predicted, outputs[name].shape)
                 else:
-                    output_shape = (self._vectorize,)+outputs[name].shape
+                    # multiple inputs, multiple predictions
+                    if isinstance(shape, tuple):
+                        output_shape = (self._vectorize,) + shape
+                    else:
+                        output_shape = (self._vectorize,)
                     predicted = np.zeros(output_shape)
                     rmse = self._metadata(name)['rmse'] = []
-                    print('inputs:', inputs)
                     for i in range(self._vectorize):
                         pred_i = surrogate.predict(inputs[i])
-                        predicted[i] = np.reshape(pred_i, outputs[name].shape)
-                        print('predicted:', predicted)
+                        predicted[i] = np.reshape(pred_i, shape)
                         if isinstance(predicted[i], tuple):  # rmse option
                             rmse.append(predicted[i][1])
                             predicted[i] = predicted[i][0]
                     outputs[name] = np.reshape(predicted, output_shape)
-            else:
-                raise RuntimeError("Metamodel '%s': No surrogate specified for output '%s'"
-                                   % (self.pathname, name))
 
-    def _vec_to_array(self, vec, out=None):
+    def _vec_to_array(self, vec):
         """
-        Convert from a dictionary of inputs to the ndarray input.
+        Convert from a dictionary of inputs to a flat ndarray.
+
+        Parameters
+        ----------
+        vec : <Vector>
+            pointer to the input vector.
+
+        Returns
+        -------
+        ndarray
+            flattened array of input data
         """
         array_real = True
 
-        if out is None:
-            arr = np.zeros(self._input_size)
-        else:
-            arr = out
+        arr = np.zeros(self._input_size)
 
         idx = 0
         for name, sz in self._surrogate_input_names:
             val = vec[name]
-            if isinstance(val, list):
-                val = np.array(val)
             if isinstance(val, np.ndarray):
                 if array_real and np.issubdtype(val.dtype, complex):
                     array_real = False
-                    inputs = inputs.astype(complex)
+                    arr = arr.astype(complex)
                 arr[idx:idx + sz] = val.flat
                 idx += sz
             else:
                 arr[idx] = val
                 idx += 1
+
+        return arr
+
+    def _vec_to_array2d(self, vec):
+        """
+        Convert from a dictionary of inputs to a 2d ndarray with self._vectorize rows.
+
+        Parameters
+        ----------
+        vec : <Vector>
+            pointer to the input vector.
+
+        Returns
+        -------
+        ndarray
+            2d array, self._vectorize rows of flattened input data.
+        """
+        array_real = True
+
+        arr = np.zeros((self._vectorize, self._input_size))
+
+        for row in range(self._vectorize):
+            idx = 0
+            for name, sz in self._surrogate_input_names:
+                val = vec[name]
+                if isinstance(val, np.ndarray):
+                    if array_real and np.issubdtype(val.dtype, complex):
+                        array_real = False
+                        arr = arr.astype(complex)
+                    arr[row][idx:idx + sz] = val[row].flat
+                    idx += sz
+                else:
+                    arr[row][idx] = val
+                    idx += 1
 
         return arr
 

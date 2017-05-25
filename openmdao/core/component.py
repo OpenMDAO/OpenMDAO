@@ -21,10 +21,6 @@ from openmdao.utils.general_utils import format_as_float_or_array, ensure_compat
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 
-# Object to represent default value for `add_output`.
-_NotSet = object()
-
-
 class Component(System):
     """
     Base Component class; not to be directly instantiated.
