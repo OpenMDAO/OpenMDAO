@@ -56,12 +56,22 @@ class ScipyOptimizer(Driver):
     ----------
     fail : bool
         Flag that indicates failure of most recent optimization.
+    iter_count : int
+        Counter for function evaluations.
+    result : <OptimizeResult>
+        Result returned from scipy.optimize call.
     opt_settings : dict
         Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
+    _con_cache : OrderedDict
+        Cached result of constraint evaluations because scipy asks for them in a separate function.
+    _con_idx : OrderedDict
+        Used for constraint bookkeeping in the presence of 2-sided constraints.
     _cons : dict
         Contains all constraint info.
     _designvars : dict
         Contains all design variable info.
+    _grad_cache : OrderedDict
+        Cached result of constraint derivatives because scipy asks for them in a separate function.
     _objs : dict
         Contains all objective info.
     """
@@ -99,11 +109,12 @@ class ScipyOptimizer(Driver):
 
         self.result = None
         self.fail = 0
-        self.grad_cache = None
-        self.con_cache = None
-        self.con_idx = OrderedDict()
+        self._grad_cache = None
+        self._con_cache = None
+        self._con_idx = OrderedDict()
         self.objs = None
         self.fail = False
+        self.iter_count = 0
 
     def _setup_driver(self, problem):
         """
@@ -142,7 +153,7 @@ class ScipyOptimizer(Driver):
         model._solve_nonlinear()
 
         self.objs = list(self.get_objective_values())
-        self.con_cache = self.get_constraint_values()
+        self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()
 
         # maxiter and disp get passsed into scipy with all the other options.
@@ -204,7 +215,7 @@ class ScipyOptimizer(Driver):
                         con_dict['jac'] = self._congradfunc
                     con_dict['args'] = [name, j]
                     constraints.append(con_dict)
-                self.con_idx[name] = i
+                self._con_idx[name] = i
                 i += size
 
                 # Add extra constraint if double-sided
@@ -280,7 +291,7 @@ class ScipyOptimizer(Driver):
                 f_new = obj
                 break
 
-            self.con_cache = self.get_constraint_values()
+            self._con_cache = self.get_constraint_values()
 
         except Exception as msg:
             tb = traceback.format_exc()
@@ -323,7 +334,7 @@ class ScipyOptimizer(Driver):
         else:
             dbl_side = False
 
-        cons = self.con_cache
+        cons = self._con_cache
         meta = self._cons[name]
 
         # Equality constraints
@@ -367,7 +378,7 @@ class ScipyOptimizer(Driver):
             quantities = list(self._objs) + list(self._cons)
             grad = self._compute_total_derivs(of=quantities, wrt=self._designvars,
                                               return_format='array')
-            self.grad_cache = grad
+            self._grad_cache = grad
 
         except Exception as msg:
             tb = traceback.format_exc()
@@ -410,9 +421,9 @@ class ScipyOptimizer(Driver):
         else:
             dbl_side = False
 
-        grad = self.grad_cache
+        grad = self._grad_cache
         meta = self._cons[name]
-        grad_idx = self.con_idx[name] + idx + 1
+        grad_idx = self._con_idx[name] + idx + 1
 
         # print("Constraint Gradient returned")
         # print(x_new)
