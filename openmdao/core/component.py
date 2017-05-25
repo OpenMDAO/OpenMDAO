@@ -674,8 +674,8 @@ class Component(System):
                 in_size = np.prod(self._var_abs2meta['input'][abs_key[1]]['shape'])
             else:  # assume output
                 in_size = np.prod(self._var_abs2meta['output'][abs_key[1]]['shape'])
-            
-            if in_size == 0 and self.comm.rank != 0:  # 'inactive' component. skip checks
+
+            if in_size == 0 and self.comm.rank != 0:  # 'inactive' component
                 return
 
             rows = meta['rows']
