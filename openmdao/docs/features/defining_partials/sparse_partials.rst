@@ -12,7 +12,7 @@ Usage
 1. To specify the sparsity pattern in the AIJ format (alternatively known as COO format), use the :code:`rows` and :code:`cols` arguments
 to :code:`declare_partials`. For example, to declare a sparsity pattern of non-zero
 entries in the (0, 0), (1, 1), (1, 2), and (1,3) positions, one would use
-:code:`rows=[0, 1, 1, 1], cols=[0, 1, 2, 3]`. When using :code:`compute_partial_derivs`, you do not
+:code:`rows=[0, 1, 1, 1], cols=[0, 1, 2, 3]`. When using :code:`compute_partials`, you do not
 need to pass the sparsity pattern again. Instead, you simply give the values for the entries in the
 same order as given in :code:`declare_partials`.
 

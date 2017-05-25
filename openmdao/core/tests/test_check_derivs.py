@@ -1,4 +1,4 @@
-""" Testing for Problem.check_partial_derivs and check_total_derivatives."""
+""" Testing for Problem.check_partials and check_total_derivatives."""
 
 import unittest
 from six import iteritems
@@ -27,7 +27,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partial_derivs(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, outputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -50,7 +50,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         string_stream = StringIO()
 
-        data = prob.check_partial_derivs(out_stream=string_stream)
+        data = prob.check_partials(out_stream=string_stream)
 
         lines = string_stream.getvalue().split("\n")
 
@@ -75,7 +75,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partial_derivs(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, outputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -96,7 +96,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partial_derivs()
+        data = prob.check_partials()
 
         x1_error = data['comp']['y', 'x1']['abs error']
         assert_rel_error(self, x1_error.forward, 1., 1e-8)
@@ -118,7 +118,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partial_derivs(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, outputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -134,7 +134,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         string_stream = StringIO()
 
-        data = prob.check_partial_derivs(out_stream=string_stream)
+        data = prob.check_partials(out_stream=string_stream)
 
         lines = string_stream.getvalue().split("\n")
 
@@ -159,7 +159,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partial_derivs(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, outputs, partials):
                 """Intentionally left out derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([3.0])
@@ -180,7 +180,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
 
-        data = prob.check_partial_derivs(out_stream=stream)
+        data = prob.check_partials(out_stream=stream)
 
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']
@@ -226,7 +226,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
         p.setup()
-        data = p.check_partial_derivs(out_stream=None)
+        data = p.check_partials(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -247,7 +247,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
                 self.run_count = 0
 
-            def compute_partial_derivs(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, outputs, partials):
                 partials['flow:T', 'T'] = 1.
                 partials['flow:P', 'P'] = 1.
 
@@ -269,7 +269,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         model.nl_solver = NLRunOnce()
 
         p.setup()
-        data = p.check_partial_derivs(out_stream=None)
+        data = p.check_partials(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -279,7 +279,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.assertAlmostEqual(abs_error.forward_reverse, 0.)
 
         # Make sure we only FD this twice.
-        # The count is 5 because in check_partial_derivs, there are two calls to apply_nonlinear
+        # The count is 5 because in check_partials, there are two calls to apply_nonlinear
         # when compute the fwd and rev analytic derivatives, then one call to apply_nonlinear
         # to compute the reference point for FD, then two additional calls for the two inputs.
         comp = model.get_subsystem('units')
@@ -339,7 +339,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        data = p.check_partial_derivs(out_stream=None)
+        data = p.check_partials(out_stream=None)
         identity = np.eye(4)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
@@ -365,7 +365,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partial_derivs(out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -397,7 +397,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partial_derivs(out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -411,7 +411,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 assert_rel_error(self, rel_error.forward_reverse, 0., 1e-5)
 
     def test_implicit_undeclared(self):
-        # Test to see that check_partial_derivs works when state_wrt_input and state_wrt_state
+        # Test to see that check_partials works when state_wrt_input and state_wrt_state
         # partials are missing.
 
         class ImplComp4Test(ImplicitComponent):
@@ -447,7 +447,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partial_derivs(out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         assert_rel_error(self, data['comp']['y', 'extra']['J_fwd'], np.zeros((2, 2)))
         assert_rel_error(self, data['comp']['y', 'extra']['J_rev'], np.zeros((2, 2)))
