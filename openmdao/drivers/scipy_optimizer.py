@@ -258,7 +258,7 @@ class ScipyOptimizer(Driver):
 
     def _objfunc(self, x_new):
         """
-        Evaluates and return the objective function.
+        Evaluate and return the objective function.
 
         Model is executed here.
 
