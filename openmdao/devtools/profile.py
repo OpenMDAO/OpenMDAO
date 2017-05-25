@@ -153,7 +153,6 @@ def _instance_profile(frame, event, arg):
     if event == 'call':
         func_name = frame.f_code.co_name
         if func_name in _profile_matches:
-            #ovr = etime()
             loc = frame.f_locals
             if 'self' in loc:
                 self = loc['self']
@@ -168,7 +167,6 @@ def _instance_profile(frame, event, arg):
     elif event == 'return':
         func_name = frame.f_code.co_name
         if func_name in _profile_matches:
-            #ovr = etime()
             loc = frame.f_locals
             if 'self' in loc:
                 self = loc['self']
