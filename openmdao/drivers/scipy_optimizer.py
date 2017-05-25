@@ -258,7 +258,7 @@ class ScipyOptimizer(Driver):
 
     def _objfunc(self, x_new):
         """
-        Function that evaluates and returns the objective function.
+        Evaluates and return the objective function.
 
         Model is executed here.
 
@@ -309,7 +309,7 @@ class ScipyOptimizer(Driver):
 
     def _confunc(self, x_new, name, idx):
         """
-        Function that returns the value of the constraint function requested in args.
+        Return the value of the constraint function requested in args.
 
         Note that this function is called for each constraint, so the model is only run when the
         objective is evaluated.
@@ -359,7 +359,7 @@ class ScipyOptimizer(Driver):
 
     def _gradfunc(self, x_new):
         """
-        Function that evaluates and returns the objective function.
+        Evaluate and return the objective function.
 
         Gradients for the constraints are also calculated and cached here.
 
@@ -396,7 +396,7 @@ class ScipyOptimizer(Driver):
 
     def _congradfunc(self, x_new, name, idx):
         """
-        Function that returns the cached gradient of the constraint function.
+        Return the cached gradient of the constraint function.
 
         Note, scipy calls the constraints one at a time, so the gradient is cached when the
         objective gradient is called.
