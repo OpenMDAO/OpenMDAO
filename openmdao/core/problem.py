@@ -657,7 +657,6 @@ class Problem(object):
         # derivatives that we will return.
         totals = OrderedDict()
         if return_format == 'flat_dict':
-            totals = OrderedDict()
             for okeys in of:
                 for okey in okeys:
                     for ikeys in wrt:
@@ -665,7 +664,6 @@ class Problem(object):
                             totals[(okey, ikey)] = None
 
         elif return_format == 'dict':
-            totals = OrderedDict()
             for okeys in of:
                 for okey in okeys:
                     totals[okey] = OrderedDict()
