@@ -310,12 +310,13 @@ class Driver(object):
 
         elif return_format == 'array':
 
+            # Compute the derivatives in dict format, and then convert to array.
             derivs = prob._compute_total_derivs(of=of, wrt=wrt, return_format='dict',
                                                 global_names=global_names)
 
             # Use sizes pre-computed in derivs for ease
-            otart = osize = 0
-            istart = isize = 0
+            osize = 0
+            isize = 0
             do_wrt = True
             Jslices = {}
             for okey, oval in iteritems(derivs):
