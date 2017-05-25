@@ -14,6 +14,7 @@ from openmdao.solvers.nl_runonce import NLRunOnce
 from openmdao.solvers.ln_runonce import LNRunOnce
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
+from openmdao.utils.array_utils import convert_neg
 from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 
 
@@ -367,7 +368,6 @@ class Group(System):
                 sizes[type_][proc_slice, var_slice] = subsys._var_sizes[type_]
 
                 for set_name in set2iset[type_]:
-                    proc_slice = slice(*subsystems_proc_range[ind])
                     var_slice = slice(*subsystems_var_range_byset[type_][set_name][ind])
                     sizes_byset[type_][set_name][proc_slice, var_slice] = \
                         subsys._var_sizes_byset[type_][set_name]
@@ -379,6 +379,8 @@ class Group(System):
                 for set_name in set2iset[type_]:
                     self.comm.Allgather(
                         sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
+
+        self._setup_global_shapes()
 
     def _setup_global_connections(self, recurse=True):
         """
@@ -692,17 +694,25 @@ class Group(System):
                 # Read in and process src_indices
                 shape_in = meta_in['shape']
                 shape_out = meta_out['shape']
+                global_shape_out = meta_out['global_shape']
+                global_size_out = meta_out['global_size']
                 src_indices = meta_in['src_indices']
                 if src_indices is None:
                     src_indices = np.arange(np.prod(shape_in), dtype=int)
-                elif src_indices.ndim != 1:
+                elif src_indices.ndim == 1:
+                    src_indices = convert_neg(src_indices, global_size_out)
+                else:
                     if len(shape_out) == 1:
                         src_indices = src_indices.flatten()
+                        src_indices = convert_neg(src_indices, global_size_out)
                     else:
+                        # TODO: this duplicates code found
+                        # in System._setup_scaling.
                         entries = [list(range(x)) for x in shape_in]
                         cols = np.vstack(src_indices[i] for i in product(*entries))
-                        dimidxs = [cols[:, i] for i in range(cols.shape[1])]
-                        src_indices = np.ravel_multi_index(dimidxs, shape_out)
+                        dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
+                                   for i in range(cols.shape[1])]
+                        src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
 
                 # 1. Compute the output indices
                 output_inds = np.zeros(src_indices.shape[0], int)
@@ -885,8 +895,8 @@ class Group(System):
             name of the target variable(s) to connect
         src_indices : collection of int optional
             When an input variable connects to some subset of an array output
-            variable, you can specify which indices of the source to be
-            transferred to the input here.
+            variable, you can specify which global indices of the source to be
+            transferred to the input here.  Negative indices are supported.
         """
         # if src_indices argument is given, it should be valid
         if isinstance(src_indices, string_types):

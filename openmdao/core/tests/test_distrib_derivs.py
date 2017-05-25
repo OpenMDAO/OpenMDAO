@@ -4,7 +4,7 @@ import unittest
 import numpy
 
 from openmdao.api import ParallelGroup, Group, Problem, IndepVarComp, \
-    ExecComp, LinearBlockGS
+    ExecComp, LinearBlockGS, ExplicitComponent
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.devtools.testutil import assert_rel_error
@@ -75,6 +75,39 @@ class DistribExecComp(ExecComp):
         return (2, 2)
 
 
+class DistribCoordComp(ExplicitComponent):
+    def initialize_variables(self):
+        comm = self.comm
+        rank = comm.rank
+
+        if rank == 0:
+            self.add_input('invec', numpy.zeros((5, 3)),
+                           src_indices=[[(0,0), (0,1), (0,2)],
+                                        [(1,0), (1,1), (1,2)],
+                                        [(2,0), (2,1), (2,2)],
+                                        [(3,0), (3,1), (3,2)],
+                                        [(4,0), (4,1), (4,2)]])
+            self.add_output('outvec', numpy.zeros((5, 3)), distributed=True)
+        else:
+            self.add_input('invec', numpy.zeros((4, 3)),
+                           src_indices=[[(5,0), (5,1), (5,2)],
+                                        [(6,0), (6,1), (6,2)],
+                                        [(7,0), (7,1), (7,2)],
+                                        # use some negative indices here to
+                                        # make sure they work
+                                        [(-1,0), (8,1), (-1,2)]])
+            self.add_output('outvec', numpy.zeros((4, 3)), distributed=True)
+
+    def compute(self, inputs, outputs):
+        if self.comm.rank == 0:
+            outputs['outvec'] = inputs['invec'] * 2.0
+        else:
+            outputs['outvec'] = inputs['invec'] * 3.0
+
+    def get_req_procs(self):
+        return (2, 2)
+
+
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class MPITests1(unittest.TestCase):
 
@@ -111,6 +144,39 @@ class MPITests1(unittest.TestCase):
 class MPITests2(unittest.TestCase):
 
     N_PROCS = 2
+
+    def test_distrib_shape(self):
+        points = numpy.array([
+            [0., 0., 0.],
+            [0., 0., 1.],
+            [0., 1., 0.],
+            [0., 1., 1.],
+            [1., 0., 0.],
+
+            [1., 0., 1.],
+            [1., 1., 0.],
+            [1., 1., 1.],
+            [0., 0., 2.],
+        ])
+
+        prob = Problem()
+
+        prob.model.add_subsystem('indep', IndepVarComp('x', points, distributed=True))
+        prob.model.add_subsystem('comp', DistribCoordComp())
+        prob.model.add_subsystem('total', ExecComp('y=x',
+                                                   x=numpy.zeros((9,3)),
+                                                   y=numpy.zeros((9,3))))
+        prob.model.connect('indep.x', 'comp.invec')
+        prob.model.connect('comp.outvec', 'total.x')
+
+        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        prob.run_model()
+
+        final = points.copy()
+        final[0:5] *= 2.0
+        final[5:9] *= 3.0
+
+        assert_rel_error(self, prob['total.y'], final)
 
     def test_two_simple(self):
         size = 3

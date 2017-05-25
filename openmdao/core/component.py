@@ -160,7 +160,7 @@ class Component(System):
 
         meta_names = {
             'input': ('units', 'shape', 'var_set'),
-            'output': ('units', 'shape', 'var_set', 'ref', 'ref0'),
+            'output': ('units', 'shape', 'var_set', 'ref', 'ref0', 'distributed'),
         }
 
         for type_ in ['input', 'output']:
@@ -234,6 +234,8 @@ class Component(System):
                 for set_name in self._var_set2iset[type_]:
                     self.comm.Allgather(
                         sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
+
+        self._setup_global_shapes()
 
     def _setup_partials(self, recurse=True):
         """
@@ -353,7 +355,8 @@ class Component(System):
         return metadata
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0,
+                   distributed=False):
         """
         Add an output variable to the component.
 
@@ -396,6 +399,8 @@ class Component(System):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
+        distributed : bool
+            If True, this variable is distributed across multiple processes.
 
         Returns
         -------
@@ -476,6 +481,8 @@ class Component(System):
 
         # var_set: taken as is
         metadata['var_set'] = var_set
+
+        metadata['distributed'] = distributed
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
