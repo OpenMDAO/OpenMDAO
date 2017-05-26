@@ -1,6 +1,7 @@
 """Define the LNRunOnce class."""
 
 from openmdao.solvers.ln_bgs import LinearBlockGS
+from openmdao.utils.record_util import create_local_meta, update_local_meta
 
 
 class LNRunOnce(LinearBlockGS):
@@ -46,5 +47,10 @@ class LNRunOnce(LinearBlockGS):
 
         # Single iteration of GS
         self._iter_execute()
+
+        # TODO_RECORDERS - need to replace None in this with metadata from above
+        metadata = self.metadata = create_local_meta(None, type(self).__name__)
+        update_local_meta(metadata, (self._iter_count,))
+        self._rec_mgr.record_iteration(self, metadata) # no norms
 
         return False, 0.0, 0.0

@@ -12,6 +12,19 @@ from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver, NonlinearSolver
 
+# recording_iteration_stack = []
+#
+# function push_recording_iteration_stack(name, iter_count):
+#     recording_iteration_stack.append((name, iter_count))
+#
+# function pop_recording_iteration_stack():
+#     recording_iteration_stack.pop()
+#
+# function print_recording_iteration_stack():
+#     print()
+#     for name, iter_count in reversed(recording_iteration_stack)  :
+#         print(name, iter_count)
+#     print 60*'-'
 
 class BaseRecorder(object):
     """

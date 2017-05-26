@@ -12,7 +12,11 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import NonlinearBlockGS, SqliteRecorder, Group, IndepVarComp, ExecComp, NewtonSolver, DirectSolver
+from openmdao.api import SqliteRecorder, Group, IndepVarComp, ExecComp
+from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac, NewtonSolver, \
+                            NLRunOnce
+from openmdao.api import DirectSolver, ScipyIterativeSolver, PetscKSP, LinearBlockGS, LNRunOnce, LinearBlockJac
+
 from openmdao.core.problem import Problem
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
@@ -143,6 +147,8 @@ def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
         # from the database, get the actual data recorded
         db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
         row_actual = db_cur.fetchone()
+        # db_cur.execute("SELECT * FROM solver_iterations")
+        # rows = db_cur.fetchall()
         test.assertTrue(row_actual, 'Solver iterations table is empty. Should contain at least one record')
 
         counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, output_blob, residuals_blob = row_actual
@@ -150,12 +156,16 @@ def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
         output_actual = blob_to_array(output_blob)
         residuals_actual = blob_to_array(residuals_blob)
         # Does the timestamp make sense?
-        test.assertTrue( t0 <= timestamp and timestamp <= t1)
+        test.assertTrue( t0 <= timestamp and timestamp <= t1, 'timestamp should be between when the model started and stopped')
 
         test.assertEqual(success, 1)
         test.assertEqual(msg, '')
-        test.assertEqual(abs_err, expected_abs_error)
-        test.assertEqual(rel_err, expected_rel_error)
+        if expected_abs_error:
+            test.assertTrue( abs_err, 'Expected absolute error but none recorded')
+            assert_rel_error(test, abs_err, expected_abs_error, tolerance)
+        if expected_rel_error:
+            test.assertTrue( rel_err, 'Expected relative error but none recorded')
+            assert_rel_error(test, rel_err, expected_rel_error, tolerance)
 
         for vartype, actual, expected in (
                 ('outputs', output_actual, expected_output),
@@ -173,6 +183,14 @@ def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
                     # Check to see if the values in actual and expected match
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
+
+def _assertSolverIterationDataRecordedBasic(test, db_cur):
+    """
+        Just make sure something was recorded for the solver
+    """
+    db_cur.execute("SELECT * FROM solver_iterations")
+    row_actual = db_cur.fetchone()
+    test.assertTrue(row_actual, 'Solver iterations table is empty. Should contain at least one record')
 
 
 def _assertMetadataRecorded(test, db_cur):
@@ -252,6 +270,13 @@ class TestSqliteRecorder(unittest.TestCase):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertSolverIterationDataRecorded(self, cur, expected, tolerance)
+        con.close()
+
+    def assertSolverIterationDataRecordedBasic(self):
+        '''Just want to make sure something was recorded'''
+        con = sqlite3.connect(self.filename)
+        cur = con.cursor()
+        _assertSolverIterationDataRecordedBasic(self, cur)
         con.close()
 
     def assertMetadataRecorded(self ):
@@ -345,6 +370,8 @@ class TestSqliteRecorder(unittest.TestCase):
                             }
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, None, expected_constraints),), self.eps)
+
+    # TODO_RECORDERS - need to add tests for recording options for recording Systems and Solvers
 
     def test_simple_driver_recording(self):
 
@@ -459,12 +486,12 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_inputs = {
                             "obj_cmp.z": [5.0, 2.0],
-                            "obj_cmp.y1": [25.54548589,],
+                            "obj_cmp.y1": [25.58914915,],
                             "obj_cmp.x": [1.0,],
-                            "obj_cmp.y2": [12.05425424,],
+                            "obj_cmp.y2": [12.05857185,],
                             }
 
-        expected_outputs = {"obj_cmp.obj": [28.54549171,],
+        expected_outputs = {"obj_cmp.obj": [28.58915495,],
                             }
 
         expected_residuals = {"obj_cmp.obj": [0.0,],
@@ -577,7 +604,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
         self.prob.model.nl_solver = NonlinearBlockGS()
-        self.prob.model._nl_solver.add_recorder(self.recorder)
+        self.prob.model.nl_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
 
@@ -614,8 +641,113 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                                                  expected_solver_output, expected_solver_residuals),), self.eps)
 
-    def test_record_linear_solver(self):
-        raise unittest.SkipTest("Linear Solver recording not working yet")
+    def test_record_line_search_armijo_goldstein(self):
+        self.setup_sellar_model()
+
+        model = self.prob.model
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 4
+        ls = model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+
+        # This is pretty bogus, but it ensures that we get a few LS iterations.
+        ls.options['c'] = 100.0
+        ls.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        # TODO_RECORDERS - should really check to see that we get more than just one record as this test does
+        self.assertSolverIterationDataRecordedBasic()
+
+    def test_record_line_search_bounds_enforce(self):
+        self.setup_sellar_model()
+
+        model = self.prob.model
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['solve_subsystems'] = True
+        model.nl_solver.options['max_sub_solves'] = 4
+        ls = model.nl_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+
+        ls.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        # TODO_RECORDERS - should really check to see that we get more than just one record as this test does
+        self.assertSolverIterationDataRecordedBasic()
+
+
+    def test_record_solver_nonlinear_block_gs(self):
+        self.setup_sellar_model()
+
+        self.prob.model.nl_solver = NonlinearBlockGS()
+        self.prob.model.nl_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        self.assertSolverIterationDataRecordedBasic()
+
+    def test_record_solver_nonlinear_block_jac(self):
+        self.setup_sellar_model()
+
+        self.prob.model.nl_solver = NonlinearBlockJac()
+        self.prob.model.nl_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        self.assertSolverIterationDataRecordedBasic()
+
+    def test_record_solver_nonlinear_newton(self):
+        self.setup_sellar_model()
+
+        self.prob.model.nl_solver = NewtonSolver()
+        self.prob.model.nl_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        self.assertSolverIterationDataRecordedBasic()
+
+    def test_record_solver_nonlinear_nl_run_once(self):
+        self.setup_sellar_model()
+
+        self.prob.model.nl_solver = NLRunOnce()
+        self.prob.model.nl_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        #### No norms so no expected norms
+        self.assertSolverIterationDataRecordedBasic()
+
+    def test_record_solver_linear_direct_solver(self):
+
+        # raise unittest.SkipTest("Linear Solver recording not working yet")
 
         prob = Problem()
         model = prob.model = SellarDerivatives()
@@ -632,36 +764,122 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        coordinate = [0, 'Direct', (3,)]
+        #### No norms so no expected norms
 
-        expected_abs_error = 1.31880284470753394998e-10
+        # TODO_RECORDERS - need to be more thorough
+        self.assertSolverIterationDataRecordedBasic()
 
-        expected_rel_error = 3.6299074030587596e-12
+    def test_record_solver_linear_scipy_iterative_solver(self):
 
-        expected_solver_output = {
-            "con_cmp1.con1": [-22.42830237000701],
-            "d1.y1": [25.58830237000701],
-            "con_cmp2.con2": [-11.941511849375644],
-            "pz.z": [5.0, 2.0],
-            "obj_cmp.obj": [28.588308165163074],
-            "d2.y2": [12.058488150624356],
-            "px.x": [1.0]
-        }
+        # raise unittest.SkipTest("Linear Solver recording not working yet")
 
-        expected_solver_residuals = {
-            "con_cmp1.con1": [0.0],
-            "d1.y1": [1.318802844707534e-10],
-            "con_cmp2.con2": [0.0],
-            "pz.z": [0.0, 0.0],
-            "obj_cmp.obj": [0.0],
-            "d2.y2": [0.0],
-            "px.x": [0.0]
-        }
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
 
-        t0, t1 = run_driver(prob)
+        model.nl_solver = NewtonSolver()
+        # used for analytic derivatives
+        model.nl_solver.ln_solver = ScipyIterativeSolver()
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        model.nl_solver.ln_solver.add_recorder(self.recorder)
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
-                                                 expected_solver_output, expected_solver_residuals),), self.eps)
+        prob.setup()
+        prob.run_model()
+
+        # TODO_RECORDERS - need to be more thorough
+        self.assertSolverIterationDataRecordedBasic()
+
+    def test_record_solver_linear_petsc_ksp(self):
+
+        # raise unittest.SkipTest("Linear Solver recording not working yet")
+
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.nl_solver = NewtonSolver()
+        # used for analytic derivatives
+        model.nl_solver.ln_solver = PetscKSP()
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        model.nl_solver.ln_solver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.run_model()
+
+        # TODO_RECORDERS - need to be more thorough
+        self.assertSolverIterationDataRecordedBasic()
+
+    def test_record_solver_linear_block_gs(self):
+
+        # raise unittest.SkipTest("Linear Solver recording not working yet")
+
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.nl_solver = NewtonSolver()
+        # used for analytic derivatives
+        model.nl_solver.ln_solver = LinearBlockGS()
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        model.nl_solver.ln_solver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.run_model()
+
+        # TODO_RECORDERS - need to be more thorough
+        self.assertSolverIterationDataRecordedBasic()
+
+    def test_record_solver_linear_ln_run_once(self):
+
+        # raise unittest.SkipTest("Linear Solver recording not working yet")
+
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.nl_solver = NewtonSolver()
+        # used for analytic derivatives
+        model.nl_solver.ln_solver = LNRunOnce()
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        model.nl_solver.ln_solver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.run_model()
+
+        #### No norms so no expected norms
+
+        # TODO_RECORDERS - need to be more thorough
+        self.assertSolverIterationDataRecordedBasic()
+
+    def test_record_solver_linear_block_jac(self):
+
+        # raise unittest.SkipTest("Linear Solver recording not working yet")
+
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.nl_solver = NewtonSolver()
+        # used for analytic derivatives
+        model.nl_solver.ln_solver = LinearBlockJac()
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        model.nl_solver.ln_solver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.run_model()
+
+        # TODO_RECORDERS - need to be more thorough
+        self.assertSolverIterationDataRecordedBasic()
 
     def test_global_counter(self):
         if OPT is None:

@@ -13,6 +13,7 @@ from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
+from openmdao.utils.record_util import create_local_meta, update_local_meta
 
 
 class DirectSolver(LinearSolver):
@@ -170,5 +171,10 @@ class DirectSolver(LinearSolver):
                 b_data = b_vec.get_data()
                 x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
                 x_vec.set_data(x_data)
+
+        # TODO_RECORDERS - need to replace None in this with metadata from above
+        metadata = self.metadata = create_local_meta(None, type(self).__name__)
+        update_local_meta(metadata, (self._iter_count,))
+        self._rec_mgr.record_iteration(self, metadata) # no norms
 
         return False, 0., 0.

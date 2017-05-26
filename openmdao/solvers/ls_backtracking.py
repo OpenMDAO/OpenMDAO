@@ -93,6 +93,7 @@ class BoundsEnforceLS(NonlinearSolver):
 
         fail = (np.isinf(norm) or np.isnan(norm))
 
+        # TODO_RECORDERS - replace None with parent metadata
         metadata = self.metadata = create_local_meta(None, type(self).__name__)
         update_local_meta(metadata, (self._iter_count,))
         self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
@@ -243,12 +244,15 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             self._iter_count += 1
             norm = self._iter_get_norm()
             self._mpi_print(self._iter_count, norm, norm / norm0)
+            # TODO_RECORDERS - replace None with parent metadata
+            metadata = self.metadata = create_local_meta(None, type(self).__name__)
+            update_local_meta(metadata, (self._iter_count,))
+            self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
+
+
 
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
 
-        metadata = self.metadata = create_local_meta(None, type(self).__name__)
-        update_local_meta(metadata, (self._iter_count,))
-        self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
 
         return fail, norm, norm / norm0
