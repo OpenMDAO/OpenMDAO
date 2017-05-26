@@ -312,7 +312,7 @@ class MetaModel(ExplicitComponent):
 
         return arr
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         """
         Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
 
