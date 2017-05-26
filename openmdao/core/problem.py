@@ -610,7 +610,7 @@ class Problem(object):
         vec_dresid = model._vectors['residual']
         fwd = mode == 'fwd'
         nproc = self.comm.size
-        iproc = self.comm.rank
+        iproc = model.comm.rank
 
         # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:
@@ -670,6 +670,7 @@ class Problem(object):
                     for ikeys in wrt:
                         for ikey in ikeys:
                             totals[okey][ikey] = None
+
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
@@ -711,8 +712,6 @@ class Problem(object):
         dinputs = input_vec[vecname]
         doutputs = output_vec[vecname]
 
-        iproc = model.comm.rank
-
         # If Forward mode, solve linear system for each 'wrt'
         # If Adjoint mode, solve linear system for each 'of'
         for icount, input_names in enumerate(input_list):
@@ -730,10 +729,6 @@ class Problem(object):
                     in_voi_meta = input_vois[input_name]
                     if 'indices' in in_voi_meta:
                         in_idxs = in_voi_meta['indices']
-                    elif 'index' in in_voi_meta:
-                        in_idxs = in_voi_meta['index']
-                        if in_idxs is not None:
-                            in_idxs = np.array([in_idxs], dtype=int)
 
                 distrib = in_var_meta['distributed']
                 dup = False
@@ -786,10 +781,6 @@ class Problem(object):
                                 out_voi_meta = output_vois[output_name]
                                 if 'indices' in out_voi_meta:
                                     out_idxs = out_voi_meta['indices']
-                                elif 'index' in out_voi_meta:
-                                    out_idxs = out_voi_meta['index']
-                                    if out_idxs is not None:
-                                        out_idxs = np.array([out_idxs], dtype=int)
 
                             if out_idxs is not None:
                                 deriv_val = deriv_val[out_idxs]
@@ -836,6 +827,7 @@ class Problem(object):
                                         totals[okey][ikey] = np.zeros((loc_size, len_val))
                                     if store:
                                         totals[okey][ikey][loc_idx, :] = deriv_val
+
                             else:
                                 raise RuntimeError("unsupported return format")
 

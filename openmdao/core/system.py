@@ -1853,9 +1853,10 @@ class System(object):
             resp['indices'] = indices
 
         else:  # 'obj'
-            resp['index'] = index
             if index is not None:
                 resp['size'] = 1
+                index = np.array([index], dtype=int)
+            resp['indices'] = index
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
