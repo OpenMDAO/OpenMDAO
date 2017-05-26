@@ -224,7 +224,7 @@ class MetaModel(ExplicitComponent):
                     outputs[name] = np.reshape(predicted, outputs[name].shape)
                 elif overrides_method('vectorized_predict', surrogate, SurrogateModel):
                     # multiple inputs flattened, one prediction of multiple outputs
-                    predicted = surrogate.predict(inputs.flat)
+                    predicted = surrogate.vectorized_predict(inputs.flat)
                     if isinstance(predicted, tuple):  # rmse option
                         self._metadata(name)['rmse'] = predicted[1]
                         predicted = predicted[0]
