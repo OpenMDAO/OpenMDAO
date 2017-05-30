@@ -473,7 +473,7 @@ class PetscKSP(LinearSolver):
 
         Returns
         -------
-        <Group>
+        <LinearSolver>
             reference to the 'precon' property.
         """
         warn_deprecation("The 'preconditioner' property provides backwards compatibility "
@@ -487,8 +487,8 @@ class PetscKSP(LinearSolver):
 
         Parameters
         ----------
-        precon : <Group>
-            reference to a <Group> to be assigned to the 'precon' property.
+        precon : <LinearSolver>
+            reference to a <LinearSolver> to be assigned to the 'precon' property.
         """
         warn_deprecation("The 'preconditioner' property provides backwards compatibility "
                          "with OpenMDAO <= 1.x ; use 'precon' instead.")
