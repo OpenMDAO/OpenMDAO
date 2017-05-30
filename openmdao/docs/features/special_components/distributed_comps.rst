@@ -1,6 +1,6 @@
 
-Distributed Component
----------------------
+Distributed Components
+----------------------
 
 At times when you need to perform a computation using large input arrays, you may
 want to perform that computation in multiple processes, where each process
@@ -18,6 +18,12 @@ across the processes.  You should always specify *src_indices* when connecting
 to a distributed output unless your input is equal to the size of the entire
 distributed output.  Otherwise, the assumed *src_indices* will be from 0 to
 1 less than the size of your input, which is probably not what you want.
+
+Components must either be entirely distributed or not, i.e., if a component
+has any distributed variables, they must all be distributed.  You tell the
+framework that a component is a distributed component by passing
+*distributed=True* into its base class *__init__* method or by setting its
+*_distributed* attribute.
 
 The following simple example shows how to create a distributed component that
 distributes its computation evenly across the available processes, up to a
