@@ -1853,9 +1853,10 @@ class System(object):
             resp['indices'] = indices
 
         else:  # 'obj'
-            resp['index'] = index
             if index is not None:
                 resp['size'] = 1
+                index = np.array([index], dtype=int)
+            resp['indices'] = index
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
@@ -2251,6 +2252,17 @@ class System(object):
         self._check_reconf()
 
         return False, 0., 0.
+
+    def check_config(self, logger):
+        """
+        Perform optional error checks.
+
+        Parameters
+        ----------
+        logger : object
+            The object that manages logging output.
+        """
+        pass
 
     def _apply_linear(self, vec_names, mode, var_inds=None):
         """

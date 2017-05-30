@@ -23,7 +23,7 @@ Usage
     openmdao.jacobians.tests.test_jacobian_features.SimpleCompGlob.initialize_partials
 
 3. Using the :code:`val` argument to set a constant partial derivative. Note that if the :code:`val` arugment is used,
-then the partial derivative does not need to be calculated in :code:`compute_partial_derivs`.
+then the partial derivative does not need to be calculated in :code:`compute_partials`.
 
 * Scalar [see :math:`\displaystyle\frac{\partial f}{\partial x}`]
 * Dense Array [see :math:`\displaystyle\frac{\partial f}{\partial z}`]

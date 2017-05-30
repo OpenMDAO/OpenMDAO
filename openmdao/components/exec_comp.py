@@ -232,7 +232,7 @@ class ExecComp(ExplicitComponent):
         for expr in self._codes:
             exec(expr, _expr_dict, _IODict(outputs, inputs))
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         """
         Use complex step method to update the given Jacobian.
 

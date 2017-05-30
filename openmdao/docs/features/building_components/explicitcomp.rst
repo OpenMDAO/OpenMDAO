@@ -31,13 +31,13 @@ The implementation of each method will be illustrated using a simple explicit co
   .. embed-code::
       openmdao.core.tests.test_expl_comp.TestExplCompSimpleCompute.compute
 
-- :code:`compute_partial_derivs(inputs, outputs, partials)` :
+- :code:`compute_partials(inputs, outputs, partials)` :
 
   [Optional] Compute the :code:`partials` (partial derivatives) given the :code:`inputs`.
   The :code:`outputs` are also provided for convenience.
 
   .. embed-code::
-      openmdao.core.tests.test_expl_comp.TestExplCompSimplePartial.compute_partial_derivs
+      openmdao.core.tests.test_expl_comp.TestExplCompSimplePartial.compute_partials
 
 - :code:`compute_jacvec_product(inputs, outputs, d_inputs, d_outputs, mode)` :
 
