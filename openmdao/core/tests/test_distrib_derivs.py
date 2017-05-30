@@ -21,12 +21,15 @@ else:
 
 class DistribExecComp(ExecComp):
     """
-    An ExecComp that uses 2 procs and takes input var slices.  If you give it two expressions, it
-    will use one in proc0 and the other in proc1.
+    An ExecComp that uses N procs and takes input var slices.  Unlike a normal
+    ExecComp, if only supports a single expression per proc.  If you give it
+    multiple expressions, it will use a different one in each proc, repeating
+    the last one in any remaining procs.
     """
     def __init__(self, exprs, arr_size=11, **kwargs):
         super(DistribExecComp, self).__init__(exprs, **kwargs)
         self.arr_size = arr_size
+        self._distributed = True
 
     def initialize_variables(self):
         outs = set()
@@ -41,8 +44,8 @@ class DistribExecComp(ExecComp):
             raise RuntimeError("DistribExecComp only supports up to 1 expression per MPI process.")
 
         if len(self._exprs) < comm.size:
+            # repeat the last expression for any leftover procs
             self._exprs.extend([self._exprs[-1]] * (comm.size - len(self._exprs)))
-
 
         self._exprs = [self._exprs[rank]]
 
@@ -72,7 +75,7 @@ class DistribExecComp(ExecComp):
         super(DistribExecComp, self).initialize_variables()
 
     def get_req_procs(self):
-        return (2, 2)
+        return (2, None)
 
 
 class DistribCoordComp(ExplicitComponent):

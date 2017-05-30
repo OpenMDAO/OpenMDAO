@@ -692,7 +692,7 @@ class Component(System):
             out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
             if abs_key[1] in self._var_abs2meta['input']:
                 in_size = np.prod(self._var_abs2meta['input'][abs_key[1]]['shape'])
-            else:  # assume output
+            else:  # assume output (or get a KeyError)
                 in_size = np.prod(self._var_abs2meta['output'][abs_key[1]]['shape'])
 
             if in_size == 0 and self.comm.rank != 0:  # 'inactive' component
