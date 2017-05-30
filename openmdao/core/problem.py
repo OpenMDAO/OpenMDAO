@@ -258,7 +258,7 @@ class Problem(object):
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
-        if check:
+        if check and comm.rank == 0:
             check_config(self, logger)
 
         return self
