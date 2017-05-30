@@ -31,9 +31,17 @@ def get_method_class(meth):
         if meth.__name__ in cls.__dict__:
             return cls
 
+class _TotProfData(object):
+    __slots__ = ['name', 'etime']
 
-class _ProfData(Structure):
+
+class _InstProfData(object):
+    __slots__ = ['name', 'etime']
+
+
+class _ProfStruct(Structure):
     _fields_ = [ ('t',c_float), ('ovr',c_float), ('tstamp',c_float), ('id',c_uint) ]
+
 
 _profile_methods = None
 _profile_prefix = None
@@ -41,7 +49,7 @@ _profile_out = None
 _profile_start = None
 _profile_setup = False
 _profile_total = 0.0
-_profile_struct = _ProfData()
+_profile_struct = _ProfStruct()
 _profile_funcs_dict = OrderedDict()
 _profile_matches = {}
 _call_stack = []
@@ -176,14 +184,14 @@ def _instance_profile(frame, event, arg):
                         # save the id for this path
                         _profile_funcs_dict[path] = len(_profile_funcs_dict)
 
-                    _call_stack.pop()
+                    name = _call_stack.pop()
                     start = _timing_stack.pop()
 
-                    _profile_struct.t = etime() - start
-                    _profile_struct.ovr = 0. #start - ovr # keep track of overhead for later subtraction
-                    _profile_struct.tstamp = start
-                    _profile_struct.id = _profile_funcs_dict[path]
-                    _profile_out.write(_profile_struct)
+                    # _profile_struct.t = etime() - start
+                    # _profile_struct.ovr = 0. #start - ovr # keep track of overhead for later subtraction
+                    # _profile_struct.tstamp = start
+                    # _profile_struct.id = _profile_funcs_dict[path]
+                    # _profile_out.write(_profile_struct)
 
 
 def start():
