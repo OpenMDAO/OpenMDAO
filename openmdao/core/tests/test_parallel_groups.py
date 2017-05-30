@@ -3,8 +3,10 @@
 from __future__ import division, print_function
 
 import unittest
+import numpy
 
-from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp
+from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, \
+                         ExplicitComponent
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -191,6 +193,78 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
+
+    def test_zero_shape(self):
+        raise unittest.SkipTest("zero shapes not fully supported yet")
+        class MultComp(ExplicitComponent):
+            def __init__(self, mult):
+                self.mult = mult
+                super(MultComp, self).__init__()
+
+            def initialize_variables(self):
+                if self.comm.rank == 0:
+                    self.add_input('x', shape=1)
+                    self.add_output('y', shape=1)
+                else:
+                    self.add_input('x', shape=0)
+                    self.add_output('y', shape=0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] * self.mult
+
+            def compute_partials(self, inputs, outputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['y', 'x'] = numpy.array([self.mult])
+
+        prob = Problem()
+        
+        #import wingdbstub
+
+        model = prob.model
+        model.add_subsystem('iv', IndepVarComp('x', 1.0))
+        model.add_subsystem('c1', MultComp(3.0))
+
+        model.sub = model.add_subsystem('sub', ParallelGroup())
+        model.sub.add_subsystem('c2', MultComp(-2.0))
+        model.sub.add_subsystem('c3', MultComp(5.0))
+
+        model.add_subsystem('c2', MultComp(1.0))
+        model.add_subsystem('c3', MultComp(1.0))
+
+        model.connect('iv.x', 'c1.x')
+
+        model.connect('c1.y', 'sub.c2.x')
+        model.connect('c1.y', 'sub.c3.x')
+
+        model.connect('sub.c2.y', 'c2.x')
+        model.connect('sub.c3.y', 'c3.x')
+
+        of=['c2.y', "c3.y"]
+        wrt=['iv.x']
+
+        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
+
+        assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
+
+        assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
+        assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
+
+        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.run_model()
+
+        J = prob.compute_total_derivs(of=['c2.y', "c3.y"], wrt=['iv.x'])
+
+        assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
+
+        assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
+        assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

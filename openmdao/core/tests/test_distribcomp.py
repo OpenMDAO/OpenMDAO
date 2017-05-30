@@ -86,8 +86,9 @@ class DistribCompSimple(ExplicitComponent):
 class DistribInputComp(ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
     def __init__(self, arr_size=11):
-        super(DistribInputComp, self).__init__(distributed=True)
+        super(DistribInputComp, self).__init__()
         self.arr_size = arr_size
+        self._distributed = True
 
     def compute(self, inputs, outputs):
         if MPI:
@@ -116,8 +117,9 @@ class DistribInputComp(ExplicitComponent):
 class DistribOverlappingInputComp(ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
     def __init__(self, arr_size=11):
-        super(DistribOverlappingInputComp, self).__init__(distributed=True)
+        super(DistribOverlappingInputComp, self).__init__()
         self.arr_size = arr_size
+        self._distributed = True
 
     def compute(self, inputs, outputs):
         outputs['outvec'][:] = 0
@@ -158,8 +160,10 @@ class DistribOverlappingInputComp(ExplicitComponent):
 class DistribInputDistribOutputComp(ExplicitComponent):
     """Uses 2 procs and takes input var slices."""
     def __init__(self, arr_size=11):
-        super(DistribInputDistribOutputComp, self).__init__(distributed=True)
+        super(DistribInputDistribOutputComp, self).__init__()
         self.arr_size = arr_size
+        self._distributed = True
+
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
@@ -186,8 +190,9 @@ class DistribNoncontiguousComp(ExplicitComponent):
     var slices as well
     """
     def __init__(self, arr_size=11):
-        super(DistribNoncontiguousComp, self).__init__(distributed=True)
+        super(DistribNoncontiguousComp, self).__init__()
         self.arr_size = arr_size
+        self._distributed = True
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
@@ -211,8 +216,9 @@ class DistribGatherComp(ExplicitComponent):
     """Uses 2 procs gathers a distrib input into a full output"""
 
     def __init__(self, arr_size=11):
-        super(DistribGatherComp, self).__init__(distributed=True)
+        super(DistribGatherComp, self).__init__()
         self.arr_size = arr_size
+        self._distributed = True
 
     def compute(self, inputs, outputs):
         if MPI:
@@ -316,8 +322,9 @@ class MPITests(unittest.TestCase):
 
         class DistribComp(ExplicitComponent):
             def __init__(self, size):
+                super(DistribComp, self).__init__()
                 self.size = size
-                super(DistribComp, self).__init__(distributed=True)
+                self._distributed = True
 
             def compute(self, inputs, outputs):
                 if self.comm.rank == 0:

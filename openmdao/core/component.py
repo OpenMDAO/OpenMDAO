@@ -58,16 +58,11 @@ class Component(System):
         **kwargs : dict of keyword arguments
             available here and in all descendants of this system.
         """
-        if 'distributed' in kwargs:
-            distributed = kwargs.pop('distributed')
-        else:
-            distributed = False
-
         super(Component, self).__init__(**kwargs)
         self._approx_schemes = OrderedDict()
 
         self._matrix_free = False
-        self._distributed = distributed
+        self._distributed = False
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}

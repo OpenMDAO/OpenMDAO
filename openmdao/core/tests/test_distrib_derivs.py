@@ -189,7 +189,7 @@ class MPITests2(unittest.TestCase):
         # pydevd.settrace('localhost', port=10000+MPI.COMM_WORLD.rank,
         #                 stdoutToServer=True, stderrToServer=True)
 
-        group.add_subsystem('P', IndepVarComp('x', numpy.ones(size)))
+        group.add_subsystem('P', IndepVarComp('x', numpy.arange(size)))
         group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
                                                   x=numpy.zeros(size),
                                                   y=numpy.zeros(size)))
