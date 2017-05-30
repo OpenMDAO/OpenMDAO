@@ -4,7 +4,7 @@ import unittest
 import numpy
 
 from openmdao.api import ParallelGroup, Group, Problem, IndepVarComp, \
-    ExecComp, LinearBlockGS, ExplicitComponent
+    ExecComp, LinearBlockGS, ExplicitComponent, ImplicitComponent, PetscKSP
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.devtools.testutil import assert_rel_error
@@ -319,6 +319,107 @@ class MPITests2(unittest.TestCase):
 
     def test_distrib_voi(self):
         raise unittest.SkipTest("distrib vois no supported yet")
+
+
+
+class DistribStateImplicit(ImplicitComponent):
+
+    def initialize_variables(self):
+
+        self.add_input('a', val=10., units='m')
+
+        rank = self.comm.rank
+
+        GLOBAL_SIZE = 5
+        sizes, offsets = evenly_distrib_idxs(self.comm.size, GLOBAL_SIZE)
+
+        print('rank: {}; local size:{}'.format(rank, sizes[rank]))
+
+        self.add_output('states', shape=int(sizes[rank]))
+        self.add_output('out_var', shape=1)
+
+        self.local_size = sizes[rank]
+
+        self.ln_solver = PetscKSP()
+
+    def get_req_procs(self):
+        return 1,10
+
+    def solve_nonlinear(self, i, o):
+        o['states'] = i['a']
+
+        local_sum = numpy.zeros(1)
+        local_sum[0] = numpy.sum(o['states'])
+        tmp = numpy.zeros(1)
+        self.comm.Allreduce(local_sum, tmp, op=MPI.SUM)
+
+        o['out_var'] = tmp[0]
+
+    def apply_nonlinear(self, i, o, r):
+        r['states'] = o['states'] - i['a']
+
+        local_sum = numpy.zeros(1)
+        local_sum[0] = numpy.sum(o['states'])
+        global_sum = numpy.zeros(1)
+        self.comm.Allreduce(local_sum, global_sum, op=MPI.SUM)
+
+        r['out_var'] = o['out_var'] - tmp[0]
+
+    def apply_linear(self, i, o, d_i, d_o, d_r, mode):
+        if mode == 'fwd':
+            if 'states' in d_o:
+                d_r['states'] += d_o['states']
+
+                local_sum = numpy.array([numpy.sum(d_o['states'])])
+                global_sum = numpy.zeros(1)
+                self.comm.Allreduce(local_sum, global_sum, op=MPI.SUM)
+                d_r['out_var'] -= global_sum
+
+            if 'out_var' in d_o:
+                    d_r['out_var'] += d_o['out_var']
+
+            if 'a' in d_i:
+                    d_r['states'] -= d_i['a']
+
+        elif mode == 'rev':
+            if 'states' in d_o:
+                d_o['states'] += d_r['states']
+
+                tmp = numpy.zeros(1)
+                if self.comm.rank == 0:
+                    tmp[0] = d_r['out_var'].copy()
+                self.comm.Bcast(tmp, root=0)
+
+                d_o['states'] -= tmp
+
+            if 'out_var' in d_o:
+                d_o['out_var'] += d_r['out_var']
+
+            if 'a' in d_i:
+                    d_i['a'] -= numpy.sum(d_r['states'])
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class MPITests3(unittest.TestCase):
+
+    N_PROCS = 3
+
+    def test_distrib_apply(self):
+        p = Problem()
+        p.model.add_subsystem('des_vars', IndepVarComp('a', val=10., units='m'), promotes=['*'])
+        p.model.add_subsystem('icomp', DistribStateImplicit(), promotes=['*'])
+
+        expected = numpy.array([[5.]])
+
+        p.setup(vector_class=PETScVector, mode='fwd') # works
+        p.run_model()
+        jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+        assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
+
+        p.setup(vector_class=PETScVector, mode='rev') # works
+        p.run_model()
+        jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+        assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
