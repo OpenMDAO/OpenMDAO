@@ -404,7 +404,6 @@ class LinearSolverTests(object):
             prob.set_solver_print(level=0)
 
             mda = prob.model.get_subsystem('mda')
-            mda.nl_solver.options['atol'] = 1e-12
 
             prob.setup(check=False, mode='fwd')
             prob.run_model()
@@ -439,11 +438,8 @@ class LinearSolverTests(object):
             # Test derivatives across a converged Sellar model.
 
             prob = Problem()
-            prob.model = SellarStateConnection()
-            prob.model.ln_solver = self.ln_solver_class()
+            prob.model = SellarStateConnection(ln_solver=self.ln_solver_class(), nl_atol=1e-12)
             prob.set_solver_print(level=0)
-
-            prob.model.nl_solver.options['atol'] = 1e-12
 
             prob.setup(check=False, mode='fwd')
             prob.run_model()

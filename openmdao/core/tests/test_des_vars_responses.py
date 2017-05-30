@@ -7,10 +7,11 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, NonlinearBlockGS
+from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp
 from openmdao.devtools.testutil import assert_rel_error
 
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
+from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
+     SellarDis2withDerivatives, ExecComp, ScipyIterativeSolver
 
 
 class TestDesVarsResponses(unittest.TestCase):
@@ -165,9 +166,27 @@ class TestDesVarsResponses(unittest.TestCase):
     def test_api_on_subsystems(self):
 
         prob = Problem()
+        model = prob.model = Group()
 
-        prob.model = SellarDerivativesConnected()
-        prob.model.nl_solver = NonlinearBlockGS()
+        model.add_subsystem('px', IndepVarComp('x', 1.0))
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
+
+        model.add_subsystem('d1', SellarDis1withDerivatives())
+        model.add_subsystem('d2', SellarDis2withDerivatives())
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0))
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'))
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'))
+
+        model.connect('px.x', ['d1.x', 'obj_cmp.x'])
+        model.connect('pz.z', ['d1.z', 'd2.z', 'obj_cmp.z'])
+        model.connect('d1.y1', ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1'])
+        model.connect('d2.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
+
+        model.nl_solver = NonlinearBlockGS()
+        model.ln_solver = ScipyIterativeSolver()
 
         px = prob.model.get_subsystem('px')
         px.add_design_var('x', lower=-100, upper=100)
