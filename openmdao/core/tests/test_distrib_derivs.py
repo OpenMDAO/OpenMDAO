@@ -333,9 +333,8 @@ class DistribStateImplicit(ImplicitComponent):
         GLOBAL_SIZE = 5
         sizes, offsets = evenly_distrib_idxs(self.comm.size, GLOBAL_SIZE)
 
-        print('rank: {}; local size:{}'.format(rank, sizes[rank]))
-
         self.add_output('states', shape=int(sizes[rank]))
+
         self.add_output('out_var', shape=1)
 
         self.local_size = sizes[rank]
@@ -405,6 +404,7 @@ class MPITests3(unittest.TestCase):
 
     def test_distrib_apply(self):
         p = Problem()
+
         p.model.add_subsystem('des_vars', IndepVarComp('a', val=10., units='m'), promotes=['*'])
         p.model.add_subsystem('icomp', DistribStateImplicit(), promotes=['*'])
 
