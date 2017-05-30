@@ -194,9 +194,6 @@ class TestParallelGroups(unittest.TestCase):
 
     def test_setup_messages(self):
 
-        testlogger = TestLogger()
-        msg = 'Only want to see this on rank 0'
-
         class Noisy(ConvergeDiverge):
             def check_config(self, logger):
                 logger.error(msg)
@@ -204,6 +201,18 @@ class TestParallelGroups(unittest.TestCase):
                 logger.info(msg)
 
         prob = Problem(Noisy())
+
+        # check that error is thrown if not using PETScVector
+        msg = ("The `vector_class` argument must be `PETScVector` when "
+               "running under MPI but 'DefaultVector' was specified.")
+        with self.assertRaises(ValueError) as cm:
+            prob.setup(check=False, mode='fwd')
+
+        self.assertEqual(str(cm.exception), msg)
+
+        # check that we get setup messages only on proc 0
+        msg = 'Only want to see this on rank 0'
+        testlogger = TestLogger()
         prob.setup(vector_class=PETScVector, check=True, mode='fwd',
                    logger=testlogger)
 
