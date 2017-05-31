@@ -3,6 +3,7 @@
 from __future__ import division, print_function
 
 import unittest
+import warnings
 
 import numpy as np
 
@@ -123,6 +124,28 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
         assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
         assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
 
+    def test_preconditioner_deprecation(self):
+
+        group = TestImplicitGroup(lnSolverClass=ScipyIterativeSolver)
+
+        msg = "The 'preconditioner' property provides backwards compatibility " \
+            + "with OpenMDAO <= 1.x ; use 'precon' instead."
+
+        # check deprecation on setter
+        with warnings.catch_warnings(record=True) as w:
+            precon = group.ln_solver.preconditioner = LinearBlockGS()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), msg)
+
+        # check deprecation on getter
+        with warnings.catch_warnings(record=True) as w:
+            pre = group.ln_solver.preconditioner
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), msg)
 
 class TestScipyIterativeSolverFeature(unittest.TestCase):
 
