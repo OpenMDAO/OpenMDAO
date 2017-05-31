@@ -299,8 +299,9 @@ class Component(System):
             raise TypeError('The name argument should be a string')
         if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
             raise TypeError('The val argument should be a float, list, tuple, ndarray or Iterable')
-        if shape is not None and not isinstance(shape, (int, tuple, list)):
-            raise TypeError('The shape argument should be an int, tuple, or list')
+        if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
+            raise TypeError("The shape argument should be an int, tuple, or list but "
+                            "a '%s' was given" % type(shape))
         if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
                                                                     np.ndarray, Iterable)):
             raise TypeError('The src_indices argument should be an int, list, '
