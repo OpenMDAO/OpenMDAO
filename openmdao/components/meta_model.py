@@ -224,7 +224,7 @@ class MetaModel(ExplicitComponent):
                     outputs[name] = np.reshape(predicted, outputs[name].shape)
                 elif overrides_method('vectorized_predict', surrogate, SurrogateModel):
                     # multiple inputs flattened, one prediction of multiple outputs
-                    predicted = surrogate.predict(inputs.flat)
+                    predicted = surrogate.vectorized_predict(inputs.flat)
                     if isinstance(predicted, tuple):  # rmse option
                         self._metadata(name)['rmse'] = predicted[1]
                         predicted = predicted[0]
@@ -312,7 +312,7 @@ class MetaModel(ExplicitComponent):
 
         return arr
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         """
         Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
 

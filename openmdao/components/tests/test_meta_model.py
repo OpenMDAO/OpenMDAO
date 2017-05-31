@@ -400,16 +400,19 @@ class MetaModelTestCase(unittest.TestCase):
         mm.default_surrogate = FloatKrigingSurrogate()
 
         prob = Problem()
-        prob.model.add_subsystem('mm', mm, promotes=['x'])
-        prob.model.add_subsystem('p', IndepVarComp('x', 0.), promotes=['x'])
-        prob.setup(check=False)
+        prob.model.add_subsystem('p', IndepVarComp('x', 0.),
+                                 promotes_outputs=['x'])
+        prob.model.add_subsystem('mm', mm,
+                                 promotes_inputs=['x'])
+        prob.setup()
 
         mm.metadata['train:x'] = [0., .25, .5, .75, 1.]
         mm.metadata['train:f'] = [1., .75, .5, .25, 0.]
+
         prob['x'] = 0.125
         prob.run_model()
 
-        data = prob.check_partial_derivs(out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         Jf = data['mm'][('f', 'x')]['J_fwd']
         Jr = data['mm'][('f', 'x')]['J_rev']
@@ -418,7 +421,7 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, Jr[0][0], -1., 1.e-3)
 
         # TODO: complex step not currently supported in check_partial_derivs
-        # data = prob.check_partial_derivs(global_options={'method': 'cs'})
+        # data = prob.check_partials(global_options={'method': 'cs'})
 
         abs_errors = data['mm'][('f', 'x')]['abs error']
         self.assertTrue(len(abs_errors) > 0)
