@@ -43,6 +43,7 @@ setup(name='openmdao',
           'openmdao.utils',
           'openmdao.vectors',
           'openmdao.surrogate_models',
+          'openmdao.surrogate_models.nn_interpolators'
       ],
       package_data={
           'openmdao.devtools': ['*.wpr', '*.html'],
