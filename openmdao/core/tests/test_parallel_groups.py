@@ -204,7 +204,7 @@ class TestParallelGroups(unittest.TestCase):
 
         # check that error is thrown if not using PETScVector
         msg = ("The `vector_class` argument must be `PETScVector` when "
-               "running under MPI but 'DefaultVector' was specified.")
+               "running in parallel under MPI but 'DefaultVector' was specified.")
         with self.assertRaises(ValueError) as cm:
             prob.setup(check=False, mode='fwd')
 

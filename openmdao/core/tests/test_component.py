@@ -69,12 +69,12 @@ class TestExplicitComponent(unittest.TestCase):
             comp.add_input('arr', val=np.ones((2,2)), src_indices=[0,1])
 
         msg = ("The shape argument should be an int, tuple, or list "
-               "but a '<class 'numpy.ndarray'>' was given")
+               "but a '<(.*) 'numpy.ndarray'>' was given")
         with assertRaisesRegex(self, TypeError, msg):
             comp.add_output('arr', shape=np.array([2.]))
 
         msg = ("The shape argument should be an int, tuple, or list "
-               "but a '<class 'float'>' was given")
+               "but a '<(.*) 'float'>' was given")
         with assertRaisesRegex(self, TypeError, msg):
             comp.add_output('arr', shape=2.)
 

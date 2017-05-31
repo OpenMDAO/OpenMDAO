@@ -246,11 +246,11 @@ class Problem(object):
         comm = self.comm
 
         # PETScVector is required for MPI
-        # if not isinstance(comm, FakeComm) and vector_class is not PETScVector:
-        #     msg = ("The `vector_class` argument must be `PETScVector` when "
-        #            "running under MPI but '%s' was specified."
-        #            % vector_class.__name__)
-        #     raise ValueError(msg)
+        if comm.size > 1 and vector_class is not PETScVector:
+            msg = ("The `vector_class` argument must be `PETScVector` when "
+                   "running in parallel under MPI but '%s' was specified."
+                   % vector_class.__name__)
+            raise ValueError(msg)
 
         if mode not in ['fwd', 'rev', 'auto']:
             msg = "Unsupported mode: '%s'" % mode
