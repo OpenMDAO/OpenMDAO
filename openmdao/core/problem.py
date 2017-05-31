@@ -23,7 +23,10 @@ from openmdao.error_checking.check_config import check_config
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import FakeComm
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.vectors.petsc_vector import PETScVector
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
@@ -254,7 +257,7 @@ class Problem(object):
         comm = self.comm
 
         # PETScVector is required for MPI
-        if comm.size > 1 and vector_class is not PETScVector:
+        if PETScVector and comm.size > 1 and vector_class is not PETScVector:
             msg = ("The `vector_class` argument must be `PETScVector` when "
                    "running in parallel under MPI but '%s' was specified."
                    % vector_class.__name__)
