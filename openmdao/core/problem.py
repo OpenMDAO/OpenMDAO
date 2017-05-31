@@ -92,6 +92,8 @@ class Problem(object):
         self._use_ref_vector = use_ref_vector
         self._solver_print_cache = []
 
+        self._mode = None  # mode is assigned in setup()
+
     def __getitem__(self, name):
         """
         Get an output/input variable.
@@ -174,6 +176,9 @@ class Problem(object):
         float
             absolute error.
         """
+        if self._mode is None:
+            raise RuntimeError("The `setup` method must be called before `run_model`.")
+
         return self.model.run_solve_nonlinear()
 
     def run_driver(self):
@@ -185,6 +190,9 @@ class Problem(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
+        if self._mode is None:
+            raise RuntimeError("The `setup` method must be called before `run_driver`.")
+
         with self.model._scaled_context_all():
             return self.driver.run()
 
