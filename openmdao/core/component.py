@@ -342,6 +342,11 @@ class Component(System):
             var_rel2data_io = self._var_rel2data_io
             var_rel_names = self._var_rel_names
 
+        # Disallow dupes
+        if name in var_rel2data_io:
+            msg = "Variable name '{}' already exists.".format(name)
+            raise ValueError(msg)
+
         var_rel2data_io[name] = {
             'prom': name, 'rel': name,
             'my_idx': len(self._var_rel_names['input']),
@@ -487,6 +492,11 @@ class Component(System):
         else:
             var_rel2data_io = self._var_rel2data_io
             var_rel_names = self._var_rel_names
+
+        # Disallow dupes
+        if name in var_rel2data_io:
+            msg = "Variable name '{}' already exists.".format(name)
+            raise ValueError(msg)
 
         var_rel2data_io[name] = {
             'prom': name, 'rel': name,
