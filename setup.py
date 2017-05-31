@@ -48,6 +48,8 @@ setup(name='openmdao',
           'openmdao.devtools.problem_viewer': ['*.css', '*.js', '*.template',
                                                '*.woff'],
           'openmdao.utils': ['unit_library.ini'],
+          'openmdao.test_suite': ['*.py', '*/*.py'],
+          'openmdao': ['*/tests/*.py', '*/*/tests/*.py']
       },
       install_requires=[
         'six', 'numpydoc', #'numpy>=1.9.2',
