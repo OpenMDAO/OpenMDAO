@@ -68,6 +68,27 @@ class TestExplicitComponent(unittest.TestCase):
         with assertRaisesRegex(self, ValueError, msg):
             comp.add_input('arr', val=np.ones((2,2)), src_indices=[0,1])
 
+        msg = ("The shape argument should be an int, tuple, or list "
+               "but a '<(.*) 'numpy.ndarray'>' was given")
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_output('arr', shape=np.array([2.]))
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_input('arr', shape=np.array([2.]))
+
+        msg = ("The shape argument should be an int, tuple, or list "
+               "but a '<(.*) 'float'>' was given")
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_output('arr', shape=2.)
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_input('arr', shape=2.)
+
+        # check that a numpy integer type is accepted for shape
+        shapes = np.array([3], dtype=np.uint32)
+        comp.add_output('aro', shape=shapes[0])
+        comp.add_input('ari', shape=shapes[0])
+
     def test_deprecated_vars_in_init(self):
         """test that deprecation warning is issued if vars are declared in __init__."""
         with warnings.catch_warnings(record=True) as w:
