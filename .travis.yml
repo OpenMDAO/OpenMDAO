@@ -77,5 +77,5 @@ script:
 - cd openmdao/docs
 - make all
 # run all openmdao tests
-- testflo openmdao --pre_announce
-- testflo openmdao --pre_announce -m "ptest*"
+- testflo openmdao
+- testflo openmdao -m "ptest*"
