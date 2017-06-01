@@ -67,10 +67,6 @@ install:
 - if [ "$MPI" ]; then
     pip install mpi4py;
     pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
-    # currently, the parametric tests will timeout under MPI without the --pre_announce arg
-    export PRE_ANNOUNCE=--pre_announce ;
-  else
-    export PRE_ANNOUNCE= ;
   fi
 - pip install redbaron
 - pip install git+https://github.com/OpenMDAO/testflo.git
@@ -82,5 +78,5 @@ script:
 - make all
 # run all openmdao tests
 
-- testflo openmdao $PRE_ANNOUNCE -m "ptest*"
+- testflo openmdao --pre_announce  -m "ptest*"
 - testflo openmdao
