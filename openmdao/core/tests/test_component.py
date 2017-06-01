@@ -8,7 +8,7 @@ import warnings
 from six.moves import range
 from six import assertRaisesRegex
 
-from openmdao.api import Problem, ExplicitComponent, Group
+from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
 from openmdao.core.component import Component
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
@@ -134,6 +134,93 @@ class TestExplicitComponent(unittest.TestCase):
         prob.setup(check=False)
         self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
         self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
+
+    def test_add_input_output_dupes(self):
+
+        class Comp(ExplicitComponent):
+
+            def initialize_variables(self):
+
+                self.add_input('x', val=3.0)
+                self.add_input('x', val=3.0)
+
+                self.add_output('y', val=3.0)
+
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('px', IndepVarComp('x', val=3.0))
+        model.add_subsystem('comp', Comp())
+
+        model.connect('px.x', 'comp.x')
+
+        msg = "Variable name 'x' already exists."
+        with assertRaisesRegex(self, ValueError, msg):
+            prob.setup(check=False)
+
+        class Comp(ExplicitComponent):
+
+            def initialize_variables(self):
+
+                self.add_input('x', val=3.0)
+
+                self.add_output('y', val=3.0)
+                self.add_output('y', val=3.0)
+
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('px', IndepVarComp('x', val=3.0))
+        model.add_subsystem('comp', Comp())
+
+        model.connect('px.x', 'comp.x')
+
+        msg = "Variable name 'y' already exists."
+        with assertRaisesRegex(self, ValueError, msg):
+            prob.setup(check=False)
+
+        class Comp(ExplicitComponent):
+
+            def initialize_variables(self):
+
+                self.add_input('x', val=3.0)
+
+                self.add_output('x', val=3.0)
+                self.add_output('y', val=3.0)
+
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('px', IndepVarComp('x', val=3.0))
+        model.add_subsystem('comp', Comp())
+
+        model.connect('px.x', 'comp.x')
+
+        msg = "Variable name 'x' already exists."
+        with assertRaisesRegex(self, ValueError, msg):
+            prob.setup(check=False)
+
+        # Make sure we can reconfigure.
+
+        class Comp(ExplicitComponent):
+
+            def initialize_variables(self):
+
+                self.add_input('x', val=3.0)
+                self.add_output('y', val=3.0)
+
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('px', IndepVarComp('x', val=3.0))
+        model.add_subsystem('comp', Comp())
+
+        model.connect('px.x', 'comp.x')
+
+        prob.setup(check=False)
+
+        # pretend we reconfigured
+        prob.setup(check=False)
 
 
 class TestImplicitComponent(unittest.TestCase):
