@@ -16,7 +16,7 @@ from struct import Struct
 from ctypes import Structure, c_uint, c_float
 from types import MethodType
 
-from six import iteritems
+from six import iteritems, itervalues
 
 try:
     from mpi4py import MPI
@@ -31,17 +31,16 @@ def get_method_class(meth):
         if meth.__name__ in cls.__dict__:
             return cls
 
-class _TotProfData(object):
-    __slots__ = ['name', 'etime']
-
-
-class _InstProfData(object):
-    __slots__ = ['name', 'etime']
-
-
-class _ProfStruct(Structure):
-    _fields_ = [ ('t',c_float), ('ovr',c_float), ('tstamp',c_float), ('id',c_uint) ]
-
+def _prof_node(name, obj=None):
+    return {
+        'name': name,
+        'time': 0.,
+        'count': 0,
+        'tot_time': 0.,
+        'tot_count': 0,
+        'children': set(),
+        'obj': obj,
+    }
 
 _profile_methods = None
 _profile_prefix = None
@@ -49,11 +48,11 @@ _profile_out = None
 _profile_start = None
 _profile_setup = False
 _profile_total = 0.0
-_profile_struct = _ProfStruct()
-_profile_funcs_dict = OrderedDict()
 _profile_matches = {}
 _call_stack = []
 _timing_stack = []
+_inst_data = {}
+_objs = {}   # mapping of ids to instance objects
 
 
 def setup(prefix='prof_raw', methods=None, prof_dir=None):
@@ -165,10 +164,10 @@ def _instance_profile(frame, event, arg):
             if 'self' in loc:
                 self = loc['self']
                 if isinstance(self, _profile_matches[func_name]):
-                    if 'pathname' in self.__dict__:
-                        name = '.'.join([self.pathname, func_name])
-                    else:
-                        name = "<%s_%d>.%s" % (type(self).__name__, id(self), func_name)
+                    # if 'pathname' in self.__dict__:
+                    #     name = '.'.join([self.pathname, func_name])
+                    # else:
+                    name = "<%s_%d>.%s" % (type(self).__name__, id(self), func_name)
                     _call_stack.append(name)
                     _timing_stack.append(etime())
 
@@ -180,19 +179,16 @@ def _instance_profile(frame, event, arg):
                 self = loc['self']
                 if isinstance(self, _profile_matches[func_name]):
                     path = ','.join(_call_stack)
-                    if path not in _profile_funcs_dict:
-                        # save the id for this path
-                        _profile_funcs_dict[path] = len(_profile_funcs_dict)
 
-                    name = _call_stack.pop()
+                    _call_stack.pop()
                     start = _timing_stack.pop()
 
-                    # _profile_struct.t = etime() - start
-                    # _profile_struct.ovr = 0. #start - ovr # keep track of overhead for later subtraction
-                    # _profile_struct.tstamp = start
-                    # _profile_struct.id = _profile_funcs_dict[path]
-                    # _profile_out.write(_profile_struct)
+                    if path not in _inst_data:
+                        _inst_data[path] = _prof_node(path, self)
 
+                    pdata = _inst_data[path]
+                    pdata['time'] += etime() - start
+                    pdata['count'] += 1
 
 def start():
     """Turn on profiling.
@@ -221,30 +217,6 @@ def stop():
     _profile_total += (etime() - _profile_start)
     _profile_start = None
 
-def _iter_raw_prof_file(rawname, fdict=None):
-    """Returns an iterator of (elapsed_time, timestamp, funcpath)
-    from a raw profile data file.
-    """
-    global _profile_struct
-
-    if fdict is None:
-        fdict = {}
-
-    fn, ext = os.path.splitext(rawname)
-    dname = os.path.dirname(rawname)
-    fname = os.path.basename(fn)
-    funcs_fname = os.path.join(dname, "funcs_" + fname + ext)
-
-    with open(funcs_fname, 'r') as f:
-        for line in f:
-            line = line.strip()
-            path, ident = line.split(' ')
-            fdict[ident] = path
-
-    with open(rawname, 'rb') as f:
-        while f.readinto(_profile_struct):
-            path = fdict[str(_profile_struct.id)]
-            yield _profile_struct.t, _profile_struct.ovr, _profile_struct.tstamp, path
 
 def _finalize_profile():
     """called at exit to write out the file mapping function call paths
@@ -254,33 +226,47 @@ def _finalize_profile():
 
     stop()
 
+    # fix names in _inst_data
+    _obj_map = {}
+    _new_inst_data = {}
+    for funcpath, data in iteritems(_inst_data):
+        fname = funcpath.rsplit(',', 1)[-1]
+        try:
+            name = data['obj'].pathname
+        except AttributeError:
+            pass
+        else:
+            _obj_map[fname] = '.'.join((name, fname.rsplit('.', 1)[-1]))
+
     rank = MPI.COMM_WORLD.rank if MPI else 0
 
     dname = os.path.dirname(_profile_prefix)
     fname = os.path.basename(_profile_prefix)
-    funcs_fname = os.path.join(dname, "funcs_" + fname)
+    with open("%s.%d" % (fname, rank), 'w') as f:
+        f.write("@total 1 %f\n" % _profile_total)
+        for name, data in iteritems(_inst_data):
+            new_name = ','.join([
+                _obj_map.get(s, s) for s in name.split(',')
+            ])
+            f.write("%s %d %f\n" % (new_name, data['count'], data['time']))
 
-    with open("%s.%d" % (funcs_fname, rank), 'w') as f:
-        for name, ident in iteritems(_profile_funcs_dict):
-            f.write("%s %s\n" % (name, ident))
-        # also write out the total time so that we can report how much of
-        # the runtime is invisible to our profile.
-        f.write("%s %s\n" % (_profile_total, "@total"))
 
+def _iter_raw_prof_file(rawname):
+    """
+    Returns an iterator of (elapsed_time, timestamp, funcpath)
+    from a raw profile data file.
+    """
+    global _profile_struct
 
-def _update_counts(dct, name, elapsed, overhead):
-    try:
-        d = dct[name]
-    except KeyError:
-        dct[name] = d = {
-                'count': 0,
-                'time': 0.,
-                'ovr': 0.,
-            }
+    fn, ext = os.path.splitext(rawname)
+    dname = os.path.dirname(rawname)
+    fname = os.path.basename(fn)
 
-    d['count'] += 1
-    d['time'] += elapsed
-    d['ovr'] += overhead
+    with open(rawname, 'r') as f:
+        for line in f:
+            path, count, elapsed = line.split()
+            yield path, int(count), float(elapsed)
+
 
 def process_profile(flist):
     """Take the generated raw profile data, potentially from multiple files,
@@ -296,15 +282,18 @@ def process_profile(flist):
     """
 
     nfiles = len(flist)
-    proc_trees = []
     funcs = {}
     totals = {}
     total_under_profile = 0.0
     tops = set()
 
-    for fname in flist:
-        fdict = {}
+    tree_nodes = {}
 
+    # this name has to be '.' and not '', else we have issues
+    # when combining multiple files due to sort order
+    tree_nodes['.'] = _prof_node('.')
+
+    for fname in flist:
         ext = os.path.splitext(fname)[1]
         try:
             extval = int(ext.lstrip('.'))
@@ -312,94 +301,50 @@ def process_profile(flist):
         except:
             dec = False
 
-        for t, ovr, tstamp, funcpath in _iter_raw_prof_file(fname, fdict):
-            parts = funcpath.split(',')
+        for funcpath, count, t in _iter_raw_prof_file(fname):
 
             # for multi-file MPI profiles, decorate names with the rank
             if nfiles > 1 and dec:
+                parts = funcpath.split(',')
                 parts = ["%s%s" % (p,dec) for p in parts]
                 funcpath = ','.join(parts)
 
-            elapsed = float(t)
-            overhead = float(ovr)
-
-            _update_counts(funcs, funcpath, elapsed, overhead)
-
-            stack = parts[:-1]
-            if not stack:
+            if ',' not in funcpath:
                 tops.add(funcpath)
 
-        total_under_profile += float(fdict['@total'])
+                if funcpath == '@total':
+                    total_under_profile += t
 
-    tree = {
-        'name': '.', # this name has to be '.' and not '', else we have issues
-                     # when combining multiple files due to sort order
-        'time': 0.,
-        'ovr': 0.,
-        # keep track of total time under profiling, so that we
-        # can see if there is some time that isn't accounted for by the
-        # functions we've chosen to profile.
-        'tot_time': total_under_profile,
-        'count': 1,
-        'tot_count': 1,
-        'children': [],
-    }
+            tree_nodes[funcpath] = node = _prof_node(funcpath)
+            node['time'] += t
+            node['count'] += count
 
-    tmp = {} # just for temporary lookup of objects
+            funcname = funcpath.rsplit(',', 1)[-1]
+            if funcname in totals:
+                tnode = totals[funcname]
+            else:
+                totals[funcname] = tnode = _prof_node(funcname)
+            tnode['tot_time'] += t
+            tnode['tot_count'] += count
 
-    for path, fdict in sorted(iteritems(funcs)):
-        parts = path.split(',')
-
-        dct = {
-            'name': parts[-1],
-            'children': [],
-            'time': fdict['time'],
-            'ovr': fdict['ovr'],
-            'tot_time': 0.,
-            'count': fdict['count'],
-            'tot_count': 0,
-        }
-
-        tmp[path] = dct
-
-        if path in tops:
-            tree['children'].append(dct)
-            tree['time'] += dct['time']
-            tree['ovr'] += dct['ovr']
+    # create the call tree
+    for funcpath, node in iteritems(tree_nodes):
+        parts = funcpath.rsplit(',', 1)
+        if len(parts) > 1:
+            parent, child = parts
+            tree_nodes[parent]['children'].add(child)
         else:
-            caller = ','.join(parts[:-1])
-            tmp[caller]['children'].append(dct)
+            tree_nodes['.']['children'].add(funcpath)
 
-    # sum up the child overheads and subtract from the elapsed time for each
-    # function
-    def remove_child_ovr(node):
-        kids = node['children']
-        total = 0.
-        if kids:
-            for k in kids:
-                total += remove_child_ovr(k)
-            node['time'] -= total
-        return total + node['ovr']
+    for node in itervalues(tree_nodes):
+        node['children'] = list(node['children'])
+        if not node['children']:
+            del node['children']
 
-    remove_child_ovr(tree)
+    return tree_nodes, totals
 
-    # now that func times are corrected, calculate totals
-    for path, dct in iteritems(tmp):
-        name = path.split(',')[-1]
-        if name in totals:
-            totals[name]['time'] += dct['time']
-            totals[name]['count'] += dct['count']
-        else:
-            totals[name] = { 'time': dct['time'], 'count': dct['count'] }
 
-    for path, dct in iteritems(tmp):
-        name = path.split(',')[-1]
-        dct['tot_time'] = totals[name]['time']
-        dct['tot_count'] = totals[name]['count']
-
-    return tree, totals
-
-def prof_dump(fname=None, include_tstamp=True):
+def prof_dump(fname=None):
     """Print the contents of the given raw profile data file to stdout.
 
     Args
@@ -407,20 +352,14 @@ def prof_dump(fname=None, include_tstamp=True):
 
     fname : str
         Name of raw profile data file.
-
-    include_tstamp : bool (True)
-        If True, include the timestamp in the dump.
     """
 
     if fname is None:
         fname = sys.argv[1]
 
-    if include_tstamp:
-        for t, ovr, tstamp, funcpath in _iter_raw_prof_file(fname):
-            print(funcpath, t, ovr, tstamp)
-    else:
-        for t, ovr, _, funcpath in _iter_raw_prof_file(fname):
-            print(funcpath, t, ovr)
+    for funcpath, count, t in _iter_raw_prof_file(fname):
+        print(funcpath, count, t)
+
 
 def prof_totals():
     """Called from the command line to create a file containing total elapsed
@@ -449,28 +388,15 @@ def prof_totals():
 
     try:
 
-        out_stream.write("\nTotals\n-------------\n")
-        out_stream.write("Function Name, Total Time, Calls\n")
-        grands = {}
-        for func, data in sorted(((k,v) for k,v in iteritems(totals)),
-                                    key=lambda x:x[1]['time'],
-                                    reverse=True):
-            out_stream.write("%s, %s, %s\n" %
-                               (func, data['time'], data['count']))
+        out_stream.write("\nTotals\n------\n\n")
+        out_stream.write("Total Calls Total Time Function Name\n")
+
+        for func, data in sorted([(k,v) for k,v in iteritems(totals)],
+                                    key=lambda x:x[1]['tot_time']):
+            out_stream.write("%10d %11f %s\n" %
+                               (data['tot_count'], data['tot_time'], func))
 
             func_name = func.split('.')[-1]
-            if func_name not in grands:
-                grands[func_name] = {}
-                grands[func_name]['count'] = 0
-                grands[func_name]['time'] = 0
-            grands[func_name]['count'] += int(data['count'])
-            grands[func_name]['time'] += float(data['time'])
-
-        out_stream.write("\nGrand Totals\n-------------\n")
-        out_stream.write("Function Name, Total Time, Calls\n")
-        for func, data in iteritems(grands):
-            out_stream.write("%s, %s, %s\n" %
-                             (func, data['time'], data['count']))
 
     finally:
         if out_stream is not sys.stdout:
@@ -494,7 +420,7 @@ def prof_view():
         print("No files to process.")
         sys.exit(0)
 
-    call_graph, totals = process_profile(options.rawfiles)
+    call_graph, _ = process_profile(options.rawfiles)
 
     viewer = "icicle.html"
     code_dir = os.path.dirname(os.path.abspath(__file__))
