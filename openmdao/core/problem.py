@@ -47,6 +47,9 @@ class Problem(object):
     driver : <Driver>
         Slot for the driver. The default driver is `Driver`, which just runs
         the model once.
+    _mode : 'fwd' or 'rev'
+        Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+        reverse (adjoint).
     _use_ref_vector : bool
         If True, allocate vectors to store ref. values.
     _solver_print_cache : list
