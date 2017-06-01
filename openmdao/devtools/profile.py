@@ -9,6 +9,7 @@ import argparse
 import json
 import atexit
 import types
+import warnings
 from string import Template
 from collections import OrderedDict, defaultdict
 from functools import wraps
@@ -181,13 +182,13 @@ def _instance_profile(frame, event, arg):
                             if base.__name__ not in clist:
                                 clist.append(base.__name__)
                         classes = _file2class[frame.f_code.co_filename]
-                    if len(classes) == 1:
-                        name = "<%s#%d>.%s" % (classes[0], id(self), func_name)
-                    else:
+                    if len(classes) > 1:
                         # TODO: fix this
-                        raise RuntimeError("multiple classes %s in same module (%s) "
-                                           "not supported yet" % (classes,
-                                                                  frame.f_code.co_filename))
+                        warnings.warn("multiple classes %s found in same module (%s), "
+                                      "using the first (might be wrong)" % (classes,
+                                                                            frame.f_code.co_filename))
+                    name = "<%s#%d>.%s" % (classes[0], id(self), func_name)
+
                     _call_stack.append(name)
                     _timing_stack.append(etime())
 
@@ -200,11 +201,11 @@ def _instance_profile(frame, event, arg):
                 if isinstance(self, _profile_matches[func_name]):
                     path = ','.join(_call_stack)
 
-                    _call_stack.pop()
+                    short_name = _call_stack.pop()
                     start = _timing_stack.pop()
 
                     if path not in _inst_data:
-                        _inst_data[path] = _prof_node(path, self)
+                        _inst_data[path] = _prof_node(short_name, self)
 
                     pdata = _inst_data[path]
                     pdata['time'] += etime() - start
@@ -323,9 +324,10 @@ def process_profile(flist):
 
         for funcpath, count, t in _iter_raw_prof_file(fname):
 
+            parts = funcpath.split(',')
+
             # for multi-file MPI profiles, decorate names with the rank
             if nfiles > 1 and dec:
-                parts = funcpath.split(',')
                 parts = ["%s%s" % (p,dec) for p in parts]
                 funcpath = ','.join(parts)
 
@@ -335,11 +337,11 @@ def process_profile(flist):
                 if funcpath == '@total':
                     total_under_profile += t
 
-            tree_nodes[funcpath] = node = _prof_node(funcpath)
+            tree_nodes[funcpath] = node = _prof_node(parts[-1])
             node['time'] += t
             node['count'] += count
 
-            funcname = funcpath.rsplit(',', 1)[-1]
+            funcname = parts[-1]
             if funcname in totals:
                 tnode = totals[funcname]
             else:
@@ -442,15 +444,6 @@ def prof_view():
 
     with open(os.path.join(code_dir, viewer), "r") as f:
         template = f.read()
-
-    seen = {id(call_graph)}
-    stack = call_graph['children'][:]
-    while stack:
-        entry = stack.pop()
-        if id(entry) not in seen:
-            seen.add(id(entry))
-        else:
-            raise RuntimeError("%s was already seen" % entry['name'])
 
     graphjson = json.dumps(call_graph)
 

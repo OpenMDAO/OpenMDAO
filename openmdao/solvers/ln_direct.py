@@ -8,7 +8,7 @@ import numpy as np
 import scipy.linalg
 import scipy.sparse.linalg
 
-from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.ln_solver import LinearSolver
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix

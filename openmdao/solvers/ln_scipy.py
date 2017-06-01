@@ -5,7 +5,7 @@ from __future__ import division, print_function
 import numpy as np
 from scipy.sparse.linalg import LinearOperator, gmres
 
-from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.ln_solver import LinearSolver
 
 
 class ScipyIterativeSolver(LinearSolver):

@@ -1,6 +1,6 @@
 """Define the NonlinearBlockGS class."""
 
-from openmdao.solvers.solver import NonlinearSolver
+from openmdao.solvers.nl_solver import NonlinearSolver
 
 
 class NonlinearBlockGS(NonlinearSolver):

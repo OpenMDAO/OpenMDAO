@@ -11,7 +11,7 @@ try:
 except ImportError:
     PETSc = None
 
-from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.ln_solver import LinearSolver
 
 
 KSP_TYPES = [

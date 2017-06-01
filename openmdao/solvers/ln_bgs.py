@@ -2,7 +2,7 @@
 
 from six.moves import range
 
-from openmdao.solvers.solver import BlockLinearSolver
+from openmdao.solvers.ln_solver import BlockLinearSolver
 
 
 class LinearBlockGS(BlockLinearSolver):

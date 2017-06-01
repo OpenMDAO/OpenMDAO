@@ -6,7 +6,7 @@ This is a simple nonlinear solver that just runs the system once.
 
 from six.moves import range
 
-from openmdao.solvers.solver import NonlinearSolver
+from openmdao.solvers.nl_solver import NonlinearSolver
 
 
 class NLRunOnce(NonlinearSolver):

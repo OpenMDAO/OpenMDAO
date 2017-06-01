@@ -1,5 +1,5 @@
 """Define the NonlinearBlockJac class."""
-from openmdao.solvers.solver import NonlinearSolver
+from openmdao.solvers.nl_solver import NonlinearSolver
 
 
 class NonlinearBlockJac(NonlinearSolver):

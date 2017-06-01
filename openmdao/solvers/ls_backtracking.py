@@ -10,7 +10,7 @@ from math import isnan
 
 import numpy as np
 
-from openmdao.solvers.solver import NonlinearSolver
+from openmdao.solvers.nl_solver import NonlinearSolver
 
 
 class BoundsEnforceLS(NonlinearSolver):
