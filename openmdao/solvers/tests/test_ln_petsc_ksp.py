@@ -5,16 +5,12 @@ from __future__ import division, print_function
 import unittest
 import warnings
 
-from openmdao.core.problem import Problem
-from openmdao.core.group import Group
-from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.solvers.ln_petsc_ksp import PetscKSP
-from openmdao.solvers.ln_bgs import LinearBlockGS
-from openmdao.solvers.ln_direct import DirectSolver
-from openmdao.solvers.nl_newton import NewtonSolver
+import numpy as np
+
+from openmdao.api import Problem, Group, IndepVarComp, PetscKSP, LinearBlockGS, DirectSolver, \
+     ExecComp, NewtonSolver, NonlinearBlockGS
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
-from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
-     SellarDerivatives
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -249,7 +245,22 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
 
     def test_specify_solver(self):
         prob = Problem()
-        model = prob.model = SellarDerivatives()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NonlinearBlockGS()
 
         model.ln_solver = PetscKSP()
 
@@ -265,7 +276,22 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
 
     def test_specify_ksp_type(self):
         prob = Problem()
-        model = prob.model = SellarDerivatives()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NonlinearBlockGS()
 
         model.ln_solver = PetscKSP()
         model.ln_solver.options['ksp_type'] = 'gmres'
@@ -282,7 +308,22 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
 
     def test_feature_maxiter(self):
         prob = Problem()
-        model = prob.model = SellarDerivatives()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NonlinearBlockGS()
 
         model.ln_solver = PetscKSP()
         model.ln_solver.options['maxiter'] = 3
@@ -299,7 +340,22 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
 
     def test_feature_atol(self):
         prob = Problem()
-        model = prob.model = SellarDerivatives()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NonlinearBlockGS()
 
         model.ln_solver = PetscKSP()
         model.ln_solver.options['atol'] = 1.0e-20
@@ -316,7 +372,22 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
 
     def test_feature_rtol(self):
         prob = Problem()
-        model = prob.model = SellarDerivatives()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NonlinearBlockGS()
 
         model.ln_solver = PetscKSP()
         model.ln_solver.options['rtol'] = 1.0e-20
@@ -334,12 +405,26 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
     def test_specify_precon(self):
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NewtonSolver()
-        prob.model.ln_sollver = PetscKSP()
+        model = prob.model = Group()
 
-        prob.model.ln_solver.precon = LinearBlockGS()
-        prob.model.ln_solver.precon.options['maxiter'] = 2
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NewtonSolver()
+        model.ln_sollver = PetscKSP()
+
+        model.ln_solver.precon = LinearBlockGS()
+        model.ln_solver.precon.options['maxiter'] = 2
 
         prob.setup()
         prob.run_model()

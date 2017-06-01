@@ -2,7 +2,10 @@
 
 import unittest
 
-from openmdao.api import Problem, NonlinearBlockGS, Group, ScipyIterativeSolver
+import numpy as np
+
+from openmdao.api import Problem, NonlinearBlockGS, Group, ScipyIterativeSolver, IndepVarComp, \
+     ExecComp
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
@@ -14,7 +17,21 @@ class TestNLBGaussSeidel(unittest.TestCase):
     def test_feature_set_options(self):
 
         prob = Problem()
-        prob.model = SellarDerivatives()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
         nlgbs = prob.model.nl_solver = NonlinearBlockGS()
 
         nlgbs.options['maxiter'] = 20
@@ -31,8 +48,22 @@ class TestNLBGaussSeidel(unittest.TestCase):
     def test_feature_basic(self):
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
 
         prob.setup()
 
@@ -44,9 +75,22 @@ class TestNLBGaussSeidel(unittest.TestCase):
     def test_feature_maxiter(self):
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+        model = prob.model = Group()
 
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
         nlgbs.options['maxiter'] = 2
 
         prob.setup()
@@ -60,8 +104,22 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
-        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+        model = prob.model = Group()
 
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
         nlgbs.options['rtol'] = 1e-3
 
         prob.setup()
@@ -74,9 +132,22 @@ class TestNLBGaussSeidel(unittest.TestCase):
     def test_feature_atol(self):
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+        model = prob.model = Group()
 
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
         nlgbs.options['atol'] = 1e-4
 
         prob.setup()
@@ -90,8 +161,22 @@ class TestNLBGaussSeidel(unittest.TestCase):
         # Basic sellar test.
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -117,10 +202,24 @@ class TestNLBGaussSeidel(unittest.TestCase):
         raise unittest.SkipTest("AnalysisError not implemented yet")
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
-        prob.model.nl_solver.options['maxiter'] = 2
-        prob.model.nl_solver.options['err_on_maxiter'] = True
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+        nlgbs.options['maxiter'] = 2
+        nlgbs.options['err_on_maxiter'] = True
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
