@@ -72,7 +72,6 @@ install:
   else
     export PRE_ANNOUNCE=
   fi
-  fi
 - pip install redbaron
 - pip install git+https://github.com/OpenMDAO/testflo.git
 - pip install .
