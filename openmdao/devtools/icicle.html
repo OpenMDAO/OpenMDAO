@@ -79,7 +79,9 @@ var y = d3.scale.linear()
 var color = d3.scale.category20c();
 
 var partition = d3.layout.partition()
-    .value(function(d) { return d.time; });
+    .value(function(d) {
+        return d.time;
+    });
 
 var svg = d3.select("body").append("svg")
     .attr("width", width)
@@ -90,10 +92,10 @@ var rect = svg.selectAll("rect");
 var root = $call_graph_data;
 
 var formatTime = d3.format(".3g");
-var formatTpct = d3.format(".2%")
-var formatCalls = d3.format(",d")
+var formatTpct = d3.format(".2%");
+var formatCalls = d3.format(",d");
 
-var last_d;
+var last_d = null;
 
 window.onresize = resize;
 
@@ -104,7 +106,7 @@ function resize() {
     x = d3.scale.linear()
         .range([0, width]);
 
-    if (last_d != null) {
+    if (last_d !== null) {
         x.domain([last_d.x, last_d.x + last_d.dx]);
         y.domain([last_d.y, 1]).range([last_d.y ? 20 : 0, height]);
     }
@@ -138,14 +140,14 @@ window.onload = function() {
         .on("click", click)
         .on("mouseover", function(d) {
             rect.attr("fill", function(dd) {
-                if (d.name == dd.name) {
+                if (d.short_name === dd.short_name) {
                     return "magenta";
                 }
                 else {
                     return color((dd.children ? dd : dd.parent).name);
                 }
             });
-             funcpath.text(d.name);
+             funcpath.text(d.short_name);
              loctime.text(formatTime(d.time));
              tottime.text(formatTime(d.tot_time));
              loccalls.text(formatCalls(d.count));
@@ -155,7 +157,7 @@ window.onload = function() {
         .on("mouseout", function(d) {
             rect.attr("fill", function(d) {
                 return color((d.children ? d : d.parent).name);
-            })
+            });
              return tooltip.style("display", "none");
         })
         .on("mousemove", function(d) {

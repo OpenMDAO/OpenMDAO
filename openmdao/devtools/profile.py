@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import os
+from os.path import abspath
 import sys
 from time import time as etime
 from inspect import getmembers, getmro
@@ -8,16 +9,12 @@ from fnmatch import fnmatchcase
 import argparse
 import json
 import atexit
-import types
 import warnings
 from string import Template
-from collections import OrderedDict, defaultdict
-from functools import wraps
-from struct import Struct
-from ctypes import Structure, c_uint, c_float
-from types import MethodType
+from collections import defaultdict
 
-from six import iteritems, itervalues
+
+from six import iteritems, PY3
 
 try:
     from mpi4py import MPI
@@ -33,9 +30,12 @@ def get_actual_class(frame, class_):
         if meth.__name__ in cls.__dict__:
             return cls
 
-def _prof_node(name, obj=None):
+def _prof_node(parts, obj=None):
+    name = ','.join(parts)
+    short_name = parts[-1]
     return {
         'name': name,
+        'short_name': short_name,
         'time': 0.,
         'count': 0,
         'tot_time': 0.,
@@ -108,7 +108,7 @@ def setup(prefix='prof_raw', methods=None, prof_dir=None):
         from openmdao.vectors.vector import Vector
 
         _profile_methods = {
-            "*": (System, Jacobian, Matrix, Vector, Solver, Driver, Problem),
+            "*": (System, Jacobian, Matrix, Solver, Driver, Problem),
         }
     else:
         _profile_methods = methods
@@ -178,16 +178,23 @@ def _instance_profile(frame, event, arg):
                     classes = _file2class[frame.f_code.co_filename]
                     if not classes:
                         for base in self.__class__.__mro__[:-1]:
-                            clist = _file2class[sys.modules[base.__module__].__file__[:-1]]
+                            if PY3:
+                                clist = _file2class[sys.modules[base.__module__].__file__]
+                            else:
+                                clist = _file2class[sys.modules[base.__module__].__file__[:-1]]
                             if base.__name__ not in clist:
                                 clist.append(base.__name__)
                         classes = _file2class[frame.f_code.co_filename]
                     if len(classes) > 1:
                         # TODO: fix this
                         warnings.warn("multiple classes %s found in same module (%s), "
-                                      "using the first (might be wrong)" % (classes,
-                                                                            frame.f_code.co_filename))
-                    name = "<%s#%d>.%s" % (classes[0], id(self), func_name)
+                                      "using self.__class__ (might be wrong)" % (classes,
+                                                                                 frame.f_code.co_filename))
+                        classes = [self.__class__.__name__]
+                    try:
+                        name = "<%s#%d>.%s" % (classes[0], id(self), func_name)
+                    except IndexError:
+                        name = "<%s#%d>.%s" % (self.__class__.__name__, id(self), func_name)
 
                     _call_stack.append(name)
                     _timing_stack.append(etime())
@@ -200,12 +207,11 @@ def _instance_profile(frame, event, arg):
                 self = loc['self']
                 if isinstance(self, _profile_matches[func_name]):
                     path = ','.join(_call_stack)
-
-                    short_name = _call_stack.pop()
-                    start = _timing_stack.pop()
-
                     if path not in _inst_data:
-                        _inst_data[path] = _prof_node(short_name, self)
+                        _inst_data[path] = _prof_node(_call_stack, self)
+
+                    _call_stack.pop()
+                    start = _timing_stack.pop()
 
                     pdata = _inst_data[path]
                     pdata['time'] += etime() - start
@@ -261,7 +267,6 @@ def _finalize_profile():
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
 
-    dname = os.path.dirname(_profile_prefix)
     fname = os.path.basename(_profile_prefix)
     with open("%s.%d" % (fname, rank), 'w') as f:
         f.write("@total 1 %f\n" % _profile_total)
@@ -277,12 +282,6 @@ def _iter_raw_prof_file(rawname):
     Returns an iterator of (elapsed_time, timestamp, funcpath)
     from a raw profile data file.
     """
-    global _profile_struct
-
-    fn, ext = os.path.splitext(rawname)
-    dname = os.path.dirname(rawname)
-    fname = os.path.basename(fn)
-
     with open(rawname, 'r') as f:
         for line in f:
             path, count, elapsed = line.split()
@@ -303,7 +302,6 @@ def process_profile(flist):
     """
 
     nfiles = len(flist)
-    funcs = {}
     totals = {}
     total_under_profile = 0.0
     tops = set()
@@ -312,12 +310,12 @@ def process_profile(flist):
 
     # this name has to be '.' and not '', else we have issues
     # when combining multiple files due to sort order
-    tree_nodes['@total'] = _prof_node('@total')
+    tree_nodes['@total'] = _prof_node(['@total'])
 
     for fname in flist:
         ext = os.path.splitext(fname)[1]
         try:
-            extval = int(ext.lstrip('.'))
+            int(ext.lstrip('.'))
             dec = ext
         except:
             dec = False
@@ -331,13 +329,13 @@ def process_profile(flist):
                 parts = ["%s%s" % (p,dec) for p in parts]
                 funcpath = ','.join(parts)
 
-            if ',' not in funcpath:
+            if len(parts) == 1:
                 tops.add(funcpath)
 
                 if funcpath == '@total':
                     total_under_profile += t
 
-            tree_nodes[funcpath] = node = _prof_node(parts[-1])
+            tree_nodes[funcpath] = node = _prof_node(parts)
             node['time'] += t
             node['count'] += count
 
@@ -345,7 +343,7 @@ def process_profile(flist):
             if funcname in totals:
                 tnode = totals[funcname]
             else:
-                totals[funcname] = tnode = _prof_node(funcname)
+                totals[funcname] = tnode = _prof_node(parts)
             tnode['tot_time'] += t
             tnode['tot_count'] += count
 
@@ -357,6 +355,20 @@ def process_profile(flist):
             tree_nodes[parent]['children'].append(tree_nodes[funcpath])
         elif funcpath != '@total':
             tree_nodes['@total']['children'].append(tree_nodes[funcpath])
+
+    # in order to make the D3 partition layout give accurate proportions, we can only put values
+    # into leaf nodes because the parent node values get overridden by the sum of the children. To
+    # get around this, we create a child for each non-leaf node with the prefix 'exclusive%d' and put the
+    # time exclusive to the parent into that child, so that when all of the children are summed, they'll
+    # add up to the correct time for the parent and the visual proportions of the parent will be correct.
+    for i, (funcpath, node) in enumerate(iteritems(tree_nodes)):
+        if node['children']:
+            child_sum = sum([c['time'] for c in node['children']])
+            parts = funcpath.split(',')
+            ex_child_node = _prof_node(parts + [parts[-1]+',exclusive%d' % i])
+            ex_child_node['time'] = node['time'] - child_sum
+            ex_child_node['count'] = 1
+            node['children'].append(ex_child_node)
 
     return tree_nodes['@total'], totals
 
@@ -412,9 +424,6 @@ def prof_totals():
                                     key=lambda x:x[1]['tot_time']):
             out_stream.write("%10d %11f %s\n" %
                                (data['tot_count'], data['tot_time'], func))
-
-            func_name = func.split('.')[-1]
-
     finally:
         if out_stream is not sys.stdout:
             out_stream.close()
