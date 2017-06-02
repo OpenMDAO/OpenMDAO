@@ -362,13 +362,19 @@ def process_profile(flist):
     # time exclusive to the parent into that child, so that when all of the children are summed, they'll
     # add up to the correct time for the parent and the visual proportions of the parent will be correct.
     for i, (funcpath, node) in enumerate(iteritems(tree_nodes)):
+        parts = funcpath.split(',')
         if node['children']:
             child_sum = sum([c['time'] for c in node['children']])
-            parts = funcpath.split(',')
             ex_child_node = _prof_node(parts + [parts[-1]+',exclusive%d' % i])
             ex_child_node['time'] = node['time'] - child_sum
+            ex_child_node['tot_time'] = ex_child_node['time']
             ex_child_node['count'] = 1
+            ex_child_node['tot_count'] = 1
+            del ex_child_node['obj']
             node['children'].append(ex_child_node)
+        del node['obj']
+        node['tot_time'] = totals[parts[-1]]['tot_time']
+        node['tot_count'] = totals[parts[-1]]['tot_count']
 
     return tree_nodes['@total'], totals
 
@@ -402,6 +408,8 @@ def prof_totals():
     parser.add_argument('rawfiles', metavar='rawfile', nargs='*',
                         help='File(s) containing raw profile data to be processed. Wildcards are allowed.')
 
+    #TODO: add arg to set max number of results (starting at largest)
+
     options = parser.parse_args()
 
     if not options.rawfiles:
@@ -415,15 +423,17 @@ def prof_totals():
 
     _, totals = process_profile(options.rawfiles)
 
+    total_time = totals['@total']['tot_time']
+
     try:
 
-        out_stream.write("\nTotals\n------\n\n")
-        out_stream.write("Total Calls Total Time Function Name\n")
+        out_stream.write("\nTotal     Total           Function\n")
+        out_stream.write("Calls     Time (s)    %   Name\n")
 
         for func, data in sorted([(k,v) for k,v in iteritems(totals)],
                                     key=lambda x:x[1]['tot_time']):
-            out_stream.write("%10d %11f %s\n" %
-                               (data['tot_count'], data['tot_time'], func))
+            out_stream.write("%6d %11f %6.2f %s\n" %
+                               (data['tot_count'], data['tot_time'], (data['tot_time']/total_time*100.), func))
     finally:
         if out_stream is not sys.stdout:
             out_stream.close()
