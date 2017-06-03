@@ -299,8 +299,9 @@ class Component(System):
             raise TypeError('The name argument should be a string')
         if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
             raise TypeError('The val argument should be a float, list, tuple, ndarray or Iterable')
-        if shape is not None and not isinstance(shape, (int, tuple, list)):
-            raise TypeError('The shape argument should be an int, tuple, or list')
+        if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
+            raise TypeError("The shape argument should be an int, tuple, or list but "
+                            "a '%s' was given" % type(shape))
         if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
                                                                     np.ndarray, Iterable)):
             raise TypeError('The src_indices argument should be an int, list, '
@@ -341,6 +342,11 @@ class Component(System):
         else:
             var_rel2data_io = self._var_rel2data_io
             var_rel_names = self._var_rel_names
+
+        # Disallow dupes
+        if name in var_rel2data_io:
+            msg = "Variable name '{}' already exists.".format(name)
+            raise ValueError(msg)
 
         var_rel2data_io[name] = {
             'prom': name, 'rel': name,
@@ -428,8 +434,9 @@ class Component(System):
             raise TypeError('The ref0 argument should be a float, list, tuple, or ndarray')
         if not np.isscalar(res_ref) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
             raise TypeError('The res_ref argument should be a float, list, tuple, or ndarray')
-        if shape is not None and not isinstance(shape, (int, tuple, list)):
-            raise TypeError('The shape argument should be an int, tuple, or list')
+        if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
+            raise TypeError("The shape argument should be an int, tuple, or list but "
+                            "a '%s' was given" % type(shape))
         if units is not None and not isinstance(units, str):
             raise TypeError('The units argument should be a str or None')
         if res_units is not None and not isinstance(res_units, str):
@@ -487,6 +494,11 @@ class Component(System):
         else:
             var_rel2data_io = self._var_rel2data_io
             var_rel_names = self._var_rel_names
+
+        # Disallow dupes
+        if name in var_rel2data_io:
+            msg = "Variable name '{}' already exists.".format(name)
+            raise ValueError(msg)
 
         var_rel2data_io[name] = {
             'prom': name, 'rel': name,
