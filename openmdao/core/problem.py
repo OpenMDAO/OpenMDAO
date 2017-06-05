@@ -234,6 +234,12 @@ class Problem(object):
 
         return self.run_driver()
 
+    def cleanup(self):
+        """
+        Clean up resources prior to exit.
+        """
+        self.driver.cleanup()
+
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto'):
         """
         Set up everything.

@@ -85,6 +85,8 @@ html: all
 
 help:
 	@echo "Please use 'make <target>' where <target> is one of"
+	@echo "  html-update to remake a file based on a single rst file changing."
+	@echo "  single     to remake a file based on its dependecy (e.g. code-embed) changing, not its rst file"
 	@echo "  html       to make standalone HTML files"
 	@echo "  dirhtml    to make HTML files named index.html in directories"
 	@echo "  singlehtml to make a single large HTML file"

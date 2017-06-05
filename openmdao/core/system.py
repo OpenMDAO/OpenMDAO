@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from collections import OrderedDict, Iterable
 from fnmatch import fnmatchcase
 import sys
+import inspect
 from itertools import product
 
 from six import iteritems, string_types
@@ -18,10 +19,15 @@ from openmdao.proc_allocators.default_allocator import DefaultAllocator
 
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array
+from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
+<<<<<<< HEAD
 from openmdao.utils.array_utils import convert_neg
+=======
+from openmdao.utils.record_util import create_local_meta, update_local_meta
+>>>>>>> 0834eb450caeb366fce756db741b7063a053a76d
 
 
 class System(object):
@@ -49,6 +55,9 @@ class System(object):
         MPI communicator object.
     metadata : <OptionsDictionary>
         Dictionary of user-defined arguments.
+    iter_count : int
+        Int that holds the number of times this system has iterated
+        in a recording run.
     #
     _mpi_proc_allocator : <ProcAllocator>
         Object that distributes procs among subsystems.
@@ -174,6 +183,8 @@ class System(object):
         dict of all driver design vars added to the system.
     _responses : dict of dict
         dict of all driver responses added to the system.
+    _rec_mgr : <RecordingManager>
+        object that manages all recorders added to this system.
     #
     _static_mode : bool
         If true, we are outside of initialize_subsystems and initialize_variables.
@@ -206,6 +217,8 @@ class System(object):
         self.pathname = ''
         self.comm = None
         self.metadata = OptionsDictionary()
+
+        self.iter_count = 0
 
         self._mpi_proc_allocator = DefaultAllocator()
 
@@ -277,6 +290,7 @@ class System(object):
 
         self._design_vars = {}
         self._responses = {}
+        self._rec_mgr = RecordingManager()
 
         self._static_mode = True
         self._static_subsystems_allprocs = []
@@ -625,6 +639,9 @@ class System(object):
         # If full or reconf setup, reset this system's variables to initial values.
         if setup_mode in ('full', 'reconf'):
             self.set_initial_values()
+
+        self._rec_mgr.startup(self)
+        self._rec_mgr.record_metadata(self)
 
     def _setup_procs(self, pathname, comm):
         """
@@ -2113,6 +2130,14 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
+        # TODO_RECORDERS
+        #   Systems, no matter the type, should be able to save inputs, outputs, and
+        #       residuals (System._vectors['inputs']['nonlinear'], etc.) after _apply_nonlinear and
+        # _solve_nonlinear calls
+
+        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also
+        #  make it work generally with any type of system at this point).
+
     def list_states(self, stream=sys.stdout):
         """
         List all states and their values and residuals.
@@ -2184,6 +2209,14 @@ class System(object):
         """
         with self._scaled_context_all():
             self._apply_linear(vec_names, mode, scope_out, scope_in)
+
+        # TODO_RECORDERS
+        #  The _apply_linear and _solve_linear methods work w d_inputs, d_outputs, and d_residuals,
+        #       each one is associated with a vecname.
+        #  These would be (System._vectors['inputs'][vec_name], etc.). In the list of vec_names,
+        #     there is always a 'linear', and depending on the problem, there may be others.
+        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to make it work
+        # generally with any type of system at this point).
 
     def run_solve_linear(self, vec_names, mode):
         """
@@ -2290,15 +2323,6 @@ class System(object):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         pass
 
@@ -2312,6 +2336,43 @@ class System(object):
             Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
+        """
+        pass
+
+    def initialize_processors(self):
+        """
+        Optional user-defined method run after repartitioning/rebalancing.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+        """
+        pass
+
+    def initialize_variables(self):
+        """
+        Required method for components to declare inputs and outputs.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+        """
+        pass
+
+    def initialize_partials(self):
+        """
+        Optional method for components to declare Jacobian structure/approximations.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+            variable names
         """
         pass
 
@@ -2329,3 +2390,24 @@ class System(object):
             states.extend(subsys._list_states())
 
         return states
+
+    def add_recorder(self, recorder):
+        """
+        Add a recorder to the driver.
+
+        Parameters
+        ----------
+        recorder : <BaseRecorder>
+           A recorder instance.
+        """
+        self._rec_mgr.append(recorder)
+
+    def record_iteration(self):
+        """
+        Record an iteration of the current System.
+        """
+        self.iter_count += 1
+        metadata = create_local_meta(None, self.pathname)
+        update_local_meta(metadata, (self.iter_count,))
+        # send the calling method name into record_iteration, e.g. 'solve_nonlinear'
+        self._rec_mgr.record_iteration(self, metadata, method=inspect.stack()[1][3])

@@ -5,6 +5,8 @@ import numpy as np
 
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.utils.record_util import create_local_meta, update_local_meta
 
 
 class SolverInfo(object):
@@ -43,10 +45,14 @@ class Solver(object):
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
         Number of iterations for the current invocation of the solver.
+    _rec_mgr : <RecordingManager>
+        object that manages all recorders added to this solver
     _solver_info : <SolverInfo>
         Object to store some formatting for iprint that is shared across all solvers.
     options : <OptionsDictionary>
         Options dictionary.
+    metadata : dict
+        Dictionary holding data about this solver.
     supports : <OptionsDictionary>
         Options dictionary describing what features are supported by this
         solver.
@@ -87,6 +93,20 @@ class Solver(object):
         self._declare_options()
         self.options.update(kwargs)
 
+        self.metadata = {}
+        self._rec_mgr = RecordingManager()
+
+    def add_recorder(self, recorder):
+        """
+        Add a recorder to the driver's RecordingManager.
+
+        Parameters
+        ----------
+        recorder : <BaseRecorder>
+           A recorder instance to be added to RecManager.
+        """
+        self._rec_mgr.append(recorder)
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -108,6 +128,8 @@ class Solver(object):
         """
         self._system = system
         self._depth = depth
+        self._rec_mgr.startup(self)
+        self._rec_mgr.record_metadata(self)
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -181,8 +203,14 @@ class Solver(object):
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
             self._iter_execute()
+            norm = self._iter_get_norm()
             self._iter_count += 1
             norm = self._iter_get_norm()
+
+            metadata = self.metadata = create_local_meta(None, type(self).__name__)
+            update_local_meta(metadata, (self._iter_count,))
+            self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
+
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))

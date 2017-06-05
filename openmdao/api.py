@@ -62,3 +62,6 @@ from openmdao.drivers.scipy_optimizer import ScipyOptimizer
 
 # System-Building Tools
 from openmdao.utils.options_dictionary import OptionsDictionary
+
+# Recorders
+from openmdao.recorders.sqlite_recorder import SqliteRecorder

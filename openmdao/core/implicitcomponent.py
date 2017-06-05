@@ -32,9 +32,12 @@ class ImplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
+        super(ImplicitComponent, self)._apply_nonlinear()
+
         with self._unscaled_context(
                 outputs=[self._outputs], residuals=[self._residuals]):
             self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
+        self.record_iteration()
 
     def _solve_nonlinear(self):
         """
@@ -53,10 +56,14 @@ class ImplicitComponent(Component):
         super(ImplicitComponent, self)._solve_nonlinear()
 
         if self._nl_solver is not None:
-            return self._nl_solver.solve()
+            result = self._nl_solver.solve()
+            self.record_iteration()
+            return result
         else:
             with self._unscaled_context(outputs=[self._outputs]):
                 result = self.solve_nonlinear(self._inputs, self._outputs)
+
+            self.record_iteration()
 
             if result is None:
                 return False, 0., 0.
@@ -95,6 +102,7 @@ class ImplicitComponent(Component):
                         outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
                     self.apply_linear(self._inputs, self._outputs,
                                       d_inputs, d_outputs, d_residuals, mode)
+        self.record_iteration()
 
     def _solve_linear(self, vec_names, mode):
         """
@@ -117,7 +125,9 @@ class ImplicitComponent(Component):
             relative error.
         """
         if self._ln_solver is not None:
-            return self._ln_solver.solve(vec_names, mode)
+            result = self._ln_solver.solve(vec_names, mode)
+            self.record_iteration()
+            return result
         else:
             failed = False
             abs_errors = []
@@ -138,6 +148,8 @@ class ImplicitComponent(Component):
                 failed = failed or result[0]
                 abs_errors.append(result[1])
                 rel_errors.append(result[2])
+
+            self.record_iteration()
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 

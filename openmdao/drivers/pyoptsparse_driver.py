@@ -20,6 +20,9 @@ from pyoptsparse import Optimization
 
 from openmdao.core.driver import Driver
 
+
+from openmdao.utils.record_util import create_local_meta, update_local_meta
+
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
                 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG'}
@@ -188,6 +191,11 @@ class pyOptSparseDriver(Driver):
         self.pyopt_solution = None
         self.iter_count = 0
 
+        # Metadata Setup
+        self.metadata = create_local_meta(None, self.options['optimizer'])
+        self.iter_count = 0
+        update_local_meta(self.metadata, (self.iter_count,))
+
         # Initial Run
         model._solve_nonlinear()
 
@@ -351,6 +359,7 @@ class pyOptSparseDriver(Driver):
         """
         model = self._problem.model
         fail = 0
+        metadata = self.metadata
 
         try:
             for name in self._indep_list:
@@ -361,10 +370,17 @@ class pyOptSparseDriver(Driver):
 
             # Execute the model
             self.iter_count += 1
+            update_local_meta(metadata, (self.iter_count,))
             model._solve_nonlinear()
 
             func_dict = self.get_objective_values()
             func_dict.update(self.get_constraint_values(lintype='nonlinear'))
+
+            # Record after getting obj and constraint to assure they have
+            # been gathered in MPI.
+
+            print('in pyoptsparse recording')
+            self._rec_mgr.record_iteration(self, metadata)
 
         except Exception as msg:
             tb = traceback.format_exc()
