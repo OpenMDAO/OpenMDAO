@@ -142,10 +142,11 @@ def _collect_methods(method_dict):
 
     for pattern, classes in iteritems(method_dict):
         for class_ in classes:
-            fname = sys.modules[class_.__module__].__file__[:-1]
-            classes = file2class[fname]
-            if class_.__name__ not in classes:
-                file2class[fname].append(class_.__name__)
+            for base in class_.__mro__:
+                fname = sys.modules[base.__module__].__file__[:-1]
+                classes = file2class[fname]
+                if base.__name__ not in classes:
+                    file2class[fname].append(base.__name__)
 
             for name, obj in getmembers(class_):
                 if callable(obj) and (pattern == '*' or fnmatchcase(name, pattern)):
@@ -176,15 +177,6 @@ def _instance_profile(frame, event, arg):
                 self = loc['self']
                 if isinstance(self, _profile_matches[func_name]):
                     classes = _file2class[frame.f_code.co_filename]
-                    if not classes:
-                        for base in self.__class__.__mro__[:-1]:
-                            if PY3:
-                                clist = _file2class[sys.modules[base.__module__].__file__]
-                            else:
-                                clist = _file2class[sys.modules[base.__module__].__file__[:-1]]
-                            if base.__name__ not in clist:
-                                clist.append(base.__name__)
-                        classes = _file2class[frame.f_code.co_filename]
                     if len(classes) > 1:
                         # TODO: fix this
                         warnings.warn("multiple classes %s found in same module (%s), "
@@ -279,7 +271,7 @@ def _finalize_profile():
 
 def _iter_raw_prof_file(rawname):
     """
-    Returns an iterator of (elapsed_time, timestamp, funcpath)
+    Returns an iterator of (funcpath, count, elapsed_time)
     from a raw profile data file.
     """
     with open(rawname, 'r') as f:
@@ -332,7 +324,7 @@ def process_profile(flist):
             if len(parts) == 1:
                 tops.add(funcpath)
 
-                if funcpath == '@total':
+                if funcpath != '@total':
                     total_under_profile += t
 
             tree_nodes[funcpath] = node = _prof_node(parts)
@@ -363,9 +355,15 @@ def process_profile(flist):
     # add up to the correct time for the parent and the visual proportions of the parent will be correct.
     for i, (funcpath, node) in enumerate(iteritems(tree_nodes)):
         parts = funcpath.split(',')
-        if node['children']:
+        if len(node['children']) > 0:
             child_sum = sum([c['time'] for c in node['children']])
-            ex_child_node = _prof_node(parts + [parts[-1]+',exclusive%d' % i])
+            diff = node['time'] - child_sum
+            for i, c in enumerate(node['children']):
+                print(parts[-1], i, c['short_name'], c['time'])
+            if funcpath == '@total':
+                ex_child_node = _prof_node(parts + [parts[-1]+',unknown%d' % i])
+            else:
+                ex_child_node = _prof_node(parts + [parts[-1]+',exclusive%d' % i])
             ex_child_node['time'] = node['time'] - child_sum
             ex_child_node['tot_time'] = ex_child_node['time']
             ex_child_node['count'] = 1
@@ -375,6 +373,9 @@ def process_profile(flist):
         del node['obj']
         node['tot_time'] = totals[parts[-1]]['tot_time']
         node['tot_count'] = totals[parts[-1]]['tot_count']
+
+    tree_nodes['@total']['tot_time'] = tree_nodes['@total']['time']
+    tree_nodes['@total']['time'] = total_under_profile
 
     return tree_nodes['@total'], totals
 
