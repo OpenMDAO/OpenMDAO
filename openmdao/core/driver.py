@@ -3,6 +3,7 @@
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.record_util import create_local_meta, update_local_meta
+import numpy as np
 from openmdao.utils.options_dictionary import OptionsDictionary
 from six import iteritems
 
@@ -182,13 +183,14 @@ class Driver(object):
         if indices is None:
             indices = slice(None)
 
+        desvar = self._problem.model._outputs._views_flat[name]
+        desvar[indices] = value
+
         # Scale design variable values
         if scaler is not None:
-            value *= 1.0 / scaler
+            desvar[indices] *= 1.0 / scaler
         if adder is not None:
-            value -= adder
-
-        self._problem.model._outputs._views_flat[name][indices] = value
+            desvar[indices] -= adder
 
     def get_response_values(self, filter=None):
         """
@@ -239,11 +241,11 @@ class Driver(object):
         for name, meta in iteritems(objectives):
             scaler = meta['scaler']
             adder = meta['adder']
-            index = meta['index']
-            if index is None:
+            indices = meta['indices']
+            if indices is None:
                 val = vec[name].copy()
             else:
-                val = vec[name][index]
+                val = vec[name][indices]
 
             # Scale objectives
             if adder is not None:
@@ -365,7 +367,8 @@ class Driver(object):
             Default is None, which uses the driver's desvars.
         return_format : string
             Format to return the derivatives. Default is a 'flat_dict', which
-            returns them in a dictionary whose keys are tuples of form (of, wrt).
+            returns them in a dictionary whose keys are tuples of form (of, wrt). For
+            the scipy optimizer, 'array' is also supported.
         global_names : bool
             Set to True when passing in global names to skip some translation steps.
 
@@ -374,13 +377,16 @@ class Driver(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        derivs = self._problem._compute_total_derivs(of=of, wrt=wrt, return_format=return_format,
-                                                     global_names=global_names)
+        prob = self._problem
 
         if return_format == 'dict':
 
+            derivs = prob._compute_total_derivs(of=of, wrt=wrt, return_format=return_format,
+                                                global_names=global_names)
+
             for okey, oval in iteritems(derivs):
                 for ikey, val in iteritems(oval):
+
                     imeta = self._designvars[ikey]
                     ometa = self._responses[okey]
 
@@ -400,6 +406,59 @@ class Driver(object):
                         val *= 1.0 / iscaler
                     if iadder is not None:
                         val -= iadder
+
+        elif return_format == 'array':
+
+            # Compute the derivatives in dict format, and then convert to array.
+            derivs = prob._compute_total_derivs(of=of, wrt=wrt, return_format='dict',
+                                                global_names=global_names)
+
+            # Use sizes pre-computed in derivs for ease
+            osize = 0
+            isize = 0
+            do_wrt = True
+            Jslices = {}
+            for okey, oval in iteritems(derivs):
+                if do_wrt:
+                    for ikey, val in iteritems(oval):
+                        istart = isize
+                        isize += val.shape[1]
+                        Jslices[ikey] = slice(istart, isize)
+
+                do_wrt = False
+                ostart = osize
+                osize += oval[ikey].shape[0]
+                Jslices[okey] = slice(ostart, osize)
+
+            new_derivs = np.zeros((osize, isize))
+
+            # Apply driver ref/ref0 and position subjac into array jacobian.
+            for okey, oval in iteritems(derivs):
+                for ikey, val in iteritems(oval):
+
+                    imeta = self._designvars[ikey]
+                    ometa = self._responses[okey]
+
+                    iscaler = imeta['scaler']
+                    iadder = imeta['adder']
+                    oscaler = ometa['scaler']
+                    oadder = ometa['adder']
+
+                    # Scale response side
+                    if oadder is not None:
+                        val += oadder
+                    if oscaler is not None:
+                        val *= oscaler
+
+                    # Scale design var side
+                    if iscaler is not None:
+                        val *= 1.0 / iscaler
+                    if iadder is not None:
+                        val -= iadder
+
+                    new_derivs[Jslices[okey], Jslices[ikey]] = val
+
+            derivs = new_derivs
 
         else:
             msg = "Derivative scaling by the driver only supports the 'dict' format at present."

@@ -156,7 +156,7 @@ class Component(System):
 
         meta_names = {
             'input': ('units', 'shape', 'var_set'),
-            'output': ('units', 'shape', 'var_set', 'ref', 'ref0'),
+            'output': ('units', 'shape', 'var_set', 'ref', 'ref0', 'distributed'),
         }
 
         for type_ in ['input', 'output']:
@@ -231,6 +231,8 @@ class Component(System):
                     self.comm.Allgather(
                         sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
 
+        self._setup_global_shapes()
+
     def _setup_partials(self, recurse=True):
         """
         Call initialize_partials in components.
@@ -272,6 +274,11 @@ class Component(System):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for
             reconfigurability. Default is 0.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
         """
         if inspect.stack()[1][3] == '__init__':
             warn_deprecation("In the future, the 'add_input' method must be "
@@ -292,8 +299,9 @@ class Component(System):
             raise TypeError('The name argument should be a string')
         if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
             raise TypeError('The val argument should be a float, list, tuple, ndarray or Iterable')
-        if shape is not None and not isinstance(shape, (int, tuple, list)):
-            raise TypeError('The shape argument should be an int, tuple, or list')
+        if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
+            raise TypeError("The shape argument should be an int, tuple, or list but "
+                            "a '%s' was given" % type(shape))
         if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
                                                                     np.ndarray, Iterable)):
             raise TypeError('The src_indices argument should be an int, list, '
@@ -335,14 +343,22 @@ class Component(System):
             var_rel2data_io = self._var_rel2data_io
             var_rel_names = self._var_rel_names
 
+        # Disallow dupes
+        if name in var_rel2data_io:
+            msg = "Variable name '{}' already exists.".format(name)
+            raise ValueError(msg)
+
         var_rel2data_io[name] = {
             'prom': name, 'rel': name,
             'my_idx': len(self._var_rel_names['input']),
             'type': 'input', 'metadata': metadata}
         var_rel_names['input'].append(name)
 
+        return metadata
+
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0,
+                   distributed=False):
         """
         Add an output variable to the component.
 
@@ -385,6 +401,13 @@ class Component(System):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
+        distributed : bool
+            If True, this variable is distributed across multiple processes.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
         """
         if inspect.stack()[1][3] == '__init__':
             warn_deprecation("In the future, the 'add_output' method must be "
@@ -411,8 +434,9 @@ class Component(System):
             raise TypeError('The ref0 argument should be a float, list, tuple, or ndarray')
         if not np.isscalar(res_ref) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
             raise TypeError('The res_ref argument should be a float, list, tuple, or ndarray')
-        if shape is not None and not isinstance(shape, (int, tuple, list)):
-            raise TypeError('The shape argument should be an int, tuple, or list')
+        if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
+            raise TypeError("The shape argument should be an int, tuple, or list but "
+                            "a '%s' was given" % type(shape))
         if units is not None and not isinstance(units, str):
             raise TypeError('The units argument should be a str or None')
         if res_units is not None and not isinstance(res_units, str):
@@ -461,6 +485,8 @@ class Component(System):
         # var_set: taken as is
         metadata['var_set'] = var_set
 
+        metadata['distributed'] = distributed
+
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
             var_rel2data_io = self._static_var_rel2data_io
@@ -469,11 +495,18 @@ class Component(System):
             var_rel2data_io = self._var_rel2data_io
             var_rel_names = self._var_rel_names
 
+        # Disallow dupes
+        if name in var_rel2data_io:
+            msg = "Variable name '{}' already exists.".format(name)
+            raise ValueError(msg)
+
         var_rel2data_io[name] = {
             'prom': name, 'rel': name,
             'my_idx': len(self._var_rel_names['output']),
             'type': 'output', 'metadata': metadata}
         var_rel_names['output'].append(name)
+
+        return metadata
 
     def approx_partials(self, of, wrt, method='fd', **kwargs):
         """

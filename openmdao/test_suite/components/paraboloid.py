@@ -27,7 +27,7 @@ class Paraboloid(ExplicitComponent):
 
         outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         """
         Jacobian for our paraboloid.
         """
@@ -41,7 +41,7 @@ class Paraboloid(ExplicitComponent):
 class ParaboloidMatVec(Paraboloid):
     """ Use matrix-vector product instead."""
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         """Analytical derivatives."""
         pass
 

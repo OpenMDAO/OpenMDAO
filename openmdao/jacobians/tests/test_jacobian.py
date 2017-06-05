@@ -16,7 +16,8 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+     SellarDis2withDerivatives
 
 
 class MyExplicitComp(ExplicitComponent):
@@ -43,7 +44,7 @@ class MyExplicitComp(ExplicitComponent):
                            y[0]*17. - y[0]*y[1] + 2.*y[1]
         outputs['f'][1] = outputs['f'][0]*3.0
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         x = inputs['x']
         y = inputs['y']
         jac1 = self._jac_type(np.array([
@@ -95,7 +96,7 @@ class MyExplicitComp2(ExplicitComponent):
         z = inputs['z']
         outputs['f'] = (w[0]-5.0)**2 + (w[1]+1.0)**2 + w[2]*6. + z*7.
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         w = inputs['w']
         z = inputs['z']
         jac = self._jac_type(np.array([[
@@ -138,7 +139,7 @@ class ExplicitSetItemComp(ExplicitComponent):
         self.add_input('in', val=in_val*scale)
         self.add_output('out', val=out_val*scale)
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         partials['out', 'in'] = self._constructor(self._value)
 
 
@@ -325,8 +326,23 @@ class TestJacobian(unittest.TestCase):
 
     def test_component_assembled_jac(self):
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NewtonSolver()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
 
         d1 = prob.model.get_subsystem('d1')
 
@@ -362,8 +378,23 @@ class TestJacobian(unittest.TestCase):
 
     def test_jacobian_changed_group(self):
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NewtonSolver()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
 
         prob.model.jacobian = DenseJacobian()
 
@@ -377,8 +408,23 @@ class TestJacobian(unittest.TestCase):
 
     def test_jacobian_changed_component(self):
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NewtonSolver()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
 

@@ -23,6 +23,11 @@ from openmdao.error_checking.check_config import check_config
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import FakeComm
 from openmdao.vectors.default_vector import DefaultVector
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
+
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
@@ -42,6 +47,9 @@ class Problem(object):
     driver : <Driver>
         Slot for the driver. The default driver is `Driver`, which just runs
         the model once.
+    _mode : 'fwd' or 'rev'
+        Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+        reverse (adjoint).
     _use_ref_vector : bool
         If True, allocate vectors to store ref. values.
     _solver_print_cache : list
@@ -89,6 +97,8 @@ class Problem(object):
 
         self._use_ref_vector = use_ref_vector
         self._solver_print_cache = []
+
+        self._mode = None  # mode is assigned in setup()
 
     def __getitem__(self, name):
         """
@@ -172,6 +182,9 @@ class Problem(object):
         float
             absolute error.
         """
+        if self._mode is None:
+            raise RuntimeError("The `setup` method must be called before `run_model`.")
+
         return self.model.run_solve_nonlinear()
 
     def run_driver(self):
@@ -183,6 +196,9 @@ class Problem(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
+        if self._mode is None:
+            raise RuntimeError("The `setup` method must be called before `run_driver`.")
+
         with self.model._scaled_context_all():
             return self.driver.run()
 
@@ -249,6 +265,13 @@ class Problem(object):
         model = self.model
         comm = self.comm
 
+        # PETScVector is required for MPI
+        if PETScVector and comm.size > 1 and vector_class is not PETScVector:
+            msg = ("The `vector_class` argument must be `PETScVector` when "
+                   "running in parallel under MPI but '%s' was specified."
+                   % vector_class.__name__)
+            raise ValueError(msg)
+
         if mode not in ['fwd', 'rev', 'auto']:
             msg = "Unsupported mode: '%s'" % mode
             raise ValueError(msg)
@@ -264,14 +287,14 @@ class Problem(object):
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
-        if check:
+        if check and comm.rank == 0:
             check_config(self, logger)
 
         return self
 
-    def check_partial_derivs(self, out_stream=sys.stdout, comps=None, compact_print=False,
-                             abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
-                             force_dense=True):
+    def check_partials(self, out_stream=sys.stdout, comps=None, compact_print=False,
+                       abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
+                       force_dense=True):
         """
         Check partial derivatives comprehensively for all components in your model.
 
@@ -616,7 +639,7 @@ class Problem(object):
         vec_dresid = model._vectors['residual']
         fwd = mode == 'fwd'
         nproc = self.comm.size
-        iproc = self.comm.rank
+        iproc = model.comm.rank
 
         # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:
@@ -676,6 +699,7 @@ class Problem(object):
                     for ikeys in wrt:
                         for ikey in ikeys:
                             totals[okey][ikey] = None
+
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
@@ -717,8 +741,6 @@ class Problem(object):
         dinputs = input_vec[vecname]
         doutputs = output_vec[vecname]
 
-        iproc = model.comm.rank
-
         # If Forward mode, solve linear system for each 'wrt'
         # If Adjoint mode, solve linear system for each 'of'
         for icount, input_names in enumerate(input_list):
@@ -727,6 +749,7 @@ class Problem(object):
                 # need a vector for clean code, so use _views_flat.
                 flat_view = dinputs._views_flat[input_name]
                 in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
+                in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
                 start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
                 end = np.sum(model._var_sizes['output'][:iproc + 1, in_var_idx])
 
@@ -735,21 +758,22 @@ class Problem(object):
                     in_voi_meta = input_vois[input_name]
                     if 'indices' in in_voi_meta:
                         in_idxs = in_voi_meta['indices']
-                    elif 'index' in in_voi_meta:
-                        in_idxs = in_voi_meta['index']
-                        if in_idxs is not None:
-                            in_idxs = np.array([in_idxs], dtype=int)
 
+                distrib = in_var_meta['distributed']
                 dup = False
                 if in_idxs is not None:
                     irange = in_idxs
                     loc_size = len(in_idxs)
+                elif distrib:
+                    irange = range(in_var_meta['global_size'])
+                    loc_size = end - start
                 else:  # var is duplicated
                     irange = range(end - start)
                     loc_size = end - start
                     dup = True
 
-                for loc_idx, idx in enumerate(irange):
+                loc_idx = -1
+                for idx in irange:
 
                     # Maybe we don't need to clean up so much at the beginning,
                     # since we clean this every time.
@@ -771,6 +795,9 @@ class Problem(object):
                     else:
                         store = False
 
+                    if store:
+                        loc_idx += 1
+
                     model._solve_linear([vecname], mode)
 
                     # Pull out the answers and pack into our data structure.
@@ -783,16 +810,12 @@ class Problem(object):
                                 out_voi_meta = output_vois[output_name]
                                 if 'indices' in out_voi_meta:
                                     out_idxs = out_voi_meta['indices']
-                                elif 'index' in out_voi_meta:
-                                    out_idxs = out_voi_meta['index']
-                                    if out_idxs is not None:
-                                        out_idxs = np.array([out_idxs], dtype=int)
 
                             if out_idxs is not None:
                                 deriv_val = deriv_val[out_idxs]
                             len_val = len(deriv_val)
 
-                            if nproc > 1:  # var is duplicated
+                            if dup and nproc > 1:
                                 self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
                                     model._var_sizes['output'][:, out_var_idx])[0][0]))
 
@@ -833,6 +856,7 @@ class Problem(object):
                                         totals[okey][ikey] = np.zeros((loc_size, len_val))
                                     if store:
                                         totals[okey][ikey][loc_idx, :] = deriv_val
+
                             else:
                                 raise RuntimeError("unsupported return format")
 

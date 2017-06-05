@@ -68,7 +68,8 @@ class ExplicitComponent(Component):
             other_names.append(out_name)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0,
+                   distributed=False):
         """
         Add an output variable to the component.
 
@@ -114,6 +115,13 @@ class ExplicitComponent(Component):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
+        distributed : bool
+            If True, this variable is distributed across multiple processes.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
         """
         if res_ref is None:
             res_ref = ref
@@ -123,10 +131,12 @@ class ExplicitComponent(Component):
                              "called from 'initialize_variables' rather than "
                              "in the '__init__' function.")
 
-        super(ExplicitComponent, self).add_output(name, val=val, shape=shape, units=units,
-                                                  res_units=res_units, desc=desc, lower=lower,
-                                                  upper=upper, ref=ref, ref0=ref0, res_ref=res_ref,
-                                                  var_set=var_set)
+        return super(ExplicitComponent, self).add_output(name,
+                                                         val=val, shape=shape, units=units,
+                                                         res_units=res_units, desc=desc,
+                                                         lower=lower, upper=upper,
+                                                         ref=ref, ref0=ref0, res_ref=res_ref,
+                                                         var_set=var_set)
 
     def _negate_jac(self):
         """
@@ -294,7 +304,7 @@ class ExplicitComponent(Component):
                 # negate constant subjacs (and others that will get overwritten)
                 # back to normal
                 self._negate_jac()
-                self.compute_partial_derivs(self._inputs, self._outputs, J)
+                self.compute_partials(self._inputs, self._outputs, J)
 
                 # re-negate the jacobian
                 self._negate_jac()
@@ -320,7 +330,7 @@ class ExplicitComponent(Component):
         """
         pass
 
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         """
         Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
 

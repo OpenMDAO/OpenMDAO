@@ -15,7 +15,7 @@ from openmdao.test_suite.groups.parallel_groups import \
     FanOutGrouped, FanInGrouped2, Diamond, ConvergeDiverge, \
     FanOutGroupedVarSets
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.devtools.testutil import assert_rel_error, TestLogger
 
 
 
@@ -191,6 +191,42 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
+
+    def test_setup_messages(self):
+
+        class Noisy(ConvergeDiverge):
+            def check_config(self, logger):
+                logger.error(msg)
+                logger.warning(msg)
+                logger.info(msg)
+
+        prob = Problem(Noisy())
+
+        # check that error is thrown if not using PETScVector
+        msg = ("The `vector_class` argument must be `PETScVector` when "
+               "running in parallel under MPI but 'DefaultVector' was specified.")
+        with self.assertRaises(ValueError) as cm:
+            prob.setup(check=False, mode='fwd')
+
+        self.assertEqual(str(cm.exception), msg)
+
+        # check that we get setup messages only on proc 0
+        msg = 'Only want to see this on rank 0'
+        testlogger = TestLogger()
+        prob.setup(vector_class=PETScVector, check=True, mode='fwd',
+                   logger=testlogger)
+
+        if prob.comm.rank > 0:
+            self.assertEqual(len(testlogger.get('error')), 0)
+            self.assertEqual(len(testlogger.get('warning')), 0)
+            self.assertEqual(len(testlogger.get('info')), 0)
+        else:
+            self.assertEqual(len(testlogger.get('error')), 1)
+            self.assertEqual(len(testlogger.get('warning')), 1)
+            self.assertEqual(len(testlogger.get('info')), 1)
+            self.assertTrue(msg in testlogger.get('error')[0])
+            self.assertTrue(msg in testlogger.get('warning')[0])
+            self.assertTrue(msg in testlogger.get('info')[0])
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
