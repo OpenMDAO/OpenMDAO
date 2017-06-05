@@ -70,10 +70,10 @@ if __name__ == "__main__":
     from openmdao.core.indepvarcomp import IndepVarComp
 
     model = Group()
-    model.add_subsystem('des_vars', IndepVarComp((
-        ('x', 3.0),
-        ('y', -4.0),
-    )))
+    ivc = IndepVarComp()
+    ivc.add_output('x', 3.0)
+    ivc.add_output('y', -4.0)
+    model.add_subsystem('des_vars', ivc)
     model.add_subsystem('parab_comp', Paraboloid())
 
     model.connect('des_vars.x', 'parab_comp.x')
@@ -81,10 +81,10 @@ if __name__ == "__main__":
 
     prob = Problem(model)
     prob.setup()
-    prob.run()
-    print(prob['parab_comp.f'])
+    prob.run_driver()
+    print(prob['parab_comp.f_xy'])
 
     prob['des_vars.x'] = 5.0
     prob['des_vars.y'] = -2.0
-    prob.run()
-    print(prob['parab_comp.f'])
+    prob.run_driver()
+    print(prob['parab_comp.f_xy'])

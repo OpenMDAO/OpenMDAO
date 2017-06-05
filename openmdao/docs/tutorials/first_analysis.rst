@@ -73,13 +73,13 @@ Here, we connect the design variables to the inputs on the paraboloid component.
 
 Once the model hierarchy is defined,
 we pass it to the constructor of the `Problem` class then call the `setup()` method on that problem which tells the framework to do some initial work to get the data structures in place for execution.
-Then we call `run()` to actually perform the computation.
+Then we call `run_driver()` to actually perform the computation.
 
-Here we called run twice.
+Here we called run_driver twice.
 The first times with the initial values of 3.0 and -4.0 for `x` and `y`.
 The second time we changed those values and re-ran.
 There are a few details to note here.
-First, notice the way we printed the outputs via :code:`prob['parab_comp.f']` and similarly how we set the new values for `x` and `y`.
+First, notice the way we printed the outputs via :code:`prob['parab_comp.f_xy']` and similarly how we set the new values for `x` and `y`.
 You can both get and set values using the problem, which works with dimensional values in the units of the source variable.
 In this case, there are no units on the source (i.e. `des_vars.x`).
 You can read more about how OpenMDAO handles units and scaling here[LINK TO FEATURE DOC].
@@ -92,10 +92,10 @@ You can read more about how OpenMDAO handles units and scaling here[LINK TO FEAT
         from openmdao.core.indepvarcomp import IndepVarComp
 
         model = Group()
-        model.add_subsystem('des_vars', IndepVarComp((
-            ('x', 3.0),
-            ('y', -4.0),
-        )))
+        ivc = IndepVarComp()
+        ivc.add_output('x', 3.0)
+        ivc.add_output('y', -4.0)
+        model.add_subsystem('des_vars', ivc)
         model.add_subsystem('parab_comp', Paraboloid())
 
         model.connect('des_vars.x', 'parab_comp.x')
@@ -103,10 +103,10 @@ You can read more about how OpenMDAO handles units and scaling here[LINK TO FEAT
 
         prob = Problem(model)
         prob.setup()
-        prob.run()
-        print(prob['parab_comp.f'])
+        prob.run_driver()
+        print(prob['parab_comp.f_xy'])
 
         prob['des_vars.x'] = 5.0
         prob['des_vars.y'] = -2.0
-        prob.run()
-        print(prob['parab_comp.f'])
+        prob.run_driver()
+        print(prob['parab_comp.f_xy'])
