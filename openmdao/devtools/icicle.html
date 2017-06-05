@@ -14,6 +14,18 @@ rect {
   stroke: #fff;
 }
 
+/*
+we're hiding the @parent nodes, which are the ones that contain
+whatever time is required to make all of the children + @parent to
+add up to actual time recorded for the parent.  They're hidden because
+they would do nothing but confuse users, but they must exist in order for
+the child blocks to have correct visual proportions relative to each other
+using d3.partition.
+*/
+.hiderect {
+    visibility: hidden;
+}
+
 #tooltip {
   position: absolute;
   text-align: left;
@@ -134,12 +146,20 @@ window.onload = function() {
         .attr("y", function(d) { return y(d.y); })
         .attr("width", function(d) { return x(d.dx); })
         .attr("height", function(d) { return y(d.dy); })
+        .classed("crect", function(d, i) {
+            return (d.short_name !== '@parent');
+        })
+        .classed("hiderect", function(d, i) {
+            return (d.short_name === '@parent');
+        });
+
+    var crect = d3.selectAll(".crect")
         .attr("fill", function(d) {
             return color((d.children ? d : d.parent).name);
         })
         .on("click", click)
         .on("mouseover", function(d) {
-            rect.attr("fill", function(dd) {
+            crect.attr("fill", function(dd) {
                 if (d.short_name === dd.short_name) {
                     return "magenta";
                 }
@@ -155,7 +175,7 @@ window.onload = function() {
              return tooltip.style("display", "inline");
          })
         .on("mouseout", function(d) {
-            rect.attr("fill", function(d) {
+            crect.attr("fill", function(d) {
                 return color((d.children ? d : d.parent).name);
             });
              return tooltip.style("display", "none");

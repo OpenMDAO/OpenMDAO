@@ -12,6 +12,8 @@ import atexit
 import warnings
 from string import Template
 from collections import defaultdict
+import cProfile
+from contextlib import contextmanager
 
 
 from six import iteritems, PY3
@@ -22,6 +24,25 @@ except ImportError:
     MPI = None
 
 from openmdao.devtools.webview import webview
+
+
+@contextmanager
+def cProfile_context(fname='prof_out'):
+    """
+    Turns on cProfile profiling for a section of code.
+
+    Parameters
+    ----------
+    fname : str
+        Name of file to write profile data to.
+    """
+    prof = cProfile.Profile()
+    prof.enable()
+    yield prof
+    prof.disable()
+
+    prof.dump_stats(fname)
+
 
 def get_actual_class(frame, class_):
     """Given a frame and a class, find the class that matches the"""
@@ -143,6 +164,8 @@ def _collect_methods(method_dict):
     for pattern, classes in iteritems(method_dict):
         for class_ in classes:
             for base in class_.__mro__:
+                if base is object:
+                    continue
                 fname = sys.modules[base.__module__].__file__[:-1]
                 classes = file2class[fname]
                 if base.__name__ not in classes:
@@ -350,20 +373,14 @@ def process_profile(flist):
 
     # in order to make the D3 partition layout give accurate proportions, we can only put values
     # into leaf nodes because the parent node values get overridden by the sum of the children. To
-    # get around this, we create a child for each non-leaf node with the prefix 'exclusive%d' and put the
+    # get around this, we create a child for each non-leaf node with the name '@parent' and put the
     # time exclusive to the parent into that child, so that when all of the children are summed, they'll
     # add up to the correct time for the parent and the visual proportions of the parent will be correct.
-    for i, (funcpath, node) in enumerate(iteritems(tree_nodes)):
+    for funcpath, node in iteritems(tree_nodes):
         parts = funcpath.split(',')
         if len(node['children']) > 0:
             child_sum = sum([c['time'] for c in node['children']])
-            diff = node['time'] - child_sum
-            for i, c in enumerate(node['children']):
-                print(parts[-1], i, c['short_name'], c['time'])
-            if funcpath == '@total':
-                ex_child_node = _prof_node(parts + [parts[-1]+',unknown%d' % i])
-            else:
-                ex_child_node = _prof_node(parts + [parts[-1]+',exclusive%d' % i])
+            ex_child_node = _prof_node(parts + ['@parent'])
             ex_child_node['time'] = node['time'] - child_sum
             ex_child_node['tot_time'] = ex_child_node['time']
             ex_child_node['count'] = 1
