@@ -368,7 +368,19 @@ class pyOptSparseDriver(Driver):
             # Execute the model
             self.iter_count += 1
             update_local_meta(metadata, (self.iter_count,))
+
+            from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, pop_recording_iteration_stack
+            push_recording_iteration_stack('pyoptsparsedriver',self.iter_count)
+
+
             model._solve_nonlinear()
+
+
+            print_recording_iteration_stack()
+            pop_recording_iteration_stack()
+
+
+
 
             func_dict = self.get_objective_values()
             func_dict.update(self.get_constraint_values(lintype='nonlinear'))
@@ -376,7 +388,6 @@ class pyOptSparseDriver(Driver):
             # Record after getting obj and constraint to assure they have
             # been gathered in MPI.
 
-            print('in pyoptsparse recording')
             self._rec_mgr.record_iteration(self, metadata)
 
         except Exception as msg:

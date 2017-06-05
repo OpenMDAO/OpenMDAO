@@ -23,6 +23,7 @@ from openmdao.utils.record_util import format_iteration_coordinate
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped
+from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
 # check that pyoptsparse is installed
@@ -470,7 +471,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.model.add_recorder(self.recorder)
 
-        d1 = self.prob.model.get_subsystem('d1')    # an instance of SellarDis1withDerivatives
+        d1 = self.prob.model.get_subsystem('d1') # an instance of SellarDis1withDerivatives which is a Group
         d1.add_recorder(self.recorder)
 
         obj_cmp = self.prob.model.get_subsystem('obj_cmp') # an ExecComp
@@ -482,6 +483,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
+        # TODO_RECORDERS - need to check the recording of the d1 also
         coordinate = [0, 'obj_cmp', (6, )]
 
         expected_inputs = {
@@ -583,15 +585,17 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.model.add_recorder(self.recorder)
 
-        pz = prob.model.get_subsystem('pz')
+        pz = prob.model.get_subsystem('pz') # IndepVarComp which is an ExplicitComponent
         pz.add_recorder(self.recorder)
 
-        mda = prob.model.get_subsystem('mda')
+        mda = prob.model.get_subsystem('mda') # Group
         d1 = mda.get_subsystem('d1')
         d1.add_recorder(self.recorder)
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
+
+        t0, t1 = run_driver(prob)
+
         prob.cleanup()
 
         #TODO_RECORDERS - need to test values !!!
@@ -762,7 +766,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.nl_solver.ln_solver.add_recorder(self.recorder)
 
         prob.setup()
-        prob.run_model()
+        t0, t1 = run_driver(prob)
 
         #### No norms so no expected norms
 
@@ -786,7 +790,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.nl_solver.ln_solver.add_recorder(self.recorder)
 
         prob.setup()
-        prob.run_model()
+        t0, t1 = run_driver(prob)
 
         # TODO_RECORDERS - need to be more thorough
         self.assertSolverIterationDataRecordedBasic()
@@ -808,7 +812,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.nl_solver.ln_solver.add_recorder(self.recorder)
 
         prob.setup()
-        prob.run_model()
+        t0, t1 = run_driver(prob)
 
         # TODO_RECORDERS - need to be more thorough
         self.assertSolverIterationDataRecordedBasic()
@@ -830,7 +834,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.nl_solver.ln_solver.add_recorder(self.recorder)
 
         prob.setup()
-        prob.run_model()
+        t0, t1 = run_driver(prob)
 
         # TODO_RECORDERS - need to be more thorough
         self.assertSolverIterationDataRecordedBasic()
@@ -852,7 +856,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.nl_solver.ln_solver.add_recorder(self.recorder)
 
         prob.setup()
-        prob.run_model()
+        t0, t1 = run_driver(prob)
 
         #### No norms so no expected norms
 
@@ -876,7 +880,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.nl_solver.ln_solver.add_recorder(self.recorder)
 
         prob.setup()
-        prob.run_model()
+        t0, t1 = run_driver(prob)
 
         # TODO_RECORDERS - need to be more thorough
         self.assertSolverIterationDataRecordedBasic()
@@ -916,7 +920,7 @@ class TestSqliteRecorder(unittest.TestCase):
         mda.nl_solver.add_recorder(self.recorder)
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
+        t0, t1 = run_driver(prob)
         prob.cleanup()
 
         # get global counter values from driver, system, and solver recording
@@ -938,6 +942,32 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertTrue(counters_driver.isdisjoint(counters_system))
         self.assertTrue(counters_driver.isdisjoint(counters_solver))
         self.assertTrue(counters_system.isdisjoint(counters_solver))
+
+    def test_implicit_component(self):
+
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+        g1 = model.get_subsystem('g1')
+        g1.nl_solver = NewtonSolver()
+        g1.nl_solver.options['rtol'] = 1.0e-5
+        g1.ln_solver = DirectSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nl_solver = NewtonSolver()
+        g2.nl_solver.options['rtol'] = 1.0e-5
+        g2.ln_solver = DirectSolver()
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.nl_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
+
+
 
 if __name__ == "__main__":
     unittest.main()

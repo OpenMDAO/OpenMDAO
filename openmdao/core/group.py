@@ -5,6 +5,7 @@ from six import iteritems, string_types
 from six.moves import range
 from itertools import product, chain
 from collections import Iterable, Counter
+import inspect
 
 import numpy as np
 import warnings
@@ -1057,12 +1058,24 @@ class Group(System):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
+            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack()
+        if do_recording:
+            name = self.pathname if self.pathname else 'root'
+            push_recording_iteration_stack(name + '._apply_nonlinear', self.iter_count)
+            print_recording_iteration_stack()
+
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
         for subsys in self._subsystems_myproc:
             subsys._apply_nonlinear()
 
-        self.record_iteration()
+        if do_recording:
+            self.record_iteration()
+
+            pop_recording_iteration_stack()
+
 
     def _solve_nonlinear(self):
         """
@@ -1079,6 +1092,14 @@ class Group(System):
         """
         super(Group, self)._solve_nonlinear()
 
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
+            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack()
+        if do_recording:
+            name = self.pathname if self.pathname else 'root'
+            push_recording_iteration_stack(name + '._solve_nonlinear', self.iter_count)
+            print_recording_iteration_stack()
+
         # Execute guess_nonlinear if specified.
         # We need to call this early enough so that any solver that needs initial guesses has
         # them.
@@ -1089,7 +1110,12 @@ class Group(System):
                     sub.guess_nonlinear(sub._inputs, sub._outputs, sub._residuals)
 
         result = self._nl_solver.solve()
-        self.record_iteration()
+
+        if do_recording:
+            self.record_iteration()
+
+            pop_recording_iteration_stack()
+
         return result
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
@@ -1109,6 +1135,15 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
+            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack()
+        if do_recording:
+            name = self.pathname if self.pathname else 'root'
+            push_recording_iteration_stack(name + '._apply_linear', self.iter_count)
+            print_recording_iteration_stack()
+
+
         with self.jacobian_context() as J:
             # Use global Jacobian
             if self._owns_assembled_jac or self._views_assembled_jac:
@@ -1129,7 +1164,12 @@ class Group(System):
                     for vec_name in vec_names:
                         self._transfer(vec_name, mode)
 
-        self.record_iteration()
+        if do_recording:
+            self.record_iteration()
+
+            pop_recording_iteration_stack()
+
+
 
     def _solve_linear(self, vec_names, mode):
         """
@@ -1151,8 +1191,22 @@ class Group(System):
         float
             absolute error.
         """
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
+            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack()
+        if do_recording:
+            name = self.pathname if self.pathname else 'root'
+            push_recording_iteration_stack(name + '._solve_linear', self.iter_count)
+            print_recording_iteration_stack()
+
         result = self._ln_solver.solve(vec_names, mode)
-        self.record_iteration()
+
+        if do_recording:
+            self.record_iteration()
+
+
+            pop_recording_iteration_stack()
+
         return result
 
     def _linearize(self, do_nl=True, do_ln=True):

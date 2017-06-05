@@ -169,6 +169,15 @@ class ExplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
+            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack()
+
+        if do_recording:
+            push_recording_iteration_stack(self.pathname + '._solve_nonlinear', self.iter_count)
+            print_recording_iteration_stack()
+
+
         with self._unscaled_context(
                 outputs=[self._outputs], residuals=[self._residuals]):
             self._residuals.set_vec(self._outputs)
@@ -176,7 +185,10 @@ class ExplicitComponent(Component):
             self._residuals -= self._outputs
             self._outputs += self._residuals
 
-        self.record_iteration()
+        if do_recording:
+            self.record_iteration()
+
+            pop_recording_iteration_stack()
 
     def _solve_nonlinear(self):
         """
@@ -193,12 +205,23 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._solve_nonlinear()
 
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
+            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack()
+
+        if do_recording:
+            push_recording_iteration_stack(self.pathname + '._solve_nonlinear', self.iter_count)
+            print_recording_iteration_stack()
+
         with self._unscaled_context(
                 outputs=[self._outputs], residuals=[self._residuals]):
             self._residuals.set_const(0.0)
             failed = self.compute(self._inputs, self._outputs)
 
-        self.record_iteration()
+        if do_recording:
+            self.record_iteration()
+
+            pop_recording_iteration_stack()
 
         return bool(failed), 0., 0.
 
@@ -219,6 +242,15 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
+
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
+            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack()
+        if do_recording:
+            push_recording_iteration_stack(self.pathname + '._apply_linear', self.iter_count)
+            print_recording_iteration_stack()
+
+
         for vec_name in vec_names:
             with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
@@ -234,7 +266,11 @@ class ExplicitComponent(Component):
                     self.compute_jacvec_product(self._inputs, self._outputs,
                                                 d_inputs, d_residuals, mode)
                     d_residuals *= -1.0
-        self.record_iteration()
+        if do_recording:
+            self.record_iteration()
+
+            pop_recording_iteration_stack()
+
 
     def _solve_linear(self, vec_names, mode):
         """
@@ -256,6 +292,14 @@ class ExplicitComponent(Component):
         float
             relative error.
         """
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
+            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack()
+        if do_recording:
+            push_recording_iteration_stack(self.pathname + '._solve_linear', self.iter_count)
+            print_recording_iteration_stack()
+
+
         for vec_name in vec_names:
             d_outputs = self._vectors['output'][vec_name]
             d_residuals = self._vectors['residual'][vec_name]
@@ -267,7 +311,11 @@ class ExplicitComponent(Component):
                 elif mode == 'rev':
                     d_residuals.set_vec(d_outputs)
 
-        self.record_iteration()
+        if do_recording:
+            self.record_iteration()
+
+            pop_recording_iteration_stack()
+
 
         return False, 0., 0.
 
