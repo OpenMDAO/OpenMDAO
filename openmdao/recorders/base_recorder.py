@@ -12,6 +12,27 @@ from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver, NonlinearSolver
 
+recording_iteration_stack = []
+import inspect
+def iter_get_norm_on_call_stack():
+    for s in inspect.stack():
+        if s[3] == '_iter_get_norm':
+            return True
+    return False
+
+def push_recording_iteration_stack(name, iter_count):
+    recording_iteration_stack.append((name, iter_count))
+
+def pop_recording_iteration_stack():
+    recording_iteration_stack.pop()
+
+def print_recording_iteration_stack():
+    print
+    for name, iter_count in reversed(recording_iteration_stack)  :
+        if name == 'mda.d2._solve_nonlinear' and iter_count == 114:
+            pass
+        print '^^^', name, iter_count
+    print 60*'^'
 
 class BaseRecorder(object):
     """

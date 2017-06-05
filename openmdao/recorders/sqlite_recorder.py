@@ -118,8 +118,9 @@ class SqliteRecorder(BaseRecorder):
             self.record_iteration_system(object_requesting_recording, metadata, kwargs['method'])
 
         elif isinstance(object_requesting_recording, Solver):
-            self.record_iteration_solver(object_requesting_recording, metadata, kwargs['abs'],
-                                         kwargs['rel'])
+            # self.record_iteration_solver(object_requesting_recording, metadata, kwargs['abs'],
+            #                              kwargs['rel'])
+            self.record_iteration_solver(object_requesting_recording, metadata, **kwargs)
         else:
             raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
 
@@ -350,8 +351,7 @@ class SqliteRecorder(BaseRecorder):
         self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                             ('system', self.cursor.lastrowid))
 
-    def record_iteration_solver(self, object_requesting_recording, metadata, absolute=None,
-                                relative=None):
+    def record_iteration_solver(self, object_requesting_recording, metadata, **kwargs):
         """
         Record an iteration using solver options.
 
@@ -372,14 +372,14 @@ class SqliteRecorder(BaseRecorder):
 
         # Go through the recording options of Solver to construct the entry to be inserted.
         if self.options['record_abs_error']:
-            abs_error = absolute
+            abs_error = kwargs.get('abs')
         else:
-            abs_error = 0.0  # Is something else a better default val?
+            abs_error = None
 
         if self.options['record_rel_error']:
-            rel_error = relative
+            rel_error = kwargs.get('rel')
         else:
-            rel_error = 0.0
+            rel_error = None
 
         if self.options['record_solver_output']:
             dtype_tuples = []
@@ -387,7 +387,7 @@ class SqliteRecorder(BaseRecorder):
             if isinstance(object_requesting_recording, NonlinearSolver):
                 outputs = object_requesting_recording._system._outputs
             else:  # it's a LinearSolver
-                outputs = object_requesting_recording._system._vectors['outputs']
+                outputs = object_requesting_recording._system._vectors['output']['linear']
 
             outs = {}
             if 'out' in self._filtered_solver:
@@ -412,7 +412,7 @@ class SqliteRecorder(BaseRecorder):
             if isinstance(object_requesting_recording, NonlinearSolver):
                 residuals = object_requesting_recording._system._residuals
             else:  # it's a LinearSolver
-                residuals = object_requesting_recording._system._vectors['residuals']
+                residuals = object_requesting_recording._system._vectors['residual']['linear']
 
             res = {}
             if 'res' in self._filtered_solver:

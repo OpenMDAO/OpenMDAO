@@ -7,6 +7,7 @@ from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.record_util import create_local_meta, update_local_meta
 
 
 class ScipyIterativeSolver(LinearSolver):
@@ -149,8 +150,15 @@ class ScipyIterativeSolver(LinearSolver):
                 self._norm0 = norm
             else:
                 self._norm0 = 1.0
+
+        # TODO_RECORDERS - need to replace None in this with metadata from above
+        metadata = self.metadata = create_local_meta(None, type(self).__name__)
+        update_local_meta(metadata, (self._iter_count,))
+        self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / self._norm0)
+
         self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1
+
 
     def solve(self, vec_names, mode):
         """

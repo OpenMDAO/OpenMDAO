@@ -7,6 +7,8 @@ This is a simple nonlinear solver that just runs the system once.
 from six.moves import range
 
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.utils.record_util import create_local_meta, update_local_meta
+
 
 
 class NLRunOnce(NonlinearSolver):
@@ -45,5 +47,10 @@ class NLRunOnce(NonlinearSolver):
                 system._transfer('nonlinear', 'fwd', isub)
                 subsys._solve_nonlinear()
                 system._check_reconf_update()
+
+        # TODO_RECORDERS - need to replace None in this with metadata from above
+        metadata = self.metadata = create_local_meta(None, type(self).__name__)
+        update_local_meta(metadata, (self._iter_count,))
+        self._rec_mgr.record_iteration(self, metadata)
 
         return False, 0.0, 0.0
