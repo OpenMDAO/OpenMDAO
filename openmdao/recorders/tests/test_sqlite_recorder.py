@@ -89,7 +89,6 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
 
-
 def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
     """
         expected can be from multiple cases
@@ -132,7 +131,6 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
                     # Check to see if the values in actual and expected match
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
-
 
 def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
     """
@@ -192,7 +190,6 @@ def _assertSolverIterationDataRecordedBasic(test, db_cur):
     db_cur.execute("SELECT * FROM solver_iterations")
     row_actual = db_cur.fetchone()
     test.assertTrue(row_actual, 'Solver iterations table is empty. Should contain at least one record')
-
 
 def _assertMetadataRecorded(test, db_cur):
 
@@ -471,7 +468,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.model.add_recorder(self.recorder)
 
-        d1 = self.prob.model.get_subsystem('d1') # an instance of SellarDis1withDerivatives which is a Group
+        d1 = self.prob.model.get_subsystem('d1')  # an instance of SellarDis1withDerivatives which is a Group
         d1.add_recorder(self.recorder)
 
         obj_cmp = self.prob.model.get_subsystem('obj_cmp') # an ExecComp

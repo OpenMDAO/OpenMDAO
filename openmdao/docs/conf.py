@@ -88,7 +88,6 @@ extensions = [
     'show_unittest_examples',
     'embed_code',
     'embed_test',
-    'link_class_from_docstring',
     'tags'
 ]
 

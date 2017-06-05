@@ -2419,8 +2419,9 @@ class System(object):
 
         method_name = inspect.stack()[1][3]
         import unittest
-        test_name = get_current_case()
-        print 'qqq', test_name, base_filename, method_name
+        #test_name = get_current_case()
+        test_name = "this"
+        #print 'qqq', test_name, base_filename, method_name
 
 
 import inspect
@@ -2439,10 +2440,10 @@ def get_current_case():
     Tested on Python 2.7 and 3.3 - 3.6 with nose 1.3.7.
     '''
 
-    '/Users/hschilli/Documents/OpenMDAO/dev/blue_recording_global_counter/openmdao/recorders/tests/test_sqlite_recorder.py'
+    #'/Users/hschilli/Documents/OpenMDAO/dev/blue_recording_global_counter/openmdao/recorders/tests/test_sqlite_recorder.py'
     for frame_info in inspect.stack():
         if frame_info[1].endswith('tests/test_sqlite_recorder.py'):
             if frame_info[3] == 'run_driver':
                 continue
             return frame_info[3]
-    raise RuntimeError('Could not determine test case')
+    # raise RuntimeError('Could not determine test case')
