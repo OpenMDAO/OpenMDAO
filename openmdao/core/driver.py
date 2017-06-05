@@ -1,9 +1,10 @@
 """Define a base class for all Drivers in OpenMDAO."""
+import numpy as np
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.record_util import create_local_meta, update_local_meta
-import numpy as np
+
 from openmdao.utils.options_dictionary import OptionsDictionary
 from six import iteritems
 

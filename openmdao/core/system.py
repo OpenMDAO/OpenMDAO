@@ -23,8 +23,9 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
-from openmdao.utils.record_util import create_local_meta, update_local_meta
 from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.record_util import create_local_meta, update_local_meta
+
 
 
 class System(object):
