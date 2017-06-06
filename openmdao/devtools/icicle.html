@@ -76,38 +76,32 @@ h1 {
 </head>
 <body>
     <header><h1>$title</h1></header>
-<script type="text/javascript" src="http://d3js.org/d3.v3.js"></script>
+<script type="text/javascript" src="http://d3js.org/d3.v4.min.js"></script>
 <script>
 
 var width = 960,
     height = 500;
 
-var x = d3.scale.linear()
+var x = d3.scaleLinear()
     .range([0, width]);
 
-var y = d3.scale.linear()
+var y = d3.scaleLinear()
     .range([0, height]);
 
-var color = d3.scale.category20c();
+var color = d3.scaleOrdinal()
+    .range(d3.schemeCategory20c);
 
-var partition = d3.layout.partition()
-    .value(function(d) {
-        return d.time;
-    });
+var svg;
 
-var svg = d3.select("body").append("svg")
-    .attr("width", width)
-    .attr("height", height);
-
-var rect = svg.selectAll("rect");
-
-var root = $call_graph_data;
+var root_table = $call_graph_data;
 
 var formatTime = d3.format(".3g");
 var formatTpct = d3.format(".2%");
 var formatCalls = d3.format(",d");
 
 var last_d = null;
+var rect;
+var tooltip;
 
 window.onresize = resize;
 
@@ -115,23 +109,28 @@ function resize() {
     width = window.innerWidth;
 
     svg.attr("width", width);
-    x = d3.scale.linear()
+    x = d3.scaleLinear()
         .range([0, width]);
 
     if (last_d !== null) {
-        x.domain([last_d.x, last_d.x + last_d.dx]);
-        y.domain([last_d.y, 1]).range([last_d.y ? 20 : 0, height]);
+        x.domain([last_d.x0, last_d.x1]);
+        y.domain([last_d.y0, 1]).range([last_d.y0 ? 20 : 0, height]);
     }
 
-    rect.attr("x", function(d) { return x(d.x); })
-        .attr("y", function(d) { return y(d.y); })
-        .attr("width", function(d) { return x(d.x + d.dx) - x(d.x); })
-        .attr("height", function(d) { return y(d.y + d.dy) - y(d.y); });
+    rect.attr("x", function(d) { return x(d.x0); })
+        .attr("y", function(d) { return y(d.y0); })
+        .attr("width", function(d) { return x(d.x1) - x(d.x0); })
+        .attr("height", function(d) { return y(d.y1) - y(d.y0); });
 }
 
 window.onload = function() {
-    var tooltip = d3.select("#tooltip")
+
+    tooltip = d3.selectAll("#tooltip")
         .style("display", "none");
+
+    svg = d3.select("body").append("svg")
+        .attr("width", width)
+        .attr("height", height);
 
     var funcpath = d3.select(".funcpath");
     var loctime = d3.select(".loctime");
@@ -139,57 +138,68 @@ window.onload = function() {
     var tottime = d3.select(".tottime");
     var totcalls = d3.select(".totcalls");
 
-    rect = rect
-        .data(partition.nodes(root))
-      .enter().append("rect")
-        .attr("x", function(d) { return x(d.x); })
-        .attr("y", function(d) { return y(d.y); })
-        .attr("width", function(d) { return x(d.dx); })
-        .attr("height", function(d) { return y(d.dy); })
-        .classed("crect", function(d, i) {
-            return (d.short_name !== '@parent');
-        })
-        .classed("hiderect", function(d, i) {
-            return (d.short_name === '@parent');
-        });
+    var stratify = d3.stratify()
+        .id(function(d) { return d.name; })
+        .parentId(function(d) { return d.name.substring(0, d.name.lastIndexOf("/")); });
 
-    var crect = d3.selectAll(".crect")
+    var root = stratify(root_table)
+        .sum(function(d) { return d.time; })
+        .sort(function(a,b) { return b.value - a.value; });
+
+    var partition = d3.partition()
+        .padding(0);
+
+    partition(root);
+
+    rect = d3.select("svg").selectAll("rect")
+        .data(root.descendants())
+        .enter().append("rect")
+        .attr("x", function(d) { return x(d.x0); })
+        .attr("y", function(d) { return y(d.y0); })
+        .attr("width", function(d) { return x(d.x1) - x(d.x0); })
+        .attr("height", function(d) { return y(d.y1) - y(d.y0); })
+        .classed("hiderect", function(d) { return d.data.short_name === "@parent"; });
+
+    var crect = rect.select(function(d) {
+            return d.data.short_name === "@parent" ? null : this;
+        })
         .attr("fill", function(d) {
-            return color((d.children ? d : d.parent).name);
+            return color((d.children ? d : d.parent).id);
         })
         .on("click", click)
         .on("mouseover", function(d) {
             crect.attr("fill", function(dd) {
-                if (d.short_name === dd.short_name) {
+                if (d.data.short_name === dd.data.short_name) {
                     return "magenta";
                 }
                 else {
-                    return color((dd.children ? dd : dd.parent).name);
+                    return color((dd.children ? dd : dd.parent).id);
                 }
             });
-             funcpath.text(d.short_name);
-             loctime.text(formatTime(d.time));
-             tottime.text(formatTime(d.tot_time));
-             loccalls.text(formatCalls(d.count));
-             totcalls.text(formatCalls(d.tot_count));
+             funcpath.text(d.data.short_name);
+             loctime.text(formatTime(d.value));
+             tottime.text(formatTime(d.data.tot_time));
+             loccalls.text(formatCalls(d.data.count));
+             totcalls.text(formatCalls(d.data.tot_count));
              return tooltip.style("display", "inline");
          })
         .on("mouseout", function(d) {
             crect.attr("fill", function(d) {
-                return color((d.children ? d : d.parent).name);
+                return color((d.children ? d : d.parent).id);
             });
              return tooltip.style("display", "none");
         })
         .on("mousemove", function(d) {
             var newx;
-            if (d3.event.layerX < tooltip[0][0].clientWidth/2) {
+            var clientWidthO2 = tooltip.nodes()[0].clientWidth/2;
+            if (d3.event.layerX < clientWidthO2) {
                 newx = 0;
             }
-            else if (d3.event.layerX > window.innerWidth-tooltip[0][0].clientWidth/2) {
-                newx = window.innerWidth-tooltip[0][0].clientWidth;
+            else if (d3.event.layerX > window.innerWidth-clientWidthO2) {
+                newx = window.innerWidth-tooltip.nodes()[0].clientWidth;
             }
             else {
-                newx = d3.event.layerX-tooltip[0][0].clientWidth/2;
+                newx = d3.event.layerX-clientWidthO2;
             }
             return tooltip
                 .style("left", (newx) + "px")
@@ -201,15 +211,15 @@ window.onload = function() {
 
 function click(d) {
   last_d = d;
-  x.domain([d.x, d.x + d.dx]);
-  y.domain([d.y, 1]).range([d.y ? 20 : 0, height]);
+  x.domain([d.x0, d.x1]);
+  y.domain([d.y0, 1]).range([d.y0 ? 20 : 0, height]);
 
   rect.transition()
       .duration(750)
-      .attr("x", function(d) { return x(d.x); })
-      .attr("y", function(d) { return y(d.y); })
-      .attr("width", function(d) { return x(d.x + d.dx) - x(d.x); })
-      .attr("height", function(d) { return y(d.y + d.dy) - y(d.y); });
+      .attr("x", function(d) { return x(d.x0); })
+      .attr("y", function(d) { return y(d.y0); })
+      .attr("width", function(d) { return x(d.x1) - x(d.x0); })
+      .attr("height", function(d) { return y(d.y1) - y(d.y0); });
 }
 
 </script>

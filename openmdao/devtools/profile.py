@@ -14,7 +14,7 @@ from string import Template
 from collections import defaultdict
 import cProfile
 from contextlib import contextmanager
-
+from itertools import chain
 
 from six import iteritems, PY3
 
@@ -44,24 +44,16 @@ def cProfile_context(fname='prof_out'):
     prof.dump_stats(fname)
 
 
-def get_actual_class(frame, class_):
-    """Given a frame and a class, find the class that matches the"""
-    frame.f_code.co_filename
-    for cls in getmro(meth.__self__.__class__):
-        if meth.__name__ in cls.__dict__:
-            return cls
-
 def _prof_node(parts, obj=None):
-    name = ','.join(parts)
-    short_name = parts[-1]
+    name = '/'.join(parts)
     return {
         'name': name,
-        'short_name': short_name,
+        'short_name': parts[-1],
         'time': 0.,
         'count': 0,
         'tot_time': 0.,
         'tot_count': 0,
-        'children': [],
+        'child_time': 0.,
         'obj': obj,
     }
 
@@ -166,7 +158,10 @@ def _collect_methods(method_dict):
             for base in class_.__mro__:
                 if base is object:
                     continue
-                fname = sys.modules[base.__module__].__file__[:-1]
+                if PY3:
+                    fname = sys.modules[base.__module__].__file__
+                else:
+                    fname = sys.modules[base.__module__].__file__[:-1]
                 classes = file2class[fname]
                 if base.__name__ not in classes:
                     file2class[fname].append(base.__name__)
@@ -189,7 +184,7 @@ def _instance_profile(frame, event, arg):
     Collects profile data for functions that match _profile_matches.
     The data collected will include time elapsed, number of calls, ...
     """
-    global _call_stack, _profile_out, _profile_struct, \
+    global _call_stack, _profile_out, _profile_struct, _inst_data, \
            _profile_funcs_dict, _profile_start, _profile_matches, _file2class
 
     if event == 'call':
@@ -200,6 +195,17 @@ def _instance_profile(frame, event, arg):
                 self = loc['self']
                 if isinstance(self, _profile_matches[func_name]):
                     classes = _file2class[frame.f_code.co_filename]
+                    if not classes:
+                        for base in self.__class__.__mro__:
+                            if base is object:
+                                continue
+                            if PY3:
+                                fname = sys.modules[base.__module__].__file__
+                            else:
+                                fname = sys.modules[base.__module__].__file__[:-1]
+                            classes = _file2class[fname]
+                            if base.__name__ not in classes:
+                                classes.append(base.__name__)
                     if len(classes) > 1:
                         # TODO: fix this
                         warnings.warn("multiple classes %s found in same module (%s), "
@@ -221,7 +227,7 @@ def _instance_profile(frame, event, arg):
             if 'self' in loc:
                 self = loc['self']
                 if isinstance(self, _profile_matches[func_name]):
-                    path = ','.join(_call_stack)
+                    path = '/'.join(_call_stack)
                     if path not in _inst_data:
                         _inst_data[path] = _prof_node(_call_stack, self)
 
@@ -233,9 +239,10 @@ def _instance_profile(frame, event, arg):
                     pdata['count'] += 1
 
 def start():
-    """Turn on profiling.
     """
-    global _profile_start, _profile_setup
+    Turn on profiling.
+    """
+    global _profile_start, _profile_setup, _call_stack, _inst_data
     if _profile_start is not None:
         print("profiling is already active.")
         return
@@ -244,34 +251,44 @@ def start():
         setup()  # just do a default setup
 
     _profile_start = etime()
+    _call_stack.append('@total')
+    if '@total' not in _inst_data:
+        _inst_data['@total'] = _prof_node(['@total'])
 
     sys.setprofile(_instance_profile)
 
 def stop():
-    """Turn off profiling.
     """
-    global _profile_total, _profile_start
+    Turn off profiling.
+    """
+    global _profile_total, _profile_start, _call_stack, _inst_data
     if _profile_start is None:
         return
 
     sys.setprofile(None)
 
+    _call_stack.pop()
+
     _profile_total += (etime() - _profile_start)
+    _inst_data['@total']['time'] = _profile_total
+    _inst_data['@total']['count'] += 1
     _profile_start = None
 
 
 def _finalize_profile():
-    """called at exit to write out the file mapping function call paths
+    """
+    called at exit to write out the file mapping function call paths
     to identifiers.
     """
-    global _profile_prefix, _profile_funcs_dict, _profile_total
+    global _profile_prefix, _profile_funcs_dict, _profile_total, _inst_data
 
     stop()
 
     # fix names in _inst_data
     _obj_map = {}
     for funcpath, data in iteritems(_inst_data):
-        fname = funcpath.rsplit(',', 1)[-1]
+        parts = funcpath.rsplit('/', 1)
+        fname = parts[-1]
         try:
             name = data['obj'].pathname
         except AttributeError:
@@ -280,14 +297,37 @@ def _finalize_profile():
             klass = fname.split('#')[0][1:]
             _obj_map[fname] = '.'.join((name, "<%s.%s>" % (klass, fname.rsplit('.', 1)[-1])))
 
+    # compute child times
+    for funcpath, data in iteritems(_inst_data):
+        parts = funcpath.rsplit('/', 1)
+        if len(parts) > 1:
+            _inst_data[parts[0]]['child_time'] += data['time']
+
+    # in order to make the D3 partition layout give accurate proportions, we can only put values
+    # into leaf nodes because the parent node values get overridden by the sum of the children. To
+    # get around this, we create a child for each non-leaf node with the name '@parent' and put the
+    # time exclusive to the parent into that child, so that when all of the children are summed, they'll
+    # add up to the correct time for the parent and the visual proportions of the parent will be correct.
+
+    # compute child timings
+    parnodes = []
+    for funcpath, node in iteritems(_inst_data):
+        if node['child_time'] > 0.:
+            parts = funcpath.split('/')
+            pparts = parts + ['@parent']
+            ex_child_node = _prof_node(pparts)
+            ex_child_node['time'] = node['time'] - node['child_time']
+            ex_child_node['count'] = 1
+
+            parnodes.append(('/'.join(pparts), ex_child_node))
+
     rank = MPI.COMM_WORLD.rank if MPI else 0
 
     fname = os.path.basename(_profile_prefix)
     with open("%s.%d" % (fname, rank), 'w') as f:
-        f.write("@total 1 %f\n" % _profile_total)
-        for name, data in iteritems(_inst_data):
-            new_name = ','.join([
-                _obj_map.get(s, s) for s in name.split(',')
+        for name, data in chain(iteritems(_inst_data), parnodes):
+            new_name = '/'.join([
+                _obj_map.get(s, s) for s in name.split('/')
             ])
             f.write("%s %d %f\n" % (new_name, data['count'], data['time']))
 
@@ -304,9 +344,9 @@ def _iter_raw_prof_file(rawname):
 
 
 def process_profile(flist):
-    """Take the generated raw profile data, potentially from multiple files,
-    and combine it to get hierarchy structure and total execution counts and
-    timing data.
+    """
+    Take the generated raw profile data, potentially from multiple files,
+    and combine it to get execution counts and timing data.
 
     Args
     ----
@@ -318,14 +358,8 @@ def process_profile(flist):
 
     nfiles = len(flist)
     totals = {}
-    total_under_profile = 0.0
-    tops = set()
 
     tree_nodes = {}
-
-    # this name has to be '.' and not '', else we have issues
-    # when combining multiple files due to sort order
-    tree_nodes['@total'] = _prof_node(['@total'])
 
     for fname in flist:
         ext = os.path.splitext(fname)[1]
@@ -337,64 +371,48 @@ def process_profile(flist):
 
         for funcpath, count, t in _iter_raw_prof_file(fname):
 
-            parts = funcpath.split(',')
+            parts = funcpath.split('/')
 
             # for multi-file MPI profiles, decorate names with the rank
             if nfiles > 1 and dec:
                 parts = ["%s%s" % (p,dec) for p in parts]
-                funcpath = ','.join(parts)
-
-            if len(parts) == 1:
-                tops.add(funcpath)
-
-                if funcpath != '@total':
-                    total_under_profile += t
+                funcpath = '/'.join(parts)
 
             tree_nodes[funcpath] = node = _prof_node(parts)
             node['time'] += t
             node['count'] += count
 
             funcname = parts[-1]
+            if funcname == '@parent':
+                continue
+
             if funcname in totals:
                 tnode = totals[funcname]
             else:
                 totals[funcname] = tnode = _prof_node(parts)
+
             tnode['tot_time'] += t
             tnode['tot_count'] += count
 
-    # create the call tree
     for funcpath, node in iteritems(tree_nodes):
-        parts = funcpath.rsplit(',', 1)
-        if len(parts) > 1:
-            parent, child = parts
-            tree_nodes[parent]['children'].append(tree_nodes[funcpath])
-        elif funcpath != '@total':
-            tree_nodes['@total']['children'].append(tree_nodes[funcpath])
-
-    # in order to make the D3 partition layout give accurate proportions, we can only put values
-    # into leaf nodes because the parent node values get overridden by the sum of the children. To
-    # get around this, we create a child for each non-leaf node with the name '@parent' and put the
-    # time exclusive to the parent into that child, so that when all of the children are summed, they'll
-    # add up to the correct time for the parent and the visual proportions of the parent will be correct.
-    for funcpath, node in iteritems(tree_nodes):
-        parts = funcpath.split(',')
-        if len(node['children']) > 0:
-            child_sum = sum([c['time'] for c in node['children']])
-            ex_child_node = _prof_node(parts + ['@parent'])
-            ex_child_node['time'] = node['time'] - child_sum
-            ex_child_node['tot_time'] = ex_child_node['time']
-            ex_child_node['count'] = 1
-            ex_child_node['tot_count'] = 1
-            del ex_child_node['obj']
-            node['children'].append(ex_child_node)
-        del node['obj']
-        node['tot_time'] = totals[parts[-1]]['tot_time']
-        node['tot_count'] = totals[parts[-1]]['tot_count']
+        parts = funcpath.split('/')
+        if parts[-1] != '@parent':
+            node['tot_time'] = totals[parts[-1]]['tot_time']
+            node['tot_count'] = totals[parts[-1]]['tot_count']
 
     tree_nodes['@total']['tot_time'] = tree_nodes['@total']['time']
-    tree_nodes['@total']['time'] = total_under_profile
 
-    return tree_nodes['@total'], totals
+    # D3 sums up all children to get parent value, so we need to
+    # zero out the parent value else we get double the value we want
+    # once we add in all of the times from descendants.
+    for funcpath, node in iteritems(tree_nodes):
+        parts = funcpath.rsplit('/', 1)
+        if parts[-1] == '@parent':
+            tree_nodes[parts[0]]['time'] = 0.
+        del node['obj']
+        del node['child_time']
+
+    return list(tree_nodes.values()), totals
 
 
 def prof_dump(fname=None):
