@@ -4,6 +4,7 @@ from __future__ import division, print_function
 
 from openmdao.solvers.solver import Solver
 
+
 class NonlinearSolver(Solver):
     """
     Base class for nonlinear solvers.

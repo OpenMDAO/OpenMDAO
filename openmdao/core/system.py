@@ -29,6 +29,7 @@ _vec_key2type = {
     'residual': 'output'
 }
 
+
 class System(object):
     """
     Base class for all systems in OpenMDAO.

@@ -5,6 +5,7 @@ from __future__ import division, print_function
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.solvers.solver import Solver
 
+
 class LinearSolver(Solver):
     """
     Base class for linear solvers.

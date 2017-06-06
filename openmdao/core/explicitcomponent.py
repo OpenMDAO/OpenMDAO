@@ -131,10 +131,12 @@ class ExplicitComponent(Component):
                              "called from 'initialize_variables' rather than "
                              "in the '__init__' function.")
 
-        return super(ExplicitComponent, self).add_output(name, val=val, shape=shape, units=units,
-                                                  res_units=res_units, desc=desc, lower=lower,
-                                                  upper=upper, ref=ref, ref0=ref0, res_ref=res_ref,
-                                                  var_set=var_set, distributed=distributed)
+        return super(ExplicitComponent, self).add_output(name, val=val, shape=shape,
+                                                         units=units, res_units=res_units,
+                                                         desc=desc,
+                                                         lower=lower, upper=upper,
+                                                         ref=ref, ref0=ref0, res_ref=res_ref,
+                                                         var_set=var_set, distributed=distributed)
 
     def _negate_jac(self):
         """
