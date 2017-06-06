@@ -37,9 +37,31 @@ runs for the first time.
 
 The first time a `MetaModel` runs, it will train the surrogates using the
 training data that has been provided and then it will predict the output
-values. The training step only occurs on the first run.
+values. This training step only occurs on the first run.
 
 .. embed-test::
     openmdao.components.tests.test_meta_model.MetaModelTestCase.test_metamodel_feature
+
+The inputs and outputs of a `MetaModel` are not limited to scalar values. The
+following modified version of the example uses an array to predict sine and
+cosine as a single output array of two values.  You will also note that the default
+surrogate can been passed as an argument to the `MetaModel` constructor, as an
+alternative to specifying it later.
+
+.. embed-test::
+    openmdao.components.tests.test_meta_model.MetaModelTestCase.test_metamodel_feature2d
+
+In addition, it's possible to vectorize the input and output variables so that you can
+make multiple predictions for the inputs and outputs in a single execution of the
+`MetaModel` component. This is done by setting the ``vectorize`` argument when
+constructing the `MetaModel` component.  The following example vectorizes the ``trig``
+component so that it makes three predictions at a time.  In this case, the input is
+three independent values of ``x`` and the output is the corresponding predicted values
+for the sine and cosine functions at those three points.  Note that a vectorized
+`MetaModel` component requires the first dimension of all input and output variables
+to be the same size as specified in the ``vectorize`` argument.
+
+.. embed-test::
+    openmdao.components.tests.test_meta_model.MetaModelTestCase.test_metamodel_feature_vector2d
 
 .. tags:: MetaModel, Examples

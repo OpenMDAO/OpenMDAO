@@ -99,6 +99,7 @@ Drivers
    :maxdepth: 1
 
    features/drivers/add_vois
+   features/drivers/scipy_optimizer
 
 
 Running your models

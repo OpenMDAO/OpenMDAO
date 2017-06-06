@@ -16,7 +16,7 @@ class MetaModelTestCase(unittest.TestCase):
         sin_mm.add_input('x', 0.)
         sin_mm.add_output('f_x', 0.)
 
-        prob = Problem(Group())
+        prob = Problem()
         prob.model.add_subsystem('sin_mm', sin_mm)
 
         # check that missing surrogate is detected in check_config
@@ -56,38 +56,6 @@ class MetaModelTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
 
-    @unittest.skip('not currently supported')
-    def test_sin_metamodel_vector(self):
-        # Like simple sine example, but with input of length n instead of scalar
-        # The expected behavior is that the output is also of length n, with
-        # each one being an independent prediction.
-        # Its as if you stamped out n copies of metamodel, ran n scalars
-        # through its input, then muxed all those outputs into one contiguous
-        # array but you skip all the n-copies thing and do it all as an array
-
-        size = 3
-
-        # create a MetaModel for sine
-        sin_mm = MetaModel()
-        sin_mm.add_input('x', np.zeros(size))
-        sin_mm.add_output('f_x', np.zeros(size))
-        sin_mm.default_surrogate = FloatKrigingSurrogate()
-
-        # add it to a Problem
-        prob = Problem(Group())
-        prob.model.add_subsystem('sin_mm', sin_mm)
-        prob.setup(check=False)
-
-        # train the surrogate with vector input and check predicted value
-        sin_mm.metadata['train:x'] = np.linspace(0,10,20)
-        sin_mm.metadata['train:f_x'] = .5*np.sin(sin_mm.metadata['train:x'])
-
-        prob['sin_mm.x'] = np.array([2.1, 3.2, 4.3])
-
-        prob.run_model()
-
-        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
-
     def test_sin_metamodel_preset_data(self):
         # preset training data
         x = np.linspace(0,10,200)
@@ -98,7 +66,7 @@ class MetaModelTestCase(unittest.TestCase):
         sin_mm.add_input('x', 0., training_data = np.linspace(0,10,200))
         sin_mm.add_output('f_x', 0., training_data=f_x)
 
-        prob = Problem(Group())
+        prob = Problem()
         prob.model.add_subsystem('sin_mm', sin_mm)
 
         # check that missing surrogate is detected in check_setup
@@ -134,7 +102,7 @@ class MetaModelTestCase(unittest.TestCase):
         sin_mm.default_surrogate = KrigingSurrogate(eval_rmse=True)
 
         # add it to a Problem
-        prob = Problem(Group())
+        prob = Problem()
         prob.model.add_subsystem('sin_mm', sin_mm)
         prob.setup(check=False)
 
@@ -225,7 +193,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.warm_restart = True
 
         # add to problem
-        prob = Problem(Group())
+        prob = Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
@@ -263,7 +231,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_output('y2', 0.)
         mm.default_surrogate = FloatKrigingSurrogate()
 
-        prob = Problem(Group())
+        prob = Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
@@ -290,7 +258,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_output('y2', 0.)
         mm.default_surrogate = FloatKrigingSurrogate()
 
-        prob = Problem(Group())
+        prob = Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
@@ -316,7 +284,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_output('y', np.zeros(2,))
         mm.default_surrogate = FloatKrigingSurrogate()
 
-        prob = Problem(Group())
+        prob = Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
@@ -347,7 +315,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_output('y', np.zeros((2, 2)))
         mm.default_surrogate = FloatKrigingSurrogate()
 
-        prob = Problem(Group())
+        prob = Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
@@ -379,7 +347,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_output('f', 0.)
         mm.default_surrogate = FloatKrigingSurrogate()
 
-        prob = Problem(Group())
+        prob = Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
@@ -393,9 +361,9 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected = "MetaModel: Each variable must have the same number" \
-                   " of training points. Expected 4 but found" \
-                   " 2 points for 'y'."
+        expected = ("MetaModel: Each variable must have the same number"
+                    " of training points. Expected 4 but found"
+                    " 2 points for 'y'.")
 
         self.assertEqual(str(cm.exception), expected)
 
@@ -406,7 +374,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_output('f', 0.)
         mm.default_surrogate = FloatKrigingSurrogate()
 
-        prob = Problem(Group())
+        prob = Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
@@ -420,10 +388,9 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected = "MetaModel: Each variable must have the same number" \
-                   " of training points. Expected 4 but found" \
-                   " 2 points for 'f'."
-
+        expected = ("MetaModel: Each variable must have the same number"
+                    " of training points. Expected 4 but found"
+                    " 2 points for 'f'.")
         self.assertEqual(str(cm.exception), expected)
 
     def test_derivatives(self):
@@ -432,17 +399,20 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_output('f', 0.)
         mm.default_surrogate = FloatKrigingSurrogate()
 
-        prob = Problem(Group())
-        prob.model.add_subsystem('mm', mm, promotes=['x'])
-        prob.model.add_subsystem('p', IndepVarComp('x', 0.), promotes=['x'])
-        prob.setup(check=False)
+        prob = Problem()
+        prob.model.add_subsystem('p', IndepVarComp('x', 0.),
+                                 promotes_outputs=['x'])
+        prob.model.add_subsystem('mm', mm,
+                                 promotes_inputs=['x'])
+        prob.setup()
 
         mm.metadata['train:x'] = [0., .25, .5, .75, 1.]
         mm.metadata['train:f'] = [1., .75, .5, .25, 0.]
+
         prob['x'] = 0.125
         prob.run_model()
 
-        data = prob.check_partial_derivs(out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         Jf = data['mm'][('f', 'x')]['J_fwd']
         Jr = data['mm'][('f', 'x')]['J_rev']
@@ -451,7 +421,7 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, Jr[0][0], -1., 1.e-3)
 
         # TODO: complex step not currently supported in check_partial_derivs
-        # data = prob.check_partial_derivs(global_options={'method': 'cs'})
+        # data = prob.check_partials(global_options={'method': 'cs'})
 
         abs_errors = data['mm'][('f', 'x')]['abs error']
         self.assertTrue(len(abs_errors) > 0)
@@ -483,6 +453,121 @@ class MetaModelTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['trig.sin_x'], .5*np.sin(prob['trig.x']), 1e-4)
         assert_rel_error(self, prob['trig.cos_x'], .5*np.cos(prob['trig.x']), 1e-4)
+
+    def test_metamodel_feature2d(self):
+        # similar to previous example, but output is 2d
+
+        # create a MetaModel that predicts sine and cosine as an array
+        trig = MetaModel(default_surrogate=FloatKrigingSurrogate())
+        trig.add_input('x', 0)
+        trig.add_output('y', np.zeros(2))
+
+        # add it to a Problem
+        prob = Problem()
+        prob.model.add_subsystem('trig', trig)
+        prob.setup(check=False)
+
+        # provide training data
+        trig.metadata['train:x'] = np.linspace(0, 10, 20)
+        trig.metadata['train:y'] = np.column_stack((
+            .5*np.sin(trig.metadata['train:x']),
+            .5*np.cos(trig.metadata['train:x'])
+        ))
+
+        # train the surrogate and check predicted value
+        prob['trig.x'] = 2.1
+        prob.run_model()
+        assert_rel_error(self, prob['trig.y'],
+                         np.append(
+                            .5*np.sin(prob['trig.x']),
+                            .5*np.cos(prob['trig.x'])
+                         ),
+                         1e-4)
+
+    def test_metamodel_feature_vector(self):
+        # Like simple sine example, but with input of length n instead of scalar
+        # The expected behavior is that the output is also of length n, with
+        # each one being an independent prediction.
+        # Its as if you stamped out n copies of metamodel, ran n scalars
+        # through its input, then muxed all those outputs into one contiguous
+        # array but you skip all the n-copies thing and do it all as an array
+
+        size = 3
+
+        # create a vectorized MetaModel for sine
+        trig = MetaModel(vectorize=size, default_surrogate=FloatKrigingSurrogate())
+        trig.add_input('x', np.zeros(size))
+        trig.add_output('y', np.zeros(size))
+
+        # add it to a Problem
+        prob = Problem()
+        prob.model.add_subsystem('trig', trig)
+        prob.setup(check=False)
+
+        # provide training data
+        trig.metadata['train:x'] = np.linspace(0, 10, 20)
+        trig.metadata['train:y'] = .5*np.sin(trig.metadata['train:x'])
+
+        # train the surrogate and check predicted value
+        prob['trig.x'] = np.array([2.1, 3.2, 4.3])
+        prob.run_model()
+        assert_rel_error(self, prob['trig.y'],
+                         np.array(.5*np.sin(prob['trig.x'])),
+                         1e-4)
+
+    def test_metamodel_feature_vector2d(self):
+        # similar to previous example, but processes 3 inputs/outputs at a time
+        size = 3
+
+        # create a vectorized MetaModel for sine and cosine
+        trig = MetaModel(vectorize=size, default_surrogate=FloatKrigingSurrogate())
+        trig.add_input('x', np.zeros(size))
+        trig.add_output('y', np.zeros((size, 2)))
+
+        # add it to a Problem
+        prob = Problem()
+        prob.model.add_subsystem('trig', trig)
+        prob.setup(check=False)
+
+        # provide training data
+        trig.metadata['train:x'] = np.linspace(0, 10, 20)
+        trig.metadata['train:y'] = np.column_stack((
+            .5*np.sin(trig.metadata['train:x']),
+            .5*np.cos(trig.metadata['train:x'])
+        ))
+
+        # train the surrogate and check predicted value
+        prob['trig.x'] = np.array([2.1, 3.2, 4.3])
+        prob.run_model()
+        assert_rel_error(self, prob['trig.y'],
+                         np.column_stack((
+                             .5*np.sin(prob['trig.x']),
+                             .5*np.cos(prob['trig.x'])
+                         )),
+                         1e-4)
+
+    def test_metamodel_vector_errors(self):
+        # invalid values for vectorize argument. Bad.
+        for bad_value in [True, -1, 0, 1, 1.5]:
+            with self.assertRaises(RuntimeError) as cm:
+                MetaModel(vectorize=True)
+                self.assertEqual(str(cm.exception),
+                                 "Metamodel: The value of the 'vectorize' "
+                                 "argument must be an integer greater than "
+                                 "one, found '%s'." % str(bad_value))
+
+        # first dimension of all inputs/outputs must be 3
+        mm = MetaModel(vectorize=3)
+
+        with self.assertRaises(RuntimeError) as cm:
+            mm.add_input('x', np.zeros(2))
+        self.assertEqual(str(cm.exception),
+                         "Metamodel: First dimension of input 'x' must be 3")
+
+        with self.assertRaises(RuntimeError) as cm:
+            mm.add_output('y', np.zeros(4))
+        self.assertEqual(str(cm.exception),
+                         "Metamodel: First dimension of output 'y' must be 3")
 
 
 if __name__ == "__main__":

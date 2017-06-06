@@ -43,7 +43,7 @@ The component is the basic building block of a model. You will always define com
 
     - `initialize_variables`: define all your inputs and outputs here
     - `compute`: calculation of all output values for the given inputs
-    - `compute_partial_derivs`: derivatives of all the outputs values with respect to all the inputs
+    - `compute_partials`: derivatives of all the outputs values with respect to all the inputs
 
 .. note::
 
