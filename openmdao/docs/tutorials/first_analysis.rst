@@ -73,9 +73,9 @@ Here, we connect the design variables to the inputs on the paraboloid component.
 
 Once the model hierarchy is defined,
 we pass it to the constructor of the `Problem` class then call the `setup()` method on that problem which tells the framework to do some initial work to get the data structures in place for execution.
-Then we call `run_driver()` to actually perform the computation.
+In this case, we call `run_model()` to actually perform the computation. Later, we'll see how to explicitly set drivers and will be calling `run_driver()` instead.
 
-Here we called run_driver twice.
+Here we called run_model twice.
 The first times with the initial values of 3.0 and -4.0 for `x` and `y`.
 The second time we changed those values and re-ran.
 There are a few details to note here.
@@ -103,10 +103,10 @@ You can read more about how OpenMDAO handles units and scaling here[LINK TO FEAT
 
         prob = Problem(model)
         prob.setup()
-        prob.run_driver()
+        prob.run_model()
         print(prob['parab_comp.f_xy'])
 
         prob['des_vars.x'] = 5.0
         prob['des_vars.y'] = -2.0
-        prob.run_driver()
+        prob.run_model()
         print(prob['parab_comp.f_xy'])

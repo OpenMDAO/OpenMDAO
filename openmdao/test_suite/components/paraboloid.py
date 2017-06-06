@@ -81,10 +81,10 @@ if __name__ == "__main__":
 
     prob = Problem(model)
     prob.setup()
-    prob.run_driver()
+    prob.run_model()
     print(prob['parab_comp.f_xy'])
 
     prob['des_vars.x'] = 5.0
     prob['des_vars.y'] = -2.0
-    prob.run_driver()
+    prob.run_model()
     print(prob['parab_comp.f_xy'])
