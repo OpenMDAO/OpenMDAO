@@ -13,7 +13,7 @@ from openmdao.devtools.testutil import assert_rel_error
 
 class TestImplCompSimpleCompute(ImplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('a', val=1.)
         self.add_input('b', val=1.)
         self.add_input('c', val=1.)
@@ -219,7 +219,7 @@ class TestImplCompSimple(unittest.TestCase):
 
         class ImpWithInitial(TestImplCompSimpleLinearize):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('a', val=1.)
                 self.add_input('b', val=1.)
                 self.add_input('c', val=1.)

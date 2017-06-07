@@ -17,7 +17,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_incorrect_jacobian(self):
         class MyComp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
 
@@ -65,7 +65,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_feature_incorrect_jacobian(self):
         class MyComp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
 
@@ -108,7 +108,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_component_only(self):
         class MyComp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
 
@@ -149,7 +149,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_missing_entry(self):
         class MyComp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
 
@@ -202,14 +202,14 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_nested_fd_units(self):
         class UnitCompBase(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('T', val=284., units="degR", desc="Temperature")
                 self.add_input('P', val=1., units='lbf/inch**2', desc="Pressure")
 
                 self.add_output('flow:T', val=284., units="degR", desc="Temperature")
                 self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
 
-            def initialize_partials(self):
+            def setup_partials(self):
                 self.approx_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
@@ -238,7 +238,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_units(self):
         class UnitCompBase(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('T', val=284., units="degR", desc="Temperature")
                 self.add_input('P', val=1., units='lbf/inch**2', desc="Pressure")
 
@@ -306,7 +306,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
                 self.size = size
 
-            def initialize_variables(self):
+            def setup(self):
                 if self.units is None:
                     self.add_input(self.i_var, self.val)
                     self.add_output(self.o_var, self.val)
@@ -314,7 +314,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                     self.add_input(self.i_var, self.val, units=self.units)
                     self.add_output(self.o_var, self.val, units=self.units)
 
-            def initialize_partials(self):
+            def setup_partials(self):
                 row_col = np.arange(self.size)
                 self.declare_partials(of=self.o_var, wrt=self.i_var,
                                       val=1, rows=row_col, cols=row_col)
@@ -416,7 +416,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         class ImplComp4Test(ImplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', np.ones(2))
                 self.add_input('dummy', np.ones(2))
                 self.add_output('y', np.ones(2))

@@ -11,7 +11,7 @@ from openmdao.devtools.testutil import assert_rel_error
 
 class TestExplCompSimpleCompute(ExplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('length', val=1.)
         self.add_input('width', val=1.)
         self.add_output('area', val=1.)

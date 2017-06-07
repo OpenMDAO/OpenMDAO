@@ -73,7 +73,7 @@ class CycleGroup(ParametericTestGroup):
                               type_=bool,
                               desc='If the derivatives should be finite differenced.')
 
-    def initialize_subsystems(self):
+    def setup(self):
         num_comp = self.metadata['num_comp']
         if num_comp < 2:
             raise ValueError('Number of components must be at least 2.')
