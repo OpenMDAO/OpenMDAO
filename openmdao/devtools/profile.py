@@ -24,6 +24,7 @@ except ImportError:
     MPI = None
 
 from openmdao.devtools.webview import webview
+from openmdao.devtools.trace import _trace_dict
 
 
 @contextmanager
@@ -120,9 +121,7 @@ def setup(prefix='prof_raw', methods=None, prof_dir=None):
         from openmdao.matrices.matrix import Matrix
         from openmdao.vectors.vector import Vector
 
-        _profile_methods = {
-            "*": (System, Jacobian, Matrix, Solver, Driver, Problem),
-        }
+        _profile_methods = _trace_dict['openmdao']
     else:
         _profile_methods = methods
 
@@ -153,6 +152,7 @@ def _collect_methods(method_dict):
     matches = {}
     file2class = defaultdict(list)  # map files to classes
 
+    # TODO: update this to also work with stand-alone functions
     for pattern, classes in iteritems(method_dict):
         for class_ in classes:
             for base in class_.__mro__:
@@ -255,6 +255,8 @@ def start():
     if '@total' not in _inst_data:
         _inst_data['@total'] = _prof_node(['@total'])
 
+    if sys.getprofile() is not None:
+        raise RuntimeError("another profile function is already active.")
     sys.setprofile(_instance_profile)
 
 def stop():

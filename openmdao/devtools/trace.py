@@ -2,11 +2,14 @@ from __future__ import print_function
 
 import os
 import sys
-import gc
+import warnings
 
 from inspect import getmembers, isroutine
 from fnmatch import fnmatchcase
 from contextlib import contextmanager
+from collections import defaultdict
+
+from six import iteritems, PY3
 
 from openmdao.core.system import System
 from openmdao.core.group import Group
@@ -23,86 +26,55 @@ from openmdao.matrices.matrix import Matrix
 # This maps a simple identifier to a group of classes and possibly corresponding
 # glob patterns for each class.
 _trace_dict = {
-    'all': None,
-    'openmdao': (System, Component, Group, Problem),
-    'setup': [(s, ['*setup*']) for s in (System, Component, Group, Problem)]
+    'openmdao': {
+        "*": (System, Jacobian, Matrix, Solver, Driver, Problem),
+    },
+    'setup': {
+        "*setup*": (System, Solver, Driver, Problem),
+    },
 }
 
 
-def _get_methods(klass, patterns=None):
-    """
-    Return a list of method names for the given class, subject to optional filters.
-
-    Parameters
-    ----------
-    klass : class
-        The class to return method names from.
-    patterns : iter of str, optional
-        Iter of glob patterns specifying methods to keep.
-    """
-    methods = getmembers(klass, isroutine)
-    if patterns is None:
-        return [name for name, method in methods]
-
-    filtered = []
-    for name, _ in methods:
-        for p in patterns:
-            if fnmatchcase(name, p):
-                filtered.append(name)
-                break
-    return filtered
-
-def _get_all_methods(class_patterns):
-    """
-    Return a dict of method names and corresponding class tuples.
-
-    Parameters
-    ----------
-    class_patterns : list of (class, pattern) tuples
-        A list of classes and patters to filter their methods
-
-    Returns
-    -------
-    dict
-        Methods dict.  Values are class tuples.
-    """
-    methods = {}
-    for tup in class_patterns:
-        if isinstance(tup, tuple):
-            klass, patterns = tup
-        else:
-            klass = tup
-            patterns = None
-        for name in _get_methods(klass, patterns):
-            if name in methods:
-                methods[name].append(klass)
-            else:
-                methods[name] = [klass]
-
-    # convert class lists to tuples so we can use in isinstance calls
-    for name in methods:
-        methods[name] = tuple(methods[name])
-        # TODO: keep most base of classes in tuple (see if it affects performance)
-
-    return methods
-
-
 _active_traces = {}
+_file2class = {}
 _method_counts = {}
 _mem_changes = {}
-_callstack = [None]*100
+_callstack = []
 _registered = False  # prevents multiple atexit registrations
 
+# even through this is called '_trace_calls', it's called as part of
+# sys.setprofile and not sys.settrace because we're not interested in
+# tracing by line.
 def _trace_calls(frame, event, arg):
-    func_name = frame.f_code.co_name
-    if func_name in _active_traces:
-        loc = frame.f_locals
-        if 'self' in loc:
-            insts = _active_traces[func_name]
-            self = loc['self']
-            if self is not None and isinstance(self, insts):
-                fullname = '.'.join((self.__class__.__name__, func_name))
-                if event is 'call':
+    if event == 'call':
+        func_name = frame.f_code.co_name
+        if func_name in _active_traces:
+            loc = frame.f_locals
+            if 'self' in loc:
+                self = loc['self']
+                if isinstance(self, _active_traces[func_name]):
+                    classes = _file2class[frame.f_code.co_filename]
+                    if not classes:
+                        for base in self.__class__.__mro__:
+                            if base is object:
+                                continue
+                            if PY3:
+                                fname = sys.modules[base.__module__].__file__
+                            else:
+                                fname = sys.modules[base.__module__].__file__[:-1]
+                            classes = _file2class[fname]
+                            if base.__name__ not in classes:
+                                classes.append(base.__name__)
+                    if len(classes) > 1:
+                        # TODO: fix this
+                        warnings.warn("multiple classes %s found in same module (%s), "
+                                      "using self.__class__ (might be wrong)" % (classes,
+                                                                                 frame.f_code.co_filename))
+                        classes = [self.__class__.__name__]
+                    try:
+                        fullname = '.'.join((classes[0], func_name))
+                    except IndexError:
+                        fullname = func_name
                     if trace_mem:
                         _callstack.append((fullname, mem_usage()))
                     else:
@@ -113,7 +85,13 @@ def _trace_calls(frame, event, arg):
                             _method_counts[fullname] = 1
                         print('   ' * len(_callstack),
                               "%s (%d)" % (fullname, _method_counts[fullname]))
-                elif event is 'return':
+    elif event == 'return':
+        func_name = frame.f_code.co_name
+        if func_name in _active_traces:
+            loc = frame.f_locals
+            if 'self' in loc:
+                self = loc['self']
+                if isinstance(self, _active_traces[func_name]):
                     if trace_mem:
                         fullname, mem_start = _callstack.pop()
                         delta = mem_usage() - mem_start
@@ -125,33 +103,159 @@ def _trace_calls(frame, event, arg):
                     else:
                         _callstack.pop()
 
-def trace_init(trace_type='call'):
+def _trace_memory(frame, event, arg):
+    if event == 'call':
+        func_name = frame.f_code.co_name
+        if func_name in _active_traces:
+            loc = frame.f_locals
+            if 'self' in loc:
+                self = loc['self']
+                if isinstance(self, _active_traces[func_name]):
+                    classes = _file2class[frame.f_code.co_filename]
+                    if not classes:
+                        for base in self.__class__.__mro__:
+                            if base is object:
+                                continue
+                            if PY3:
+                                fname = sys.modules[base.__module__].__file__
+                            else:
+                                fname = sys.modules[base.__module__].__file__[:-1]
+                            classes = _file2class[fname]
+                            if base.__name__ not in classes:
+                                classes.append(base.__name__)
+                    if len(classes) > 1:
+                        # TODO: fix this
+                        warnings.warn("multiple classes %s found in same module (%s), "
+                                      "using self.__class__ (might be wrong)" % (classes,
+                                                                                 frame.f_code.co_filename))
+                        classes = [self.__class__.__name__]
+                    try:
+                        fullname = '.'.join((classes[0], func_name))
+                    except IndexError:
+                        fullname = func_name
+
+                    _callstack.append((fullname, mem_usage()))
+    elif event == 'return':
+        func_name = frame.f_code.co_name
+        if func_name in _active_traces:
+            loc = frame.f_locals
+            if 'self' in loc:
+                self = loc['self']
+                if isinstance(self, _active_traces[func_name]):
+                    fullname, mem_start = _callstack.pop()
+                    delta = mem_usage() - mem_start
+                    if delta > 0.0:
+                        if fullname in _mem_changes:
+                            _mem_changes[fullname] += delta
+                        else:
+                            _mem_changes[fullname] = delta
+
+
+def _code2funcname(self, code_obj):
+    classes = _file2class[code_obj.co_filename]
+    if not classes:
+        for base in self.__class__.__mro__:
+            if base is object:
+                continue
+            if PY3:
+                fname = sys.modules[base.__module__].__file__
+            else:
+                fname = sys.modules[base.__module__].__file__[:-1]
+            classes = _file2class[fname]
+            if base.__name__ not in classes:
+                classes.append(base.__name__)
+    if len(classes) > 1:
+        # TODO: fix this
+        warnings.warn("multiple classes %s found in same module (%s), "
+                      "using self.__class__ (might be wrong)" % (classes,
+                                                                 frame.f_code.co_filename))
+        classes = [self.__class__.__name__]
+    try:
+        return '.'.join((classes[0], func_name))
+    except IndexError:
+        return func_name
+
+
+def _collect_methods(method_dict):
+    """
+    Iterate over a dict of method name patterns mapped to classes.  Search
+    through the classes for anything that matches and return a dict of
+    exact name matches and their correspoding classes.
+
+    Parameters
+    ----------
+    method_dict : {pattern1: classes1, ... pattern_n: classes_n}
+        Dict of glob patterns mapped to lists of classes used for isinstance checks
+
+    Returns
+    -------
+    dict
+        Dict of method names and tuples of all classes that matched for that method.
+    """
+    matches = {}
+    file2class = defaultdict(list)  # map files to classes
+
+    # TODO: update this to also work with stand-alone functions
+    for pattern, classes in iteritems(method_dict):
+        for class_ in classes:
+            for base in class_.__mro__:
+                if base is object:
+                    continue
+                if PY3:
+                    fname = sys.modules[base.__module__].__file__
+                else:
+                    fname = sys.modules[base.__module__].__file__[:-1]
+                classes = file2class[fname]
+                if base.__name__ not in classes:
+                    file2class[fname].append(base.__name__)
+
+            for name, obj in getmembers(class_):
+                if callable(obj) and (pattern == '*' or fnmatchcase(name, pattern)):
+                    if name in matches:
+                        matches[name].append(class_)
+                    else:
+                        matches[name] = [class_]
+
+    # convert values to tuples so we can use in isinstance call
+    for name in matches:
+        matches[name] = tuple(matches[name])
+
+    return matches, file2class
+
+
+def trace_init(trace_type='call', trace_mem_group=True):
     global _registered, trace_mem, trace
     if not _registered:
         if trace_type == 'mem':
-            trace_mem = True
+            trace_mem = trace_mem_group
             def print_totals():
                 items = sorted(_mem_changes.items(), key=lambda x: x[1])
                 for n, delta in items:
                     if delta > 0.0:
-                        print("%s %g" % (n, delta))
+                        print("%s %g MB" % (n, delta))
             import atexit
             atexit.register(print_totals)
             _registered = True
         else:
             trace = True
 
-def trace_on(class_group='all'):
-    global _active_traces
-    _active_traces = _get_all_methods(_trace_dict[class_group])
+
+def trace_on(class_group='openmdao'):
+    global _active_traces, _file2class
+    print("class_group",class_group)
+    _active_traces, _file2class = _collect_methods(_trace_dict[class_group])
+    if sys.getprofile() is not None:
+        raise RuntimeError("another profile function is already active.")
     sys.setprofile(_trace_calls)
+
 
 def trace_off():
     sys.setprofile(None)
 
+
 @contextmanager
-def tracing(trace_type='call', class_group='all'):
-    trace_init(trace_type)
+def tracing(trace_type='call', trace_mem_group='openmdao'):
+    trace_init(trace_type, trace_mem_group=trace_mem_group)
     trace_on(class_group)
     yield
     trace_off()
@@ -168,12 +272,12 @@ class tracedfunc(object):
     class_group : str, optional
         Identifier of a group of classes that will have their functions traced.
     """
-    def __init__(self, trace_type='call', class_group='all'):
+    def __init__(self, trace_type='call', trace_mem_group='openmdao'):
         self.trace_type = trace_type
-        self.classes = class_group
+        self.trace_mem_group = trace_mem_group
 
     def __call__(self, func):
-        trace_init(trace_type=self.trace_type)
+        trace_init(trace_type=self.trace_type, trace_mem_group=self.trace_mem_group)
 
         def wrapped(*args, **kwargs):
             trace_on(self.classes)
@@ -181,13 +285,13 @@ class tracedfunc(object):
             trace_off()
         return wrapped
 
-trace = os.environ.get('OPENMDAO_TRACE')
+trace_calls = os.environ.get('OPENMDAO_TRACE')
 trace_mem = os.environ.get('OPENMDAO_TRACE_MEM')
 
-if trace:
+if trace_calls:
     trace_init(trace_type='call')
-    trace_on(_trace_dict[trace])
+    trace_on(trace_calls)
 elif trace_mem:
     from openmdao.devtools.debug import mem_usage
-    trace_init(trace_type='mem')
-    trace_on(_trace_dict[trace_mem])
+    trace_init(trace_type='mem', trace_mem_group=trace_mem)
+    trace_on(trace_mem)
