@@ -13,9 +13,9 @@ ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
 $(error The '$(SPHINXBUILD)' command was not found. Make sure you have Sphinx installed, then set the SPHINXBUILD environment variable to point to the full path of the '$(SPHINXBUILD)' executable. Alternatively you can add the directory with the executable to your PATH. If you don't have Sphinx installed, grab it from http://sphinx-doc.org/)
 endif
 
-SPHINX_VERSION := $(shell $(SPHINXBUILD) --version)
-ifeq (,$(findstring 1.5, $(SPHINX_VERSION)))
-$(error Version 1.5 of Sphinx is required, but $(SPHINX_VERSION) was found.  Upgrade via 'pip install --upgrade sphinx' or get the latest from http://sphinx-doc.org/)
+SPHINX_VERSION := $(shell $(SPHINXBUILD) --version | grep -o -E "[0-9\.]+")
+ifeq ($(shell expr $(SPHINX_VERSION) \< 1.5), 1)
+$(error Version 1.5 or later of Sphinx is required, but $(SPHINX_VERSION) was found.  Upgrade via 'pip install --upgrade sphinx' or get the latest from http://sphinx-doc.org/)
 endif
 
 # Internal variables.
@@ -28,7 +28,7 @@ I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 .PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext
 
 #first item in makefile is default action of "make"
-html-update:
+html-update: mock redbaron
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS)  $(BUILDDIR)/html
 
 single:
@@ -42,7 +42,7 @@ clean:
 	#rm -rf _srcdocs/dev
 	rm -rf tags
 	rm -rf tmp
-	rm feature_docs_unit_test_db.sqlite
+	rm -f feature_docs_unit_test_db.sqlite
 
 mock:
 	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
