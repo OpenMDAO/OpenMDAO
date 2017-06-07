@@ -1249,39 +1249,55 @@ class Group(System):
             of = list(var[0] for var in pro2abs['output'].values())
             candidate_wrt = list(var[0] for var in pro2abs['input'].values())
 
+            from openmdao.core.indepvarcomp import IndepVarComp
             wrt = []
+            ivc = []
             for var in candidate_wrt:
                 src = self._conn_abs_in2out.get(var)
 
                 if src is None:
                     wrt.append(var)
+
+                # Weed out inputs connected to anything inside our system unless the source is an
+                # indepvarcomp.
                 else:
                     compname = '.'.join(src.split('.')[:-1])
                     comp = self.get_subsystem(compname)
-                    from openmdao.core.indepvarcomp import IndepVarComp
                     if isinstance(comp, IndepVarComp):
                         wrt.append(src)
+                        ivc.append(src)
 
-            # Create Jacobian stub
-            for key in product(of, wrt + of):
-                meta_changes = {
-                    'method': method,
-                }
-                if key[0] == key[1]:
-                    meta_changes['value'] = 1.0
-                meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
-                meta.update(meta_changes)
-                meta.update(self._owns_approx_jac_meta)
-                self._subjacs_info[key] = meta
-
-            # Create approximations
             with self.jacobian_context() as J:
-                for key, meta in iteritems(self._subjacs_info):
+                print('of', of)
+                print('wrt', wrt)
+                for key in product(of, wrt + of):
+                    meta_changes = {
+                        'method': method,
+                    }
+                    if key[0] == key[1]:
+                        meta_changes['value'] = 1.0
+                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    meta.update(meta_changes)
+                    meta.update(self._owns_approx_jac_meta)
+                    self._subjacs_info[key] = meta
+
+                    # Create Jacobian stub for every key pair
                     J._set_partials_meta(key, meta)
 
+                    # Create approximations, but only for the ones we need.
                     # TODO: support states
-                    if meta['dependent'] and key[1] not in of:
+                    if meta['dependent']:
+
+                        # Skip explicit res wrt outputs
+                        if key[1] in of and key[1] not in ivc:
+                            continue
+
+                        # Skip indepvarcomp res wrt other srcs
+                        if key[0] in ivc:
+                            continue
+
                         approx.add_approximation(key, meta)
+                        print('added', key)
 
             approx._init_approximations()
 

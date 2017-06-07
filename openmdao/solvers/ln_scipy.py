@@ -131,8 +131,8 @@ class ScipyIterativeSolver(LinearSolver):
         scope_out, scope_in = system._get_scope()
         system._apply_linear([vec_name], self._mode, scope_out, scope_in)
 
-        print('in', in_vec)
-        print('out', b_vec.get_data())
+        # print('in', in_vec)
+        # print('out', b_vec.get_data())
         return b_vec.get_data()
 
     def _monitor(self, res):
@@ -194,6 +194,8 @@ class ScipyIterativeSolver(LinearSolver):
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
+
+            #x_vec.set_const(0.0)
             x_vec_combined = x_vec.get_data()
             size = x_vec_combined.size
             linop = LinearOperator((size, size), dtype=float,
