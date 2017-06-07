@@ -222,7 +222,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
         # Check partials
-        data = prob.check_partial_derivs(out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -264,7 +264,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
         # Check partials
-        data = prob.check_partial_derivs(out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -308,7 +308,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
         # Check partials
-        data = prob.check_partial_derivs(out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -363,7 +363,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
         # Check partials
-        data = prob.check_partial_derivs(out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -410,7 +410,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
         # Check partials
-        data = prob.check_partial_derivs(out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -456,7 +456,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
         # Check partials
-        data = prob.check_partial_derivs(out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):

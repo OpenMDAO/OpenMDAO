@@ -80,6 +80,8 @@ class pyOptSparseDriver(Driver):
 
     Attributes
     ----------
+    fail : bool
+        Flag that indicates failure of most recent optimization.
     hist_file : str or None
         File location for saving pyopt_sparse optimization history.
         Default is None for no output.
@@ -150,6 +152,7 @@ class pyOptSparseDriver(Driver):
 
         self._indep_list = []
         self._quantities = []
+        self.fail = False
 
     def _setup_driver(self, problem):
         """

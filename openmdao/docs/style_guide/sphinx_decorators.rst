@@ -29,7 +29,7 @@ and a method that looks like this and has the decorator applied to it:
    ::
 
     @mydecorator
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         """
         Compute sub-jacobian parts / factorization.
 
@@ -57,7 +57,7 @@ But if we add the call signature of the method to the docstring as the first lin
    ::
 
     @mydecorator
-    def compute_partial_derivs(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, outputs, partials):
         """
         Compute sub-jacobian parts / factorization.
 
