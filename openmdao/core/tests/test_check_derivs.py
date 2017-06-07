@@ -10,7 +10,7 @@ from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NLRunO
                          ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
-from openmdao.test_suite.components.paraboloid import ParaboloidMatVec
+from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
 
 class TestProblemCheckPartials(unittest.TestCase):
