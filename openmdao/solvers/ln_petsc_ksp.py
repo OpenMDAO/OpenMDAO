@@ -13,7 +13,7 @@ except ImportError:
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.record_util import create_local_meta, update_local_meta
-
+from openmdao.utils.general_utils import warn_deprecation
 
 
 KSP_TYPES = [
@@ -471,3 +471,31 @@ class PetscKSP(LinearSolver):
         pc_mat.setPythonContext(self)
 
         return ksp
+
+    @property
+    def preconditioner(self):
+        """
+        Provide 'preconditioner' property for backwards compatibility.
+
+        Returns
+        -------
+        <LinearSolver>
+            reference to the 'precon' property.
+        """
+        warn_deprecation("The 'preconditioner' property provides backwards compatibility "
+                         "with OpenMDAO <= 1.x ; use 'precon' instead.")
+        return self.precon
+
+    @preconditioner.setter
+    def preconditioner(self, precon):
+        """
+        Provide for setting the 'preconditioner' property for backwards compatibility.
+
+        Parameters
+        ----------
+        precon : <LinearSolver>
+            reference to a <LinearSolver> to be assigned to the 'precon' property.
+        """
+        warn_deprecation("The 'preconditioner' property provides backwards compatibility "
+                         "with OpenMDAO <= 1.x ; use 'precon' instead.")
+        self.precon = precon

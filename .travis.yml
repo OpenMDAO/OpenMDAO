@@ -70,11 +70,12 @@ install:
   fi
 - pip install redbaron
 - pip install git+https://github.com/OpenMDAO/testflo.git
-- pip install -e .
+- pip install .
 
 script:
-- testflo . --pre_announce -m "ptest*"
-- testflo . --pre_announce
-#after tests, need to cd down so that conf.py can be found for doc build
+# make docs first
 - cd openmdao/docs
 - make all
+# run all openmdao tests
+- testflo . --pre_announce -m "ptest*"
+- testflo openmdao
