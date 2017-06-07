@@ -96,7 +96,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials()
+        data = prob.check_partials(out_stream=None)
 
         x1_error = data['comp']['y', 'x1']['abs error']
         assert_rel_error(self, x1_error.forward, 1., 1e-8)

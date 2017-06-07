@@ -45,7 +45,13 @@ def check_config(problem, logger=None):
             logger = _set_logger
 
     _check_hanging_inputs(problem, logger)
-    _check_dataflow(problem.model, logger)
+
+    for system in problem.model.system_iter(include_self=True, recurse=True):
+        # system specific check
+        system.check_config(logger)
+        # check dataflow within Group
+        if isinstance(system, Group):
+            _check_dataflow(system, logger)
 
 
 def compute_sys_graph(group, input_srcs, comps_only=False):
@@ -151,35 +157,34 @@ def _check_dataflow(group, logger):
     logger : object
         The object that manages logging output.
     """
-    for system in group.system_iter(include_self=True, recurse=True, typ=Group):
-        sccs = get_sccs(system)
-        cycles = [sorted(s) for s in sccs if len(s) > 1]
-        cycle_idxs = {}
+    sccs = get_sccs(group)
+    cycles = [sorted(s) for s in sccs if len(s) > 1]
+    cycle_idxs = {}
 
-        if cycles:
-            logger.warning("Group '%s' has the following cycles: %s" %
-                           (system.pathname, cycles))
-            for i, cycle in enumerate(cycles):
-                # keep track of cycles so we can detect when a system in
-                # one cycle is out of order with a system in a different cycle.
-                for s in cycle:
-                    cycle_idxs[s] = i
+    if cycles:
+        logger.warning("Group '%s' has the following cycles: %s" %
+                       (group.pathname, cycles))
+        for i, cycle in enumerate(cycles):
+            # keep track of cycles so we can detect when a system in
+            # one cycle is out of order with a system in a different cycle.
+            for s in cycle:
+                cycle_idxs[s] = i
 
-        ubcs = _get_out_of_order_subs(system, system._conn_global_abs_in2out)
+    ubcs = _get_out_of_order_subs(group, group._conn_global_abs_in2out)
 
-        for tgt_system, src_systems in sorted(ubcs.items()):
-            keep_srcs = []
+    for tgt_system, src_systems in sorted(ubcs.items()):
+        keep_srcs = []
 
-            for src_system in src_systems:
-                if not (src_system in cycle_idxs and
-                        tgt_system in cycle_idxs and
-                        cycle_idxs[tgt_system] == cycle_idxs[src_system]):
-                    keep_srcs.append(src_system)
+        for src_system in src_systems:
+            if not (src_system in cycle_idxs and
+                    tgt_system in cycle_idxs and
+                    cycle_idxs[tgt_system] == cycle_idxs[src_system]):
+                keep_srcs.append(src_system)
 
-            if keep_srcs:
-                logger.warning("System '%s' executes out-of-order with "
-                               "respect to its source systems %s" %
-                               (tgt_system, sorted(keep_srcs)))
+        if keep_srcs:
+            logger.warning("System '%s' executes out-of-order with "
+                           "respect to its source systems %s" %
+                           (tgt_system, sorted(keep_srcs)))
 
 
 def _get_out_of_order_subs(group, input_srcs):
