@@ -160,6 +160,8 @@ class System(object):
     _ln_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
     #
+    _approx_schemes : OrderedDict
+        A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
     _jacobian_changed : bool
@@ -272,7 +274,10 @@ class System(object):
         self._jacobian = DictionaryJacobian()
         self._jacobian._system = self
         self._jacobian_changed = True
+        self._approx_schemes = OrderedDict()
         self._owns_assembled_jac = False
+        self._owns_approx_jac = False
+        self._owns_approx_jac_meta = {}
         self._subjacs_info = {}
 
         self._design_vars = {}

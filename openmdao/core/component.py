@@ -27,8 +27,6 @@ class Component(System):
 
     Attributes
     ----------
-    _approx_schemes : OrderedDict
-        A mapping of approximation types to the associated ApproximationScheme.
     _matrix_free : Bool
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian.
@@ -56,8 +54,6 @@ class Component(System):
             available here and in all descendants of this system.
         """
         super(Component, self).__init__(**kwargs)
-        self._approx_schemes = OrderedDict()
-
         self._matrix_free = False
 
         self._var_rel_names = {'input': [], 'output': []}

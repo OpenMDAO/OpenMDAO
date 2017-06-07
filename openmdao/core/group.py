@@ -1,21 +1,25 @@
 """Define the Group class."""
 from __future__ import division
 
-from six import iteritems, string_types
-from six.moves import range
+from collections import Iterable, Counter, OrderedDict
 from itertools import product, chain
-from collections import Iterable, Counter
-
-import numpy as np
 import warnings
 
+from six import iteritems, string_types, itervalues
+from six.moves import range
+
+import numpy as np
+
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
-from openmdao.solvers.nl_runonce import NLRunOnce
-from openmdao.solvers.ln_runonce import LNRunOnce
-from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.units import is_compatible
-from openmdao.utils.array_utils import convert_neg
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.proc_allocators.proc_allocator import ProcAllocationError
+from openmdao.solvers.ln_runonce import LNRunOnce
+from openmdao.solvers.nl_runonce import NLRunOnce
+from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.name_maps import rel_key2abs_key
+from openmdao.utils.units import is_compatible
 
 
 class Group(System):
@@ -1117,7 +1121,7 @@ class Group(System):
         """
         with self.jacobian_context() as J:
             # Use global Jacobian
-            if self._owns_assembled_jac or self._views_assembled_jac:
+            if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
                 for vec_name in vec_names:
                     with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                         d_inputs, d_outputs, d_residuals = vecs
@@ -1176,8 +1180,16 @@ class Group(System):
             for subsys in self._subsystems_myproc:
                 subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
 
+            # Group finite difference
+            if self._owns_approx_jac:
+                with self._unscaled_context(outputs=[self._outputs]):
+                    for approximation in itervalues(self._approx_schemes):
+                        approximation.compute_approximations(self, jac=J, deriv_type='total')
+
+                J._update()
+
             # Update jacobian
-            if self._owns_assembled_jac or self._views_assembled_jac:
+            elif self._owns_assembled_jac or self._views_assembled_jac:
                 J._update()
 
         if self._nl_solver is not None and do_nl:
@@ -1185,3 +1197,95 @@ class Group(System):
 
         if self._ln_solver is not None and do_nl:
             self._ln_solver._linearize()
+
+    def approx_all_partials(self, method='fd', **kwargs):
+        """
+        Inform the framework that the specified derivatives are to be approximated.
+
+        Parameters
+        ----------
+        method : str
+            The type of approximation that should be used. Valid options include:
+                - 'fd': Finite Difference
+        **kwargs : dict
+            Keyword arguments for controlling the behavior of the approximation.
+        """
+        self._approx_schemes = OrderedDict()
+        supported_methods = {'fd': FiniteDifference}
+
+        if method not in supported_methods:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method, supported_methods.keys()))
+
+        if method not in self._approx_schemes:
+            self._approx_schemes[method] = supported_methods[method]()
+
+        self._owns_approx_jac = True
+        self._owns_approx_jac_meta = dict(kwargs)
+
+    def _setup_jacobians(self, jacobian=None, recurse=True):
+        """
+        Set and populate jacobians down through the system tree.
+
+        In <Group>, we only need to prepare for Group finite difference. However, to be efficient,
+        we need to find the minimum set of inputs and outputs to approximate.
+
+        Parameters
+        ----------
+        jacobian : <AssembledJacobian> or None
+            The global jacobian to populate for this system.
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        self._jacobian_changed = False
+
+        # Group finite difference or complex step.
+        # TODO: Make sure this works under and over an AssembledJacobian
+        if self._owns_approx_jac:
+            method = self._approx_schemes.keys()[0]
+            approx = self._approx_schemes[method]
+            pro2abs = self._var_allprocs_prom2abs_list
+
+            of = list(var[0] for var in pro2abs['output'].values())
+            candidate_wrt = list(var[0] for var in pro2abs['input'].values())
+
+            wrt = []
+            for var in candidate_wrt:
+                src = self._conn_abs_in2out.get(var)
+
+                if src is None:
+                    wrt.append(var)
+                else:
+                    compname = '.'.join(src.split('.')[:-1])
+                    comp = self.get_subsystem(compname)
+                    from openmdao.core.indepvarcomp import IndepVarComp
+                    if isinstance(comp, IndepVarComp):
+                        wrt.append(src)
+
+            # Create Jacobian stub
+            for key in product(of, wrt + of):
+                meta_changes = {
+                    'method': method,
+                }
+                if key[0] == key[1]:
+                    meta_changes['value'] = 1.0
+                meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                meta.update(meta_changes)
+                meta.update(self._owns_approx_jac_meta)
+                self._subjacs_info[key] = meta
+
+            # Create approximations
+            with self.jacobian_context() as J:
+                for key, meta in iteritems(self._subjacs_info):
+                    J._set_partials_meta(key, meta)
+
+                    # TODO: support states
+                    if meta['dependent'] and key[1] not in of:
+                        approx.add_approximation(key, meta)
+
+            approx._init_approximations()
+
+            self._jacobian._system = self
+            self._jacobian._initialize()
+
+        super(Group, self)._setup_jacobians(jacobian, recurse)
