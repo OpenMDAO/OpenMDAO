@@ -48,8 +48,6 @@ except ImportError:
 # Developer Tools
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
-from openmdao.devtools.trace import tracedfunc, tracing, trace_on, trace_off, trace_init
-from openmdao.devtools import profile
 
 # Derivative Specification
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, \

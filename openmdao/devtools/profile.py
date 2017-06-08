@@ -54,6 +54,9 @@ def _prof_node(parts, obj=None):
         'count': 0,
         'tot_time': 0.,
         'tot_count': 0,
+        'pct_total': 0.,
+        'tot_pct_total': 0.,
+        'pct_parent': 0.,
         'child_time': 0.,
         'obj': obj,
     }
@@ -72,14 +75,14 @@ _objs = {}   # mapping of ids to instance objects
 _file2class = {}
 
 
-def setup(prefix='prof_raw', methods=None, prof_dir=None):
+def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
     """
     Instruments certain important openmdao methods for profiling.
 
     Args
     ----
 
-    prefix : str ('prof_raw')
+    prefix : str ('iprof')
         Prefix used for the raw profile data. Process rank will be appended
         to it to get the actual filename.  When not using MPI, rank=0.
 
@@ -95,7 +98,11 @@ def setup(prefix='prof_raw', methods=None, prof_dir=None):
             }
 
     prof_dir : str
-        Directory where the profile files will be written.
+        Directory where the profile files will be written. Defaults to the
+        current directory.
+
+    finallize : bool
+        If True, register a function to finalize the profile before exit.
 
     """
 
@@ -179,6 +186,7 @@ def _collect_methods(method_dict):
 
     return matches, file2class
 
+# TODO: create a cython version of this to cut down on overhead...
 def _instance_profile(frame, event, arg):
     """
     Collects profile data for functions that match _profile_matches.
@@ -259,6 +267,7 @@ def start():
         raise RuntimeError("another profile function is already active.")
     sys.setprofile(_instance_profile)
 
+
 def stop():
     """
     Turn off profiling.
@@ -279,8 +288,7 @@ def stop():
 
 def _finalize_profile():
     """
-    called at exit to write out the file mapping function call paths
-    to identifiers.
+    Called at exit to write out the profiling data.
     """
     global _profile_prefix, _profile_funcs_dict, _profile_total, _inst_data
 
@@ -397,22 +405,25 @@ def process_profile(flist):
             tnode['tot_count'] += count
 
     for funcpath, node in iteritems(tree_nodes):
-        parts = funcpath.split('/')
+        parts = funcpath.rsplit('/', 1)
         if parts[-1] != '@parent':
             node['tot_time'] = totals[parts[-1]]['tot_time']
             node['tot_count'] = totals[parts[-1]]['tot_count']
+            node['pct_parent'] = node['time'] / tree_nodes[parts[0]]['time']
+            node['pct_total'] = node['time'] / tree_nodes['@total']['time']
+            node['tot_pct_total'] = totals[parts[-1]]['tot_time'] / tree_nodes['@total']['time']
+        del node['obj']
+        del node['child_time']
 
     tree_nodes['@total']['tot_time'] = tree_nodes['@total']['time']
 
-    # D3 sums up all children to get parent value, so we need to
-    # zero out the parent value else we get double the value we want
-    # once we add in all of the times from descendants.
     for funcpath, node in iteritems(tree_nodes):
         parts = funcpath.rsplit('/', 1)
+        # D3 sums up all children to get parent value, so we need to
+        # zero out the parent value else we get double the value we want
+        # once we add in all of the times from descendants.
         if parts[-1] == '@parent':
             tree_nodes[parts[0]]['time'] = 0.
-        del node['obj']
-        del node['child_time']
 
     return list(tree_nodes.values()), totals
 
@@ -512,5 +523,47 @@ def prof_view():
     if not options.noshow:
         webview(outfile)
 
+def main():
+    from optparse import OptionParser
+    usage = "profile.py [scriptfile [arg] ..."
+    parser = OptionParser(usage=usage)
+    parser.allow_interspersed_args = False
+    parser.add_option('-v', '--view', dest="view",
+        help="View of profiling output, ['web', 'totals', 'dump']", default='web')
+
+    if not sys.argv[1:]:
+        parser.print_usage()
+        sys.exit(2)
+
+    (options, args) = parser.parse_args()
+    sys.argv[:] = args
+
+    if len(args) > 0:
+        progname = args[0]
+        sys.path.insert(0, os.path.dirname(progname))
+
+        with open(progname, 'rb') as fp:
+            code = compile(fp.read(), progname, 'exec')
+        globs = {
+            '__file__': progname,
+            '__name__': '__main__',
+            '__package__': None,
+            '__cached__': None,
+        }
+
+        setup(finalize=False)
+        sys.argv.append('iprof.0')
+        start()
+        exec (code, globs)
+        _finalize_profile()
+
+        if options.view == 'web':
+            prof_view()
+        elif options.view == 'console':
+            prof_totals()
+        elif options.view == 'dump':
+            prof_dump()
+
+
 if __name__ == '__main__':
-    prof_dump(sys.argv[1])
+    main()

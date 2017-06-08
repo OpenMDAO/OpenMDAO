@@ -60,6 +60,18 @@ using d3.partition.
     font-weight: bold;
 }
 
+.pctparent {
+    font-weight: bold;
+}
+
+.pcttotal {
+    font-weight: bold;
+}
+
+.totpcttotal {
+    font-weight: bold;
+}
+
 p {
     line-height: .2em;
 }
@@ -95,8 +107,9 @@ var svg;
 
 var root_table = $call_graph_data;
 
+var prec = d3.precisionFixed(0.05);
 var formatTime = d3.format(".3g");
-var formatTpct = d3.format(".2%");
+var formatPct = d3.format("." + prec + "%");
 var formatCalls = d3.format(",d");
 
 var last_d = null;
@@ -137,6 +150,9 @@ window.onload = function() {
     var loccalls = d3.select(".loccalls");
     var tottime = d3.select(".tottime");
     var totcalls = d3.select(".totcalls");
+    var pctparent = d3.select(".pctparent");
+    var pcttotal = d3.select(".pcttotal");
+    var totpcttotal = d3.select(".totpcttotal")
 
     var stratify = d3.stratify()
         .id(function(d) { return d.name; })
@@ -181,6 +197,9 @@ window.onload = function() {
              tottime.text(formatTime(d.data.tot_time));
              loccalls.text(formatCalls(d.data.count));
              totcalls.text(formatCalls(d.data.tot_count));
+             pctparent.text(formatPct(d.data.pct_parent));
+             pcttotal.text(formatPct(d.data.pct_total));
+             totpcttotal.text(formatPct(d.data.tot_pct_total));
              return tooltip.style("display", "inline");
          })
         .on("mouseout", function(d) {
@@ -229,8 +248,8 @@ function click(d) {
         <tr><td>Function:</td><td class=funcpath></td></tr>
     </table>
     <table>
-        <tr><td>Local time:</td><td class=loctime></td><td>Local calls:</td> <td class=loccalls></td></tr>
-        <tr><td>Total time:</td><td class=tottime></td> <td>Total calls:</td> <td class=totcalls></td></tr>
+        <tr><td>Local time:</td><td class=loctime></td><td>Local calls:</td> <td class=loccalls></td><td>Pct parent:</td> <td class=pctparent></td></tr>
+        <tr><td>Total time:</td><td class=tottime></td> <td>Total calls:</td> <td class=totcalls></td><td>Pct total:</td> <td class=pcttotal></td><td>Total Pct total:</td> <td class=totpcttotal></td></tr>
     </table>
 </div>
 </body>

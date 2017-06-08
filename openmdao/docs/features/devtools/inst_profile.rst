@@ -51,13 +51,13 @@ collect profiling data during a particular part of execution, you can call
 
 
 After your script is finished running, you should see a new file called
-`prof_raw.0` in your current directory.  If you happen
+`iprof.0` in your current directory.  If you happen
 to have activated profiling for an MPI run, then you'll have a copy of that
-file for each MPI process, so `prof_raw.0`, `prof_raw.1`, etc.
+file for each MPI process, so `iprof.0`, `iprof.1`, etc.
 
 There are two command scripts you can run on those raw data files.  The first
 is `proftotals`.  Running that on raw profiling files will give you tabular output containing total
-runtime and total number of calls for each profiled function.  For example: `proftotals prof_raw.0` might
+runtime and total number of calls for each profiled function.  For example: `proftotals iprof.0` might
 give you output like the following:
 
 ::
