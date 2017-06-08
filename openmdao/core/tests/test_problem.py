@@ -367,7 +367,7 @@ class TestProblem(unittest.TestCase):
     def test_setup_bad_mode(self):
         # Test error message when passing bad mode to setup.
 
-        prob = Problem(Group())
+        prob = Problem()
 
         try:
             prob.setup(mode='junk')
@@ -376,6 +376,28 @@ class TestProblem(unittest.TestCase):
             self.assertEqual(str(err), msg)
         else:
             self.fail('Expecting ValueError')
+
+    def test_run_before_setup(self):
+        # Test error message when running before setup.
+
+        prob = Problem()
+
+        try:
+            prob.run_model()
+        except RuntimeError as err:
+            msg = "The `setup` method must be called before `run_model`."
+            self.assertEqual(str(err), msg)
+        else:
+            self.fail('Expecting RuntimeError')
+
+        try:
+            prob.run_driver()
+        except RuntimeError as err:
+            msg = "The `setup` method must be called before `run_driver`."
+            self.assertEqual(str(err), msg)
+        else:
+            self.fail('Expecting RuntimeError')
+
 
     def test_root_deprecated(self):
         # testing the root property
