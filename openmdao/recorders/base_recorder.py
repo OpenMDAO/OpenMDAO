@@ -3,7 +3,7 @@ Class definition for BaseRecorder, the base class for all recorders.
 """
 from fnmatch import fnmatchcase
 import sys
-
+import inspect
 from six import StringIO
 
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -13,26 +13,54 @@ from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver, NonlinearSolver
 
 recording_iteration_stack = []
-import inspect
+
+
 def iter_get_norm_on_call_stack():
+    """
+    Get norm on call stack.
+
+    Returns
+        True if qqq
+        False if qqq
+    """
     for s in inspect.stack():
         if s[3] == '_iter_get_norm':
             return True
     return False
 
+
 def push_recording_iteration_stack(name, iter_count):
+    """
+    Push onto recording iteration stack.
+
+    Parameters
+    ----------
+    name
+
+    iter_count
+
+    """
     recording_iteration_stack.append((name, iter_count))
 
+
 def pop_recording_iteration_stack():
+    """
+    Pop from recording iteration stack.
+    """
     recording_iteration_stack.pop()
 
+
 def print_recording_iteration_stack():
+    """
+    Print the stack.
+    """
     print
-    for name, iter_count in reversed(recording_iteration_stack)  :
+    for name, iter_count in reversed(recording_iteration_stack):
         if name == 'mda.d2._solve_nonlinear' and iter_count == 114:
             pass
         print '^^^', name, iter_count
-    print 60*'^'
+    print 60 * '^'
+
 
 class BaseRecorder(object):
     """

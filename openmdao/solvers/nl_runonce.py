@@ -10,7 +10,6 @@ from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.record_util import create_local_meta, update_local_meta
 
 
-
 class NLRunOnce(NonlinearSolver):
     """
     Simple solver that runs the containing system once.

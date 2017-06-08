@@ -1068,8 +1068,9 @@ class Group(System):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
-            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            print_recording_iteration_stack, pop_recording_iteration_stack, \
+            iter_get_norm_on_call_stack
         do_recording = not iter_get_norm_on_call_stack()
         if do_recording:
             name = self.pathname if self.pathname else 'root'
@@ -1086,7 +1087,6 @@ class Group(System):
 
             pop_recording_iteration_stack()
 
-
     def _solve_nonlinear(self):
         """
         Compute outputs. The model is assumed to be in a scaled state.
@@ -1102,8 +1102,9 @@ class Group(System):
         """
         super(Group, self)._solve_nonlinear()
 
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
-            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            print_recording_iteration_stack, pop_recording_iteration_stack, \
+            iter_get_norm_on_call_stack
         do_recording = not iter_get_norm_on_call_stack()
         if do_recording:
             name = self.pathname if self.pathname else 'root'
@@ -1145,14 +1146,14 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
-            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            print_recording_iteration_stack, pop_recording_iteration_stack, \
+            iter_get_norm_on_call_stack
         do_recording = not iter_get_norm_on_call_stack()
         if do_recording:
             name = self.pathname if self.pathname else 'root'
             push_recording_iteration_stack(name + '._apply_linear', self.iter_count)
             print_recording_iteration_stack()
-
 
         with self.jacobian_context() as J:
             # Use global Jacobian
@@ -1179,8 +1180,6 @@ class Group(System):
 
             pop_recording_iteration_stack()
 
-
-
     def _solve_linear(self, vec_names, mode):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
@@ -1201,8 +1200,9 @@ class Group(System):
         float
             absolute error.
         """
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
-            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            print_recording_iteration_stack, pop_recording_iteration_stack, \
+            iter_get_norm_on_call_stack
         do_recording = not iter_get_norm_on_call_stack()
         if do_recording:
             name = self.pathname if self.pathname else 'root'
@@ -1213,8 +1213,6 @@ class Group(System):
 
         if do_recording:
             self.record_iteration()
-
-
             pop_recording_iteration_stack()
 
         return result

@@ -2415,7 +2415,7 @@ class System(object):
         filepath = inspect.stack()[1][1]
         import os.path
         base = os.path.basename(filepath)
-        base_filename =  os.path.splitext(base)[0]
+        base_filename = os.path.splitext(base)[0]
 
         method_name = inspect.stack()[1][3]
         import unittest
@@ -2423,26 +2423,26 @@ class System(object):
         print 'qqq', test_name, base_filename, method_name
 
 
-import inspect
-
 def get_current_case():
-    '''
+    """
     Get information about the currently running test case.
-
-    Returns the fully qualified name of the current test function
-    when called from within a test method, test function, setup or 
-    teardown.
 
     Raises ``RuntimeError`` if the current test case could not be
     determined.
 
     Tested on Python 2.7 and 3.3 - 3.6 with nose 1.3.7.
-    '''
 
-    '/Users/hschilli/Documents/OpenMDAO/dev/blue_recording_global_counter/openmdao/recorders/tests/test_sqlite_recorder.py'
+    Returns
+    -------
+    str
+        The fully qualified name of the current test function
+         when called from within a test method, test function, setup or
+         teardown.
+    """
+    # 'OpenMDAO/dev/blue_recording_global_counter/openmdao/recorders/tests/test_sqlite_recorder.py'
     for frame_info in inspect.stack():
         if frame_info[1].endswith('tests/test_sqlite_recorder.py'):
             if frame_info[3] == 'run_driver':
                 continue
             return frame_info[3]
-    raise RuntimeError('Could not determine test case')
+    # raise RuntimeError('Could not determine test case')

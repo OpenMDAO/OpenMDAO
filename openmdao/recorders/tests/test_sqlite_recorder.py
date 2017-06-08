@@ -22,7 +22,9 @@ from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped
+from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
+        SellarDis1withDerivatives, SellarDis2withDerivatives
+
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
@@ -42,7 +44,6 @@ def run_driver(problem):
     t1 = time.time()
 
     return t0, t1
-
 
 def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
     """
@@ -89,7 +90,6 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
 
-
 def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
     """
         expected can be from multiple cases
@@ -132,7 +132,6 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
                     # Check to see if the values in actual and expected match
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
-
 
 def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
     """
@@ -192,7 +191,6 @@ def _assertSolverIterationDataRecordedBasic(test, db_cur):
     db_cur.execute("SELECT * FROM solver_iterations")
     row_actual = db_cur.fetchone()
     test.assertTrue(row_actual, 'Solver iterations table is empty. Should contain at least one record')
-
 
 def _assertMetadataRecorded(test, db_cur):
 
@@ -295,7 +293,17 @@ class TestSqliteRecorder(unittest.TestCase):
     def setup_sellar_model(self):
         self.prob = Problem()
 
-        self.prob.model = SellarDerivatives()
+        model = self.prob.model = Group()
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                            z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
         self.prob.model.nl_solver = NonlinearBlockGS()
 
         self.prob.model.add_design_var('x', lower=-100, upper=100)
@@ -303,6 +311,37 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.model.add_objective('obj')
         self.prob.model.add_constraint('con1')
         self.prob.model.add_constraint('con2')
+
+    def setup_sellar_grouped_model(self):
+        self.prob = Problem()
+
+        model = self.prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        mda = model.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.ln_solver = ScipyIterativeSolver()
+        mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        mda.nl_solver = NonlinearBlockGS()
+        model.ln_solver = ScipyIterativeSolver()
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+
 
     def test_only_desvars_recorded(self):
 
@@ -313,6 +352,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_objectives'] = False
         self.recorder.options['record_constraints'] = False
         self.prob.driver.add_recorder(self.recorder)
+
         self.prob.setup(check=False)
 
         t0, t1 = run_driver(self.prob)
@@ -371,8 +411,6 @@ class TestSqliteRecorder(unittest.TestCase):
                             }
 
         self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, None, expected_constraints),), self.eps)
-
-    # TODO_RECORDERS - need to add tests for recording options for recording Systems and Solvers
 
     def test_simple_driver_recording(self):
 
@@ -488,12 +526,12 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_inputs = {
                             "obj_cmp.z": [5.0, 2.0],
-                            "obj_cmp.y1": [25.58914915,],
+                            "obj_cmp.y1": [25.58830236,],
                             "obj_cmp.x": [1.0,],
                             "obj_cmp.y2": [12.05857185,],
                             }
 
-        expected_outputs = {"obj_cmp.obj": [28.58915495,],
+        expected_outputs = {"obj_cmp.obj": [28.58830816,],
                             }
 
         expected_residuals = {"obj_cmp.obj": [0.0,],
@@ -562,41 +600,45 @@ class TestSqliteRecorder(unittest.TestCase):
 
         if OPTIMIZER is None:
             raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+        self.setup_sellar_grouped_model()
 
-        prob = Problem()
-        model = prob.model = SellarDerivativesGrouped()
-
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
+        self.prob.driver = pyOptSparseDriver()
+        self.prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
-            prob.driver.opt_settings['ACC'] = 1e-9
-        prob.driver.options['print_results'] = True
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+        self.prob.driver.options['print_results'] = True
 
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
+        # self.nl_solver = self.metadata['nl_solver']
+        # if self.metadata['nl_atol']:
+        #     self.nl_solver.options['atol'] = self.metadata['nl_atol']
+        # if self.metadata['nl_maxiter']:
+        #     self.nl_solver.options['maxiter'] = self.metadata['nl_maxiter']
+        #
+        # self.ln_solver = self.metadata['ln_solver']
+        # if self.metadata['ln_atol']:
+        #     self.ln_solver.options['atol'] = self.metadata['ln_atol']
+        # if self.metadata['ln_maxiter']:
+        #     self.ln_solver.options['maxiter'] = self.metadata['ln_maxiter']
 
         self.recorder.options['record_inputs'] = True
         self.recorder.options['record_outputs'] = True
         self.recorder.options['record_residuals'] = True
         self.recorder.options['record_metadata'] = True
 
-        prob.model.add_recorder(self.recorder)
+        self.prob.model.add_recorder(self.recorder)
 
-        pz = prob.model.get_subsystem('pz') # IndepVarComp which is an ExplicitComponent
+        pz = self.prob.model.get_subsystem('pz') # IndepVarComp which is an ExplicitComponent
         pz.add_recorder(self.recorder)
 
-        mda = prob.model.get_subsystem('mda') # Group
+        mda = self.prob.model.get_subsystem('mda') # Group
         d1 = mda.get_subsystem('d1')
         d1.add_recorder(self.recorder)
 
-        prob.setup(check=False, mode='rev')
+        self.prob.setup(check=False, mode='rev')
 
-        t0, t1 = run_driver(prob)
+        t0, t1 = run_driver(self.prob)
 
-        prob.cleanup()
+        self.prob.cleanup()
 
         #TODO_RECORDERS - need to test values !!!
 
@@ -691,7 +733,6 @@ class TestSqliteRecorder(unittest.TestCase):
         # TODO_RECORDERS - should really check to see that we get more than just one record as this test does
         self.assertSolverIterationDataRecordedBasic()
 
-
     def test_record_solver_nonlinear_block_gs(self):
         self.setup_sellar_model()
 
@@ -751,22 +792,20 @@ class TestSqliteRecorder(unittest.TestCase):
 
     def test_record_solver_linear_direct_solver(self):
 
-        # raise unittest.SkipTest("Linear Solver recording not working yet")
+        self.setup_sellar_model()
 
-        prob = Problem()
-        model = prob.model = SellarDerivatives()
-
-        model.nl_solver = NewtonSolver()
+        self.prob.model.nl_solver = NewtonSolver()
         # used for analytic derivatives
-        model.nl_solver.ln_solver = DirectSolver()
+        self.prob.model.nl_solver.ln_solver = DirectSolver()
+
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        model.nl_solver.ln_solver.add_recorder(self.recorder)
+        self.prob.model.nl_solver.ln_solver.add_recorder(self.recorder)
 
-        prob.setup()
-        t0, t1 = run_driver(prob)
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
 
         #### No norms so no expected norms
 
@@ -774,45 +813,39 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSolverIterationDataRecordedBasic()
 
     def test_record_solver_linear_scipy_iterative_solver(self):
+        self.setup_sellar_model()
 
-        # raise unittest.SkipTest("Linear Solver recording not working yet")
-
-        prob = Problem()
-        model = prob.model = SellarDerivatives()
-
-        model.nl_solver = NewtonSolver()
+        self.prob.model.nl_solver = NewtonSolver()
         # used for analytic derivatives
-        model.nl_solver.ln_solver = ScipyIterativeSolver()
+        self.prob.model.nl_solver.ln_solver = ScipyIterativeSolver()
+
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        model.nl_solver.ln_solver.add_recorder(self.recorder)
+        self.prob.model.nl_solver.ln_solver.add_recorder(self.recorder)
 
-        prob.setup()
-        t0, t1 = run_driver(prob)
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
 
         # TODO_RECORDERS - need to be more thorough
         self.assertSolverIterationDataRecordedBasic()
 
     def test_record_solver_linear_petsc_ksp(self):
+        self.setup_sellar_model()
 
-        # raise unittest.SkipTest("Linear Solver recording not working yet")
-
-        prob = Problem()
-        model = prob.model = SellarDerivatives()
-
-        model.nl_solver = NewtonSolver()
+        self.prob.model.nl_solver = NewtonSolver()
         # used for analytic derivatives
-        model.nl_solver.ln_solver = PetscKSP()
+        self.prob.model.nl_solver.ln_solver = PetscKSP()
+
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        model.nl_solver.ln_solver.add_recorder(self.recorder)
+        self.prob.model.nl_solver.ln_solver.add_recorder(self.recorder)
 
-        prob.setup()
-        t0, t1 = run_driver(prob)
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
 
         # TODO_RECORDERS - need to be more thorough
         self.assertSolverIterationDataRecordedBasic()
@@ -820,21 +853,20 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_solver_linear_block_gs(self):
 
         # raise unittest.SkipTest("Linear Solver recording not working yet")
+        self.setup_sellar_model()
 
-        prob = Problem()
-        model = prob.model = SellarDerivatives()
-
-        model.nl_solver = NewtonSolver()
+        self.prob.model.nl_solver = NewtonSolver()
         # used for analytic derivatives
-        model.nl_solver.ln_solver = LinearBlockGS()
+        self.prob.model.nl_solver.ln_solver = LinearBlockGS()
+
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        model.nl_solver.ln_solver.add_recorder(self.recorder)
+        self.prob.model.nl_solver.ln_solver.add_recorder(self.recorder)
 
-        prob.setup()
-        t0, t1 = run_driver(prob)
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
 
         # TODO_RECORDERS - need to be more thorough
         self.assertSolverIterationDataRecordedBasic()
@@ -842,21 +874,20 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_solver_linear_ln_run_once(self):
 
         # raise unittest.SkipTest("Linear Solver recording not working yet")
+        self.setup_sellar_model()
 
-        prob = Problem()
-        model = prob.model = SellarDerivatives()
-
-        model.nl_solver = NewtonSolver()
+        self.prob.model.nl_solver = NewtonSolver()
         # used for analytic derivatives
-        model.nl_solver.ln_solver = LNRunOnce()
+        self.prob.model.nl_solver.ln_solver = LNRunOnce()
+
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        model.nl_solver.ln_solver.add_recorder(self.recorder)
+        self.prob.model.nl_solver.ln_solver.add_recorder(self.recorder)
 
-        prob.setup()
-        t0, t1 = run_driver(prob)
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
 
         #### No norms so no expected norms
 
@@ -866,21 +897,20 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_solver_linear_block_jac(self):
 
         # raise unittest.SkipTest("Linear Solver recording not working yet")
+        self.setup_sellar_model()
 
-        prob = Problem()
-        model = prob.model = SellarDerivatives()
-
-        model.nl_solver = NewtonSolver()
+        self.prob.model.nl_solver = NewtonSolver()
         # used for analytic derivatives
-        model.nl_solver.ln_solver = LinearBlockJac()
+        self.prob.model.nl_solver.ln_solver = LinearBlockJac()
+
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        model.nl_solver.ln_solver.add_recorder(self.recorder)
+        self.prob.model.nl_solver.ln_solver.add_recorder(self.recorder)
 
-        prob.setup()
-        t0, t1 = run_driver(prob)
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
 
         # TODO_RECORDERS - need to be more thorough
         self.assertSolverIterationDataRecordedBasic()
@@ -892,21 +922,16 @@ class TestSqliteRecorder(unittest.TestCase):
         if OPTIMIZER is None:
             raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
-        prob = Problem()
-        model = prob.model = SellarDerivativesGrouped()
+        #prob = Problem()
+        #model = prob.model = SellarDerivativesGrouped()
+        self.setup_sellar_grouped_model()
 
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
+        self.prob.driver = pyOptSparseDriver()
+        self.prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
-            prob.driver.opt_settings['ACC'] = 1e-2 # to speed the test up
-            prob.driver.opt_settings['ACC'] = 1e-9
-        prob.driver.options['print_results'] = True
-
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
+            self.prob.driver.opt_settings['ACC'] = 1e-2 # to speed the test up
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+        self.prob.driver.options['print_results'] = True
 
         self.recorder.options['record_inputs'] = True
         self.recorder.options['record_outputs'] = True
@@ -914,14 +939,14 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_metadata'] = True
 
         # Add recorders for Driver, System, Solver
-        prob.driver.add_recorder(self.recorder)
-        prob.model.add_recorder(self.recorder)
-        mda = prob.model.get_subsystem('mda')
+        self.prob.driver.add_recorder(self.recorder)
+        self.prob.model.add_recorder(self.recorder)
+        mda = self.prob.model.get_subsystem('mda')
         mda.nl_solver.add_recorder(self.recorder)
 
-        prob.setup(check=False, mode='rev')
-        t0, t1 = run_driver(prob)
-        prob.cleanup()
+        self.prob.setup(check=False, mode='rev')
+        t0, t1 = run_driver(self.prob)
+        self.prob.cleanup()
 
         # get global counter values from driver, system, and solver recording
         con = sqlite3.connect(self.filename)

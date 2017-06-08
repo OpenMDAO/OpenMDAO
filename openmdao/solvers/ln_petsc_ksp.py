@@ -160,7 +160,8 @@ class Monitor(object):
         # TODO_RECORDERS - need to replace None in this with metadata from above
         metadata = self.metadata = create_local_meta(None, type(self).__name__)
         update_local_meta(metadata, (self._solver._iter_count,))
-        self._solver._rec_mgr.record_iteration(self._solver, metadata, abs=norm, rel=norm / self._norm0)
+        self._solver._rec_mgr.record_iteration(self._solver, metadata, abs=norm,
+                                               rel=norm / self._norm0)
 
         self._solver._mpi_print(counter, norm, norm / self._norm0)
         self._solver._iter_count += 1
