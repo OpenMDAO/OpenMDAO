@@ -1246,17 +1246,17 @@ class Group(System):
             approx = self._approx_schemes[method]
             pro2abs = self._var_allprocs_prom2abs_list
 
-            of = list(var[0] for var in pro2abs['output'].values())
+            of = set(var[0] for var in pro2abs['output'].values())
             candidate_wrt = list(var[0] for var in pro2abs['input'].values())
 
             from openmdao.core.indepvarcomp import IndepVarComp
-            wrt = []
+            wrt = set()
             ivc = []
             for var in candidate_wrt:
                 src = self._conn_abs_in2out.get(var)
 
                 if src is None:
-                    wrt.append(var)
+                    wrt.add(var)
 
                 # Weed out inputs connected to anything inside our system unless the source is an
                 # indepvarcomp.
@@ -1264,13 +1264,13 @@ class Group(System):
                     compname = '.'.join(src.split('.')[:-1])
                     comp = self.get_subsystem(compname)
                     if isinstance(comp, IndepVarComp):
-                        wrt.append(src)
+                        wrt.add(src)
                         ivc.append(src)
 
             with self.jacobian_context() as J:
                 print('of', of)
                 print('wrt', wrt)
-                for key in product(of, wrt + of):
+                for key in product(of, wrt.union(of)):
                     meta_changes = {
                         'method': method,
                     }

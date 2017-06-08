@@ -30,6 +30,9 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
+        # 1 output x 2 inputs
+        self.assertEqual(len(model._approx_schemes['fd']._exec_list), 2)
+
     def test_paraboloid_subbed(self):
         prob = Problem()
         model = prob.model = Group()
@@ -51,6 +54,10 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
+
+        # 1 output x 2 inputs
+        sub = model.get_subsystem('sub')
+        self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 2)
 
     def test_paraboloid_subbed_with_conns(self):
         prob = Problem()
@@ -80,6 +87,10 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p1.x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p2.y'], [[8.0]], 1e-6)
+
+        # 3 outputs x 2 inputs
+        sub = model.get_subsystem('sub')
+        self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 6)
 
 if __name__ == "__main__":
     unittest.main()
