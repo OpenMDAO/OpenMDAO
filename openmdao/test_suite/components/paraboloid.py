@@ -10,7 +10,7 @@ class Paraboloid(ExplicitComponent):
     Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
     """
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', val=0.0)
         self.add_input('y', val=0.0)
 

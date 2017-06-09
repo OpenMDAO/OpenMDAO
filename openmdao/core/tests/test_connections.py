@@ -60,7 +60,7 @@ class TestConnections(unittest.TestCase):
 
         class Src(ExplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
 
                 self.add_input('x', 2.0)
                 self.add_output('y1', np.zeros((3, )))
@@ -74,7 +74,7 @@ class TestConnections(unittest.TestCase):
 
         class Tgt(ExplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
 
                 self.add_input('x1')
                 self.add_input('x2')
@@ -107,7 +107,7 @@ class TestConnections(unittest.TestCase):
 
         class Src(ExplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
 
                 self.add_input('x', 2.0)
                 self.add_output('y1', np.zeros((3, )))
@@ -125,7 +125,7 @@ class TestConnections(unittest.TestCase):
 
         class Tgt(ExplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
 
                 self.add_input('x1')
                 self.add_input('x2')
@@ -441,12 +441,12 @@ class TestConnectionsPromoted(unittest.TestCase):
 
 
 #class Sink1(ExplicitComponent):
-    #def initialize_variables(self):
+    #def setup(self):
         #self.add_input('x', val=0.0, units='m')
 
 
 #class Sink2(ExplicitComponent):
-    #def initialize_variables(self):
+    #def setup(self):
         #self.add_input('x', val=0.0, units='mm')
 
 #class TestConnSetup(unittest.TestCase):

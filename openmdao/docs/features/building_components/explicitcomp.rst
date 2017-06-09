@@ -16,13 +16,13 @@ ExplicitComponent Methods
 
 The implementation of each method will be illustrated using a simple explicit component that computes the output *area* as a function of inputs *length* and *width*.
 
-- :code:`initialize_variables()` :
+- :code:`setup()` :
 
   Declare input and output variables via :code:`add_input` and :code:`add_output`.
   Information like variable names, sizes, units, and bounds are declared.
 
   .. embed-code::
-      openmdao.core.tests.test_expl_comp.TestExplCompSimpleCompute.initialize_variables
+      openmdao.core.tests.test_expl_comp.TestExplCompSimpleCompute.setup
 
 - :code:`compute(inputs, outputs)` :
 

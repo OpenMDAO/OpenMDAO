@@ -18,7 +18,7 @@ class ImplCompOneState(ImplicitComponent):
     y = 0.3968459
     """
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', 1.2278849186466743)
         self.add_output('y', val=1.0)
 
@@ -61,7 +61,7 @@ class ImplCompTwoStates(ImplicitComponent):
     dz_dx = -4/(x+1)**2 = -1.7777777777777777
     """
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', 0.5)
         self.add_output('y', 0.0)
         self.add_output('z', 2.0, lower=1.5, upper=2.5)
@@ -115,7 +115,7 @@ class ImplCompTwoStatesArrays(ImplicitComponent):
     dz_dx = -4/(x+1)**2 = -1.7777777777777777
     """
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', np.zeros((3, 1)))
         self.add_output('y', np.zeros((3, 1)))
         self.add_output('z', 2.0*np.ones((3, 1)), lower=1.5,
