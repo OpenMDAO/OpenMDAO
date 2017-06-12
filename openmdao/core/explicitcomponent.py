@@ -179,14 +179,15 @@ class ExplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
-            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            print_recording_iteration_stack, pop_recording_iteration_stack, \
+            iter_get_norm_on_call_stack
+
         do_recording = not iter_get_norm_on_call_stack()
 
         if do_recording:
             push_recording_iteration_stack(self.pathname + '._solve_nonlinear', self.iter_count)
             print_recording_iteration_stack()
-
 
         with self._unscaled_context(
                 outputs=[self._outputs], residuals=[self._residuals]):
@@ -215,8 +216,9 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._solve_nonlinear()
 
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
-            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            print_recording_iteration_stack, pop_recording_iteration_stack, \
+            iter_get_norm_on_call_stack
         do_recording = not iter_get_norm_on_call_stack()
 
         if do_recording:
@@ -252,14 +254,13 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
-            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            print_recording_iteration_stack, pop_recording_iteration_stack, \
+            iter_get_norm_on_call_stack
         do_recording = not iter_get_norm_on_call_stack()
         if do_recording:
             push_recording_iteration_stack(self.pathname + '._apply_linear', self.iter_count)
             print_recording_iteration_stack()
-
 
         for vec_name in vec_names:
             with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
@@ -278,9 +279,7 @@ class ExplicitComponent(Component):
                     d_residuals *= -1.0
         if do_recording:
             self.record_iteration()
-
             pop_recording_iteration_stack()
-
 
     def _solve_linear(self, vec_names, mode):
         """
@@ -302,13 +301,13 @@ class ExplicitComponent(Component):
         float
             relative error.
         """
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, \
-            pop_recording_iteration_stack, iter_get_norm_on_call_stack
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            print_recording_iteration_stack, pop_recording_iteration_stack, \
+            iter_get_norm_on_call_stack
         do_recording = not iter_get_norm_on_call_stack()
         if do_recording:
             push_recording_iteration_stack(self.pathname + '._solve_linear', self.iter_count)
             print_recording_iteration_stack()
-
 
         for vec_name in vec_names:
             d_outputs = self._vectors['output'][vec_name]
@@ -325,7 +324,6 @@ class ExplicitComponent(Component):
             self.record_iteration()
 
             pop_recording_iteration_stack()
-
 
         return False, 0., 0.
 

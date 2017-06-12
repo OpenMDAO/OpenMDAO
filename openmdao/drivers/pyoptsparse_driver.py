@@ -372,18 +372,15 @@ class pyOptSparseDriver(Driver):
             self.iter_count += 1
             update_local_meta(metadata, (self.iter_count,))
 
-            from openmdao.recorders.base_recorder import push_recording_iteration_stack, print_recording_iteration_stack, pop_recording_iteration_stack
-            push_recording_iteration_stack('pyoptsparsedriver',self.iter_count)
-
+            from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+                print_recording_iteration_stack, pop_recording_iteration_stack, \
+                iter_get_norm_on_call_stack
+            push_recording_iteration_stack('pyoptsparsedriver', self.iter_count)
 
             model._solve_nonlinear()
 
-
             print_recording_iteration_stack()
             pop_recording_iteration_stack()
-
-
-
 
             func_dict = self.get_objective_values()
             func_dict.update(self.get_constraint_values(lintype='nonlinear'))

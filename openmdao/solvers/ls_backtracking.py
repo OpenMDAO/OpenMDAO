@@ -249,10 +249,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             update_local_meta(metadata, (self._iter_count,))
             self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
 
-
-
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
-
 
         return fail, norm, norm / norm0

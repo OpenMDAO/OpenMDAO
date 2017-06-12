@@ -2,7 +2,8 @@
 # and allows the use of the custom directive for tags in our rst (e.g.):
 # .. tags:: tag1, tag2, tag3
 import os
-from sphinx.util.compat import Directive, make_admonition
+from sphinx.util.compat import Directive
+from docutils.parsers.rst.directives.admonitions import Admonition
 from docutils import nodes
 from sphinx.locale import _
 
@@ -67,8 +68,8 @@ class TagDirective(Directive):
         # Replace content[0] with hyperlinks to display in admonition
         self.content[0] = linkjoin
 
-        ad = make_admonition(tag, self.name, [_('Tags')], self.options,
-                             self.content, self.lineno, self.content_offset,
-                             self.block_text, self.state, self.state_machine)
+        ad = Admonition(self.name, [_('Tags')], self.options,
+                        self.content, self.lineno, self.content_offset,
+                        self.block_text, self.state, self.state_machine)
 
-        return [targetnode] + ad
+        return [targetnode] + ad.run()
