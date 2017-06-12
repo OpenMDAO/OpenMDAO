@@ -32,7 +32,7 @@ class DistributedAdder(ExplicitComponent):
         """
         return (1, self.size)
 
-    def initialize_variables(self):
+    def setup(self):
         """
         specify the local sizes of the variables and which specific indices this specific
         distributed component will handle. Indices do NOT need to be sequential or
@@ -72,7 +72,7 @@ class Summer(ExplicitComponent):
         super(Summer, self).__init__()
         self.size = size
 
-    def initialize_variables(self):
+    def setup(self):
         #NOTE: this component depends on the full y array, so OpenMDAO
         #      will automatically gather all the values for it
         self.add_input('y', val=np.zeros(self.size))

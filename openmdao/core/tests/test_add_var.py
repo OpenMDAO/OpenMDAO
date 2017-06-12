@@ -11,7 +11,7 @@ from openmdao.devtools.testutil import assert_rel_error
 class CompAddWithDefault(ExplicitComponent):
     """Component for tests for declaring only default value."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x_a')
         self.add_input('x_b', val=3.)
         self.add_input('x_c', val=(3., 3.))
@@ -27,7 +27,7 @@ class CompAddWithDefault(ExplicitComponent):
 class CompAddWithShape(ExplicitComponent):
     """Component for tests for declaring only shape."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x_a', shape=2)
         self.add_input('x_b', shape=(2, 2))
         self.add_input('x_c', shape=[2, 2])
@@ -39,7 +39,7 @@ class CompAddWithShape(ExplicitComponent):
 class CompAddWithIndices(ExplicitComponent):
     """Component for tests for declaring only indices."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x_a', src_indices=0)
         self.add_input('x_b', src_indices=(0, 1))
         self.add_input('x_c', src_indices=[0, 1])
@@ -52,7 +52,7 @@ class CompAddWithIndices(ExplicitComponent):
 class CompAddWithShapeAndIndices(ExplicitComponent):
     """Component for tests for declaring shape and array indices."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x_a', shape=2, src_indices=(0,1))
         self.add_input('x_b', shape=(2,), src_indices=(0,1))
         self.add_input('x_c', shape=(2, 2), src_indices=np.arange(4).reshape((2, 2)))
@@ -62,7 +62,7 @@ class CompAddWithShapeAndIndices(ExplicitComponent):
 class CompAddArrayWithScalar(ExplicitComponent):
     """Component for tests for declaring a scalar val with an array variable."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x_a', val=2.0, shape=(6))
         self.add_input('x_b', val=2.0, shape=(3, 2))
         self.add_input('x_c', val=2.0, src_indices=np.arange(6))
@@ -74,7 +74,7 @@ class CompAddArrayWithScalar(ExplicitComponent):
 class CompAddWithArrayIndices(ExplicitComponent):
     """Component for tests for declaring with array val and array indices."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x_a', val=2.0 * np.ones(6), src_indices=np.arange(6))
         self.add_input('x_b', val=2.0 * np.ones((3, 2)), src_indices=np.arange(6).reshape((3, 2)))
         self.add_output('y')
@@ -83,7 +83,7 @@ class CompAddWithArrayIndices(ExplicitComponent):
 class CompAddWithBounds(ExplicitComponent):
     """Component for tests for declaring bounds."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x')
         self.add_output('y_a', val=2.0, lower=0.)
         self.add_output('y_b', val=2.0, lower=0., upper=10.)

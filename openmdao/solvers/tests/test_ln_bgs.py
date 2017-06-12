@@ -15,12 +15,12 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDe
 
 
 class SimpleImp(ImplicitComponent):
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('a', val=1.)
         self.add_output('x', val=0.)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        residuals['x'] = 3.0 * inputs['a'] + 2.0 * outputs['x']
+        residuals['x'] = 3.0*inputs['a'] + 2.0*outputs['x']
 
     def linearize(self, inputs, outputs, jacobian):
         jacobian['x', 'x'] = 2.0
@@ -60,6 +60,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
     def test_simple_implicit(self):
         # This verifies that we can perform lgs around an implicit comp and get the right answer
         # as long as we slot a non-lgs linear solver on that component.
+
         prob = Problem()
         model = prob.model = Group()
         model.add_subsystem('p', IndepVarComp('a', 5.0))
@@ -76,7 +77,6 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         self.assertEqual(deriv['comp.x', 'p.a'], -1.5)
 
     def test_implicit_cycle(self):
-
         prob = Problem()
         model = prob.model = Group()
 
@@ -100,7 +100,6 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         self.assertLess(res, 2.0e-2)
 
     def test_implicit_cycle_precon(self):
-
         prob = Problem()
         model = prob.model = Group()
 

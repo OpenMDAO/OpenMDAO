@@ -10,8 +10,8 @@ From Sellar's analytic problem.
 
 import numpy as np
 
-from openmdao.api import Group, ExplicitComponent, ExecComp, IndepVarComp, NonlinearBlockGS, \
-     ScipyIterativeSolver
+from openmdao.api import Group, ExplicitComponent, ExecComp, IndepVarComp, \
+                         NonlinearBlockGS, ScipyIterativeSolver
 
 
 class SellarDis1(ExplicitComponent):
@@ -19,7 +19,7 @@ class SellarDis1(ExplicitComponent):
     Component containing Discipline 1 -- no derivatives version.
     """
 
-    def initialize_variables(self):
+    def setup(self):
 
         # Global Design Variable
         self.add_input('z', val=np.zeros(2))
@@ -33,7 +33,7 @@ class SellarDis1(ExplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0)
 
-    def initialize_partials(self):
+    def setup_partials(self):
         """
         Finite difference all partials.
         """
@@ -57,7 +57,7 @@ class SellarDis2(ExplicitComponent):
     Component containing Discipline 2 -- no derivatives version.
     """
 
-    def initialize_variables(self):
+    def setup(self):
         # Global Design Variable
         self.add_input('z', val=np.zeros(2))
 
@@ -67,7 +67,7 @@ class SellarDis2(ExplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0)
 
-    def initialize_partials(self):
+    def setup_partials(self):
         """
         Finite difference all partials.
         """
@@ -97,7 +97,7 @@ class SellarNoDerivatives(Group):
     Group containing the Sellar MDA. This version uses the disciplines without derivatives.
     """
 
-    def initialize_subsystems(self):
+    def setup(self):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
@@ -114,4 +114,3 @@ class SellarNoDerivatives(Group):
 
         self.nl_solver = NonlinearBlockGS()
         self.ln_solver = ScipyIterativeSolver()
-
