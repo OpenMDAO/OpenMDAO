@@ -15,9 +15,9 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.group import Group
-from openmdao.solvers.nonlinear_block_gs import NonlinearBlockGS
-from openmdao.solvers.scipy_iter_solver import ScipyIterativeSolver
-from openmdao.solvers.newton import NewtonSolver
+from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
+from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver
+from openmdao.solvers.nonlinear.newton import NewtonSolver
 
 
 class SellarDis1(ExplicitComponent):
@@ -190,8 +190,8 @@ class SellarNoDerivatives(Group):
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         cycle = self.add_subsystem('cycle', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        d1 = cycle.add_subsystem('d1', SellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
-        d2 = cycle.add_subsystem('d2', SellarDis2(), promotes=['z', 'y1', 'y2'])
+        cycle.add_subsystem('d1', SellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
+        cycle.add_subsystem('d2', SellarDis2(), promotes=['z', 'y1', 'y2'])
 
         self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                            z=np.array([0.0, 0.0]), x=0.0),

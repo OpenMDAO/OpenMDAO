@@ -7,12 +7,12 @@ from six.moves import range
 
 from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.solvers.linesearch_backtracking import ArmijoGoldsteinLS, BoundsEnforceLS
-from openmdao.solvers.newton import NewtonSolver
-from openmdao.solvers.scipy_iter_solver import ScipyIterativeSolver
+from openmdao.solvers.nonlinear.linesearch_backtracking import ArmijoGoldsteinLS, BoundsEnforceLS
+from openmdao.solvers.nonlinear.newton import NewtonSolver
+from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch \
-    import ImplCompOneState, ImplCompTwoStates, ImplCompTwoStatesArrays
+    import ImplCompTwoStates, ImplCompTwoStatesArrays
 
 
 class TestArmejoGoldsteinBounds(unittest.TestCase):
@@ -142,7 +142,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
 
-        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+        top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -166,7 +166,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
 
-        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='wall')
+        top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='wall')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -190,7 +190,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
 
-        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar')
+        top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -259,7 +259,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
+        top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -283,7 +283,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='scalar')
+        top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='scalar')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -374,7 +374,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = ScipyIterativeSolver()
 
-        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
+        top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
 
         top.setup(check=False)
 

@@ -10,8 +10,8 @@ import numpy as np
 import warnings
 
 from openmdao.core.system import System
-from openmdao.solvers.nonlinear_runonce import NonLinearRunOnce
-from openmdao.solvers.linear_runonce import LinearRunOnce
+from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
+from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
 from openmdao.utils.array_utils import convert_neg

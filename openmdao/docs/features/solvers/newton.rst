@@ -83,7 +83,7 @@ Specifying a Linear Solver
 
 We can choose a different linear solver for calculating the Newton step by setting the `linear_solver` attribute. The default is to use the
 linear solver that was specified on the containing system, which by default is LinearBlockGS. Here,
-we modify the model to use :ref:`DirectSolver <usr_openmdao.solvers.direct.py>` instead.
+we modify the model to use :ref:`DirectSolver <usr_openmdao.solvers.linear.direct.py>` instead.
 
 .. embed-test::
     openmdao.solvers.tests.test_newton.TestNewtonFeatures.test_feature_linear_solver
@@ -104,7 +104,7 @@ let's set up a problem that has implicit bounds on one of its states.
 
 In this component, the state "z" is only valid between 1.5 and 2.5, while the other state is valid
 everywhere. You can verify that if NewtonSolver is used with no backtracking specified, the solution
-violates the bounds on "z".  Here, we specify :ref:`ArmijoGoldsteinLS <usr_openmdao.solvers.linesearch_backtracking.py>`
+violates the bounds on "z".  Here, we specify :ref:`ArmijoGoldsteinLS <usr_openmdao.solvers.nonlinear.linesearch_backtracking.py>`
 as our line search algorithm, and we get a solution on the lower bounds for "z".
 
 .. embed-test::

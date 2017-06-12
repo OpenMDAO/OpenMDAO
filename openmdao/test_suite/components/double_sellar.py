@@ -1,8 +1,8 @@
 from openmdao.core.group import Group
-from openmdao.solvers.newton import NewtonSolver
-from openmdao.solvers.direct import DirectSolver
+from openmdao.solvers.nonlinear.newton import NewtonSolver
+from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
+from openmdao.test_suite.components.sellar import SellarImplicitDis1
 
 
 class SubSellar(Group):

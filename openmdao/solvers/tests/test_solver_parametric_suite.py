@@ -12,8 +12,8 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
                                                   CSRJacobian, CSCJacobian
-from openmdao.solvers.newton import NewtonSolver
-from openmdao.solvers.direct import DirectSolver
+from openmdao.solvers.nonlinear.newton import NewtonSolver
+from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.parametric_suite import parametric_suite
 

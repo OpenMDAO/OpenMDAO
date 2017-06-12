@@ -1,6 +1,6 @@
 """Define the LinearRunOnce class."""
 
-from openmdao.solvers.linear_block_gs import LinearBlockGS
+from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 
 
 class LinearRunOnce(LinearBlockGS):

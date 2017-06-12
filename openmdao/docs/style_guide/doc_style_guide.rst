@@ -197,11 +197,11 @@ which the class lives. Here's a specific, working example:
 
   .. code-block:: python
 
-    :ref:`Direct <usr_openmdao.solvers.direct.py>`
+    :ref:`Direct <usr_openmdao.solvers.linear.direct.py>`
 
 which makes a link like this, that leads to the Direct solver's user docs:
 
-    :ref:`Direct <usr_openmdao.solvers.direct.py>`
+    :ref:`Direct <usr_openmdao.solvers.linear.direct.py>`
 
 
 Feature Docs and their Custom Directives for Including Code in Documentation

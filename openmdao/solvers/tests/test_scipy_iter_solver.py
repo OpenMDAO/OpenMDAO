@@ -9,9 +9,9 @@ import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem, ExecComp, NonlinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.solvers.linear_block_gs import LinearBlockGS
-from openmdao.solvers.scipy_iter_solver import ScipyIterativeSolver, gmres
-from openmdao.solvers.newton import NewtonSolver
+from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
+from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver, gmres
+from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
@@ -133,7 +133,7 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
 
         # check deprecation on setter
         with warnings.catch_warnings(record=True) as w:
-            precon = group.linear_solver.preconditioner = LinearBlockGS()
+            group.linear_solver.preconditioner = LinearBlockGS()
 
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
@@ -141,11 +141,12 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
 
         # check deprecation on getter
         with warnings.catch_warnings(record=True) as w:
-            pre = group.linear_solver.preconditioner
+            group.linear_solver.preconditioner
 
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
         self.assertEqual(str(w[0].message), msg)
+
 
 class TestScipyIterativeSolverFeature(unittest.TestCase):
 

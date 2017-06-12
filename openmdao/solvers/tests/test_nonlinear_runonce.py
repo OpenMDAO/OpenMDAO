@@ -4,7 +4,7 @@ import unittest
 
 from openmdao.api import Problem, ScipyIterativeSolver, IndepVarComp, Group
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.solvers.nonlinear_runonce import NonLinearRunOnce
+from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import ConvergeDivergeGroups
 
