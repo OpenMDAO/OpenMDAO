@@ -16,13 +16,13 @@ ImplicitComponent Methods
 
 The implementation of each method will be illustrated using a simple implicit component that computes the output :math:`x` implicitly via a quadratic equation, :math:`ax^2 + bx + c =0`, where :math:`a`, :math:`b`, and :math:`c` are inputs to the component.
 
-- :code:`initialize_variables()` :
+- :code:`setup()` :
 
   Declare input and output variables via :code:`add_input` and :code:`add_output`.
   Information like variable names, sizes, units, and bounds are declared.
 
   .. embed-code::
-      openmdao.core.tests.test_impl_comp.TestImplCompSimpleCompute.initialize_variables
+      openmdao.core.tests.test_impl_comp.TestImplCompSimpleCompute.setup
 
 - :code:`apply_nonlinear(inputs, outputs, residuals)` :
 

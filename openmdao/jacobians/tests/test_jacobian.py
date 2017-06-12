@@ -25,12 +25,12 @@ class MyExplicitComp(ExplicitComponent):
         super(MyExplicitComp, self).__init__()
         self._jac_type = jac_type
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', val=np.zeros(2))
         self.add_input('y', val=np.zeros(2))
         self.add_output('f', val=np.zeros(2))
 
-    def initialize_partials(self):
+    def setup_partials(self):
         val = self._jac_type(np.array([[1., 1.], [1., 1.]]))
         if isinstance(val, list):
             self.declare_partials('f', ['x','y'], rows=val[1], cols=val[2], val=val[0])
@@ -73,12 +73,12 @@ class MyExplicitComp2(ExplicitComponent):
         super(MyExplicitComp2, self).__init__()
         self._jac_type = jac_type
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('w', val=np.zeros(3))
         self.add_input('z', val=0.0)
         self.add_output('f', val=0.0)
 
-    def initialize_partials(self):
+    def setup_partials(self):
         val = self._jac_type(np.array([[7.]]))
         if isinstance(val, list):
             self.declare_partials('f', 'z', rows=val[1], cols=val[2], val=val[0])
@@ -118,7 +118,7 @@ class ExplicitSetItemComp(ExplicitComponent):
         self._constructor = constructor
         super(ExplicitSetItemComp, self).__init__()
 
-    def initialize_variables(self):
+    def setup(self):
         if self._shape == 'scalar':
             in_val = 1
             out_val = 1
@@ -468,10 +468,10 @@ class TestJacobian(unittest.TestCase):
         # that compute also uses and could get corrupted
 
         class Comp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', val=1.0, shape=2)
                 self.add_output('y', val=1.0, shape=2)
-            def initialize_partials(self):
+            def setup_partials(self):
                 self.val = 2 * np.ones(2)
                 self.rows = np.arange(2)
                 self.cols = np.arange(2)
@@ -513,7 +513,7 @@ class TestJacobian(unittest.TestCase):
 
         class ParaboloidApply(ImplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', val=0.0)
                 self.add_input('y', val=0.0)
 

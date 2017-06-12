@@ -18,7 +18,7 @@ class DoubleArrayComp(ExplicitComponent):
                             [-1.0, 0.0, 8.0, 1.0],
                             [1.0, 4.0, -5.0, 6.0]])
 
-    def initialize_variables(self):
+    def setup(self):
         # Params
         self.add_input('x1', np.zeros([2]))
         self.add_input('x2', np.zeros([2]))
