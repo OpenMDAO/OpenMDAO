@@ -1,23 +1,18 @@
 """Test the LinearBlockJac class."""
 
 from __future__ import division, print_function
-from six import iteritems
 
 import unittest
 
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem, LinearBlockJac, AssembledJacobian, \
-     ExecComp, NonlinearBlockGS
+    ExecComp, NonlinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
-from openmdao.test_suite.components.simple_comps import DoubleArrayComp
-from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
-     FanOut, FanOutGrouped, ConvergeDivergeFlat, \
-     ConvergeDivergeGroups, Diamond, DiamondFlat
-from openmdao.solvers.tests.linear_test_base import LinearSolverTests
+from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
+
 
 class TestLinearBlockJacSolver(LinearSolverTests.LinearSolverTestCase):
 

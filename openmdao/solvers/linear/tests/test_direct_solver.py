@@ -9,7 +9,8 @@ from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
-from openmdao.solvers.tests.linear_test_base import LinearSolverTests
+from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
+
 
 class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 

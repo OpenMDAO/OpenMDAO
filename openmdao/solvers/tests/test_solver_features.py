@@ -1,11 +1,11 @@
-"""Test the code we put in out main dolver featuer document."""
+"""Test the code we put in out main solver feature document."""
 
 import unittest
 
 from openmdao.api import Problem
 from openmdao.solvers.nonlinear.newton import NewtonSolver
-from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
+from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 

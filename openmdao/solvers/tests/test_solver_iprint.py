@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver, Group, PetscKSP, \
+from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver, Group, \
                          IndepVarComp, NonlinearBlockGS, NonlinearBlockJac, LinearBlockGS
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.sellar import SellarDerivatives

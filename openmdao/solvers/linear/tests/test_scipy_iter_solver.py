@@ -12,7 +12,7 @@ from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver, gmres
 from openmdao.solvers.nonlinear.newton import NewtonSolver
-from openmdao.solvers.tests.linear_test_base import LinearSolverTests
+from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
