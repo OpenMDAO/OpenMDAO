@@ -2,9 +2,13 @@
 
 import unittest
 
-from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, ExecComp
+import numpy as np
+
+from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, ExecComp, NewtonSolver
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 
 
 class TestGroupFiniteDifference(unittest.TestCase):
@@ -59,7 +63,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         sub = model.get_subsystem('sub')
         self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 2)
 
-    def test_paraboloid_subbed_with_conns(self):
+    def test_paraboloid_subbed_with_connections(self):
         prob = Problem()
         model = prob.model = Group()
         model.add_subsystem('p1', IndepVarComp('x', 0.0))
@@ -91,6 +95,65 @@ class TestGroupFiniteDifference(unittest.TestCase):
         # 3 outputs x 2 inputs
         sub = model.get_subsystem('sub')
         self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 6)
+
+    def test_arrray_comp(self):
+
+        class DoubleArrayFD(DoubleArrayComp):
+
+            def compute_partials(self, inputs, outputs, partials):
+                """
+                Override deriv calculation.
+                """
+                pass
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x1', val=np.ones(2)))
+        model.add_subsystem('p2', IndepVarComp('x2', val=np.ones(2)))
+        comp = model.add_subsystem('comp', DoubleArrayFD())
+        model.connect('p1.x1', 'comp.x1')
+        model.connect('p2.x2', 'comp.x2')
+
+        model.ln_solver = ScipyIterativeSolver()
+        model.approx_all_partials()
+
+        prob.setup(check=False)
+        prob.run_model()
+        model.run_linearize()
+
+        Jfd = model.jacobian._subjacs
+        assert_rel_error(self, Jfd['comp.y1', 'p1.x1'], -comp.JJ[0:2, 0:2], 1e-6)
+        assert_rel_error(self, Jfd['comp.y1', 'p2.x2'], -comp.JJ[0:2, 2:4], 1e-6)
+        assert_rel_error(self, Jfd['comp.y2', 'p1.x1'], -comp.JJ[2:4, 0:2], 1e-6)
+        assert_rel_error(self, Jfd['comp.y2', 'p2.x2'], -comp.JJ[2:4, 2:4], 1e-6)
+
+    def test_implicit(self):
+
+        class TestImplCompArrayDense(TestImplCompArray):
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = self.mtx
+                jacobian['x', 'rhs'] = -np.eye(2)
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p_rhs', IndepVarComp('rhs', val=np.ones(2)))
+        sub = model.add_subsystem('sub', Group())
+        sub.add_subsystem('comp', TestImplCompArrayDense())
+        model.connect('p_rhs.rhs', 'sub.comp.rhs')
+
+        #model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+        sub.approx_all_partials()
+        prob.set_solver_print()
+
+        prob.setup(check=False)
+        prob.run_model()
+        model.run_linearize()
+        print(sub.jacobian._subjacs)
+        print('hey')
 
 if __name__ == "__main__":
     unittest.main()

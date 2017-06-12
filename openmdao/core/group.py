@@ -18,7 +18,7 @@ from openmdao.solvers.ln_runonce import LNRunOnce
 from openmdao.solvers.nl_runonce import NLRunOnce
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.name_maps import rel_key2abs_key
+from openmdao.utils.name_maps import rel_key2abs_key, abs_name2rel_name
 from openmdao.utils.units import is_compatible
 
 
@@ -1267,6 +1267,15 @@ class Group(System):
                         wrt.add(src)
                         ivc.append(src)
 
+            from openmdao.core.implicitcomponent import ImplicitComponent
+            states = set()
+            for var in of:
+                compname = abs_name2rel_name(self, '.'.join(var.split('.')[:-1]))
+                comp = self.get_subsystem(compname)
+                if isinstance(comp, ImplicitComponent):
+                    wrt.add(var)
+                    states.add(var)
+
             with self.jacobian_context() as J:
                 print('of', of)
                 print('wrt', wrt)
@@ -1288,12 +1297,18 @@ class Group(System):
                     # TODO: support states
                     if meta['dependent']:
 
-                        # Skip explicit res wrt outputs
-                        if key[1] in of and key[1] not in ivc:
-                            continue
-
                         # Skip indepvarcomp res wrt other srcs
                         if key[0] in ivc:
+                            continue
+
+                        # States always get added
+                        if key[0] in states:
+                            approx.add_approximation(key, meta)
+                            print('added', key)
+                            continue
+
+                        # Skip explicit res wrt outputs
+                        if key[1] in of and key[1] not in ivc:
                             continue
 
                         approx.add_approximation(key, meta)
