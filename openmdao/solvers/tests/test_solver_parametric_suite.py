@@ -50,8 +50,8 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         """
         for jac in ['dict', 'coo', 'csr', 'csc', 'dense']:
             prob = Problem(model=ImplComp4Test())
-            prob.model.nl_solver = NewtonSolver()
-            prob.model.ln_solver = DirectSolver()
+            prob.model.nonlinear_solver = NewtonSolver()
+            prob.model.linear_solver = DirectSolver()
             prob.set_solver_print(level=0)
 
             if jac == 'dict':

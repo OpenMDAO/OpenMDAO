@@ -5,13 +5,13 @@
 Setting Nonlinear and Linear Solvers
 =====================================
 
-A nonlinear solver, like :ref:`NonlinearBlockGS <usr_openmdao.solvers.nonlinear_bgs.py>` or :ref:`Newton <usr_openmdao.solvers.newton.py>`,
+A nonlinear solver, like :ref:`NonlinearBlockGS <usr_openmdao.solvers.nonlinear_block_gs.py>` or :ref:`Newton <usr_openmdao.solvers.newton.py>`,
 is used to converge the nonlinear analysis. A nonlinear solver is needed whenever this is either a cyclic dependency between components in your model.
 It might also be needed if you have an :ref:`ImplicitComponent <usr_openmdao.core.implicitcomponent.py>` in your model that expects the framework to handle its convergence.
 
 Whenever you use a nonlinear solver on a :ref:`Group <usr_openmdao.core.group.py>` or :ref:`Component <usr_openmdao.core.component.py>`, if you're going to be working with analytic derivatives,
 you will also need a linear solver.
-A linear solver, like :ref:`LinearBlockGS <usr_openmdao.solvers.linear_bgs.py>` or :ref:`DirectSolver <usr_openmdao.solvers.direct.py>`,
+A linear solver, like :ref:`LinearBlockGS <usr_openmdao.solvers.linear_block_gs.py>` or :ref:`DirectSolver <usr_openmdao.solvers.direct.py>`,
 is used to solve the linear system that provides total derivatives across the model.
 
 You can add nonlinear and linear solvers at any level of the model hierarchy,

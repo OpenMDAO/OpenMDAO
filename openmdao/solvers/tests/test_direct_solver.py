@@ -13,7 +13,7 @@ from openmdao.solvers.tests.linear_test_base import LinearSolverTests
 
 class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
-    ln_solver_class = DirectSolver
+    linear_solver_class = DirectSolver
 
     # DirectSolver doesn't iterate.
     def test_solve_linear_maxiter(self):
@@ -30,7 +30,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=DirectSolver))
 
-        p.model.ln_solver.options['maxiter'] = 1
+        p.model.linear_solver.options['maxiter'] = 1
         p.setup(check=False)
 
         p.set_solver_print(level=0)
@@ -54,7 +54,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)
-        g1.ln_solver._linearize()
+        g1.linear_solver._linearize()
         g1._solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
@@ -68,7 +68,7 @@ class TestDirectSolverFeature(unittest.TestCase):
         prob = Problem()
         model = prob.model = SellarDerivatives()
 
-        model.ln_solver = DirectSolver()
+        model.linear_solver = DirectSolver()
 
         prob.setup()
         prob.run_model()

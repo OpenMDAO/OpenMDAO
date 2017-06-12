@@ -271,8 +271,8 @@ class TestScaling(unittest.TestCase):
                                                              use_scal=use_scal))
             prob.model.connect('row1.y', 'row2.x')
             prob.model.connect('row2.y', 'row1.x')
-            prob.model.nl_solver = NewtonSolver(maxiter=2, atol=1e-5, rtol=0)
-            prob.model.nl_solver.ln_solver = ScipyIterativeSolver(maxiter=1)
+            prob.model.nonlinear_solver = NewtonSolver(maxiter=2, atol=1e-5, rtol=0)
+            prob.model.nonlinear_solver.linear_solver = ScipyIterativeSolver(maxiter=1)
 
             prob.set_solver_print(level=0)
 
@@ -359,8 +359,8 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nl_solver = NonlinearBlockGS()
-        model.nl_solver.options['maxiter'] = 1
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver.options['maxiter'] = 1
 
         prob.set_solver_print(level=0)
 
@@ -397,8 +397,8 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nl_solver = NonlinearBlockGS()
-        model.nl_solver.options['maxiter'] = 1
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver.options['maxiter'] = 1
 
         prob.set_solver_print(level=0)
 
@@ -431,8 +431,8 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nl_solver = NonlinearBlockGS()
-        model.nl_solver.options['maxiter'] = 1
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver.options['maxiter'] = 1
 
         prob.set_solver_print(level=0)
 
@@ -467,8 +467,8 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nl_solver = NonlinearBlockGS()
-        model.nl_solver.options['maxiter'] = 1
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver.options['maxiter'] = 1
 
         prob.set_solver_print(level=0)
 
@@ -834,8 +834,8 @@ class TestScaling(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = DirectSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = DirectSolver()
 
         prob.setup(check=False)
         prob.run_model()
@@ -852,8 +852,8 @@ class TestScaling(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = DirectSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = DirectSolver()
 
         model.jacobian = AssembledJacobian()
 

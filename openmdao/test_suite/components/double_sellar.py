@@ -28,8 +28,8 @@ class DoubleSellar(Group):
         self.connect('g2.y2', 'g1.x')
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        self.nl_solver = NewtonSolver()
-        self.ln_solver = DirectSolver()
+        self.nonlinear_solver = NewtonSolver()
+        self.linear_solver = DirectSolver()
 
 
 class SubSellarImplicit(Group):
@@ -55,5 +55,5 @@ class DoubleSellarImplicit(Group):
         self.connect('g2.y2', 'g1.x')
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        self.nl_solver = NewtonSolver()
-        self.ln_solver = DirectSolver()
+        self.nonlinear_solver = NewtonSolver()
+        self.linear_solver = DirectSolver()

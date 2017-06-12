@@ -81,12 +81,12 @@ Options
 Specifying a Linear Solver
 --------------------------
 
-We can choose a different linear solver for calculating the Newton step by setting the `ln_solver` attribute. The default is to use the
+We can choose a different linear solver for calculating the Newton step by setting the `linear_solver` attribute. The default is to use the
 linear solver that was specified on the containing system, which by default is LinearBlockGS. Here,
 we modify the model to use :ref:`DirectSolver <usr_openmdao.solvers.direct.py>` instead.
 
 .. embed-test::
-    openmdao.solvers.tests.test_newton.TestNewtonFeatures.test_feature_ln_solver
+    openmdao.solvers.tests.test_newton.TestNewtonFeatures.test_feature_linear_solver
 
 Specifying a Linesearch algorithm
 ---------------------------------

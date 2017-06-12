@@ -3,8 +3,8 @@ import unittest
 import numpy as np
 
 from openmdao.core.problem import Problem
-from openmdao.solvers.scipy import ScipyIterativeSolver
-from openmdao.solvers.nonlinear_bgs import NonlinearBlockGS
+from openmdao.solvers.scipy_iter_solver import ScipyIterativeSolver
+from openmdao.solvers.nonlinear_block_gs import NonlinearBlockGS
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 

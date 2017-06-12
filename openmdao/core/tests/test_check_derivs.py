@@ -266,7 +266,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
-        model.nl_solver = NonLinearRunOnce()
+        model.nonlinear_solver = NonLinearRunOnce()
 
         p.setup()
         data = p.check_partials(out_stream=None)

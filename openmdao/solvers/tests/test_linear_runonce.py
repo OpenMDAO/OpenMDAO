@@ -16,15 +16,15 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         prob = Problem()
         prob.model = ConvergeDivergeGroups()
 
-        prob.model.ln_solver = LinearRunOnce()
+        prob.model.linear_solver = LinearRunOnce()
         prob.set_solver_print(level=0)
 
         g1 = prob.model.get_subsystem('g1')
         g2 = g1.get_subsystem('g2')
         g3 = prob.model.get_subsystem('g3')
-        g1.ln_solver = LinearRunOnce()
-        g2.ln_solver = LinearRunOnce()
-        g3.ln_solver = LinearRunOnce()
+        g1.linear_solver = LinearRunOnce()
+        g2.linear_solver = LinearRunOnce()
+        g3.linear_solver = LinearRunOnce()
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -53,7 +53,7 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.ln_solver = LinearRunOnce()
+        model.linear_solver = LinearRunOnce()
 
         prob.setup(check=False, mode='fwd')
 

@@ -9,11 +9,11 @@ class NewtonSolver(NonlinearSolver):
     """
     Newton solver.
 
-    The default linear solver is the ln_solver in the containing system.
+    The default linear solver is the linear_solver in the containing system.
 
     Attributes
     ----------
-    ln_solver : <LinearSolver>
+    linear_solver : <LinearSolver>
         Linear solver to use to find the Newton search direction. The default
         is the parent system's linear solver.
     linesearch : <NonlinearSolver>
@@ -30,7 +30,7 @@ class NewtonSolver(NonlinearSolver):
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
         Number of iterations for the current invocation of the solver.
-    _ln_solver_from_parent : bool
+    _linear_solver_from_parent : bool
         This is set to True if we are using the parent system's linear solver.
     """
 
@@ -48,13 +48,14 @@ class NewtonSolver(NonlinearSolver):
         super(NewtonSolver, self).__init__(**kwargs)
 
         # Slot for linear solver
-        self.ln_solver = None
+        self.linear_solver = None
 
         # Slot for linesearch
         self.linesearch = None
 
-        # We only need to call linearize on the ln_solver if its not shared with the parent group.
-        self._ln_solver_from_parent = True
+        # We only need to call linearize on the linear solver
+        # if its not shared with the parent group.
+        self._linear_solver_from_parent = True
 
     def _declare_options(self):
         """
@@ -79,11 +80,11 @@ class NewtonSolver(NonlinearSolver):
         """
         super(NewtonSolver, self)._setup_solvers(system, depth)
 
-        if self.ln_solver is not None:
-            self.ln_solver._setup_solvers(self._system, self._depth + 1)
-            self._ln_solver_from_parent = False
+        if self.linear_solver is not None:
+            self.linear_solver._setup_solvers(self._system, self._depth + 1)
+            self._linear_solver_from_parent = False
         else:
-            self.ln_solver = system.ln_solver
+            self.linear_solver = system.linear_solver
 
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system, self._depth + 1)
@@ -103,8 +104,8 @@ class NewtonSolver(NonlinearSolver):
         """
         super(NewtonSolver, self)._set_solver_print(level=level, type_=type_)
 
-        if self.ln_solver is not None and type_ != 'NL':
-            self.ln_solver._set_solver_print(level=level, type_=type_)
+        if self.linear_solver is not None and type_ != 'NL':
+            self.linear_solver._set_solver_print(level=level, type_=type_)
 
         if self.linesearch is not None:
             self.linesearch._set_solver_print(level=level, type_=type_)
@@ -138,8 +139,8 @@ class NewtonSolver(NonlinearSolver):
         """
         Perform any required linearization operations such as matrix factorization.
         """
-        if not self._ln_solver_from_parent:
-            self.ln_solver._linearize()
+        if not self._linear_solver_from_parent:
+            self.linear_solver._linearize()
 
         if self.linesearch is not None:
             self.linesearch._linearize()
@@ -172,7 +173,7 @@ class NewtonSolver(NonlinearSolver):
         system._vectors['residual']['linear'] *= -1.0
         system._linearize()
 
-        self.ln_solver.solve(['linear'], 'fwd')
+        self.linear_solver.solve(['linear'], 'fwd')
 
         if self.linesearch:
             self.linesearch._do_subsolve = do_subsolve

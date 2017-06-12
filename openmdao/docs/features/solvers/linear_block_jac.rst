@@ -6,7 +6,7 @@ Linear Solver: LinearBlockJac
 =============================
 
 The LinearBlockJac uses the Block Jacobi method to solve the linear system. The method is similar to that used by the
-:ref:`LinearBlockGS <usr_openmdao.solvers.linear_bgs.py>` solver, except that it propagates the derivatives from outputs
+:ref:`LinearBlockGS <usr_openmdao.solvers.linear_block_gs.py>` solver, except that it propagates the derivatives from outputs
 to inputs only once per iteration. When to choose this solver over the other ones is an advanced topic.
 
 The LinearBlockJac solver is a block solver, so you can specify different linear solvers in the subsystems and they
@@ -15,7 +15,7 @@ will be utilized to solve the subsystem linear problem.
 Here, we calculate the total derivatives across the Sellar system.
 
 .. embed-test::
-    openmdao.solvers.tests.test_linear_bjac.TestBJacSolverFeature.test_specify_solver
+    openmdao.solvers.tests.test_linear_block_jac.TestBJacSolverFeature.test_specify_solver
 
 Options
 -------
@@ -28,7 +28,7 @@ Options
   information, this takes more iterations to converge than the LinearBlockGS solver.
 
   .. embed-test::
-      openmdao.solvers.tests.test_linear_bjac.TestBJacSolverFeature.test_feature_maxiter
+      openmdao.solvers.tests.test_linear_block_jac.TestBJacSolverFeature.test_feature_maxiter
 
 - atol
 
@@ -37,7 +37,7 @@ Options
   tolerance `atol`, the iteration will terminate.
 
   .. embed-test::
-      openmdao.solvers.tests.test_linear_bjac.TestBJacSolverFeature.test_feature_atol
+      openmdao.solvers.tests.test_linear_block_jac.TestBJacSolverFeature.test_feature_atol
 
 - rtol
 
@@ -46,6 +46,6 @@ Options
   initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
 
   .. embed-test::
-      openmdao.solvers.tests.test_linear_bjac.TestBJacSolverFeature.test_feature_rtol
+      openmdao.solvers.tests.test_linear_block_jac.TestBJacSolverFeature.test_feature_rtol
 
 .. tags:: Solver, LinearSolver

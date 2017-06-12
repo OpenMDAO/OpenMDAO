@@ -205,7 +205,7 @@ class TestProblem(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
         prob.run_model()
@@ -222,7 +222,7 @@ class TestProblem(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
 
@@ -249,7 +249,7 @@ class TestProblem(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.driver = ScipyOpt()
         prob.driver.options['method'] = 'slsqp'
@@ -272,7 +272,7 @@ class TestProblem(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
 
@@ -287,7 +287,7 @@ class TestProblem(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivativesConnected()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
 
@@ -302,7 +302,7 @@ class TestProblem(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
 
@@ -319,7 +319,7 @@ class TestProblem(unittest.TestCase):
     def test_feature_set_get_array(self):
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
 
@@ -350,7 +350,7 @@ class TestProblem(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
 

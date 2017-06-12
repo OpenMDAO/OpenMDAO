@@ -81,15 +81,15 @@ Solvers (nonlinear and linear)
    features/solvers/set_solvers
    features/solvers/solver_options
    features/solvers/nonlinear_runonce
-   features/solvers/nonlinear_bgs
-   features/solvers/nonlinear_bjac
+   features/solvers/nonlinear_block_gs
+   features/solvers/nonlinear_block_jac
    features/solvers/newton
    features/solvers/linear_runonce
    features/solvers/direct
-   features/solvers/linear_bgs
+   features/solvers/linear_block_gs
    features/solvers/scipy
    features/solvers/petsc_ksp
-   features/solvers/linear_bjac
+   features/solvers/linear_block_jac
    features/solvers/linesearch_backtracking
 
 Drivers

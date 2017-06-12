@@ -15,16 +15,16 @@ class TestNonLinearRunOnceSolver(unittest.TestCase):
         # Test derivatives for converge-diverge-groups topology.
         prob = Problem()
         prob.model = ConvergeDivergeGroups()
-        prob.model.ln_solver = ScipyIterativeSolver()
+        prob.model.linear_solver = ScipyIterativeSolver()
         prob.set_solver_print(level=0)
 
-        prob.model.nl_solver = NonLinearRunOnce()
+        prob.model.nonlinear_solver = NonLinearRunOnce()
         g1 = prob.model.get_subsystem('g1')
         g2 = g1.get_subsystem('g2')
         g3 = prob.model.get_subsystem('g3')
-        g1.nl_solver = NonLinearRunOnce()
-        g2.nl_solver = NonLinearRunOnce()
-        g3.nl_solver = NonLinearRunOnce()
+        g1.nonlinear_solver = NonLinearRunOnce()
+        g2.nonlinear_solver = NonLinearRunOnce()
+        g3.nonlinear_solver = NonLinearRunOnce()
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -41,7 +41,7 @@ class TestNonLinearRunOnceSolver(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.nl_solver = NonLinearRunOnce()
+        model.nonlinear_solver = NonLinearRunOnce()
 
         prob.setup(check=False, mode='fwd')
 

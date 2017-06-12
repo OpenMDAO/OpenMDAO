@@ -9,7 +9,7 @@ from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.linesearch_backtracking import ArmijoGoldsteinLS, BoundsEnforceLS
 from openmdao.solvers.newton import NewtonSolver
-from openmdao.solvers.scipy import ScipyIterativeSolver
+from openmdao.solvers.scipy_iter_solver import ScipyIterativeSolver
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompOneState, ImplCompTwoStates, ImplCompTwoStatesArrays
@@ -24,9 +24,9 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStates())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nl_solver = NewtonSolver()
-        top.model.nl_solver.options['maxiter'] = 10
-        top.model.ln_solver = ScipyIterativeSolver()
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = ScipyIterativeSolver()
 
         top.setup(check=False)
 
@@ -50,7 +50,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
     def test_linesearch_bounds_vector(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 1.0
 
@@ -74,7 +74,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
     def test_linesearch_bounds_wall(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
+        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
 
@@ -98,7 +98,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
     def test_linesearch_bounds_scalar(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='scalar')
+        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='scalar')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
 
@@ -129,9 +129,9 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nl_solver = NewtonSolver()
-        top.model.nl_solver.options['maxiter'] = 10
-        top.model.ln_solver = ScipyIterativeSolver()
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = ScipyIterativeSolver()
 
         top.set_solver_print(level=0)
         top.setup(check=False)
@@ -142,7 +142,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -166,7 +166,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = BoundsEnforceLS(bound_enforcement='wall')
+        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='wall')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -190,7 +190,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar')
+        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -221,9 +221,9 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nl_solver = NewtonSolver()
-        top.model.nl_solver.options['maxiter'] = 10
-        top.model.ln_solver = ScipyIterativeSolver()
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = ScipyIterativeSolver()
 
         top.set_solver_print(level=0)
         top.setup(check=False)
@@ -234,7 +234,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
         ls.options['c'] = .1
 
         # Setup again because we assigned a new linesearch
@@ -259,7 +259,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
+        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -283,7 +283,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
 
-        ls = top.model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='scalar')
+        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='scalar')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -309,21 +309,21 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         model = prob.model = DoubleSellar()
 
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
-        model.nl_solver.options['solve_subsystems'] = True
-        model.nl_solver.options['max_sub_solves'] = 4
-        ls = model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 4
+        ls = model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
 
         # This is pretty bogus, but it ensures that we get a few LS iterations.
         ls.options['c'] = 100.0
@@ -348,11 +348,11 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStates())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nl_solver = NewtonSolver()
-        top.model.nl_solver.options['maxiter'] = 10
-        top.model.ln_solver = ScipyIterativeSolver()
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = ScipyIterativeSolver()
 
-        ls = top.model.nl_solver.linesearch = ArmijoGoldsteinLS()
+        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS()
         ls.options['maxiter'] = 10
 
         top.setup(check=False)
@@ -370,11 +370,11 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nl_solver = NewtonSolver()
-        top.model.nl_solver.options['maxiter'] = 10
-        top.model.ln_solver = ScipyIterativeSolver()
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = ScipyIterativeSolver()
 
-        ls = top.model.nl_solver.linesearch = BoundsEnforceLS()
+        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
 
         top.setup(check=False)
 
@@ -395,11 +395,11 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nl_solver = NewtonSolver()
-        top.model.nl_solver.options['maxiter'] = 10
-        top.model.ln_solver = ScipyIterativeSolver()
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = ScipyIterativeSolver()
 
-        ls = top.model.nl_solver.linesearch = BoundsEnforceLS()
+        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
         ls.options['bound_enforcement'] = 'vector'
 
         top.setup(check=False)
@@ -421,11 +421,11 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nl_solver = NewtonSolver()
-        top.model.nl_solver.options['maxiter'] = 10
-        top.model.ln_solver = ScipyIterativeSolver()
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = ScipyIterativeSolver()
 
-        ls = top.model.nl_solver.linesearch = BoundsEnforceLS()
+        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
         ls.options['bound_enforcement'] = 'wall'
 
         top.setup(check=False)
@@ -447,11 +447,11 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nl_solver = NewtonSolver()
-        top.model.nl_solver.options['maxiter'] = 10
-        top.model.ln_solver = ScipyIterativeSolver()
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = ScipyIterativeSolver()
 
-        ls = top.model.nl_solver.linesearch = BoundsEnforceLS()
+        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
         ls.options['bound_enforcement'] = 'scalar'
 
         top.setup(check=False)

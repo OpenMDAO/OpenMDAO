@@ -651,7 +651,7 @@ class TestGroup(unittest.TestCase):
         order_list = []
         prob = Problem()
         model = prob.model
-        model.nl_solver = NonLinearRunOnce()
+        model.nonlinear_solver = NonLinearRunOnce()
         model.add_subsystem('indeps', IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))
@@ -683,7 +683,7 @@ class TestGroup(unittest.TestCase):
         order_list = []
         prob = Problem()
         model = prob.model
-        model.nl_solver = NonLinearRunOnce()
+        model.nonlinear_solver = NonLinearRunOnce()
         model.add_subsystem('indeps', IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))
