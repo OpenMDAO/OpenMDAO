@@ -15,9 +15,9 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.group import Group
-from openmdao.solvers.nl_bgs import NonlinearBlockGS
-from openmdao.solvers.ln_scipy import ScipyIterativeSolver
-from openmdao.solvers.nl_newton import NewtonSolver
+from openmdao.solvers.nonlinear_bgs import NonlinearBlockGS
+from openmdao.solvers.scipy import ScipyIterativeSolver
+from openmdao.solvers.newton import NewtonSolver
 
 
 class SellarDis1(ExplicitComponent):

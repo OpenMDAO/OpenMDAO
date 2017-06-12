@@ -1,15 +1,15 @@
-"""Test the NLRunOnce linear solver class."""
+"""Test the NonLinearRunOnce linear solver class."""
 
 import unittest
 
 from openmdao.api import Problem, ScipyIterativeSolver, IndepVarComp, Group
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.solvers.nl_runonce import NLRunOnce
+from openmdao.solvers.nonlinear_runonce import NonLinearRunOnce
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import ConvergeDivergeGroups
 
 
-class TestNLRunOnceSolver(unittest.TestCase):
+class TestNonLinearRunOnceSolver(unittest.TestCase):
 
     def test_converge_diverge_groups(self):
         # Test derivatives for converge-diverge-groups topology.
@@ -18,13 +18,13 @@ class TestNLRunOnceSolver(unittest.TestCase):
         prob.model.ln_solver = ScipyIterativeSolver()
         prob.set_solver_print(level=0)
 
-        prob.model.nl_solver = NLRunOnce()
+        prob.model.nl_solver = NonLinearRunOnce()
         g1 = prob.model.get_subsystem('g1')
         g2 = g1.get_subsystem('g2')
         g3 = prob.model.get_subsystem('g3')
-        g1.nl_solver = NLRunOnce()
-        g2.nl_solver = NLRunOnce()
-        g3.nl_solver = NLRunOnce()
+        g1.nl_solver = NonLinearRunOnce()
+        g2.nl_solver = NonLinearRunOnce()
+        g3.nl_solver = NonLinearRunOnce()
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -41,7 +41,7 @@ class TestNLRunOnceSolver(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.nl_solver = NLRunOnce()
+        model.nl_solver = NonLinearRunOnce()
 
         prob.setup(check=False, mode='fwd')
 

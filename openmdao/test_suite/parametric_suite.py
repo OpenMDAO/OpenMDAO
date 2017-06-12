@@ -11,8 +11,8 @@ from unittest import SkipTest
 from openmdao.core.problem import Problem
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
                                                   CSRJacobian, CSCJacobian
-from openmdao.solvers.ln_scipy import ScipyIterativeSolver
-from openmdao.solvers.nl_newton import NewtonSolver
+from openmdao.solvers.scipy import ScipyIterativeSolver
+from openmdao.solvers.newton import NewtonSolver
 from openmdao.test_suite.groups.cycle_group import CycleGroup
 from openmdao.vectors.default_vector import DefaultVector
 

@@ -10,8 +10,8 @@ import numpy as np
 import warnings
 
 from openmdao.core.system import System
-from openmdao.solvers.nl_runonce import NLRunOnce
-from openmdao.solvers.ln_runonce import LNRunOnce
+from openmdao.solvers.nonlinear_runonce import NonLinearRunOnce
+from openmdao.solvers.linear_runonce import LinearRunOnce
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
 from openmdao.utils.array_utils import convert_neg
@@ -39,9 +39,9 @@ class Group(System):
         # because our lint check thinks that we are defining new attributes
         # called nl_solver and ln_solver without documenting them.
         if not self._nl_solver:
-            self._nl_solver = NLRunOnce()
+            self._nl_solver = NonLinearRunOnce()
         if not self._ln_solver:
-            self._ln_solver = LNRunOnce()
+            self._ln_solver = LinearRunOnce()
 
     def setup(self):
         """

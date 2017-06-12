@@ -6,14 +6,14 @@ Nonlinear Solver: NonlinearBlockJac
 ===================================
 
 The NonlinearBlockJac solver is a nonlinear solver that uses the block Jacobi method to solve
-the system. When to choose this solver over :ref:`NonlinearBlockGS <usr_openmdao.solvers.nl_bgs.py>`
+the system. When to choose this solver over :ref:`NonlinearBlockGS <usr_openmdao.solvers.nonlinear_bgs.py>`
 is an advanced topic, but it is valid for systems that satisfy the same conditions:
 
 1. System (or subsystem) contains a cycle, though subsystems may.
 2. System does not contain any implicit states, though subsystems may.
 
 Note that you may not know if you satisfy the second condition, so choosing a solver can be "trial and error." If
-NonlinearBlockJac doesn't work, then you will need to use :ref:`NewtonSolver <usr_openmdao.solvers.nl_newton.py>`.
+NonlinearBlockJac doesn't work, then you will need to use :ref:`NewtonSolver <usr_openmdao.solvers.newton.py>`.
 
 The main difference over `NonlinearBlockGS` is that data passing is delayed until after all subsystems have been
 executed.

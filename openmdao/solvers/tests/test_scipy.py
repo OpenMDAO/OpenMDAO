@@ -9,9 +9,9 @@ import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem, ExecComp, NonlinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.solvers.ln_bgs import LinearBlockGS
-from openmdao.solvers.ln_scipy import ScipyIterativeSolver, gmres
-from openmdao.solvers.nl_newton import NewtonSolver
+from openmdao.solvers.linear_bgs import LinearBlockGS
+from openmdao.solvers.scipy import ScipyIterativeSolver, gmres
+from openmdao.solvers.newton import NewtonSolver
 from openmdao.solvers.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives

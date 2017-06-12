@@ -1,30 +1,30 @@
-"""Test the LNRunOnce linear solver class."""
+"""Test the LinearRunOnce linear solver class."""
 
 import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.solvers.ln_runonce import LNRunOnce
+from openmdao.solvers.linear_runonce import LinearRunOnce
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import ConvergeDivergeGroups
 
 
-class TestLNRunOnceSolver(unittest.TestCase):
+class TestLinearRunOnceSolver(unittest.TestCase):
 
     def test_converge_diverge_groups(self):
         # Test derivatives for converge-diverge-groups topology.
         prob = Problem()
         prob.model = ConvergeDivergeGroups()
 
-        prob.model.ln_solver = LNRunOnce()
+        prob.model.ln_solver = LinearRunOnce()
         prob.set_solver_print(level=0)
 
         g1 = prob.model.get_subsystem('g1')
         g2 = g1.get_subsystem('g2')
         g3 = prob.model.get_subsystem('g3')
-        g1.ln_solver = LNRunOnce()
-        g2.ln_solver = LNRunOnce()
-        g3.ln_solver = LNRunOnce()
+        g1.ln_solver = LinearRunOnce()
+        g2.ln_solver = LinearRunOnce()
+        g3.ln_solver = LinearRunOnce()
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -53,7 +53,7 @@ class TestLNRunOnceSolver(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.ln_solver = LNRunOnce()
+        model.ln_solver = LinearRunOnce()
 
         prob.setup(check=False, mode='fwd')
 

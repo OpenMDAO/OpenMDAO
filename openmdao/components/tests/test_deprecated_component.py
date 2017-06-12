@@ -8,7 +8,7 @@ from six.moves import cStringIO
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, Component, Group, NewtonSolver, NLRunOnce
+from openmdao.api import Problem, IndepVarComp, Component, Group, NewtonSolver, NonLinearRunOnce
 from openmdao.api import ScipyIterativeSolver as ScipyGMRES
 from openmdao.devtools.testutil import assert_rel_error
 
@@ -337,7 +337,7 @@ class DepCompTestCase(unittest.TestCase):
         comp.self_solve = True
 
         prob.model.ln_solver = ScipyGMRES()
-        prob.model.nl_solver = NLRunOnce()
+        prob.model.nl_solver = NonLinearRunOnce()
         prob.set_solver_print(level=0)
 
         prob.model.connect('p1.x', 'comp.x')

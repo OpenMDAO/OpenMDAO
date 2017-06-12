@@ -11,7 +11,7 @@ import warnings
 import numpy as np
 from parameterized import parameterized
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, NLRunOnce
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, NonLinearRunOnce
 from openmdao.devtools.testutil import assert_rel_error
 try:
     from openmdao.parallel_api import PETScVector
@@ -651,7 +651,7 @@ class TestGroup(unittest.TestCase):
         order_list = []
         prob = Problem()
         model = prob.model
-        model.nl_solver = NLRunOnce()
+        model.nl_solver = NonLinearRunOnce()
         model.add_subsystem('indeps', IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))
@@ -683,7 +683,7 @@ class TestGroup(unittest.TestCase):
         order_list = []
         prob = Problem()
         model = prob.model
-        model.nl_solver = NLRunOnce()
+        model.nl_solver = NonLinearRunOnce()
         model.add_subsystem('indeps', IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))

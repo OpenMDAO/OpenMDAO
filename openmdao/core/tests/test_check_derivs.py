@@ -6,7 +6,7 @@ from six.moves import cStringIO as StringIO
 
 import numpy as np
 
-from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NLRunOnce, \
+from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonLinearRunOnce, \
                          ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
@@ -266,7 +266,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
-        model.nl_solver = NLRunOnce()
+        model.nl_solver = NonLinearRunOnce()
 
         p.setup()
         data = p.check_partials(out_stream=None)

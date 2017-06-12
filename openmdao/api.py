@@ -16,18 +16,18 @@ from openmdao.components.meta_model import MetaModel
 from openmdao.components.multifi_meta_model import MultiFiMetaModel
 
 # Solvers
-from openmdao.solvers.ln_bgs import LinearBlockGS
-from openmdao.solvers.ln_bjac import LinearBlockJac
-from openmdao.solvers.ln_direct import DirectSolver
-from openmdao.solvers.ln_petsc_ksp import PetscKSP
-from openmdao.solvers.ln_runonce import LNRunOnce
-from openmdao.solvers.ln_scipy import ScipyIterativeSolver
-from openmdao.solvers.ls_backtracking import ArmijoGoldsteinLS
-from openmdao.solvers.ls_backtracking import BoundsEnforceLS
-from openmdao.solvers.nl_bgs import NonlinearBlockGS
-from openmdao.solvers.nl_bjac import NonlinearBlockJac
-from openmdao.solvers.nl_newton import NewtonSolver
-from openmdao.solvers.nl_runonce import NLRunOnce
+from openmdao.solvers.linear_bgs import LinearBlockGS
+from openmdao.solvers.linear_bjac import LinearBlockJac
+from openmdao.solvers.direct import DirectSolver
+from openmdao.solvers.petsc_ksp import PetscKSP
+from openmdao.solvers.linear_runonce import LinearRunOnce
+from openmdao.solvers.scipy import ScipyIterativeSolver
+from openmdao.solvers.linesearch_backtracking import ArmijoGoldsteinLS
+from openmdao.solvers.linesearch_backtracking import BoundsEnforceLS
+from openmdao.solvers.nonlinear_bgs import NonlinearBlockGS
+from openmdao.solvers.nonlinear_bjac import NonlinearBlockJac
+from openmdao.solvers.newton import NewtonSolver
+from openmdao.solvers.nonlinear_runonce import NonLinearRunOnce
 
 # Surrogate Models
 from openmdao.surrogate_models.kriging import KrigingSurrogate, FloatKrigingSurrogate

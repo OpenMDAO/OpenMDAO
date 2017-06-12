@@ -7,9 +7,9 @@ from six.moves import range
 
 from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.solvers.ls_backtracking import ArmijoGoldsteinLS, BoundsEnforceLS
-from openmdao.solvers.nl_newton import NewtonSolver
-from openmdao.solvers.ln_scipy import ScipyIterativeSolver
+from openmdao.solvers.linesearch_backtracking import ArmijoGoldsteinLS, BoundsEnforceLS
+from openmdao.solvers.newton import NewtonSolver
+from openmdao.solvers.scipy import ScipyIterativeSolver
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompOneState, ImplCompTwoStates, ImplCompTwoStatesArrays
@@ -125,7 +125,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def setUp(self):
         top = Problem()
         top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3,1))))
+        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
@@ -217,7 +217,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
     def setUp(self):
         top = Problem()
         top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3,1))))
+        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
@@ -366,7 +366,7 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundscheck_basic(self):
         top = Problem()
         top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3,1))))
+        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
@@ -391,7 +391,7 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundscheck_vector(self):
         top = Problem()
         top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3,1))))
+        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
@@ -417,7 +417,7 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundscheck_wall(self):
         top = Problem()
         top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3,1))))
+        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
@@ -443,7 +443,7 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundscheck_scalar(self):
         top = Problem()
         top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3,1))))
+        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 

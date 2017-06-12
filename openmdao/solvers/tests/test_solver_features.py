@@ -3,11 +3,11 @@
 import unittest
 
 from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
-from openmdao.solvers.nl_newton import NewtonSolver
-from openmdao.solvers.ln_direct import DirectSolver
-from openmdao.solvers.nl_bgs import NonlinearBlockGS
-from openmdao.solvers.ln_scipy import ScipyIterativeSolver
-from openmdao.solvers.ln_bgs import LinearBlockGS
+from openmdao.solvers.newton import NewtonSolver
+from openmdao.solvers.direct import DirectSolver
+from openmdao.solvers.nonlinear_bgs import NonlinearBlockGS
+from openmdao.solvers.scipy import ScipyIterativeSolver
+from openmdao.solvers.linear_bgs import LinearBlockGS
 
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDerivatives

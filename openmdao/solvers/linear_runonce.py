@@ -1,9 +1,9 @@
-"""Define the LNRunOnce class."""
+"""Define the LinearRunOnce class."""
 
-from openmdao.solvers.ln_bgs import LinearBlockGS
+from openmdao.solvers.linear_bgs import LinearBlockGS
 
 
-class LNRunOnce(LinearBlockGS):
+class LinearRunOnce(LinearBlockGS):
     """
     Simple linear solver that performs a single iteration of Guass-Seidel.
 
