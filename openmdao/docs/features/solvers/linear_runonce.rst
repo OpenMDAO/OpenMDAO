@@ -20,6 +20,6 @@ Here is an example of using an LinearRunOnce solver to calculate the derivatives
 the <Paraboloid> component.
 
 .. embed-test::
-    openmdao.solvers.tests.test_ln_runonce.TestLinearRunOnceSolver.test_feature_solver
+    openmdao.solvers.tests.test_linear_runonce.TestLinearRunOnceSolver.test_feature_solver
 
 .. tags:: Solver, LinearSolver

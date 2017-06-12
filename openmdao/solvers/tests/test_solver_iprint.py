@@ -17,7 +17,7 @@ class TestSolverPrint(unittest.TestCase):
         prob = Problem()
         prob.model = SellarDerivatives()
         newton = prob.model.nl_solver = NewtonSolver()
-        ln_scipy = prob.model.ln_solver = ScipyIterativeSolver()
+        scipy = prob.model.ln_solver = ScipyIterativeSolver()
 
         newton.options['maxiter'] = 2
         prob.setup(check=False)
@@ -27,7 +27,7 @@ class TestSolverPrint(unittest.TestCase):
         prob['y2'] = -26
 
         newton.options['iprint'] = -1
-        ln_scipy.options['iprint'] = -1
+        scipy.options['iprint'] = -1
         prob.run_model()
         print('done')
 
@@ -36,7 +36,7 @@ class TestSolverPrint(unittest.TestCase):
         prob = Problem()
         prob.model = SellarDerivatives()
         newton = prob.model.nl_solver = NewtonSolver()
-        ln_scipy = prob.model.ln_solver = ScipyIterativeSolver()
+        scipy = prob.model.ln_solver = ScipyIterativeSolver()
 
         newton.options['maxiter'] = 1
         prob.setup(check=False)
@@ -45,7 +45,7 @@ class TestSolverPrint(unittest.TestCase):
         prob['y2'] = -26
 
         newton.options['iprint'] = 0
-        ln_scipy.options['iprint'] = 0
+        scipy.options['iprint'] = 0
 
         prob.run_model()
 
@@ -54,7 +54,7 @@ class TestSolverPrint(unittest.TestCase):
         prob = Problem()
         prob.model = SellarDerivatives()
         newton = prob.model.nl_solver = NewtonSolver()
-        ln_scipy = prob.model.ln_solver = ScipyIterativeSolver()
+        scipy = prob.model.ln_solver = ScipyIterativeSolver()
 
         newton.options['maxiter'] = 20
         prob.setup(check=False)
@@ -63,7 +63,7 @@ class TestSolverPrint(unittest.TestCase):
         prob['y2'] = -26
 
         newton.options['iprint'] = 1
-        ln_scipy.options['iprint'] = 0
+        scipy.options['iprint'] = 0
         prob.run_model()
 
     def test_feature_iprint_2(self):
@@ -71,7 +71,7 @@ class TestSolverPrint(unittest.TestCase):
         prob = Problem()
         prob.model = SellarDerivatives()
         newton = prob.model.nl_solver = NewtonSolver()
-        ln_scipy = prob.model.ln_solver = ScipyIterativeSolver()
+        scipy = prob.model.ln_solver = ScipyIterativeSolver()
 
         newton.options['maxiter'] = 20
         prob.setup(check=False)
@@ -80,7 +80,7 @@ class TestSolverPrint(unittest.TestCase):
         prob['y2'] = -20
 
         newton.options['iprint'] = 2
-        ln_scipy.options['iprint'] = 1
+        scipy.options['iprint'] = 1
         prob.run_model()
 
     def test_hierarchy_iprint(self):

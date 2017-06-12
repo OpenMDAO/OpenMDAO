@@ -1,30 +1,30 @@
 :orphan:
 
-.. _petscKSP:
+.. _scipyiterativesolver:
 
-Linear Solver: PetscKSP
-=======================
+Linear Solver: ScipyIterativeSolver
+===================================
 
-The PetscKSP is an iterative linear solver that wraps the linear solution methods found in PETSc via Petsc4py.
-The default method is "fgmres", or the Flexible Generalized Minimal RESidual method, though you choose any of
-the other methods in PETSc. This linear solver is capable of handling any system topology very
+The ScipyIterativeSolver is an iterative linear solver that wraps the methods found in `scipy.sparse.linalg`.
+The default method is "GMRES", or the Generalized Minimal RESidual method, though you can give it other
+methods that satisfy the same interface. This linear solver is capable of handling any system topology very
 effectively. It also solves all subsystems below it in the hierarchy, so assigning different solvers to
 subsystems will have no effect on the solution at this level.
 
-This solver works under MPI, so it is a good alternative to :ref:`ScipyIterativeSolver <usr_openmdao.solvers.scipy.py>`.
-This solver is also re-entrant, so there are no problems if it is nested during preconditioning.
+This is a serial solver, so it should never be used under MPI; use :ref:`PetscKSP <usr_openmdao.solvers.petsc_ksp.py>`
+instead.
 
 Here, we calculate the total derivatives across the Sellar system.
 
 .. embed-test::
-    openmdao.solvers.tests.test_ln_petsc_ksp.TestPetscKSPSolverFeature.test_specify_solver
+    openmdao.solvers.tests.test_scipy.TestScipyIterativeSolverFeature.test_specify_solver
 
 Options
 -------
 
 - maxiter
 
-  This lets you specify the maximum number of GMRES (or other algorithm) iterations to apply. The default maximum is 100, which
+  This lets you specify the maximum number of GMRES iterations to apply. The default maximum is 1000, which
   is much higher than the other linear solvers because each multiplication by the system Jacobian is considered
   to be an iteration. You may have to decrease this value if you have a coupled system that is converging
   very slowly. (Of course, in such a case, it may be better to add a preconditioner.)  Alternatively, you
@@ -35,7 +35,7 @@ Options
   soon.)
 
   .. embed-test::
-      openmdao.solvers.tests.test_ln_petsc_ksp.TestPetscKSPSolverFeature.test_feature_maxiter
+      openmdao.solvers.tests.test_scipy.TestScipyIterativeSolverFeature.test_feature_maxiter
 
 - atol
 
@@ -48,28 +48,11 @@ Options
   You may need to adjust this setting if you have abnormally large or small values in your global Jacobean.
 
   .. embed-test::
-      openmdao.solvers.tests.test_ln_petsc_ksp.TestPetscKSPSolverFeature.test_feature_atol
+      openmdao.solvers.tests.test_scipy.TestScipyIterativeSolverFeature.test_feature_atol
 
 - rtol
 
-  Here, we set the absolute tolerance to a much tighter value (default is 1.0e-12) to show what happens. In
-  practice, the tolerance serves a dual role in GMRES. In addition to being a termination criteria, the tolerance
-  also defines what GMRES considers to be tiny. Tiny numbers are replaced by zero when the argument vector is
-  normalized at the start of each new matrix-vector product. The end result here is that we iterate longer to get
-  a marginally better answer.
-
-  You may need to adjust this setting if you have abnormally large or small values in your global Jacobean.
-
-  .. embed-test::
-      openmdao.solvers.tests.test_ln_petsc_ksp.TestPetscKSPSolverFeature.test_feature_rtol
-
-- ksp_type
-
-  You can specify which PETSc algorithm to use in place of 'fgmres' by settng the "ksp_type" in the options
-  dictionary.  Here, we use 'gmres' instead.
-
-  .. embed-test::
-      openmdao.solvers.tests.test_ln_petsc_ksp.TestPetscKSPSolverFeature.test_specify_ksp_type
+  The 'rtol' setting is not supported by Scipy GMRES.
 
 Specifying a Preconditioner
 ---------------------------
@@ -83,6 +66,11 @@ Here, we add a Gauss Seidel preconditioner to the simple Sellar solution with Ne
 GMRES iterations is lower when using the preconditioner.
 
 .. embed-test::
-    openmdao.solvers.tests.test_ln_petsc_ksp.TestPetscKSPSolverFeature.test_specify_precon
+    openmdao.solvers.tests.test_scipy.TestScipyIterativeSolverFeature.test_specify_precon
+
+**A note on nesting ScipyIterativeSolver under a preconditoner:** The underlying GMRES module is not
+re-entrant, so it cannot be called as a new instance while it is running. If you need to use gmres under
+gmres in a preconditioner stack, you should use :ref:`PetscKSP <usr_openmdao.solvers.petsc_ksp.py>` at
+one (ore more) of the levels.
 
 .. tags:: Solver, LinearSolver
