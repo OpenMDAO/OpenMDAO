@@ -3,7 +3,7 @@
 .. _nlrunonce:
 
 Nonlinear Solver: NonLinearRunOnce
-===========================
+==================================
 
 The simplest solver in OpenMDAO is the NonLinearRunOnce solver, which executes the
 system's components or subsystems sequentially. No iteration is performed by

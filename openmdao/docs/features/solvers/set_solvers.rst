@@ -3,7 +3,7 @@
 .. _set-solvers:
 
 Setting Nonlinear and Linear Solvers
-=====================================
+====================================
 
 A nonlinear solver, like :ref:`NonlinearBlockGS <usr_openmdao.solvers.nonlinear.nonlinear_block_gs.py>` or :ref:`Newton <usr_openmdao.solvers.nonlinear.newton.py>`,
 is used to converge the nonlinear analysis. A nonlinear solver is needed whenever this is either a cyclic dependency between components in your model.
@@ -19,7 +19,7 @@ letting you build a hierarchical solver setup to efficiently converge your model
 
 
 Solvers for the Sellar Problem
-----------------------------------
+------------------------------
 
 The Sellar Problem has two components with a cyclic dependency, so the appropriate nonlinear solver is necessary.
 We'll use the :ref:`Newton <usr_openmdao.solvers.nonlinear.newton.py>` nonlinear solver,

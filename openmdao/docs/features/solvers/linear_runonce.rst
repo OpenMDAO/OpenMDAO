@@ -3,7 +3,7 @@
 .. _lnrunonce:
 
 Linear Solver: LinearRunOnce
-========================
+============================
 
 The simplest linear solver in OpenMDAO is the LinearRunOnce solver, which sequentially calls `apply_linear`
 and `solve_linear` once on each subsystem. It is directly analogous to applying a single pass of the

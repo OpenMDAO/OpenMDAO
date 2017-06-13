@@ -4,7 +4,7 @@
 
 
 Controlling Solver Behavior
-=============================
+===========================
 
 Solver Options
 ----------------
@@ -18,7 +18,7 @@ For instance, here is how you would change the iteration limit and convergence t
 
 
 Displaying Solver Convergence Info
-------------------------------------
+----------------------------------
 
 Solvers can all print out some information about their convergence history.
 If you want to control that printing behavior you can use the `iprint` option in the solver.
