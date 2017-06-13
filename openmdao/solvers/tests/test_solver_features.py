@@ -20,10 +20,11 @@ class TestSolverFeatures(unittest.TestCase):
         prob = Problem()
         model = prob.model = SellarDerivatives()
 
-        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver = newton = NewtonSolver()
+
         # using a different linear solver for Newton with a looser tolerance
-        model.nonlinear_solver.linear_solver = ScipyIterativeSolver()
-        model.nonlinear_solver.linear_solver.options['atol'] = 1e-4
+        newton.linear_solver = ScipyIterativeSolver()
+        newton.linear_solver.options['atol'] = 1e-4
 
         # used for analytic derivatives
         model.linear_solver = DirectSolver()

@@ -19,6 +19,6 @@ fitted with a solver that can handle them such as :ref:`NewtonSolver <usr_openmd
 Here is an example of using an NonLinearRunOnce solver for a simple model with the <Paraboloid> component.
 
 .. embed-test::
-    openmdao.solvers.tests.test_nonlinear_runonce.TestNonLinearRunOnceSolver.test_feature_solver
+    openmdao.solvers.nonlinear.tests.test_nonlinear_runonce.TestNonLinearRunOnceSolver.test_feature_solver
 
 .. tags:: Solver, NonlinearSolver

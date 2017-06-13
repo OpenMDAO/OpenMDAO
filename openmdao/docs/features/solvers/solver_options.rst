@@ -13,7 +13,7 @@ All solvers (both nonlinear and linear) have a number of options that you access
 For instance, here is how you would change the iteration limit and convergence tolerances for the :ref: `NonlinearBlockGS <usr_openmdao.solvers.nonlinear.nonlinear_block_gs.NonlinearBlockGS>`
 
 .. embed-test::
-    openmdao.solvers.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_set_options
+    openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_set_options
 
 
 

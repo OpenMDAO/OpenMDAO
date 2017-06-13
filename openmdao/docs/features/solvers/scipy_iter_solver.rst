@@ -17,7 +17,7 @@ instead.
 Here, we calculate the total derivatives across the Sellar system.
 
 .. embed-test::
-    openmdao.solvers.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_specify_solver
+    openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_specify_solver
 
 Options
 -------
@@ -35,7 +35,7 @@ Options
   soon.)
 
   .. embed-test::
-      openmdao.solvers.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_feature_maxiter
+      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_feature_maxiter
 
 - atol
 
@@ -48,7 +48,7 @@ Options
   You may need to adjust this setting if you have abnormally large or small values in your global Jacobean.
 
   .. embed-test::
-      openmdao.solvers.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_feature_atol
+      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_feature_atol
 
 - rtol
 
@@ -66,7 +66,7 @@ Here, we add a Gauss Seidel preconditioner to the simple Sellar solution with Ne
 GMRES iterations is lower when using the preconditioner.
 
 .. embed-test::
-    openmdao.solvers.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_specify_precon
+    openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_specify_precon
 
 **A note on nesting ScipyIterativeSolver under a preconditoner:** The underlying GMRES module is not
 re-entrant, so it cannot be called as a new instance while it is running. If you need to use gmres under

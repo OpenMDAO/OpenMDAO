@@ -19,7 +19,7 @@ Note that systems without cycles or implicit states will converge in one iterati
 Here, we calculate the total derivatives across the Sellar system.
 
 .. embed-test::
-    openmdao.solvers.tests.test_linear_block_gs.TestBGSSolverFeature.test_specify_solver
+    openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_specify_solver
 
 Options
 -------
@@ -31,7 +31,7 @@ Options
   reach the specified absolute or relative tolerance.
 
   .. embed-test::
-      openmdao.solvers.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_maxiter
+      openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_maxiter
 
 - atol
 
@@ -40,7 +40,7 @@ Options
   tolerance `atol`, the iteration will terminate.
 
   .. embed-test::
-      openmdao.solvers.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_atol
+      openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_atol
 
 - rtol
 
@@ -49,6 +49,6 @@ Options
   initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
 
   .. embed-test::
-      openmdao.solvers.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_rtol
+      openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_rtol
 
 .. tags:: Solver, LinearSolver

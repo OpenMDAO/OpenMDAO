@@ -15,6 +15,6 @@ Here we calculate the total derivatives of the Sellar system objective with resp
 variable 'z'.
 
 .. embed-test::
-    openmdao.solvers.tests.test_direct_solver.TestDirectSolverFeature.test_specify_solver
+    openmdao.solvers.linear.tests.test_direct_solver.TestDirectSolverFeature.test_specify_solver
 
 .. tags:: Solver, LinearSolver

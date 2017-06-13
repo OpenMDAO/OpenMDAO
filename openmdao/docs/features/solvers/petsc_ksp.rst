@@ -17,7 +17,7 @@ This solver is also re-entrant, so there are no problems if it is nested during 
 Here, we calculate the total derivatives across the Sellar system.
 
 .. embed-test::
-    openmdao.solvers.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_solver
+    openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_solver
 
 Options
 -------
@@ -35,7 +35,7 @@ Options
   soon.)
 
   .. embed-test::
-      openmdao.solvers.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_feature_maxiter
+      openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_feature_maxiter
 
 - atol
 
@@ -48,7 +48,7 @@ Options
   You may need to adjust this setting if you have abnormally large or small values in your global Jacobean.
 
   .. embed-test::
-      openmdao.solvers.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_feature_atol
+      openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_feature_atol
 
 - rtol
 
@@ -61,7 +61,7 @@ Options
   You may need to adjust this setting if you have abnormally large or small values in your global Jacobean.
 
   .. embed-test::
-      openmdao.solvers.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_feature_rtol
+      openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_feature_rtol
 
 - ksp_type
 
@@ -69,7 +69,7 @@ Options
   dictionary.  Here, we use 'gmres' instead.
 
   .. embed-test::
-      openmdao.solvers.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_ksp_type
+      openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_ksp_type
 
 Specifying a Preconditioner
 ---------------------------
@@ -83,6 +83,6 @@ Here, we add a Gauss Seidel preconditioner to the simple Sellar solution with Ne
 GMRES iterations is lower when using the preconditioner.
 
 .. embed-test::
-    openmdao.solvers.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_precon
+    openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_precon
 
 .. tags:: Solver, LinearSolver

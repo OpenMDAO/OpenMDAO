@@ -27,7 +27,7 @@ The following examples use a Newton solver on a component `ImplCompTwoStates` wi
 (which in this case is the `AmijoGoldsteinLS`.):
 
 .. embed-test::
-    openmdao.solvers.tests.test_linesearch_backtracking.TestFeatureLineSearch.test_feature_boundscheck_basic
+    openmdao.solvers.nonlinear.tests.test_linesearch_backtracking.TestFeatureLineSearch.test_feature_boundscheck_basic
 
 Bound Enforcement
 -----------------
@@ -70,7 +70,7 @@ Here are a few examples of this option:
   computed gradient.
 
 .. embed-test::
-    openmdao.solvers.tests.test_linesearch_backtracking.TestFeatureLineSearch.test_feature_boundscheck_vector
+    openmdao.solvers.nonlinear.tests.test_linesearch_backtracking.TestFeatureLineSearch.test_feature_boundscheck_vector
 
 - bound_enforcement: scalar
 
@@ -79,7 +79,7 @@ Here are a few examples of this option:
   are the ones that violate their upper or lower bounds. The backtracking continues along the modified gradient.
 
 .. embed-test::
-    openmdao.solvers.tests.test_linesearch_backtracking.TestFeatureLineSearch.test_feature_boundscheck_scalar
+    openmdao.solvers.nonlinear.tests.test_linesearch_backtracking.TestFeatureLineSearch.test_feature_boundscheck_scalar
 
 - bound_enforcement: wall
 
@@ -89,7 +89,7 @@ Here are a few examples of this option:
   direction that follows the boundary of the violated output bounds.
 
 .. embed-test::
-    openmdao.solvers.tests.test_linesearch_backtracking.TestFeatureLineSearch.test_feature_boundscheck_wall
+    openmdao.solvers.nonlinear.tests.test_linesearch_backtracking.TestFeatureLineSearch.test_feature_boundscheck_wall
 
 Control Options
 ---------------
