@@ -162,8 +162,8 @@ def _instance_profile(frame, event, arg):
             if 'self' in loc:
                 self = loc['self']
                 if isinstance(self, _profile_matches[func_name]):
-                    name = "%s#%d#%d#%s" % (frame.f_code.co_filename,
-                                              frame.f_code.co_firstlineno, id(self), func_name)
+                    name = "%s#%d#%d" % (frame.f_code.co_filename,
+                                         frame.f_code.co_firstlineno, id(self))
                     _call_stack.append(name)
                     _timing_stack.append(etime())
 
@@ -299,7 +299,7 @@ def _finalize_profile():
         fname = parts[-1]
         if fname == '$total':
             continue
-        filename, line, ident, _ = fname.split('#')
+        filename, line, ident = fname.split('#')
         qfile, qclass, qname = _find_qualified_name(filename, int(line), cache)
 
         idict = idents[(qfile, qclass)]
