@@ -7,7 +7,7 @@ from six.moves import range
 
 from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.solvers.nonlinear.linesearch_backtracking import ArmijoGoldsteinLS, BoundsEnforceLS
+from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS, BoundsEnforceLS
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver
 from openmdao.test_suite.components.double_sellar import DoubleSellar
