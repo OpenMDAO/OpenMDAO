@@ -15,8 +15,8 @@ rect {
 }
 
 /*
-we're hiding the @parent nodes, which are the ones that contain
-whatever time is required to make all of the children + @parent to
+we're hiding the $parent nodes, which are the ones that contain
+whatever time is required to make all of the children + $parent to
 add up to actual time recorded for the parent.  They're hidden because
 they would do nothing but confuse users, but they must exist in order for
 the child blocks to have correct visual proportions relative to each other
@@ -88,7 +88,7 @@ h1 {
 </head>
 <body>
     <header><h1>$title</h1></header>
-<script type="text/javascript" src="http://d3js.org/d3.v4.min.js"></script>
+<script type="text/javascript" src="http://d3js.org/d3.v4.js"></script>
 <script>
 
 var width = 960,
@@ -156,7 +156,7 @@ window.onload = function() {
 
     var stratify = d3.stratify()
         .id(function(d) { return d.name; })
-        .parentId(function(d) { return d.name.substring(0, d.name.lastIndexOf("/")); });
+        .parentId(function(d) { return d.name.substring(0, d.name.lastIndexOf("@")); });
 
     var root = stratify(root_table)
         .sum(function(d) { return d.time; })
@@ -174,10 +174,10 @@ window.onload = function() {
         .attr("y", function(d) { return y(d.y0); })
         .attr("width", function(d) { return x(d.x1) - x(d.x0); })
         .attr("height", function(d) { return y(d.y1) - y(d.y0); })
-        .classed("hiderect", function(d) { return d.data.short_name === "@parent"; });
+        .classed("hiderect", function(d) { return d.data.short_name === "$parent"; });
 
     var crect = rect.select(function(d) {
-            return d.data.short_name === "@parent" ? null : this;
+            return d.data.short_name === "$parent" ? null : this;
         })
         .attr("fill", function(d) {
             return color((d.children ? d : d.parent).id);

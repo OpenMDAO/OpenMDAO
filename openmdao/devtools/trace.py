@@ -17,6 +17,8 @@ from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.matrix import Matrix
+from openmdao.vectors.vector import Vector, Transfer
+
 
 # This maps a simple identifier to a group of classes and corresponding
 # glob patterns for each class.
@@ -24,30 +26,39 @@ _trace_dict = {
     'openmdao': {
         "*": (System, Jacobian, Matrix, Solver, Driver, Problem),
     },
+    'memory': {
+        "*": (System, Vector, Jacobian, Matrix, Solver, Driver, Problem),
+    },
     'setup': {
         "*setup*": (System, Solver, Driver, Problem),
     },
 }
 
 
+def func_group(name):
+    return _trace_dict[name]
+
+
+# final dict of method names and their corresponding classes
 _active_traces = {}
 _file2class = {}
 _method_counts = {}
 _mem_changes = {}
 _callstack = []
+_method_patterns = {}
+_trace_callback = None  # pointer to function that implements the trace
 _registered = False  # prevents multiple atexit registrations
 
 # even through this is called '_trace_calls', it's called as part of
 # sys.setprofile and not sys.settrace because we're not interested in
 # tracing by line.
 def _trace_calls(frame, event, arg):
-    if event == 'call':
-        func_name = frame.f_code.co_name
-        if func_name in _active_traces:
+    if frame.f_code.co_name in _active_traces:
+        if event == 'call':
             loc = frame.f_locals
             if 'self' in loc:
                 self = loc['self']
-                if isinstance(self, _active_traces[func_name]):
+                if isinstance(self, _active_traces[frame.f_code.co_name]):
                     fullname = _code2funcname(self, frame.f_code)
                     _callstack.append(fullname)
                     if fullname in _method_counts:
@@ -56,13 +67,11 @@ def _trace_calls(frame, event, arg):
                         _method_counts[fullname] = 1
                     print('   ' * len(_callstack),
                           "%s (%d)" % (fullname, _method_counts[fullname]))
-    elif event == 'return':
-        func_name = frame.f_code.co_name
-        if func_name in _active_traces:
+        elif event == 'return':
             loc = frame.f_locals
             if 'self' in loc:
                 self = loc['self']
-                if isinstance(self, _active_traces[func_name]):
+                if isinstance(self, _active_traces[frame.f_code.co_name]):
                     _callstack.pop()
 
 def _trace_memory(frame, event, arg):
@@ -73,7 +82,7 @@ def _trace_memory(frame, event, arg):
             if 'self' in loc:
                 self = loc['self']
                 if isinstance(self, _active_traces[func_name]):
-                    _callstack.append((self, frame.f_code, mem_usage()))
+                    _callstack.append([self, frame.f_code, mem_usage()])
     elif event == 'return':
         func_name = frame.f_code.co_name
         if func_name in _active_traces:
@@ -89,6 +98,14 @@ def _trace_memory(frame, event, arg):
                         else:
                             _mem_changes[(self, code_obj)] = delta
 
+                        # we only want to see deltas from the routines that actually allocate
+                        # memory rather then those routines and all of the routines that call
+                        # them either directly or indirectly, so we add the current delta to
+                        # the mem usage up the call stack, which will subtract it from the ancestor
+                        # deltas.
+                        for i in range(len(_callstack)):
+                            _callstack[i][2] += delta
+
 
 def _code2funcname(self, code_obj):
     classes = _file2class[code_obj.co_filename]
@@ -96,10 +113,12 @@ def _code2funcname(self, code_obj):
         for base in self.__class__.__mro__:
             if base is object:
                 continue
-            if PY3:
-                fname = sys.modules[base.__module__].__file__
+            if base.__module__ == '__main__':
+                fname = __file__
             else:
-                fname = sys.modules[base.__module__].__file__[:-1]
+                fname = sys.modules[base.__module__].__file__
+                if not PY3:
+                    fname = fname[:-1]
             classes = _file2class[fname]
             if base.__name__ not in classes:
                 classes.append(base.__name__)
@@ -172,51 +191,53 @@ def _collect_methods(method_dict):
     return matches, file2class
 
 
-def trace_init(trace_type='call', trace_group=True):
-    global _registered, trace_mem, trace
+def setup(trace_type='call', methods=None):
+    global _registered, _method_patterns, _active_traces, _file2class, _trace_callback
     if not _registered:
+        if methods is None:
+            _method_patterns = func_group('openmdao')
+        else:
+            _method_patterns = methods
+        _active_traces, _file2class = _collect_methods(_method_patterns)
+
         if trace_type == 'mem':
-            trace_mem = trace_group
+            global mem_usage
+            from openmdao.devtools.debug import mem_usage
+
+            _trace_callback = _trace_memory
+
             def print_totals():
                 items = sorted(_mem_changes.items(), key=lambda x: x[1])
                 for (self, code_obj), delta in items:
-                    if delta > 0.0:
+                    if delta != 0.0:
                         print("%s %g MB" % (_code2funcname(self, code_obj), delta))
             import atexit
             atexit.register(print_totals)
             _registered = True
         else:
-            trace = True
+            _trace_callback = _trace_calls
 
 
-def trace_on(class_group='openmdao'):
-    global _active_traces, _file2class
-    _active_traces, _file2class = _collect_methods(_trace_dict[class_group])
+def start():
+    global _active_traces, _file2class, _method_patterns, _trace_callback
+    _active_traces, _file2class = _collect_methods(_method_patterns)
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
-    sys.setprofile(_trace_calls)
+    if _trace_callback is None:
+        raise RuntimeError("trace.setup() was not called before trace.start().")
+    sys.setprofile(_trace_callback)
 
 
-def trace_off():
+def stop():
     sys.setprofile(None)
-
-trace_mem_off = trace_off
-
-
-def trace_mem_on(class_group='openmdao'):
-    global _active_traces, _file2class
-    _active_traces, _file2class = _collect_methods(_trace_dict[class_group])
-    if sys.getprofile() is not None:
-        raise RuntimeError("another profile function is already active.")
-    sys.setprofile(_trace_memory)
 
 
 @contextmanager
-def tracing(trace_type='call', trace_group='openmdao'):
-    trace_init(trace_type, trace_group=trace_group)
-    trace_on(class_group)
+def tracing(trace_type='call', methods=None):
+    setup(trace_type, methods=methods)
+    start()
     yield
-    trace_off()
+    stop()
 
 
 class tracedfunc(object):
@@ -230,17 +251,17 @@ class tracedfunc(object):
     trace_group : str, optional
         Identifier of a group of classes and methods to trace.
     """
-    def __init__(self, trace_type='call', trace_group='openmdao'):
+    def __init__(self, trace_type='call', methods=None):
         self.trace_type = trace_type
-        self.trace_group = trace_group
+        self.methods = methods
 
     def __call__(self, func):
-        trace_init(trace_type=self.trace_type, trace_group=self.trace_group)
+        setup(trace_type=self.trace_type, methods=self.methods)
 
         def wrapped(*args, **kwargs):
-            trace_on(self.trace_group)
+            start()
             func(*args, **kwargs)
-            trace_off()
+            stop()
         return wrapped
 
 
@@ -265,11 +286,8 @@ def main():
     if len(args) > 0:
         progname = args[0]
         sys.path.insert(0, os.path.dirname(progname))
-        if options.type_ == 'mem':
-            global mem_usage
-            from openmdao.devtools.debug import mem_usage
 
-        trace_init(trace_type=options.type_, trace_group=options.group)
+        setup(trace_type=options.type_, methods=func_group(options.group))
         with open(progname, 'rb') as fp:
             code = compile(fp.read(), progname, 'exec')
         globs = {
@@ -278,10 +296,8 @@ def main():
             '__package__': None,
             '__cached__': None,
         }
-        if options.type_ == 'call':
-            trace_on(options.group)
-        else:
-            trace_mem_on(options.group)
+
+        start()
 
         exec (code, globs)
 

@@ -1,22 +1,18 @@
 from __future__ import print_function
 
 import os
-from os.path import abspath
 import sys
+import ast
 from time import time as etime
-from inspect import getmembers, getmro
+from inspect import getmembers
 from fnmatch import fnmatchcase
 import argparse
 import json
 import atexit
-import warnings
-from string import Template
 from collections import defaultdict
-import cProfile
-from contextlib import contextmanager
 from itertools import chain
 
-from six import iteritems, PY3
+from six import iteritems
 
 try:
     from mpi4py import MPI
@@ -24,29 +20,11 @@ except ImportError:
     MPI = None
 
 from openmdao.devtools.webview import webview
-from openmdao.devtools.trace import _trace_dict
-
-
-@contextmanager
-def cProfile_context(fname='prof_out'):
-    """
-    Turns on cProfile profiling for a section of code.
-
-    Parameters
-    ----------
-    fname : str
-        Name of file to write profile data to.
-    """
-    prof = cProfile.Profile()
-    prof.enable()
-    yield prof
-    prof.disable()
-
-    prof.dump_stats(fname)
+from openmdao.devtools.trace import func_group
 
 
 def _prof_node(parts, obj=None):
-    name = '/'.join(parts)
+    name = '@'.join(parts)
     return {
         'name': name,
         'short_name': parts[-1],
@@ -120,15 +98,7 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
     _profile_setup = True
 
     if methods is None:
-        from openmdao.core.problem import Problem
-        from openmdao.core.system import System
-        from openmdao.core.driver import Driver
-        from openmdao.solvers.solver import Solver
-        from openmdao.jacobians.jacobian import Jacobian
-        from openmdao.matrices.matrix import Matrix
-        from openmdao.vectors.vector import Vector
-
-        _profile_methods = _trace_dict['openmdao']
+        _profile_methods = func_group('openmdao')
     else:
         _profile_methods = methods
 
@@ -162,17 +132,6 @@ def _collect_methods(method_dict):
     # TODO: update this to also work with stand-alone functions
     for pattern, classes in iteritems(method_dict):
         for class_ in classes:
-            for base in class_.__mro__:
-                if base is object:
-                    continue
-                if PY3:
-                    fname = sys.modules[base.__module__].__file__
-                else:
-                    fname = sys.modules[base.__module__].__file__[:-1]
-                classes = file2class[fname]
-                if base.__name__ not in classes:
-                    file2class[fname].append(base.__name__)
-
             for name, obj in getmembers(class_):
                 if callable(obj) and (pattern == '*' or fnmatchcase(name, pattern)):
                     if name in matches:
@@ -185,6 +144,7 @@ def _collect_methods(method_dict):
         matches[name] = tuple(matches[name])
 
     return matches, file2class
+
 
 # TODO: create a cython version of this to cut down on overhead...
 def _instance_profile(frame, event, arg):
@@ -202,29 +162,8 @@ def _instance_profile(frame, event, arg):
             if 'self' in loc:
                 self = loc['self']
                 if isinstance(self, _profile_matches[func_name]):
-                    classes = _file2class[frame.f_code.co_filename]
-                    if not classes:
-                        for base in self.__class__.__mro__:
-                            if base is object:
-                                continue
-                            if PY3:
-                                fname = sys.modules[base.__module__].__file__
-                            else:
-                                fname = sys.modules[base.__module__].__file__[:-1]
-                            classes = _file2class[fname]
-                            if base.__name__ not in classes:
-                                classes.append(base.__name__)
-                    if len(classes) > 1:
-                        # TODO: fix this
-                        warnings.warn("multiple classes %s found in same module (%s), "
-                                      "using self.__class__ (might be wrong)" % (classes,
-                                                                                 frame.f_code.co_filename))
-                        classes = [self.__class__.__name__]
-                    try:
-                        name = "<%s#%d>.%s" % (classes[0], id(self), func_name)
-                    except IndexError:
-                        name = "<%s#%d>.%s" % (self.__class__.__name__, id(self), func_name)
-
+                    name = "%s#%d#%d#%s" % (frame.f_code.co_filename,
+                                              frame.f_code.co_firstlineno, id(self), func_name)
                     _call_stack.append(name)
                     _timing_stack.append(etime())
 
@@ -235,16 +174,17 @@ def _instance_profile(frame, event, arg):
             if 'self' in loc:
                 self = loc['self']
                 if isinstance(self, _profile_matches[func_name]):
-                    path = '/'.join(_call_stack)
+                    final = etime()
+                    path = '@'.join(_call_stack)
                     if path not in _inst_data:
                         _inst_data[path] = _prof_node(_call_stack, self)
 
                     _call_stack.pop()
-                    start = _timing_stack.pop()
 
                     pdata = _inst_data[path]
-                    pdata['time'] += etime() - start
+                    pdata['time'] += final - _timing_stack.pop()
                     pdata['count'] += 1
+
 
 def start():
     """
@@ -259,9 +199,9 @@ def start():
         setup()  # just do a default setup
 
     _profile_start = etime()
-    _call_stack.append('@total')
-    if '@total' not in _inst_data:
-        _inst_data['@total'] = _prof_node(['@total'])
+    _call_stack.append('$total')
+    if '$total' not in _inst_data:
+        _inst_data['$total'] = _prof_node(['$total'])
 
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
@@ -281,9 +221,65 @@ def stop():
     _call_stack.pop()
 
     _profile_total += (etime() - _profile_start)
-    _inst_data['@total']['time'] = _profile_total
-    _inst_data['@total']['count'] += 1
+    _inst_data['$total']['time'] = _profile_total
+    _inst_data['$total']['count'] += 1
     _profile_start = None
+
+
+class ClassVisitor(ast.NodeVisitor):
+    def __init__(self, fname, cache):
+        ast.NodeVisitor.__init__(self)
+        self.fname = fname
+        self.cache = cache
+        self.class_stack = []
+
+    def visit_ClassDef(self, node):
+        self.class_stack.append(node.name)
+        for bnode in node.body:
+            self.visit(bnode)
+        self.class_stack.pop()
+
+    def visit_FunctionDef(self, node):
+        if self.class_stack:
+            qual =  (None, '.'.join(self.class_stack),  node.name)
+        else:
+            qual = ("<%s>" % self.fname, None, node.name)
+
+        self.cache[node.lineno] = qual
+
+
+def _find_qualified_name(filename, line, cache):
+    """
+    Determine full function name (class.method) or function for unbound functions.
+
+    Parameters
+    ----------
+    filename : str
+        Name of file containing source code.
+    line : int
+        Line number within the give file.
+    cache : dict
+        A dictionary containing infomation by filename.
+
+    Returns
+    -------
+    str or None
+        Fully qualified function/method name or None.
+    """
+
+    if filename not in cache:
+        fcache = {}
+
+        with open(filename, 'Ur') as f:
+            contents = f.read()
+            if len(contents) > 0 and contents[-1] != '\n':
+                contents += '\n'
+
+            ClassVisitor(filename, fcache).visit(ast.parse(contents, filename))
+
+        cache[filename] = fcache
+
+    return cache[filename][line]
 
 
 def _finalize_profile():
@@ -296,26 +292,45 @@ def _finalize_profile():
 
     # fix names in _inst_data
     _obj_map = {}
+    cache = {}
+    idents = defaultdict(dict)  # map idents to a smaller number
     for funcpath, data in iteritems(_inst_data):
-        parts = funcpath.rsplit('/', 1)
+        parts = funcpath.rsplit('@', 1)
         fname = parts[-1]
+        if fname == '$total':
+            continue
+        filename, line, ident, _ = fname.split('#')
+        qfile, qclass, qname = _find_qualified_name(filename, int(line), cache)
+
+        idict = idents[(qfile, qclass)]
+        if ident in idict:
+            ident = idict[ident]
+        else:
+            idict[ident] = len(idict)
+            ident = idict[ident]
+
         try:
             name = data['obj'].pathname
         except AttributeError:
-            pass
+            if qfile is None:
+                _obj_map[fname] = "<%s#%d.%s>" % (qclass, ident, qname)
+            else:
+                _obj_map[fname] = "<%s.%s>" % (qfile, qname)
         else:
-            klass = fname.split('#')[0][1:]
-            _obj_map[fname] = '.'.join((name, "<%s.%s>" % (klass, fname.rsplit('.', 1)[-1])))
+            _obj_map[fname] = '.'.join((name, "<%s.%s>" % (qclass, qname)))
+
+    _obj_map['$total'] = '$total'
+    _obj_map['$parent'] = '$parent'
 
     # compute child times
     for funcpath, data in iteritems(_inst_data):
-        parts = funcpath.rsplit('/', 1)
+        parts = funcpath.rsplit('@', 1)
         if len(parts) > 1:
             _inst_data[parts[0]]['child_time'] += data['time']
 
     # in order to make the D3 partition layout give accurate proportions, we can only put values
     # into leaf nodes because the parent node values get overridden by the sum of the children. To
-    # get around this, we create a child for each non-leaf node with the name '@parent' and put the
+    # get around this, we create a child for each non-leaf node with the name '$parent' and put the
     # time exclusive to the parent into that child, so that when all of the children are summed, they'll
     # add up to the correct time for the parent and the visual proportions of the parent will be correct.
 
@@ -323,22 +338,20 @@ def _finalize_profile():
     parnodes = []
     for funcpath, node in iteritems(_inst_data):
         if node['child_time'] > 0.:
-            parts = funcpath.split('/')
-            pparts = parts + ['@parent']
+            parts = funcpath.split('@')
+            pparts = parts + ['$parent']
             ex_child_node = _prof_node(pparts)
             ex_child_node['time'] = node['time'] - node['child_time']
             ex_child_node['count'] = 1
 
-            parnodes.append(('/'.join(pparts), ex_child_node))
+            parnodes.append(('@'.join(pparts), ex_child_node))
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
 
     fname = os.path.basename(_profile_prefix)
     with open("%s.%d" % (fname, rank), 'w') as f:
         for name, data in chain(iteritems(_inst_data), parnodes):
-            new_name = '/'.join([
-                _obj_map.get(s, s) for s in name.split('/')
-            ])
+            new_name = '@'.join([_obj_map[s] for s in name.split('@')])
             f.write("%s %d %f\n" % (new_name, data['count'], data['time']))
 
 
@@ -381,19 +394,19 @@ def process_profile(flist):
 
         for funcpath, count, t in _iter_raw_prof_file(fname):
 
-            parts = funcpath.split('/')
+            parts = funcpath.split('@')
 
             # for multi-file MPI profiles, decorate names with the rank
             if nfiles > 1 and dec:
                 parts = ["%s%s" % (p,dec) for p in parts]
-                funcpath = '/'.join(parts)
+                funcpath = '@'.join(parts)
 
             tree_nodes[funcpath] = node = _prof_node(parts)
             node['time'] += t
             node['count'] += count
 
             funcname = parts[-1]
-            if funcname == '@parent':
+            if funcname == '$parent':
                 continue
 
             if funcname in totals:
@@ -405,24 +418,24 @@ def process_profile(flist):
             tnode['tot_count'] += count
 
     for funcpath, node in iteritems(tree_nodes):
-        parts = funcpath.rsplit('/', 1)
-        if parts[-1] != '@parent':
+        parts = funcpath.rsplit('@', 1)
+        if parts[-1] != '$parent':
             node['tot_time'] = totals[parts[-1]]['tot_time']
             node['tot_count'] = totals[parts[-1]]['tot_count']
             node['pct_parent'] = node['time'] / tree_nodes[parts[0]]['time']
-            node['pct_total'] = node['time'] / tree_nodes['@total']['time']
-            node['tot_pct_total'] = totals[parts[-1]]['tot_time'] / tree_nodes['@total']['time']
+            node['pct_total'] = node['time'] / tree_nodes['$total']['time']
+            node['tot_pct_total'] = totals[parts[-1]]['tot_time'] / tree_nodes['$total']['time']
         del node['obj']
         del node['child_time']
 
-    tree_nodes['@total']['tot_time'] = tree_nodes['@total']['time']
+    tree_nodes['$total']['tot_time'] = tree_nodes['$total']['time']
 
     for funcpath, node in iteritems(tree_nodes):
-        parts = funcpath.rsplit('/', 1)
+        parts = funcpath.rsplit('@', 1)
         # D3 sums up all children to get parent value, so we need to
         # zero out the parent value else we get double the value we want
         # once we add in all of the times from descendants.
-        if parts[-1] == '@parent':
+        if parts[-1] == '$parent':
             tree_nodes[parts[0]]['time'] = 0.
 
     return list(tree_nodes.values()), totals
@@ -472,7 +485,7 @@ def prof_totals():
 
     _, totals = process_profile(options.rawfiles)
 
-    total_time = totals['@total']['tot_time']
+    total_time = totals['$total']['tot_time']
 
     try:
 
@@ -517,8 +530,8 @@ def prof_view():
 
     outfile = 'profile_' + viewer
     with open(outfile, 'w') as f:
-        f.write(Template(template).substitute(call_graph_data=graphjson,
-                                              title=options.title))
+        template = template.replace('$call_graph_data', graphjson)
+        f.write(template.replace('$title', options.title))
 
     if not options.noshow:
         webview(outfile)
