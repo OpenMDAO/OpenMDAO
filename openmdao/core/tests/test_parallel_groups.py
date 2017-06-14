@@ -200,7 +200,7 @@ class TestParallelGroups(unittest.TestCase):
                 self.mult = mult
                 super(MultComp, self).__init__()
 
-            def initialize_variables(self):
+            def setup(self):
                 if self.comm.rank == 0:
                     self.add_input('x', shape=1)
                     self.add_output('y', shape=1)
@@ -212,8 +212,7 @@ class TestParallelGroups(unittest.TestCase):
                 outputs['y'] = inputs['x'] * self.mult
 
             def compute_partials(self, inputs, outputs, partials):
-                J = partials
-                J['y', 'x'] = numpy.array([self.mult])
+                partials['y', 'x'] = numpy.array([self.mult])
 
         prob = Problem()
 
