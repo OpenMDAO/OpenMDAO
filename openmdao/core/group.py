@@ -1267,14 +1267,16 @@ class Group(System):
                         wrt.add(src)
                         ivc.append(src)
 
-            from openmdao.core.implicitcomponent import ImplicitComponent
-            states = set()
-            for var in of:
-                compname = abs_name2rel_name(self, '.'.join(var.split('.')[:-1]))
-                comp = self.get_subsystem(compname)
-                if isinstance(comp, ImplicitComponent):
-                    wrt.add(var)
-                    states.add(var)
+            # TODO - Handling states is a quandry, because what we want to do around them is
+            # ambiguous.
+            # from openmdao.core.implicitcomponent import ImplicitComponent
+            # states = set()
+            # for var in of:
+                # compname = abs_name2rel_name(self, '.'.join(var.split('.')[:-1]))
+                # comp = self.get_subsystem(compname)
+                # if isinstance(comp, ImplicitComponent):
+                    # wrt.add(var)
+                    # states.add(var)
 
             with self.jacobian_context() as J:
                 print('of', of)
@@ -1302,10 +1304,10 @@ class Group(System):
                             continue
 
                         # States always get added
-                        if key[0] in states:
-                            approx.add_approximation(key, meta)
-                            print('added', key)
-                            continue
+                        # if key[0] in states:
+                        #     approx.add_approximation(key, meta)
+                        #     print('added', key)
+                        #     continue
 
                         # Skip explicit res wrt outputs
                         if key[1] in of and key[1] not in ivc:

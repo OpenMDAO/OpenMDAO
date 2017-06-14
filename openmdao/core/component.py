@@ -738,5 +738,5 @@ class Component(System):
                 if method and meta['dependent']:
                     self._approx_schemes[method].add_approximation(key, meta)
 
-        for approx in self._approx_schemes:
+        for approx in itervalues(self._approx_schemes):
             approx._init_approximations()

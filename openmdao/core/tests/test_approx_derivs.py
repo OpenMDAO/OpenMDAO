@@ -59,6 +59,10 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
+        Jfd = sub.jacobian._subjacs
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.x'], [[6.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[-8.0]], 1e-6)
+
         # 1 output x 2 inputs
         sub = model.get_subsystem('sub')
         self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 2)
@@ -91,6 +95,10 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p1.x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p2.y'], [[8.0]], 1e-6)
+
+        Jfd = sub.jacobian._subjacs
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.bx.xin'], [[6.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.by.yin'], [[-8.0]], 1e-6)
 
         # 3 outputs x 2 inputs
         sub = model.get_subsystem('sub')
@@ -128,23 +136,46 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, Jfd['comp.y2', 'p1.x1'], -comp.JJ[2:4, 0:2], 1e-6)
         assert_rel_error(self, Jfd['comp.y2', 'p2.x2'], -comp.JJ[2:4, 2:4], 1e-6)
 
-    def test_implicit(self):
+    def test_implicit_component_fd(self):
+        # Somehow this wasn't tested in the original fd tests (which are mostly feature tests.)
 
         class TestImplCompArrayDense(TestImplCompArray):
 
-            def linearize(self, inputs, outputs, jacobian):
-                jacobian['x', 'x'] = self.mtx
-                jacobian['x', 'rhs'] = -np.eye(2)
+            def setup_partials(self):
+                self.approx_partials('*', '*')
 
         prob = Problem()
         model = prob.model = Group()
 
         model.add_subsystem('p_rhs', IndepVarComp('rhs', val=np.ones(2)))
         sub = model.add_subsystem('sub', Group())
-        sub.add_subsystem('comp', TestImplCompArrayDense())
+        comp = sub.add_subsystem('comp', TestImplCompArrayDense())
         model.connect('p_rhs.rhs', 'sub.comp.rhs')
 
-        #model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
+
+        prob.setup(check=False)
+        prob.run_model()
+        model.run_linearize()
+
+        Jfd = comp.jacobian._subjacs
+        assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)
+
+    def test_implicit(self):
+
+        class TestImplCompArrayNoSolve(TestImplCompArray):
+            def solve_nonlinear(self, inputs, outputs):
+                pass
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p_rhs', IndepVarComp('rhs', val=np.ones(2)))
+        sub = model.add_subsystem('sub', Group())
+        comp = sub.add_subsystem('comp', TestImplCompArrayNoSolve())
+        model.connect('p_rhs.rhs', 'sub.comp.rhs')
+
         model.ln_solver = ScipyIterativeSolver()
         sub.approx_all_partials()
         prob.set_solver_print()
@@ -154,6 +185,10 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.run_linearize()
         print(sub.jacobian._subjacs)
         print('hey')
+
+        Jfd = sub.jacobian._subjacs
+        assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)
 
 if __name__ == "__main__":
     unittest.main()

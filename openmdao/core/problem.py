@@ -647,8 +647,6 @@ class Problem(object):
         # TODO: Support parallel adjoint and parallel forward derivatives
         #       Aside: how are they specified, and do we have to pick up any
         #       that are missed?
-        # TODO: Handle driver scaling.
-        # TODO: Support for any other return_format we need.
         # TODO: Support constraint sparsity (i.e., skip in/out that are not
         #       relevant for this constraint) (desvars too?)
         # TODO: Don't calculate for inactive constraints
@@ -773,7 +771,7 @@ class Problem(object):
                     # since we clean this every time.
                     dinputs.set_const(0.0)
 
-                    # the 'store' flag is here so that we properly initialize
+                    # The 'store' flag is here so that we properly initialize
                     # totals to zeros instead of None in those cases when none
                     # of the specified indices are within the range of interest
                     # for this proc.
