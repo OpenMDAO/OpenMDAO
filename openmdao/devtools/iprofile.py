@@ -35,7 +35,6 @@ def _prof_node(parts):
         'obj': parts[1],
     }
 
-_profile_methods = None
 _profile_prefix = None
 _profile_out = None
 _profile_start = None
@@ -79,7 +78,7 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
 
     """
 
-    global _profile_prefix, _profile_methods, _matches
+    global _profile_prefix, _matches
     global _profile_setup, _profile_total, _profile_out
 
     if _profile_setup:
@@ -93,9 +92,7 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
     _profile_setup = True
 
     if methods is None:
-        _profile_methods = func_group('openmdao')
-    else:
-        _profile_methods = methods
+        methods = func_group('openmdao')
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
     _profile_out = open("%s.%d" % (_profile_prefix, rank), 'wb')
@@ -103,7 +100,7 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
     if finalize:
         atexit.register(_finalize_profile)
 
-    _matches = _collect_methods(_profile_methods)
+    _matches = _collect_methods(methods)
 
 
 # TODO: create a cython version of this to cut down on overhead...

@@ -78,15 +78,15 @@ def find_qualified_name(filename, line, cache):
 # This maps a simple identifier to a group of classes and corresponding
 # glob patterns for each class.
 _trace_dict = {
-    'openmdao': {
-        "*": (System, Jacobian, Matrix, Solver, Driver, Problem),
-    },
-    'memory': {
-        "*": (System, Vector, Jacobian, Matrix, Solver, Driver, Problem),
-    },
-    'setup': {
-        "*setup*": (System, Solver, Driver, Problem),
-    },
+    'openmdao': [
+        ("*", (System, Jacobian, Matrix, Solver, Driver, Problem)),
+    ],
+    'memory': [
+        ("*", (System, Vector, Jacobian, Matrix, Solver, Driver, Problem)),
+    ],
+    'setup': [
+        ("*setup*", (System, Solver, Driver, Problem)),
+    ],
 }
 
 
@@ -99,7 +99,6 @@ _matches = {}
 _method_counts = {}
 _mem_changes = {}
 _callstack = []
-_method_patterns = {}
 _trace_callback = None  # pointer to function that implements the trace
 _registered = False  # prevents multiple atexit registrations
 _stack = []
@@ -172,7 +171,7 @@ def _trace_mem_ret(frame, arg):
 _trace_memory = _create_trace_func(_trace_mem_call, _trace_mem_ret)
 
 
-def _collect_methods(method_dict):
+def _collect_methods(method_patterns):
     """
     Iterate over a dict of method name patterns mapped to classes.  Search
     through the classes for anything that matches and return a dict of
@@ -180,8 +179,8 @@ def _collect_methods(method_dict):
 
     Parameters
     ----------
-    method_dict : {pattern1: classes1, ... pattern_n: classes_n}
-        Dict of glob patterns mapped to lists of classes used for isinstance checks
+    method_patterns : [(pattern1, (class1, class2, ... class_n)), ... (pattern_n, (class_n1, class_n2, ...)]
+        List of tuples of glob patterns and lists of classes used for isinstance checks
 
     Returns
     -------
@@ -191,7 +190,7 @@ def _collect_methods(method_dict):
     matches = {}
 
     # TODO: update this to also work with stand-alone functions
-    for pattern, classes in iteritems(method_dict):
+    for pattern, classes in method_patterns:
         for class_ in classes:
             for name, obj in getmembers(class_):
                 if callable(obj) and (pattern == '*' or fnmatchcase(name, pattern)):
@@ -208,13 +207,12 @@ def _collect_methods(method_dict):
 
 
 def setup(trace_type='call', methods=None):
-    global _registered, _method_patterns, _matches, _file2class, _trace_callback
+    global _registered, _matches, _file2class, _trace_callback
     if not _registered:
         if methods is None:
-            _method_patterns = func_group('openmdao')
-        else:
-            _method_patterns = methods
-        _matches = _collect_methods(_method_patterns)
+            methods = func_group('openmdao')
+
+        _matches = _collect_methods(methods)
 
         if trace_type == 'mem':
             global mem_usage
@@ -242,8 +240,7 @@ def setup(trace_type='call', methods=None):
 
 
 def start():
-    global _matches, _method_patterns, _trace_callback
-    _matches = _collect_methods(_method_patterns)
+    global _matches, _trace_callback
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
     if _trace_callback is None:

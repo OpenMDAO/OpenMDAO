@@ -12,40 +12,37 @@ by the specific problem, system, group, driver, or solver that called them, it
 can provide insight into which parts of your model are more expensive, even when
 different parts of your model use many of the same underlying functions.
 
-To use profiling, you first have to import the profile module.
+The simplest way to use instance based profiling is via the command line using the `-m`
+option to python.  For example:
+
 
 .. code::
 
-   from openmdao.api import profile
+   python -m openmdao.devtools.iprofile <your_python_script_here>
 
 
-:code:`profile` by default will record information for all calls to any of the main OpenMDAO base classes,
+:code:`iprofile` by default will record information for all calls to any of the main OpenMDAO base classes,
 for example, `:code:`System`, :code:`Problem`, :code:`Solver`, and :code:`Jacobian`.  If you want to change
 that, or change other profiling options, you can call :code:`profile.setup()`.  Calling :code:`profile.setup()`
 is only necessary if you don't like the defaults.
 
-
-To begin profiling, call :code:`profile.start().  If for some reason you want to only
-collect profiling data during a particular part of execution, you can call
-:code:`profile.stop` to turn off collection.  For example:
+If you want more control over the profiling process, you can import `openmdao.devtools.iprofile` and manually
+call `setup()`, `start()` and `stop()`.  For example:
 
 
 .. testcode:: profile_activate
 
-    from openmdao.api import Problem, Group, profile
+    from openmdao.devtools import iprofile
 
-    prob = Problem()
+    # you can define your own custom set of methods to track here
+    methods = {
+    }
+    iprofile.setup()
+    iprofile.start()
 
-    # define my model...
+    # define my model and run it...
 
-    # I'm happy with the defaults, so just call profile.start() without calling profile.setup()
-    profile.start()
-
-    prob.setup()
-
-    prob.run_model()
-
-    profile.stop()
+    iprofile.stop()
 
     # do some other stuff that I don't want to profile...
 
