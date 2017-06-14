@@ -162,7 +162,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
         assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)
 
-    def test_group_with_newton(self):
+    def test_around_newton(self):
         # For a group that is set to FD that has a Newton solver, make sure it doesn't
         # try to FD itself while solving.
 
@@ -182,7 +182,6 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.nl_solver = NewtonSolver()
         model.ln_solver = ScipyIterativeSolver()
         model.approx_all_partials()
-        prob.set_solver_print()
 
         prob.setup(check=False)
         prob.run_model()
@@ -190,14 +189,36 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, prob['comp.x'], [1.97959184, 4.02040816], 1e-5)
 
         model.run_linearize()
-        print(model.jacobian._subjacs)
-        print('hey')
 
         of = ['comp.x']
         wrt = ['p_rhs.rhs']
         Jfd = prob.compute_total_derivs(of=of, wrt=wrt)
 
         assert_rel_error(self, Jfd['comp.x', 'p_rhs.rhs'], [[1.01020408, -0.01020408], [-0.01020408,  1.01020408]], 1e-5)
+
+    def test_step_size(self):
+        # Test makes sure option metadata propagates to the fd function
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.ln_solver = ScipyIterativeSolver()
+
+        # Worse step so that our answer will be off a wee bit.
+        model.approx_all_partials(step=1e-2)
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        of = ['f_xy']
+        wrt = ['x', 'y']
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+
+        assert_rel_error(self, derivs['f_xy', 'x'], [[-5.99]], 1e-6)
+        assert_rel_error(self, derivs['f_xy', 'y'], [[8.01]], 1e-6)
 
 if __name__ == "__main__":
     unittest.main()

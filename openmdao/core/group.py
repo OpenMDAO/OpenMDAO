@@ -1279,14 +1279,13 @@ class Group(System):
                     # states.add(var)
 
             with self.jacobian_context() as J:
-                print('of', of)
-                print('wrt', wrt)
                 for key in product(of, wrt.union(of)):
                     meta_changes = {
                         'method': method,
                     }
                     if key[0] == key[1]:
-                        meta_changes['value'] = 1.0
+                        size = self._outputs._views_flat[key[0]].shape[0]
+                        meta_changes['value'] = np.eye(size)
                     meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
                     meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)
@@ -1314,7 +1313,6 @@ class Group(System):
                             continue
 
                         approx.add_approximation(key, meta)
-                        print('added', key)
 
             approx._init_approximations()
 
