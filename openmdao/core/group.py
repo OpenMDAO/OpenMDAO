@@ -1070,8 +1070,8 @@ class Group(System):
         """
         from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
             print_recording_iteration_stack, pop_recording_iteration_stack, \
-            iter_get_norm_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack()
+            iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack() and not compute_total_derivs_on_call_stack()
         if do_recording:
             name = self.pathname if self.pathname else 'root'
             push_recording_iteration_stack(name + '._apply_nonlinear', self.iter_count)
@@ -1104,8 +1104,8 @@ class Group(System):
 
         from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
             print_recording_iteration_stack, pop_recording_iteration_stack, \
-            iter_get_norm_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack()
+            iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack() and not compute_total_derivs_on_call_stack()
         if do_recording:
             name = self.pathname if self.pathname else 'root'
             push_recording_iteration_stack(name + '._solve_nonlinear', self.iter_count)
@@ -1148,8 +1148,8 @@ class Group(System):
         """
         from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
             print_recording_iteration_stack, pop_recording_iteration_stack, \
-            iter_get_norm_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack()
+            iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack() and not compute_total_derivs_on_call_stack()
         if do_recording:
             name = self.pathname if self.pathname else 'root'
             push_recording_iteration_stack(name + '._apply_linear', self.iter_count)
@@ -1202,8 +1202,8 @@ class Group(System):
         """
         from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
             print_recording_iteration_stack, pop_recording_iteration_stack, \
-            iter_get_norm_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack()
+            iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack() and not compute_total_derivs_on_call_stack()
         if do_recording:
             name = self.pathname if self.pathname else 'root'
             push_recording_iteration_stack(name + '._solve_linear', self.iter_count)

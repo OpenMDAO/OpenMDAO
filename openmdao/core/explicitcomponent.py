@@ -181,12 +181,11 @@ class ExplicitComponent(Component):
         """
         from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
             print_recording_iteration_stack, pop_recording_iteration_stack, \
-            iter_get_norm_on_call_stack
-
-        do_recording = not iter_get_norm_on_call_stack()
+            iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack() and not compute_total_derivs_on_call_stack()
 
         if do_recording:
-            push_recording_iteration_stack(self.pathname + '._solve_nonlinear', self.iter_count)
+            push_recording_iteration_stack(self.pathname + '._apply_nonlinear', self.iter_count)
             print_recording_iteration_stack()
 
         with self._unscaled_context(
@@ -218,8 +217,8 @@ class ExplicitComponent(Component):
 
         from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
             print_recording_iteration_stack, pop_recording_iteration_stack, \
-            iter_get_norm_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack()
+            iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack() and not compute_total_derivs_on_call_stack()
 
         if do_recording:
             push_recording_iteration_stack(self.pathname + '._solve_nonlinear', self.iter_count)
@@ -256,8 +255,8 @@ class ExplicitComponent(Component):
         """
         from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
             print_recording_iteration_stack, pop_recording_iteration_stack, \
-            iter_get_norm_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack()
+            iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack() and not compute_total_derivs_on_call_stack()
         if do_recording:
             push_recording_iteration_stack(self.pathname + '._apply_linear', self.iter_count)
             print_recording_iteration_stack()
@@ -303,8 +302,8 @@ class ExplicitComponent(Component):
         """
         from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
             print_recording_iteration_stack, pop_recording_iteration_stack, \
-            iter_get_norm_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack()
+            iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
+        do_recording = not iter_get_norm_on_call_stack() and not compute_total_derivs_on_call_stack()
         if do_recording:
             push_recording_iteration_stack(self.pathname + '._solve_linear', self.iter_count)
             print_recording_iteration_stack()

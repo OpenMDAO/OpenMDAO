@@ -50,6 +50,11 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
         expected can be from multiple cases
     """
 
+    # db_cur.execute("SELECT * FROM driver_iterations")
+    # rows = db_cur.fetchall()
+
+
+
     # iterate through the cases
     for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, constraints_expected in expected:
         iter_coord = format_iteration_coordinate(coord)
@@ -192,6 +197,14 @@ def _assertSolverIterationDataRecordedBasic(test, db_cur):
     row_actual = db_cur.fetchone()
     test.assertTrue(row_actual, 'Solver iterations table is empty. Should contain at least one record')
 
+def _assertSystemIterationDataRecordedBasic(test, db_cur):
+    """
+        Just make sure something was recorded for the solver
+    """
+    db_cur.execute("SELECT * FROM system_iterations")
+    row_actual = db_cur.fetchone()
+    test.assertTrue(row_actual, 'System iterations table is empty. Should contain at least one record')
+
 def _assertMetadataRecorded(test, db_cur):
 
     db_cur.execute("SELECT format_version FROM metadata")
@@ -276,6 +289,13 @@ class TestSqliteRecorder(unittest.TestCase):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertSolverIterationDataRecordedBasic(self, cur)
+        con.close()
+
+    def assertSystemIterationDataRecordedBasic(self):
+        '''Just want to make sure something was recorded'''
+        con = sqlite3.connect(self.filename)
+        cur = con.cursor()
+        _assertSystemIterationDataRecordedBasic(self, cur)
         con.close()
 
     def assertMetadataRecorded(self ):
@@ -522,7 +542,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         # TODO_RECORDERS - need to check the recording of the d1 also
-        coordinate = [0, 'obj_cmp', (6, )]
+        coordinate = [0, 'root._solve_nonlinear', (0, ), 'obj_cmp._solve_nonlinear', (6, )]
 
         expected_inputs = {
                             "obj_cmp.z": [5.0, 2.0],
@@ -608,18 +628,6 @@ class TestSqliteRecorder(unittest.TestCase):
             self.prob.driver.opt_settings['ACC'] = 1e-9
         self.prob.driver.options['print_results'] = True
 
-        # self.nl_solver = self.metadata['nl_solver']
-        # if self.metadata['nl_atol']:
-        #     self.nl_solver.options['atol'] = self.metadata['nl_atol']
-        # if self.metadata['nl_maxiter']:
-        #     self.nl_solver.options['maxiter'] = self.metadata['nl_maxiter']
-        #
-        # self.ln_solver = self.metadata['ln_solver']
-        # if self.metadata['ln_atol']:
-        #     self.ln_solver.options['atol'] = self.metadata['ln_atol']
-        # if self.metadata['ln_maxiter']:
-        #     self.ln_solver.options['maxiter'] = self.metadata['ln_maxiter']
-
         self.recorder.options['record_inputs'] = True
         self.recorder.options['record_outputs'] = True
         self.recorder.options['record_residuals'] = True
@@ -640,7 +648,28 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        #TODO_RECORDERS - need to test values !!!
+        coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (0, ), 'mda._solve_nonlinear', (0, ), 'mda.d1._solve_nonlinear', (4, )]
+        expected_inputs = {
+                            "mda.d1.z": [5.0, 2.0],
+                            "mda.d1.x": [1.0,],
+                            "mda.d1.y2": [12.0584865,],
+                            }
+        expected_outputs = {"mda.d1.y1": [25.5883027,],
+                            }
+        expected_residuals = {"mda.d1.y1": [0.0,],
+                            }
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
+                                                 expected_residuals),), self.eps)
+
+        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'pz._solve_nonlinear', (2, )]
+        expected_inputs = None
+        expected_outputs = {"pz.z": [2.8640616, 0.825643,],
+                            }
+        expected_residuals = {"pz.z": [0.0, 0.0],
+                            }
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
+                                                 expected_residuals),), self.eps)
+
 
     def test_record_solver(self):
         self.setup_sellar_model()
@@ -970,28 +999,44 @@ class TestSqliteRecorder(unittest.TestCase):
 
     def test_implicit_component(self):
 
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        from openmdao.core.tests.test_impl_comp import TestImplCompSimpleLinearize, TestImplCompSimpleJacVec
+        group = Group()
+        group.add_subsystem('comp1', IndepVarComp([('a', 1.0), ('b', 1.0), ('c', 1.0)]))
+        group.add_subsystem('comp2', TestImplCompSimpleLinearize())
+        group.add_subsystem('comp3', TestImplCompSimpleJacVec())
+        group.connect('comp1.a', 'comp2.a')
+        group.connect('comp1.b', 'comp2.b')
+        group.connect('comp1.c', 'comp2.c')
+        group.connect('comp1.a', 'comp3.a')
+        group.connect('comp1.b', 'comp3.b')
+        group.connect('comp1.c', 'comp3.c')
 
-        g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()
+        prob = Problem(model=group)
 
-        g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        comp2 = prob.model.get_subsystem('comp2') # ImplicitComponent
+        comp2.add_recorder(self.recorder)
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        prob.setup(check=False)
 
-        model.nl_solver.options['solve_subsystems'] = True
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
 
-        prob.setup()
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
+        coordinate = [0, 'root._solve_nonlinear', (0, ), 'comp2._solve_nonlinear', (0, )]
+        expected_inputs = {
+                            "comp2.a": [1.0,],
+                            "comp2.b": [-4.0,],
+                            "comp2.c": [3.0,],
+                            }
+        expected_outputs = {"comp2.x": [3.0,],
+                            }
+        expected_residuals = {"comp2.x": [0.0,],
+                            }
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
+                                                 expected_residuals),), self.eps)
 
 
 if __name__ == "__main__":

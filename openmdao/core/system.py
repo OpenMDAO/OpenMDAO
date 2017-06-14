@@ -2410,17 +2410,18 @@ class System(object):
         # send the calling method name into record_iteration, e.g. 'solve_nonlinear'
         self._rec_mgr.record_iteration(self, metadata, method=inspect.stack()[1][3])
 
-        # 1 and 3
-        filepath = inspect.stack()[1][1]
-        import os.path
-        base = os.path.basename(filepath)
-        base_filename = os.path.splitext(base)[0]
-
-        method_name = inspect.stack()[1][3]
-        import unittest
-        #test_name = get_current_case()
-        test_name = "this"
-        #print 'qqq', test_name, base_filename, method_name
+        # TODO_RECORDER - for debugging but needs to be removed
+        # want to see that we cover all class.methods that need to be recorded
+        # filepath = inspect.stack()[1][1]
+        # import os.path
+        # base = os.path.basename(filepath)
+        # base_filename = os.path.splitext(base)[0]
+        #
+        # method_name = inspect.stack()[1][3]
+        # import unittest
+        # test_name = get_current_case()
+        # # test_name = "this"
+        # print 'qqq', test_name, base_filename, method_name
 
 
 def get_current_case():
@@ -2432,9 +2433,7 @@ def get_current_case():
 
     Tested on Python 2.7 and 3.3 - 3.6 with nose 1.3.7.
 
-<<<<<<< HEAD
     #'/Users/hschilli/Documents/OpenMDAO/dev/blue_recording_global_counter/openmdao/recorders/tests/test_sqlite_recorder.py'
-=======
     Returns
     -------
     str
@@ -2443,10 +2442,9 @@ def get_current_case():
          teardown.
     """
     # 'OpenMDAO/dev/blue_recording_global_counter/openmdao/recorders/tests/test_sqlite_recorder.py'
->>>>>>> 0d24da272f8d60ca6e8119e119b075d6b0c4353e
     for frame_info in inspect.stack():
         if frame_info[1].endswith('tests/test_sqlite_recorder.py'):
             if frame_info[3] == 'run_driver':
                 continue
             return frame_info[3]
-    # raise RuntimeError('Could not determine test case')
+    raise RuntimeError('Could not determine test case')

@@ -17,16 +17,31 @@ recording_iteration_stack = []
 
 def iter_get_norm_on_call_stack():
     """
-    Get norm on call stack.
+    iter_get_norm_ on call stack?
 
     Returns
-        True if qqq
-        False if qqq
+        True
+        False
     """
     for s in inspect.stack():
         if s[3] == '_iter_get_norm':
             return True
     return False
+
+def compute_total_derivs_on_call_stack():
+    """
+    compute_total_derivs on call stack?
+
+    Returns
+        True
+        False
+    """
+    for s in inspect.stack():
+        if s[3] == '_compute_total_derivs':
+            return True
+    return False
+
+
 
 
 def push_recording_iteration_stack(name, iter_count):
@@ -54,12 +69,33 @@ def print_recording_iteration_stack():
     """
     Print the stack.
     """
-    print
+    return #TODO_RECORDER - remove all the printing later
+    # print
     for name, iter_count in reversed(recording_iteration_stack):
-        if name == 'mda.d2._solve_nonlinear' and iter_count == 114:
+        if name == 'pyoptsparsedriver' and iter_count == 6:
             pass
         print '^^^', name, iter_count
     print 60 * '^'
+
+
+def get_formatted_iteration_coordinate():
+
+    '''
+    Get the iteration coordinate in human readable format like this:
+    
+        'rank0:pyoptsparsedriver|6|root._solve_nonlinear|6|mda._solve_nonlinear|6|mda.d1._solve_nonlinear|45'
+    '''
+
+    separator = '|'
+    iteration_coord_list = []
+
+    for name, iter_count in recording_iteration_stack:
+        iteration_coord_list.append( '{}{}{}'.format(name,separator, iter_count))
+
+    rank = 0 # TODO_RECORDER - needs to be updated when we go parallel
+    formatted_iteration_coordinate = ':'.join(["rank%d"%rank, separator.join(iteration_coord_list)])
+    return formatted_iteration_coordinate
+
 
 
 class BaseRecorder(object):

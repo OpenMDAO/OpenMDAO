@@ -196,8 +196,19 @@ class pyOptSparseDriver(Driver):
         self.iter_count = 0
         update_local_meta(self.metadata, (self.iter_count,))
 
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            print_recording_iteration_stack, pop_recording_iteration_stack, \
+            iter_get_norm_on_call_stack
+        push_recording_iteration_stack(self.options['optimizer'], self.iter_count)
+
+
         # Initial Run
         model._solve_nonlinear()
+
+
+        print_recording_iteration_stack()
+        pop_recording_iteration_stack()
+
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
@@ -318,7 +329,14 @@ class pyOptSparseDriver(Driver):
             val = dv_dict[name]
             self.set_design_var(name, val)
 
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            print_recording_iteration_stack, pop_recording_iteration_stack
+        push_recording_iteration_stack(self.options['optimizer'], self.iter_count)
+
         model._solve_nonlinear()
+
+        print_recording_iteration_stack()
+        pop_recording_iteration_stack()
 
         # Save the most recent solution.
         self.pyopt_solution = sol
@@ -375,12 +393,10 @@ class pyOptSparseDriver(Driver):
             from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
                 print_recording_iteration_stack, pop_recording_iteration_stack, \
                 iter_get_norm_on_call_stack
-            push_recording_iteration_stack('pyoptsparsedriver', self.iter_count)
+            push_recording_iteration_stack(self.options['optimizer'], self.iter_count)
 
             model._solve_nonlinear()
 
-            print_recording_iteration_stack()
-            pop_recording_iteration_stack()
 
             func_dict = self.get_objective_values()
             func_dict.update(self.get_constraint_values(lintype='nonlinear'))
@@ -389,6 +405,11 @@ class pyOptSparseDriver(Driver):
             # been gathered in MPI.
 
             self._rec_mgr.record_iteration(self, metadata)
+
+            print_recording_iteration_stack()
+            pop_recording_iteration_stack()
+
+
 
         except Exception as msg:
             tb = traceback.format_exc()
