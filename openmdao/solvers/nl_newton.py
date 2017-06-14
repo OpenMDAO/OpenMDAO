@@ -119,7 +119,16 @@ class NewtonSolver(NonlinearSolver):
             norm.
         """
         system = self._system
+
+        # Disable local fd
+        approx_status = system._owns_approx_jac
+        system._owns_approx_jac = False
+
         system._apply_nonlinear()
+
+        # Enable local fd
+        system._owns_approx_jac = approx_status
+
         return system._residuals.get_norm()
 
     def _linearize_children(self):
@@ -153,6 +162,10 @@ class NewtonSolver(NonlinearSolver):
         do_subsolve = self.options['solve_subsystems'] and \
             (self._iter_count <= self.options['max_sub_solves'])
 
+        # Disable local fd
+        approx_status = system._owns_approx_jac
+        system._owns_approx_jac = False
+
         # Hybrid newton support.
         if do_subsolve:
 
@@ -181,6 +194,9 @@ class NewtonSolver(NonlinearSolver):
             system._outputs += system._vectors['output']['linear']
 
         self._solver_info.prefix = self._solver_info.prefix[:-3]
+
+        # Enable local fd
+        system._owns_approx_jac = approx_status
 
     def _mpi_print_header(self):
         """
