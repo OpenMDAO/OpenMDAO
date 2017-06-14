@@ -2,10 +2,7 @@ from __future__ import print_function
 
 import os
 import sys
-import ast
 from time import time as etime
-from inspect import getmembers
-from fnmatch import fnmatchcase
 import argparse
 import json
 import atexit
@@ -20,23 +17,22 @@ except ImportError:
     MPI = None
 
 from openmdao.devtools.webview import webview
-from openmdao.devtools.trace import func_group
+from openmdao.devtools.trace import func_group, find_qualified_name, _collect_methods
 
 
-def _prof_node(parts, obj=None):
-    name = '@'.join(parts)
+def _prof_node(parts):
     return {
-        'name': name,
-        'short_name': parts[-1],
-        'time': 0.,
-        'count': 0,
+        'name': '@'.join(parts[0]),
+        'short_name': parts[0][-1],
+        'time': parts[2],
+        'count': parts[3],
         'tot_time': 0.,
         'tot_count': 0,
         'pct_total': 0.,
         'tot_pct_total': 0.,
         'pct_parent': 0.,
         'child_time': 0.,
-        'obj': obj,
+        'obj': parts[1],
     }
 
 _profile_methods = None
@@ -45,12 +41,11 @@ _profile_out = None
 _profile_start = None
 _profile_setup = False
 _profile_total = 0.0
-_profile_matches = {}
+_matches = {}
 _call_stack = []
 _timing_stack = []
 _inst_data = {}
 _objs = {}   # mapping of ids to instance objects
-_file2class = {}
 
 
 def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
@@ -84,8 +79,8 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
 
     """
 
-    global _profile_prefix, _profile_methods, _profile_matches
-    global _profile_setup, _profile_total, _profile_out, _file2class
+    global _profile_prefix, _profile_methods, _matches
+    global _profile_setup, _profile_total, _profile_out
 
     if _profile_setup:
         raise RuntimeError("profiling is already set up.")
@@ -105,85 +100,42 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
     rank = MPI.COMM_WORLD.rank if MPI else 0
     _profile_out = open("%s.%d" % (_profile_prefix, rank), 'wb')
 
-    atexit.register(_finalize_profile)
+    if finalize:
+        atexit.register(_finalize_profile)
 
-    _profile_matches, _file2class = _collect_methods(_profile_methods)
-
-
-def _collect_methods(method_dict):
-    """
-    Iterate over a dict of method name patterns mapped to classes.  Search
-    through the classes for anything that matches and return a dict of
-    exact name matches and their correspoding classes.
-
-    Parameters
-    ----------
-    method_dict : {pattern1: classes1, ... pattern_n: classes_n}
-        Dict of glob patterns mapped to lists of classes used for isinstance checks
-
-    Returns
-    -------
-    dict
-        Dict of method names and tuples of all classes that matched for that method.
-    """
-    matches = {}
-    file2class = defaultdict(list)  # map files to classes
-
-    # TODO: update this to also work with stand-alone functions
-    for pattern, classes in iteritems(method_dict):
-        for class_ in classes:
-            for name, obj in getmembers(class_):
-                if callable(obj) and (pattern == '*' or fnmatchcase(name, pattern)):
-                    if name in matches:
-                        matches[name].append(class_)
-                    else:
-                        matches[name] = [class_]
-
-    # convert values to tuples so we can use in isinstance call
-    for name in matches:
-        matches[name] = tuple(matches[name])
-
-    return matches, file2class
+    _matches = _collect_methods(_profile_methods)
 
 
 # TODO: create a cython version of this to cut down on overhead...
 def _instance_profile(frame, event, arg):
     """
-    Collects profile data for functions that match _profile_matches.
-    The data collected will include time elapsed, number of calls, ...
+    Collects profile data for functions that match _matches.
+    Elapsed time and number of calls are collected.
     """
     global _call_stack, _profile_out, _profile_struct, _inst_data, \
-           _profile_funcs_dict, _profile_start, _profile_matches, _file2class
+           _profile_funcs_dict, _profile_start, _matches
 
     if event == 'call':
-        func_name = frame.f_code.co_name
-        if func_name in _profile_matches:
-            loc = frame.f_locals
-            if 'self' in loc:
-                self = loc['self']
-                if isinstance(self, _profile_matches[func_name]):
-                    name = "%s#%d#%d" % (frame.f_code.co_filename,
-                                         frame.f_code.co_firstlineno, id(self))
-                    _call_stack.append(name)
-                    _timing_stack.append(etime())
+        if frame.f_code.co_name in _matches and 'self' in frame.f_locals and  \
+                isinstance(frame.f_locals['self'], _matches[frame.f_code.co_name]):
+            _timing_stack.append((frame.f_code.co_filename,
+                                  frame.f_code.co_firstlineno, id(frame.f_locals['self']), etime(), frame))
+            _call_stack.append("%s#%d#%d" % _timing_stack[-1][:-2])
 
-    elif event == 'return':
-        func_name = frame.f_code.co_name
-        if func_name in _profile_matches:
-            loc = frame.f_locals
-            if 'self' in loc:
-                self = loc['self']
-                if isinstance(self, _profile_matches[func_name]):
-                    final = etime()
-                    path = '@'.join(_call_stack)
-                    if path not in _inst_data:
-                        _inst_data[path] = _prof_node(_call_stack, self)
+    elif event == 'return' and _timing_stack:
+        fname, line, ident, start, oldframe = _timing_stack[-1]
+        if oldframe is frame:
+            final = etime()
+            path = '@'.join(_call_stack)
+            if path not in _inst_data:
+                _inst_data[path] = [_call_stack[:], frame.f_locals['self'], 0., 0]
 
-                    _call_stack.pop()
+            _call_stack.pop()
+            _timing_stack.pop()
 
-                    pdata = _inst_data[path]
-                    pdata['time'] += final - _timing_stack.pop()
-                    pdata['count'] += 1
+            pdata = _inst_data[path]
+            pdata[2] += final - start
+            pdata[3] += 1
 
 
 def start():
@@ -201,7 +153,7 @@ def start():
     _profile_start = etime()
     _call_stack.append('$total')
     if '$total' not in _inst_data:
-        _inst_data['$total'] = _prof_node(['$total'])
+        _inst_data['$total'] = [['$total'], None, 0., 0]
 
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
@@ -221,65 +173,9 @@ def stop():
     _call_stack.pop()
 
     _profile_total += (etime() - _profile_start)
-    _inst_data['$total']['time'] = _profile_total
-    _inst_data['$total']['count'] += 1
+    _inst_data['$total'][2] = _profile_total
+    _inst_data['$total'][3] += 1
     _profile_start = None
-
-
-class ClassVisitor(ast.NodeVisitor):
-    def __init__(self, fname, cache):
-        ast.NodeVisitor.__init__(self)
-        self.fname = fname
-        self.cache = cache
-        self.class_stack = []
-
-    def visit_ClassDef(self, node):
-        self.class_stack.append(node.name)
-        for bnode in node.body:
-            self.visit(bnode)
-        self.class_stack.pop()
-
-    def visit_FunctionDef(self, node):
-        if self.class_stack:
-            qual =  (None, '.'.join(self.class_stack),  node.name)
-        else:
-            qual = ("<%s>" % self.fname, None, node.name)
-
-        self.cache[node.lineno] = qual
-
-
-def _find_qualified_name(filename, line, cache):
-    """
-    Determine full function name (class.method) or function for unbound functions.
-
-    Parameters
-    ----------
-    filename : str
-        Name of file containing source code.
-    line : int
-        Line number within the give file.
-    cache : dict
-        A dictionary containing infomation by filename.
-
-    Returns
-    -------
-    str or None
-        Fully qualified function/method name or None.
-    """
-
-    if filename not in cache:
-        fcache = {}
-
-        with open(filename, 'Ur') as f:
-            contents = f.read()
-            if len(contents) > 0 and contents[-1] != '\n':
-                contents += '\n'
-
-            ClassVisitor(filename, fcache).visit(ast.parse(contents, filename))
-
-        cache[filename] = fcache
-
-    return cache[filename][line]
 
 
 def _finalize_profile():
@@ -295,12 +191,14 @@ def _finalize_profile():
     cache = {}
     idents = defaultdict(dict)  # map idents to a smaller number
     for funcpath, data in iteritems(_inst_data):
+        _inst_data[funcpath] = _prof_node(data)
+        data = _inst_data[funcpath]
         parts = funcpath.rsplit('@', 1)
         fname = parts[-1]
         if fname == '$total':
             continue
         filename, line, ident = fname.split('#')
-        qfile, qclass, qname = _find_qualified_name(filename, int(line), cache)
+        qfile, qclass, qname = find_qualified_name(filename, int(line), cache)
 
         idict = idents[(qfile, qclass)]
         if ident in idict:
@@ -340,10 +238,7 @@ def _finalize_profile():
         if node['child_time'] > 0.:
             parts = funcpath.split('@')
             pparts = parts + ['$parent']
-            ex_child_node = _prof_node(pparts)
-            ex_child_node['time'] = node['time'] - node['child_time']
-            ex_child_node['count'] = 1
-
+            ex_child_node = _prof_node([pparts, None, node['time'] - node['child_time'], 1])
             parnodes.append(('@'.join(pparts), ex_child_node))
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
@@ -371,8 +266,8 @@ def process_profile(flist):
     Take the generated raw profile data, potentially from multiple files,
     and combine it to get execution counts and timing data.
 
-    Args
-    ----
+    Parameters
+    ----------
 
     flist : list of str
         Names of raw profiling data files.
@@ -401,9 +296,7 @@ def process_profile(flist):
                 parts = ["%s%s" % (p,dec) for p in parts]
                 funcpath = '@'.join(parts)
 
-            tree_nodes[funcpath] = node = _prof_node(parts)
-            node['time'] += t
-            node['count'] += count
+            tree_nodes[funcpath] = node = _prof_node([parts, None, t, count])
 
             funcname = parts[-1]
             if funcname == '$parent':
@@ -412,7 +305,7 @@ def process_profile(flist):
             if funcname in totals:
                 tnode = totals[funcname]
             else:
-                totals[funcname] = tnode = _prof_node(parts)
+                totals[funcname] = tnode = _prof_node([parts, None, 0., 0])
 
             tnode['tot_time'] += t
             tnode['tot_count'] += count
@@ -444,8 +337,8 @@ def process_profile(flist):
 def prof_dump(fname=None):
     """Print the contents of the given raw profile data file to stdout.
 
-    Args
-    ----
+    Parameters
+    ----------
 
     fname : str
         Name of raw profile data file.
@@ -459,7 +352,8 @@ def prof_dump(fname=None):
 
 
 def prof_totals():
-    """Called from the command line to create a file containing total elapsed
+    """
+    Called from the command line to create a file containing total elapsed
     times and number of calls for all profiled functions.
 
     """
@@ -501,7 +395,9 @@ def prof_totals():
             out_stream.close()
 
 def prof_view():
-    """Called from a command line to generate an html viewer for profile data."""
+    """
+    Called from a command line to generate an html viewer for profile data.
+    """
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--noshow', action='store_true', dest='noshow',
@@ -542,7 +438,7 @@ def main():
     parser = OptionParser(usage=usage)
     parser.allow_interspersed_args = False
     parser.add_option('-v', '--view', dest="view",
-        help="View of profiling output, ['web', 'totals', 'dump']", default='web')
+        help="View of profiling output, ['web', 'console', 'dump']", default='web')
 
     if not sys.argv[1:]:
         parser.print_usage()
@@ -576,6 +472,9 @@ def main():
             prof_totals()
         elif options.view == 'dump':
             prof_dump()
+        else:
+            print("unknown view option '%s'" % options.view, file=sys.stderr)
+            sys.exit(-1)
 
 
 if __name__ == '__main__':

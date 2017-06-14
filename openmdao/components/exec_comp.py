@@ -381,6 +381,9 @@ class _IODict(object):
         else:
             self._outputs[name] = value  # will raise KeyError
 
+    def __contains__(self, name):
+        return name in self._outputs or name in self._inputs
+
 
 def _import_functs(mod, dct, names=None):
     """
