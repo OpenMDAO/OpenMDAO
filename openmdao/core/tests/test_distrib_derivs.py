@@ -31,7 +31,7 @@ class DistribExecComp(ExecComp):
         self.arr_size = arr_size
         self._distributed = True
 
-    def initialize_variables(self):
+    def setup(self):
         outs = set()
         allvars = set()
         exprs = self._exprs
@@ -72,14 +72,14 @@ class DistribExecComp(ExecComp):
                 meta['value'] = numpy.ones(sizes[rank], float)
                 meta['src_indices'] = numpy.arange(start, end, dtype=int)
 
-        super(DistribExecComp, self).initialize_variables()
+        super(DistribExecComp, self).setup()
 
     def get_req_procs(self):
         return (2, None)
 
 
 class DistribCoordComp(ExplicitComponent):
-    def initialize_variables(self):
+    def setup(self):
         comm = self.comm
         rank = comm.rank
 

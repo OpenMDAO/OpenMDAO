@@ -14,10 +14,9 @@ except ImportError:
     PETScVector = None
 
 from openmdao.test_suite.groups.parallel_groups import \
-    FanOutGrouped, FanInGrouped2, Diamond, ConvergeDiverge, \
-    FanOutGroupedVarSets
+    FanOutGrouped, FanInGrouped2, Diamond, ConvergeDiverge
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.devtools.testutil import assert_rel_error, TestLogger
 
 
 
@@ -213,13 +212,10 @@ class TestParallelGroups(unittest.TestCase):
                 outputs['y'] = inputs['x'] * self.mult
 
             def compute_partials(self, inputs, outputs, partials):
-                """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x'] = numpy.array([self.mult])
 
         prob = Problem()
-        
-        #import wingdbstub
 
         model = prob.model
         model.add_subsystem('iv', IndepVarComp('x', 1.0))
@@ -265,6 +261,43 @@ class TestParallelGroups(unittest.TestCase):
 
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
+
+    def test_setup_messages(self):
+
+        class Noisy(ConvergeDiverge):
+            def check_config(self, logger):
+                logger.error(msg)
+                logger.warning(msg)
+                logger.info(msg)
+
+        prob = Problem(Noisy())
+
+        # check that error is thrown if not using PETScVector
+        msg = ("The `vector_class` argument must be `PETScVector` when "
+               "running in parallel under MPI but 'DefaultVector' was specified.")
+        with self.assertRaises(ValueError) as cm:
+            prob.setup(check=False, mode='fwd')
+
+        self.assertEqual(str(cm.exception), msg)
+
+        # check that we get setup messages only on proc 0
+        msg = 'Only want to see this on rank 0'
+        testlogger = TestLogger()
+        prob.setup(vector_class=PETScVector, check=True, mode='fwd',
+                   logger=testlogger)
+
+        if prob.comm.rank > 0:
+            self.assertEqual(len(testlogger.get('error')), 0)
+            self.assertEqual(len(testlogger.get('warning')), 0)
+            self.assertEqual(len(testlogger.get('info')), 0)
+        else:
+            self.assertEqual(len(testlogger.get('error')), 1)
+            self.assertEqual(len(testlogger.get('warning')), 1)
+            self.assertEqual(len(testlogger.get('info')), 1)
+            self.assertTrue(msg in testlogger.get('error')[0])
+            self.assertTrue(msg in testlogger.get('warning')[0])
+            self.assertTrue(msg in testlogger.get('info')[0])
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

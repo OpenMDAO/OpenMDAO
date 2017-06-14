@@ -3,11 +3,14 @@
 from __future__ import division, print_function
 import unittest
 
+import numpy as np
+
 from openmdao.solvers.tests.linear_test_base import LinearSolverTests
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.api import LinearBlockGS, Problem, Group, ImplicitComponent, IndepVarComp, \
-    DirectSolver, NewtonSolver, ScipyIterativeSolver, AssembledJacobian
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarImplicitDis1, SellarImplicitDis2
+    DirectSolver, NewtonSolver, ScipyIterativeSolver, AssembledJacobian, ExecComp, NonlinearBlockGS
+from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2, \
+     SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 
 
@@ -47,7 +50,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
         class SimpleImp(ImplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('a', val=1.)
                 self.add_output('x', val=0.)
 
@@ -122,13 +125,28 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         # Newton is kinda slow on this for some reason, this is how far it gets with directsolver too.
         self.assertLess(res, 2.0e-2)
 
+
 class TestBGSSolverFeature(unittest.TestCase):
 
     def test_specify_solver(self):
         prob = Problem()
-        model = prob.model = SellarDerivatives()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.ln_solver = LinearBlockGS()
+        model.nl_solver = NonlinearBlockGS()
 
         prob.setup()
         prob.run_model()
@@ -142,7 +160,22 @@ class TestBGSSolverFeature(unittest.TestCase):
 
     def test_feature_maxiter(self):
         prob = Problem()
-        model = prob.model = SellarDerivatives()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NonlinearBlockGS()
 
         model.ln_solver = LinearBlockGS()
         model.ln_solver.options['maxiter'] = 2
@@ -159,7 +192,22 @@ class TestBGSSolverFeature(unittest.TestCase):
 
     def test_feature_atol(self):
         prob = Problem()
-        model = prob.model = SellarDerivatives()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NonlinearBlockGS()
 
         model.ln_solver = LinearBlockGS()
         model.ln_solver.options['atol'] = 1.0e-3
@@ -176,7 +224,22 @@ class TestBGSSolverFeature(unittest.TestCase):
 
     def test_feature_rtol(self):
         prob = Problem()
-        model = prob.model = SellarDerivatives()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NonlinearBlockGS()
 
         model.ln_solver = LinearBlockGS()
         model.ln_solver.options['rtol'] = 1.0e-3

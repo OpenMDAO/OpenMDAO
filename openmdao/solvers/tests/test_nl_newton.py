@@ -8,21 +8,22 @@ from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
     NewtonSolver, ExecComp, ScipyIterativeSolver, ImplicitComponent, \
     DirectSolver, DenseJacobian
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit
+from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit, \
+     SubSellar
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
-     SellarNoDerivatives, SellarDerivatives, \
-     SellarStateConnection
+     SellarNoDerivatives, SellarDerivatives, SellarStateConnection, StateConnection, \
+     SellarDis1withDerivatives, SellarDis2withDerivatives
 
 
 class TestNewton(unittest.TestCase):
 
     def test_specify_newton_ln_solver_in_system(self):
         prob = Problem()
-        model = prob.model = SellarDerivatives()
 
-        model.nl_solver = NewtonSolver()
-        # used for analytic derivatives
-        model.ln_solver = DirectSolver()
+        my_newton = NewtonSolver()
+        my_newton.ln_solver = DirectSolver()
+
+        model = prob.model = SellarDerivatives(nl_solver=my_newton)
 
         prob.setup()
 
@@ -38,8 +39,7 @@ class TestNewton(unittest.TestCase):
         Sellar.
         """
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NewtonSolver()
+        prob.model = SellarDerivatives(nl_solver=NewtonSolver())
 
         prob.setup(check=False)
         prob.run_model()
@@ -51,9 +51,7 @@ class TestNewton(unittest.TestCase):
         # Tests basic Newton solution on Sellar in a subgroup
 
         prob = Problem()
-        prob.model = SellarDerivativesGrouped()
-        mda = prob.model.get_subsystem('mda')
-        mda.nl_solver = NewtonSolver()
+        prob.model = SellarDerivativesGrouped(nl_solver=NewtonSolver())
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -68,11 +66,8 @@ class TestNewton(unittest.TestCase):
     def test_sellar(self):
         # Just tests Newton on Sellar with FD derivs.
 
-        raise unittest.SkipTest("FD not implemented yet")
-
         prob = Problem()
-        prob.model = SellarNoDerivatives()
-        prob.model.nl_solver = NewtonSolver()
+        prob.model = SellarNoDerivatives(nl_solver=NewtonSolver())
 
         prob.setup(check=False)
         prob.run_model()
@@ -81,7 +76,7 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nl_solver.iter_count, 8)
+        self.assertLess(prob.model.nl_solver._iter_count, 8)
 
     def test_sellar_analysis_error(self):
         # Make sure analysis error is raised.
@@ -109,9 +104,7 @@ class TestNewton(unittest.TestCase):
         # on the head component behind the cycle break.
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NewtonSolver()
-        prob.model.ln_solver = LinearBlockGS()
+        prob.model = SellarDerivatives(nl_solver=NewtonSolver(), ln_solver=LinearBlockGS())
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -134,8 +127,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar_derivs_with_Lin_GS(self):
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NewtonSolver()
+        prob.model = SellarDerivatives(nl_solver=NewtonSolver())
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -151,8 +143,8 @@ class TestNewton(unittest.TestCase):
         # Sellar model closes loop with state connection instead of a cycle.
 
         prob = Problem()
-        prob.model = SellarStateConnection()
-        prob.model.nl_solver = NewtonSolver()
+        prob.model = SellarStateConnection(nl_solver=NewtonSolver())
+
         prob.set_solver_print(level=0)
         prob.setup(check=False)
         prob.run_model()
@@ -170,8 +162,7 @@ class TestNewton(unittest.TestCase):
         raise unittest.SkipTest("FD not implemented yet")
 
         prob = Problem()
-        prob.model = SellarStateConnection()
-        prob.model.nl_solver = NewtonSolver()
+        prob.model = SellarStateConnection(nl_solver=NewtonSolver())
 
         # TODO - Specify FD for group.
         # prob.model.deriv_options['type'] = 'fd'
@@ -189,17 +180,44 @@ class TestNewton(unittest.TestCase):
     def test_sellar_specify_linear_solver(self):
 
         prob = Problem()
-        prob.model = SellarStateConnection()
-        prob.model.nl_solver = NewtonSolver()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        proms = ['x', 'z', 'y1', 'state_eq.y2_actual', 'state_eq.y2_command', 'd1.y2', 'd2.y2']
+        sub = model.add_subsystem('sub', Group(), promotes=proms)
+
+        subgrp = sub.add_subsystem('state_eq_group', Group(),
+                                   promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
+        subgrp.ln_solver = ScipyIterativeSolver()
+        subgrp.add_subsystem('state_eq', StateConnection())
+
+        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
+        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1'])
+
+        model.connect('state_eq.y2_command', 'd1.y2')
+        model.connect('d2.y2', 'state_eq.y2_actual')
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                           promotes=['x', 'z', 'y1', 'obj'])
+        model.connect('d2.y2', 'obj_cmp.y2')
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2'])
+        model.connect('d2.y2', 'con_cmp2.y2')
+
+        model.nl_solver = NewtonSolver()
 
         # Use bad settings for this one so that problem doesn't converge.
         # That way, we test that we are really using Newton's Lin Solver
         # instead.
-        prob.model.ln_solver = ScipyIterativeSolver()
-        prob.model.ln_solver.options['maxiter'] = 1
+        model.ln_solver = ScipyIterativeSolver()
+        model.ln_solver.options['maxiter'] = 1
 
         # The good solver
-        prob.model.nl_solver.ln_solver = ScipyIterativeSolver()
+        model.nl_solver.ln_solver = ScipyIterativeSolver()
 
         prob.set_solver_print(level=0)
         prob.setup(check=False)
@@ -209,24 +227,51 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nl_solver._iter_count, 8)
-        self.assertEqual(prob.model.ln_solver._iter_count, 0)
-        self.assertGreater(prob.model.nl_solver.ln_solver._iter_count, 0)
+        self.assertLess(model.nl_solver._iter_count, 8)
+        self.assertEqual(model.ln_solver._iter_count, 0)
+        self.assertGreater(model.nl_solver.ln_solver._iter_count, 0)
 
     def test_sellar_specify_linear_direct_solver(self):
 
         prob = Problem()
-        prob.model = SellarStateConnection()
-        prob.model.nl_solver = NewtonSolver()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        proms = ['x', 'z', 'y1', 'state_eq.y2_actual', 'state_eq.y2_command', 'd1.y2', 'd2.y2']
+        sub = model.add_subsystem('sub', Group(), promotes=proms)
+
+        subgrp = sub.add_subsystem('state_eq_group', Group(),
+                                   promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
+        subgrp.ln_solver = ScipyIterativeSolver()
+        subgrp.add_subsystem('state_eq', StateConnection())
+
+        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
+        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1'])
+
+        model.connect('state_eq.y2_command', 'd1.y2')
+        model.connect('d2.y2', 'state_eq.y2_actual')
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                           promotes=['x', 'z', 'y1', 'obj'])
+        model.connect('d2.y2', 'obj_cmp.y2')
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2'])
+        model.connect('d2.y2', 'con_cmp2.y2')
+
+        model.nl_solver = NewtonSolver()
 
         # Use bad settings for this one so that problem doesn't converge.
         # That way, we test that we are really using Newton's Lin Solver
         # instead.
-        prob.model.ln_solver = ScipyIterativeSolver()
-        prob.model.ln_solver.options['maxiter'] = 1
+        sub.ln_solver = ScipyIterativeSolver()
+        model.ln_solver.options['maxiter'] = 1
 
         # The good solver
-        prob.model.nl_solver.ln_solver = DirectSolver()
+        model.nl_solver.ln_solver = DirectSolver()
 
         prob.set_solver_print(level=0)
         prob.setup(check=False)
@@ -236,8 +281,8 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nl_solver._iter_count, 8)
-        self.assertEqual(prob.model.ln_solver._iter_count, 0)
+        self.assertLess(model.nl_solver._iter_count, 8)
+        self.assertEqual(model.ln_solver._iter_count, 0)
 
     def test_implicit_utol(self):
         # We are setup for reach utol termination condition quite quickly.
@@ -674,7 +719,7 @@ class TestNewton(unittest.TestCase):
 
         class ImpComp(ImplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('a', val=1.)
                 self.add_output('x', val=0.)
                 self.applied = False
@@ -714,8 +759,24 @@ class TestNewtonFeatures(unittest.TestCase):
     def test_feature_basic(self):
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        nlgbs = prob.model.nl_solver = NewtonSolver()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.ln_solver = LinearBlockGS()
+
+        nlgbs = model.nl_solver = NewtonSolver()
 
         prob.setup()
 
@@ -727,9 +788,24 @@ class TestNewtonFeatures(unittest.TestCase):
     def test_feature_maxiter(self):
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        nlgbs = prob.model.nl_solver = NewtonSolver()
+        model = prob.model = Group()
 
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.ln_solver = LinearBlockGS()
+
+        nlgbs = model.nl_solver = NewtonSolver()
         nlgbs.options['maxiter'] = 2
 
         prob.setup()
@@ -742,9 +818,24 @@ class TestNewtonFeatures(unittest.TestCase):
     def test_feature_rtol(self):
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        nlgbs = prob.model.nl_solver = NewtonSolver()
+        model = prob.model = Group()
 
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.ln_solver = LinearBlockGS()
+
+        nlgbs = model.nl_solver = NewtonSolver()
         nlgbs.options['rtol'] = 1e-3
 
         prob.setup()
@@ -757,9 +848,24 @@ class TestNewtonFeatures(unittest.TestCase):
     def test_feature_atol(self):
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        nlgbs = prob.model.nl_solver = NewtonSolver()
+        model = prob.model = Group()
 
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.ln_solver = LinearBlockGS()
+
+        nlgbs = model.nl_solver = NewtonSolver()
         nlgbs.options['atol'] = 1e-4
 
         prob.setup()
@@ -772,9 +878,26 @@ class TestNewtonFeatures(unittest.TestCase):
     def test_feature_ln_solver(self):
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        nlgbs = prob.model.nl_solver = NewtonSolver()
-        prob.ln_solver = DirectSolver()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.ln_solver = LinearBlockGS()
+
+        nlgbs = model.nl_solver = NewtonSolver()
+
+        nlgbs.ln_solver = DirectSolver()
 
         prob.setup()
 
@@ -785,7 +908,17 @@ class TestNewtonFeatures(unittest.TestCase):
 
     def test_feature_max_sub_solves(self):
         prob = Problem()
-        model = prob.model = DoubleSellarImplicit()
+        model = prob.model = Group()
+
+        model.add_subsystem('g1', SubSellar())
+        model.add_subsystem('g2', SubSellar())
+
+        model.connect('g1.y2', 'g2.x')
+        model.connect('g2.y2', 'g1.x')
+
+        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = DirectSolver()
 
         g1 = model.get_subsystem('g1')
         g1.nl_solver = NewtonSolver()

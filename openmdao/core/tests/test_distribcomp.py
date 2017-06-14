@@ -98,7 +98,7 @@ class DistribInputComp(ExplicitComponent):
         else:
             outputs['outvec'] = inputs['invec'] * 2.0
 
-    def initialize_variables(self):
+    def setup(self):
         comm = self.comm
         rank = comm.rank
 
@@ -132,7 +132,7 @@ class DistribOverlappingInputComp(ExplicitComponent):
             outputs['outvec'][:8] = outs[:8]
             outputs['outvec'][4:11] += outs[4:11]
 
-    def initialize_variables(self):
+    def setup(self):
         """ component declares the local sizes and sets initial values
         for all distributed inputs and outputs"""
 
@@ -168,7 +168,7 @@ class DistribInputDistribOutputComp(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
 
-    def initialize_variables(self):
+    def setup(self):
 
         comm = self.comm
         rank = comm.rank
@@ -197,7 +197,7 @@ class DistribNoncontiguousComp(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
 
-    def initialize_variables(self):
+    def setup(self):
 
         comm = self.comm
         rank = comm.rank
@@ -228,7 +228,7 @@ class DistribGatherComp(ExplicitComponent):
         else:
             outputs['outvec'] = inputs['invec']
 
-    def initialize_variables(self):
+    def setup(self):
 
         comm = self.comm
         rank = comm.rank
@@ -332,7 +332,7 @@ class MPITests(unittest.TestCase):
                 else:
                     outputs['outvec'] = inputs['invec'] * -3.0
 
-            def initialize_variables(self):
+            def setup(self):
                 comm = self.comm
                 rank = comm.rank
 
@@ -356,7 +356,7 @@ class MPITests(unittest.TestCase):
                 super(Summer, self).__init__()
                 self.size = size
 
-            def initialize_variables(self):
+            def setup(self):
                 # this results in 8 entries for proc 0 and 7 entries for proc 1
                 # when using 2 processes.
                 sizes, offsets = evenly_distrib_idxs(self.comm.size, self.size)
@@ -474,7 +474,7 @@ class TestGroupMPI(unittest.TestCase):
     def test_promote_distrib(self):
 
         class MyComp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 # decide what parts of the array we want based on our rank
                 if self.comm.rank == 0:
                     idxs = [0, 1, 2]

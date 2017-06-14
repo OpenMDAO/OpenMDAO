@@ -80,7 +80,7 @@ class IndepVarComp(ExplicitComponent):
                 raise ValueError("IndepVarComp init: '%s' is not supported "
                                  "in IndepVarComp." % illegal)
 
-    def initialize_variables(self):
+    def setup(self):
         """
         Define the independent variables as output variables.
         """

@@ -16,7 +16,8 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+     SellarDis2withDerivatives
 
 
 class MyExplicitComp(ExplicitComponent):
@@ -24,12 +25,12 @@ class MyExplicitComp(ExplicitComponent):
         super(MyExplicitComp, self).__init__()
         self._jac_type = jac_type
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', val=np.zeros(2))
         self.add_input('y', val=np.zeros(2))
         self.add_output('f', val=np.zeros(2))
 
-    def initialize_partials(self):
+    def setup_partials(self):
         val = self._jac_type(np.array([[1., 1.], [1., 1.]]))
         if isinstance(val, list):
             self.declare_partials('f', ['x','y'], rows=val[1], cols=val[2], val=val[0])
@@ -72,12 +73,12 @@ class MyExplicitComp2(ExplicitComponent):
         super(MyExplicitComp2, self).__init__()
         self._jac_type = jac_type
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('w', val=np.zeros(3))
         self.add_input('z', val=0.0)
         self.add_output('f', val=0.0)
 
-    def initialize_partials(self):
+    def setup_partials(self):
         val = self._jac_type(np.array([[7.]]))
         if isinstance(val, list):
             self.declare_partials('f', 'z', rows=val[1], cols=val[2], val=val[0])
@@ -117,7 +118,7 @@ class ExplicitSetItemComp(ExplicitComponent):
         self._constructor = constructor
         super(ExplicitSetItemComp, self).__init__()
 
-    def initialize_variables(self):
+    def setup(self):
         if self._shape == 'scalar':
             in_val = 1
             out_val = 1
@@ -325,8 +326,23 @@ class TestJacobian(unittest.TestCase):
 
     def test_component_assembled_jac(self):
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NewtonSolver()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
 
         d1 = prob.model.get_subsystem('d1')
 
@@ -362,8 +378,23 @@ class TestJacobian(unittest.TestCase):
 
     def test_jacobian_changed_group(self):
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NewtonSolver()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
 
         prob.model.jacobian = DenseJacobian()
 
@@ -377,8 +408,23 @@ class TestJacobian(unittest.TestCase):
 
     def test_jacobian_changed_component(self):
         prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nl_solver = NewtonSolver()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nl_solver = NewtonSolver()
+        model.ln_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
 
@@ -422,10 +468,10 @@ class TestJacobian(unittest.TestCase):
         # that compute also uses and could get corrupted
 
         class Comp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', val=1.0, shape=2)
                 self.add_output('y', val=1.0, shape=2)
-            def initialize_partials(self):
+            def setup_partials(self):
                 self.val = 2 * np.ones(2)
                 self.rows = np.arange(2)
                 self.cols = np.arange(2)
@@ -467,7 +513,7 @@ class TestJacobian(unittest.TestCase):
 
         class ParaboloidApply(ImplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', val=0.0)
                 self.add_input('y', val=0.0)
 

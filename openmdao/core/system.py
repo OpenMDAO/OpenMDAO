@@ -176,18 +176,18 @@ class System(object):
         dict of all driver responses added to the system.
     #
     _static_mode : bool
-        If true, we are outside of initialize_subsystems and initialize_variables.
+        If true, we are outside of setup.
         In this case, add_input, add_output, and add_subsystem all add to the
         '_static' versions of the respective data structures.
         These data structures are never reset during reconfiguration.
     _static_subsystems_allprocs : [<System>, ...]
-        List of subsystems that stores all subsystems added outside of initialize_subsystems.
+        List of subsystems that stores all subsystems added outside of setup.
     _static_manual_connections : dict
-        Dictionary that stores all explicit connections added outside of initialize_subsystems.
+        Dictionary that stores all explicit connections added outside of setup.
     _static_design_vars : dict of dict
-        Driver design variables added outside of initialize_subsystems.
+        Driver design variables added outside of setup.
     _static_responses : dict of dict
-        Driver responses added outside of initialize_subsystems.
+        Driver responses added outside of setup.
     #
     _reconfigured : bool
         If True, this system has reconfigured, and the immediate parent should update.
@@ -301,7 +301,7 @@ class System(object):
                 old = {'input': self._inputs, 'output': self._outputs}
 
                 # Perform reconfiguration
-                self.setup('reconf')
+                self.resetup('reconf')
 
                 new = {'input': self._inputs, 'output': self._outputs}
 
@@ -330,7 +330,7 @@ class System(object):
         if reconf:
             # Perform an update setup
             with self._unscaled_context_all():
-                self.setup('update')
+                self.resetup('update')
 
             # Reset the _reconfigured attribute to False
             for subsys in self._subsystems_myproc:
@@ -546,7 +546,7 @@ class System(object):
 
         return root_vectors
 
-    def setup(self, setup_mode='full'):
+    def resetup(self, setup_mode='full'):
         """
         Public wrapper for _setup that reconfigures after an initial setup has been performed.
 
@@ -648,7 +648,7 @@ class System(object):
 
     def _setup_vars(self, recurse=True):
         """
-        Call initialize_variables in components and count variables, total and by var_set.
+        Call setup in components and count variables, total and by var_set.
 
         Parameters
         ----------
@@ -1068,7 +1068,7 @@ class System(object):
 
     def _setup_partials(self, recurse=True):
         """
-        Call initialize_partials in components.
+        Call setup_partials in components.
 
         Parameters
         ----------

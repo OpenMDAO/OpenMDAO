@@ -23,6 +23,11 @@ from openmdao.error_checking.check_config import check_config
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.vectors.default_vector import DefaultVector
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
+
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
@@ -42,6 +47,9 @@ class Problem(object):
     driver : <Driver>
         Slot for the driver. The default driver is `Driver`, which just runs
         the model once.
+    _mode : 'fwd' or 'rev'
+        Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+        reverse (adjoint).
     _use_ref_vector : bool
         If True, allocate vectors to store ref. values.
     _solver_print_cache : list
@@ -89,6 +97,8 @@ class Problem(object):
 
         self._use_ref_vector = use_ref_vector
         self._solver_print_cache = []
+
+        self._mode = None  # mode is assigned in setup()
 
     def __getitem__(self, name):
         """
@@ -172,6 +182,9 @@ class Problem(object):
         float
             absolute error.
         """
+        if self._mode is None:
+            raise RuntimeError("The `setup` method must be called before `run_model`.")
+
         return self.model.run_solve_nonlinear()
 
     def run_driver(self):
@@ -183,6 +196,9 @@ class Problem(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
+        if self._mode is None:
+            raise RuntimeError("The `setup` method must be called before `run_driver`.")
+
         with self.model._scaled_context_all():
             return self.driver.run()
 
@@ -243,6 +259,13 @@ class Problem(object):
         model = self.model
         comm = self.comm
 
+        # PETScVector is required for MPI
+        if PETScVector and comm.size > 1 and vector_class is not PETScVector:
+            msg = ("The `vector_class` argument must be `PETScVector` when "
+                   "running in parallel under MPI but '%s' was specified."
+                   % vector_class.__name__)
+            raise ValueError(msg)
+
         if mode not in ['fwd', 'rev', 'auto']:
             msg = "Unsupported mode: '%s'" % mode
             raise ValueError(msg)
@@ -258,7 +281,7 @@ class Problem(object):
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
-        if check:
+        if check and comm.rank == 0:
             check_config(self, logger)
 
         return self
