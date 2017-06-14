@@ -327,7 +327,7 @@ class MPITests2(unittest.TestCase):
 
 class DistribStateImplicit(ImplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
 
         self.add_input('a', val=10., units='m')
 
