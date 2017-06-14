@@ -365,7 +365,7 @@ class DistribStateImplicit(ImplicitComponent):
         global_sum = numpy.zeros(1)
         self.comm.Allreduce(local_sum, global_sum, op=MPI.SUM)
 
-        r['out_var'] = o['out_var'] - tmp[0]
+        r['out_var'] = o['out_var'] - global_sum[0]
 
     def apply_linear(self, i, o, d_i, d_o, d_r, mode):
         if mode == 'fwd':
@@ -413,12 +413,12 @@ class MPITests3(unittest.TestCase):
 
         expected = numpy.array([[5.]])
 
-        p.setup(vector_class=PETScVector, mode='fwd') # works
+        p.setup(vector_class=PETScVector, mode='fwd')
         p.run_model()
         jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
         assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
 
-        p.setup(vector_class=PETScVector, mode='rev') # works
+        p.setup(vector_class=PETScVector, mode='rev')
         p.run_model()
         jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
         assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
