@@ -52,8 +52,8 @@ class ImplicitComponent(Component):
         # Reconfigure if needed.
         super(ImplicitComponent, self)._solve_nonlinear()
 
-        if self._nl_solver is not None:
-            return self._nl_solver.solve()
+        if self._nonlinear_solver is not None:
+            return self._nonlinear_solver.solve()
         else:
             with self._unscaled_context(outputs=[self._outputs]):
                 result = self.solve_nonlinear(self._inputs, self._outputs)
@@ -116,8 +116,8 @@ class ImplicitComponent(Component):
         float
             relative error.
         """
-        if self._ln_solver is not None:
-            return self._ln_solver.solve(vec_names, mode)
+        if self._linear_solver is not None:
+            return self._linear_solver.solve(vec_names, mode)
         else:
             failed = False
             abs_errors = []
@@ -163,11 +163,11 @@ class ImplicitComponent(Component):
             if self._owns_assembled_jac or self._views_assembled_jac:
                 J._update()
 
-        if self._nl_solver is not None and do_nl:
-            self._nl_solver._linearize()
+        if self._nonlinear_solver is not None and do_nl:
+            self._nonlinear_solver._linearize()
 
-        if self._ln_solver is not None and do_ln:
-            self._ln_solver._linearize()
+        if self._linear_solver is not None and do_ln:
+            self._linear_solver._linearize()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
@@ -259,8 +259,8 @@ class ImplicitComponent(Component):
 
         Note: this is not the linear solution for the implicit component. We use identity so
         that simple implicit components can function in a preconditioner under linear gauss-seidel.
-        To correctly solve this component, you should slot a solver in ln_solver or override this
-        method.
+        To correctly solve this component, you should slot a solver in linear_solver or override
+        this method.
 
         Parameters
         ----------

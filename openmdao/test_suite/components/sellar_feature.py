@@ -112,5 +112,5 @@ class SellarNoDerivatives(Group):
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        self.nl_solver = NonlinearBlockGS()
-        self.ln_solver = ScipyIterativeSolver()
+        self.nonlinear_solver = NonlinearBlockGS()
+        self.linear_solver = ScipyIterativeSolver()

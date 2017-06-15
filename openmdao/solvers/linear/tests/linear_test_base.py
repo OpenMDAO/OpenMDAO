@@ -22,14 +22,14 @@ from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
 
 class LinearSolverTests(object):
     class LinearSolverTestCase(unittest.TestCase):
-        ln_solver_class = None
+        linear_solver_class = None
 
 
         def test_solve_linear_maxiter(self):
             """Verify that the linear solver abides by the 'maxiter' option."""
 
-            group = TestImplicitGroup(lnSolverClass=self.ln_solver_class)
-            group.ln_solver.options['maxiter'] = 2
+            group = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
+            group.linear_solver.options['maxiter'] = 2
 
             p = Problem(group)
             p.setup(check=False)
@@ -42,14 +42,14 @@ class LinearSolverTests(object):
             d_outputs.set_const(0.0)
             group.run_solve_linear(['linear'], 'fwd')
 
-            self.assertTrue(group.ln_solver._iter_count == 2)
+            self.assertTrue(group.linear_solver._iter_count == 2)
 
             # reverse
             d_outputs.set_const(1.0)
             d_residuals.set_const(0.0)
             group.run_solve_linear(['linear'], 'rev')
 
-            self.assertTrue(group.ln_solver._iter_count == 2)
+            self.assertTrue(group.linear_solver._iter_count == 2)
 
         def test_simple_matvec(self):
             # Tests derivatives on a simple comp that defines compute_jacvec.
@@ -60,7 +60,7 @@ class LinearSolverTests(object):
             model.add_subsystem('mycomp', TestExplCompSimpleJacVec(),
                                 promotes=['length', 'width', 'area'])
 
-            model.ln_solver = self.ln_solver_class()
+            model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
@@ -92,7 +92,7 @@ class LinearSolverTests(object):
             sub.add_subsystem('mycomp', TestExplCompSimpleJacVec(),
                                 promotes=['length', 'width', 'area'])
 
-            model.ln_solver = self.ln_solver_class()
+            model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
@@ -125,7 +125,7 @@ class LinearSolverTests(object):
             sub.add_subsystem('mycomp', TestExplCompSimpleJacVec(),
                                 promotes=['length', 'width', 'area'])
 
-            model.ln_solver = self.ln_solver_class()
+            model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
@@ -157,7 +157,7 @@ class LinearSolverTests(object):
 
             prob = Problem()
             model = prob.model = group
-            model.ln_solver = self.ln_solver_class()
+            model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
@@ -181,7 +181,7 @@ class LinearSolverTests(object):
             # Test derivatives for fan-out topology.
             prob = Problem()
             prob.model = FanOut()
-            prob.model.ln_solver = self.ln_solver_class()
+            prob.model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
@@ -202,7 +202,7 @@ class LinearSolverTests(object):
             # Test derivatives for fan-out-grouped topology.
             prob = Problem()
             prob.model = FanOutGrouped()
-            prob.model.ln_solver = self.ln_solver_class()
+            prob.model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
@@ -223,7 +223,7 @@ class LinearSolverTests(object):
             # Test derivatives for fan-in topology.
             prob = Problem()
             prob.model = FanIn()
-            prob.model.ln_solver = self.ln_solver_class()
+            prob.model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
@@ -247,7 +247,7 @@ class LinearSolverTests(object):
             # Test derivatives for fan-in-grouped topology.
             prob = Problem()
             prob.model = FanInGrouped()
-            prob.model.ln_solver = self.ln_solver_class()
+            prob.model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
@@ -271,7 +271,7 @@ class LinearSolverTests(object):
             # Test derivatives for converge-diverge-flat topology.
             prob = Problem()
             prob.model = ConvergeDivergeFlat()
-            prob.model.ln_solver = self.ln_solver_class()
+            prob.model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
@@ -298,9 +298,9 @@ class LinearSolverTests(object):
 
             prob = Problem()
             prob.model = ConvergeDivergeFlat()
-            prob.model.ln_solver = self.ln_solver_class()
-            prob.model.ln_solver.options['maxiter'] = 2
-            prob.model.ln_solver.options['err_on_maxiter'] = True
+            prob.model.linear_solver = self.linear_solver_class()
+            prob.model.linear_solver.options['maxiter'] = 2
+            prob.model.linear_solver.options['err_on_maxiter'] = True
 
             prob.setup(check=False)
             prob.run()
@@ -324,7 +324,7 @@ class LinearSolverTests(object):
             # Test derivatives for converge-diverge-groups topology.
             prob = Problem()
             prob.model = ConvergeDivergeGroups()
-            prob.model.ln_solver = self.ln_solver_class()
+            prob.model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
@@ -349,7 +349,7 @@ class LinearSolverTests(object):
             # Test derivatives for flat diamond topology.
             prob = Problem()
             prob.model = DiamondFlat()
-            prob.model.ln_solver = self.ln_solver_class()
+            prob.model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
@@ -374,7 +374,7 @@ class LinearSolverTests(object):
 
             prob = Problem()
             prob.model = Diamond()
-            prob.model.ln_solver = self.ln_solver_class()
+            prob.model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
@@ -399,7 +399,7 @@ class LinearSolverTests(object):
 
             prob = Problem()
             prob.model = SellarDerivativesGrouped()
-            prob.model.ln_solver = self.ln_solver_class()
+            prob.model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
             mda = prob.model.get_subsystem('mda')
@@ -437,7 +437,7 @@ class LinearSolverTests(object):
             # Test derivatives across a converged Sellar model.
 
             prob = Problem()
-            prob.model = SellarStateConnection(ln_solver=self.ln_solver_class(), nl_atol=1e-12)
+            prob.model = SellarStateConnection(linear_solver=self.linear_solver_class(), nl_atol=1e-12)
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')

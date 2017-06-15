@@ -21,7 +21,7 @@ class TestDesVarsResponses(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.driver = ScipyOpt()
         prob.driver.options['method'] = 'slsqp'
@@ -46,7 +46,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -69,7 +69,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -94,7 +94,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=[-100, -20], upper=[100, 20])
@@ -117,7 +117,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z',
@@ -142,7 +142,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=range(-101, -99),
@@ -185,8 +185,8 @@ class TestDesVarsResponses(unittest.TestCase):
         model.connect('d1.y1', ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1'])
         model.connect('d2.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
 
-        model.nl_solver = NonlinearBlockGS()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = ScipyIterativeSolver()
 
         px = prob.model.get_subsystem('px')
         px.add_design_var('x', lower=-100, upper=100)
@@ -221,7 +221,7 @@ class TestDesvarOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.model.add_design_var('junk')
 
@@ -235,7 +235,7 @@ class TestDesvarOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_design_var('x', lower=-100, upper=100, ref=1.0,
@@ -274,7 +274,7 @@ class TestDesvarOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100, ref0=-100.0,
                                   ref=100)
@@ -300,7 +300,7 @@ class TestDesvarOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_design_var(42, lower=-100, upper=100, ref0=-100.0,
@@ -314,7 +314,7 @@ class TestDesvarOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_design_var('x', lower='foo', upper=[0, 100],
@@ -337,7 +337,7 @@ class TestConstraintOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.model.add_constraint('junk')
 
@@ -351,7 +351,7 @@ class TestConstraintOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=-100, upper=100, ref=1.0,
@@ -390,7 +390,7 @@ class TestConstraintOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -418,7 +418,7 @@ class TestConstraintOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_design_var(42, lower=-100, upper=100, ref0=-100.0,
@@ -432,7 +432,7 @@ class TestConstraintOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_design_var('x', lower='foo', upper=[0, 100],
@@ -452,7 +452,7 @@ class TestConstraintOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_constraint(42, lower=-100, upper=100, ref0=-100.0,
@@ -466,7 +466,7 @@ class TestConstraintOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_constraint('con1', lower='foo', upper=[0, 100],
@@ -486,7 +486,7 @@ class TestConstraintOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
@@ -521,7 +521,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.model.add_objective('junk')
 
@@ -536,7 +536,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_objective('con1', lower=-100, upper=100, ref=1.0,
@@ -578,7 +578,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -604,7 +604,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_objective(42, ref0=-100.0, ref=100)
@@ -617,7 +617,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         prob = Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nl_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_objective('obj', index='foo')

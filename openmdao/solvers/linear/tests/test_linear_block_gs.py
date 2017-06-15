@@ -5,17 +5,17 @@ import unittest
 
 import numpy as np
 
-from openmdao.solvers.tests.linear_test_base import LinearSolverTests
+from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.api import LinearBlockGS, Problem, Group, ImplicitComponent, IndepVarComp, \
     DirectSolver, NewtonSolver, ScipyIterativeSolver, AssembledJacobian, ExecComp, NonlinearBlockGS
 from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2, \
-     SellarDis1withDerivatives, SellarDis2withDerivatives
+    SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 
 
 class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
-    ln_solver_class = LinearBlockGS
+    linear_solver_class = LinearBlockGS
 
     def test_globaljac_err(self):
         prob = Problem()
@@ -25,7 +25,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
-        model.ln_solver = self.ln_solver_class()
+        model.linear_solver = self.linear_solver_class()
         prob.set_solver_print(level=0)
 
         prob.model.jacobian = AssembledJacobian()
@@ -67,8 +67,8 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         comp = model.add_subsystem('comp', SimpleImp())
         model.connect('p.a', 'comp.a')
 
-        model.ln_solver = self.ln_solver_class()
-        comp.ln_solver = DirectSolver()
+        model.linear_solver = self.linear_solver_class()
+        comp.linear_solver = DirectSolver()
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -87,9 +87,9 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         model.connect('d1.y1', 'd2.y1')
         model.connect('d2.y2', 'd1.y2')
 
-        model.nl_solver = NewtonSolver()
-        model.nl_solver.options['maxiter'] = 5
-        model.ln_solver = self.ln_solver_class()
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['maxiter'] = 5
+        model.linear_solver = self.linear_solver_class()
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -111,10 +111,10 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         model.connect('d1.y1', 'd2.y1')
         model.connect('d2.y2', 'd1.y2')
 
-        model.nl_solver = NewtonSolver()
-        model.nl_solver.options['maxiter'] = 5
-        model.ln_solver = ScipyIterativeSolver()
-        model.ln_solver.precon = self.ln_solver_class()
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['maxiter'] = 5
+        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver.precon = self.linear_solver_class()
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -145,8 +145,8 @@ class TestBGSSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.ln_solver = LinearBlockGS()
-        model.nl_solver = NonlinearBlockGS()
+        model.linear_solver = LinearBlockGS()
+        model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
         prob.run_model()
@@ -175,10 +175,10 @@ class TestBGSSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nl_solver = NonlinearBlockGS()
+        model.nonlinear_solver = NonlinearBlockGS()
 
-        model.ln_solver = LinearBlockGS()
-        model.ln_solver.options['maxiter'] = 2
+        model.linear_solver = LinearBlockGS()
+        model.linear_solver.options['maxiter'] = 2
 
         prob.setup()
         prob.run_model()
@@ -207,10 +207,10 @@ class TestBGSSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nl_solver = NonlinearBlockGS()
+        model.nonlinear_solver = NonlinearBlockGS()
 
-        model.ln_solver = LinearBlockGS()
-        model.ln_solver.options['atol'] = 1.0e-3
+        model.linear_solver = LinearBlockGS()
+        model.linear_solver.options['atol'] = 1.0e-3
 
         prob.setup()
         prob.run_model()
@@ -239,10 +239,10 @@ class TestBGSSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nl_solver = NonlinearBlockGS()
+        model.nonlinear_solver = NonlinearBlockGS()
 
-        model.ln_solver = LinearBlockGS()
-        model.ln_solver.options['rtol'] = 1.0e-3
+        model.linear_solver = LinearBlockGS()
+        model.linear_solver.options['rtol'] = 1.0e-3
 
         prob.setup()
         prob.run_model()

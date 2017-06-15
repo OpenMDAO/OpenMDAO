@@ -6,14 +6,14 @@ Nonlinear Solver: NonlinearBlockJac
 ===================================
 
 The NonlinearBlockJac solver is a nonlinear solver that uses the block Jacobi method to solve
-the system. When to choose this solver over :ref:`NonlinearBlockGS <usr_openmdao.solvers.nl_bgs.py>`
+the system. When to choose this solver over :ref:`NonlinearBlockGS <usr_openmdao.solvers.nonlinear.nonlinear_block_gs.py>`
 is an advanced topic, but it is valid for systems that satisfy the same conditions:
 
 1. System (or subsystem) contains a cycle, though subsystems may.
 2. System does not contain any implicit states, though subsystems may.
 
 Note that you may not know if you satisfy the second condition, so choosing a solver can be "trial and error." If
-NonlinearBlockJac doesn't work, then you will need to use :ref:`NewtonSolver <usr_openmdao.solvers.nl_newton.py>`.
+NonlinearBlockJac doesn't work, then you will need to use :ref:`NewtonSolver <usr_openmdao.solvers.nonlinear.newton.py>`.
 
 The main difference over `NonlinearBlockGS` is that data passing is delayed until after all subsystems have been
 executed.
@@ -22,7 +22,7 @@ Here, we choose the NonlinearBlockJac to solve the Sellar problem, which has two
 cyclic dependency, has no implicit states, and works very well with Jacobi.
 
 .. embed-test::
-    openmdao.solvers.tests.test_nl_bjac.TestNLBlockJacobi.test_feature_basic
+    openmdao.solvers.nonlinear.tests.test_nonlinear_block_jac.TestNLBlockJacobi.test_feature_basic
 
 This solver runs all of the subsystems each iteration, but just passes the data along all connections
 simultaneously once per iteration. After each iteration, the iteration count and the residual norm are
@@ -40,7 +40,7 @@ Options
   reach the specified absolute or relative tolerance.
 
   .. embed-test::
-      openmdao.solvers.tests.test_nl_bjac.TestNLBlockJacobi.test_feature_maxiter
+      openmdao.solvers.nonlinear.tests.test_nonlinear_block_jac.TestNLBlockJacobi.test_feature_maxiter
 
 - atol
 
@@ -50,7 +50,7 @@ Options
   tolerance `atol`, the iteration will terminate.
 
   .. embed-test::
-      openmdao.solvers.tests.test_nl_bjac.TestNLBlockJacobi.test_feature_atol
+      openmdao.solvers.nonlinear.tests.test_nonlinear_block_jac.TestNLBlockJacobi.test_feature_atol
 
 - rtol
 
@@ -60,6 +60,6 @@ Options
   initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
 
   .. embed-test::
-      openmdao.solvers.tests.test_nl_bjac.TestNLBlockJacobi.test_feature_rtol
+      openmdao.solvers.nonlinear.tests.test_nonlinear_block_jac.TestNLBlockJacobi.test_feature_rtol
 
 .. tags:: Solver, NonlinearSolver

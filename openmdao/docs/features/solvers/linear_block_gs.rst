@@ -9,7 +9,7 @@ The LinearBlockGS uses Block Gauss Seidel to solve the linear system. The Linear
 residual is below a tolerance, or the maximum number of iterations has been exceeded. As such,
 it is generally usable for any system topology, and can handle cycles and implicit states
 alike. It is not always the best solver to choose, however, and is known to diverge or plateau
-on some problems. In such a case, you may need to use a solver such as :ref:`ScipyIterativeSolver <usr_openmdao.solvers.ln_scipy.py>`.
+on some problems. In such a case, you may need to use a solver such as :ref:`ScipyIterativeSolver <usr_openmdao.solvers.scipy.py>`.
 
 The LinearBlockGS solver is a block solver, so you can specify different linear solvers in the subsystems and they
 will be utilized to solve the subsystem linear problem.
@@ -19,7 +19,7 @@ Note that systems without cycles or implicit states will converge in one iterati
 Here, we calculate the total derivatives across the Sellar system.
 
 .. embed-test::
-    openmdao.solvers.tests.test_ln_bgs.TestBGSSolverFeature.test_specify_solver
+    openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_specify_solver
 
 Options
 -------
@@ -31,7 +31,7 @@ Options
   reach the specified absolute or relative tolerance.
 
   .. embed-test::
-      openmdao.solvers.tests.test_ln_bgs.TestBGSSolverFeature.test_feature_maxiter
+      openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_maxiter
 
 - atol
 
@@ -40,7 +40,7 @@ Options
   tolerance `atol`, the iteration will terminate.
 
   .. embed-test::
-      openmdao.solvers.tests.test_ln_bgs.TestBGSSolverFeature.test_feature_atol
+      openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_atol
 
 - rtol
 
@@ -49,6 +49,6 @@ Options
   initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
 
   .. embed-test::
-      openmdao.solvers.tests.test_ln_bgs.TestBGSSolverFeature.test_feature_rtol
+      openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_rtol
 
 .. tags:: Solver, LinearSolver
