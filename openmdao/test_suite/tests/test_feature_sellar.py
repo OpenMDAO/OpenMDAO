@@ -22,7 +22,7 @@ class TestSellarFeature(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nl_solver._iter_count, 8)
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
 
 if __name__ == "__main__":
     unittest.main()

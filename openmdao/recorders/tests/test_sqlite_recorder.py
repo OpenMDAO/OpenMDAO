@@ -1,25 +1,18 @@
 """ Unit test for the SqliteRecorder. """
 import errno
 import os
-from shutil import rmtree
-from six import iteritems
-
-from six import PY2, PY3
-if PY2:
-    import cPickle as pickle
-if PY3:
-    import pickle
-
 import sqlite3
-from tempfile import mkdtemp
 import time
 import unittest
 import numpy as np
 
-from openmdao.api import SqliteRecorder, Group, IndepVarComp, ExecComp
+from shutil import rmtree
+from six import iteritems, PY2, PY3
+from tempfile import mkdtemp
+
 from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac, NewtonSolver, \
-                            NLRunOnce
-from openmdao.api import DirectSolver, ScipyIterativeSolver, PetscKSP, LinearBlockGS, LNRunOnce, LinearBlockJac
+                         NonLinearRunOnce, SqliteRecorder, Group, IndepVarComp, ExecComp, DirectSolver, \
+                         ScipyIterativeSolver, PetscKSP, LinearBlockGS, LinearRunOnce, LinearBlockJac
 
 from openmdao.core.problem import Problem
 from openmdao.devtools.testutil import assert_rel_error
@@ -28,16 +21,20 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
         SellarDis1withDerivatives, SellarDis2withDerivatives
-
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
+if PY2:
+    import cPickle as pickle
+if PY3:
+    import pickle
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+
     optimizers = {'pyoptsparse': pyOptSparseDriver}
 # optimizers = {'scipy': ScipyOptimizer, }
 
@@ -311,7 +308,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-        self.prob.model.nl_solver = NonlinearBlockGS()
+        self.prob.model.nonlinear_solver = NonlinearBlockGS()
 
         self.prob.model.add_design_var('x', lower=-100, upper=100)
         self.prob.model.add_design_var('z', lower=-100, upper=100)
@@ -328,7 +325,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         mda = model.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        mda.ln_solver = ScipyIterativeSolver()
+        mda.linear_solver = ScipyIterativeSolver()
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -339,8 +336,8 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        mda.nl_solver = NonlinearBlockGS()
-        model.ln_solver = ScipyIterativeSolver()
+        mda.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = ScipyIterativeSolver()
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
@@ -615,17 +612,17 @@ class TestSqliteRecorder(unittest.TestCase):
             self.prob.driver.opt_settings['ACC'] = 1e-9
         self.prob.driver.options['print_results'] = True
 
-        # self.nl_solver = self.metadata['nl_solver']
-        # if self.metadata['nl_atol']:
-        #     self.nl_solver.options['atol'] = self.metadata['nl_atol']
-        # if self.metadata['nl_maxiter']:
-        #     self.nl_solver.options['maxiter'] = self.metadata['nl_maxiter']
+        # self.nonlinear_solver = self.metadata['nonlinear_solver']
+        # if self.metadata['nonlinear_atol']:
+        #     self.nonlinear_solver.options['atol'] = self.metadata['nonlinear_atol']
+        # if self.metadata['nonlinear_maxiter']:
+        #     self.nonlinear_solver.options['maxiter'] = self.metadata['nonlinear_maxiter']
         #
-        # self.ln_solver = self.metadata['ln_solver']
-        # if self.metadata['ln_atol']:
-        #     self.ln_solver.options['atol'] = self.metadata['ln_atol']
-        # if self.metadata['ln_maxiter']:
-        #     self.ln_solver.options['maxiter'] = self.metadata['ln_maxiter']
+        # self.linear_solver = self.metadata['linear_solver']
+        # if self.metadata['linear_atol']:
+        #     self.linear_solver.options['atol'] = self.metadata['linear_atol']
+        # if self.metadata['linear_maxiter']:
+        #     self.linear_solver.options['maxiter'] = self.metadata['linear_maxiter']
 
         self.recorder.options['record_inputs'] = True
         self.recorder.options['record_outputs'] = True
@@ -656,8 +653,8 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nl_solver = NonlinearBlockGS()
-        self.prob.model.nl_solver.add_recorder(self.recorder)
+        self.prob.model.nonlinear_solver = NonlinearBlockGS()
+        self.prob.model._nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
 
@@ -698,12 +695,12 @@ class TestSqliteRecorder(unittest.TestCase):
         self.setup_sellar_model()
 
         model = self.prob.model
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
-        model.nl_solver.options['solve_subsystems'] = True
-        model.nl_solver.options['max_sub_solves'] = 4
-        ls = model.nl_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        model._nonlinear_solver.options['solve_subsystems'] = True
+        model._nonlinear_solver.options['max_sub_solves'] = 4
+        ls = model._nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
 
         # This is pretty bogus, but it ensures that we get a few LS iterations.
         ls.options['c'] = 100.0
@@ -722,12 +719,12 @@ class TestSqliteRecorder(unittest.TestCase):
         self.setup_sellar_model()
 
         model = self.prob.model
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
-        model.nl_solver.options['solve_subsystems'] = True
-        model.nl_solver.options['max_sub_solves'] = 4
-        ls = model.nl_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 4
+        ls = model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
 
         ls.add_recorder(self.recorder)
 
@@ -743,8 +740,8 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_solver_nonlinear_block_gs(self):
         self.setup_sellar_model()
 
-        self.prob.model.nl_solver = NonlinearBlockGS()
-        self.prob.model.nl_solver.add_recorder(self.recorder)
+        self.prob.model.nonlinear_solver = NonlinearBlockGS()
+        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
 
@@ -757,8 +754,8 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_solver_nonlinear_block_jac(self):
         self.setup_sellar_model()
 
-        self.prob.model.nl_solver = NonlinearBlockJac()
-        self.prob.model.nl_solver.add_recorder(self.recorder)
+        self.prob.model.nonlinear_solver = NonlinearBlockJac()
+        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
 
@@ -771,8 +768,8 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_solver_nonlinear_newton(self):
         self.setup_sellar_model()
 
-        self.prob.model.nl_solver = NewtonSolver()
-        self.prob.model.nl_solver.add_recorder(self.recorder)
+        self.prob.model.nonlinear_solver = NewtonSolver()
+        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
 
@@ -785,8 +782,8 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_solver_nonlinear_nl_run_once(self):
         self.setup_sellar_model()
 
-        self.prob.model.nl_solver = NLRunOnce()
-        self.prob.model.nl_solver.add_recorder(self.recorder)
+        self.prob.model.nonlinear_solver = NonLinearRunOnce()
+        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
 
@@ -801,15 +798,15 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.prob.model.nl_solver = NewtonSolver()
+        self.prob.model.nonlinear_solver = NewtonSolver()
         # used for analytic derivatives
-        self.prob.model.nl_solver.ln_solver = DirectSolver()
+        self.prob.model.nonlinear_solver.linear_solver = DirectSolver()
 
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nl_solver.ln_solver.add_recorder(self.recorder)
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
@@ -822,15 +819,15 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_solver_linear_scipy_iterative_solver(self):
         self.setup_sellar_model()
 
-        self.prob.model.nl_solver = NewtonSolver()
+        self.prob.model.nonlinear_solver = NewtonSolver()
         # used for analytic derivatives
-        self.prob.model.nl_solver.ln_solver = ScipyIterativeSolver()
+        self.prob.model.nonlinear_solver.linear_solver = ScipyIterativeSolver()
 
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nl_solver.ln_solver.add_recorder(self.recorder)
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
@@ -841,15 +838,15 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_solver_linear_petsc_ksp(self):
         self.setup_sellar_model()
 
-        self.prob.model.nl_solver = NewtonSolver()
+        self.prob.model.nonlinear_solver = NewtonSolver()
         # used for analytic derivatives
-        self.prob.model.nl_solver.ln_solver = PetscKSP()
+        self.prob.model.nonlinear_solver.linear_solver = PetscKSP()
 
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nl_solver.ln_solver.add_recorder(self.recorder)
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
@@ -862,15 +859,15 @@ class TestSqliteRecorder(unittest.TestCase):
         # raise unittest.SkipTest("Linear Solver recording not working yet")
         self.setup_sellar_model()
 
-        self.prob.model.nl_solver = NewtonSolver()
+        self.prob.model.nonlinear_solver = NewtonSolver()
         # used for analytic derivatives
-        self.prob.model.nl_solver.ln_solver = LinearBlockGS()
+        self.prob.model.nonlinear_solver.linear_solver = LinearBlockGS()
 
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nl_solver.ln_solver.add_recorder(self.recorder)
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
@@ -883,15 +880,15 @@ class TestSqliteRecorder(unittest.TestCase):
         # raise unittest.SkipTest("Linear Solver recording not working yet")
         self.setup_sellar_model()
 
-        self.prob.model.nl_solver = NewtonSolver()
+        self.prob.model.nonlinear_solver = NewtonSolver()
         # used for analytic derivatives
-        self.prob.model.nl_solver.ln_solver = LNRunOnce()
+        self.prob.model.nonlinear_solver.linear_solver = LinearRunOnce()
 
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nl_solver.ln_solver.add_recorder(self.recorder)
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
@@ -906,15 +903,15 @@ class TestSqliteRecorder(unittest.TestCase):
         # raise unittest.SkipTest("Linear Solver recording not working yet")
         self.setup_sellar_model()
 
-        self.prob.model.nl_solver = NewtonSolver()
+        self.prob.model.nonlinear_solver = NewtonSolver()
         # used for analytic derivatives
-        self.prob.model.nl_solver.ln_solver = LinearBlockJac()
+        self.prob.model.nonlinear_solver.linear_solver = LinearBlockJac()
 
         self.recorder.options['record_abs_error'] = True
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nl_solver.ln_solver.add_recorder(self.recorder)
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
@@ -929,8 +926,6 @@ class TestSqliteRecorder(unittest.TestCase):
         if OPTIMIZER is None:
             raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
-        #prob = Problem()
-        #model = prob.model = SellarDerivativesGrouped()
         self.setup_sellar_grouped_model()
 
         self.prob.driver = pyOptSparseDriver()
@@ -949,7 +944,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.add_recorder(self.recorder)
         self.prob.model.add_recorder(self.recorder)
         mda = self.prob.model.get_subsystem('mda')
-        mda.nl_solver.add_recorder(self.recorder)
+        mda.nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False, mode='rev')
         t0, t1 = run_driver(self.prob)
@@ -981,19 +976,19 @@ class TestSqliteRecorder(unittest.TestCase):
         model = prob.model = DoubleSellar()
 
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
-        model.nl_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
         t0, t1 = run_driver(prob)

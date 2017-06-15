@@ -163,7 +163,7 @@ class TestUnitConversion(unittest.TestCase):
         prob = Problem(model=UnitConvGroup())
 
         prob.model.jacobian = DenseJacobian()
-        prob.model.ln_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver()
         # Check the outputs after running to test the unit conversions
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -853,11 +853,11 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc1.y', 'sub.cc2.x')
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
-        #root.nl_solver = Newton()
-        #root.ln_solver = ScipyGMRES()
+        #root.nonlinear_solver = Newton()
+        #root.linear_solver = ScipyGMRES()
 
-        #sub.nl_solver = Newton()
-        #sub.ln_solver = DirectSolver()
+        #sub.nonlinear_solver = Newton()
+        #sub.linear_solver = DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('c1.y2')
@@ -872,9 +872,9 @@ class TestUnitConversion(unittest.TestCase):
         ## Make sure we can calculate a good derivative in the presence of pollution
 
         #sub._jacobian_changed = True
-        #sub.ln_solver.rel_inputs = ['sub.cc2.x', 'sub.cc1.x2']
+        #sub.linear_solver.rel_inputs = ['sub.cc2.x', 'sub.cc1.x2']
         #rhs_buf = {None : np.array([3.5, 1.7])}
-        #sol_buf = sub.ln_solver.solve(rhs_buf, sub, mode='fwd')[None]
+        #sol_buf = sub.linear_solver.solve(rhs_buf, sub, mode='fwd')[None]
         #assert_rel_error(self, sol_buf[0], -3.52052052, 1e-3)
         #assert_rel_error(self, sol_buf[1], -2.05205205, 1e-3)
 
@@ -900,13 +900,13 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc1.y', 'sub.cc2.x')
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
-        #root.nl_solver = Newton()
-        #root.nl_solver.options['maxiter'] = 1
-        #root.ln_solver = ScipyGMRES()
-        #root.ln_solver.options['maxiter'] = 1
+        #root.nonlinear_solver = Newton()
+        #root.nonlinear_solver.options['maxiter'] = 1
+        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver.options['maxiter'] = 1
 
-        #sub.nl_solver = Newton()
-        #sub.ln_solver = DirectSolver()
+        #sub.nonlinear_solver = Newton()
+        #sub.linear_solver = DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
@@ -938,14 +938,14 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc1.y', 'sub.cc2.x')
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
-        #root.nl_solver = Newton()
-        #root.nl_solver.options['maxiter'] = 1
-        #root.ln_solver = ScipyGMRES()
-        #root.ln_solver.options['maxiter'] = 1
-        #root.ln_solver.options['mode'] = 'rev'
+        #root.nonlinear_solver = Newton()
+        #root.nonlinear_solver.options['maxiter'] = 1
+        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver.options['maxiter'] = 1
+        #root.linear_solver.options['mode'] = 'rev'
 
-        #sub.nl_solver = Newton()
-        #sub.ln_solver = DirectSolver()
+        #sub.nonlinear_solver = Newton()
+        #sub.linear_solver = DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
@@ -1018,14 +1018,14 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc1.y', 'sub.cc2.x')
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
-        #root.nl_solver = Newton()
-        #root.nl_solver.options['maxiter'] = 1
-        #root.ln_solver = ScipyGMRES()
-        #root.ln_solver.options['maxiter'] = 1
-        #root.ln_solver.options['mode'] = 'rev'
+        #root.nonlinear_solver = Newton()
+        #root.nonlinear_solver.options['maxiter'] = 1
+        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver.options['maxiter'] = 1
+        #root.linear_solver.options['mode'] = 'rev'
 
-        #sub.nl_solver = Newton()
-        #sub.ln_solver = DirectSolver()
+        #sub.nonlinear_solver = Newton()
+        #sub.linear_solver = DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
@@ -1059,13 +1059,13 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc1.y', 'sub.cc2.x')
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
-        #root.nl_solver = Newton()
-        #root.nl_solver.options['maxiter'] = 1
-        #root.ln_solver = ScipyGMRES()
-        #root.ln_solver.options['maxiter'] = 1
+        #root.nonlinear_solver = Newton()
+        #root.nonlinear_solver.options['maxiter'] = 1
+        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver.options['maxiter'] = 1
 
-        #sub.nl_solver = Newton()
-        #sub.ln_solver = ScipyGMRES()
+        #sub.nonlinear_solver = Newton()
+        #sub.linear_solver = ScipyGMRES()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
@@ -1077,7 +1077,7 @@ class TestUnitConversion(unittest.TestCase):
         ## GMRES doesn't cause a successive build-up in the value of an out-of
         ## scope param, but the linear solver doesn't converge. We can test to
         ## make sure it does.
-        #iter_count = sub.ln_solver.iter_count
+        #iter_count = sub.linear_solver.iter_count
         #self.assertTrue(iter_count < 20)
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
 
@@ -1101,14 +1101,14 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc1.y', 'sub.cc2.x')
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
-        #root.nl_solver = Newton()
-        #root.nl_solver.options['maxiter'] = 1
-        #root.ln_solver = ScipyGMRES()
-        #root.ln_solver.options['maxiter'] = 1
+        #root.nonlinear_solver = Newton()
+        #root.nonlinear_solver.options['maxiter'] = 1
+        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver.options['maxiter'] = 1
 
-        #sub.nl_solver = Newton()
-        #sub.ln_solver = ScipyGMRES()
-        #sub.ln_solver.precon = DirectSolver()
+        #sub.nonlinear_solver = Newton()
+        #sub.linear_solver = ScipyGMRES()
+        #sub.linear_solver.precon = DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
@@ -1120,7 +1120,7 @@ class TestUnitConversion(unittest.TestCase):
         ## GMRES doesn't cause a successive build-up in the value of an out-of
         ## scope param, but the linear solver doesn't converge. We can test to
         ## make sure it does.
-        #iter_count = sub.ln_solver.iter_count
+        #iter_count = sub.linear_solver.iter_count
         #self.assertTrue(iter_count < 20)
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
 

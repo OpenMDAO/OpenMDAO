@@ -16,13 +16,13 @@ The NonlinearBlockGS solver is a block solver, so you can specify different nonl
 will be utilized to solve the subsystem nonlinear problem.
 
 Note that you may not know if you satisfy the second condition, so choosing a solver can be "trial and error." If
-NonlinearBlockGS doesn't work, then you will need to use :ref:`NewtonSolver <usr_openmdao.solvers.nl_newton.py>`.
+NonlinearBlockGS doesn't work, then you will need to use :ref:`NewtonSolver <usr_openmdao.solvers.nonlinear.newton.py>`.
 
 Here, we choose the NonlinearBlockGS to solve the Sellar problem, which has two components with a
 cyclic dependency, has no implicit states, and works very well with Gauss Seidel.
 
 .. embed-test::
-    openmdao.solvers.tests.test_nl_bgs.TestNLBGaussSeidel.test_feature_basic
+    openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_basic
 
 This solver runs all of the subsystems each iteration, passing data along all connections
 including the cyclic ones. After each iteration, the iteration count and the residual norm are
@@ -40,7 +40,7 @@ Options
   reach the specified absolute or relative tolerance.
 
   .. embed-test::
-      openmdao.solvers.tests.test_nl_bgs.TestNLBGaussSeidel.test_feature_maxiter
+      openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_maxiter
 
 - atol
 
@@ -50,7 +50,7 @@ Options
   tolerance `atol`, the iteration will terminate.
 
   .. embed-test::
-      openmdao.solvers.tests.test_nl_bgs.TestNLBGaussSeidel.test_feature_atol
+      openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_atol
 
 - rtol
 
@@ -60,6 +60,6 @@ Options
   initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
 
   .. embed-test::
-      openmdao.solvers.tests.test_nl_bgs.TestNLBGaussSeidel.test_feature_rtol
+      openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_rtol
 
 .. tags:: Solver, NonlinearSolver

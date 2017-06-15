@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, LinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.solvers.nl_bjac import NonlinearBlockJac
+from openmdao.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
 
@@ -30,8 +30,8 @@ class TestNLBlockJacobi(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.ln_solver = LinearBlockGS()
-        model.nl_solver = NonlinearBlockJac()
+        model.linear_solver = LinearBlockGS()
+        model.nonlinear_solver = NonlinearBlockJac()
 
         prob.setup()
 
@@ -58,9 +58,9 @@ class TestNLBlockJacobi(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.ln_solver = LinearBlockGS()
+        model.linear_solver = LinearBlockGS()
 
-        nlgbs = model.nl_solver = NonlinearBlockJac()
+        nlgbs = model.nonlinear_solver = NonlinearBlockJac()
         nlgbs.options['maxiter'] = 4
 
         prob.setup()
@@ -88,9 +88,9 @@ class TestNLBlockJacobi(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.ln_solver = LinearBlockGS()
+        model.linear_solver = LinearBlockGS()
 
-        nlgbs = model.nl_solver = NonlinearBlockJac()
+        nlgbs = model.nonlinear_solver = NonlinearBlockJac()
         nlgbs.options['rtol'] = 1e-3
 
         prob.setup()
@@ -118,9 +118,9 @@ class TestNLBlockJacobi(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.ln_solver = LinearBlockGS()
+        model.linear_solver = LinearBlockGS()
 
-        nlgbs = model.nl_solver = NonlinearBlockJac()
+        nlgbs = model.nonlinear_solver = NonlinearBlockJac()
         nlgbs.options['atol'] = 1e-2
 
         prob.setup()

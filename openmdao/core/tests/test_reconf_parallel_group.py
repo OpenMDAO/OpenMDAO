@@ -22,11 +22,11 @@ class ReconfGroup(Group):
     def setup(self):
         self._mpi_proc_allocator.parallel = self.parallel
         if self.parallel:
-            self.nl_solver = NewtonSolver()
-            self.ln_solver = PetscKSP()
+            self.nonlinear_solver = NewtonSolver()
+            self.linear_solver = PetscKSP()
         else:
-            self.nl_solver = NonlinearBlockGS()
-            self.ln_solver = LinearBlockGS()
+            self.nonlinear_solver = NonlinearBlockGS()
+            self.linear_solver = LinearBlockGS()
 
         self.add_subsystem('C1', ExecComp('z = 1 / 3. * y + x0'), promotes=['x0'])
         self.add_subsystem('C2', ExecComp('z = 1 / 4. * y + x1'), promotes=['x1'])

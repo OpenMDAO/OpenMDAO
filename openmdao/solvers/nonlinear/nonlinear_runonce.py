@@ -1,5 +1,5 @@
 """
-Define the NLRunOnce class.
+Define the NonLinearRunOnce class.
 
 This is a simple nonlinear solver that just runs the system once.
 """
@@ -10,7 +10,7 @@ from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.record_util import create_local_meta, update_local_meta
 
 
-class NLRunOnce(NonlinearSolver):
+class NonLinearRunOnce(NonlinearSolver):
     """
     Simple solver that runs the containing system once.
 

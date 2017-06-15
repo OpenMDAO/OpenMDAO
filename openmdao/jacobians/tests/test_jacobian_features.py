@@ -153,7 +153,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         self.problem = Problem(model=model)
         self.problem.set_solver_print(level=0)
-        model.ln_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyIterativeSolver()
         model.jacobian = COOJacobian()
 
     def test_dependence(self):
@@ -237,7 +237,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         problem = Problem(model=model)
         problem.set_solver_print(level=0)
-        model.ln_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyIterativeSolver()
         model.jacobian = COOJacobian()
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
@@ -411,7 +411,7 @@ class TestJacobianForDocs(unittest.TestCase):
 
         problem = Problem(model=model)
         model.suppress_solver_output = True
-        model.ln_solver = DirectSolver()
+        model.linear_solver = DirectSolver()
         model.jacobian = DenseJacobian()
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])

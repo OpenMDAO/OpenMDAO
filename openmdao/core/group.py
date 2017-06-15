@@ -11,8 +11,8 @@ import numpy as np
 import warnings
 
 from openmdao.core.system import System
-from openmdao.solvers.nl_runonce import NLRunOnce
-from openmdao.solvers.ln_runonce import LNRunOnce
+from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
+from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
 from openmdao.utils.array_utils import convert_neg
@@ -38,11 +38,11 @@ class Group(System):
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
-        # called nl_solver and ln_solver without documenting them.
-        if not self._nl_solver:
-            self._nl_solver = NLRunOnce()
-        if not self._ln_solver:
-            self._ln_solver = LNRunOnce()
+        # called nonlinear_solver and linear_solver without documenting them.
+        if not self._nonlinear_solver:
+            self._nonlinear_solver = NonLinearRunOnce()
+        if not self._linear_solver:
+            self._linear_solver = LinearRunOnce()
 
     def setup(self):
         """
@@ -1120,11 +1120,10 @@ class Group(System):
                 with sub._unscaled_context(outputs=[sub._outputs], residuals=[sub._residuals]):
                     sub.guess_nonlinear(sub._inputs, sub._outputs, sub._residuals)
 
-        result = self._nl_solver.solve()
+        result = self._nonlinear_solver.solve()
 
         if do_recording:
             self.record_iteration()
-
             pop_recording_iteration_stack()
 
         return result
@@ -1209,7 +1208,7 @@ class Group(System):
             push_recording_iteration_stack(name + '._solve_linear', self.iter_count)
             print_recording_iteration_stack()
 
-        result = self._ln_solver.solve(vec_names, mode)
+        result = self._linear_solver.solve(vec_names, mode)
 
         if do_recording:
             self.record_iteration()
@@ -1230,8 +1229,10 @@ class Group(System):
         """
         with self.jacobian_context() as J:
 
-            sub_do_nl = (self._nl_solver is not None) and (self._nl_solver._linearize_children())
-            sub_do_ln = (self._ln_solver is not None) and (self._ln_solver._linearize_children())
+            sub_do_nl = (self._nonlinear_solver is not None) and \
+                        (self._nonlinear_solver._linearize_children())
+            sub_do_ln = (self._linear_solver is not None) and \
+                        (self._linear_solver._linearize_children())
 
             for subsys in self._subsystems_myproc:
                 subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
@@ -1240,8 +1241,8 @@ class Group(System):
             if self._owns_assembled_jac or self._views_assembled_jac:
                 J._update()
 
-        if self._nl_solver is not None and do_nl:
-            self._nl_solver._linearize()
+        if self._nonlinear_solver is not None and do_nl:
+            self._nonlinear_solver._linearize()
 
-        if self._ln_solver is not None and do_nl:
-            self._ln_solver._linearize()
+        if self._linear_solver is not None and do_nl:
+            self._linear_solver._linearize()

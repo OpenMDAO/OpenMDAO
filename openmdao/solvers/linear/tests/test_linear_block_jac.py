@@ -1,27 +1,22 @@
 """Test the LinearBlockJac class."""
 
 from __future__ import division, print_function
-from six import iteritems
 
 import unittest
 
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem, LinearBlockJac, AssembledJacobian, \
-     ExecComp, NonlinearBlockGS
+    ExecComp, NonlinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
-from openmdao.test_suite.components.simple_comps import DoubleArrayComp
-from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \
-     FanOut, FanOutGrouped, ConvergeDivergeFlat, \
-     ConvergeDivergeGroups, Diamond, DiamondFlat
-from openmdao.solvers.tests.linear_test_base import LinearSolverTests
+from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
+
 
 class TestLinearBlockJacSolver(LinearSolverTests.LinearSolverTestCase):
 
-    ln_solver_class = LinearBlockJac
+    linear_solver_class = LinearBlockJac
 
     def test_globaljac_err(self):
         prob = Problem()
@@ -31,7 +26,7 @@ class TestLinearBlockJacSolver(LinearSolverTests.LinearSolverTestCase):
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
-        model.ln_solver = LinearBlockJac()
+        model.linear_solver = LinearBlockJac()
         prob.set_solver_print(level=0)
 
         prob.model.jacobian = AssembledJacobian()
@@ -70,8 +65,8 @@ class TestBJacSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nl_solver = NonlinearBlockGS()
-        model.ln_solver = LinearBlockJac()
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = LinearBlockJac()
 
         prob.setup()
         prob.run_model()
@@ -100,10 +95,10 @@ class TestBJacSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nl_solver = NonlinearBlockGS()
+        model.nonlinear_solver = NonlinearBlockGS()
 
-        model.ln_solver = LinearBlockJac()
-        model.ln_solver.options['maxiter'] = 5
+        model.linear_solver = LinearBlockJac()
+        model.linear_solver.options['maxiter'] = 5
 
         prob.setup()
         prob.run_model()
@@ -132,10 +127,10 @@ class TestBJacSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nl_solver = NonlinearBlockGS()
+        model.nonlinear_solver = NonlinearBlockGS()
 
-        model.ln_solver = LinearBlockJac()
-        model.ln_solver.options['atol'] = 1.0e-3
+        model.linear_solver = LinearBlockJac()
+        model.linear_solver.options['atol'] = 1.0e-3
 
         prob.setup()
         prob.run_model()
@@ -164,10 +159,10 @@ class TestBJacSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nl_solver = NonlinearBlockGS()
+        model.nonlinear_solver = NonlinearBlockGS()
 
-        model.ln_solver = LinearBlockJac()
-        model.ln_solver.options['rtol'] = 1.0e-3
+        model.linear_solver = LinearBlockJac()
+        model.linear_solver.options['rtol'] = 1.0e-3
 
         prob.setup()
         prob.run_model()

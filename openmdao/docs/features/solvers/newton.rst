@@ -12,7 +12,7 @@ so a linear solver can also be specified. By default, the NewtonSolver uses the 
 that is slotted in the containing system.
 
 .. embed-test::
-    openmdao.solvers.tests.test_nl_newton.TestNewtonFeatures.test_feature_basic
+    openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_basic
 
 Most of the solver in OpenMDAO operate hierarchically in that you can use solvers on subgroups
 to subdivide the calculation effort. However, the NewtonSolver is an exception. It does not
@@ -31,7 +31,7 @@ Options
   reach the specified absolute or relative tolerance.
 
   .. embed-test::
-      openmdao.solvers.tests.test_nl_newton.TestNewtonFeatures.test_feature_maxiter
+      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_maxiter
 
 - atol
 
@@ -41,7 +41,7 @@ Options
   tolerance `atol`, the iteration will terminate.
 
   .. embed-test::
-      openmdao.solvers.tests.test_nl_newton.TestNewtonFeatures.test_feature_atol
+      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_atol
 
 - rtol
 
@@ -51,7 +51,7 @@ Options
   initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
 
   .. embed-test::
-      openmdao.solvers.tests.test_nl_newton.TestNewtonFeatures.test_feature_rtol
+      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_rtol
 
 - solve_subsystems
 
@@ -64,7 +64,7 @@ Options
   its subsystems.
 
   .. embed-test::
-      openmdao.solvers.tests.test_nl_newton.TestNewton.test_solve_subsystems_basic
+      openmdao.solvers.nonlinear.tests.test_newton.TestNewton.test_solve_subsystems_basic
 
 - max_sub_solves
 
@@ -76,17 +76,17 @@ Options
   evaluation, but not during any subsequent iteration.
 
   .. embed-test::
-      openmdao.solvers.tests.test_nl_newton.TestNewtonFeatures.test_feature_max_sub_solves
+      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_max_sub_solves
 
 Specifying a Linear Solver
 --------------------------
 
-We can choose a different linear solver for calculating the Newton step by setting the `ln_solver` attribute. The default is to use the
+We can choose a different linear solver for calculating the Newton step by setting the `linear_solver` attribute. The default is to use the
 linear solver that was specified on the containing system, which by default is LinearBlockGS. Here,
-we modify the model to use :ref:`DirectSolver <usr_openmdao.solvers.ln_direct.py>` instead.
+we modify the model to use :ref:`DirectSolver <usr_openmdao.solvers.linear.direct.py>` instead.
 
 .. embed-test::
-    openmdao.solvers.tests.test_nl_newton.TestNewtonFeatures.test_feature_ln_solver
+    openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_linear_solver
 
 Specifying a Linesearch algorithm
 ---------------------------------
@@ -104,10 +104,10 @@ let's set up a problem that has implicit bounds on one of its states.
 
 In this component, the state "z" is only valid between 1.5 and 2.5, while the other state is valid
 everywhere. You can verify that if NewtonSolver is used with no backtracking specified, the solution
-violates the bounds on "z".  Here, we specify :ref:`ArmijoGoldsteinLS <usr_openmdao.solvers.ls_backtracking.py>`
+violates the bounds on "z".  Here, we specify :ref:`ArmijoGoldsteinLS <usr_openmdao.solvers.linesearch.backtracking.py>`
 as our line search algorithm, and we get a solution on the lower bounds for "z".
 
 .. embed-test::
-    openmdao.solvers.tests.test_ls_backtracking.TestFeatureLineSearch.test_feature_specification
+    openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_specification
 
 .. tags:: Solver, NonlinearSolver
