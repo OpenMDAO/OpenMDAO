@@ -165,8 +165,8 @@ class Component(BaseComponent):
         """
         super(Component, self)._solve_nonlinear()
 
-        if self._nl_solver is not None:
-            self._nl_solver.solve()
+        if self._nonlinear_solver is not None:
+            self._nonlinear_solver.solve()
         else:
             self._scale_vec(self._inputs, 'input', 'phys')
             self._scale_vec(self._outputs, 'output', 'phys')
@@ -237,8 +237,8 @@ class Component(BaseComponent):
         float
             absolute error.
         """
-        if self._ln_solver is not None:
-            return self._ln_solver(vec_names, mode)
+        if self._linear_solver is not None:
+            return self._linear_solver(vec_names, mode)
         else:
             for vec_name in vec_names:
                 d_outputs = self._vectors['output'][vec_name]

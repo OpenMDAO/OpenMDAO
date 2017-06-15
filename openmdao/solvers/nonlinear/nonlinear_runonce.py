@@ -1,5 +1,5 @@
 """
-Define the NLRunOnce class.
+Define the NonLinearRunOnce class.
 
 This is a simple nonlinear solver that just runs the system once.
 """
@@ -9,7 +9,7 @@ from six.moves import range
 from openmdao.solvers.solver import NonlinearSolver
 
 
-class NLRunOnce(NonlinearSolver):
+class NonLinearRunOnce(NonlinearSolver):
     """
     Simple solver that runs the containing system once.
 

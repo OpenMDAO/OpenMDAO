@@ -100,10 +100,10 @@ def tree(system, include_solvers=True, stream=sys.stdout):
         stream.write(indent)
         stream.write("%s %s\n" % (type(s).__name__, s.name))
         if include_solvers:
-            if s.nl_solver is not None:
-                stream.write("%s %s nl_solver\n" % (indent, type(s.nl_solver).__name__))
-            if s.ln_solver is not None:
-                stream.write("%s %s ln_solver\n" % (indent, type(s.ln_solver).__name__))
+            if s.nonlinear_solver is not None:
+                stream.write("%s %s nonlinear_solver\n" % (indent, type(s.nonlinear_solver).__name__))
+            if s.linear_solver is not None:
+                stream.write("%s %s linear_solver\n" % (indent, type(s.linear_solver).__name__))
 
 def max_mem_usage():
     """

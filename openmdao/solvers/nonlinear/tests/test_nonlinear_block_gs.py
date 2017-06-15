@@ -32,7 +32,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
 
         nlgbs.options['maxiter'] = 20
         nlgbs.options['atol'] = 1e-6
@@ -63,7 +63,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
 
@@ -90,7 +90,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
         nlgbs.options['maxiter'] = 2
 
         prob.setup()
@@ -119,7 +119,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
         nlgbs.options['rtol'] = 1e-3
 
         prob.setup()
@@ -147,7 +147,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
         nlgbs.options['atol'] = 1e-4
 
         prob.setup()
@@ -176,7 +176,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -186,7 +186,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nl_solver._iter_count, 8)
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
 
         # Make sure we only call apply_linear on 'heads'
         #nd1 = prob.model.cycle.d1.execution_count
@@ -217,7 +217,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nl_solver = NonlinearBlockGS()
+        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
         nlgbs.options['maxiter'] = 2
         nlgbs.options['err_on_maxiter'] = True
 
@@ -246,13 +246,13 @@ class TestNLBGaussSeidel(unittest.TestCase):
                 self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
                 self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-                self.nl_solver = NonlinearBlockGS()
-                self.ln_solver = ScipyIterativeSolver()
+                self.nonlinear_solver = NonlinearBlockGS()
+                self.linear_solver = ScipyIterativeSolver()
 
         prob = Problem()
         root = prob.model = Group()
-        root.nl_solver = NonlinearBlockGS()
-        root.nl_solver.options['maxiter'] = 20
+        root.nonlinear_solver = NonlinearBlockGS()
+        root.nonlinear_solver.options['maxiter'] = 20
         root.add_subsystem('g1', SellarModified())
         root.add_subsystem('g2', SellarModified())
 
@@ -298,8 +298,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         root.connect('sub2.p1.f_xy', 'sub1.p2.x')
         root.connect('sub2.p2.f_xy', 'sub1.p2.y')
 
-        root.nl_solver = NonlinearBlockGS()
-        root.ln_solver = ScipyIterativeSolver()
+        root.nonlinear_solver = NonlinearBlockGS()
+        root.linear_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
