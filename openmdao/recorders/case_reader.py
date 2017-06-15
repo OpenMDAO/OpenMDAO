@@ -7,7 +7,7 @@ from openmdao.recorders.sqlite_reader import SqliteCaseReader
 
 def CaseReader(filename):
     """
-    A factory function that returns a CaseReader for the given file.
+    Return a CaseReader for the given file.
 
     Parameters
     ----------

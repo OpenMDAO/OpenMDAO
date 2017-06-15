@@ -2,15 +2,16 @@
 Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 """
 
-import cPickle
 import io
-import numpy as np
-from six import iteritems
 import sqlite3
 
-from openmdao.recorders.base_recorder import BaseRecorder
+import numpy as np
+from six import iteritems
+from six.moves import cPickle as pickle
+
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
+from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.solvers.solver import Solver, NonlinearSolver
 from openmdao.utils.record_util import format_iteration_coordinate
 
@@ -50,7 +51,6 @@ class SqliteRecorder(BaseRecorder):
 
     Attributes
     ----------
-
     model_viewer_data : dict
         Dict that holds the data needed to generate N2 diagram.
     con
@@ -157,7 +157,7 @@ class SqliteRecorder(BaseRecorder):
         # used for the dtypes in the creation of the numpy structured array
         # we want to write to sqlite
         if self.options['record_desvars']:
-            if (self._filtered_driver):
+            if self._filtered_driver:
                 desvars_values = \
                     object_requesting_recording.get_design_var_values(self._filtered_driver['des'])
             else:
@@ -175,7 +175,7 @@ class SqliteRecorder(BaseRecorder):
                     desvars_array[name] = value
 
         if self.options['record_responses']:
-            if (self._filtered_driver):
+            if self._filtered_driver:
                 responses_values = \
                     object_requesting_recording.get_response_values(self._filtered_driver['res'])
             else:
@@ -193,7 +193,7 @@ class SqliteRecorder(BaseRecorder):
                     responses_array[name] = value
 
         if self.options['record_objectives']:
-            if (self._filtered_driver):
+            if self._filtered_driver:
                 objectives_values = \
                     object_requesting_recording.get_objective_values(self._filtered_driver['obj'])
             else:
@@ -211,7 +211,7 @@ class SqliteRecorder(BaseRecorder):
                     objectives_array[name] = value
 
         if self.options['record_constraints']:
-            if (self._filtered_driver):
+            if self._filtered_driver:
                 constraints_values = \
                     object_requesting_recording.get_constraint_values(self._filtered_driver['con'])
             else:
@@ -472,8 +472,9 @@ class SqliteRecorder(BaseRecorder):
             The Driver that would like to record its metadata.
         """
         driver_class = type(object_requesting_recording).__name__
-        model_viewer_data = cPickle.dumps(object_requesting_recording._model_viewer_data,
-                                          cPickle.HIGHEST_PROTOCOL)
+        model_viewer_data = pickle.dumps(object_requesting_recording._model_viewer_data,
+                                         pickle.HIGHEST_PROTOCOL)
+
         self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
                          "VALUES(?,:model_viewer_data)", (driver_class,
                                                           sqlite3.Binary(model_viewer_data)))
@@ -487,8 +488,8 @@ class SqliteRecorder(BaseRecorder):
         object_requesting_recording: <System>
             The System that would like to record its metadata.
         """
-        scaling_factors = cPickle.dumps(object_requesting_recording._scaling_vecs,
-                                        cPickle.HIGHEST_PROTOCOL)
+        scaling_factors = pickle.dumps(object_requesting_recording._scaling_vecs,
+                                       pickle.HIGHEST_PROTOCOL)
 
         self.con.execute("INSERT INTO system_metadata(id, scaling_factors) VALUES(?,?)",
                          (object_requesting_recording.pathname,
@@ -507,8 +508,8 @@ class SqliteRecorder(BaseRecorder):
         solver_class = type(object_requesting_recording).__name__
         id = "%s.%s".format(path, solver_class)
 
-        solver_options = cPickle.dumps(object_requesting_recording.options,
-                                       cPickle.HIGHEST_PROTOCOL)
+        solver_options = pickle.dumps(object_requesting_recording.options,
+                                      pickle.HIGHEST_PROTOCOL)
         self.con.execute(
             "INSERT INTO solver_metadata(id, solver_options, solver_class) "
             "VALUES(?, :solver_options,?)", (id, sqlite3.Binary(solver_options), solver_class))

@@ -20,8 +20,10 @@ def iter_get_norm_on_call_stack():
     Get norm on call stack.
 
     Returns
-        True if qqq
-        False if qqq
+    -------
+        True if iter_get_norm on stack.
+
+        False if iter_get_norm not on stack.
     """
     for s in inspect.stack():
         if s[3] == '_iter_get_norm':
@@ -58,8 +60,8 @@ def print_recording_iteration_stack():
     for name, iter_count in reversed(recording_iteration_stack):
         if name == 'mda.d2._solve_nonlinear' and iter_count == 114:
             pass
-        print '^^^', name, iter_count
-    print 60 * '^'
+        print('^^^', name, iter_count)
+    print(60 * '^')
 
 
 class BaseRecorder(object):

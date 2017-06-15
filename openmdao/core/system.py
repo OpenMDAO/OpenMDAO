@@ -159,7 +159,7 @@ class System(object):
         Vector of upper bounds, scaled and dimensionless.
     #
     _scaling_vecs : dict of dict of Vectors
-        First key is indicates vector type and coefficient, second key is vec_name.
+        First key indicates vector type and coefficient, second key is vec_name.
     #
     _nl_solver : <NonlinearSolver>
         Nonlinear solver to be used for solve_nonlinear.
@@ -2207,14 +2207,6 @@ class System(object):
         with self._scaled_context_all():
             self._apply_linear(vec_names, mode, scope_out, scope_in)
 
-        # TODO_RECORDERS
-        #  The _apply_linear and _solve_linear methods work w d_inputs, d_outputs, and d_residuals,
-        #       each one is associated with a vecname.
-        #  These would be (System._vectors['inputs'][vec_name], etc.). In the list of vec_names,
-        #     there is always a 'linear', and depending on the problem, there may be others.
-        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to make it work
-        # generally with any type of system at this point).
-
     def run_solve_linear(self, vec_names, mode):
         """
         Apply inverse jac product.
@@ -2338,7 +2330,7 @@ class System(object):
 
     def initialize_processors(self):
         """
-        Optional user-defined method run after repartitioning/rebalancing.
+        Run after repartitioning/rebalancing. (Optional user-defined method).
 
         Available attributes:
             name
@@ -2350,7 +2342,7 @@ class System(object):
 
     def initialize_variables(self):
         """
-        Required method for components to declare inputs and outputs.
+        Declare inputs and outputs. (Required method for components).
 
         Available attributes:
             name
@@ -2362,7 +2354,7 @@ class System(object):
 
     def initialize_partials(self):
         """
-        Optional method for components to declare Jacobian structure/approximations.
+        Declare Jacobian structure/approximations. (Optional method for components).
 
         Available attributes:
             name
@@ -2420,7 +2412,7 @@ class System(object):
         method_name = inspect.stack()[1][3]
         import unittest
         test_name = get_current_case()
-        print 'qqq', test_name, base_filename, method_name
+        print('qqq', test_name, base_filename, method_name)
 
 
 def get_current_case():

@@ -1,15 +1,19 @@
 """ Unit test for the SqliteRecorder. """
-
-import cPickle
 import errno
 import os
 from shutil import rmtree
 from six import iteritems
+
+from six import PY2, PY3
+if PY2:
+    import cPickle as pickle
+if PY3:
+    import pickle
+
 import sqlite3
 from tempfile import mkdtemp
 import time
 import unittest
-
 import numpy as np
 
 from openmdao.api import SqliteRecorder, Group, IndepVarComp, ExecComp
@@ -28,13 +32,13 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDeriv
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
+
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
-optimizers = {'pyoptsparse': pyOptSparseDriver}
+    optimizers = {'pyoptsparse': pyOptSparseDriver}
 # optimizers = {'scipy': ScipyOptimizer, }
 
 
@@ -214,7 +218,10 @@ def _assertDriverMetadataRecorded(test, db_cur, expected):
         test.assertEqual(None,row)
         return
 
-    model_viewer_data = cPickle.loads(str(row[0]))
+    if PY2:
+        model_viewer_data = pickle.loads(str(row[0]))
+    if PY3:
+        model_viewer_data = pickle.loads(row[0])
 
     test.assertTrue(isinstance(model_viewer_data, dict ) )
 

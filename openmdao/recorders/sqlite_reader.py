@@ -45,7 +45,7 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _load(self):
         """
-        The initial load of data from the sqlite database file.
+        Load data from the sqlite database file.
 
         Load the metadata from the sqlite file, populating the
         `format_version`, `parameters`, and `unknowns` attributes of this

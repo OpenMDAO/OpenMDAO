@@ -32,7 +32,6 @@ class TestViewModelData(unittest.TestCase):
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
 
-
     def test_model_viewer_has_correct_data_from_problem(self):
         """
         Verify that the correct model structure data exists when stored as compared

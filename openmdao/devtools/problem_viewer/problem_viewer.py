@@ -1,5 +1,4 @@
 import os
-import pickle
 import json
 from six import iteritems
 import networkx as nx
@@ -98,8 +97,13 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
         cur = con.cursor()
         cur.execute("SELECT model_viewer_data FROM driver_metadata;")
         model_pickle = cur.fetchone()
-        import cPickle
-        return cPickle.loads(str(model_pickle[0]))
+        from six import PY2, PY3
+        if PY2:
+            import cPickle
+            return cPickle.loads(str(model_pickle[0]))
+        if PY3:
+            import pickle
+            return pickle.loads(model_pickle[0])
 
     else:
         raise TypeError('_get_viewer_data only accepts Problems or Groups or sqlite filenames')
