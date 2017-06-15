@@ -22,11 +22,35 @@ from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
-        SellarDis1withDerivatives, SellarDis2withDerivatives
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
-from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.paraboloid import Paraboloid
+
+
+
+
+import sys
+old_f = sys.stdout
+
+class F:
+
+    def write(self, x):
+        old_f.write(x)
+
+    def writelines(self, lines):
+        old_f.writelines(lines)
+
+    def flush(self):
+        old_f.flush()
+
+    def getvalue(self):
+        return old_f.getvalue()
+
+# sys.stdout = F()
+
+
+
+
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -35,8 +59,6 @@ if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 optimizers = {'pyoptsparse': pyOptSparseDriver}
-# optimizers = {'scipy': ScipyOptimizer, }
-
 
 def run_driver(problem):
     t0 = time.time()
@@ -49,11 +71,6 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
     """
         expected can be from multiple cases
     """
-
-    # db_cur.execute("SELECT * FROM driver_iterations")
-    # rows = db_cur.fetchall()
-
-
 
     # iterate through the cases
     for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, constraints_expected in expected:
@@ -152,8 +169,6 @@ def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
         # from the database, get the actual data recorded
         db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
         row_actual = db_cur.fetchone()
-        # db_cur.execute("SELECT * FROM solver_iterations")
-        # rows = db_cur.fetchall()
         test.assertTrue(row_actual, 'Solver iterations table is empty. Should contain at least one record')
 
         counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, output_blob, residuals_blob = row_actual
@@ -256,7 +271,6 @@ class TestSqliteRecorder(unittest.TestCase):
         self.eps = 1e-5
 
     def tearDown(self):
-        print('self.filename', self.filename)
         return
         try:
             rmtree(self.dir)
@@ -542,7 +556,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         # TODO_RECORDERS - need to check the recording of the d1 also
-        coordinate = [0, 'root._solve_nonlinear', (0, ), 'obj_cmp._solve_nonlinear', (6, )]
+        coordinate = [0, 'Driver', (1, ),'root._solve_nonlinear', (0, ), 'obj_cmp._solve_nonlinear', (6, )]
 
         expected_inputs = {
                             "obj_cmp.z": [5.0, 2.0],
@@ -644,11 +658,19 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.setup(check=False, mode='rev')
 
+        sys.stdout = F()
+
+        print( 'qqq')
+
+
+
         t0, t1 = run_driver(self.prob)
+
+
 
         self.prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (0, ), 'mda._solve_nonlinear', (0, ), 'mda.d1._solve_nonlinear', (4, )]
+        coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (0, ), 'NLRunOnce', (1, ), 'mda._solve_nonlinear', (0, ), 'mda.d1._solve_nonlinear', (4, )]
         expected_inputs = {
                             "mda.d1.z": [5.0, 2.0],
                             "mda.d1.x": [1.0,],
@@ -661,7 +683,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
                                                  expected_residuals),), self.eps)
 
-        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'pz._solve_nonlinear', (2, )]
+        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (1, ), 'pz._solve_nonlinear', (2, )]
         expected_inputs = None
         expected_outputs = {"pz.z": [2.8640616, 0.825643,],
                             }
@@ -1025,7 +1047,7 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
-        coordinate = [0, 'root._solve_nonlinear', (0, ), 'comp2._solve_nonlinear', (0, )]
+        coordinate = [0, 'Driver', (1, ),'root._solve_nonlinear', (0, ), 'NLRunOnce', (1, ), 'comp2._solve_nonlinear', (0, )]
         expected_inputs = {
                             "comp2.a": [1.0,],
                             "comp2.b": [-4.0,],

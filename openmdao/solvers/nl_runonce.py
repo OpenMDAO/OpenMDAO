@@ -34,6 +34,11 @@ class NLRunOnce(NonlinearSolver):
         """
         system = self._system
 
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            print_recording_iteration_stack, pop_recording_iteration_stack, \
+            iter_get_norm_on_call_stack
+        push_recording_iteration_stack('NLRunOnce', 1)
+
         # If this is a parallel group, transfer all at once then run each subsystem.
         if len(system._subsystems_myproc) != len(system._subsystems_allprocs):
             system._transfer('nonlinear', 'fwd')
@@ -47,9 +52,13 @@ class NLRunOnce(NonlinearSolver):
                 subsys._solve_nonlinear()
                 system._check_reconf_update()
 
+
         # TODO_RECORDERS - need to replace None in this with metadata from above
         metadata = self.metadata = create_local_meta(None, type(self).__name__)
         update_local_meta(metadata, (self._iter_count,))
         self._rec_mgr.record_iteration(self, metadata)
+
+        print_recording_iteration_stack()
+        pop_recording_iteration_stack()
 
         return False, 0.0, 0.0

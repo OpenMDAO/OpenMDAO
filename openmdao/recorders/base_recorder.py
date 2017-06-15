@@ -28,6 +28,7 @@ def iter_get_norm_on_call_stack():
             return True
     return False
 
+
 def compute_total_derivs_on_call_stack():
     """
     compute_total_derivs on call stack?
@@ -40,8 +41,6 @@ def compute_total_derivs_on_call_stack():
         if s[3] == '_compute_total_derivs':
             return True
     return False
-
-
 
 
 def push_recording_iteration_stack(name, iter_count):
@@ -67,15 +66,13 @@ def pop_recording_iteration_stack():
 
 def print_recording_iteration_stack():
     """
-    Print the stack.
+    Print the record iteration stack. For debugging
     """
     return #TODO_RECORDER - remove all the printing later
     # print
-    for name, iter_count in reversed(recording_iteration_stack):
-        if name == 'pyoptsparsedriver' and iter_count == 6:
-            pass
-        print '^^^', name, iter_count
-    print 60 * '^'
+    # for name, iter_count in reversed(recording_iteration_stack):
+    #     print '^^^', name, iter_count
+    # print 60 * '^'
 
 
 def get_formatted_iteration_coordinate():

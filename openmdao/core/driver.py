@@ -346,8 +346,16 @@ class Driver(object):
         metadata = self.metadata = create_local_meta(None, 'Driver')
         update_local_meta(metadata, (self.iter_count,))
 
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            print_recording_iteration_stack, pop_recording_iteration_stack, \
+            iter_get_norm_on_call_stack
+        push_recording_iteration_stack('Driver', self.iter_count)
+
         failure_flag = self._problem.model._solve_nonlinear()
         self._rec_mgr.record_iteration(self, metadata)
+
+        print_recording_iteration_stack()
+        pop_recording_iteration_stack()
 
         return failure_flag
 
