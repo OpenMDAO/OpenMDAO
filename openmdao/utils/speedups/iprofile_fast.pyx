@@ -1,6 +1,7 @@
 
 from cpython.ref cimport PyObject
-from cpython.string cimport PyString_AsString
+#from cpython.string cimport PyString_AsString
+from cpython.dict cimport PyDict_GetItemString, PyDict_SetItemString, PyDict_New, PyDict_Contains
 
 from cpython.pystate cimport (
     Py_tracefunc,
