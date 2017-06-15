@@ -333,7 +333,6 @@ class DistribStateImplicit(ImplicitComponent):
     of 'states'.
     """
     def setup(self):
-
         self.add_input('a', val=10., units='m')
 
         rank = self.comm.rank
@@ -347,7 +346,7 @@ class DistribStateImplicit(ImplicitComponent):
 
         self.local_size = sizes[rank]
 
-        self.ln_solver = PetscKSP()
+        self.linear_solver = PetscKSP()
 
     def get_req_procs(self):
         return 1,10
