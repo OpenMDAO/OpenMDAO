@@ -779,7 +779,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertSolverIterationDataRecordedBasic()
 
-    def test_record_solver_nonlinear_nl_run_once(self):
+    def test_record_solver_nonlinear_nonlinear_run_once(self):
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NonLinearRunOnce()
@@ -875,7 +875,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # TODO_RECORDERS - need to be more thorough
         self.assertSolverIterationDataRecordedBasic()
 
-    def test_record_solver_linear_ln_run_once(self):
+    def test_record_solver_linear_linear_run_once(self):
 
         # raise unittest.SkipTest("Linear Solver recording not working yet")
         self.setup_sellar_model()
