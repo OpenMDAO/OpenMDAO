@@ -17,17 +17,17 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
 
 class TestNewton(unittest.TestCase):
 
-    def test_specify_newton_ln_solver_in_system(self):
+    def test_specify_newton_linear_solver_in_system(self):
         prob = Problem()
 
         my_newton = NewtonSolver()
-        my_newton.ln_solver = DirectSolver()
+        my_newton.linear_solver = DirectSolver()
 
-        model = prob.model = SellarDerivatives(nl_solver=my_newton)
+        model = prob.model = SellarDerivatives(nonlinear_solver=my_newton)
 
         prob.setup()
 
-        self.assertIsInstance(model.nl_solver.ln_solver, DirectSolver)
+        self.assertIsInstance(model.nonlinear_solver.linear_solver, DirectSolver)
 
         prob.run_model()
 
@@ -39,7 +39,7 @@ class TestNewton(unittest.TestCase):
         Sellar.
         """
         prob = Problem()
-        prob.model = SellarDerivatives(nl_solver=NewtonSolver())
+        prob.model = SellarDerivatives(nonlinear_solver=NewtonSolver())
 
         prob.setup(check=False)
         prob.run_model()
@@ -51,7 +51,7 @@ class TestNewton(unittest.TestCase):
         # Tests basic Newton solution on Sellar in a subgroup
 
         prob = Problem()
-        prob.model = SellarDerivativesGrouped(nl_solver=NewtonSolver())
+        prob.model = SellarDerivativesGrouped(nonlinear_solver=NewtonSolver())
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -61,13 +61,13 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nl_solver._iter_count, 8)
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
 
     def test_sellar(self):
         # Just tests Newton on Sellar with FD derivs.
 
         prob = Problem()
-        prob.model = SellarNoDerivatives(nl_solver=NewtonSolver())
+        prob.model = SellarNoDerivatives(nonlinear_solver=NewtonSolver())
 
         prob.setup(check=False)
         prob.run_model()
@@ -76,7 +76,7 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nl_solver._iter_count, 8)
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
 
     def test_sellar_analysis_error(self):
         # Make sure analysis error is raised.
@@ -85,9 +85,9 @@ class TestNewton(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarNoDerivatives()
-        prob.model.nl_solver = Newton()
-        prob.model.nl_solver.options['err_on_maxiter'] = True
-        prob.model.nl_solver.options['maxiter'] = 2
+        prob.model.nonlinear_solver = Newton()
+        prob.model.nonlinear_solver.options['err_on_maxiter'] = True
+        prob.model.nonlinear_solver.options['maxiter'] = 2
 
         prob.setup(check=False)
 
@@ -104,7 +104,7 @@ class TestNewton(unittest.TestCase):
         # on the head component behind the cycle break.
 
         prob = Problem()
-        prob.model = SellarDerivatives(nl_solver=NewtonSolver(), ln_solver=LinearBlockGS())
+        prob.model = SellarDerivatives(nonlinear_solver=NewtonSolver(), linear_solver=LinearBlockGS())
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -114,7 +114,7 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nl_solver._iter_count, 8)
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
 
         ## Make sure we only call apply_linear on 'heads'
         #nd1 = prob.model.d1.execution_count
@@ -127,7 +127,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar_derivs_with_Lin_GS(self):
 
         prob = Problem()
-        prob.model = SellarDerivatives(nl_solver=NewtonSolver())
+        prob.model = SellarDerivatives(nonlinear_solver=NewtonSolver())
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -137,13 +137,13 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nl_solver._iter_count, 8)
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
 
     def test_sellar_state_connection(self):
         # Sellar model closes loop with state connection instead of a cycle.
 
         prob = Problem()
-        prob.model = SellarStateConnection(nl_solver=NewtonSolver())
+        prob.model = SellarStateConnection(nonlinear_solver=NewtonSolver())
 
         prob.set_solver_print(level=0)
         prob.setup(check=False)
@@ -153,7 +153,7 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nl_solver._iter_count, 8)
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
 
     def test_sellar_state_connection_fd_system(self):
         # Sellar model closes loop with state connection instead of a cycle.
@@ -162,7 +162,7 @@ class TestNewton(unittest.TestCase):
         raise unittest.SkipTest("FD not implemented yet")
 
         prob = Problem()
-        prob.model = SellarStateConnection(nl_solver=NewtonSolver())
+        prob.model = SellarStateConnection(nonlinear_solver=NewtonSolver())
 
         # TODO - Specify FD for group.
         # prob.model.deriv_options['type'] = 'fd'
@@ -175,7 +175,7 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nl_solver._iter_count, 6)
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 6)
 
     def test_sellar_specify_linear_solver(self):
 
@@ -190,7 +190,7 @@ class TestNewton(unittest.TestCase):
 
         subgrp = sub.add_subsystem('state_eq_group', Group(),
                                    promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
-        subgrp.ln_solver = ScipyIterativeSolver()
+        subgrp.linear_solver = ScipyIterativeSolver()
         subgrp.add_subsystem('state_eq', StateConnection())
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
@@ -208,16 +208,16 @@ class TestNewton(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2'])
         model.connect('d2.y2', 'con_cmp2.y2')
 
-        model.nl_solver = NewtonSolver()
+        model.nonlinear_solver = NewtonSolver()
 
         # Use bad settings for this one so that problem doesn't converge.
         # That way, we test that we are really using Newton's Lin Solver
         # instead.
-        model.ln_solver = ScipyIterativeSolver()
-        model.ln_solver.options['maxiter'] = 1
+        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver.options['maxiter'] = 1
 
         # The good solver
-        model.nl_solver.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver.linear_solver = ScipyIterativeSolver()
 
         prob.set_solver_print(level=0)
         prob.setup(check=False)
@@ -227,9 +227,9 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(model.nl_solver._iter_count, 8)
-        self.assertEqual(model.ln_solver._iter_count, 0)
-        self.assertGreater(model.nl_solver.ln_solver._iter_count, 0)
+        self.assertLess(model.nonlinear_solver._iter_count, 8)
+        self.assertEqual(model.linear_solver._iter_count, 0)
+        self.assertGreater(model.nonlinear_solver.linear_solver._iter_count, 0)
 
     def test_sellar_specify_linear_direct_solver(self):
 
@@ -244,7 +244,7 @@ class TestNewton(unittest.TestCase):
 
         subgrp = sub.add_subsystem('state_eq_group', Group(),
                                    promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
-        subgrp.ln_solver = ScipyIterativeSolver()
+        subgrp.linear_solver = ScipyIterativeSolver()
         subgrp.add_subsystem('state_eq', StateConnection())
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
@@ -262,16 +262,16 @@ class TestNewton(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2'])
         model.connect('d2.y2', 'con_cmp2.y2')
 
-        model.nl_solver = NewtonSolver()
+        model.nonlinear_solver = NewtonSolver()
 
         # Use bad settings for this one so that problem doesn't converge.
         # That way, we test that we are really using Newton's Lin Solver
         # instead.
-        sub.ln_solver = ScipyIterativeSolver()
-        model.ln_solver.options['maxiter'] = 1
+        sub.linear_solver = ScipyIterativeSolver()
+        model.linear_solver.options['maxiter'] = 1
 
         # The good solver
-        model.nl_solver.ln_solver = DirectSolver()
+        model.nonlinear_solver.linear_solver = DirectSolver()
 
         prob.set_solver_print(level=0)
         prob.setup(check=False)
@@ -281,8 +281,8 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(model.nl_solver._iter_count, 8)
-        self.assertEqual(model.ln_solver._iter_count, 0)
+        self.assertLess(model.nonlinear_solver._iter_count, 8)
+        self.assertEqual(model.linear_solver._iter_count, 0)
 
     def test_implicit_utol(self):
         # We are setup for reach utol termination condition quite quickly.
@@ -330,8 +330,8 @@ class TestNewton(unittest.TestCase):
         root.add_subsystem('comp', CubicImplicit())
         root.connect('p1.x', 'comp.x')
 
-        prob.model.nl_solver = NewtonSolver()
-        prob.model.ln_solver = ScipyIterativeSolver()
+        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.linear_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
         prob['comp.z'] = -4.93191510182
@@ -340,7 +340,7 @@ class TestNewton(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['comp.z'], -4.93191510182, .00001)
-        self.assertLessEqual(prob.model.nl_solver._iter_count, 4,
+        self.assertLessEqual(prob.model.nonlinear_solver._iter_count, 4,
                              msg='Should get there pretty quick because of utol.')
 
     def test_solve_subsystems_basic(self):
@@ -348,19 +348,19 @@ class TestNewton(unittest.TestCase):
         model = prob.model = DoubleSellar()
 
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
-        model.nl_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
         prob.run_model()
@@ -376,19 +376,19 @@ class TestNewton(unittest.TestCase):
         model.jacobian = DenseJacobian()
 
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
-        model.nl_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
         prob.run_model()
@@ -404,19 +404,19 @@ class TestNewton(unittest.TestCase):
         model.jacobian = DenseJacobian()
 
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
-        model.nl_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
         prob.run_model()
@@ -432,19 +432,19 @@ class TestNewton(unittest.TestCase):
         model.jacobian = DenseJacobian()
 
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
-        model.nl_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
         prob.run_model()
@@ -460,18 +460,18 @@ class TestNewton(unittest.TestCase):
         model.jacobian = DenseJacobian()
 
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = ScipyIterativeSolver()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = ScipyIterativeSolver()
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = ScipyIterativeSolver()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = ScipyIterativeSolver()
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = DirectSolver()
-        model.nl_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = DirectSolver()
+        model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
         prob.run_model()
@@ -487,18 +487,18 @@ class TestNewton(unittest.TestCase):
         model.jacobian = DenseJacobian()
 
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
-        model.nl_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
+        model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
         prob.run_model()
@@ -514,18 +514,18 @@ class TestNewton(unittest.TestCase):
         model.jacobian = DenseJacobian()
 
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
-        model.nl_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
+        model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
         prob.run_model()
@@ -541,18 +541,18 @@ class TestNewton(unittest.TestCase):
         model.jacobian = DenseJacobian()
 
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
-        model.nl_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
+        model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
         prob.run_model()
@@ -567,18 +567,18 @@ class TestNewton(unittest.TestCase):
         model = prob.model = DoubleSellar()
 
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
         g1.jacobian = DenseJacobian()
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
         prob.setup()
         prob.run_model()
@@ -619,99 +619,99 @@ class TestNewton(unittest.TestCase):
 
         # each SubSellar group converges itself
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = CountNewton()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = CountDS()  # used for derivatives
+        g1.nonlinear_solver = CountNewton()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = CountDS()  # used for derivatives
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = CountNewton()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = CountNewton()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
         # Enfore behavior: max_sub_solves = 0 means we run once during init
 
-        model.nl_solver.options['maxiter'] = 5
-        model.nl_solver.options['solve_subsystems'] = True
-        model.nl_solver.options['max_sub_solves'] = 0
+        model.nonlinear_solver.options['maxiter'] = 5
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 0
         prob.set_solver_print(level=0)
 
         prob.setup()
         prob.run_model()
 
         # Verifying subsolvers ran
-        self.assertEqual(g1.nl_solver.total_count, 2)
-        self.assertEqual(g2.nl_solver.total_count, 2)
-        self.assertEqual(g1.ln_solver.lin_count, 3)
+        self.assertEqual(g1.nonlinear_solver.total_count, 2)
+        self.assertEqual(g2.nonlinear_solver.total_count, 2)
+        self.assertEqual(g1.linear_solver.lin_count, 3)
 
         prob = Problem()
         model = prob.model = DoubleSellar()
 
         # each SubSellar group converges itself
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = CountNewton()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = CountDS()  # used for derivatives
+        g1.nonlinear_solver = CountNewton()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = CountDS()  # used for derivatives
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = CountNewton()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = CountNewton()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
         # Enforce Behavior: baseline
 
-        model.nl_solver.options['maxiter'] = 5
-        model.nl_solver.options['solve_subsystems'] = True
-        model.nl_solver.options['max_sub_solves'] = 5
+        model.nonlinear_solver.options['maxiter'] = 5
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 5
         prob.set_solver_print(level=0)
 
         prob.setup()
         prob.run_model()
 
         # Verifying subsolvers ran
-        self.assertEqual(g1.nl_solver.total_count, 5)
-        self.assertEqual(g2.nl_solver.total_count, 5)
-        self.assertEqual(g1.ln_solver.lin_count, 8)
+        self.assertEqual(g1.nonlinear_solver.total_count, 5)
+        self.assertEqual(g2.nonlinear_solver.total_count, 5)
+        self.assertEqual(g1.linear_solver.lin_count, 8)
 
         prob = Problem()
         model = prob.model = DoubleSellar()
 
         # each SubSellar group converges itself
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = CountNewton()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = CountDS()  # used for derivatives
+        g1.nonlinear_solver = CountNewton()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = CountDS()  # used for derivatives
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = CountNewton()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = CountNewton()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
         # Enfore behavior: max_sub_solves = 1 means we run during init and first iteration of iter_execute
 
-        model.nl_solver.options['maxiter'] = 5
-        model.nl_solver.options['solve_subsystems'] = True
-        model.nl_solver.options['max_sub_solves'] = 1
+        model.nonlinear_solver.options['maxiter'] = 5
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 1
         prob.set_solver_print(level=0)
 
         prob.setup()
         prob.run_model()
 
         # Verifying subsolvers ran
-        self.assertEqual(g1.nl_solver.total_count, 4)
-        self.assertEqual(g2.nl_solver.total_count, 4)
-        self.assertEqual(g1.ln_solver.lin_count, 6)
+        self.assertEqual(g1.nonlinear_solver.total_count, 4)
+        self.assertEqual(g2.nonlinear_solver.total_count, 4)
+        self.assertEqual(g1.linear_solver.lin_count, 6)
 
     def test_maxiter_one(self):
         # Fix bug when maxiter was set to 1.
@@ -746,8 +746,8 @@ class TestNewton(unittest.TestCase):
         root.add_subsystem('comp', ImpComp())
         root.connect('p1.a', 'comp.a')
 
-        root.nl_solver = NewtonSolver()
-        root.nl_solver.options['maxiter'] = 1
+        root.nonlinear_solver = NewtonSolver()
+        root.nonlinear_solver.options['maxiter'] = 1
         prob.set_solver_print(level=0)
 
         prob.setup()
@@ -774,9 +774,9 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.ln_solver = LinearBlockGS()
+        model.linear_solver = LinearBlockGS()
 
-        nlgbs = model.nl_solver = NewtonSolver()
+        nlgbs = model.nonlinear_solver = NewtonSolver()
 
         prob.setup()
 
@@ -803,9 +803,9 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.ln_solver = LinearBlockGS()
+        model.linear_solver = LinearBlockGS()
 
-        nlgbs = model.nl_solver = NewtonSolver()
+        nlgbs = model.nonlinear_solver = NewtonSolver()
         nlgbs.options['maxiter'] = 2
 
         prob.setup()
@@ -833,9 +833,9 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.ln_solver = LinearBlockGS()
+        model.linear_solver = LinearBlockGS()
 
-        nlgbs = model.nl_solver = NewtonSolver()
+        nlgbs = model.nonlinear_solver = NewtonSolver()
         nlgbs.options['rtol'] = 1e-3
 
         prob.setup()
@@ -863,9 +863,9 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.ln_solver = LinearBlockGS()
+        model.linear_solver = LinearBlockGS()
 
-        nlgbs = model.nl_solver = NewtonSolver()
+        nlgbs = model.nonlinear_solver = NewtonSolver()
         nlgbs.options['atol'] = 1e-4
 
         prob.setup()
@@ -875,7 +875,7 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 25.5882856302, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
-    def test_feature_ln_solver(self):
+    def test_feature_linear_solver(self):
 
         prob = Problem()
         model = prob.model = Group()
@@ -893,11 +893,11 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.ln_solver = LinearBlockGS()
+        model.linear_solver = LinearBlockGS()
 
-        nlgbs = model.nl_solver = NewtonSolver()
+        nlgbs = model.nonlinear_solver = NewtonSolver()
 
-        nlgbs.ln_solver = DirectSolver()
+        nlgbs.linear_solver = DirectSolver()
 
         prob.setup()
 
@@ -917,24 +917,24 @@ class TestNewtonFeatures(unittest.TestCase):
         model.connect('g2.y2', 'g1.x')
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = DirectSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = DirectSolver()
 
         g1 = model.get_subsystem('g1')
-        g1.nl_solver = NewtonSolver()
-        g1.nl_solver.options['rtol'] = 1.0e-5
-        g1.ln_solver = DirectSolver()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
 
         g2 = model.get_subsystem('g2')
-        g2.nl_solver = NewtonSolver()
-        g2.nl_solver.options['rtol'] = 1.0e-5
-        g2.ln_solver = DirectSolver()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
-        model.nl_solver.options['solve_subsystems'] = True
-        model.nl_solver.options['max_sub_solves'] = 0
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 0
 
         prob.setup()
         prob.run_model()

@@ -84,7 +84,7 @@ class Test(unittest.TestCase):
         group = GroupG()
         self.p = Problem(group)
 
-        self.p.model.ln_solver = LinearBlockGS()
+        self.p.model.linear_solver = LinearBlockGS()
         self.p.setup(check=False)
 
         #view_model(self.p, show_browser=False)

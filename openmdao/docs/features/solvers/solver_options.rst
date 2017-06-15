@@ -4,21 +4,21 @@
 
 
 Controlling Solver Behavior
-=============================
+===========================
 
 Solver Options
 ----------------
 
 All solvers (both nonlinear and linear) have a number of options that you access via the `options` attribute that control its behavior.
-For instance, here is how you would change the iteration limit and convergence tolerances for the :ref: `NonlinearBlockGS <usr_openmdao.solvers.nl_bgs.NonlinearBlockGS>`
+For instance, here is how you would change the iteration limit and convergence tolerances for the :ref: `NonlinearBlockGS <usr_openmdao.solvers.nonlinear.nonlinear_block_gs.NonlinearBlockGS>`
 
 .. embed-test::
-    openmdao.solvers.tests.test_nl_bgs.TestNLBGaussSeidel.test_feature_set_options
+    openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_set_options
 
 
 
 Displaying Solver Convergence Info
-------------------------------------
+----------------------------------
 
 Solvers can all print out some information about their convergence history.
 If you want to control that printing behavior you can use the `iprint` option in the solver.
