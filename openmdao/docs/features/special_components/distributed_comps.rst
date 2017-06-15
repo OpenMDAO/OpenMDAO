@@ -22,7 +22,7 @@ distributed output.  Otherwise, the assumed *src_indices* will be from 0 to
 Components must either be entirely distributed or not, i.e., if a component
 has any distributed variables, they must all be distributed.  You tell the
 framework that a component is a distributed component by setting its
-*_distributed* attribute to True.
+*distributed* attribute to True.
 
 The following simple example shows how to create a distributed component that
 distributes its computation evenly across the available processes, up to a
