@@ -1200,9 +1200,9 @@ class Group(System):
         if self._linear_solver is not None and do_ln:
             self._linear_solver._linearize()
 
-    def approx_all_partials(self, method='fd', **kwargs):
+    def approx_total_derivs(self, method='fd', **kwargs):
         """
-        Inform the framework that the specified derivatives are to be approximated.
+        Approximate derivatives for a Group using the specified approximation method.
 
         Parameters
         ----------

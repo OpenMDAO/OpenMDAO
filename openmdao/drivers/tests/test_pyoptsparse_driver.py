@@ -648,9 +648,6 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_fd(self):
-        # Finite difference not supported yet.
-        raise unittest.SkipTest("Full model FD not supported yet.")
-
         prob = Problem()
         model = prob.model = Group()
 
@@ -672,7 +669,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0)
 
-        model.deriv_options['type'] = 'fd'
+        model.approx_total_derivs(method='fd')
 
         prob.setup(check=False)
         prob.run_driver()
@@ -739,9 +736,6 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_fd(self):
-        # Finite difference not supported yet.
-        raise unittest.SkipTest("Full model FD not supported yet.")
-
         prob = Problem()
         model = prob.model = Group()
 
@@ -763,7 +757,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
 
-        model.deriv_options['type'] = 'fd'
+        model.approx_total_derivs(method='fd')
 
         prob.setup(check=False)
         prob.run_driver()

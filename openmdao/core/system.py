@@ -171,7 +171,7 @@ class System(object):
     _owns_approx_jac : bool
         If True, this system approximated its Jacobian
     _owns_approx_jac_meta : dict
-        Stores approximation metadata (e.g., step_size) from calls to approx_all_partials
+        Stores approximation metadata (e.g., step_size) from calls to approx_total_derivs
     _owns_approx_wrt : set or None
         Overrides aproximation inputs.
     _owns_approx_of : set or None

@@ -21,7 +21,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.linear_solver = ScipyIterativeSolver()
-        model.approx_all_partials()
+        model.approx_total_derivs()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -46,7 +46,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         sub.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.linear_solver = ScipyIterativeSolver()
-        sub.approx_all_partials()
+        sub.approx_total_derivs()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -83,7 +83,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.connect('sub.by.yout', 'sub.comp.y')
 
         model.linear_solver = ScipyIterativeSolver()
-        sub.approx_all_partials()
+        sub.approx_total_derivs()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -124,7 +124,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.connect('p2.x2', 'comp.x2')
 
         model.linear_solver = ScipyIterativeSolver()
-        model.approx_all_partials()
+        model.approx_total_derivs()
 
         prob.setup(check=False)
         prob.run_model()
@@ -181,11 +181,11 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         model.nonlinear_solver = NewtonSolver()
         model.linear_solver = ScipyIterativeSolver()
-        model.approx_all_partials()
+        model.approx_total_derivs()
 
         prob.setup(check=False)
         prob.run_model()
-
+        model.approx_total_derivs()
         assert_rel_error(self, prob['comp.x'], [1.97959184, 4.02040816], 1e-5)
 
         model.run_linearize()
@@ -207,7 +207,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.linear_solver = ScipyIterativeSolver()
 
         # Worse step so that our answer will be off a wee bit.
-        model.approx_all_partials(step=1e-2)
+        model.approx_total_derivs(step=1e-2)
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)

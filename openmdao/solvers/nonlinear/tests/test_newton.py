@@ -158,14 +158,10 @@ class TestNewton(unittest.TestCase):
     def test_sellar_state_connection_fd_system(self):
         # Sellar model closes loop with state connection instead of a cycle.
         # This test is just fd.
-
-        raise unittest.SkipTest("FD not implemented yet")
-
         prob = Problem()
         prob.model = SellarStateConnection(nonlinear_solver=NewtonSolver())
 
-        # TODO - Specify FD for group.
-        # prob.model.deriv_options['type'] = 'fd'
+        prob.model.approx_total_derivs(method='fd')
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)

@@ -25,3 +25,6 @@ The step size can be any non-zero number, but should be positive (one can change
 
 .. embed-test::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_fd_options
+
+Approximating Total Derivatives
+===============================

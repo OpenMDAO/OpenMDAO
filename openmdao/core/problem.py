@@ -651,8 +651,6 @@ class Problem(object):
         # TODO: Support constraint sparsity (i.e., skip in/out that are not
         #       relevant for this constraint) (desvars too?)
         # TODO: Don't calculate for inactive constraints
-        # TODO: Support full-model FD. Don't know how this'll work, but we
-        #       used to need a separate function for that.
         # -------------------------------------------------------------------
 
         # Prepare model for calculation by cleaning out the derivatives
@@ -729,7 +727,7 @@ class Problem(object):
 
             # Initialization based on driver (or user) -requested "of" and "wrt".
             if not model._owns_approx_of:
-                model.approx_all_partials(method='fd')
+                model.approx_total_derivs(method='fd')
                 model._owns_approx_of = set(of)
                 model._owns_approx_wrt = set(wrt)
                 model._setup_jacobians(recurse=False)
@@ -743,6 +741,7 @@ class Problem(object):
                         okey = old_output_list[ocount]
                         ikey = old_input_list[icount]
                         totals[okey, ikey] = -approx_jac[output_name, input_name]
+
             elif return_format == 'dict':
                 for icount, input_name in enumerate(input_list):
                     for ocount, output_name in enumerate(output_list):
