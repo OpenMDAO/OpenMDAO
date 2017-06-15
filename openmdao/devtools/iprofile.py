@@ -44,7 +44,6 @@ _matches = {}
 _call_stack = []
 _timing_stack = []
 _inst_data = {}
-_objs = {}   # mapping of ids to instance objects
 
 
 def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
@@ -58,16 +57,16 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
         Prefix used for the raw profile data. Process rank will be appended
         to it to get the actual filename.  When not using MPI, rank=0.
 
-    methods : dict, optional
-        A dict of profiled methods to override the default set.  The key
-        is the method name or glob pattern and the value is a tuple of class
+    methods : list, optional
+        A list of tuples of profiled methods to override the default set.  The first
+        entry is the method name or glob pattern and the second is a tuple of class
         objects used for isinstance checking.  The default set of methods is:
 
         ::
 
-            {
+            [
                 "*": (System, Jacobian, Matrix, Solver, Driver, Problem),
-            }
+            ]
 
     prof_dir : str
         Directory where the profile files will be written. Defaults to the
@@ -331,23 +330,6 @@ def process_profile(flist):
     return list(tree_nodes.values()), totals
 
 
-def prof_dump(fname=None):
-    """Print the contents of the given raw profile data file to stdout.
-
-    Parameters
-    ----------
-
-    fname : str
-        Name of raw profile data file.
-    """
-
-    if fname is None:
-        fname = sys.argv[1]
-
-    for funcpath, count, t in _iter_raw_prof_file(fname):
-        print(funcpath, count, t)
-
-
 def prof_totals():
     """
     Called from the command line to create a file containing total elapsed
@@ -435,7 +417,7 @@ def main():
     parser = OptionParser(usage=usage)
     parser.allow_interspersed_args = False
     parser.add_option('-v', '--view', dest="view",
-        help="View of profiling output, ['web', 'console', 'dump']", default='web')
+        help="View of profiling output, ['web', 'console']", default='web')
 
     if not sys.argv[1:]:
         parser.print_usage()
@@ -467,8 +449,6 @@ def main():
             prof_view()
         elif options.view == 'console':
             prof_totals()
-        elif options.view == 'dump':
-            prof_dump()
         else:
             print("unknown view option '%s'" % options.view, file=sys.stderr)
             sys.exit(-1)

@@ -8,8 +8,6 @@ from inspect import getmembers
 from fnmatch import fnmatchcase
 from contextlib import contextmanager
 
-from six import iteritems, PY3
-
 from openmdao.core.system import System
 from openmdao.core.problem import Problem
 from openmdao.core.driver import Driver
@@ -19,7 +17,11 @@ from openmdao.matrices.matrix import Matrix
 from openmdao.vectors.vector import Vector, Transfer
 
 
-class ClassVisitor(ast.NodeVisitor):
+class FunctionFinder(ast.NodeVisitor):
+    """
+    This class locates all of the functions and methods in a file and associates any
+    method with its corresponding class.
+    """
     def __init__(self, fname, cache):
         ast.NodeVisitor.__init__(self)
         self.fname = fname
@@ -36,7 +38,7 @@ class ClassVisitor(ast.NodeVisitor):
         if self.class_stack:
             qual =  (None, '.'.join(self.class_stack),  node.name)
         else:
-            qual = ("<%s>" % self.fname, None, node.name)
+            qual = ("<%s:%d>" % (self.fname, node.lineno), None, node.name)
 
         self.cache[node.lineno] = qual
 
@@ -68,7 +70,7 @@ def find_qualified_name(filename, line, cache):
             if len(contents) > 0 and contents[-1] != '\n':
                 contents += '\n'
 
-            ClassVisitor(filename, fcache).visit(ast.parse(contents, filename))
+                FunctionFinder(filename, fcache).visit(ast.parse(contents, filename))
 
         cache[filename] = fcache
 
