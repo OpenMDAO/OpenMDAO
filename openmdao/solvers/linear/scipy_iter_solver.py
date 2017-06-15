@@ -194,8 +194,6 @@ class ScipyIterativeSolver(LinearSolver):
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
-
-            #x_vec.set_const(0.0)
             x_vec_combined = x_vec.get_data()
             size = x_vec_combined.size
             linop = LinearOperator((size, size), dtype=float,

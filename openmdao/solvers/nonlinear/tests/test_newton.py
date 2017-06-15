@@ -637,7 +637,7 @@ class TestNewton(unittest.TestCase):
         model.nonlinear_solver.options['maxiter'] = 5
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
-        prob.set_solver_print(level=0)
+        prob.set_solver_print()
 
         prob.setup()
         prob.run_model()
@@ -645,7 +645,7 @@ class TestNewton(unittest.TestCase):
         # Verifying subsolvers ran
         self.assertEqual(g1.nonlinear_solver.total_count, 2)
         self.assertEqual(g2.nonlinear_solver.total_count, 2)
-        self.assertEqual(g1.linear_solver.lin_count, 3)
+        self.assertEqual(g1.linear_solver.lin_count, 2)
 
         prob = Problem()
         model = prob.model = DoubleSellar()
@@ -678,7 +678,7 @@ class TestNewton(unittest.TestCase):
         # Verifying subsolvers ran
         self.assertEqual(g1.nonlinear_solver.total_count, 5)
         self.assertEqual(g2.nonlinear_solver.total_count, 5)
-        self.assertEqual(g1.linear_solver.lin_count, 8)
+        self.assertEqual(g1.linear_solver.lin_count, 5)
 
         prob = Problem()
         model = prob.model = DoubleSellar()
@@ -711,7 +711,7 @@ class TestNewton(unittest.TestCase):
         # Verifying subsolvers ran
         self.assertEqual(g1.nonlinear_solver.total_count, 4)
         self.assertEqual(g2.nonlinear_solver.total_count, 4)
-        self.assertEqual(g1.linear_solver.lin_count, 6)
+        self.assertEqual(g1.linear_solver.lin_count, 4)
 
     def test_maxiter_one(self):
         # Fix bug when maxiter was set to 1.

@@ -631,9 +631,10 @@ class Problem(object):
         vec_dinput = model._vectors['input']
         vec_doutput = model._vectors['output']
         vec_dresid = model._vectors['residual']
-        fwd = mode == 'fwd'
         nproc = self.comm.size
         iproc = model.comm.rank
+        approx = model._owns_approx_jac
+        fwd = (mode == 'fwd') or approx
 
         # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:
@@ -671,26 +672,19 @@ class Problem(object):
         # Linearize Model
         model._linearize()
 
-        of = [(n,) if isinstance(n, string_types) else n for n in of]
-        wrt = [(n,) if isinstance(n, string_types) else n for n in wrt]
-
         # Create data structures (and possibly allocate space) for the total
         # derivatives that we will return.
         totals = OrderedDict()
         if return_format == 'flat_dict':
-            for okeys in of:
-                for okey in okeys:
-                    for ikeys in wrt:
-                        for ikey in ikeys:
-                            totals[(okey, ikey)] = None
+            for okey in of:
+                for ikey in wrt:
+                    totals[(okey, ikey)] = None
 
         elif return_format == 'dict':
-            for okeys in of:
-                for okey in okeys:
-                    totals[okey] = OrderedDict()
-                    for ikeys in wrt:
-                        for ikey in ikeys:
-                            totals[okey][ikey] = None
+            for okey in of:
+                totals[okey] = OrderedDict()
+                for ikey in wrt:
+                    totals[okey][ikey] = None
 
         else:
             msg = "Unsupported return format '%s." % return_format
@@ -702,16 +696,12 @@ class Problem(object):
             oldwrt, oldof = wrt, of
         else:
             oldof = of
-            of = []
-            for names in oldof:
-                of.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
-                                for name in names))
+            of = [model._var_allprocs_prom2abs_list['output'][name][0]
+                  for name in oldof]
 
             oldwrt = wrt
-            wrt = []
-            for names in oldwrt:
-                wrt.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
-                                 for name in names))
+            wrt = [model._var_allprocs_prom2abs_list['output'][name][0]
+                   for name in oldwrt]
 
         if fwd:
             input_list, output_list = wrt, of
@@ -733,10 +723,38 @@ class Problem(object):
         dinputs = input_vec[vecname]
         doutputs = output_vec[vecname]
 
-        # If Forward mode, solve linear system for each 'wrt'
-        # If Adjoint mode, solve linear system for each 'of'
-        for icount, input_names in enumerate(input_list):
-            for iname_count, input_name in enumerate(input_names):
+        # Solve for derivs with the approximation_scheme.
+        # This cuts out the middleman by grabbing the Jacobian directly after linearization.
+        if approx:
+
+            # Initialization based on driver (or user) -requested "of" and "wrt".
+            if not model._owns_approx_of:
+                model.approx_all_partials(method='fd')
+                model._owns_approx_of = set(of)
+                model._owns_approx_wrt = set(wrt)
+                model._setup_jacobians(recurse=False)
+
+            model._linearize()
+            approx_jac = model._jacobian._subjacs
+
+            if return_format == 'flat_dict':
+                for icount, input_name in enumerate(input_list):
+                    for ocount, output_name in enumerate(output_list):
+                        okey = old_output_list[ocount]
+                        ikey = old_input_list[icount]
+                        totals[okey, ikey] = -approx_jac[output_name, input_name]
+            elif return_format == 'dict':
+                for icount, input_name in enumerate(input_list):
+                    for ocount, output_name in enumerate(output_list):
+                        okey = old_output_list[ocount]
+                        ikey = old_input_list[icount]
+                        totals[okey][ikey] = -approx_jac[output_name, input_name]
+
+        # Solve for derivs using linear solver.
+        else:
+            # If Forward mode, solve linear system for each 'wrt'
+            # If Adjoint mode, solve linear system for each 'of'
+            for icount, input_name in enumerate(input_list):
                 # Dictionary access returns a scaler for 1d input, and we
                 # need a vector for clean code, so use _views_flat.
                 flat_view = dinputs._views_flat[input_name]
@@ -793,64 +811,63 @@ class Problem(object):
                     model._solve_linear([vecname], mode)
 
                     # Pull out the answers and pack into our data structure.
-                    for ocount, output_names in enumerate(output_list):
-                        for oname_count, output_name in enumerate(output_names):
-                            out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
-                            deriv_val = doutputs._views_flat[output_name]
-                            out_idxs = None
-                            if output_name in output_vois:
-                                out_voi_meta = output_vois[output_name]
-                                if 'indices' in out_voi_meta:
-                                    out_idxs = out_voi_meta['indices']
+                    for ocount, output_name in enumerate(output_list):
+                        out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                        deriv_val = doutputs._views_flat[output_name]
+                        out_idxs = None
+                        if output_name in output_vois:
+                            out_voi_meta = output_vois[output_name]
+                            if 'indices' in out_voi_meta:
+                                out_idxs = out_voi_meta['indices']
 
-                            if out_idxs is not None:
-                                deriv_val = deriv_val[out_idxs]
-                            len_val = len(deriv_val)
+                        if out_idxs is not None:
+                            deriv_val = deriv_val[out_idxs]
+                        len_val = len(deriv_val)
 
-                            if dup and nproc > 1:
-                                self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
-                                    model._var_sizes['output'][:, out_var_idx])[0][0]))
+                        if dup and nproc > 1:
+                            self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
+                                model._var_sizes['output'][:, out_var_idx])[0][0]))
 
-                            if return_format == 'flat_dict':
-                                if fwd:
-                                    key = (old_output_list[ocount][oname_count],
-                                           old_input_list[icount][iname_count])
+                        if return_format == 'flat_dict':
+                            if fwd:
+                                key = (old_output_list[ocount],
+                                       old_input_list[icount])
 
-                                    if totals[key] is None:
-                                        totals[key] = np.zeros((len_val, loc_size))
-                                    if store:
-                                        totals[key][:, loc_idx] = deriv_val
-
-                                else:
-                                    key = (old_input_list[icount][iname_count],
-                                           old_output_list[ocount][oname_count])
-
-                                    if totals[key] is None:
-                                        totals[key] = np.zeros((loc_size, len_val))
-                                    if store:
-                                        totals[key][loc_idx, :] = deriv_val
-
-                            elif return_format == 'dict':
-                                if fwd:
-                                    okey = old_output_list[ocount][oname_count]
-                                    ikey = old_input_list[icount][iname_count]
-
-                                    if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.zeros((len_val, loc_size))
-                                    if store:
-                                        totals[okey][ikey][:, loc_idx] = deriv_val
-
-                                else:
-                                    okey = old_input_list[icount][iname_count]
-                                    ikey = old_output_list[ocount][oname_count]
-
-                                    if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.zeros((loc_size, len_val))
-                                    if store:
-                                        totals[okey][ikey][loc_idx, :] = deriv_val
+                                if totals[key] is None:
+                                    totals[key] = np.zeros((len_val, loc_size))
+                                if store:
+                                    totals[key][:, loc_idx] = deriv_val
 
                             else:
-                                raise RuntimeError("unsupported return format")
+                                key = (old_input_list[icount],
+                                       old_output_list[ocount])
+
+                                if totals[key] is None:
+                                    totals[key] = np.zeros((loc_size, len_val))
+                                if store:
+                                    totals[key][loc_idx, :] = deriv_val
+
+                        elif return_format == 'dict':
+                            if fwd:
+                                okey = old_output_list[ocount]
+                                ikey = old_input_list[icount]
+
+                                if totals[okey][ikey] is None:
+                                    totals[okey][ikey] = np.zeros((len_val, loc_size))
+                                if store:
+                                    totals[okey][ikey][:, loc_idx] = deriv_val
+
+                            else:
+                                okey = old_input_list[icount]
+                                ikey = old_output_list[ocount]
+
+                                if totals[okey][ikey] is None:
+                                    totals[okey][ikey] = np.zeros((loc_size, len_val))
+                                if store:
+                                    totals[okey][ikey][loc_idx, :] = deriv_val
+
+                        else:
+                            raise RuntimeError("unsupported return format")
 
         return totals
 

@@ -12,16 +12,11 @@ import numpy as np
 
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
-<<<<<<< HEAD
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.proc_allocators.proc_allocator import ProcAllocationError
-from openmdao.solvers.ln_runonce import LNRunOnce
-from openmdao.solvers.nl_runonce import NLRunOnce
-from openmdao.utils.array_utils import convert_neg
-=======
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
->>>>>>> f949b78ee52cf5f13ea12ed8ba69c676a5614c83
+from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.name_maps import rel_key2abs_key, abs_name2rel_name
 from openmdao.utils.units import is_compatible
@@ -1253,8 +1248,15 @@ class Group(System):
             approx = self._approx_schemes[method]
             pro2abs = self._var_allprocs_prom2abs_list
 
-            of = set(var[0] for var in pro2abs['output'].values())
-            candidate_wrt = list(var[0] for var in pro2abs['input'].values())
+            if self._owns_approx_of:
+                of = self._owns_approx_of
+            else:
+                of = set(var[0] for var in pro2abs['output'].values())
+
+            if self._owns_approx_wrt:
+                candidate_wrt = self._owns_approx_wrt
+            else:
+                candidate_wrt = list(var[0] for var in pro2abs['input'].values())
 
             from openmdao.core.indepvarcomp import IndepVarComp
             wrt = set()
@@ -1273,17 +1275,6 @@ class Group(System):
                     if isinstance(comp, IndepVarComp):
                         wrt.add(src)
                         ivc.append(src)
-
-            # TODO - Handling states is a quandry, because what we want to do around them is
-            # ambiguous.
-            # from openmdao.core.implicitcomponent import ImplicitComponent
-            # states = set()
-            # for var in of:
-                # compname = abs_name2rel_name(self, '.'.join(var.split('.')[:-1]))
-                # comp = self.get_subsystem(compname)
-                # if isinstance(comp, ImplicitComponent):
-                    # wrt.add(var)
-                    # states.add(var)
 
             with self.jacobian_context() as J:
                 for key in product(of, wrt.union(of)):

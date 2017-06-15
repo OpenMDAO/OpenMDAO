@@ -20,7 +20,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.ln_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyIterativeSolver()
         model.approx_all_partials()
 
         prob.setup(check=False, mode='fwd')
@@ -45,7 +45,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         sub = model.add_subsystem('sub', Group(), promotes=['x', 'y', 'f_xy'])
         sub.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.ln_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyIterativeSolver()
         sub.approx_all_partials()
 
         prob.setup(check=False, mode='fwd')
@@ -82,7 +82,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.connect('p2.y', 'sub.by.yin')
         model.connect('sub.by.yout', 'sub.comp.y')
 
-        model.ln_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyIterativeSolver()
         sub.approx_all_partials()
 
         prob.setup(check=False, mode='fwd')
@@ -123,7 +123,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.connect('p1.x1', 'comp.x1')
         model.connect('p2.x2', 'comp.x2')
 
-        model.ln_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyIterativeSolver()
         model.approx_all_partials()
 
         prob.setup(check=False)
@@ -152,7 +152,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         comp = sub.add_subsystem('comp', TestImplCompArrayDense())
         model.connect('p_rhs.rhs', 'sub.comp.rhs')
 
-        model.ln_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
         prob.run_model()
@@ -179,8 +179,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
         comp = model.add_subsystem('comp', TestImplCompArrayDenseNoSolve())
         model.connect('p_rhs.rhs', 'comp.rhs')
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
         model.approx_all_partials()
 
         prob.setup(check=False)
@@ -204,7 +204,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.ln_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
         # Worse step so that our answer will be off a wee bit.
         model.approx_all_partials(step=1e-2)
