@@ -19,9 +19,7 @@ from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
-        SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.test_suite.components.double_sellar import DoubleSellar
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
 if PY2:
@@ -29,15 +27,15 @@ if PY2:
 if PY3:
     import pickle
 
+
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
-    optimizers = {'pyoptsparse': pyOptSparseDriver}
 # optimizers = {'scipy': ScipyOptimizer, }
-
+optimizers = {'pyoptsparse': pyOptSparseDriver}
 
 def run_driver(problem):
     t0 = time.time()
@@ -148,8 +146,6 @@ def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
         # from the database, get the actual data recorded
         db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
         row_actual = db_cur.fetchone()
-        # db_cur.execute("SELECT * FROM solver_iterations")
-        # rows = db_cur.fetchall()
         test.assertTrue(row_actual, 'Solver iterations table is empty. Should contain at least one record')
 
         counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, output_blob, residuals_blob = row_actual
@@ -192,6 +188,14 @@ def _assertSolverIterationDataRecordedBasic(test, db_cur):
     db_cur.execute("SELECT * FROM solver_iterations")
     row_actual = db_cur.fetchone()
     test.assertTrue(row_actual, 'Solver iterations table is empty. Should contain at least one record')
+
+def _assertSystemIterationDataRecordedBasic(test, db_cur):
+    """
+        Just make sure something was recorded for the solver
+    """
+    db_cur.execute("SELECT * FROM system_iterations")
+    row_actual = db_cur.fetchone()
+    test.assertTrue(row_actual, 'System iterations table is empty. Should contain at least one record')
 
 def _assertMetadataRecorded(test, db_cur):
 
@@ -247,7 +251,6 @@ class TestSqliteRecorder(unittest.TestCase):
         self.eps = 1e-5
 
     def tearDown(self):
-        print('self.filename', self.filename)
         return
         try:
             rmtree(self.dir)
@@ -280,6 +283,13 @@ class TestSqliteRecorder(unittest.TestCase):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertSolverIterationDataRecordedBasic(self, cur)
+        con.close()
+
+    def assertSystemIterationDataRecordedBasic(self):
+        '''Just want to make sure something was recorded'''
+        con = sqlite3.connect(self.filename)
+        cur = con.cursor()
+        _assertSystemIterationDataRecordedBasic(self, cur)
         con.close()
 
     def assertMetadataRecorded(self ):
@@ -513,7 +523,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.model.add_recorder(self.recorder)
 
-        d1 = self.prob.model.get_subsystem('d1') # an instance of SellarDis1withDerivatives which is a Group
+        d1 = self.prob.model.get_subsystem('d1')  # an instance of SellarDis1withDerivatives which is a Group
         d1.add_recorder(self.recorder)
 
         obj_cmp = self.prob.model.get_subsystem('obj_cmp') # an ExecComp
@@ -526,7 +536,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         # TODO_RECORDERS - need to check the recording of the d1 also
-        coordinate = [0, 'obj_cmp', (6, )]
+        coordinate = [0, 'Driver', (1, ),'root._solve_nonlinear', (0, ), 'obj_cmp._solve_nonlinear', (6, )]
 
         expected_inputs = {
                             "obj_cmp.z": [5.0, 2.0],
@@ -612,18 +622,6 @@ class TestSqliteRecorder(unittest.TestCase):
             self.prob.driver.opt_settings['ACC'] = 1e-9
         self.prob.driver.options['print_results'] = True
 
-        # self.nonlinear_solver = self.metadata['nonlinear_solver']
-        # if self.metadata['nonlinear_atol']:
-        #     self.nonlinear_solver.options['atol'] = self.metadata['nonlinear_atol']
-        # if self.metadata['nonlinear_maxiter']:
-        #     self.nonlinear_solver.options['maxiter'] = self.metadata['nonlinear_maxiter']
-        #
-        # self.linear_solver = self.metadata['linear_solver']
-        # if self.metadata['linear_atol']:
-        #     self.linear_solver.options['atol'] = self.metadata['linear_atol']
-        # if self.metadata['linear_maxiter']:
-        #     self.linear_solver.options['maxiter'] = self.metadata['linear_maxiter']
-
         self.recorder.options['record_inputs'] = True
         self.recorder.options['record_outputs'] = True
         self.recorder.options['record_residuals'] = True
@@ -644,7 +642,28 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        #TODO_RECORDERS - need to test values !!!
+        coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (0, ), 'NLRunOnce', (1, ), 'mda._solve_nonlinear', (0, ), 'mda.d1._solve_nonlinear', (4, )]
+        expected_inputs = {
+                            "mda.d1.z": [5.0, 2.0],
+                            "mda.d1.x": [1.0,],
+                            "mda.d1.y2": [12.0584865,],
+                            }
+        expected_outputs = {"mda.d1.y1": [25.5883027,],
+                            }
+        expected_residuals = {"mda.d1.y1": [0.0,],
+                            }
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
+                                                 expected_residuals),), self.eps)
+
+        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (1, ), 'pz._solve_nonlinear', (2, )]
+        expected_inputs = None
+        expected_outputs = {"pz.z": [2.8640616, 0.825643,],
+                            }
+        expected_residuals = {"pz.z": [0.0, 0.0],
+                            }
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
+                                                 expected_residuals),), self.eps)
+
 
     def test_record_solver(self):
         self.setup_sellar_model()
@@ -972,28 +991,43 @@ class TestSqliteRecorder(unittest.TestCase):
 
     def test_implicit_component(self):
 
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        from openmdao.core.tests.test_impl_comp import TestImplCompSimpleLinearize, TestImplCompSimpleJacVec
+        group = Group()
+        group.add_subsystem('comp1', IndepVarComp([('a', 1.0), ('b', 1.0), ('c', 1.0)]))
+        group.add_subsystem('comp2', TestImplCompSimpleLinearize())
+        group.add_subsystem('comp3', TestImplCompSimpleJacVec())
+        group.connect('comp1.a', 'comp2.a')
+        group.connect('comp1.b', 'comp2.b')
+        group.connect('comp1.c', 'comp2.c')
+        group.connect('comp1.a', 'comp3.a')
+        group.connect('comp1.b', 'comp3.b')
+        group.connect('comp1.c', 'comp3.c')
 
-        g1 = model.get_subsystem('g1')
-        g1.nonlinear_solver = NewtonSolver()
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
-        g1.linear_solver = DirectSolver()
+        prob = Problem(model=group)
+        prob.setup(check=False)
 
-        g2 = model.get_subsystem('g2')
-        g2.nonlinear_solver = NewtonSolver()
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
-        g2.linear_solver = DirectSolver()
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        comp2 = prob.model.get_subsystem('comp2')  # ImplicitComponent
+        comp2.add_recorder(self.recorder)
 
-        model.nonlinear_solver.options['solve_subsystems'] = True
-
-        prob.setup()
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
+        coordinate = [0, 'Driver', (1, ),'root._solve_nonlinear', (0, ), 'NLRunOnce', (1, ), 'comp2._solve_nonlinear', (0, )]
+        expected_inputs = {
+                            "comp2.a": [1.0,],
+                            "comp2.b": [-4.0,],
+                            "comp2.c": [3.0,],
+                            }
+        expected_outputs = {"comp2.x": [3.0,],
+                            }
+        expected_residuals = {"comp2.x": [0.0,],
+                            }
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
+                                                 expected_residuals),), self.eps)
 
 
 if __name__ == "__main__":

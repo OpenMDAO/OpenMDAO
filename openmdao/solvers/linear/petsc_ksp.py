@@ -12,8 +12,8 @@ except ImportError:
     PETSc = None
 
 from openmdao.solvers.solver import LinearSolver
-from openmdao.utils.record_util import create_local_meta, update_local_meta
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.record_util import create_local_meta, update_local_meta
 
 
 KSP_TYPES = [

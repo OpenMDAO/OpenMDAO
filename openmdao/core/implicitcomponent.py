@@ -118,7 +118,7 @@ class ImplicitComponent(Component):
             iter_get_norm_on_call_stack
         do_recording = not iter_get_norm_on_call_stack()
         if do_recording:
-            push_recording_iteration_stack(self.pathname + '._solve_nonlinear', self.iter_count)
+            push_recording_iteration_stack(self.pathname + '._apply_linear', self.iter_count)
             print_recording_iteration_stack()
 
         for vec_name in vec_names:
@@ -163,7 +163,7 @@ class ImplicitComponent(Component):
             iter_get_norm_on_call_stack
         do_recording = not iter_get_norm_on_call_stack()
         if do_recording:
-            push_recording_iteration_stack(self.pathname + '._solve_nonlinear', self.iter_count)
+            push_recording_iteration_stack(self.pathname + '._solve_linear', self.iter_count)
             print_recording_iteration_stack()
 
         if self._linear_solver is not None:

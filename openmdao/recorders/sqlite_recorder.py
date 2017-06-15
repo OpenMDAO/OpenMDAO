@@ -233,10 +233,16 @@ class SqliteRecorder(BaseRecorder):
         objectives_blob = array_to_blob(objectives_array)
         constraints_blob = array_to_blob(constraints_array)
 
+        # TODO_RECORDER - needs to put higher in the calling stack so we do not have
+        #    to do this in each method
+        from openmdao.recorders.base_recorder import get_formatted_iteration_coordinate
+        iteration_coordinate = get_formatted_iteration_coordinate()
+
         self.cursor.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
                             "timestamp, success, msg, desvars , responses , objectives , "
                             "constraints ) VALUES(?,?,?,?,?,?,?,?,?)",
-                            (self._counter, format_iteration_coordinate(metadata['coord']),
+                            # (self._counter, format_iteration_coordinate(metadata['coord']),
+                            (self._counter, iteration_coordinate,
                              metadata['timestamp'], metadata['success'],
                              metadata['msg'], desvars_blob,
                              responses_blob, objectives_blob,
@@ -341,10 +347,13 @@ class SqliteRecorder(BaseRecorder):
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
+        from openmdao.recorders.base_recorder import get_formatted_iteration_coordinate
+        iteration_coordinate = get_formatted_iteration_coordinate()
+
         self.cursor.execute("INSERT INTO system_iterations(counter, iteration_coordinate, "
                             "timestamp, success, msg, inputs , outputs , residuals ) "
                             "VALUES(?,?,?,?,?,?,?,?)",
-                            (self._counter, format_iteration_coordinate(metadata['coord']),
+                            (self._counter, iteration_coordinate,
                              metadata['timestamp'], metadata['success'],
                              metadata['msg'], inputs_blob,
                              outputs_blob, residuals_blob))

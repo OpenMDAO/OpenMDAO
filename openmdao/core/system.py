@@ -23,8 +23,8 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
-from openmdao.utils.record_util import create_local_meta, update_local_meta
 from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.record_util import create_local_meta, update_local_meta
 
 
 class System(object):
@@ -2403,17 +2403,6 @@ class System(object):
         # send the calling method name into record_iteration, e.g. 'solve_nonlinear'
         self._rec_mgr.record_iteration(self, metadata, method=inspect.stack()[1][3])
 
-        # 1 and 3
-        filepath = inspect.stack()[1][1]
-        import os.path
-        base = os.path.basename(filepath)
-        base_filename = os.path.splitext(base)[0]
-
-        method_name = inspect.stack()[1][3]
-        import unittest
-        test_name = get_current_case()
-        print('qqq', test_name, base_filename, method_name)
-
 
 def get_current_case():
     """
@@ -2423,6 +2412,8 @@ def get_current_case():
     determined.
 
     Tested on Python 2.7 and 3.3 - 3.6 with nose 1.3.7.
+
+    #'/Users/hschilli/Documents/OpenMDAO/dev/blue_recording_global_counter/openmdao/recorders/tests/test_sqlite_recorder.py'
 
     Returns
     -------
@@ -2437,4 +2428,4 @@ def get_current_case():
             if frame_info[3] == 'run_driver':
                 continue
             return frame_info[3]
-    # raise RuntimeError('Could not determine test case')
+    raise RuntimeError('Could not determine test case')
