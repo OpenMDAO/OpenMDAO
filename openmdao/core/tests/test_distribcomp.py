@@ -88,7 +88,7 @@ class DistribInputComp(ExplicitComponent):
     def __init__(self, arr_size=11):
         super(DistribInputComp, self).__init__()
         self.arr_size = arr_size
-        self._distributed = True
+        self.distributed = True
 
     def compute(self, inputs, outputs):
         if MPI:
@@ -119,7 +119,7 @@ class DistribOverlappingInputComp(ExplicitComponent):
     def __init__(self, arr_size=11):
         super(DistribOverlappingInputComp, self).__init__()
         self.arr_size = arr_size
-        self._distributed = True
+        self.distributed = True
 
     def compute(self, inputs, outputs):
         outputs['outvec'][:] = 0
@@ -162,7 +162,7 @@ class DistribInputDistribOutputComp(ExplicitComponent):
     def __init__(self, arr_size=11):
         super(DistribInputDistribOutputComp, self).__init__()
         self.arr_size = arr_size
-        self._distributed = True
+        self.distributed = True
 
 
     def compute(self, inputs, outputs):
@@ -192,7 +192,7 @@ class DistribNoncontiguousComp(ExplicitComponent):
     def __init__(self, arr_size=11):
         super(DistribNoncontiguousComp, self).__init__()
         self.arr_size = arr_size
-        self._distributed = True
+        self.distributed = True
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
@@ -218,7 +218,7 @@ class DistribGatherComp(ExplicitComponent):
     def __init__(self, arr_size=11):
         super(DistribGatherComp, self).__init__()
         self.arr_size = arr_size
-        self._distributed = True
+        self.distributed = True
 
     def compute(self, inputs, outputs):
         if MPI:
@@ -324,7 +324,7 @@ class MPITests(unittest.TestCase):
             def __init__(self, size):
                 super(DistribComp, self).__init__()
                 self.size = size
-                self._distributed = True
+                self.distributed = True
 
             def compute(self, inputs, outputs):
                 if self.comm.rank == 0:

@@ -1117,11 +1117,11 @@ class System(object):
             for subsys in self.system_iter():
 
                 try:
-                    if subsys._matrix_free:
+                    if subsys.matrix_free:
                         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
                         raise RuntimeError(msg)
 
-                # Groups don't have `_matrix_free`
+                # Groups don't have `matrix_free`
                 # Note, we could put this attribute on Group, but this would be True for a
                 # default Group, and thus we would need an isinstance on Component, which is the
                 # reason for the try block anyway.

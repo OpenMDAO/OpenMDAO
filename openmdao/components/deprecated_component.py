@@ -36,7 +36,7 @@ class Component(BaseComponent):
         self._output_names = []
 
         if overrides_method('apply_linear', self, Component):
-            self._matrix_free = True
+            self.matrix_free = True
 
         warn_deprecation('Components should inherit from ImplicitComponent '
                          'or ExplicitComponent. This class provides '

@@ -29,7 +29,7 @@ class DistribExecComp(ExecComp):
     def __init__(self, exprs, arr_size=11, **kwargs):
         super(DistribExecComp, self).__init__(exprs, **kwargs)
         self.arr_size = arr_size
-        self._distributed = True
+        self.distributed = True
 
     def setup(self):
         outs = set()
@@ -326,7 +326,12 @@ class MPITests2(unittest.TestCase):
 
 
 class DistribStateImplicit(ImplicitComponent):
-
+    """
+    This component is unusual in that it has a distributed variable 'states' that
+    is not connected to any other variables in the model.  The input 'a' sets the local
+    values of 'states' and the output 'out_var' is the sum of all of the distributed values
+    of 'states'.
+    """
     def setup(self):
 
         self.add_input('a', val=10., units='m')

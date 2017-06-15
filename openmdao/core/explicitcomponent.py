@@ -31,7 +31,7 @@ class ExplicitComponent(Component):
         super(ExplicitComponent, self).__init__(**kwargs)
 
         if overrides_method('compute_jacvec_product', self, ExplicitComponent):
-            self._matrix_free = True
+            self.matrix_free = True
 
     def _setup_partials(self, recurse=True):
         """

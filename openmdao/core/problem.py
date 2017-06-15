@@ -382,7 +382,7 @@ class Problem(object):
 
                 explicit = isinstance(comp, ExplicitComponent)
                 deprecated = isinstance(comp, DepComponent)
-                matrix_free = comp._matrix_free
+                matrix_free = comp.matrix_free
                 c_name = comp.pathname
 
                 # TODO: Check deprecated deriv_options.
