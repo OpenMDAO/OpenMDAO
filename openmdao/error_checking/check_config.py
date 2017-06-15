@@ -1,5 +1,6 @@
 """A module containing various configuration checks for an OpenMDAO Problem."""
 
+import sys
 import logging
 
 import numpy as np
@@ -34,7 +35,7 @@ def check_config(problem, logger=None):
         if _set_logger is None:
             logger = logging.getLogger("config_check")
             _set_logger = logger
-            console = logging.StreamHandler()
+            console = logging.StreamHandler(sys.stdout)
             # set a format which is simpler for console use
             formatter = logging.Formatter('%(levelname)s: %(message)s')
             # tell the handler to use this format

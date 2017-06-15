@@ -49,8 +49,8 @@ class Component(BaseComponent):
         abs2meta_out = self._var_abs2meta['output']
         abs2prom_out = self._var_abs2prom['output']
 
-        # Note: These declare calls are outside of initialize_partials so that users do not have to
-        # call the super version of initialize_partials. This is still post-initialize_variables.
+        # Note: These declare calls are outside of setup_partials so that users do not have to
+        # call the super version of setup_partials. This is still post-setup.
         other_names = []
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta_out[out_abs]

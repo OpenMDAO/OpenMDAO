@@ -31,7 +31,7 @@ class SellarDis1(ExplicitComponent):
         self._units = units
         self._scaling = scaling
 
-    def initialize_variables(self):
+    def setup(self):
 
         if self._units:
             units = 'ft'
@@ -55,7 +55,7 @@ class SellarDis1(ExplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0, units=units, ref=ref)
 
-    def initialize_partials(self):
+    def setup_partials(self):
         self.approx_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -79,7 +79,7 @@ class SellarDis1withDerivatives(SellarDis1):
     Component containing Discipline 1 -- derivatives version.
     """
 
-    def initialize_partials(self):
+    def setup_partials(self):
         pass
 
     def compute_partials(self, inputs, outputs, partials):
@@ -102,7 +102,7 @@ class SellarDis2(ExplicitComponent):
         self._units = units
         self._scaling = scaling
 
-    def initialize_variables(self):
+    def setup(self):
         if self._units:
             units = 'inch'
         else:
@@ -122,7 +122,7 @@ class SellarDis2(ExplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0, units=units, ref=ref)
 
-    def initialize_partials(self):
+    def setup_partials(self):
         self.approx_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -151,7 +151,7 @@ class SellarDis2withDerivatives(SellarDis2):
     Component containing Discipline 2 -- derivatives version.
     """
 
-    def initialize_partials(self):
+    def setup_partials(self):
         pass
 
     def compute_partials(self, inputs, outputs, J):
@@ -185,7 +185,7 @@ class SellarNoDerivatives(Group):
         self.metadata.declare('ln_maxiter', default=None,
                               desc='Iteration limit for linear solver.')
 
-    def initialize_subsystems(self):
+    def setup(self):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
@@ -234,7 +234,7 @@ class SellarDerivatives(Group):
         self.metadata.declare('ln_maxiter', default=None,
                               desc='Iteration limit for linear solver.')
 
-    def initialize_subsystems(self):
+    def setup(self):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
@@ -266,7 +266,7 @@ class SellarDerivativesConnected(Group):
     Group containing the Sellar MDA. This version uses the disciplines with derivatives.
     """
 
-    def initialize_subsystems(self):
+    def setup(self):
         self.add_subsystem('px', IndepVarComp('x', 1.0))
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
 
@@ -307,7 +307,7 @@ class SellarDerivativesGrouped(Group):
         self.metadata.declare('ln_maxiter', default=None,
                               desc='Iteration limit for linear solver.')
 
-    def initialize_subsystems(self):
+    def setup(self):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
@@ -344,7 +344,7 @@ class StateConnection(ImplicitComponent):
     Define connection with an explicit equation.
     """
 
-    def initialize_variables(self):
+    def setup(self):
         # Inputs
         self.add_input('y2_actual', 1.0)
 
@@ -396,7 +396,7 @@ class SellarStateConnection(Group):
         self.metadata.declare('ln_maxiter', default=None,
                               desc='Iteration limit for linear solver.')
 
-    def initialize_subsystems(self):
+    def setup(self):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
@@ -445,7 +445,7 @@ class SellarImplicitDis1(ImplicitComponent):
         self._units = units
         self._scaling = scaling
 
-    def initialize_variables(self):
+    def setup(self):
         if self._units:
             units = 'ft'
         else:
@@ -504,7 +504,7 @@ class SellarImplicitDis2(ImplicitComponent):
         self._units = units
         self._scaling = scaling
 
-    def initialize_variables(self):
+    def setup(self):
         if self._units:
             units = 'inch'
         else:

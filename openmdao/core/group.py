@@ -44,7 +44,7 @@ class Group(System):
         if not self._ln_solver:
             self._ln_solver = LNRunOnce()
 
-    def initialize_subsystems(self):
+    def setup(self):
         """
         Add subsystems to this group.
 
@@ -81,7 +81,7 @@ class Group(System):
         self._manual_connections.update(self._static_manual_connections)
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
-        self.initialize_subsystems()
+        self.setup()
         self._static_mode = True
 
         req_procs = [s.get_req_procs() for s in self._subsystems_allprocs]
@@ -114,7 +114,7 @@ class Group(System):
 
     def _setup_vars(self, recurse=True):
         """
-        Call initialize_variables in components and count variables, total and by var_set.
+        Call setup in components and count variables, total and by var_set.
 
         Parameters
         ----------

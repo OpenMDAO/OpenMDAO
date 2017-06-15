@@ -50,7 +50,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
         class SimpleImp(ImplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('a', val=1.)
                 self.add_output('x', val=0.)
 

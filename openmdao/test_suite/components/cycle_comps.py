@@ -129,7 +129,7 @@ class ExplicitCycleComp(ExplicitComponent):
             self._cycle_names['theta_out'] = 'theta_out'
             self._cycle_promotes_in = self._cycle_promotes_out = []
 
-    def initialize_variables(self):
+    def setup(self):
         for i in range(self.num_var):
             self.add_input(self._cycle_names['x'].format(i), shape=self.var_shape)
             self.add_output(self._cycle_names['y'].format(i), shape=self.var_shape)
@@ -234,7 +234,7 @@ class ExplicitCycleComp(ExplicitComponent):
         else:
             return {'val': jac}
 
-    def initialize_partials(self):
+    def setup_partials(self):
         pd_type = self.metadata['partial_type']
 
         if self.metadata['finite_difference']:
@@ -311,11 +311,11 @@ class ExplicitFirstComp(ExplicitCycleComp):
     def __str__(self):
         return 'Explicit Cycle Component - First'
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('psi', val=1.)
         self.angle_param = 'psi'
         self._cycle_names['psi'] = 'psi'
-        super(ExplicitFirstComp, self).initialize_variables()
+        super(ExplicitFirstComp, self).setup()
 
     def compute(self, inputs, outputs):
         theta = inputs[self._cycle_names['theta']]
@@ -330,10 +330,10 @@ class ExplicitLastComp(ExplicitFirstComp):
     def __str__(self):
         return 'Explicit Cycle Component - Last'
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_output('x_norm2', shape=(1,))
         self._n = 1
-        super(ExplicitLastComp, self).initialize_variables()
+        super(ExplicitLastComp, self).setup()
 
     def compute(self, inputs, outputs):
         theta = inputs[self._cycle_names['theta']]
@@ -346,8 +346,8 @@ class ExplicitLastComp(ExplicitFirstComp):
         # theta_out has 1/2 the error as theta does to the correct angle.
         outputs[self._cycle_names['theta_out']] = theta / 2 + (self._n * 2 * np.pi - psi) / (2 * k - 2)
 
-    def initialize_partials(self):
-        super(ExplicitLastComp, self).initialize_partials()
+    def setup_partials(self):
+        super(ExplicitLastComp, self).setup_partials()
 
         pd_type = self.metadata['partial_type']
         if self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':

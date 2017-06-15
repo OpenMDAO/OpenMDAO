@@ -12,7 +12,7 @@ class TestExplCompArray(ExplicitComponent):
     def initialize(self):
         self.metadata.declare('thickness', default=1.)
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('lengths', val=np.ones((2, 2)))
         self.add_input('widths', val=np.ones((2, 2)))
         self.add_output('areas', val=np.ones((2, 2)))

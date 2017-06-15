@@ -21,7 +21,7 @@ class ReconfComp(ExplicitComponent):
         else:
             return False
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', val=1.0)
         self.add_output('y', val=np.zeros(self.size))
 
@@ -40,14 +40,14 @@ class ReconfGroup(Group):
 
 class Comp(ExplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', val=1.0)
         self.add_output('z', val=1.0)
 
     def compute(self, inputs, outputs):
         outputs['z'] = 3 * inputs['x']
 
-    def compute_partials_derivs(self, inputs, outputs, jacobian):
+    def compute_partials(self, inputs, outputs, jacobian):
         jacobian['z', 'x'] = 3.0
 
 

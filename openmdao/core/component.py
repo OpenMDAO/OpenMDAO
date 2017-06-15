@@ -37,13 +37,13 @@ class Component(System):
         This is only needed while adding inputs and outputs. During setup, these are used to
         build the dictionaries of metadata.
     _static_var_rel2data_io : dict
-        Static version of above - stores data for variables added outside of initialize_variables.
+        Static version of above - stores data for variables added outside of setup.
     _var_rel_names : {'input': [str, ...], 'output': [str, ...]}
         List of relative names of owned variables existing on current proc.
         This is only needed while adding inputs and outputs. During setup, these are used to
         determine the list of absolute names.
     _static_var_rel_names : dict
-        Static version of above - stores names of variables added outside of initialize_variables.
+        Static version of above - stores names of variables added outside of setup.
     """
 
     def __init__(self, **kwargs):
@@ -66,7 +66,7 @@ class Component(System):
         self._static_var_rel_names = {'input': [], 'output': []}
         self._static_var_rel2data_io = {}
 
-    def initialize_variables(self):
+    def setup(self):
         """
         Declare inputs and outputs.
 
@@ -78,7 +78,7 @@ class Component(System):
         """
         pass
 
-    def initialize_partials(self):
+    def setup_partials(self):
         """
         Declare Jacobian structure/approximations.
 
@@ -92,7 +92,7 @@ class Component(System):
 
     def _setup_vars(self, recurse=True):
         """
-        Call initialize_variables in components and count variables, total and by var_set.
+        Call setup in components and count variables, total and by var_set.
 
         Parameters
         ----------
@@ -114,7 +114,7 @@ class Component(System):
             self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
-        self.initialize_variables()
+        self.setup()
         self._static_mode = True
 
         # Compute num_var
@@ -235,7 +235,7 @@ class Component(System):
 
     def _setup_partials(self, recurse=True):
         """
-        Call initialize_partials in components.
+        Call setup_partials in components.
 
         Parameters
         ----------
@@ -244,7 +244,7 @@ class Component(System):
         """
         super(Component, self)._setup_partials()
 
-        self.initialize_partials()
+        self.setup_partials()
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
                   desc='', var_set=0):
@@ -282,7 +282,7 @@ class Component(System):
         """
         if inspect.stack()[1][3] == '__init__':
             warn_deprecation("In the future, the 'add_input' method must be "
-                             "called from 'initialize_variables' rather than "
+                             "called from 'setup' rather than "
                              "in the '__init__' function.")
 
         if units == 'unitless':
@@ -411,7 +411,7 @@ class Component(System):
         """
         if inspect.stack()[1][3] == '__init__':
             warn_deprecation("In the future, the 'add_output' method must be "
-                             "called from 'initialize_variables' rather than "
+                             "called from 'setup' rather than "
                              "in the '__init__' function.")
 
         if units == 'unitless':

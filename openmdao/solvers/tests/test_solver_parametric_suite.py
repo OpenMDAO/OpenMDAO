@@ -20,7 +20,7 @@ from openmdao.test_suite.parametric_suite import parametric_suite
 
 class ImplComp4Test(ImplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', np.ones(2))
         self.add_output('y', np.ones(2))
         self.mtx = np.array([

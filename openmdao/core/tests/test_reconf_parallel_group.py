@@ -19,7 +19,7 @@ class ReconfGroup(Group):
 
         self.parallel = True
 
-    def initialize_subsystems(self):
+    def setup(self):
         self._mpi_proc_allocator.parallel = self.parallel
         if self.parallel:
             self.nl_solver = NewtonSolver()
@@ -65,8 +65,8 @@ class Test(unittest.TestCase):
             print(prob['C2.z'])
 
         # Now, reconfigure so ReconfGroup is not parallel, and x0, x1 should be preserved
-        prob.model.get_subsystem('g').setup('reconf')
-        prob.model.setup('update')
+        prob.model.get_subsystem('g').resetup('reconf')
+        prob.model.resetup('update')
         prob.run_model()
         assert_rel_error(self, prob['C1.z'], 8.0, 1e-8)
         assert_rel_error(self, prob['C2.z'], 6.0, 1e-8)

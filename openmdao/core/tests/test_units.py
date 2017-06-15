@@ -16,7 +16,7 @@ from openmdao.devtools.testutil import assert_rel_error
 class SpeedComp(ExplicitComponent):
     """Simple speed computation from distance and time with unit conversations."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('distance', val=1.0, units='km')
         self.add_input('time', val=1.0, units='h')
         self.add_output('speed', val=1.0, units='km/h')
@@ -28,7 +28,7 @@ class SpeedComp(ExplicitComponent):
 class SrcComp(ExplicitComponent):
     """Source provides degrees Celsius."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x1', 100.0)
         self.add_output('x2', 100.0, units='degC')
 
@@ -44,7 +44,7 @@ class SrcComp(ExplicitComponent):
 class TgtCompF(ExplicitComponent):
     """Target expressed in degrees F."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x2', 100.0, units='degF')
         self.add_output('x3', 100.0)
 
@@ -60,7 +60,7 @@ class TgtCompF(ExplicitComponent):
 class TgtCompC(ExplicitComponent):
     """Target expressed in degrees Celsius."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x2', 100.0, units='degC')
         self.add_output('x3', 100.0)
 
@@ -76,7 +76,7 @@ class TgtCompC(ExplicitComponent):
 class TgtCompK(ExplicitComponent):
     """Target expressed in degrees Kelvin."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x2', 100.0, units='degK')
         self.add_output('x3', 100.0)
 
@@ -92,7 +92,7 @@ class TgtCompK(ExplicitComponent):
 class TgtCompFMulti(ExplicitComponent):
     """Contains some extra inputs that might trip things up."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('_x2', 100.0, units='degF')
         self.add_input('x2', 100.0, units='degF')
         self.add_input('x2_', 100.0, units='degF')
@@ -280,7 +280,7 @@ class TestUnitConversion(unittest.TestCase):
         class SrcCompa(ExplicitComponent):
             """Source provides degrees Celsius."""
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x1', 100.0)
                 self.add_output('x2', 100.0, units='degC')
 
@@ -300,7 +300,7 @@ class TestUnitConversion(unittest.TestCase):
         class TgtCompFa(ExplicitComponent):
             """Target expressed in degrees F."""
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x2', 100.0, units='degF')
                 self.add_output('x3', 100.0)
 
@@ -425,11 +425,11 @@ class TestUnitConversion(unittest.TestCase):
     def test_bad_units(self):
         """Test error handling when invalid units are declared."""
         class Comp1(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', 0.0, units='junk')
 
         class Comp2(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_output('x', 0.0, units='junk')
 
         with self.assertRaises(Exception) as cm:
@@ -802,7 +802,7 @@ class TestUnitConversion(unittest.TestCase):
     def test_incompatible_connections(self):
 
         class BadComp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x2', 100.0, units='m')
                 self.add_output('x3', 100.0)
 
