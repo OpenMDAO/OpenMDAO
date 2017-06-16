@@ -42,7 +42,7 @@ for those calculations, the Group looks like a Component with an approximated Ja
 derivatives rather than partial derivatives, so any implicit states that are contained within the group will not have their
 partials exposed for convergence by solvers that are higher in the hierarchy. If you want to finite difference a Group that
 contains implicit states somewhere inside, then you must have an appropriate solver (such as NewtonSolver) inside the group
-to solve the implicit relationship.
+to solve the implicit relationships.
 
 Here is a classic example of where you might use an approximation like finite difference. In this example, we could just
 approximate the partials on components CompOne and CompTwo separately. However, CompTwo has a vector input that is 25 wide,
