@@ -206,10 +206,14 @@ class TestSystem(unittest.TestCase):
             residuals['C2.y'] = bad_val.tolist()
 
     def test_deprecated_solver_names(self):
+        class DummySolver():
+            pass
+
         model = Group()
 
+        # check nl_solver setter
         with warnings.catch_warnings(record=True) as w:
-            _ = model.nl_solver
+            model.nl_solver = DummySolver()
 
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
@@ -217,8 +221,9 @@ class TestSystem(unittest.TestCase):
                          "The 'nl_solver' attribute provides backwards compatibility "
                          "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
 
+        # check nl_solver getter
         with warnings.catch_warnings(record=True) as w:
-            model.nl_solver = None
+            solver = model.nl_solver
 
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
@@ -226,8 +231,11 @@ class TestSystem(unittest.TestCase):
                          "The 'nl_solver' attribute provides backwards compatibility "
                          "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
 
+        self.assertTrue(isinstance(solver, DummySolver))
+
+        # check ln_solver setter
         with warnings.catch_warnings(record=True) as w:
-            _ = model.ln_solver
+            model.ln_solver = DummySolver()
 
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
@@ -235,8 +243,9 @@ class TestSystem(unittest.TestCase):
                          "The 'ln_solver' attribute provides backwards compatibility "
                          "with OpenMDAO 1.x ; use 'linear_solver' instead.")
 
+        # check ln_solver getter
         with warnings.catch_warnings(record=True) as w:
-            model.ln_solver = None
+            solver = model.ln_solver
 
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
@@ -244,6 +253,7 @@ class TestSystem(unittest.TestCase):
                          "The 'ln_solver' attribute provides backwards compatibility "
                          "with OpenMDAO 1.x ; use 'linear_solver' instead.")
 
+        self.assertTrue(isinstance(solver, DummySolver))
 
 
 if __name__ == "__main__":
