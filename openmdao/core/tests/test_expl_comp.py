@@ -55,12 +55,17 @@ class TestExplCompSimple(unittest.TestCase):
 
     def test_compute(self):
         group = Group()
-        group.add_subsystem('comp1', IndepVarComp([('length', 1.0), ('width', 1.0)]))
+
+        comp1 = group.add_subsystem('comp1', IndepVarComp())
+        comp1.add_output('length', 1.0)
+        comp1.add_output('width', 1.0)
+
         group.add_subsystem('comp2', TestExplCompSimplePartial())
         group.add_subsystem('comp3', TestExplCompSimpleJacVec())
+
         group.connect('comp1.length', 'comp2.length')
-        group.connect('comp1.width', 'comp2.width')
         group.connect('comp1.length', 'comp3.length')
+        group.connect('comp1.width', 'comp2.width')
         group.connect('comp1.width', 'comp3.width')
 
         prob = Problem(model=group)
@@ -84,10 +89,13 @@ class TestExplCompSimple(unittest.TestCase):
         # Piggyback testing of list_states
 
         stream = cStringIO()
-        prob.model.list_states(stream=stream)
+        states = prob.model.list_outputs(explicit=False, out_stream=stream)
         content = stream.getvalue()
 
-        self.assertTrue('No states in model' in content)
+        print('states:', states)
+        print(content)
+
+        self.assertEqual(states, [])
 
 
 if __name__ == '__main__':

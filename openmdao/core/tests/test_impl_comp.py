@@ -101,9 +101,15 @@ class TestImplCompSimple(unittest.TestCase):
 
     def test_compute(self):
         group = Group()
-        group.add_subsystem('comp1', IndepVarComp([('a', 1.0), ('b', 1.0), ('c', 1.0)]))
+
+        comp1 = group.add_subsystem('comp1', IndepVarComp())
+        comp1.add_output('a', 1.0)
+        comp1.add_output('b', 1.0)
+        comp1.add_output('c', 1.0)
+
         group.add_subsystem('comp2', TestImplCompSimpleLinearize())
         group.add_subsystem('comp3', TestImplCompSimpleJacVec())
+
         group.connect('comp1.a', 'comp2.a')
         group.connect('comp1.b', 'comp2.b')
         group.connect('comp1.c', 'comp2.c')
@@ -135,18 +141,30 @@ class TestImplCompSimple(unittest.TestCase):
         # Piggyback testing of list_states
 
         stream = cStringIO()
-        prob.model.list_states(stream=stream)
+
+        states = prob.model.list_outputs(explicit=False, out_stream=stream)
         content = stream.getvalue()
+
+        print('states:', states)
+        print(content)
+
+        self.assertEqual(states, ['comp2.x', 'comp3.x'])
 
         self.assertTrue('comp2.x' in content)
         self.assertTrue('comp3.x' in content)
 
     def test_subgroup_list_states(self):
         group = Group()
-        group.add_subsystem('comp1', IndepVarComp([('a', 1.0), ('b', 1.0), ('c', 1.0)]))
+
+        comp1 = group.add_subsystem('comp1', IndepVarComp())
+        comp1.add_output('a', 1.0)
+        comp1.add_output('b', 1.0)
+        comp1.add_output('c', 1.0)
+
         sub = group.add_subsystem('sub', Group())
         sub.add_subsystem('comp2', TestImplCompSimpleLinearize())
         sub.add_subsystem('comp3', TestImplCompSimpleJacVec())
+
         group.connect('comp1.a', 'sub.comp2.a')
         group.connect('comp1.b', 'sub.comp2.b')
         group.connect('comp1.c', 'sub.comp2.c')
@@ -167,11 +185,17 @@ class TestImplCompSimple(unittest.TestCase):
         # Piggyback testing of list_states
 
         stream = cStringIO()
-        sub.list_states(stream=stream)
+        states = sub.list_outputs(explicit=False, out_stream=stream)
         content = stream.getvalue()
+
+        print('states:', states)
+        print(content)
+
+        self.assertEqual(states, ['sub.comp2.x', 'sub.comp3.x'])
 
         self.assertTrue('comp2.x' in content)
         self.assertTrue('comp3.x' in content)
+
 
     def test_guess_nonlinear(self):
 

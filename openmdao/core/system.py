@@ -2105,35 +2105,114 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
-    def list_states(self, stream=sys.stdout):
+    def list_outputs(self, explicit=True, implicit=True, out_stream=sys.stdout):
         """
-        List all states and their values and residuals.
+        List outputs.
 
         Parameters
         ----------
-        stream : output stream, optional
-            Stream to write the state info to. Default is sys.stdout.
+        explicit : bool, optional
+            include outputs from explicit components. Default is True.
+
+        implicit : bool, optional
+            include outputs from implicit components. Default is True.
+
+        out_stream : file_like
+            Where to send human readable output. Default is sys.stdout. Set to None to suppress.           
+
+        Returns
+        -------
+        list : list
+            list of names of outputs
         """
         outputs = self._outputs
         resids = self._residuals
         states = self._list_states()
 
+        names = []
+        if explicit:
+            names += self._outputs
+            print('outputs:', names)
+            if not implicit:
+                names = [ output for output in names if output not in states ]
+            print('outputs:', names)
+        elif implicit:
+            names = states
+            print('states:', states)
+
         pathname = self.pathname
         if pathname == '':
             pathname = 'model'
 
-        if states:
-            stream.write("\nStates in %s:\n\n" % pathname)
-            for uname in states:
-                stream.write("%s\n" % uname)
-                stream.write("Value: ")
-                stream.write(str(outputs._views[uname]))
-                stream.write('\n')
-                stream.write("Residual: ")
-                stream.write(str(resids._views[uname]))
-                stream.write('\n\n')
-        else:
-            stream.write("\nNo states in %s.\n" % pathname)
+        if out_stream:
+            if explicit:
+                out_stream.write("\nOutputs in %s:\n\n" % pathname)
+                for uname in outputs:
+                    out_stream.write("%s\n" % uname)
+                    out_stream.write("Value: ")
+                    out_stream.write(str(outputs._views[uname]))
+                    out_stream.write('\n')
+                    out_stream.write("Residual: ")
+                    out_stream.write(str(resids._views[uname]))
+                    out_stream.write('\n\n')
+            if implicit:
+                out_stream.write("\nStates in %s:\n\n" % pathname)
+                for uname in states:
+                    out_stream.write("%s\n" % uname)
+                    out_stream.write("Value: ")
+                    out_stream.write(str(outputs._views[uname]))
+                    out_stream.write('\n')
+                    out_stream.write("Residual: ")
+                    out_stream.write(str(resids._views[uname]))
+                    out_stream.write('\n\n')
+
+        return names
+
+    def list_residuals(self, explicit=True, implicit=True, out_stream=sys.stdout):
+        """
+        List residuals.
+
+        Parameters
+        ----------
+        explicit : bool, optional
+            include outputs from explicit components. Default is True.
+
+        implicit : bool, optional
+            include outputs from implicit components. Default is True.
+
+        out_stream : file_like
+            Where to send human readable output. Default is sys.stdout. Set to None to suppress.           
+
+        Returns
+        -------
+        list : list
+            list of names of residuals
+        """
+        outputs = self._outputs
+        resids = self._residuals
+        states = self._list_states()
+
+        names = []
+
+        pathname = self.pathname
+        if pathname == '':
+            pathname = 'model'
+
+        if out_stream:
+            if implicit:
+                out_stream.write("\nStates in %s:\n\n" % pathname)
+                for uname in states:
+                    out_stream.write("%s\n" % uname)
+                    out_stream.write("Value: ")
+                    out_stream.write(str(outputs._views[uname]))
+                    out_stream.write('\n')
+                    out_stream.write("Residual: ")
+                    out_stream.write(str(resids._views[uname]))
+                    out_stream.write('\n\n')
+            else:
+                out_stream.write("\nNo states in %s.\n" % pathname)
+
+        return names
 
     def run_solve_nonlinear(self):
         """
