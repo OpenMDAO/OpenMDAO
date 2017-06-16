@@ -262,7 +262,6 @@ class ApproxTotalsFeature(unittest.TestCase):
         model.approx_total_derivs()
 
         prob.setup()
-        prob.set_solver_print(level=0)
         prob.run_model()
 
         of = ['z']
@@ -271,6 +270,52 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         assert_rel_error(self, derivs['z', 'x'], [[300.0]], 1e-6)
         self.assertEqual(comp2._exec_count, 3)
+
+    def test_arguments(self):
+
+        class CompOne(ExplicitComponent):
+
+                def setup(self):
+                    self.add_input('x', val=0.0)
+                    self.add_output('y', val=np.zeros(25))
+                    self._exec_count = 0
+
+                def compute(self, inputs, outputs):
+                    x = inputs['x']
+                    outputs['y'] = np.arange(25) * x
+                    self._exec_count += 1
+
+
+        class CompTwo(ExplicitComponent):
+
+                def setup(self):
+                    self.add_input('y', val=np.zeros(25))
+                    self.add_output('z', val=0.0)
+                    self._exec_count = 0
+
+                def compute(self, inputs, outputs):
+                    y = inputs['y']
+                    outputs['z'] = np.sum(y)
+                    self._exec_count += 1
+
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
+        comp2 = model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
+
+        model.linear_solver = ScipyIterativeSolver()
+        model.approx_total_derivs(method='fd', step=1e-7, form='central', step_calc='rel')
+
+        prob.setup()
+        prob.run_model()
+
+        of = ['z']
+        wrt = ['x']
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+
+        assert_rel_error(self, derivs['z', 'x'], [[300.0]], 1e-6)
 
 if __name__ == "__main__":
     unittest.main()

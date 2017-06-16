@@ -29,7 +29,31 @@ The step size can be any non-zero number, but should be positive (one can change
 Approximating Total Derivatives
 ===============================
 
-There are also times where it makes more sense to approximate the derivatives for an entire group in one shot.
+There are also times where it makes more sense to approximate the derivatives for an entire group in one shot. You can turn on
+the approximation by calling `approx_total_derivs` on any `Group`.
+
+.. automethod:: openmdao.core.group.Group.approx_total_derivs
+    :noindex:
+
+The default method is finite difference, and OpenMDAO
+automatically figures out what derivatives are needed to populate the Jacobian. When total derivative approximation is turned
+on in a group, all linear solves or derivative computation that are intiated above that Group's level are approximated, and
+for those calculations, the Group looks like a Component with an approximated Jacobian. However, the Jacobian contains total
+derivatives rather than partial derivatives, so any implicit states that are contained within the group will not have their
+partials exposed for convergence by solvers that are higher in the hierarchy. If you want to finite difference a Group that
+contains implicit states somewhere inside, then you must have an appropriate solver (such as NewtonSolver) inside the group
+to solve the implicit relationship.
+
+Here is a classic example of where you might use an approximation like finite difference. In this example, we could just
+approximate the partials on components CompOne and CompTwo separately. However, CompTwo has a vector input that is 25 wide,
+so it would require 25 separate executions under finite difference. If we instead approximate the total derivatives on the
+whole group, we only have one input, so just one extra execution.
 
 .. embed-test::
     openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_basic
+
+The same arguments are used for both partial and total derivative approximation specifications. Here we set the finite difference
+step size, the form to central differences, and the step_calc to relative instead of absolute.
+
+.. embed-test::
+    openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_arguments
