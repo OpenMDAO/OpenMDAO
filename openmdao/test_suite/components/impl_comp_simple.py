@@ -10,7 +10,7 @@ from openmdao.api import ImplicitComponent
 
 class TestImplCompSimple(ImplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('a', val=1.)
         self.add_output('x', val=0.)
 

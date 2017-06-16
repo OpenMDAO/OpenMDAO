@@ -34,7 +34,7 @@ class TestLinearSystem(unittest.TestCase):
         prob.setup()
 
         lingrp = prob.model.get_subsystem('lingrp')
-        lingrp.ln_solver = ScipyIterativeSolver()
+        lingrp.linear_solver = ScipyIterativeSolver()
 
         prob.set_solver_print(level=0)
         prob.run_model()

@@ -21,7 +21,7 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
 
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.mpi import FakeComm
+from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.vectors.default_vector import DefaultVector
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -382,7 +382,7 @@ class Problem(object):
 
                 explicit = isinstance(comp, ExplicitComponent)
                 deprecated = isinstance(comp, DepComponent)
-                matrix_free = comp._matrix_free
+                matrix_free = comp.matrix_free
                 c_name = comp.pathname
 
                 # TODO: Check deprecated deriv_options.
@@ -700,16 +700,12 @@ class Problem(object):
 
         # Convert of and wrt names from promoted to unpromoted
         # (which is absolute path since we're at the top)
-        if global_names:
-            oldwrt, oldof = wrt, of
-        else:
-            oldof = of
+        oldwrt, oldof = wrt, of
+        if not global_names:
             of = []
             for names in oldof:
                 of.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
                                 for name in names))
-
-            oldwrt = wrt
             wrt = []
             for names in oldwrt:
                 wrt.append(tuple(model._var_allprocs_prom2abs_list['output'][name][0]
@@ -754,17 +750,14 @@ class Problem(object):
                         in_idxs = in_voi_meta['indices']
 
                 distrib = in_var_meta['distributed']
-                dup = False
                 if in_idxs is not None:
                     irange = in_idxs
                     loc_size = len(in_idxs)
-                elif distrib:
+                    dup = False
+                else:
                     irange = range(in_var_meta['global_size'])
                     loc_size = end - start
-                else:  # var is duplicated
-                    irange = range(end - start)
-                    loc_size = end - start
-                    dup = True
+                    dup = not distrib
 
                 loc_idx = -1
                 for idx in irange:
@@ -782,12 +775,8 @@ class Problem(object):
                     if start <= idx < end:
                         flat_view[idx - start] = 1.0
                         store = True
-                    elif dup:
-                        # var is duplicated so we don't loop over the full
-                        # distributed size
-                        store = True
                     else:
-                        store = False
+                        store = dup
 
                     if store:
                         loc_idx += 1

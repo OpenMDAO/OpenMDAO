@@ -25,12 +25,12 @@ class MyExplicitComp(ExplicitComponent):
         super(MyExplicitComp, self).__init__()
         self._jac_type = jac_type
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', val=np.zeros(2))
         self.add_input('y', val=np.zeros(2))
         self.add_output('f', val=np.zeros(2))
 
-    def initialize_partials(self):
+    def setup_partials(self):
         val = self._jac_type(np.array([[1., 1.], [1., 1.]]))
         if isinstance(val, list):
             self.declare_partials('f', ['x','y'], rows=val[1], cols=val[2], val=val[0])
@@ -73,12 +73,12 @@ class MyExplicitComp2(ExplicitComponent):
         super(MyExplicitComp2, self).__init__()
         self._jac_type = jac_type
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('w', val=np.zeros(3))
         self.add_input('z', val=0.0)
         self.add_output('f', val=0.0)
 
-    def initialize_partials(self):
+    def setup_partials(self):
         val = self._jac_type(np.array([[7.]]))
         if isinstance(val, list):
             self.declare_partials('f', 'z', rows=val[1], cols=val[2], val=val[0])
@@ -118,7 +118,7 @@ class ExplicitSetItemComp(ExplicitComponent):
         self._constructor = constructor
         super(ExplicitSetItemComp, self).__init__()
 
-    def initialize_variables(self):
+    def setup(self):
         if self._shape == 'scalar':
             in_val = 1
             out_val = 1
@@ -235,9 +235,9 @@ class TestJacobian(unittest.TestCase):
         top.connect('C1.f', 'C2.z', src_indices=[1])
 
         top.jacobian = jac_class()
-        top.nl_solver = NewtonSolver()
-        top.nl_solver.ln_solver = ScipyIterativeSolver(maxiter=100)
-        top.ln_solver = ScipyIterativeSolver(
+        top.nonlinear_solver = NewtonSolver()
+        top.nonlinear_solver.linear_solver = ScipyIterativeSolver(maxiter=100)
+        top.linear_solver = ScipyIterativeSolver(
             maxiter=200, atol=1e-10, rtol=1e-10)
         prob.set_solver_print(level=0)
 
@@ -341,8 +341,8 @@ class TestJacobian(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
         d1 = prob.model.get_subsystem('d1')
 
@@ -364,7 +364,7 @@ class TestJacobian(unittest.TestCase):
         c2 = prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c'))
         c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0'))
 
-        prob.model.nl_solver = NewtonSolver()
+        prob.model.nonlinear_solver = NewtonSolver()
         c3.jacobian = DenseJacobian()
 
         prob.model.connect('indep.x', 'C1.a')
@@ -393,8 +393,8 @@ class TestJacobian(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
         prob.model.jacobian = DenseJacobian()
 
@@ -423,8 +423,8 @@ class TestJacobian(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
 
@@ -446,7 +446,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('y=2.0*x*x'))
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
-        prob.model.nl_solver = NewtonSolver()
+        prob.model.nonlinear_solver = NewtonSolver()
         G1.jacobian = DenseJacobian()
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
@@ -468,10 +468,10 @@ class TestJacobian(unittest.TestCase):
         # that compute also uses and could get corrupted
 
         class Comp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', val=1.0, shape=2)
                 self.add_output('y', val=1.0, shape=2)
-            def initialize_partials(self):
+            def setup_partials(self):
                 self.val = 2 * np.ones(2)
                 self.rows = np.arange(2)
                 self.cols = np.arange(2)
@@ -497,7 +497,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('y=2.0*x'))
         G1.add_subsystem('C2', ExecComp('y=3.0*x'))
 
-        G1.nl_solver = NewtonSolver()
+        G1.nonlinear_solver = NewtonSolver()
         prob.model.jacobian = CSRJacobian()
 
         prob.model.connect('indeps.x', 'G1.C1.x')
@@ -513,7 +513,7 @@ class TestJacobian(unittest.TestCase):
 
         class ParaboloidApply(ImplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', val=0.0)
                 self.add_input('y', val=0.0)
 

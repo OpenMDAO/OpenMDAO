@@ -15,9 +15,9 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.group import Group
-from openmdao.solvers.nl_bgs import NonlinearBlockGS
-from openmdao.solvers.ln_scipy import ScipyIterativeSolver
-from openmdao.solvers.nl_newton import NewtonSolver
+from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
+from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver
+from openmdao.solvers.nonlinear.newton import NewtonSolver
 
 
 class SellarDis1(ExplicitComponent):
@@ -31,7 +31,7 @@ class SellarDis1(ExplicitComponent):
         self._units = units
         self._scaling = scaling
 
-    def initialize_variables(self):
+    def setup(self):
 
         if self._units:
             units = 'ft'
@@ -55,7 +55,7 @@ class SellarDis1(ExplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0, units=units, ref=ref)
 
-    def initialize_partials(self):
+    def setup_partials(self):
         self.approx_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -79,16 +79,16 @@ class SellarDis1withDerivatives(SellarDis1):
     Component containing Discipline 1 -- derivatives version.
     """
 
-    def initialize_partials(self):
+    def setup_partials(self):
         pass
 
     def compute_partials(self, inputs, outputs, partials):
         """
         Jacobian for Sellar discipline 1.
         """
-        partials['y1','y2'] = -0.2
-        partials['y1','z'] = np.array([[2.0 * inputs['z'][0], 1.0]])
-        partials['y1','x'] = 1.0
+        partials['y1', 'y2'] = -0.2
+        partials['y1', 'z'] = np.array([[2.0 * inputs['z'][0], 1.0]])
+        partials['y1', 'x'] = 1.0
 
 
 class SellarDis2(ExplicitComponent):
@@ -102,7 +102,7 @@ class SellarDis2(ExplicitComponent):
         self._units = units
         self._scaling = scaling
 
-    def initialize_variables(self):
+    def setup(self):
         if self._units:
             units = 'inch'
         else:
@@ -122,7 +122,7 @@ class SellarDis2(ExplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0, units=units, ref=ref)
 
-    def initialize_partials(self):
+    def setup_partials(self):
         self.approx_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -151,7 +151,7 @@ class SellarDis2withDerivatives(SellarDis2):
     Component containing Discipline 2 -- derivatives version.
     """
 
-    def initialize_partials(self):
+    def setup_partials(self):
         pass
 
     def compute_partials(self, inputs, outputs, J):
@@ -172,26 +172,26 @@ class SellarNoDerivatives(Group):
     """
 
     def initialize(self):
-        self.metadata.declare('nl_solver', default=NonlinearBlockGS(),
+        self.metadata.declare('nonlinear_solver', default=NonlinearBlockGS(),
                               desc='Nonlinear solver for Sellar MDA')
         self.metadata.declare('nl_atol', default=None,
                               desc='User-specified atol for nonlinear solver.')
         self.metadata.declare('nl_maxiter', default=None,
                               desc='Iteration limit for nonlinear solver.')
-        self.metadata.declare('ln_solver', default=ScipyIterativeSolver(),
+        self.metadata.declare('linear_solver', default=ScipyIterativeSolver(),
                               desc='Linear solver')
         self.metadata.declare('ln_atol', default=None,
                               desc='User-specified atol for linear solver.')
         self.metadata.declare('ln_maxiter', default=None,
                               desc='Iteration limit for linear solver.')
 
-    def initialize_subsystems(self):
+    def setup(self):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         cycle = self.add_subsystem('cycle', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        d1 = cycle.add_subsystem('d1', SellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
-        d2 = cycle.add_subsystem('d2', SellarDis2(), promotes=['z', 'y1', 'y2'])
+        cycle.add_subsystem('d1', SellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
+        cycle.add_subsystem('d2', SellarDis2(), promotes=['z', 'y1', 'y2'])
 
         self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                            z=np.array([0.0, 0.0]), x=0.0),
@@ -200,19 +200,19 @@ class SellarNoDerivatives(Group):
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        self.nl_solver = NonlinearBlockGS()
+        self.nonlinear_solver = NonlinearBlockGS()
 
-        self.nl_solver = self.metadata['nl_solver']
+        self.nonlinear_solver = self.metadata['nonlinear_solver']
         if self.metadata['nl_atol']:
-            self.nl_solver.options['atol'] = self.metadata['nl_atol']
+            self.nonlinear_solver.options['atol'] = self.metadata['nl_atol']
         if self.metadata['nl_maxiter']:
-            self.nl_solver.options['maxiter'] = self.metadata['nl_maxiter']
+            self.nonlinear_solver.options['maxiter'] = self.metadata['nl_maxiter']
 
-        cycle.ln_solver = self.metadata['ln_solver']
+        cycle.linear_solver = self.metadata['linear_solver']
         if self.metadata['ln_atol']:
-            cycle.ln_solver.options['atol'] = self.metadata['ln_atol']
+            cycle.linear_solver.options['atol'] = self.metadata['ln_atol']
         if self.metadata['ln_maxiter']:
-            cycle.ln_solver.options['maxiter'] = self.metadata['ln_maxiter']
+            cycle.linear_solver.options['maxiter'] = self.metadata['ln_maxiter']
 
 
 class SellarDerivatives(Group):
@@ -221,20 +221,20 @@ class SellarDerivatives(Group):
     """
 
     def initialize(self):
-        self.metadata.declare('nl_solver', default=NonlinearBlockGS(),
+        self.metadata.declare('nonlinear_solver', default=NonlinearBlockGS(),
                               desc='Nonlinear solver for Sellar MDA')
         self.metadata.declare('nl_atol', default=None,
                               desc='User-specified atol for nonlinear solver.')
         self.metadata.declare('nl_maxiter', default=None,
                               desc='Iteration limit for nonlinear solver.')
-        self.metadata.declare('ln_solver', default=ScipyIterativeSolver(),
+        self.metadata.declare('linear_solver', default=ScipyIterativeSolver(),
                               desc='Linear solver')
         self.metadata.declare('ln_atol', default=None,
                               desc='User-specified atol for linear solver.')
         self.metadata.declare('ln_maxiter', default=None,
                               desc='Iteration limit for linear solver.')
 
-    def initialize_subsystems(self):
+    def setup(self):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
@@ -248,17 +248,17 @@ class SellarDerivatives(Group):
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        self.nl_solver = self.metadata['nl_solver']
+        self.nonlinear_solver = self.metadata['nonlinear_solver']
         if self.metadata['nl_atol']:
-            self.nl_solver.options['atol'] = self.metadata['nl_atol']
+            self.nonlinear_solver.options['atol'] = self.metadata['nl_atol']
         if self.metadata['nl_maxiter']:
-            self.nl_solver.options['maxiter'] = self.metadata['nl_maxiter']
+            self.nonlinear_solver.options['maxiter'] = self.metadata['nl_maxiter']
 
-        self.ln_solver = self.metadata['ln_solver']
+        self.linear_solver = self.metadata['linear_solver']
         if self.metadata['ln_atol']:
-            self.ln_solver.options['atol'] = self.metadata['ln_atol']
+            self.linear_solver.options['atol'] = self.metadata['ln_atol']
         if self.metadata['ln_maxiter']:
-            self.ln_solver.options['maxiter'] = self.metadata['ln_maxiter']
+            self.linear_solver.options['maxiter'] = self.metadata['ln_maxiter']
 
 
 class SellarDerivativesConnected(Group):
@@ -266,7 +266,7 @@ class SellarDerivativesConnected(Group):
     Group containing the Sellar MDA. This version uses the disciplines with derivatives.
     """
 
-    def initialize_subsystems(self):
+    def setup(self):
         self.add_subsystem('px', IndepVarComp('x', 1.0))
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
 
@@ -284,8 +284,8 @@ class SellarDerivativesConnected(Group):
         self.connect('d1.y1', ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1'])
         self.connect('d2.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
 
-        self.nl_solver = NonlinearBlockGS()
-        self.ln_solver = ScipyIterativeSolver()
+        self.nonlinear_solver = NonlinearBlockGS()
+        self.linear_solver = ScipyIterativeSolver()
 
 
 class SellarDerivativesGrouped(Group):
@@ -294,49 +294,49 @@ class SellarDerivativesGrouped(Group):
     """
 
     def initialize(self):
-        self.metadata.declare('nl_solver', default=NonlinearBlockGS(),
+        self.metadata.declare('nonlinear_solver', default=NonlinearBlockGS(),
                               desc='Nonlinear solver for Sellar MDA')
         self.metadata.declare('nl_atol', default=None,
                               desc='User-specified atol for nonlinear solver.')
         self.metadata.declare('nl_maxiter', default=None,
                               desc='Iteration limit for nonlinear solver.')
-        self.metadata.declare('ln_solver', default=ScipyIterativeSolver(),
+        self.metadata.declare('linear_solver', default=ScipyIterativeSolver(),
                               desc='Linear solver')
         self.metadata.declare('ln_atol', default=None,
                               desc='User-specified atol for linear solver.')
         self.metadata.declare('ln_maxiter', default=None,
                               desc='Iteration limit for linear solver.')
 
-    def initialize_subsystems(self):
+    def setup(self):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         mda = self.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        mda.ln_solver = ScipyIterativeSolver()
+        mda.linear_solver = ScipyIterativeSolver()
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
         self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                     z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
-                 promotes=['obj', 'x', 'z', 'y1', 'y2'])
+                                               z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        mda.nl_solver = NonlinearBlockGS()
-        self.ln_solver = ScipyIterativeSolver()
+        mda.nonlinear_solver = NonlinearBlockGS()
+        self.linear_solver = ScipyIterativeSolver()
 
-        self.nl_solver = self.metadata['nl_solver']
+        self.nonlinear_solver = self.metadata['nonlinear_solver']
         if self.metadata['nl_atol']:
-            self.nl_solver.options['atol'] = self.metadata['nl_atol']
+            self.nonlinear_solver.options['atol'] = self.metadata['nl_atol']
         if self.metadata['nl_maxiter']:
-            self.nl_solver.options['maxiter'] = self.metadata['nl_maxiter']
+            self.nonlinear_solver.options['maxiter'] = self.metadata['nl_maxiter']
 
-        self.ln_solver = self.metadata['ln_solver']
+        self.linear_solver = self.metadata['linear_solver']
         if self.metadata['ln_atol']:
-            self.ln_solver.options['atol'] = self.metadata['ln_atol']
+            self.linear_solver.options['atol'] = self.metadata['ln_atol']
         if self.metadata['ln_maxiter']:
-            self.ln_solver.options['maxiter'] = self.metadata['ln_maxiter']
+            self.linear_solver.options['maxiter'] = self.metadata['ln_maxiter']
 
 
 class StateConnection(ImplicitComponent):
@@ -344,7 +344,7 @@ class StateConnection(ImplicitComponent):
     Define connection with an explicit equation.
     """
 
-    def initialize_variables(self):
+    def setup(self):
         # Inputs
         self.add_input('y2_actual', 1.0)
 
@@ -383,28 +383,28 @@ class SellarStateConnection(Group):
     """
 
     def initialize(self):
-        self.metadata.declare('nl_solver', default=NewtonSolver(),
+        self.metadata.declare('nonlinear_solver', default=NewtonSolver(),
                               desc='Nonlinear solver for Sellar MDA')
         self.metadata.declare('nl_atol', default=None,
                               desc='User-specified atol for nonlinear solver.')
         self.metadata.declare('nl_maxiter', default=None,
                               desc='Iteration limit for nonlinear solver.')
-        self.metadata.declare('ln_solver', default=ScipyIterativeSolver(),
+        self.metadata.declare('linear_solver', default=ScipyIterativeSolver(),
                               desc='Linear solver')
         self.metadata.declare('ln_atol', default=None,
                               desc='User-specified atol for linear solver.')
         self.metadata.declare('ln_maxiter', default=None,
                               desc='Iteration limit for linear solver.')
 
-    def initialize_subsystems(self):
+    def setup(self):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         sub = self.add_subsystem('sub', Group(), promotes=['x', 'z', 'y1', 'state_eq.y2_actual', 'state_eq.y2_command', 'd1.y2', 'd2.y2'])
-        sub.ln_solver = ScipyIterativeSolver()
+        sub.linear_solver = ScipyIterativeSolver()
 
         subgrp = sub.add_subsystem('state_eq_group', Group(), promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
-        subgrp.ln_solver = ScipyIterativeSolver()
+        subgrp.linear_solver = ScipyIterativeSolver()
         subgrp.add_subsystem('state_eq', StateConnection())
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
@@ -414,25 +414,26 @@ class SellarStateConnection(Group):
         self.connect('d2.y2', 'state_eq.y2_actual')
 
         self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                     z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
-                 promotes=['x', 'z', 'y1', 'obj'])
+                                               z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                           promotes=['x', 'z', 'y1', 'obj'])
         self.connect('d2.y2', 'obj_cmp.y2')
 
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2'])
         self.connect('d2.y2', 'con_cmp2.y2')
 
-        self.nl_solver = self.metadata['nl_solver']
+        self.nonlinear_solver = self.metadata['nonlinear_solver']
         if self.metadata['nl_atol']:
-            self.nl_solver.options['atol'] = self.metadata['nl_atol']
+            self.nonlinear_solver.options['atol'] = self.metadata['nl_atol']
         if self.metadata['nl_maxiter']:
-            self.nl_solver.options['maxiter'] = self.metadata['nl_maxiter']
+            self.nonlinear_solver.options['maxiter'] = self.metadata['nl_maxiter']
 
-        self.ln_solver = self.metadata['ln_solver']
+        self.linear_solver = self.metadata['linear_solver']
         if self.metadata['ln_atol']:
-            self.ln_solver.options['atol'] = self.metadata['ln_atol']
+            self.linear_solver.options['atol'] = self.metadata['ln_atol']
         if self.metadata['ln_maxiter']:
-            self.ln_solver.options['maxiter'] = self.metadata['ln_maxiter']
+            self.linear_solver.options['maxiter'] = self.metadata['ln_maxiter']
+
 
 class SellarImplicitDis1(ImplicitComponent):
     """
@@ -445,7 +446,7 @@ class SellarImplicitDis1(ImplicitComponent):
         self._units = units
         self._scaling = scaling
 
-    def initialize_variables(self):
+    def setup(self):
         if self._units:
             units = 'ft'
         else:
@@ -504,7 +505,7 @@ class SellarImplicitDis2(ImplicitComponent):
         self._units = units
         self._scaling = scaling
 
-    def initialize_variables(self):
+    def setup(self):
         if self._units:
             units = 'inch'
         else:

@@ -29,21 +29,24 @@ class Component(System):
     ----------
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
-    _matrix_free : Bool
+    matrix_free : Bool
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian.
+    distributed : bool
+        This is True if the component has variables that are distributed across multiple
+        processes.
     _var_rel2data_io : dict
         Dictionary mapping relative names to dicts with keys (prom, rel, my_idx, type_, metadata).
         This is only needed while adding inputs and outputs. During setup, these are used to
         build the dictionaries of metadata.
     _static_var_rel2data_io : dict
-        Static version of above - stores data for variables added outside of initialize_variables.
+        Static version of above - stores data for variables added outside of setup.
     _var_rel_names : {'input': [str, ...], 'output': [str, ...]}
         List of relative names of owned variables existing on current proc.
         This is only needed while adding inputs and outputs. During setup, these are used to
         determine the list of absolute names.
     _static_var_rel_names : dict
-        Static version of above - stores names of variables added outside of initialize_variables.
+        Static version of above - stores names of variables added outside of setup.
     """
 
     def __init__(self, **kwargs):
@@ -58,7 +61,8 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
         self._approx_schemes = OrderedDict()
 
-        self._matrix_free = False
+        self.matrix_free = False
+        self.distributed = False
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
@@ -66,7 +70,7 @@ class Component(System):
         self._static_var_rel_names = {'input': [], 'output': []}
         self._static_var_rel2data_io = {}
 
-    def initialize_variables(self):
+    def setup(self):
         """
         Declare inputs and outputs.
 
@@ -78,7 +82,7 @@ class Component(System):
         """
         pass
 
-    def initialize_partials(self):
+    def setup_partials(self):
         """
         Declare Jacobian structure/approximations.
 
@@ -92,7 +96,7 @@ class Component(System):
 
     def _setup_vars(self, recurse=True):
         """
-        Call initialize_variables in components and count variables, total and by var_set.
+        Call setup in components and count variables, total and by var_set.
 
         Parameters
         ----------
@@ -114,7 +118,7 @@ class Component(System):
             self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
-        self.initialize_variables()
+        self.setup()
         self._static_mode = True
 
         # Compute num_var
@@ -235,7 +239,7 @@ class Component(System):
 
     def _setup_partials(self, recurse=True):
         """
-        Call initialize_partials in components.
+        Call setup_partials in components.
 
         Parameters
         ----------
@@ -244,7 +248,7 @@ class Component(System):
         """
         super(Component, self)._setup_partials()
 
-        self.initialize_partials()
+        self.setup_partials()
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
                   desc='', var_set=0):
@@ -282,7 +286,7 @@ class Component(System):
         """
         if inspect.stack()[1][3] == '__init__':
             warn_deprecation("In the future, the 'add_input' method must be "
-                             "called from 'initialize_variables' rather than "
+                             "called from 'setup' rather than "
                              "in the '__init__' function.")
 
         if units == 'unitless':
@@ -357,8 +361,7 @@ class Component(System):
         return metadata
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0,
-                   distributed=False):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
         """
         Add an output variable to the component.
 
@@ -401,8 +404,6 @@ class Component(System):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
-        distributed : bool
-            If True, this variable is distributed across multiple processes.
 
         Returns
         -------
@@ -411,7 +412,7 @@ class Component(System):
         """
         if inspect.stack()[1][3] == '__init__':
             warn_deprecation("In the future, the 'add_output' method must be "
-                             "called from 'initialize_variables' rather than "
+                             "called from 'setup' rather than "
                              "in the '__init__' function.")
 
         if units == 'unitless':
@@ -485,7 +486,7 @@ class Component(System):
         # var_set: taken as is
         metadata['var_set'] = var_set
 
-        metadata['distributed'] = distributed
+        metadata['distributed'] = self.distributed
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -698,11 +699,15 @@ class Component(System):
             out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
             if abs_key[1] in self._var_abs2meta['input']:
                 in_size = np.prod(self._var_abs2meta['input'][abs_key[1]]['shape'])
-            elif abs_key[1] in self._var_abs2meta['output']:
+            else:  # assume output (or get a KeyError)
                 in_size = np.prod(self._var_abs2meta['output'][abs_key[1]]['shape'])
+
+            if in_size == 0 and self.comm.rank != 0:  # 'inactive' component
+                return
+
             rows = meta['rows']
             cols = meta['cols']
-            if rows is not None:
+            if not (rows is None or rows.size == 0):
                 if rows.min() < 0:
                     msg = '{}: d({})/d({}): row indices must be non-negative'
                     raise ValueError(msg.format(self.pathname, of, wrt))

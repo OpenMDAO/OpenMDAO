@@ -18,7 +18,7 @@ class ReconfComp(ExplicitComponent):
 
         self.size = size
 
-    def initialize_variables(self):
+    def setup(self):
         self.size += 1
         self.add_input('x', val=1.0)
         self.add_output('y', val=np.zeros(self.size))
@@ -32,14 +32,14 @@ class ReconfComp(ExplicitComponent):
 
 class Comp(ExplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', val=1.0)
         self.add_output('z', val=1.0)
 
     def compute(self, inputs, outputs):
         outputs['z'] = 3 * inputs['x']
 
-    def compute_partials_derivs(self, inputs, outputs, jacobian):
+    def compute_partials(self, inputs, outputs, jacobian):
         jacobian['z', 'x'] = 3.0
 
 
@@ -64,7 +64,7 @@ class Test(unittest.TestCase):
         assert_rel_error(self, totals['y', 'x'], [[2.0]])
 
         # Now run the setup method on the root system; size of y = 2
-        p.model.setup()
+        p.model.resetup()
         p['x'] = 3
         p.run_model()
         totals = p.compute_total_derivs(wrt=['x'], of=['y'])
@@ -74,8 +74,8 @@ class Test(unittest.TestCase):
         assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones((2, 1)))
 
         # Now reconfigure from c2 and update in root; size of y = 3; the value of x is preserved
-        p.model.get_subsystem('c2').setup('reconf')
-        p.model.setup('update')
+        p.model.get_subsystem('c2').resetup('reconf')
+        p.model.resetup('update')
         p.run_model()
         totals = p.compute_total_derivs(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 3.0)
@@ -84,8 +84,8 @@ class Test(unittest.TestCase):
         assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones((3, 1)))
 
         # Now reconfigure from c3 and update in root; size of y = 3; the value of x is preserved
-        p.model.get_subsystem('c3').setup('reconf')
-        p.model.setup('update')
+        p.model.get_subsystem('c3').resetup('reconf')
+        p.model.resetup('update')
         p.run_model()
         totals = p.compute_total_derivs(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 3.0)
@@ -96,7 +96,7 @@ class Test(unittest.TestCase):
         # Finally, setup reconf from root; size of y = 4
         # Since we are at the root, calling setup('full') and setup('reconf') have the same effect.
         # In both cases, variable values are lost so we have to set x=3 again.
-        p.model.setup('reconf')
+        p.model.resetup('reconf')
         p['x'] = 3
         p.run_model()
         totals = p.compute_total_derivs(wrt=['x'], of=['y'])

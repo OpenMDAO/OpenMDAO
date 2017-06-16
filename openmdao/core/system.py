@@ -17,7 +17,7 @@ from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobi
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 
 from openmdao.utils.general_utils import \
-    determine_adder_scaler, format_as_float_or_array
+    determine_adder_scaler, format_as_float_or_array, warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
@@ -155,9 +155,9 @@ class System(object):
     _scaling_vecs : dict of dict of Vectors
         First key is indicates vector type and coefficient, second key is vec_name.
     #
-    _nl_solver : <NonlinearSolver>
+    _nonlinear_solver : <NonlinearSolver>
         Nonlinear solver to be used for solve_nonlinear.
-    _ln_solver : <LinearSolver>
+    _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
     #
     _jacobian : <Jacobian>
@@ -176,18 +176,18 @@ class System(object):
         dict of all driver responses added to the system.
     #
     _static_mode : bool
-        If true, we are outside of initialize_subsystems and initialize_variables.
+        If true, we are outside of setup.
         In this case, add_input, add_output, and add_subsystem all add to the
         '_static' versions of the respective data structures.
         These data structures are never reset during reconfiguration.
     _static_subsystems_allprocs : [<System>, ...]
-        List of subsystems that stores all subsystems added outside of initialize_subsystems.
+        List of subsystems that stores all subsystems added outside of setup.
     _static_manual_connections : dict
-        Dictionary that stores all explicit connections added outside of initialize_subsystems.
+        Dictionary that stores all explicit connections added outside of setup.
     _static_design_vars : dict of dict
-        Driver design variables added outside of initialize_subsystems.
+        Driver design variables added outside of setup.
     _static_responses : dict of dict
-        Driver responses added outside of initialize_subsystems.
+        Driver responses added outside of setup.
     #
     _reconfigured : bool
         If True, this system has reconfigured, and the immediate parent should update.
@@ -266,8 +266,8 @@ class System(object):
             ('residual', 'norm0'): {}, ('residual', 'norm1'): {},
         }
 
-        self._nl_solver = None
-        self._ln_solver = None
+        self._nonlinear_solver = None
+        self._linear_solver = None
 
         self._jacobian = DictionaryJacobian()
         self._jacobian._system = self
@@ -301,7 +301,7 @@ class System(object):
                 old = {'input': self._inputs, 'output': self._outputs}
 
                 # Perform reconfiguration
-                self.setup('reconf')
+                self.resetup('reconf')
 
                 new = {'input': self._inputs, 'output': self._outputs}
 
@@ -330,7 +330,7 @@ class System(object):
         if reconf:
             # Perform an update setup
             with self._unscaled_context_all():
-                self.setup('update')
+                self.resetup('update')
 
             # Reset the _reconfigured attribute to False
             for subsys in self._subsystems_myproc:
@@ -546,7 +546,7 @@ class System(object):
 
         return root_vectors
 
-    def setup(self, setup_mode='full'):
+    def resetup(self, setup_mode='full'):
         """
         Public wrapper for _setup that reconfigures after an initial setup has been performed.
 
@@ -648,7 +648,7 @@ class System(object):
 
     def _setup_vars(self, recurse=True):
         """
-        Call initialize_variables in components and count variables, total and by var_set.
+        Call setup in components and count variables, total and by var_set.
 
         Parameters
         ----------
@@ -743,20 +743,13 @@ class System(object):
         """
         meta = self._var_allprocs_abs2meta['output']
 
-        if self.comm.size == 1:
-            for abs_name in self._var_allprocs_abs_names['output']:
-                mymeta = meta[abs_name]
-                local_shape = mymeta['shape']
-                mymeta['global_size'] = np.prod(local_shape)
-                mymeta['global_shape'] = local_shape
-            return
-
         # now set global sizes and shapes into metadata for distributed outputs
         sizes = self._var_sizes['output']
         for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
             mymeta = meta[abs_name]
             local_shape = mymeta['shape']
             if not mymeta['distributed']:
+                # not distributed, just use local shape and size
                 mymeta['global_size'] = np.prod(local_shape)
                 mymeta['global_shape'] = local_shape
                 continue
@@ -992,7 +985,6 @@ class System(object):
                 if src_indices is not None:
                     if not (np.isscalar(ref) and np.isscalar(ref0)):
                         global_shape_out = meta_out['global_shape']
-                        global_size_out = meta_out['global_size']
                         if src_indices.ndim != 1:
                             if len(shape_out) == 1:
                                 src_indices = src_indices.flatten()
@@ -1065,10 +1057,10 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        if self._nl_solver is not None:
-            self._nl_solver._setup_solvers(self, 0)
-        if self._ln_solver is not None:
-            self._ln_solver._setup_solvers(self, 0)
+        if self._nonlinear_solver is not None:
+            self._nonlinear_solver._setup_solvers(self, 0)
+        if self._linear_solver is not None:
+            self._linear_solver._setup_solvers(self, 0)
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -1076,7 +1068,7 @@ class System(object):
 
     def _setup_partials(self, recurse=True):
         """
-        Call initialize_partials in components.
+        Call setup_partials in components.
 
         Parameters
         ----------
@@ -1108,13 +1100,13 @@ class System(object):
             # we have a nonlinear solver that uses derivatives, this is
             # currently an error if the AssembledJacobian is not a DenseJacobian.
             # In a future story we'll add support for sparse AssembledJacobians.
-            if self._nl_solver is not None and self._nl_solver.supports['gradients']:
+            if self._nonlinear_solver is not None and self._nonlinear_solver.supports['gradients']:
                 if not isinstance(jacobian, DenseJacobian):
                     raise RuntimeError("System '%s' has a solver of type '%s'"
                                        "but a sparse AssembledJacobian has been set in a "
                                        "higher level system." %
                                        (self.pathname,
-                                        self._nl_solver.__class__.__name__))
+                                        self._nonlinear_solver.__class__.__name__))
                 self._views_assembled_jac = True
             self._owns_assembled_jac = False
 
@@ -1125,11 +1117,11 @@ class System(object):
             for subsys in self.system_iter():
 
                 try:
-                    if subsys._matrix_free:
+                    if subsys.matrix_free:
                         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
                         raise RuntimeError(msg)
 
-                # Groups don't have `_matrix_free`
+                # Groups don't have `matrix_free`
                 # Note, we could put this attribute on Group, but this would be True for a
                 # default Group, and thus we would need an isinstance on Component, which is the
                 # reason for the try block anyway.
@@ -1523,32 +1515,68 @@ class System(object):
         self._jacobian._system = oldsys
 
     @property
+    def nonlinear_solver(self):
+        """
+        Get the nonlinear solver for this system.
+        """
+        return self._nonlinear_solver
+
+    @nonlinear_solver.setter
+    def nonlinear_solver(self, solver):
+        """
+        Set this system's nonlinear solver.
+        """
+        self._nonlinear_solver = solver
+
+    @property
+    def linear_solver(self):
+        """
+        Get the linear solver for this system.
+        """
+        return self._linear_solver
+
+    @linear_solver.setter
+    def linear_solver(self, solver):
+        """
+        Set this system's linear solver.
+        """
+        self._linear_solver = solver
+
+    @property
     def nl_solver(self):
         """
         Get the nonlinear solver for this system.
         """
-        return self._nl_solver
+        warn_deprecation("The 'nl_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
+        return self._nonlinear_solver
 
     @nl_solver.setter
     def nl_solver(self, solver):
         """
-        Set this system's nonlinear solver and perform setup.
+        Set this system's nonlinear solver.
         """
-        self._nl_solver = solver
+        warn_deprecation("The 'nl_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
+        self._nonlinear_solver = solver
 
     @property
     def ln_solver(self):
         """
         Get the linear solver for this system.
         """
-        return self._ln_solver
+        warn_deprecation("The 'ln_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
+        return self._linear_solver
 
     @ln_solver.setter
     def ln_solver(self, solver):
         """
-        Set this system's linear solver and perform setup.
+        Set this system's linear solver.
         """
-        self._ln_solver = solver
+        warn_deprecation("The 'ln_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
+        self._linear_solver = solver
 
     def _set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
@@ -1567,10 +1595,10 @@ class System(object):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        if self.ln_solver is not None and type_ != 'NL':
-            self.ln_solver._set_solver_print(level=level, type_=type_)
-        if self.nl_solver is not None and type_ != 'LN':
-            self.nl_solver._set_solver_print(level=level, type_=type_)
+        if self.linear_solver is not None and type_ != 'NL':
+            self.linear_solver._set_solver_print(level=level, type_=type_)
+        if self.nonlinear_solver is not None and type_ != 'LN':
+            self.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
         for subsys in self._subsystems_allprocs:
 
@@ -1580,10 +1608,10 @@ class System(object):
 
             subsys._set_solver_print(level=level, depth=depth - current_depth, type_=type_)
 
-            if subsys.ln_solver is not None and type_ != 'NL':
-                subsys.ln_solver._set_solver_print(level=level, type_=type_)
-            if subsys.nl_solver is not None and type_ != 'LN':
-                subsys.nl_solver._set_solver_print(level=level, type_=type_)
+            if subsys.linear_solver is not None and type_ != 'NL':
+                subsys.linear_solver._set_solver_print(level=level, type_=type_)
+            if subsys.nonlinear_solver is not None and type_ != 'LN':
+                subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
     @property
     def proc_allocator(self):
