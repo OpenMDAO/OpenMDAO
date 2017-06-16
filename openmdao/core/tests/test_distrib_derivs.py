@@ -4,7 +4,7 @@ import unittest
 import numpy
 
 from openmdao.api import ParallelGroup, Group, Problem, IndepVarComp, \
-    ExecComp, LinearBlockGS, ExplicitComponent
+    ExecComp, LinearBlockGS, ExplicitComponent, ImplicitComponent, PetscKSP
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.devtools.testutil import assert_rel_error
@@ -21,12 +21,15 @@ else:
 
 class DistribExecComp(ExecComp):
     """
-    An ExecComp that uses 2 procs and takes input var slices.  If you give it two expressions, it
-    will use one in proc0 and the other in proc1.
+    An ExecComp that uses N procs and takes input var slices.  Unlike a normal
+    ExecComp, if only supports a single expression per proc.  If you give it
+    multiple expressions, it will use a different one in each proc, repeating
+    the last one in any remaining procs.
     """
     def __init__(self, exprs, arr_size=11, **kwargs):
         super(DistribExecComp, self).__init__(exprs, **kwargs)
         self.arr_size = arr_size
+        self.distributed = True
 
     def setup(self):
         outs = set()
@@ -41,8 +44,8 @@ class DistribExecComp(ExecComp):
             raise RuntimeError("DistribExecComp only supports up to 1 expression per MPI process.")
 
         if len(self._exprs) < comm.size:
+            # repeat the last expression for any leftover procs
             self._exprs.extend([self._exprs[-1]] * (comm.size - len(self._exprs)))
-
 
         self._exprs = [self._exprs[rank]]
 
@@ -72,7 +75,7 @@ class DistribExecComp(ExecComp):
         super(DistribExecComp, self).setup()
 
     def get_req_procs(self):
-        return (2, 2)
+        return (2, None)
 
 
 class DistribCoordComp(ExplicitComponent):
@@ -87,7 +90,7 @@ class DistribCoordComp(ExplicitComponent):
                                         [(2,0), (2,1), (2,2)],
                                         [(3,0), (3,1), (3,2)],
                                         [(4,0), (4,1), (4,2)]])
-            self.add_output('outvec', numpy.zeros((5, 3)), distributed=True)
+            self.add_output('outvec', numpy.zeros((5, 3)))
         else:
             self.add_input('invec', numpy.zeros((4, 3)),
                            src_indices=[[(5,0), (5,1), (5,2)],
@@ -96,7 +99,7 @@ class DistribCoordComp(ExplicitComponent):
                                         # use some negative indices here to
                                         # make sure they work
                                         [(-1,0), (8,1), (-1,2)]])
-            self.add_output('outvec', numpy.zeros((4, 3)), distributed=True)
+            self.add_output('outvec', numpy.zeros((4, 3)))
 
     def compute(self, inputs, outputs):
         if self.comm.rank == 0:
@@ -126,7 +129,7 @@ class MPITests1(unittest.TestCase):
 
         prob = Problem()
         prob.model = group
-        prob.model.ln_solver = LinearBlockGS()
+        prob.model.linear_solver = LinearBlockGS()
         prob.model.connect('P.x', 'C1.x')
         prob.model.connect('C1.y', 'C2.y')
 
@@ -161,7 +164,7 @@ class MPITests2(unittest.TestCase):
 
         prob = Problem()
 
-        prob.model.add_subsystem('indep', IndepVarComp('x', points, distributed=True))
+        prob.model.add_subsystem('indep', IndepVarComp('x', points))
         prob.model.add_subsystem('comp', DistribCoordComp())
         prob.model.add_subsystem('total', ExecComp('y=x',
                                                    x=numpy.zeros((9,3)),
@@ -186,7 +189,7 @@ class MPITests2(unittest.TestCase):
         # pydevd.settrace('localhost', port=10000+MPI.COMM_WORLD.rank,
         #                 stdoutToServer=True, stderrToServer=True)
 
-        group.add_subsystem('P', IndepVarComp('x', numpy.ones(size)))
+        group.add_subsystem('P', IndepVarComp('x', numpy.arange(size)))
         group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
                                                   x=numpy.zeros(size),
                                                   y=numpy.zeros(size)))
@@ -196,7 +199,7 @@ class MPITests2(unittest.TestCase):
 
         prob = Problem()
         prob.model = group
-        prob.model.ln_solver = LinearBlockGS()
+        prob.model.linear_solver = LinearBlockGS()
         prob.model.connect('P.x', 'C1.x')
         prob.model.connect('C1.y', 'C2.y')
 
@@ -294,8 +297,8 @@ class MPITests2(unittest.TestCase):
         root.connect("P2.x", "sub.C2.x")
         root.connect("C3.y", "C4.x")
 
-        root.ln_solver = LinearBlockGS()
-        sub.ln_solver = LinearBlockGS()
+        root.linear_solver = LinearBlockGS()
+        sub.linear_solver = LinearBlockGS()
 
         prob.model.suppress_solver_output = True
         sub.suppress_solver_output = True
@@ -319,6 +322,111 @@ class MPITests2(unittest.TestCase):
 
     def test_distrib_voi(self):
         raise unittest.SkipTest("distrib vois no supported yet")
+
+
+
+class DistribStateImplicit(ImplicitComponent):
+    """
+    This component is unusual in that it has a distributed variable 'states' that
+    is not connected to any other variables in the model.  The input 'a' sets the local
+    values of 'states' and the output 'out_var' is the sum of all of the distributed values
+    of 'states'.
+    """
+    def setup(self):
+        self.add_input('a', val=10., units='m')
+
+        rank = self.comm.rank
+
+        GLOBAL_SIZE = 5
+        sizes, offsets = evenly_distrib_idxs(self.comm.size, GLOBAL_SIZE)
+
+        self.add_output('states', shape=int(sizes[rank]))
+
+        self.add_output('out_var', shape=1)
+
+        self.local_size = sizes[rank]
+
+        self.linear_solver = PetscKSP()
+
+    def get_req_procs(self):
+        return 1,10
+
+    def solve_nonlinear(self, i, o):
+        o['states'] = i['a']
+
+        local_sum = numpy.zeros(1)
+        local_sum[0] = numpy.sum(o['states'])
+        tmp = numpy.zeros(1)
+        self.comm.Allreduce(local_sum, tmp, op=MPI.SUM)
+
+        o['out_var'] = tmp[0]
+
+    def apply_nonlinear(self, i, o, r):
+        r['states'] = o['states'] - i['a']
+
+        local_sum = numpy.zeros(1)
+        local_sum[0] = numpy.sum(o['states'])
+        global_sum = numpy.zeros(1)
+        self.comm.Allreduce(local_sum, global_sum, op=MPI.SUM)
+
+        r['out_var'] = o['out_var'] - global_sum[0]
+
+    def apply_linear(self, i, o, d_i, d_o, d_r, mode):
+        if mode == 'fwd':
+            if 'states' in d_o:
+                d_r['states'] += d_o['states']
+
+                local_sum = numpy.array([numpy.sum(d_o['states'])])
+                global_sum = numpy.zeros(1)
+                self.comm.Allreduce(local_sum, global_sum, op=MPI.SUM)
+                d_r['out_var'] -= global_sum
+
+            if 'out_var' in d_o:
+                    d_r['out_var'] += d_o['out_var']
+
+            if 'a' in d_i:
+                    d_r['states'] -= d_i['a']
+
+        elif mode == 'rev':
+            if 'states' in d_o:
+                d_o['states'] += d_r['states']
+
+                tmp = numpy.zeros(1)
+                if self.comm.rank == 0:
+                    tmp[0] = d_r['out_var'].copy()
+                self.comm.Bcast(tmp, root=0)
+
+                d_o['states'] -= tmp
+
+            if 'out_var' in d_o:
+                d_o['out_var'] += d_r['out_var']
+
+            if 'a' in d_i:
+                    d_i['a'] -= numpy.sum(d_r['states'])
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class MPITests3(unittest.TestCase):
+
+    N_PROCS = 3
+
+    def test_distrib_apply(self):
+        p = Problem()
+
+        p.model.add_subsystem('des_vars', IndepVarComp('a', val=10., units='m'), promotes=['*'])
+        p.model.add_subsystem('icomp', DistribStateImplicit(), promotes=['*'])
+
+        expected = numpy.array([[5.]])
+
+        p.setup(vector_class=PETScVector, mode='fwd')
+        p.run_model()
+        jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+        assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
+
+        p.setup(vector_class=PETScVector, mode='rev')
+        p.run_model()
+        jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+        assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

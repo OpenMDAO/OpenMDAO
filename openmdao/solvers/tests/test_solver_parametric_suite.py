@@ -12,8 +12,8 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
                                                   CSRJacobian, CSCJacobian
-from openmdao.solvers.nl_newton import NewtonSolver
-from openmdao.solvers.ln_direct import DirectSolver
+from openmdao.solvers.nonlinear.newton import NewtonSolver
+from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.parametric_suite import parametric_suite
 
@@ -50,8 +50,8 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         """
         for jac in ['dict', 'coo', 'csr', 'csc', 'dense']:
             prob = Problem(model=ImplComp4Test())
-            prob.model.nl_solver = NewtonSolver()
-            prob.model.ln_solver = DirectSolver()
+            prob.model.nonlinear_solver = NewtonSolver()
+            prob.model.linear_solver = DirectSolver()
             prob.set_solver_print(level=0)
 
             if jac == 'dict':

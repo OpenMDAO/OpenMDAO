@@ -1,8 +1,9 @@
 from openmdao.core.group import Group
-from openmdao.solvers.nl_newton import NewtonSolver
-from openmdao.solvers.ln_direct import DirectSolver
+from openmdao.solvers.nonlinear.newton import NewtonSolver
+from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
+from openmdao.test_suite.components.sellar import SellarImplicitDis1
+
 
 class SubSellar(Group):
 
@@ -27,9 +28,8 @@ class DoubleSellar(Group):
         self.connect('g2.y2', 'g1.x')
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        self.nl_solver = NewtonSolver()
-        self.ln_solver = DirectSolver()
-
+        self.nonlinear_solver = NewtonSolver()
+        self.linear_solver = DirectSolver()
 
 
 class SubSellarImplicit(Group):
@@ -55,5 +55,5 @@ class DoubleSellarImplicit(Group):
         self.connect('g2.y2', 'g1.x')
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        self.nl_solver = NewtonSolver()
-        self.ln_solver = DirectSolver()
+        self.nonlinear_solver = NewtonSolver()
+        self.linear_solver = DirectSolver()
