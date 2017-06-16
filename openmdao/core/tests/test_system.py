@@ -3,6 +3,8 @@
 import unittest
 from six import assertRaisesRegex
 
+import warnings
+
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
@@ -202,6 +204,46 @@ class TestSystem(unittest.TestCase):
         # assign bad list shape to array
         with assertRaisesRegex(self, ValueError, msg):
             residuals['C2.y'] = bad_val.tolist()
+
+    def test_deprecated_solver_names(self):
+        model = Group()
+
+        with warnings.catch_warnings(record=True) as w:
+            _ = model.nl_solver
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message),
+                         "The 'nl_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
+
+        with warnings.catch_warnings(record=True) as w:
+            model.nl_solver = None
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message),
+                         "The 'nl_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
+
+        with warnings.catch_warnings(record=True) as w:
+            _ = model.ln_solver
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message),
+                         "The 'ln_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
+
+        with warnings.catch_warnings(record=True) as w:
+            model.ln_solver = None
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message),
+                         "The 'ln_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
+
 
 
 if __name__ == "__main__":

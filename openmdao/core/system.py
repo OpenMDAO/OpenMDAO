@@ -17,7 +17,7 @@ from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobi
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 
 from openmdao.utils.general_utils import \
-    determine_adder_scaler, format_as_float_or_array
+    determine_adder_scaler, format_as_float_or_array, warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
@@ -1532,7 +1532,7 @@ class System(object):
     @nonlinear_solver.setter
     def nonlinear_solver(self, solver):
         """
-        Set this system's nonlinear solver and perform setup.
+        Set this system's nonlinear solver.
         """
         self._nonlinear_solver = solver
 
@@ -1546,8 +1546,44 @@ class System(object):
     @linear_solver.setter
     def linear_solver(self, solver):
         """
-        Set this system's linear solver and perform setup.
+        Set this system's linear solver.
         """
+        self._linear_solver = solver
+
+    @property
+    def nl_solver(self):
+        """
+        Get the nonlinear solver for this system.
+        """
+        warn_deprecation("The 'nl_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
+        return self._nonlinear_solver
+
+    @nl_solver.setter
+    def nl_solver(self, solver):
+        """
+        Set this system's nonlinear solver.
+        """
+        warn_deprecation("The 'nl_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
+        self._nonlinear_solver = solver
+
+    @property
+    def ln_solver(self):
+        """
+        Get the linear solver for this system.
+        """
+        warn_deprecation("The 'ln_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
+        return self._linear_solver
+
+    @ln_solver.setter
+    def ln_solver(self, solver):
+        """
+        Set this system's linear solver.
+        """
+        warn_deprecation("The 'ln_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
         self._linear_solver = solver
 
     def _set_solver_print(self, level=2, depth=1e99, type_='all'):
