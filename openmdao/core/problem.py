@@ -2,11 +2,11 @@
 
 from __future__ import division
 from collections import OrderedDict, defaultdict, namedtuple
+from itertools import product
 import sys
 
-from six import string_types, iteritems, iterkeys
+from six import iteritems, iterkeys
 from six.moves import range
-from itertools import product
 
 import numpy as np
 import scipy.sparse as sparse
@@ -723,7 +723,8 @@ class Problem(object):
         if approx:
 
             # Initialization based on driver (or user) -requested "of" and "wrt".
-            if not model._owns_approx_of:
+            if not model._owns_approx_of or model._owns_approx_of != of \
+               or model._owns_approx_wrt != wrt:
                 model.approx_total_derivs(method='fd')
                 model._owns_approx_of = set(of)
                 model._owns_approx_wrt = set(wrt)

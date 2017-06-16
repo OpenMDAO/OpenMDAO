@@ -18,7 +18,6 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.name_maps import rel_key2abs_key, abs_name2rel_name
 from openmdao.utils.units import is_compatible
 
 
@@ -1242,7 +1241,7 @@ class Group(System):
         self._jacobian_changed = False
 
         # Group finite difference or complex step.
-        # TODO: Make sure this works under and over an AssembledJacobian
+        # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
         if self._owns_approx_jac:
             method = self._approx_schemes.keys()[0]
             approx = self._approx_schemes[method]
@@ -1299,12 +1298,6 @@ class Group(System):
                         # Skip indepvarcomp res wrt other srcs
                         if key[0] in ivc:
                             continue
-
-                        # States always get added
-                        # if key[0] in states:
-                        #     approx.add_approximation(key, meta)
-                        #     print('added', key)
-                        #     continue
 
                         # Skip explicit res wrt outputs
                         if key[1] in of and key[1] not in ivc:
