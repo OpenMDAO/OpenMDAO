@@ -759,20 +759,13 @@ class System(object):
         """
         meta = self._var_allprocs_abs2meta['output']
 
-        if self.comm.size == 1:
-            for abs_name in self._var_allprocs_abs_names['output']:
-                mymeta = meta[abs_name]
-                local_shape = mymeta['shape']
-                mymeta['global_size'] = np.prod(local_shape)
-                mymeta['global_shape'] = local_shape
-            return
-
         # now set global sizes and shapes into metadata for distributed outputs
         sizes = self._var_sizes['output']
         for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
             mymeta = meta[abs_name]
             local_shape = mymeta['shape']
             if not mymeta['distributed']:
+                # not distributed, just use local shape and size
                 mymeta['global_size'] = np.prod(local_shape)
                 mymeta['global_shape'] = local_shape
                 continue
@@ -1008,7 +1001,6 @@ class System(object):
                 if src_indices is not None:
                     if not (np.isscalar(ref) and np.isscalar(ref0)):
                         global_shape_out = meta_out['global_shape']
-                        global_size_out = meta_out['global_size']
                         if src_indices.ndim != 1:
                             if len(shape_out) == 1:
                                 src_indices = src_indices.flatten()
@@ -1141,11 +1133,11 @@ class System(object):
             for subsys in self.system_iter():
 
                 try:
-                    if subsys._matrix_free:
+                    if subsys.matrix_free:
                         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
                         raise RuntimeError(msg)
 
-                # Groups don't have `_matrix_free`
+                # Groups don't have `matrix_free`
                 # Note, we could put this attribute on Group, but this would be True for a
                 # default Group, and thus we would need an isinstance on Component, which is the
                 # reason for the try block anyway.

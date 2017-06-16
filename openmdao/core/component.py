@@ -27,9 +27,14 @@ class Component(System):
 
     Attributes
     ----------
+    _approx_schemes : OrderedDict
+        A mapping of approximation types to the associated ApproximationScheme.
     _matrix_free : Bool
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian.
+    distributed : bool
+        This is True if the component has variables that are distributed across multiple
+        processes.
     _var_rel2data_io : dict
         Dictionary mapping relative names to dicts with keys (prom, rel, my_idx, type_, metadata).
         This is only needed while adding inputs and outputs. During setup, these are used to
@@ -54,7 +59,10 @@ class Component(System):
             available here and in all descendants of this system.
         """
         super(Component, self).__init__(**kwargs)
+        self._approx_schemes = OrderedDict()
+
         self._matrix_free = False
+        self.distributed = False
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
@@ -353,8 +361,7 @@ class Component(System):
         return metadata
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0,
-                   distributed=False):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
         """
         Add an output variable to the component.
 
@@ -397,8 +404,6 @@ class Component(System):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
-        distributed : bool
-            If True, this variable is distributed across multiple processes.
 
         Returns
         -------
@@ -481,7 +486,7 @@ class Component(System):
         # var_set: taken as is
         metadata['var_set'] = var_set
 
-        metadata['distributed'] = distributed
+        metadata['distributed'] = self.distributed
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -694,11 +699,15 @@ class Component(System):
             out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
             if abs_key[1] in self._var_abs2meta['input']:
                 in_size = np.prod(self._var_abs2meta['input'][abs_key[1]]['shape'])
-            elif abs_key[1] in self._var_abs2meta['output']:
+            else:  # assume output (or get a KeyError)
                 in_size = np.prod(self._var_abs2meta['output'][abs_key[1]]['shape'])
+
+            if in_size == 0 and self.comm.rank != 0:  # 'inactive' component
+                return
+
             rows = meta['rows']
             cols = meta['cols']
-            if rows is not None:
+            if not (rows is None or rows.size == 0):
                 if rows.min() < 0:
                     msg = '{}: d({})/d({}): row indices must be non-negative'
                     raise ValueError(msg.format(self.pathname, of, wrt))
