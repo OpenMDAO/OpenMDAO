@@ -3,6 +3,8 @@ from __future__ import print_function
 import sys
 import os
 import atexit
+import argparse
+from collections import defaultdict
 
 from openmdao.devtools.prof_utils import _create_profile_callback, find_qualified_name, func_group, \
      _collect_methods
@@ -52,16 +54,19 @@ def setup(methods=None):
         _qual_cache = {}  # cache of files scanned for qualified names
 
         def print_totals():
+            count = defaultdict(set)
             for (self, code_obj), delta in sorted(mem_changes.items(), key=lambda x: x[1]):
                 if delta != 0.0:
-                    qfile, qclass, qname = find_qualified_name(code_obj.co_filename,
-                                                               code_obj.co_firstlineno,
-                                                               _qual_cache)
-                    if qfile is None:
-                        fullname = '.'.join((qclass, qname))
-                    else:
-                        fullname = ':'.join((qfile, qname))
-                    print("%s %g MB" % (fullname, delta))
+                    funcname = find_qualified_name(code_obj.co_filename,
+                                                   code_obj.co_firstlineno, _qual_cache)
+                    try:
+                        sname = self.pathname
+                    except AttributeError:
+                        cname = self.__class__.__name__
+                        count[cname].add(id(self))
+                        sname = "%s#%d" % (self.__class__.__name__, len(count[cname]))
+
+                    print("%s %g MB" % ('.'.join((sname, funcname)), delta))
 
         atexit.register(print_totals)
         _registered = True
@@ -80,39 +85,35 @@ def stop():
     sys.setprofile(None)
 
 
-def main():
-    from optparse import OptionParser
-    usage = "iprof_mem.py [scriptfile [arg] ..."
-    parser = OptionParser(usage=usage)
-    parser.allow_interspersed_args = False
-    parser.add_option('-g', '--group', dest="group",
-        help="Name of class/method group that determines which classes/methods to trace.",
-        default='openmdao')
+def profile_py_file():
 
-    if not sys.argv[1:]:
-        parser.print_usage()
-        sys.exit(2)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-g', '--group', action='store', dest='group',
+                        default='openmdao',
+                        help='Determines which group of methods will be tracked.')
+    parser.add_argument('file', metavar='file', nargs=1,
+                        help='Python file to profile.')
 
-    (options, args) = parser.parse_args()
-    sys.argv[:] = args
+    options = parser.parse_args()
 
-    if len(args) > 0:
-        progname = args[0]
-        sys.path.insert(0, os.path.dirname(progname))
+    progname = options.file[0]
+    sys.path.insert(0, os.path.dirname(progname))
 
-        setup(methods=func_group[options.group])
-        with open(progname, 'rb') as fp:
-            code = compile(fp.read(), progname, 'exec')
-        globs = {
-            '__file__': progname,
-            '__name__': '__main__',
-            '__package__': None,
-            '__cached__': None,
-        }
+    setup(methods=func_group[options.group])
+    with open(progname, 'rb') as fp:
+        code = compile(fp.read(), progname, 'exec')
 
-        start()
+    globals_dict = {
+        '__file__': progname,
+        '__name__': '__main__',
+        '__package__': None,
+        '__cached__': None,
+    }
 
-        exec (code, globs)
+    start()
+
+    exec (code, globals_dict)
+
 
 if __name__ == '__main__':
-    main()
+    profile_py_file()

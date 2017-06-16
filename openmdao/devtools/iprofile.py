@@ -143,11 +143,11 @@ def stop():
 
 def _instance_profile_callback(frame, event, arg):
     """
-    Collects profile data for functions that match _matches.
+    Collects profile data for functions that match _matches and pass the isinstance check.
+
     Elapsed time and number of calls are collected.
     """
-    global _call_stack, _profile_out, _profile_struct, _inst_data, \
-           _profile_funcs_dict, _profile_start, _matches
+    global _call_stack, _inst_data, _matches
 
     if event == 'call':
         if 'self' in frame.f_locals and  \
@@ -175,7 +175,7 @@ def _finalize_profile():
     """
     Called at exit to write out the profiling data.
     """
-    global _profile_prefix, _profile_funcs_dict, _profile_total, _inst_data
+    global _profile_prefix, _profile_total, _inst_data
 
     stop()
 
@@ -191,14 +191,12 @@ def _finalize_profile():
         if fname == '$total':
             continue
         filename, line, ident = fname.split('#')
-        qfile, qclass, qname = find_qualified_name(filename, int(line), cache)
+        qfile, qclass, qname = find_qualified_name(filename, int(line), cache, full=False)
 
         idict = idents[(qfile, qclass)]
-        if ident in idict:
-            ident = idict[ident]
-        else:
+        if ident not in idict:
             idict[ident] = len(idict)
-            ident = idict[ident]
+        ident = idict[ident] + 1  # so we'll agree with ident scheme in other tracing/profiling functions
 
         try:
             name = data['obj'].pathname
@@ -206,7 +204,7 @@ def _finalize_profile():
             if qfile is None:
                 _obj_map[fname] = "<%s#%d.%s>" % (qclass, ident, qname)
             else:
-                _obj_map[fname] = "<%s.%s>" % (qfile, qname)
+                _obj_map[fname] = "<%s:%d.%s>" % (qfile, line, qname)
         else:
             _obj_map[fname] = '.'.join((name, "<%s.%s>" % (qclass, qname)))
 
@@ -338,14 +336,17 @@ def prof_totals():
     parser.add_argument('-o', '--outfile', action='store', dest='outfile',
                         metavar='OUTFILE', default='sys.stdout',
                         help='Name of file containing function total counts and elapsed times.')
-    parser.add_argument('rawfiles', metavar='rawfile', nargs='*',
-                        help='File(s) containing raw profile data to be processed. Wildcards are allowed.')
+    parser.add_argument('-g', '--group', action='store', dest='group',
+                        default='openmdao',
+                        help='Determines which group of methods will be tracked.')
+    parser.add_argument('files', metavar='file', nargs='*',
+                        help='Raw profile data files or a python file.')
 
     #TODO: add arg to set max number of results (starting at largest)
 
     options = parser.parse_args()
 
-    if not options.rawfiles:
+    if not options.files:
         print("No files to process.")
         sys.exit(0)
 
@@ -354,7 +355,14 @@ def prof_totals():
     else:
         out_stream = open(options.outfile, 'w')
 
-    _, totals = process_profile(options.rawfiles)
+    if options.files[0].endswith('.py'):
+        if len(options.files) > 1:
+            print("iprofview can only process a single python file.", file=sys.stderr)
+            sys.exit(-1)
+        profile_py_file(options.files[0], methods=func_group[options.group])
+        options.files = ['iprof.0']
+
+    _, totals = process_profile(options.files)
 
     total_time = totals['$total']['tot_time']
 
@@ -371,6 +379,7 @@ def prof_totals():
         if out_stream is not sys.stdout:
             out_stream.close()
 
+
 def prof_view():
     """
     Called from a command line to generate an html viewer for profile data.
@@ -382,16 +391,22 @@ def prof_view():
     parser.add_argument('-t', '--title', action='store', dest='title',
                         default='Profile of Method Calls by Instance',
                         help='Title to be displayed above profiling view.')
-    parser.add_argument('rawfiles', metavar='rawfile', nargs='*',
-                        help='File(s) containing raw profile data to be processed. Wildcards are allowed.')
+    parser.add_argument('-g', '--group', action='store', dest='group',
+                        default='openmdao',
+                        help='Determines which group of methods will be tracked.')
+    parser.add_argument('files', metavar='file', nargs='+',
+                        help='Raw profile data files or a python file.')
 
     options = parser.parse_args()
 
-    if not options.rawfiles:
-        print("No files to process.")
-        sys.exit(0)
+    if options.files[0].endswith('.py'):
+        if len(options.files) > 1:
+            print("iprofview can only process a single python file.", file=sys.stderr)
+            sys.exit(-1)
+        profile_py_file(options.files[0], methods=func_group[options.group])
+        options.files = ['iprof.0']
 
-    call_graph, _ = process_profile(options.rawfiles)
+    call_graph, _ = process_profile(options.files)
 
     viewer = "icicle.html"
     code_dir = os.path.dirname(os.path.abspath(__file__))
@@ -410,48 +425,36 @@ def prof_view():
         webview(outfile)
 
 
-def main():
-    from optparse import OptionParser
-    usage = "profile.py [scriptfile [arg] ..."
-    parser = OptionParser(usage=usage)
-    parser.allow_interspersed_args = False
-    parser.add_option('-v', '--view', dest="view",
-        help="View of profiling output, ['web', 'console']", default='web')
+def profile_py_file(fname=None, methods=None):
+    """
+    Run instance-based profiling on the given python script.
 
-    if not sys.argv[1:]:
-        parser.print_usage()
-        sys.exit(2)
+    Parameters
+    ----------
+    fname : str
+        Name of the python script.
+    methods : list of (glob, (classes...)) tuples or None
+        List indicating which methods to track.
+    """
+    if fname is None:
+        args = sys.argv[1:]
+        if not args:
+            print("No files to process.", file=sys.stderr)
+            sys.exit(2)
+        fname = args[0]
+    sys.path.insert(0, os.path.dirname(fname))
 
-    (options, args) = parser.parse_args()
-    sys.argv[:] = args
+    with open(fname, 'rb') as fp:
+        code = compile(fp.read(), fname, 'exec')
 
-    if len(args) > 0:
-        progname = args[0]
-        sys.path.insert(0, os.path.dirname(progname))
+    globals_dict = {
+        '__file__': fname,
+        '__name__': '__main__',
+        '__package__': None,
+        '__cached__': None,
+    }
 
-        with open(progname, 'rb') as fp:
-            code = compile(fp.read(), progname, 'exec')
-        globs = {
-            '__file__': progname,
-            '__name__': '__main__',
-            '__package__': None,
-            '__cached__': None,
-        }
-
-        setup(finalize=False)
-        sys.argv.append('iprof.0')
-        start()
-        exec (code, globs)
-        _finalize_profile()
-
-        if options.view == 'web':
-            prof_view()
-        elif options.view == 'console':
-            prof_totals()
-        else:
-            print("unknown view option '%s'" % options.view, file=sys.stderr)
-            sys.exit(-1)
-
-
-if __name__ == '__main__':
-    main()
+    setup(methods=methods, finalize=False)
+    start()
+    exec (code, globals_dict)
+    _finalize_profile()

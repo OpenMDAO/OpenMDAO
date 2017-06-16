@@ -97,10 +97,11 @@ setup(name='openmdao',
       entry_points="""
       [console_scripts]
       wingproj=openmdao.devtools.wingproj:run_wing
-      1to2=openmdao.devtools.compat:convert_file
       webview=openmdao.devtools.webview:webview_argv
       iprofview=openmdao.devtools.iprofile:prof_view
       iproftotals=openmdao.devtools.iprofile:prof_totals
+      iprofmem=openmdao.devtools.iprof_mem:profile_py_file
       iprofdump=openmdao.devtools.iprofile:prof_dump
+      icalltrace=openmdao.devtools.trace:trace_py_file
       """
 )

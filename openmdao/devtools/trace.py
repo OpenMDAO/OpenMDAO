@@ -2,36 +2,53 @@ from __future__ import print_function
 
 import os
 import sys
+import argparse
 
 from contextlib import contextmanager
 from collections import defaultdict
 
-from openmdao.devtools.prof_utils import _create_profile_callback, find_qualified_name, func_group, _collect_methods
+from openmdao.devtools.prof_utils import _create_profile_callback, find_qualified_name, \
+                                         func_group, _collect_methods
 
 
-# final dict of method names and their corresponding classes
 _trace_calls = None  # pointer to function that implements the trace
 _registered = False  # prevents multiple atexit registrations
 
 
 def _trace_call(frame, arg, stack, context):
-    qual_cache, method_counts = context
-    qfile, qclass, qname = find_qualified_name(frame.f_code.co_filename,
-                                               frame.f_code.co_firstlineno,
-                                               qual_cache)
-    if qfile is None:
-        fullname = '.'.join((qclass, qname))
-    else:
-        fullname = ':'.join((qfile, qname))
+    """
+    This is called after we have matched based on glob pattern and isinstance check.
+    """
+    qual_cache, method_counts, class_counts = context
+    funcname = find_qualified_name(frame.f_code.co_filename,
+                                   frame.f_code.co_firstlineno, qual_cache)
 
+    self = frame.f_locals['self']
+    try:
+        sname = self.pathname
+    except AttributeError:
+        cname = self.__class__.__name__
+        class_counts[cname].add(id(self))
+        sname = "%s#%d" % (self.__class__.__name__, len(class_counts[cname]))
+
+
+    fullname = '.'.join((sname, funcname))
     method_counts[fullname] += 1
 
-    print('   ' * len(stack),
-          "%s (%d)" % (fullname, method_counts[fullname]))
+    print('   ' * len(stack), "%s (%d)" % (fullname, method_counts[fullname]))
 
 
 
 def setup(methods=None):
+    """
+    Setup call tracing.
+
+    Parameters
+    ----------
+    methods : list of (glob, (classes...)) or None
+        Methods to be traced, based on glob patterns and isinstance checks.
+
+    """
     global _registered, _trace_calls
     if not _registered:
         if methods is None:
@@ -40,11 +57,15 @@ def setup(methods=None):
         call_stack = []
         qual_cache = {}
         method_counts = defaultdict(int)
+        class_counts = defaultdict(set)
         _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods), _trace_call,
-                                                context=(qual_cache, method_counts))
+                                                context=(qual_cache, method_counts, class_counts))
 
 
 def start():
+    """
+    Start call tracing.
+    """
     global _trace_calls
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
@@ -54,11 +75,23 @@ def start():
 
 
 def stop():
+    """
+    Stop call tracing.
+    """
     sys.setprofile(None)
 
 
 @contextmanager
 def tracing(methods=None):
+    """
+    Turn on call tracing within a certain context.
+
+    Parameters
+    ----------
+    methods : list of (glob, (classes...)) or None
+        Methods to be traced, based on glob patterns and isinstance checks.
+
+    """
     setup(methods=methods)
     start()
     yield
@@ -72,7 +105,7 @@ class tracedfunc(object):
     Parameters
     ----------
     methods : list of (glob, (classes...)) tuples, optional
-        A group of classes and methods to trace.
+        Methods to be traced, based on glob patterns and isinstance checks.
     """
     def __init__(self, methods=None):
         self.methods = methods
@@ -87,39 +120,35 @@ class tracedfunc(object):
         return wrapped
 
 
-def main():
-    from optparse import OptionParser
-    usage = "trace.py [scriptfile [arg] ..."
-    parser = OptionParser(usage=usage)
-    parser.allow_interspersed_args = False
-    parser.add_option('-g', '--group', dest="group",
-        help="Name of class/method group that determines which classes/methods to trace.",
-        default='openmdao')
+def trace_py_file():
 
-    if not sys.argv[1:]:
-        parser.print_usage()
-        sys.exit(2)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-g', '--group', action='store', dest='group',
+                        default='openmdao',
+                        help='Determines which group of methods will be tracked.')
+    parser.add_argument('file', metavar='file', nargs=1,
+                        help='Python file to profile.')
 
-    (options, args) = parser.parse_args()
-    sys.argv[:] = args
+    options = parser.parse_args()
 
-    if len(args) > 0:
-        progname = args[0]
-        sys.path.insert(0, os.path.dirname(progname))
+    progname = options.file[0]
+    sys.path.insert(0, os.path.dirname(progname))
 
-        setup(methods=func_group[options.group])
-        with open(progname, 'rb') as fp:
-            code = compile(fp.read(), progname, 'exec')
-        globs = {
-            '__file__': progname,
-            '__name__': '__main__',
-            '__package__': None,
-            '__cached__': None,
-        }
+    setup(methods=func_group[options.group])
+    with open(progname, 'rb') as fp:
+        code = compile(fp.read(), progname, 'exec')
 
-        start()
+    globals_dict = {
+        '__file__': progname,
+        '__name__': '__main__',
+        '__package__': None,
+        '__cached__': None,
+    }
 
-        exec (code, globs)
+    start()
+
+    exec (code, globals_dict)
+
 
 if __name__ == '__main__':
-    main()
+    trace_py_file()

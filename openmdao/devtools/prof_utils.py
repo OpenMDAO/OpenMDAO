@@ -48,7 +48,7 @@ class FunctionFinder(ast.NodeVisitor):
         self.cache[node.lineno] = qual
 
 
-def find_qualified_name(filename, line, cache):
+def find_qualified_name(filename, line, cache, full=True):
     """
     Determine full function name (class.method) or function for unbound functions.
 
@@ -60,6 +60,8 @@ def find_qualified_name(filename, line, cache):
         Line number within the give file.
     cache : dict
         A dictionary containing infomation by filename.
+    full : bool
+        If True, assemble the full name else return the parts
 
     Returns
     -------
@@ -77,6 +79,13 @@ def find_qualified_name(filename, line, cache):
             FunctionFinder(filename, fcache).visit(ast.parse(contents, filename))
 
         cache[filename] = fcache
+
+    if full:
+        parts = cache[filename][line]
+        if parts[0]:
+            return '.'.join((parts[0], parts[2]))
+        else:
+            return '.'.join((parts[1], parts[2]))
 
     return cache[filename][line]
 
