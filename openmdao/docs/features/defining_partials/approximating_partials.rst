@@ -28,3 +28,8 @@ The step size can be any non-zero number, but should be positive (one can change
 
 Approximating Total Derivatives
 ===============================
+
+There are also times where it makes more sense to approximate the derivatives for an entire group in one shot.
+
+.. embed-test::
+    openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_basic

@@ -4,7 +4,8 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, ExecComp, NewtonSolver
+from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, ExecComp, NewtonSolver, \
+     ExplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -219,6 +220,57 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         assert_rel_error(self, derivs['f_xy', 'x'], [[-5.99]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.01]], 1e-6)
+
+
+class ApproxTotalsFeature(unittest.TestCase):
+
+    def test_basic(self):
+
+        class CompOne(ExplicitComponent):
+
+                def setup(self):
+                    self.add_input('x', val=0.0)
+                    self.add_output('y', val=np.zeros(25))
+                    self._exec_count = 0
+
+                def compute(self, inputs, outputs):
+                    x = inputs['x']
+                    outputs['y'] = np.arange(25) * x
+                    self._exec_count += 1
+
+
+        class CompTwo(ExplicitComponent):
+
+                def setup(self):
+                    self.add_input('y', val=np.zeros(25))
+                    self.add_output('z', val=0.0)
+                    self._exec_count = 0
+
+                def compute(self, inputs, outputs):
+                    y = inputs['y']
+                    outputs['z'] = np.sum(y)
+                    self._exec_count += 1
+
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
+        comp2 = model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
+
+        model.linear_solver = ScipyIterativeSolver()
+        model.approx_total_derivs()
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        of = ['z']
+        wrt = ['x']
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+
+        assert_rel_error(self, derivs['z', 'x'], [[300.0]], 1e-6)
+        self.assertEqual(comp2._exec_count, 3)
 
 if __name__ == "__main__":
     unittest.main()

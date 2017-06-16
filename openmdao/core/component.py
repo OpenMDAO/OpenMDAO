@@ -27,14 +27,14 @@ class Component(System):
 
     Attributes
     ----------
-    _approx_schemes : OrderedDict
-        A mapping of approximation types to the associated ApproximationScheme.
-    _matrix_free : Bool
+    matrix_free : Bool
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian.
     distributed : bool
         This is True if the component has variables that are distributed across multiple
         processes.
+    _approx_schemes : OrderedDict
+        A mapping of approximation types to the associated ApproximationScheme.
     _var_rel2data_io : dict
         Dictionary mapping relative names to dicts with keys (prom, rel, my_idx, type_, metadata).
         This is only needed while adding inputs and outputs. During setup, these are used to
@@ -61,7 +61,7 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
         self._approx_schemes = OrderedDict()
 
-        self._matrix_free = False
+        self.matrix_free = False
         self.distributed = False
 
         self._var_rel_names = {'input': [], 'output': []}

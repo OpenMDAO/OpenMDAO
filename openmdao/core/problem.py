@@ -690,14 +690,11 @@ class Problem(object):
 
         # Convert of and wrt names from promoted to unpromoted
         # (which is absolute path since we're at the top)
-        if global_names:
-            oldwrt, oldof = wrt, of
-        else:
-            oldof = of
+        oldwrt, oldof = wrt, of
+        if not global_names:
             of = [model._var_allprocs_prom2abs_list['output'][name][0]
                   for name in oldof]
 
-            oldwrt = wrt
             wrt = [model._var_allprocs_prom2abs_list['output'][name][0]
                    for name in oldwrt]
 
