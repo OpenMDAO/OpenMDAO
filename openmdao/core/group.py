@@ -1292,7 +1292,6 @@ class Group(System):
                     J._set_partials_meta(key, meta)
 
                     # Create approximations, but only for the ones we need.
-                    # TODO: support states
                     if meta['dependent']:
 
                         # Skip indepvarcomp res wrt other srcs
