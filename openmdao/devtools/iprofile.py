@@ -17,13 +17,13 @@ except ImportError:
     MPI = None
 
 from openmdao.devtools.webview import webview
-from openmdao.devtools.trace import func_group, find_qualified_name, _collect_methods
+from openmdao.devtools.prof_utils import func_group, find_qualified_name, _collect_methods
 
 
 def _prof_node(parts):
     return {
-        'name': '@'.join(parts[0]),
-        'short_name': parts[0][-1],
+        'name': parts[0],
+        'short_name': parts[0].rsplit('@', 1)[-1],
         'time': parts[2],
         'count': parts[3],
         'tot_time': 0.,
@@ -42,7 +42,6 @@ _profile_setup = False
 _profile_total = 0.0
 _matches = {}
 _call_stack = []
-_timing_stack = []
 _inst_data = {}
 
 
@@ -91,7 +90,7 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
     _profile_setup = True
 
     if methods is None:
-        methods = func_group('openmdao')
+        methods = func_group['openmdao']
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
     _profile_out = open("%s.%d" % (_profile_prefix, rank), 'wb')
@@ -100,38 +99,6 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
         atexit.register(_finalize_profile)
 
     _matches = _collect_methods(methods)
-
-
-# TODO: create a cython version of this to cut down on overhead...
-def _instance_profile(frame, event, arg):
-    """
-    Collects profile data for functions that match _matches.
-    Elapsed time and number of calls are collected.
-    """
-    global _call_stack, _profile_out, _profile_struct, _inst_data, \
-           _profile_funcs_dict, _profile_start, _matches
-
-    if event == 'call':
-        if frame.f_code.co_name in _matches and 'self' in frame.f_locals and  \
-                isinstance(frame.f_locals['self'], _matches[frame.f_code.co_name]):
-            _timing_stack.append((frame.f_code.co_filename,
-                                  frame.f_code.co_firstlineno, id(frame.f_locals['self']), etime(), frame))
-            _call_stack.append("%s#%d#%d" % _timing_stack[-1][:-2])
-
-    elif event == 'return' and _timing_stack:
-        fname, line, ident, start, oldframe = _timing_stack[-1]
-        if oldframe is frame:
-            final = etime()
-            path = '@'.join(_call_stack)
-            if path not in _inst_data:
-                _inst_data[path] = [_call_stack[:], frame.f_locals['self'], 0., 0]
-
-            _call_stack.pop()
-            _timing_stack.pop()
-
-            pdata = _inst_data[path]
-            pdata[2] += final - start
-            pdata[3] += 1
 
 
 def start():
@@ -147,13 +114,13 @@ def start():
         setup()  # just do a default setup
 
     _profile_start = etime()
-    _call_stack.append('$total')
+    _call_stack.append(('$total', _profile_start, None))
     if '$total' not in _inst_data:
-        _inst_data['$total'] = [['$total'], None, 0., 0]
+        _inst_data['$total'] = ['$total', None, 0., 0]
 
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
-    sys.setprofile(_instance_profile)
+    sys.setprofile(_instance_profile_callback)
 
 
 def stop():
@@ -172,6 +139,36 @@ def stop():
     _inst_data['$total'][2] = _profile_total
     _inst_data['$total'][3] += 1
     _profile_start = None
+
+
+def _instance_profile_callback(frame, event, arg):
+    """
+    Collects profile data for functions that match _matches.
+    Elapsed time and number of calls are collected.
+    """
+    global _call_stack, _profile_out, _profile_struct, _inst_data, \
+           _profile_funcs_dict, _profile_start, _matches
+
+    if event == 'call':
+        if 'self' in frame.f_locals and  \
+                isinstance(frame.f_locals['self'], _matches[frame.f_code.co_name]):
+            _call_stack.append(("%s#%d#%d" % (frame.f_code.co_filename,
+                                              frame.f_code.co_firstlineno,
+                                              id(frame.f_locals['self'])),
+                                etime(), frame))
+    elif event == 'return' and _call_stack:
+        _, start, oldframe = _call_stack[-1]
+        if oldframe is frame:
+            final = etime()
+            path = '@'.join(s[0] for s in _call_stack)
+            if path not in _inst_data:
+                _inst_data[path] = [path, frame.f_locals['self'], 0., 0]
+
+            _call_stack.pop()
+
+            pdata = _inst_data[path]
+            pdata[2] += final - start
+            pdata[3] += 1
 
 
 def _finalize_profile():
@@ -234,8 +231,9 @@ def _finalize_profile():
         if node['child_time'] > 0.:
             parts = funcpath.split('@')
             pparts = parts + ['$parent']
-            ex_child_node = _prof_node([pparts, None, node['time'] - node['child_time'], 1])
-            parnodes.append(('@'.join(pparts), ex_child_node))
+            chname = '@'.join(pparts)
+            ex_child_node = _prof_node([chname, None, node['time'] - node['child_time'], 1])
+            parnodes.append((chname, ex_child_node))
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
 
@@ -292,7 +290,7 @@ def process_profile(flist):
                 parts = ["%s%s" % (p,dec) for p in parts]
                 funcpath = '@'.join(parts)
 
-            tree_nodes[funcpath] = node = _prof_node([parts, None, t, count])
+            tree_nodes[funcpath] = node = _prof_node([funcpath, None, t, count])
 
             funcname = parts[-1]
             if funcname == '$parent':
@@ -301,7 +299,7 @@ def process_profile(flist):
             if funcname in totals:
                 tnode = totals[funcname]
             else:
-                totals[funcname] = tnode = _prof_node([parts, None, 0., 0])
+                totals[funcname] = tnode = _prof_node([funcpath, None, 0., 0])
 
             tnode['tot_time'] += t
             tnode['tot_count'] += count
@@ -410,6 +408,7 @@ def prof_view():
 
     if not options.noshow:
         webview(outfile)
+
 
 def main():
     from optparse import OptionParser
