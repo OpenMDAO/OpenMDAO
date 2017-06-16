@@ -633,7 +633,7 @@ class TestNewton(unittest.TestCase):
         model.nonlinear_solver.options['maxiter'] = 5
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
-        prob.set_solver_print()
+        prob.set_solver_print(level=0)
 
         prob.setup()
         prob.run_model()
