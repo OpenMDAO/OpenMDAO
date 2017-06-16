@@ -10,16 +10,18 @@ from shutil import rmtree
 from six import iteritems, PY2, PY3
 from tempfile import mkdtemp
 
-from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac, NewtonSolver, \
-                         NonLinearRunOnce, SqliteRecorder, Group, IndepVarComp, ExecComp, DirectSolver, \
-                         ScipyIterativeSolver, PetscKSP, LinearBlockGS, LinearRunOnce, LinearBlockJac
+from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac,\
+            NewtonSolver, NonLinearRunOnce, SqliteRecorder, Group, IndepVarComp, ExecComp, \
+            DirectSolver, ScipyIterativeSolver, PetscKSP, LinearBlockGS, LinearRunOnce, \
+            LinearBlockJac
 
 from openmdao.core.problem import Problem
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
-from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+    SellarDis2withDerivatives
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
 if PY2:
@@ -37,6 +39,7 @@ if OPTIMIZER:
 # optimizers = {'scipy': ScipyOptimizer, }
 optimizers = {'pyoptsparse': pyOptSparseDriver}
 
+
 def run_driver(problem):
     t0 = time.time()
     problem.run_driver()
@@ -44,20 +47,24 @@ def run_driver(problem):
 
     return t0, t1
 
+
 def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
     """
         expected can be from multiple cases
     """
-
     # iterate through the cases
-    for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, constraints_expected in expected:
+    for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, \
+            constraints_expected in expected:
         iter_coord = format_iteration_coordinate(coord)
 
         # from the database, get the actual data recorded
-        db_cur.execute("SELECT * FROM driver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
-        row_actual  = db_cur.fetchone()
+        db_cur.execute("SELECT * FROM driver_iterations WHERE "
+                       "iteration_coordinate=:iteration_coordinate",
+                       {"iteration_coordinate": iter_coord})
+        row_actual = db_cur.fetchone()
 
-        counter, global_counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, objectives_blob, constraints_blob = row_actual
+        counter, global_counter, iteration_coordinate, timestamp, success, msg, desvars_blob,\
+            responses_blob, objectives_blob, constraints_blob = row_actual
 
         desvars_actual = blob_to_array(desvars_blob)
         responses_actual = blob_to_array(responses_blob)
@@ -65,7 +72,7 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
         constraints_actual = blob_to_array(constraints_blob)
 
         # Does the timestamp make sense?
-        test.assertTrue( t0 <= timestamp and timestamp <= t1)
+        test.assertTrue(t0 <= timestamp and timestamp <= t1)
 
         test.assertEqual(success, 1)
         test.assertEqual(msg, '')
@@ -75,7 +82,7 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
             ('responses', responses_actual, responses_expected),
             ('objectives', objectives_actual, objectives_expected),
             ('constraints', constraints_actual, constraints_expected),
-            ):
+        ):
 
             if expected is None:
                 test.assertEqual(actual, np.array(None, dtype=object))
@@ -84,10 +91,13 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
                 test.assertEqual(len(actual[0]), len(expected))
                 for key, value in iteritems(expected):
                     # Check to see if the keys in the actual and expected match
-                    test.assertTrue(key in actual[0].dtype.names, '{} variable not found in actual data from recorder'.format(key))
+                    test.assertTrue(key in actual[0].dtype.names,
+                                    '{} variable not found in actual data'
+                                    ' from recorder'.format(key))
                     # Check to see if the values in actual and expected match
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
+
 
 def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
     """
@@ -99,17 +109,20 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
         iter_coord = format_iteration_coordinate(coord)
 
         # from the database, get the actual data recorded
-        db_cur.execute("SELECT * FROM system_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
+        db_cur.execute("SELECT * FROM system_iterations WHERE "
+                       "iteration_coordinate=:iteration_coordinate",
+                       {"iteration_coordinate": iter_coord})
         row_actual = db_cur.fetchone()
 
-        counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_blob, outputs_blob, residuals_blob = row_actual
+        counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
+            outputs_blob, residuals_blob = row_actual
 
         inputs_actual = blob_to_array(inputs_blob)
         outputs_actual = blob_to_array(outputs_blob)
         residuals_actual = blob_to_array(residuals_blob)
 
         # Does the timestamp make sense?
-        test.assertTrue( t0 <= timestamp and timestamp <= t1)
+        test.assertTrue(t0 <= timestamp and timestamp <= t1)
 
         test.assertEqual(success, 1)
         test.assertEqual(msg, '')
@@ -118,7 +131,7 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
             ('inputs', inputs_actual, inputs_expected),
             ('outputs', outputs_actual, outputs_expected),
             ('residuals', residuals_actual, residuals_expected),
-            ):
+        ):
 
             if expected is None:
                 test.assertEqual(actual, np.array(None, dtype=object))
@@ -127,10 +140,13 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
                 test.assertEqual(len(actual[0]), len(expected))
                 for key, value in iteritems(expected):
                     # Check to see if the keys in the actual and expected match
-                    test.assertTrue(key in actual[0].dtype.names, '{} variable not found in actual data from recorder'.format(key))
+                    test.assertTrue(key in actual[0].dtype.names,
+                                    '{} variable not found in actual data '
+                                    'from recorder'.format(key))
                     # Check to see if the values in actual and expected match
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
+
 
 def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
     """
@@ -139,35 +155,39 @@ def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
 
     # iterate through the cases
     for coord, (t0, t1), expected_abs_error, expected_rel_error, expected_output, \
-        expected_solver_residuals in expected:
+            expected_solver_residuals in expected:
 
         iter_coord = format_iteration_coordinate(coord)
 
         # from the database, get the actual data recorded
-        db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate", {"iteration_coordinate": iter_coord})
+        db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate",
+                       {"iteration_coordinate": iter_coord})
         row_actual = db_cur.fetchone()
-        test.assertTrue(row_actual, 'Solver iterations table is empty. Should contain at least one record')
+        test.assertTrue(row_actual, 'Solver iterations table is empty. '
+                                    'Should contain at least one record')
 
-        counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, output_blob, residuals_blob = row_actual
+        counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
+            output_blob, residuals_blob = row_actual
 
         output_actual = blob_to_array(output_blob)
         residuals_actual = blob_to_array(residuals_blob)
         # Does the timestamp make sense?
-        test.assertTrue( t0 <= timestamp and timestamp <= t1, 'timestamp should be between when the model started and stopped')
+        test.assertTrue(t0 <= timestamp and timestamp <= t1, 'timestamp should be between when the model '
+                                                             'started and stopped')
 
         test.assertEqual(success, 1)
         test.assertEqual(msg, '')
         if expected_abs_error:
-            test.assertTrue( abs_err, 'Expected absolute error but none recorded')
+            test.assertTrue(abs_err, 'Expected absolute error but none recorded')
             assert_rel_error(test, abs_err, expected_abs_error, tolerance)
         if expected_rel_error:
-            test.assertTrue( rel_err, 'Expected relative error but none recorded')
+            test.assertTrue(rel_err, 'Expected relative error but none recorded')
             assert_rel_error(test, rel_err, expected_rel_error, tolerance)
 
         for vartype, actual, expected in (
                 ('outputs', output_actual, expected_output),
                 ('residuals', residuals_actual, expected_solver_residuals),
-            ):
+        ):
 
             if expected is None:
                 test.assertEqual(actual, np.array(None, dtype=object))
@@ -176,10 +196,12 @@ def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
                 test.assertEqual(len(actual[0]), len(expected))
                 for key, value in iteritems(expected):
                     # Check to see if the keys in the actual and expected match
-                    test.assertTrue(key in actual[0].dtype.names, '{} variable not found in actual data from recorder'.format(key))
+                    test.assertTrue(key in actual[0].dtype.names, '{} variable not found in actual '
+                                                                  'data from recorder'.format(key))
                     # Check to see if the values in actual and expected match
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
+
 
 def _assertSolverIterationDataRecordedBasic(test, db_cur):
     """
@@ -187,7 +209,9 @@ def _assertSolverIterationDataRecordedBasic(test, db_cur):
     """
     db_cur.execute("SELECT * FROM solver_iterations")
     row_actual = db_cur.fetchone()
-    test.assertTrue(row_actual, 'Solver iterations table is empty. Should contain at least one record')
+    test.assertTrue(row_actual, 'Solver iterations table is empty. '
+                                'Should contain at least one record')
+
 
 def _assertSystemIterationDataRecordedBasic(test, db_cur):
     """
@@ -195,20 +219,23 @@ def _assertSystemIterationDataRecordedBasic(test, db_cur):
     """
     db_cur.execute("SELECT * FROM system_iterations")
     row_actual = db_cur.fetchone()
-    test.assertTrue(row_actual, 'System iterations table is empty. Should contain at least one record')
+    test.assertTrue(row_actual, 'System iterations table is empty. '
+                                'Should contain at least one record')
+
 
 def _assertMetadataRecorded(test, db_cur):
 
     db_cur.execute("SELECT format_version FROM metadata")
-    row  = db_cur.fetchone()
+    row = db_cur.fetchone()
 
     format_version_actual = row[0]
     format_version_expected = format_version
 
     # this always gets recorded
-    test.assertEqual( format_version_actual, format_version_expected)
+    test.assertEqual(format_version_actual, format_version_expected)
 
     return
+
 
 def _assertDriverMetadataRecorded(test, db_cur, expected):
 
@@ -216,7 +243,7 @@ def _assertDriverMetadataRecorded(test, db_cur, expected):
     row = db_cur.fetchone()
 
     if expected is None:
-        test.assertEqual(None,row)
+        test.assertEqual(None, row)
         return
 
     if PY2:
@@ -224,17 +251,20 @@ def _assertDriverMetadataRecorded(test, db_cur, expected):
     if PY3:
         model_viewer_data = pickle.loads(row[0])
 
-    test.assertTrue(isinstance(model_viewer_data, dict ) )
+    test.assertTrue(isinstance(model_viewer_data, dict))
 
-    test.assertEqual(2, len( model_viewer_data))
+    test.assertEqual(2, len(model_viewer_data))
 
-    test.assertTrue(isinstance(model_viewer_data['connections_list'], list ) )
+    test.assertTrue(isinstance(model_viewer_data['connections_list'], list))
 
-    test.assertEqual(expected['connections_list_length'], len( model_viewer_data['connections_list']))
-    test.assertEqual(expected['tree_length'], len( model_viewer_data['tree']))
+    test.assertEqual(expected['connections_list_length'],
+                     len(model_viewer_data['connections_list']))
+
+    test.assertEqual(expected['tree_length'], len(model_viewer_data['tree']))
+
     tr = model_viewer_data['tree']
     test.assertEqual(set(['name', 'type', 'subsystem_type', 'children']), set(tr.keys()))
-    test.assertEqual(expected['tree_children_length'], len( model_viewer_data['tree']['children']))
+    test.assertEqual(expected['tree_children_length'], len(model_viewer_data['tree']['children']))
 
     cl = model_viewer_data['connections_list']
     for c in cl:
@@ -279,26 +309,30 @@ class TestSqliteRecorder(unittest.TestCase):
         con.close()
 
     def assertSolverIterationDataRecordedBasic(self):
-        '''Just want to make sure something was recorded'''
+        """
+        Just want to make sure something was recorded
+        """
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertSolverIterationDataRecordedBasic(self, cur)
         con.close()
 
     def assertSystemIterationDataRecordedBasic(self):
-        '''Just want to make sure something was recorded'''
+        """
+        Just want to make sure something was recorded
+        """
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertSystemIterationDataRecordedBasic(self, cur)
         con.close()
 
-    def assertMetadataRecorded(self ):
+    def assertMetadataRecorded(self):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertMetadataRecorded(self, cur)
         con.close()
 
-    def assertDriverMetadataRecorded(self, expected_driver_metadata ):
+    def assertDriverMetadataRecorded(self, expected_driver_metadata):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertDriverMetadataRecorded(self, cur, expected_driver_metadata)
@@ -340,8 +374,8 @@ class TestSqliteRecorder(unittest.TestCase):
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
         model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
-                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+                            z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
@@ -354,8 +388,6 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_objective('obj')
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
-
-
 
     def test_only_desvars_recorded(self):
 
@@ -375,11 +407,13 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'Driver', (1, )]
 
-        expected_desvars = {"px.x": [1.0,],
+        expected_desvars = {
+                            "px.x": [1.0, ],
                             "pz.z": [5.0, 2.0]
-                            }
+                           }
 
-        self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, None, None),), self.eps)
+        self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars,
+                                           None, None, None),), self.eps)
 
     def test_only_objectives_recorded(self):
 
@@ -398,9 +432,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'Driver', (1, )]
 
-        expected_objectives = {"obj_cmp.obj": [28.58830817,]}
+        expected_objectives = {"obj_cmp.obj": [28.58830817, ]}
 
-        self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, expected_objectives, None),), self.eps)
+        self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None,
+                                           expected_objectives, None),), self.eps)
 
     def test_only_constraints_recorded(self):
 
@@ -420,11 +455,12 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'Driver', (1, )]
 
         expected_constraints = {
-                            "con_cmp1.con1": [-22.42830237,],
-                            "con_cmp2.con2": [-11.94151185,],
+                            "con_cmp1.con1": [-22.42830237, ],
+                            "con_cmp2.con2": [-11.94151185, ],
                             }
 
-        self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, None, expected_constraints),), self.eps)
+        self.assertIterationDataRecorded(((coordinate, (t0, t1), None, None, None,
+                                           expected_constraints), ), self.eps)
 
     def test_simple_driver_recording(self):
 
@@ -455,7 +491,6 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
             prob.driver.opt_settings['ACC'] = 1e-9
-        prob.driver.options['print_results'] = True
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -469,17 +504,17 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'SLSQP', (4, )]
 
-        expected_desvars = {"p1.x": [7.16666666166666666666667,],
-                            "p2.y": [-7.833333333333334,]
-                            }
+        expected_desvars = {
+                            "p1.x": [7.16666666166666666666667, ],
+                            "p2.y": [-7.833333333333334, ]
+                           }
 
-        expected_objectives = {"comp.f_xy": [-27.0833,],
-                            }
+        expected_objectives = {"comp.f_xy": [-27.0833, ], }
 
-        expected_constraints = {"con.c": [-15.0,],
-                            }
+        expected_constraints = {"con.c": [-15.0, ], }
 
-        self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, expected_objectives, expected_constraints),), self.eps)
+        self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
+                                           expected_objectives, expected_constraints),), self.eps)
 
     def test_driver_records_metadata(self):
         self.setup_sellar_model()
@@ -523,10 +558,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.model.add_recorder(self.recorder)
 
-        d1 = self.prob.model.get_subsystem('d1')  # an instance of SellarDis1withDerivatives which is a Group
+        d1 = self.prob.model.get_subsystem('d1')  # instance of SellarDis1withDerivatives, a Group
         d1.add_recorder(self.recorder)
 
-        obj_cmp = self.prob.model.get_subsystem('obj_cmp') # an ExecComp
+        obj_cmp = self.prob.model.get_subsystem('obj_cmp')  # an ExecComp
         obj_cmp.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -536,22 +571,21 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         # TODO_RECORDERS - need to check the recording of the d1 also
-        coordinate = [0, 'Driver', (1, ),'root._solve_nonlinear', (0, ), 'obj_cmp._solve_nonlinear', (6, )]
+        coordinate = [0, 'Driver', (1, ), 'root._solve_nonlinear', (0, ),
+                      'obj_cmp._solve_nonlinear', (6, )]
 
         expected_inputs = {
                             "obj_cmp.z": [5.0, 2.0],
-                            "obj_cmp.y1": [25.58830236,],
-                            "obj_cmp.x": [1.0,],
-                            "obj_cmp.y2": [12.05857185,],
-                            }
+                            "obj_cmp.y1": [25.58830236, ],
+                            "obj_cmp.x": [1.0, ],
+                            "obj_cmp.y2": [12.05857185, ],
+                          }
 
-        expected_outputs = {"obj_cmp.obj": [28.58830816,],
-                            }
+        expected_outputs = {"obj_cmp.obj": [28.58830816, ], }
 
-        expected_residuals = {"obj_cmp.obj": [0.0,],
-                            }
-        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
-                                                 expected_residuals),), self.eps)
+        expected_residuals = {"obj_cmp.obj": [0.0, ], }
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
+                                                 expected_outputs, expected_residuals),), self.eps)
 
     def test_includes(self):
         if OPT is None:
@@ -583,7 +617,6 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
             prob.driver.opt_settings['ACC'] = 1e-9
-        prob.driver.options['print_results'] = True
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -597,16 +630,14 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'SLSQP', (4, )]
 
-        expected_desvars = {"p1.x": [7.16666666166666666666667, ]
-                            }
+        expected_desvars = {"p1.x": [7.16666666166666666666667, ]}
 
-        expected_objectives = {"comp.f_xy": [-27.0833,],
-                            }
+        expected_objectives = {"comp.f_xy": [-27.0833, ], }
 
-        expected_constraints = {"con.c": [-15.0,],
-                            }
+        expected_constraints = {"con.c": [-15.0, ], }
 
-        self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None, expected_objectives, expected_constraints),), self.eps)
+        self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
+                                           expected_objectives, expected_constraints), ), self.eps)
 
     def test_record_system_with_hierarchy(self):
         if OPT is None:
@@ -620,7 +651,6 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
             self.prob.driver.opt_settings['ACC'] = 1e-9
-        self.prob.driver.options['print_results'] = True
 
         self.recorder.options['record_inputs'] = True
         self.recorder.options['record_outputs'] = True
@@ -629,10 +659,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.model.add_recorder(self.recorder)
 
-        pz = self.prob.model.get_subsystem('pz') # IndepVarComp which is an ExplicitComponent
+        pz = self.prob.model.get_subsystem('pz')  # IndepVarComp which is an ExplicitComponent
         pz.add_recorder(self.recorder)
 
-        mda = self.prob.model.get_subsystem('mda') # Group
+        mda = self.prob.model.get_subsystem('mda')  # Group
         d1 = mda.get_subsystem('d1')
         d1.add_recorder(self.recorder)
 
@@ -642,28 +672,28 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (0, ), 'NLRunOnce', (1, ), 'mda._solve_nonlinear', (0, ), 'mda.d1._solve_nonlinear', (4, )]
+        coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (0, ), 'NLRunOnce', (1, ),
+                      'mda._solve_nonlinear', (0, ), 'mda.d1._solve_nonlinear', (4, )]
+
         expected_inputs = {
                             "mda.d1.z": [5.0, 2.0],
-                            "mda.d1.x": [1.0,],
-                            "mda.d1.y2": [12.0584865,],
-                            }
-        expected_outputs = {"mda.d1.y1": [25.5883027,],
-                            }
-        expected_residuals = {"mda.d1.y1": [0.0,],
-                            }
-        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
-                                                 expected_residuals),), self.eps)
+                            "mda.d1.x": [1.0, ],
+                            "mda.d1.y2": [12.0584865, ],
+                          }
+        expected_outputs = {"mda.d1.y1": [25.5883027, ], }
+        expected_residuals = {"mda.d1.y1": [0.0, ], }
 
-        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (1, ), 'pz._solve_nonlinear', (2, )]
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
+                                                 expected_outputs, expected_residuals),), self.eps)
+
+        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (1, ),
+                      'pz._solve_nonlinear', (2, )]
+
         expected_inputs = None
-        expected_outputs = {"pz.z": [2.8640616, 0.825643,],
-                            }
-        expected_residuals = {"pz.z": [0.0, 0.0],
-                            }
+        expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
+        expected_residuals = {"pz.z": [0.0, 0.0], }
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
-                                                 expected_residuals),), self.eps)
-
+                                                 expected_residuals), ), self.eps)
 
     def test_record_solver(self):
         self.setup_sellar_model()
@@ -707,8 +737,9 @@ class TestSqliteRecorder(unittest.TestCase):
             "px.x": [0.0]
         }
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
-                                                 expected_solver_output, expected_solver_residuals),), self.eps)
+        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
+                                                 expected_rel_error, expected_solver_output,
+                                                 expected_solver_residuals),), self.eps)
 
     def test_record_line_search_armijo_goldstein(self):
         self.setup_sellar_model()
@@ -729,9 +760,12 @@ class TestSqliteRecorder(unittest.TestCase):
 
         t0, t1 = run_driver(self.prob)
 
+        coordinate = [0, 'ArmijoGoldsteinLS', (5,)]
+
         self.prob.cleanup()
 
-        # TODO_RECORDERS - should really check to see that we get more than just one record as this test does
+        # self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_alpha),), self.eps)
+        # TODO_RECORDERS - should that we get more than just one record as this test does
         self.assertSolverIterationDataRecordedBasic()
 
     def test_record_line_search_bounds_enforce(self):
@@ -753,7 +787,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        # TODO_RECORDERS - should really check to see that we get more than just one record as this test does
+        # TODO_RECORDERS - should check that we get more than just 1 record as this test does
         self.assertSolverIterationDataRecordedBasic()
 
     def test_record_solver_nonlinear_block_gs(self):
@@ -768,7 +802,40 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
+        coordinate = coordinate = [0, 'NonlinearBlockGS', (7, )]
+
+
+        expected_abs_error = 1.31880284470753394998e-10
+
+        expected_rel_error = 3.6299074030587596e-12
+
+        expected_solver_residuals = {
+            'px.x': [0.],
+            'pz.z': [0.,  0.],
+            'd1.y1': [1.31880284e-10],
+            'd2.y2': [0.],
+            'obj_cmp.obj': [0.],
+            'con_cmp1.con1': [0.],
+            'con_cmp2.con2': [0.]
+        }
+
+        expected_solver_output = {
+            'px.x': [1.],
+            'pz.z': [5.,  2.],
+            'd1.y1': [ 25.58830237],
+            'd2.y2': [ 12.05848815],
+            'obj_cmp.obj': [ 28.58830817],
+            'con_cmp1.con1': [-22.42830237],
+            'con_cmp2.con2': [-11.94151185]
+        }
+
         self.assertSolverIterationDataRecordedBasic()
+
+        # self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
+        #                                          expected_rel_error, expected_solver_output,
+        #                                          expected_solver_residuals),), self.eps)
+
+
 
     def test_record_solver_nonlinear_block_jac(self):
         self.setup_sellar_model()
@@ -810,7 +877,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        #### No norms so no expected norms
+        # No norms so no expected norms
         self.assertSolverIterationDataRecordedBasic()
 
     def test_record_solver_linear_direct_solver(self):
@@ -830,7 +897,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        #### No norms so no expected norms
+        # No norms so no expected norms
 
         # TODO_RECORDERS - need to be more thorough
         self.assertSolverIterationDataRecordedBasic()
@@ -912,7 +979,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        #### No norms so no expected norms
+        # No norms so no expected norms
 
         # TODO_RECORDERS - need to be more thorough
         self.assertSolverIterationDataRecordedBasic()
@@ -950,9 +1017,8 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver = pyOptSparseDriver()
         self.prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
-            self.prob.driver.opt_settings['ACC'] = 1e-2 # to speed the test up
+            self.prob.driver.opt_settings['ACC'] = 1e-2  # to speed the test up
             self.prob.driver.opt_settings['ACC'] = 1e-9
-        self.prob.driver.options['print_results'] = True
 
         self.recorder.options['record_inputs'] = True
         self.recorder.options['record_outputs'] = True
@@ -973,25 +1039,27 @@ class TestSqliteRecorder(unittest.TestCase):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
         cur.execute("SELECT counter FROM driver_iterations")
-        counters_driver = set( i[0] for i in cur.fetchall() )
+        counters_driver = set(i[0] for i in cur.fetchall())
         cur.execute("SELECT counter FROM system_iterations")
-        counters_system = set( i[0] for i in cur.fetchall() )
+        counters_system = set(i[0] for i in cur.fetchall())
         cur.execute("SELECT counter FROM solver_iterations")
-        counters_solver = set( i[0] for i in cur.fetchall() )
+        counters_solver = set(i[0] for i in cur.fetchall())
         cur.execute("SELECT COUNT(rowid) FROM global_iterations")
         global_iterations_records = cur.fetchone()[0]
         con.close()
 
         # Check to see that they make sense
-        self.assertEqual(self.recorder._counter, global_iterations_records )
-        self.assertEqual(self.recorder._counter, len(counters_driver) + len(counters_system) + len(counters_solver) )
+        self.assertEqual(self.recorder._counter, global_iterations_records)
+        self.assertEqual(self.recorder._counter, len(counters_driver) + len(counters_system) +
+                         len(counters_solver))
         self.assertTrue(counters_driver.isdisjoint(counters_system))
         self.assertTrue(counters_driver.isdisjoint(counters_solver))
         self.assertTrue(counters_system.isdisjoint(counters_solver))
 
     def test_implicit_component(self):
 
-        from openmdao.core.tests.test_impl_comp import TestImplCompSimpleLinearize, TestImplCompSimpleJacVec
+        from openmdao.core.tests.test_impl_comp import TestImplCompSimpleLinearize, \
+            TestImplCompSimpleJacVec
         group = Group()
         group.add_subsystem('comp1', IndepVarComp([('a', 1.0), ('b', 1.0), ('c', 1.0)]))
         group.add_subsystem('comp2', TestImplCompSimpleLinearize())
@@ -1016,18 +1084,18 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
-        coordinate = [0, 'Driver', (1, ),'root._solve_nonlinear', (0, ), 'NLRunOnce', (1, ), 'comp2._solve_nonlinear', (0, )]
+        coordinate = [0, 'Driver', (1, ), 'root._solve_nonlinear', (0, ), 'NLRunOnce', (1, ),
+                      'comp2._solve_nonlinear', (0, )]
+
         expected_inputs = {
-                            "comp2.a": [1.0,],
-                            "comp2.b": [-4.0,],
-                            "comp2.c": [3.0,],
-                            }
-        expected_outputs = {"comp2.x": [3.0,],
-                            }
-        expected_residuals = {"comp2.x": [0.0,],
-                            }
-        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
-                                                 expected_residuals),), self.eps)
+                            "comp2.a": [1.0, ],
+                            "comp2.b": [-4.0, ],
+                            "comp2.c": [3.0, ],
+                          }
+        expected_outputs = {"comp2.x": [3.0, ], }
+        expected_residuals = {"comp2.x": [0.0, ], }
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
+                                                 expected_outputs, expected_residuals),), self.eps)
 
 
 if __name__ == "__main__":

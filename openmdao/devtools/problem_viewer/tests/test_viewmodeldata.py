@@ -38,7 +38,7 @@ class TestViewModelData(unittest.TestCase):
         to the expected structure, using the SellarStateConnection model.
         """
         p = Problem()
-        p.model=SellarStateConnection()
+        p.model = SellarStateConnection()
         p.setup(check=False)
         model_viewer_data = _get_viewer_data(p)
         tree_json = json.dumps(model_viewer_data['tree'])
@@ -95,6 +95,7 @@ class TestViewModelData(unittest.TestCase):
         # Check that the html file has been created and has something in it.
         self.assertTrue(os.path.isfile(self.sqlite_html_filename))
         self.assertGreater(os.path.getsize(self.sqlite_html_filename), 100)
+
 
 if __name__ == "__main__":
     unittest.main()
