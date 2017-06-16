@@ -252,6 +252,7 @@ class TestProblem(unittest.TestCase):
 
         prob.driver = ScipyOptimizer()
         prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
@@ -262,11 +263,11 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['x'], 0.0, 1e-6)
-        assert_rel_error(self, prob['y1'], 3.160000, 1e-6)
-        assert_rel_error(self, prob['y2'], 3.755278, 1e-6)
-        assert_rel_error(self, prob['z'], [1.977639, 0.000000], 1e-6)
-        assert_rel_error(self, prob['obj'], 3.18339395, 1e-6)
+        assert_rel_error(self, prob['x'], 0.0, 1e-5)
+        assert_rel_error(self, prob['y1'], 3.160000, 1e-5)
+        assert_rel_error(self, prob['y2'], 3.755278, 1e-5)
+        assert_rel_error(self, prob['z'], [1.977639, 0.000000], 1e-5)
+        assert_rel_error(self, prob['obj'], 3.18339395, 1e-5)
 
     def test_feature_promoted_sellar_set_get_outputs(self):
 
