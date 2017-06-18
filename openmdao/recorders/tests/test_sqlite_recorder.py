@@ -658,15 +658,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.setup(check=False, mode='rev')
 
-        sys.stdout = F()
-
-        print( 'qqq')
-
-
-
         t0, t1 = run_driver(self.prob)
-
-
 
         self.prob.cleanup()
 
