@@ -28,7 +28,7 @@ class DistribExecComp(ExecComp):
         super(DistribExecComp, self).__init__(exprs, **kwargs)
         self.arr_size = arr_size
 
-    def initialize_variables(self):
+    def setup(self):
         outs = set()
         allvars = set()
         exprs = self._exprs
@@ -69,14 +69,14 @@ class DistribExecComp(ExecComp):
                 meta['value'] = numpy.ones(sizes[rank], float)
                 meta['src_indices'] = numpy.arange(start, end, dtype=int)
 
-        super(DistribExecComp, self).initialize_variables()
+        super(DistribExecComp, self).setup()
 
     def get_req_procs(self):
         return (2, 2)
 
 
 class DistribCoordComp(ExplicitComponent):
-    def initialize_variables(self):
+    def setup(self):
         comm = self.comm
         rank = comm.rank
 
@@ -126,7 +126,7 @@ class MPITests1(unittest.TestCase):
 
         prob = Problem()
         prob.model = group
-        prob.model.ln_solver = LinearBlockGS()
+        prob.model.linear_solver = LinearBlockGS()
         prob.model.connect('P.x', 'C1.x')
         prob.model.connect('C1.y', 'C2.y')
 
@@ -196,7 +196,7 @@ class MPITests2(unittest.TestCase):
 
         prob = Problem()
         prob.model = group
-        prob.model.ln_solver = LinearBlockGS()
+        prob.model.linear_solver = LinearBlockGS()
         prob.model.connect('P.x', 'C1.x')
         prob.model.connect('C1.y', 'C2.y')
 
@@ -294,8 +294,8 @@ class MPITests2(unittest.TestCase):
         root.connect("P2.x", "sub.C2.x")
         root.connect("C3.y", "C4.x")
 
-        root.ln_solver = LinearBlockGS()
-        sub.ln_solver = LinearBlockGS()
+        root.linear_solver = LinearBlockGS()
+        sub.linear_solver = LinearBlockGS()
 
         prob.model.suppress_solver_output = True
         sub.suppress_solver_output = True

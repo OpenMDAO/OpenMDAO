@@ -18,7 +18,7 @@ from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDens
 class PassThroughLength(ExplicitComponent):
     """Units/scaling test component taking length in cm and passing it through in km."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('old_length', val=1., units='cm')
         self.add_output('new_length', val=1., units='km', ref=0.1)
 
@@ -31,7 +31,7 @@ class PassThroughLength(ExplicitComponent):
 
 class ScalingExample1(ImplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x1', val=100.0)
         self.add_input('x2', val=5000.0)
         self.add_output('y1', val=200., ref=1e2)
@@ -49,7 +49,7 @@ class ScalingExample1(ImplicitComponent):
 
 class ScalingExample2(ImplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x1', val=100.0)
         self.add_input('x2', val=5000.0)
         self.add_output('y1', val=200., res_ref=1e5)
@@ -66,7 +66,7 @@ class ScalingExample2(ImplicitComponent):
 
 class ScalingExample3(ImplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x1', val=100.0)
         self.add_input('x2', val=5000.0)
         self.add_output('y1', val=200., ref=1e2, res_ref=1e5)
@@ -83,7 +83,7 @@ class ScalingExample3(ImplicitComponent):
 
 class ScalingExampleVector(ImplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', val=np.array([100., 5000.]))
         self.add_output('y', val=np.array([200., 6000.]),
                         ref=np.array([1e2, 1e3]),
@@ -100,7 +100,7 @@ class ScalingExampleVector(ImplicitComponent):
 class SpeedComputationWithUnits(ExplicitComponent):
     """Simple speed computation from distance and time with unit conversations."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('distance', 1.0, units='m')
         self.add_input('time', 1.0, units='s')
         self.add_output('speed', units='km/h')
@@ -132,7 +132,7 @@ class ScalingTestComp(ImplicitComponent):
         self.metadata.declare('coeffs')
         self.metadata.declare('use_scal', type_=bool)
 
-    def initialize_variables(self):
+    def setup(self):
 
         r1, r2, c1, c2 = self.metadata['coeffs']
 
@@ -185,7 +185,7 @@ class TestScaling(unittest.TestCase):
     def test_error_messages(self):
 
         class EComp(ImplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_output('zz', val=np.ones((4, 2)), ref=np.ones((3, 5)))
 
         prob = Problem()
@@ -197,7 +197,7 @@ class TestScaling(unittest.TestCase):
             prob.setup(check=False)
 
         class EComp(ImplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_output('zz', val=np.ones((4, 2)), ref0=np.ones((3, 5)))
 
         prob = Problem()
@@ -209,7 +209,7 @@ class TestScaling(unittest.TestCase):
             prob.setup(check=False)
 
         class EComp(ImplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_output('zz', val=np.ones((4, 2)), res_ref=np.ones((3, 5)))
 
         prob = Problem()
@@ -271,8 +271,8 @@ class TestScaling(unittest.TestCase):
                                                              use_scal=use_scal))
             prob.model.connect('row1.y', 'row2.x')
             prob.model.connect('row2.y', 'row1.x')
-            prob.model.nl_solver = NewtonSolver(maxiter=2, atol=1e-5, rtol=0)
-            prob.model.nl_solver.ln_solver = ScipyIterativeSolver(maxiter=1)
+            prob.model.nonlinear_solver = NewtonSolver(maxiter=2, atol=1e-5, rtol=0)
+            prob.model.nonlinear_solver.linear_solver = ScipyIterativeSolver(maxiter=1)
 
             prob.set_solver_print(level=0)
 
@@ -331,7 +331,7 @@ class TestScaling(unittest.TestCase):
                 self.metadata.declare('res_ref', default=None)
                 self.metadata.declare('res_ref0', default=None)
 
-            def initialize_variables(self):
+            def setup(self):
 
                 ref = self.metadata['ref']
                 ref0 = self.metadata['ref0']
@@ -359,8 +359,8 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nl_solver = NonlinearBlockGS()
-        model.nl_solver.options['maxiter'] = 1
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver.options['maxiter'] = 1
 
         prob.set_solver_print(level=0)
 
@@ -397,8 +397,8 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nl_solver = NonlinearBlockGS()
-        model.nl_solver.options['maxiter'] = 1
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver.options['maxiter'] = 1
 
         prob.set_solver_print(level=0)
 
@@ -431,8 +431,8 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nl_solver = NonlinearBlockGS()
-        model.nl_solver.options['maxiter'] = 1
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver.options['maxiter'] = 1
 
         prob.set_solver_print(level=0)
 
@@ -467,8 +467,8 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nl_solver = NonlinearBlockGS()
-        model.nl_solver.options['maxiter'] = 1
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver.options['maxiter'] = 1
 
         prob.set_solver_print(level=0)
 
@@ -494,7 +494,7 @@ class TestScaling(unittest.TestCase):
 
         class ExpCompArrayScale(TestExplCompArrayDense):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('lengths', val=np.ones((2, 2)))
                 self.add_input('widths', val=np.ones((2, 2)))
                 self.add_output('areas', val=np.ones((2, 2)), ref=2.0)
@@ -536,7 +536,7 @@ class TestScaling(unittest.TestCase):
 
         class ExpCompArrayScale(TestExplCompArrayDense):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('lengths', val=np.ones((2, 2)))
                 self.add_input('widths', val=np.ones((2, 2)))
                 self.add_output('areas', val=np.ones((2, 2)), ref=np.array([[2.0, 3.0], [5.0, 7.0]]))
@@ -577,7 +577,7 @@ class TestScaling(unittest.TestCase):
 
         class ExpCompArrayScale(TestExplCompArrayDense):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('lengths', val=np.ones((2, 2)))
                 self.add_input('widths', val=np.ones((2, 2)))
                 self.add_output('areas', val=np.ones((2, 2)), ref=np.array([[2.0, 3.0], [5.0, 7.0]]),
@@ -645,7 +645,7 @@ class TestScaling(unittest.TestCase):
     def test_implicit_scale(self):
 
         class ImpCompArrayScale(TestImplCompArrayDense):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('rhs', val=np.ones(2))
                 self.add_output('x', val=np.zeros(2), ref=np.array([2.0, 3.0]),
                                 ref0=np.array([4.0, 9.0]),
@@ -704,7 +704,7 @@ class TestScaling(unittest.TestCase):
         raise unittest.SkipTest('Cannot specify an n by m subjac with a scalar yet.')
 
         class ImpCompArrayScale(TestImplCompArrayDense):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('rhs', val=np.ones(2))
                 self.add_output('x', val=np.zeros(2), ref=np.array([2.0, 3.0]),
                                 ref0=np.array([4.0, 9.0]),
@@ -775,7 +775,7 @@ class TestScaling(unittest.TestCase):
 
         class ExpCompArrayScale(TestExplCompArrayDense):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('lengths', val=np.ones((2, 2)))
                 self.add_input('widths', val=np.ones((1, 3)))
                 self.add_output('areas', val=np.ones((2, 2)), ref=np.array([[2.0, 3.0], [5.0, 7.0]]),
@@ -814,7 +814,7 @@ class TestScaling(unittest.TestCase):
 
         class SimpleComp(ImplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', val=6.0)
                 self.add_output('y', val=1.0, ref=100.0, res_ref=10.1)
 
@@ -834,8 +834,8 @@ class TestScaling(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = DirectSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = DirectSolver()
 
         prob.setup(check=False)
         prob.run_model()
@@ -852,8 +852,8 @@ class TestScaling(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
 
-        model.nl_solver = NewtonSolver()
-        model.ln_solver = DirectSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = DirectSolver()
 
         model.jacobian = AssembledJacobian()
 

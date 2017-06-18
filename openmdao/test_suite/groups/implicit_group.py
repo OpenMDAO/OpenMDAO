@@ -12,7 +12,7 @@ class Comp(ImplicitComponent):
         super(Comp, self).__init__()
         self._use_var_sets = use_varsets
 
-    def initialize_variables(self):
+    def setup(self):
         if self._use_var_sets:
             self.add_input('a', var_set=1)
             self.add_input('b', var_set=0)
@@ -113,8 +113,8 @@ class TestImplicitGroup(Group):
         self.connect("C2.y", "C1.c")
         self.connect("C2.z", "C1.d")
 
-        self.ln_solver = lnSolverClass()
-        self.nl_solver = nlSolverClass()
+        self.linear_solver = lnSolverClass()
+        self.nonlinear_solver = nlSolverClass()
 
         if use_varsets:
             self.expected_solution = [

@@ -201,14 +201,11 @@ class pyOptSparseDriver(Driver):
             iter_get_norm_on_call_stack
         push_recording_iteration_stack(self.options['optimizer'], self.iter_count)
 
-
         # Initial Run
         model._solve_nonlinear()
 
-
         print_recording_iteration_stack()
         pop_recording_iteration_stack()
-
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
@@ -397,7 +394,6 @@ class pyOptSparseDriver(Driver):
 
             model._solve_nonlinear()
 
-
             func_dict = self.get_objective_values()
             func_dict.update(self.get_constraint_values(lintype='nonlinear'))
 
@@ -409,8 +405,6 @@ class pyOptSparseDriver(Driver):
             print_recording_iteration_stack()
             pop_recording_iteration_stack()
 
-
-
         except Exception as msg:
             tb = traceback.format_exc()
 
@@ -421,9 +415,6 @@ class pyOptSparseDriver(Driver):
             fail = 1
             func_dict = {}
 
-        # print("Functions calculated")
-        # print(dv_dict)
-        # print(func_dict)
         return func_dict, fail
 
     def _gradfunc(self, dv_dict, func_dict):

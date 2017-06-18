@@ -15,12 +15,12 @@ Usage
 1. Specifying that a variable does not depend on another.
 
 .. embed-code::
-    openmdao.jacobians.tests.test_jacobian_features.SimpleCompDependence.initialize_partials
+    openmdao.jacobians.tests.test_jacobian_features.SimpleCompDependence.setup_partials
 
 2. Specifying variables using glob patterns (see https://docs.python.org/3.6/library/fnmatch.html).
 
 .. embed-code::
-    openmdao.jacobians.tests.test_jacobian_features.SimpleCompGlob.initialize_partials
+    openmdao.jacobians.tests.test_jacobian_features.SimpleCompGlob.setup_partials
 
 3. Using the :code:`val` argument to set a constant partial derivative. Note that if the :code:`val` arugment is used,
 then the partial derivative does not need to be calculated in :code:`compute_partials`.

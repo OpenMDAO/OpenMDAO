@@ -117,7 +117,7 @@ class ExecComp(ExplicitComponent):
         self._codes = None
         self._kwargs = kwargs
 
-    def initialize_variables(self):
+    def setup(self):
         """
         Set up variable name and metadata lists.
         """

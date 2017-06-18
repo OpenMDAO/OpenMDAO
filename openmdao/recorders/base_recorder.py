@@ -17,11 +17,14 @@ recording_iteration_stack = []
 
 def iter_get_norm_on_call_stack():
     """
-    iter_get_norm_ on call stack?
+    Check if iter_get_norm is on call stack.
 
     Returns
-        True
-        False
+    -------
+        True if iter_get_norm on stack.
+
+        False if iter_get_norm not on stack.
+
     """
     for s in inspect.stack():
         if s[3] == '_iter_get_norm':
@@ -31,11 +34,13 @@ def iter_get_norm_on_call_stack():
 
 def compute_total_derivs_on_call_stack():
     """
-    compute_total_derivs on call stack?
+    Check if compute_total_derivs is on call stack.
 
     Returns
-        True
-        False
+    -------
+        True if compute_total_derivs is on stack.
+
+        False if compute_total_derivs is not on stack.
     """
     for s in inspect.stack():
         if s[3] == '_compute_total_derivs':
@@ -66,9 +71,12 @@ def pop_recording_iteration_stack():
 
 def print_recording_iteration_stack():
     """
-    Print the record iteration stack. For debugging
+    Print the record iteration stack.
+
+    Used for debugging.
     """
-    return #TODO_RECORDER - remove all the printing later
+    return
+    # TODO_RECORDER - remove all the printing later
     # print
     # for name, iter_count in reversed(recording_iteration_stack):
     #     print '^^^', name, iter_count
@@ -76,23 +84,21 @@ def print_recording_iteration_stack():
 
 
 def get_formatted_iteration_coordinate():
+    """
+    Format the iteration coordinate into human-readable form.
 
-    '''
-    Get the iteration coordinate in human readable format like this:
-    
         'rank0:pyoptsparsedriver|6|root._solve_nonlinear|6|mda._solve_nonlinear|6|mda.d1._solve_nonlinear|45'
-    '''
-
+    """
     separator = '|'
     iteration_coord_list = []
 
     for name, iter_count in recording_iteration_stack:
-        iteration_coord_list.append( '{}{}{}'.format(name,separator, iter_count))
+        iteration_coord_list.append('{}{}{}'.format(name, separator, iter_count))
 
-    rank = 0 # TODO_RECORDER - needs to be updated when we go parallel
-    formatted_iteration_coordinate = ':'.join(["rank%d"%rank, separator.join(iteration_coord_list)])
+    rank = 0  # TODO_RECORDER - needs to be updated when we go parallel
+    formatted_iteration_coordinate = ':'.join(["rank%d" % rank,
+                                               separator.join(iteration_coord_list)])
     return formatted_iteration_coordinate
-
 
 
 class BaseRecorder(object):

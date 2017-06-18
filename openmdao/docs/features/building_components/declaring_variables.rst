@@ -8,7 +8,7 @@ Calling add_input and add_output
 Every component in an OpenMDAO model is an instance of :code:`IndepVarComp`, :code:`ExplicitComponent`, :code:`ImplicitComponent`, or a subclass of one of these classes.
 Regardless of the type, each component has input variables and output variables that it must declare.
 
-In explicit and implicit components, the user must call :code:`add_input` and :code:`add_output` to declare variables in the :code:`initialize_variables` method.
+In explicit and implicit components, the user must call :code:`add_input` and :code:`add_output` to declare variables in the :code:`setup` method.
 An example is given below.
 
 .. embed-code::

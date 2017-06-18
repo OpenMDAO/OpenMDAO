@@ -16,13 +16,13 @@ except ImportError:
 
 class CompA(ExplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_output('x')
 
 
 class CompB(ExplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x')
         self.add_output('f')
 

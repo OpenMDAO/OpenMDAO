@@ -3,7 +3,7 @@ Approximating Partial Derivatives
 
 OpenMDAO allows you to specify analytic derivatives for your models, but it is not a requirement.
 If certain partial derivatives are not available, you can ask the framework to approximate the
-derivatives by using the :code:`approx_partials` method inside :code:`initialize_partials`.
+derivatives by using the :code:`approx_partials` method inside :code:`setup_partials`.
 
 .. automethod:: openmdao.core.component.Component.approx_partials
     :noindex:

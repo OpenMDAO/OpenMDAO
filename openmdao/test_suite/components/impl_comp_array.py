@@ -16,7 +16,7 @@ class TestImplCompArray(ImplicitComponent):
             [0.01, 0.99],
         ])
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('rhs', val=np.ones(2))
         self.add_output('x', val=np.zeros(2))
 

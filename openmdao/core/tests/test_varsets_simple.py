@@ -16,7 +16,7 @@ except ImportError:
 
 class Comp1(ExplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('v2')
         self.add_input('v3')
         self.add_input('v4')
@@ -25,7 +25,7 @@ class Comp1(ExplicitComponent):
 
 class Comp2(ExplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('v1')
         self.add_input('v3')
         self.add_input('v4')
@@ -34,7 +34,7 @@ class Comp2(ExplicitComponent):
 
 class Comp3(ExplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('v1')
         self.add_input('v2')
         self.add_input('v4')
@@ -43,7 +43,7 @@ class Comp3(ExplicitComponent):
 
 class Comp4(ExplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('v1')
         self.add_input('v2')
         self.add_input('v3')

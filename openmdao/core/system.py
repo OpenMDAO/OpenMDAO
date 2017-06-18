@@ -26,6 +26,7 @@ from openmdao.utils.units import convert_units
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta, update_local_meta
 
+
 class System(object):
     """
     Base class for all systems in OpenMDAO.
@@ -158,11 +159,11 @@ class System(object):
         Vector of upper bounds, scaled and dimensionless.
     #
     _scaling_vecs : dict of dict of Vectors
-        First key is indicates vector type and coefficient, second key is vec_name.
+        First key indicates vector type and coefficient, second key is vec_name.
     #
-    _nl_solver : <NonlinearSolver>
+    _nonlinear_solver : <NonlinearSolver>
         Nonlinear solver to be used for solve_nonlinear.
-    _ln_solver : <LinearSolver>
+    _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
     #
     _jacobian : <Jacobian>
@@ -183,18 +184,18 @@ class System(object):
         object that manages all recorders added to this system.
     #
     _static_mode : bool
-        If true, we are outside of initialize_subsystems and initialize_variables.
+        If true, we are outside of setup.
         In this case, add_input, add_output, and add_subsystem all add to the
         '_static' versions of the respective data structures.
         These data structures are never reset during reconfiguration.
     _static_subsystems_allprocs : [<System>, ...]
-        List of subsystems that stores all subsystems added outside of initialize_subsystems.
+        List of subsystems that stores all subsystems added outside of setup.
     _static_manual_connections : dict
-        Dictionary that stores all explicit connections added outside of initialize_subsystems.
+        Dictionary that stores all explicit connections added outside of setup.
     _static_design_vars : dict of dict
-        Driver design variables added outside of initialize_subsystems.
+        Driver design variables added outside of setup.
     _static_responses : dict of dict
-        Driver responses added outside of initialize_subsystems.
+        Driver responses added outside of setup.
     #
     _reconfigured : bool
         If True, this system has reconfigured, and the immediate parent should update.
@@ -275,8 +276,8 @@ class System(object):
             ('residual', 'norm0'): {}, ('residual', 'norm1'): {},
         }
 
-        self._nl_solver = None
-        self._ln_solver = None
+        self._nonlinear_solver = None
+        self._linear_solver = None
 
         self._jacobian = DictionaryJacobian()
         self._jacobian._system = self
@@ -311,7 +312,7 @@ class System(object):
                 old = {'input': self._inputs, 'output': self._outputs}
 
                 # Perform reconfiguration
-                self.setup('reconf')
+                self.resetup('reconf')
 
                 new = {'input': self._inputs, 'output': self._outputs}
 
@@ -340,7 +341,7 @@ class System(object):
         if reconf:
             # Perform an update setup
             with self._unscaled_context_all():
-                self.setup('update')
+                self.resetup('update')
 
             # Reset the _reconfigured attribute to False
             for subsys in self._subsystems_myproc:
@@ -556,7 +557,7 @@ class System(object):
 
         return root_vectors
 
-    def setup(self, setup_mode='full'):
+    def resetup(self, setup_mode='full'):
         """
         Public wrapper for _setup that reconfigures after an initial setup has been performed.
 
@@ -661,7 +662,7 @@ class System(object):
 
     def _setup_vars(self, recurse=True):
         """
-        Call initialize_variables in components and count variables, total and by var_set.
+        Call setup in components and count variables, total and by var_set.
 
         Parameters
         ----------
@@ -1078,10 +1079,10 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        if self._nl_solver is not None:
-            self._nl_solver._setup_solvers(self, 0)
-        if self._ln_solver is not None:
-            self._ln_solver._setup_solvers(self, 0)
+        if self._nonlinear_solver is not None:
+            self._nonlinear_solver._setup_solvers(self, 0)
+        if self._linear_solver is not None:
+            self._linear_solver._setup_solvers(self, 0)
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -1089,7 +1090,7 @@ class System(object):
 
     def _setup_partials(self, recurse=True):
         """
-        Call initialize_partials in components.
+        Call setup_partials in components.
 
         Parameters
         ----------
@@ -1121,13 +1122,13 @@ class System(object):
             # we have a nonlinear solver that uses derivatives, this is
             # currently an error if the AssembledJacobian is not a DenseJacobian.
             # In a future story we'll add support for sparse AssembledJacobians.
-            if self._nl_solver is not None and self._nl_solver.supports['gradients']:
+            if self._nonlinear_solver is not None and self._nonlinear_solver.supports['gradients']:
                 if not isinstance(jacobian, DenseJacobian):
                     raise RuntimeError("System '%s' has a solver of type '%s'"
                                        "but a sparse AssembledJacobian has been set in a "
                                        "higher level system." %
                                        (self.pathname,
-                                        self._nl_solver.__class__.__name__))
+                                        self._nonlinear_solver.__class__.__name__))
                 self._views_assembled_jac = True
             self._owns_assembled_jac = False
 
@@ -1536,32 +1537,32 @@ class System(object):
         self._jacobian._system = oldsys
 
     @property
-    def nl_solver(self):
+    def nonlinear_solver(self):
         """
         Get the nonlinear solver for this system.
         """
-        return self._nl_solver
+        return self._nonlinear_solver
 
-    @nl_solver.setter
-    def nl_solver(self, solver):
+    @nonlinear_solver.setter
+    def nonlinear_solver(self, solver):
         """
         Set this system's nonlinear solver and perform setup.
         """
-        self._nl_solver = solver
+        self._nonlinear_solver = solver
 
     @property
-    def ln_solver(self):
+    def linear_solver(self):
         """
         Get the linear solver for this system.
         """
-        return self._ln_solver
+        return self._linear_solver
 
-    @ln_solver.setter
-    def ln_solver(self, solver):
+    @linear_solver.setter
+    def linear_solver(self, solver):
         """
         Set this system's linear solver and perform setup.
         """
-        self._ln_solver = solver
+        self._linear_solver = solver
 
     def _set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
@@ -1580,10 +1581,10 @@ class System(object):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        if self.ln_solver is not None and type_ != 'NL':
-            self.ln_solver._set_solver_print(level=level, type_=type_)
-        if self.nl_solver is not None and type_ != 'LN':
-            self.nl_solver._set_solver_print(level=level, type_=type_)
+        if self.linear_solver is not None and type_ != 'NL':
+            self.linear_solver._set_solver_print(level=level, type_=type_)
+        if self.nonlinear_solver is not None and type_ != 'LN':
+            self.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
         for subsys in self._subsystems_allprocs:
 
@@ -1593,10 +1594,10 @@ class System(object):
 
             subsys._set_solver_print(level=level, depth=depth - current_depth, type_=type_)
 
-            if subsys.ln_solver is not None and type_ != 'NL':
-                subsys.ln_solver._set_solver_print(level=level, type_=type_)
-            if subsys.nl_solver is not None and type_ != 'LN':
-                subsys.nl_solver._set_solver_print(level=level, type_=type_)
+            if subsys.linear_solver is not None and type_ != 'NL':
+                subsys.linear_solver._set_solver_print(level=level, type_=type_)
+            if subsys.nonlinear_solver is not None and type_ != 'LN':
+                subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
     @property
     def proc_allocator(self):
@@ -2206,14 +2207,6 @@ class System(object):
         with self._scaled_context_all():
             self._apply_linear(vec_names, mode, scope_out, scope_in)
 
-        # TODO_RECORDERS
-        #  The _apply_linear and _solve_linear methods work w d_inputs, d_outputs, and d_residuals,
-        #       each one is associated with a vecname.
-        #  These would be (System._vectors['inputs'][vec_name], etc.). In the list of vec_names,
-        #     there is always a 'linear', and depending on the problem, there may be others.
-        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to make it work
-        # generally with any type of system at this point).
-
     def run_solve_linear(self, vec_names, mode):
         """
         Apply inverse jac product.
@@ -2337,7 +2330,7 @@ class System(object):
 
     def initialize_processors(self):
         """
-        Optional user-defined method run after repartitioning/rebalancing.
+        Run after repartitioning/rebalancing. (Optional user-defined method).
 
         Available attributes:
             name
@@ -2349,7 +2342,7 @@ class System(object):
 
     def initialize_variables(self):
         """
-        Required method for components to declare inputs and outputs.
+        Declare inputs and outputs. (Required method for components).
 
         Available attributes:
             name
@@ -2361,7 +2354,7 @@ class System(object):
 
     def initialize_partials(self):
         """
-        Optional method for components to declare Jacobian structure/approximations.
+        Declare Jacobian structure/approximations. (Optional method for components).
 
         Available attributes:
             name
@@ -2410,19 +2403,6 @@ class System(object):
         # send the calling method name into record_iteration, e.g. 'solve_nonlinear'
         self._rec_mgr.record_iteration(self, metadata, method=inspect.stack()[1][3])
 
-        # TODO_RECORDER - for debugging but needs to be removed
-        # want to see that we cover all class.methods that need to be recorded
-        # filepath = inspect.stack()[1][1]
-        # import os.path
-        # base = os.path.basename(filepath)
-        # base_filename = os.path.splitext(base)[0]
-        #
-        # method_name = inspect.stack()[1][3]
-        # import unittest
-        # test_name = get_current_case()
-        # # test_name = "this"
-        # print 'qqq', test_name, base_filename, method_name
-
 
 def get_current_case():
     """
@@ -2434,6 +2414,7 @@ def get_current_case():
     Tested on Python 2.7 and 3.3 - 3.6 with nose 1.3.7.
 
     #'/Users/hschilli/Documents/OpenMDAO/dev/blue_recording_global_counter/openmdao/recorders/tests/test_sqlite_recorder.py'
+
     Returns
     -------
     str

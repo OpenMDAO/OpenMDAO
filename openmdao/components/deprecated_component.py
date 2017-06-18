@@ -49,8 +49,8 @@ class Component(BaseComponent):
         abs2meta_out = self._var_abs2meta['output']
         abs2prom_out = self._var_abs2prom['output']
 
-        # Note: These declare calls are outside of initialize_partials so that users do not have to
-        # call the super version of initialize_partials. This is still post-initialize_variables.
+        # Note: These declare calls are outside of setup_partials so that users do not have to
+        # call the super version of setup_partials. This is still post-setup.
         other_names = []
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta_out[out_abs]
@@ -165,8 +165,8 @@ class Component(BaseComponent):
         """
         super(Component, self)._solve_nonlinear()
 
-        if self._nl_solver is not None:
-            self._nl_solver.solve()
+        if self._nonlinear_solver is not None:
+            self._nonlinear_solver.solve()
         else:
             self._scale_vec(self._inputs, 'input', 'phys')
             self._scale_vec(self._outputs, 'output', 'phys')
@@ -237,8 +237,8 @@ class Component(BaseComponent):
         float
             absolute error.
         """
-        if self._ln_solver is not None:
-            return self._ln_solver(vec_names, mode)
+        if self._linear_solver is not None:
+            return self._linear_solver(vec_names, mode)
         else:
             for vec_name in vec_names:
                 d_outputs = self._vectors['output'][vec_name]
