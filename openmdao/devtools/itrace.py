@@ -25,16 +25,18 @@ def _trace_call(frame, arg, stack, context):
 
     self = frame.f_locals['self']
     try:
-        sname = self.pathname
+        pname = "(%s)" % self.pathname
     except AttributeError:
-        cname = self.__class__.__name__
-        class_counts[cname].add(id(self))
-        sname = "%s#%d" % (self.__class__.__name__, len(class_counts[cname]))
+        pname = ""
+
+    cname = self.__class__.__name__
+    class_counts[cname].add(id(self))
+    sname = "%s#%d%s" % (self.__class__.__name__, len(class_counts[cname]), pname)
 
     fullname = '.'.join((sname, funcname))
     method_counts[fullname] += 1
 
-    print('   ' * len(stack), "%s (%d)" % (fullname, method_counts[fullname]))
+    print("%s%s (%d)" % ('   ' * (len(stack)-1), fullname, method_counts[fullname]))
 
 
 def setup(methods=None):

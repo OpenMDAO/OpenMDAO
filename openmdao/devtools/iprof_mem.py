@@ -42,7 +42,7 @@ def setup(methods=None):
     if not _registered:
         from openmdao.devtools.debug import mem_usage
         if methods is None:
-            methods = func_group['openmdao']
+            methods = func_group['openmdao_all']
 
         mem_changes = {}
         memstack = []
@@ -60,11 +60,13 @@ def setup(methods=None):
                     funcname = find_qualified_name(code_obj.co_filename,
                                                    code_obj.co_firstlineno, _qual_cache)
                     try:
-                        sname = self.pathname
+                        pname = '(%s)' % self.pathname
                     except AttributeError:
-                        cname = self.__class__.__name__
-                        count[cname].add(id(self))
-                        sname = "%s#%d" % (self.__class__.__name__, len(count[cname]))
+                        pname = ''
+
+                    cname = self.__class__.__name__
+                    count[cname].add(id(self))
+                    sname = "%s#%d%s" % (self.__class__.__name__, len(count[cname]), pname)
 
                     print("%s %g MB" % ('.'.join((sname, funcname)), delta))
 
@@ -89,7 +91,7 @@ def profile_py_file():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-g', '--group', action='store', dest='group',
-                        default='openmdao_full',
+                        default='openmdao_all',
                         help='Determines which group of methods will be tracked. Options are %s' %
                              sorted(func_group.keys()))
     parser.add_argument('file', metavar='file', nargs=1,

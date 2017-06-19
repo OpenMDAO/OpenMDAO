@@ -71,7 +71,7 @@ taken up by functions called by the parent that are not being profiled.
    iprofview -h
 
 
-If you just want to see the timing totals for each method, you can call `iprof_totals` instead
+If you just want to see the timing totals for each method, you can call `iproftotals` instead
 of `iprofview`.  For example:
 
 .. code::
@@ -87,35 +87,54 @@ runtime and total number of calls for each profiled function.  For example:
 
    Total     Total           Function
    Calls     Time (s)    %   Name
-        1    0.000001   0.00 <Solver#1._declare_options>
-        1    0.000001   0.00 indep.<System._setup_global_connections>
-        1    0.000001   0.00 indep.<System._setup_connections>
-        1    0.000001   0.00 comp1.<System._setup_connections>
-        1    0.000002   0.00 .<System.initialize>
-        1    0.000002   0.00 <Solver#0._declare_options>
-        1    0.000002   0.00 indep.<System.initialize>
-        1    0.000002   0.00 comp1.<System.initialize>
-        1    0.000002   0.00 .<System._get_initial_procs>
-        1    0.000002   0.00 .<System._setup_vars>
-        1    0.000002   0.00 indep.<System._setup_vars>
-        1    0.000002   0.00 indep.<System._setup_var_sizes>
-   ...
-        1    0.000967   0.43 <Problem#0.run_model>
-        1    0.001124   0.50 .<System._setup_vectors>
-        1    0.002057   0.91 comp1.<System._setup_scaling>
-        1    0.002148   0.95 indep.<System._setup_scaling>
-        1    0.003556   1.58 .<System._get_scaling_root_vectors>
-        1    0.007772   3.45 .<System._setup_scaling>
-        1    0.014359   6.38 comp1.<Component._setup_vars>
-        1    0.185399  82.39 indep.<Component._setup_vars>
-        1    0.199874  88.82 .<Group._setup_vars>
-        1    0.217097  96.47 .<System._setup>
-        1    0.217404  96.61 <Problem#0.setup>
-        1    0.225035 100.00 $total
+        1    0.000000   0.00 des_vars.<System.initialize>
+        1    0.000000   0.00 <Solver#3._declare_options>
+        1    0.000000   0.00 <Solver#6._declare_options>
+        1    0.000000   0.00 <Solver#7._declare_options>
+        1    0.000000   0.00 <Solver#9._declare_options>
+        1    0.000000   0.00 <Solver#15._declare_options>
+        1    0.000000   0.00 design.fan.<System.get_req_procs>
+        1    0.000000   0.00 design.nozz.<System.get_req_procs>
+        2    0.000000   0.00 design.shaft.<System.get_req_procs>
+        1    0.000000   0.00 design.fc.ambient.<System.initialize>
+        1    0.000000   0.00 <Solver#16._declare_options>
+        1    0.000000   0.00 design.fc.conv.<System.initialize>
+        1    0.000000   0.00 <Solver#20._declare_options>
+        1    0.000000   0.00 <Solver#21._declare_options>
+        2    0.000000   0.00 design.fc.conv.fs.<System.get_req_procs>
+        1    0.000000   0.00 <Solver#25._declare_options>
+        1    0.000000   0.00 design.fc.ambient.readAtmTable.<System.initialize>
+      ...
+        5    1.690505   8.06 <NonLinearRunOnce#5.solve>
+        5    1.694799   8.08 design.fc.conv.fs.exit_static.<Group._solve_nonlinear>
+        5    1.885014   8.99 <NonLinearRunOnce#6.solve>
+        5    1.892510   9.02 design.fc.conv.fs.<Group._solve_nonlinear>
+        1    1.934901   9.23 .<System._setup_scaling>
+        1    2.053042   9.79 design.fan.<Group._setup_vars>
+        5    2.549496  12.16 <NewtonSolver#2._iter_execute>
+        2    2.609760  12.44 <Solver#22._run_iterator>
+        2    2.609783  12.44 <NonlinearSolver#2.solve>
+        2    2.613209  12.46 design.fc.conv.<Group._solve_nonlinear>
+        2    2.615414  12.47 <NonLinearRunOnce#7.solve>
+        2    2.619340  12.49 design.fc.<Group._solve_nonlinear>
+        1    3.133403  14.94 design.nozz.<Group._setup_vars>
+        2    7.319256  34.90 <NewtonSolver#1._iter_execute>
+        1    7.608798  36.28 <Solver#13._run_iterator>
+        1    7.608808  36.28 <NonlinearSolver#1.solve>
+        1    7.617416  36.32 design.<Group._solve_nonlinear>
+        1    7.617761  36.32 <NonLinearRunOnce#32.solve>
+        1    7.627209  36.37 .<Group._solve_nonlinear>
+        1    7.627431  36.37 .<System.run_solve_nonlinear>
+        1    7.627438  36.37 <Problem#1.run_model>
+        1    7.818091  37.28 design.<Group._setup_vars>
+        1    7.863608  37.49 .<Group._setup_vars>
+        1   12.812045  61.09 .<System._setup>
+        1   12.826367  61.16 <Problem#1.setup>
+        1   20.973087 100.00 $total
 
 
 Note that the totals are sorted with the largest values at the end so that when
-running `proftotals` in a terminal the most important functions will show up without having to scroll to the top of
+running `iproftotals` in a terminal the most important functions will show up without having to scroll to the top of
 the output, which can be large. Also note that the function names are a combination of the OpenMDAO pathname (when
 available) plus the function name qualified by the owning class, or the class name followed by an instance id plus
 the function name.
@@ -177,46 +196,43 @@ This will generate output to the console that looks like this:
 
 ::
 
+   Group#1().System.__init__ 0.00390625 MB
+   NonLinearRunOnce#1.Solver.__init__ 0.00390625 MB
+   IndepVarComp#1(des_vars).ExplicitComponent.__init__ 0.00390625 MB
+   Group#1().System._set_solver_print 0.00390625 MB
+   FlightConditions#1(design.fc).FlightConditions.initialize 0.00390625 MB
+   LinearRunOnce#1.Solver.__init__ 0.00390625 MB
+   Inlet#1(design.inlet).Inlet.initialize 0.00390625 MB
+   LinearRunOnce#2.Solver.__init__ 0.00390625 MB
+   Compressor#1(design.fan).Compressor.initialize 0.00390625 MB
+   LinearRunOnce#3.Solver.__init__ 0.00390625 MB
    DictionaryJacobian#1.Jacobian.__init__ 0.00390625 MB
-   des_vars.ExplicitComponent.__init__ 0.00390625 MB
-   LNRunOnce#1.Solver._set_solver_print 0.00390625 MB
-   NLRunOnce#1.Solver.__init__ 0.00390625 MB
-   DictionaryJacobian#2.Jacobian.__init__ 0.00390625 MB
-   NLRunOnce#2.Solver.__init__ 0.00390625 MB
-   LNRunOnce#2.Solver.__init__ 0.00390625 MB
-   design.fan.Group.__init__ 0.00390625 MB
-   design.nozz.Nozzle.initialize 0.00390625 MB
-   NLRunOnce#3.Solver.__init__ 0.00390625 MB
-   DictionaryJacobian#3.Jacobian.__init__ 0.00390625 MB
-   design.perf.Performance.initialize 0.00390625 MB
-   design.pwr_balance.Balance.initialize 0.00390625 MB
-   NewtonSolver#1.NewtonSolver._declare_options 0.00390625 MB
-   NLRunOnce#4.Solver.__init__ 0.00390625 MB
-   LNRunOnce#3.Solver.__init__ 0.00390625 MB
-   DictionaryJacobian#4.Jacobian.__init__ 0.00390625 MB
-   design.fc.conv.fs.FlowStart.initialize 0.00390625 MB
-   ...
-   DefaultVector#2944.DefaultVector._initialize_views 0.167969 MB
-   DefaultVector#2945.DefaultVector._initialize_views 0.167969 MB
-   DefaultVector#2946.DefaultVector._initialize_views 0.167969 MB
-   DefaultVector#2947.DefaultVector._initialize_views 0.167969 MB
-   DefaultVector#2948.DefaultVector._initialize_views 0.167969 MB
-   DefaultVector#2949.DefaultVector._initialize_views 0.167969 MB
-   DefaultVector#2949.Vector.__init__ 0.167969 MB
-   DefaultVector#2950.DefaultVector._initialize_views 0.171875 MB
-   DefaultVector#2951.DefaultVector._initialize_views 0.171875 MB
-   DefaultVector#2952.DefaultVector._initialize_views 0.171875 MB
-   DefaultVector#2953.DefaultVector._initialize_views 0.175781 MB
-   DefaultVector#2953.DefaultVector._initialize_views 0.175781 MB
-   DefaultVector#2954.DefaultVector._initialize_views 0.175781 MB
-   DefaultVector#2955.DefaultVector._initialize_views 0.175781 MB
-   DefaultVector#2956.DefaultVector._initialize_views 0.175781 MB
-   DefaultVector#2956.Vector.__init__ 0.1875 MB
-   DefaultVector#2956.DefaultVector._initialize_views 0.199219 MB
-   DefaultVector#2956.DefaultVector._initialize_views 0.210938 MB
-   DefaultVector#2956.DefaultVector._clone_data 0.238281 MB
-   design.fan.map.desMap.ExplicitComponent._apply_nonlinear 8.71875 MB
-   design.DirectSolver._linearize 9.08203 MB
+   Balance#1(design.pwr_balance).Component.__init__ 0.00390625 MB
+   DirectSolver#1.Solver.__init__ 0.00390625 MB
+   DenseJacobian#1.AssembledJacobian.__init__ 0.00390625 MB
+   DenseJacobian#1.DenseJacobian.__init__ 0.00390625 MB
+   LinearRunOnce#4.Solver.__init__ 0.00390625 MB
+   NonLinearRunOnce#2.Solver.__init__ 0.00390625 MB
+   NonLinearRunOnce#3.Solver.__init__ 0.00390625 MB
+      ...
+   DefaultVector#2735.DefaultVector._initialize_views 0.179688 MB
+   DefaultVector#2736.DefaultVector._initialize_views 0.179688 MB
+   DefaultVector#2736.DefaultVector._initialize_views 0.179688 MB
+   DefaultVector#2737.DefaultVector._initialize_views 0.183594 MB
+   DefaultVector#2737.DefaultVector._initialize_views 0.183594 MB
+   DefaultVector#2737.DefaultVector._initialize_views 0.1875 MB
+   DefaultVector#2737.DefaultVector._initialize_views 0.195312 MB
+   DefaultVector#2738.DefaultVector._initialize_views 0.207031 MB
+   Group#2().Group._setup_var_data 0.210938 MB
+   DefaultVector#2738.DefaultVector._initialize_views 0.214844 MB
+   Propulsor#1(design).Group._setup_var_data 0.273438 MB
+   Mux#1(design.nozz.mux).ExplicitComponent._setup_partials 0.398438 MB
+   CompressorMap#1(design.fan.map).Group._setup_procs 0.929688 MB
+   DenseJacobian#8.AssembledJacobian._initialize 1.18359 MB
+   ChemEq#11(design.fc.conv.fs.totals.chem_eq).ImplicitComponent._apply_nonlinear 1.19531 MB
+   DenseMatrix#11.DenseMatrix._build 1.78906 MB
+   MetaModel#2(design.fan.map.desMap).ExplicitComponent._apply_nonlinear 8.70703 MB
+   DirectSolver#13.DirectSolver._linearize 9.08203 MB
 
 
 Note that the memory usage is listed in reverse order so that the largest usages are shown
@@ -240,72 +256,73 @@ The `icalltrace` command can be used to print a trace of each instance method ca
    icalltrace <your_python_script_here>
 
 
-Whenever a method is called that matches the search criteria, the pathname of the object instance,
-or its class and an ID if it has no pathname, along with the method name, will be written to the
+Whenever a method is called that matches the search criteria, the pathname of the object instance, if
+available, and its class and an instance ID, along with the method name, will be written to the
 console, indented based on its location in the call stack.  The current call count for the method
 is also displayed.   For example:
 
 
 ::
 
-    Group#1.Group.__init__ (1)
-       Group#1.System.__init__ (1)
-          DictionaryJacobian#1.Jacobian.__init__ (1)
-          .System.initialize (1)
-       NLRunOnce#1.Solver.__init__ (1)
-          NLRunOnce#1.Solver._declare_options (1)
-       LNRunOnce#1.Solver.__init__ (1)
-          LNRunOnce#1.Solver._declare_options (1)
-    Problem#1.Problem.__init__ (1)
-       Driver#1.Driver.__init__ (1)
-    IndepVarComp#1.IndepVarComp.__init__ (1)
-       IndepVarComp#1.ExplicitComponent.__init__ (1)
-          IndepVarComp#1.Component.__init__ (1)
-             IndepVarComp#1.System.__init__ (1)
-                DictionaryJacobian#2.Jacobian.__init__ (1)
-                .System.initialize (2)
-    ExecComp#1.ExecComp.__init__ (1)
-       ExecComp#1.ExplicitComponent.__init__ (1)
-          ExecComp#1.Component.__init__ (1)
-             ExecComp#1.System.__init__ (1)
-                DictionaryJacobian#3.Jacobian.__init__ (1)
-                .System.initialize (3)
-    Problem#1.Problem.setup (1)
-       .System._setup (1)
-          .System._get_initial_procs (1)
-          .Group._setup_procs (1)
-          .System.get_req_procs (1)
-          .System.get_req_procs (2)
-          .System._setup_procs (1)
-             indep.System.get_req_procs (1)
-          .System._setup_procs (2)
-             comp1.System.get_req_procs (1)
-          .Group._setup_vars (1)
-             .System._setup_vars (1)
-             indep.Component._setup_vars (1)
-                indep.System._setup_vars (1)
-             comp1.Component._setup_vars (1)
-                comp1.System._setup_vars (1)
-          .System._get_initial_var_indices (1)
-          .Group._setup_var_index_ranges (1)
-             .System._setup_var_index_ranges (1)
-          indep.System._setup_var_index_ranges (1)
-          comp1.System._setup_var_index_ranges (1)
-          .Group._setup_var_data (1)
-             .System._setup_var_data (1)
-             indep.Component._setup_var_data (1)
-                indep.System._setup_var_data (1)
-             comp1.Component._setup_var_data (1)
-                comp1.System._setup_var_data (1)
-             indep.System._get_maps (1)
-          comp1.System._get_maps (1)
+   Group#1.Group.__init__ (1)
+      Group#1.System.__init__ (1)
+         DictionaryJacobian#1.Jacobian.__init__ (1)
+         Group#1().System.initialize (1)
+      NonLinearRunOnce#1.Solver.__init__ (1)
+         NonLinearRunOnce#1.Solver._declare_options (1)
+      LinearRunOnce#1.Solver.__init__ (1)
+         LinearRunOnce#1.Solver._declare_options (1)
+   Problem#1.Problem.__init__ (1)
+      Driver#1.Driver.__init__ (1)
+   IndepVarComp#1.IndepVarComp.__init__ (1)
+      IndepVarComp#1.ExplicitComponent.__init__ (1)
+         IndepVarComp#1.Component.__init__ (1)
+            IndepVarComp#1.System.__init__ (1)
+               DictionaryJacobian#2.Jacobian.__init__ (1)
+               IndepVarComp#1().System.initialize (1)
+   ExecComp#1.ExecComp.__init__ (1)
+      ExecComp#1.ExplicitComponent.__init__ (1)
+         ExecComp#1.Component.__init__ (1)
+            ExecComp#1.System.__init__ (1)
+               DictionaryJacobian#3.Jacobian.__init__ (1)
+               ExecComp#1().System.initialize (1)
+   Problem#1.Problem.setup (1)
+      Group#1().System._setup (1)
+         Group#1().System._get_initial_procs (1)
+         Group#1().Group._setup_procs (1)
+            IndepVarComp#1().System.get_req_procs (1)
+            ExecComp#1().System.get_req_procs (1)
+            IndepVarComp#1().System._setup_procs (1)
+               IndepVarComp#1(indep).System.get_req_procs (1)
+            ExecComp#1().System._setup_procs (1)
+               ExecComp#1(comp1).System.get_req_procs (1)
+         Group#1().Group._setup_vars (1)
+            Group#1().System._setup_vars (1)
+            IndepVarComp#1(indep).Component._setup_vars (1)
+               IndepVarComp#1(indep).System._setup_vars (1)
+            ExecComp#1(comp1).Component._setup_vars (1)
+               ExecComp#1(comp1).System._setup_vars (1)
+         Group#1().System._get_initial_var_indices (1)
+         Group#1().Group._setup_var_index_ranges (1)
+            Group#1().System._setup_var_index_ranges (1)
+            IndepVarComp#1(indep).System._setup_var_index_ranges (1)
+            ExecComp#1(comp1).System._setup_var_index_ranges (1)
+         Group#1().Group._setup_var_data (1)
+            Group#1().System._setup_var_data (1)
+            IndepVarComp#1(indep).Component._setup_var_data (1)
+               IndepVarComp#1(indep).System._setup_var_data (1)
+            ExecComp#1(comp1).Component._setup_var_data (1)
+               ExecComp#1(comp1).System._setup_var_data (1)
+            IndepVarComp#1(indep).System._get_maps (1)
+            ExecComp#1(comp1).System._get_maps (1)
+
    ...
 
 
-Note that even instances that will eventually have a pathname do not yet have it when `__init__` is
-called, so at that point instead of the pathname, the class name and ID are displayed.  In the output
-above, for example, *IndepVarComp#1*  eventually aquires the pathname *indep*, so *IndepVarComp#1*
-and *indep* both refer to the same instance.
+Note that we must always include the class name and instance ID, even when the instance has a pathname
+attribute, because there are times early in execution where either the pathname attriubute doesn't exist
+yet, as in the beginning of `__init__` method, or pathname exists but still has the default value of ""
+instead of its eventual value, as in the `_setup_procs` method.
 
 
 .. tags:: Tutorials, Profiling
