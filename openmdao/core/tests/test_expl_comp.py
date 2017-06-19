@@ -9,8 +9,10 @@ from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp
 from openmdao.devtools.testutil import assert_rel_error
 
 
-class TestExplCompSimpleCompute(ExplicitComponent):
-
+class RectangleComp(ExplicitComponent):
+    """
+    A simple ExplicitComponent that computes the area of a rectangle.
+    """
     def setup(self):
         self.add_input('length', val=1.)
         self.add_input('width', val=1.)
@@ -20,14 +22,14 @@ class TestExplCompSimpleCompute(ExplicitComponent):
         outputs['area'] = inputs['length'] * inputs['width']
 
 
-class TestExplCompSimplePartial(TestExplCompSimpleCompute):
+class RectanglePartial(RectangleComp):
 
     def compute_partials(self, inputs, outputs, partials):
         partials['area', 'length'] = inputs['width']
         partials['area', 'width'] = inputs['length']
 
 
-class TestExplCompSimpleJacVec(TestExplCompSimpleCompute):
+class RectangleJacVec(RectangleComp):
 
     def compute_jacvec_product(self, inputs, outputs,
                                d_inputs, d_outputs, mode):
@@ -45,30 +47,31 @@ class TestExplCompSimpleJacVec(TestExplCompSimpleCompute):
                     d_inputs['width'] += inputs['length'] * d_outputs['area']
 
 
-class TestExplCompSimple(unittest.TestCase):
+class RectangleGroup(Group):
+
+    def setup(self):
+        comp1 = self.add_subsystem('comp1', IndepVarComp())
+        comp1.add_output('length', 1.0)
+        comp1.add_output('width', 1.0)
+
+        self.add_subsystem('comp2', RectanglePartial())
+        self.add_subsystem('comp3', RectangleJacVec())
+
+        self.connect('comp1.length', 'comp2.length')
+        self.connect('comp1.length', 'comp3.length')
+        self.connect('comp1.width', 'comp2.width')
+        self.connect('comp1.width', 'comp3.width')
+
+
+class ExplCompTestCase(unittest.TestCase):
 
     def test_simple(self):
-        comp = TestExplCompSimpleCompute()
-        prob = Problem(model=comp)
+        prob = Problem(RectangleComp())
         prob.setup(check=False)
         prob.run_model()
 
     def test_compute(self):
-        group = Group()
-
-        comp1 = group.add_subsystem('comp1', IndepVarComp())
-        comp1.add_output('length', 1.0)
-        comp1.add_output('width', 1.0)
-
-        group.add_subsystem('comp2', TestExplCompSimplePartial())
-        group.add_subsystem('comp3', TestExplCompSimpleJacVec())
-
-        group.connect('comp1.length', 'comp2.length')
-        group.connect('comp1.length', 'comp3.length')
-        group.connect('comp1.width', 'comp2.width')
-        group.connect('comp1.width', 'comp3.width')
-
-        prob = Problem(model=group)
+        prob = Problem(RectangleGroup())
         prob.setup(check=False)
 
         prob['comp1.length'] = 3.
@@ -77,6 +80,7 @@ class TestExplCompSimple(unittest.TestCase):
         assert_rel_error(self, prob['comp2.area'], 6.)
         assert_rel_error(self, prob['comp3.area'], 6.)
 
+        # total derivs
         total_derivs = prob.compute_total_derivs(
             wrt=['comp1.length', 'comp1.width'],
             of=['comp2.area', 'comp3.area']
@@ -86,16 +90,32 @@ class TestExplCompSimple(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp2.area', 'comp1.width'], [[3.]])
         assert_rel_error(self, total_derivs['comp3.area', 'comp1.width'], [[3.]])
 
-        # Piggyback testing of list_states
+        # list inputs
+        stream = cStringIO()
+        inputs = prob.model.list_inputs(out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(sorted(inputs),
+                         ['comp2.length', 'comp2.width', 'comp3.length', 'comp3.width'])
 
+        # list explicit outputs
+        stream = cStringIO()
+        outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(sorted(outputs),
+                         ['comp1.length', 'comp1.width', 'comp2.area', 'comp3.area'])
+
+        # list states
         stream = cStringIO()
         states = prob.model.list_outputs(explicit=False, out_stream=stream)
-        content = stream.getvalue()
-
-        print('states:', states)
-        print(content)
-
+        print(stream.getvalue())
         self.assertEqual(states, [])
+
+        # list residuals
+        stream = cStringIO()
+        resids = prob.model.list_residuals(out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(sorted(resids),
+                         ['comp1.length', 'comp1.width', 'comp2.area', 'comp3.area'])
 
 
 if __name__ == '__main__':

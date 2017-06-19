@@ -2141,6 +2141,64 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
+    def list_inputs(self, explicit=True, implicit=True, out_stream=sys.stdout):
+        """
+        List inputs.
+
+        Parameters
+        ----------
+        explicit : bool, optional
+            include outputs from explicit components. Default is True.
+
+        implicit : bool, optional
+            include outputs from implicit components. Default is True.
+
+        out_stream : file_like
+            Where to send human readable output. Default is sys.stdout. Set to None to suppress.
+
+        Returns
+        -------
+        list
+            list of names of inputs
+        """
+        inputs = self._inputs
+
+        pathname = self.pathname
+        if pathname == '':
+            pathname = 'model'
+
+        num_inputs = len(list(inputs))
+        header = "%d Input(s) in '%s'" % (num_inputs, pathname)
+        out_stream.write(header)
+        if num_inputs:
+            out_stream.write("\n" + "-" * len(header) + "\n")
+            out_stream.write(self._format_inputs(inputs))
+
+        return list(inputs)
+
+    def _format_inputs(self, names):
+        """
+        Format values of inputs suitable for display.
+
+        Parameters
+        ----------
+        names : list
+            list of names of inputs.
+
+        Returns
+        -------
+        str
+            formatted list of input variables with their values.
+        """
+        retval = ""
+
+        for name in names:
+            retval += "%s\n" % name
+            retval += "  value:    " + str(self._inputs._views[name])
+            retval += '\n\n'
+
+        return retval
+
     def list_outputs(self, explicit=True, implicit=True, out_stream=sys.stdout):
         """
         List outputs.
@@ -2154,27 +2212,23 @@ class System(object):
             include outputs from implicit components. Default is True.
 
         out_stream : file_like
-            Where to send human readable output. Default is sys.stdout. Set to None to suppress.           
+            Where to send human readable output. Default is sys.stdout. Set to None to suppress.
 
         Returns
         -------
-        list : list
+        list
             list of names of outputs
         """
         outputs = self._outputs
-        resids = self._residuals
         states = self._list_states()
+
+        expl_outputs = [output for output in outputs if output not in states]
 
         names = []
         if explicit:
-            names += self._outputs
-            print('outputs:', names)
-            if not implicit:
-                names = [ output for output in names if output not in states ]
-            print('outputs:', names)
-        elif implicit:
-            names = states
-            print('states:', states)
+            names += expl_outputs
+        if implicit:
+            names += states
 
         pathname = self.pathname
         if pathname == '':
@@ -2182,27 +2236,46 @@ class System(object):
 
         if out_stream:
             if explicit:
-                out_stream.write("\nOutputs in %s:\n\n" % pathname)
-                for uname in outputs:
-                    out_stream.write("%s\n" % uname)
-                    out_stream.write("Value: ")
-                    out_stream.write(str(outputs._views[uname]))
-                    out_stream.write('\n')
-                    out_stream.write("Residual: ")
-                    out_stream.write(str(resids._views[uname]))
-                    out_stream.write('\n\n')
+                num_outputs = len(expl_outputs)
+                header = "%d Explicit Output(s) in '%s'" % (num_outputs, pathname)
+                out_stream.write(header)
+                if num_outputs:
+                    out_stream.write("\n" + "-" * len(header) + "\n")
+                    out_stream.write(self._format_outputs(expl_outputs))
             if implicit:
-                out_stream.write("\nStates in %s:\n\n" % pathname)
-                for uname in states:
-                    out_stream.write("%s\n" % uname)
-                    out_stream.write("Value: ")
-                    out_stream.write(str(outputs._views[uname]))
-                    out_stream.write('\n')
-                    out_stream.write("Residual: ")
-                    out_stream.write(str(resids._views[uname]))
-                    out_stream.write('\n\n')
+                num_states = len(states)
+                header = "%d Implicit State(s) in '%s'" % (num_states, pathname)
+                out_stream.write(header)
+                if num_states:
+                    out_stream.write("\n" + "-" * len(header) + "\n")
+                    out_stream.write(self._format_outputs(states))
 
         return names
+
+    def _format_outputs(self, names):
+        """
+        Format values and residuals of outputs suitable for display.
+
+        Parameters
+        ----------
+        names : list
+            list of names of outputs.
+
+        Returns
+        -------
+        str
+            formatted list of output variables with their values and residuals.
+        """
+        retval = ""
+
+        for name in names:
+            retval += "%s\n" % name
+            retval += "  value:    " + str(self._outputs._views[name])
+            retval += '\n'
+            retval += "  residual: " + str(self._residuals._views[name])
+            retval += '\n\n'
+
+        return retval
 
     def list_residuals(self, explicit=True, implicit=True, out_stream=sys.stdout):
         """
@@ -2217,36 +2290,43 @@ class System(object):
             include outputs from implicit components. Default is True.
 
         out_stream : file_like
-            Where to send human readable output. Default is sys.stdout. Set to None to suppress.           
+            Where to send human readable output. Default is sys.stdout. Set to None to suppress.
 
         Returns
         -------
-        list : list
+        list
             list of names of residuals
         """
-        outputs = self._outputs
         resids = self._residuals
         states = self._list_states()
 
+        expl_resids = [resid for resid in resids if resid not in states]
+
         names = []
+        if explicit:
+            names += expl_resids
+        if implicit:
+            names += states
 
         pathname = self.pathname
         if pathname == '':
             pathname = 'model'
 
         if out_stream:
+            if explicit:
+                num_outputs = len(expl_resids)
+                header = "Residuals of %d Explicit Output(s) in '%s'" % (num_outputs, pathname)
+                out_stream.write(header)
+                if num_outputs:
+                    out_stream.write("\n" + "-" * len(header) + "\n")
+                    out_stream.write(self._format_outputs(expl_resids))
             if implicit:
-                out_stream.write("\nStates in %s:\n\n" % pathname)
-                for uname in states:
-                    out_stream.write("%s\n" % uname)
-                    out_stream.write("Value: ")
-                    out_stream.write(str(outputs._views[uname]))
-                    out_stream.write('\n')
-                    out_stream.write("Residual: ")
-                    out_stream.write(str(resids._views[uname]))
-                    out_stream.write('\n\n')
-            else:
-                out_stream.write("\nNo states in %s.\n" % pathname)
+                num_states = len(states)
+                header = "Residuals of %d Implicit State(s) in '%s'" % (num_states, pathname)
+                out_stream.write(header)
+                if num_states:
+                    out_stream.write("\n" + "-" * len(header) + "\n")
+                    out_stream.write(self._format_outputs(states))
 
         return names
 

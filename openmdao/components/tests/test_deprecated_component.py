@@ -77,10 +77,12 @@ class ParaboloidApply(Paraboloid):
 
 class SimpleImplicitComp(Component):
     """ A Simple Implicit Component with an additional output equation.
+
     f(x,z) = xz + z - 4
     y = x + 2z
 
     Sol: when x = 0.5, z = 2.666
+
     Coupled derivs:
     y = x + 8/(x+1)
     dy_dx = 1 - 8/(x+1)**2 = -2.5555555555555554
@@ -321,13 +323,31 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, data['comp'][('z', 'x')]['J_fwd'][0][0], 2.66666667, 1e-6)
         assert_rel_error(self, data['comp'][('z', 'z')]['J_fwd'][0][0], 1.5, 1e-6)
 
-        # Piggyback testing of list_states
-
+        # list inputs
         stream = cStringIO()
-        prob.model.list_states(stream=stream)
-        content = stream.getvalue()
+        inputs = prob.model.list_inputs(out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(sorted(inputs), ['comp.x'])
 
-        self.assertTrue('comp.z' in content)
+        # list explicit outputs
+        stream = cStringIO()
+        outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(sorted(outputs), ['comp.y', 'p1.x'])
+
+        # list states
+        stream = cStringIO()
+        states = prob.model.list_outputs(explicit=False, out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(states, ['comp.z'])
+
+        # list residuals
+        stream = cStringIO()
+        resids = prob.model.list_residuals(out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(sorted(resids), ['comp.y', 'comp.z', 'p1.x'])
+
+        self.assertEqual(states, ['comp.z'])
 
     def test_simple_implicit_self_solve(self):
 

@@ -11,7 +11,15 @@ from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, Newton
 from openmdao.devtools.testutil import assert_rel_error
 
 
-class TestImplCompSimpleCompute(ImplicitComponent):
+class QuadraticComp(ImplicitComponent):
+    """
+    A Simple Implicit Component representing a Quadratic Equation.
+    
+    R(a, b, c, x) = ax^2 + bx + c 
+
+    Solution via Quadratic Formula:
+    x = (-b + sqrt(b^2 - 4ac)) / 2a
+    """
 
     def setup(self):
         self.add_input('a', val=1.)
@@ -30,10 +38,10 @@ class TestImplCompSimpleCompute(ImplicitComponent):
         a = inputs['a']
         b = inputs['b']
         c = inputs['c']
-        outputs['x'] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / 2 / a
+        outputs['x'] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
 
 
-class TestImplCompSimpleLinearize(TestImplCompSimpleCompute):
+class QuadraticLinearize(QuadraticComp):
 
     def linearize(self, inputs, outputs, partials):
         a = inputs['a']
@@ -55,7 +63,7 @@ class TestImplCompSimpleLinearize(TestImplCompSimpleCompute):
             d_residuals['x'] = self.inv_jac * d_outputs['x']
 
 
-class TestImplCompSimpleJacVec(TestImplCompSimpleCompute):
+class QuadraticJacVec(QuadraticComp):
 
     def linearize(self, inputs, outputs, partials):
         a = inputs['a']
@@ -97,7 +105,7 @@ class TestImplCompSimpleJacVec(TestImplCompSimpleCompute):
             d_residuals['x'] = self.inv_jac * d_outputs['x']
 
 
-class TestImplCompSimple(unittest.TestCase):
+class ImplicitCompTestCase(unittest.TestCase):
 
     def test_compute(self):
         group = Group()
@@ -107,8 +115,8 @@ class TestImplCompSimple(unittest.TestCase):
         comp1.add_output('b', 1.0)
         comp1.add_output('c', 1.0)
 
-        group.add_subsystem('comp2', TestImplCompSimpleLinearize())
-        group.add_subsystem('comp3', TestImplCompSimpleJacVec())
+        group.add_subsystem('comp2', QuadraticLinearize())
+        group.add_subsystem('comp3', QuadraticJacVec())
 
         group.connect('comp1.a', 'comp2.a')
         group.connect('comp1.b', 'comp2.b')
@@ -127,6 +135,7 @@ class TestImplCompSimple(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
         assert_rel_error(self, prob['comp2.x'], 3.)
 
+        # total derivs
         total_derivs = prob.compute_total_derivs(
             wrt=['comp1.a', 'comp1.b', 'comp1.c'],
             of=['comp2.x', 'comp3.x']
@@ -138,22 +147,37 @@ class TestImplCompSimple(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.b'], [[-1.5]])
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], [[-0.5]])
 
-        # Piggyback testing of list_states
-
+        # list inputs
         stream = cStringIO()
+        inputs = prob.model.list_inputs(out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(sorted(inputs), [
+            'comp2.a', 'comp2.b', 'comp2.c',
+            'comp3.a', 'comp3.b', 'comp3.c'
+        ])
 
+        # list explicit outputs
+        stream = cStringIO()
+        outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(sorted(outputs), ['comp1.a', 'comp1.b', 'comp1.c'])
+
+        # list states
+        stream = cStringIO()
         states = prob.model.list_outputs(explicit=False, out_stream=stream)
-        content = stream.getvalue()
-
-        print('states:', states)
-        print(content)
-
+        print(stream.getvalue())
         self.assertEqual(states, ['comp2.x', 'comp3.x'])
 
-        self.assertTrue('comp2.x' in content)
-        self.assertTrue('comp3.x' in content)
+        # list residuals
+        stream = cStringIO()
+        resids = prob.model.list_residuals(out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(sorted(resids), [
+            'comp1.a', 'comp1.b', 'comp1.c',
+            'comp2.x', 'comp3.x'
+        ])
 
-    def test_subgroup_list_states(self):
+    def test_subgroup(self):
         group = Group()
 
         comp1 = group.add_subsystem('comp1', IndepVarComp())
@@ -162,8 +186,8 @@ class TestImplCompSimple(unittest.TestCase):
         comp1.add_output('c', 1.0)
 
         sub = group.add_subsystem('sub', Group())
-        sub.add_subsystem('comp2', TestImplCompSimpleLinearize())
-        sub.add_subsystem('comp3', TestImplCompSimpleJacVec())
+        sub.add_subsystem('comp2', QuadraticLinearize())
+        sub.add_subsystem('comp3', QuadraticJacVec())
 
         group.connect('comp1.a', 'sub.comp2.a')
         group.connect('comp1.b', 'sub.comp2.b')
@@ -182,24 +206,40 @@ class TestImplCompSimple(unittest.TestCase):
         assert_rel_error(self, prob['sub.comp2.x'], 3.)
         assert_rel_error(self, prob['sub.comp2.x'], 3.)
 
-        # Piggyback testing of list_states
-
+        # list inputs
         stream = cStringIO()
-        states = sub.list_outputs(explicit=False, out_stream=stream)
-        content = stream.getvalue()
+        inputs = prob.model.list_inputs(out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(sorted(inputs), [
+            'sub.comp2.a', 'sub.comp2.b', 'sub.comp2.c',
+            'sub.comp3.a', 'sub.comp3.b', 'sub.comp3.c'
+        ])
 
-        print('states:', states)
-        print(content)
+        # list explicit outputs
+        stream = cStringIO()
+        outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(sorted(outputs), ['comp1.a', 'comp1.b', 'comp1.c'])
 
+        # list states
+        stream = cStringIO()
+        states = prob.model.list_outputs(explicit=False, out_stream=stream)
+        print(stream.getvalue())
         self.assertEqual(states, ['sub.comp2.x', 'sub.comp3.x'])
 
-        self.assertTrue('comp2.x' in content)
-        self.assertTrue('comp3.x' in content)
+        # list residuals
+        stream = cStringIO()
+        resids = prob.model.list_residuals(out_stream=stream)
+        print(stream.getvalue())
+        self.assertEqual(sorted(resids), [
+            'comp1.a', 'comp1.b', 'comp1.c',
+            'sub.comp2.x', 'sub.comp3.x'
+        ])
 
 
     def test_guess_nonlinear(self):
 
-        class ImpWithInitial(TestImplCompSimpleLinearize):
+        class ImpWithInitial(QuadraticLinearize):
 
             def solve_nonlinear(self, inputs, outputs):
                 """ Do nothing. """
@@ -241,7 +281,7 @@ class TestImplCompSimple(unittest.TestCase):
 
     def test_guess_nonlinear_feature(self):
 
-        class ImpWithInitial(TestImplCompSimpleLinearize):
+        class ImpWithInitial(ImplicitComponent):
 
             def setup(self):
                 self.add_input('a', val=1.)
