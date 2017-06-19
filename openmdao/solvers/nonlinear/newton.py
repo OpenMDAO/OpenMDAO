@@ -2,7 +2,7 @@
 
 from __future__ import print_function
 
-from openmdao.solvers.nl_solver import NonlinearSolver
+from openmdao.solvers.solver import NonlinearSolver
 
 
 class NewtonSolver(NonlinearSolver):

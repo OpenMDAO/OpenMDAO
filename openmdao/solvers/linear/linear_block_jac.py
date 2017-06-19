@@ -1,5 +1,5 @@
 """Define the LinearBlockJac class."""
-from openmdao.solvers.ln_solver import BlockLinearSolver
+from openmdao.solvers.solver import BlockLinearSolver
 
 
 class LinearBlockJac(BlockLinearSolver):

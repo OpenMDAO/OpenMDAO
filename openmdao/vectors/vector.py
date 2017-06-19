@@ -196,17 +196,6 @@ class Vector(object):
         """
         return abs_name in self._names
 
-    def __str__(self):
-        """
-        Dump the vector's data as a string.
-
-        Returns
-        -------
-        str
-            A string representation of the vector's data.
-        """
-        return str(self._data)
-
     def __iter__(self):
         """
         Yield an iterator over variables involved in the current mat-vec product (relative names).

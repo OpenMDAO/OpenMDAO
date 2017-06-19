@@ -16,6 +16,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDeriv
 class TestProblem(unittest.TestCase):
 
     def test_set_2d_array(self):
+
         prob = Problem(model=Group())
         model = prob.model
         model.add_subsystem(name='indeps',

@@ -785,17 +785,14 @@ class Group(System):
                 vectors['input'][vec_name], vectors['output'][vec_name],
                 xfer_in, xfer_out, self.comm)
             transfers[vec_name]['fwd', None] = xfer_all
-            linear = vec_name is not 'nonlinear'
-            if linear:
-                transfers[vec_name]['rev', None] = xfer_all
+            transfers[vec_name]['rev', None] = xfer_all
             for isub in range(nsub_allprocs):
                 transfers[vec_name]['fwd', isub] = transfer_class(
                     vectors['input'][vec_name], vectors['output'][vec_name],
                     fwd_xfer_in[isub], fwd_xfer_out[isub], self.comm)
-                if linear:
-                    transfers[vec_name]['rev', isub] = transfer_class(
-                        vectors['input'][vec_name], vectors['output'][vec_name],
-                        rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
+                transfers[vec_name]['rev', isub] = transfer_class(
+                    vectors['input'][vec_name], vectors['output'][vec_name],
+                    rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
 
     def add(self, name, subsys, promotes=None):
         """

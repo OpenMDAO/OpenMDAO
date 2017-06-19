@@ -1,31 +1,4 @@
-import os
-import fnmatch
-
 from distutils.core import setup
-from distutils.extension import Extension
-
-USE_CYTHON = os.environ.get("OPENMDAO_USE_CYTHON")
-USE_SPEEDUPS = os.environ.get("OPENMDAO_USE_SPEEDUPS")
-
-if USE_SPEEDUPS or USE_CYTHON:
-    pattern = '*.pyx' if USE_CYTHON else '*.c'
-
-    mydir = os.path.dirname(os.path.abspath(__file__))
-    spd_dir = os.path.join(mydir, "openmdao", "utils", "speedups")
-    sources = fnmatch.filter(os.listdir(spd_dir), pattern)
-
-    extensions = [
-        Extension("openmdao.utils.speedups.%s" % os.path.splitext(s)[0],
-                  [os.path.join(spd_dir, s)])
-            for s in sources
-    ]
-
-    if USE_CYTHON:
-        from Cython.Build import cythonize
-        extensions = cythonize(extensions)
-else:
-    extensions = []
-
 
 setup(name='openmdao',
       version='2.0.0',
@@ -72,7 +45,6 @@ setup(name='openmdao',
           'openmdao.solvers.nonlinear',
           'openmdao.test_suite',
           'openmdao.utils',
-          'openmdao.utils.speedups',
           'openmdao.vectors',
           'openmdao.surrogate_models',
           'openmdao.surrogate_models.nn_interpolators'
@@ -86,7 +58,6 @@ setup(name='openmdao',
           'openmdao.test_suite': ['*.py', '*/*.py'],
           'openmdao': ['*/tests/*.py', '*/*/tests/*.py', '*/*/*/tests/*.py']
       },
-      ext_modules=extensions,
       install_requires=[
         'six', 'numpydoc', #'numpy>=1.9.2',
         'scipy',

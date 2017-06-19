@@ -23,12 +23,6 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.array_utils import convert_neg
 
-_vec_key2type = {
-    'input': 'input',
-    'output': 'output',
-    'residual': 'output'
-}
-
 
 class System(object):
     """
@@ -539,7 +533,7 @@ class System(object):
 
         for key in root_vectors:
             vec_key, coeff_key = key
-            type_ = _vec_key2type[vec_key]
+            type_ = 'output' if vec_key == 'residual' else vec_key
 
             for vec_name in self._vec_names:
                 if not initial:
