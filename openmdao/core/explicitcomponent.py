@@ -133,7 +133,7 @@ class ExplicitComponent(Component):
                                                          desc=desc,
                                                          lower=lower, upper=upper,
                                                          ref=ref, ref0=ref0, res_ref=res_ref,
-                                                         var_set=var_set, distributed=distributed)
+                                                         var_set=var_set)
 
     def _negate_jac(self):
         """
