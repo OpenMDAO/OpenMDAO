@@ -105,7 +105,7 @@ class SqliteCaseReader(BaseCaseReader):
             row = cur.fetchone()
         con.close()
 
-        counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, \
+        idx, counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, \
             objectives_blob, constraints_blob = row
 
         desvars_array = blob_to_array(desvars_blob)

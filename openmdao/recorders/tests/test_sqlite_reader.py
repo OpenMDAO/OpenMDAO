@@ -1,148 +1,149 @@
-# """ Unit tests for the SqliteCaseReader. """
-# from __future__ import print_function
-#
-# import errno
-# import os
-# import unittest
-# from shutil import rmtree
-# from tempfile import mkdtemp
-#
-# import numpy as np
-#
-# from openmdao.test_suite.components.sellar import SellarDerivatives
-#
-#
-# from openmdao.core.problem import Problem
-# from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
-# from openmdao.recorders.case_reader import CaseReader
-#
-# from openmdao.recorders.sqlite_reader import SqliteCaseReader
-#
-# try:
-#     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-# except ImportError:
-#     pyOptSparseDriver = None
-#
-# # Test that pyoptsparse SLSQP is a viable option
-# try:
-#     import pyoptsparse.pySLSQP.slsqp as slsqp
-# except ImportError:
-#     slsqp = None
-#
-#
-# optimizers = {'pyoptsparse': pyOptSparseDriver}
-# # optimizers = {'scipy': ScipyOptimizer,
-# #               'pyoptsparse': pyOptSparseDriver}
-#
-#
-#
-#
-# class TestSqliteCaseReader(unittest.TestCase):
-#
-#     def setup_sellar_model(self):
-#         self.prob = Problem()
-#         self.prob.model = model = SellarDerivatives()
-#
-#         optimizer = 'pyoptsparse'
-#         self.prob.driver = optimizers[optimizer]()
-#
-#         self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-#                                    upper=np.array([10.0, 10.0]))
-#         self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
-#         self.prob.model.add_objective('obj')
-#         self.prob.model.add_constraint('con1', upper=0.0)
-#         self.prob.model.add_constraint('con2', upper=0.0)
-#         self.prob.model.suppress_solver_output = True
-#
-#         self.prob.setup(check=False)
-#
-#
-#     def setUp(self):
-#         self.dir = mkdtemp()
-#         self.filename = os.path.join(self.dir, "sqlite_test")
-#         print('self.filename', self.filename)
-#         self.recorder = SqliteRecorder(self.filename)
-#         self.original_path = os.getcwd()
-#         os.chdir(self.dir)
-#
-#     def tearDown(self):
-#         os.chdir(self.original_path)
-#
-#
-#         return # TODO_RECORDERS - remove this
-#
-#         try:
-#             rmtree(self.dir)
-#         except OSError as e:
-#             # If directory already deleted, keep going
-#             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-#                 raise e
-#
-#     def test_format_version(self):
-#
-#         self.setup_sellar_model()
-#
-#         self.prob.run_driver()
-#
-#         self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
-#
-#         cr = CaseReader(self.filename)
-#         self.assertEqual(cr.format_version, format_version,
-#                          msg='format version not read correctly')
-#
-#     def test_reader_instantiates(self):
-#         """ Test that CaseReader returns an HDF5CaseReader. """
-#
-#         self.setup_sellar_model()
-#
-#         self.prob.run_driver()
-#
-#         self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
-#
-#         cr = CaseReader(self.filename)
-#         self.assertTrue(isinstance(cr, SqliteCaseReader), msg='CaseReader not'
-#                         ' returning the correct subclass.')
-#
-#     def test_basic_sellar(self):
-#         """ Tests that the reader returns params correctly. """
-#
-#         self.setup_sellar_model()
-#
-#         self.recorder.options['record_desvars'] = True
-#         self.recorder.options['record_responses'] = True
-#         self.recorder.options['record_objectives'] = True
-#         self.recorder.options['record_constraints'] = True
-#         self.prob.driver.add_recorder(self.recorder)
-#
-#         self.prob.run_driver()
-#
-#         self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
-#
-#         cr = CaseReader(self.filename)
-#         last_case = cr.get_case(-1)
-#
-#         np.testing.assert_almost_equal(last_case.desvars['pz.z'], [ 1.9776389,  0.],
-#                               err_msg='Case reader gives '
-#                                   'incorrect Parameter value'
-#                                   ' for {0}'.format('pz.z'))
-#         np.testing.assert_almost_equal(last_case.desvars['px.x'], [ 0.0,],
-#                               err_msg='Case reader gives '
-#                                   'incorrect Parameter value'
-#                                   ' for {0}'.format('px.x'))
-#
-#         # assert_rel_error(self, top['obj'], 3.1833940, 1e-5)
-#
-#
-#
-#         print('last_case', last_case)
-#         last_case_id = cr.list_cases()[-1]
-#         n = cr.num_cases
-#
-#         self.assertEqual(cr.num_cases, 6)
-#
-#         print('num cases', n)
-#
-#
+""" Unit tests for the SqliteCaseReader. """
+from __future__ import print_function
+
+import errno
+import os
+import unittest
+from shutil import rmtree
+from tempfile import mkdtemp
+
+import numpy as np
+
+from openmdao.test_suite.components.sellar import SellarDerivatives
+
+
+from openmdao.core.problem import Problem
+from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
+from openmdao.recorders.case_reader import CaseReader
+
+from openmdao.recorders.sqlite_reader import SqliteCaseReader
+
+try:
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+except ImportError:
+    pyOptSparseDriver = None
+
+# Test that pyoptsparse SLSQP is a viable option
+try:
+    import pyoptsparse.pySLSQP.slsqp as slsqp
+except ImportError:
+    slsqp = None
+
+
+optimizers = {'pyoptsparse': pyOptSparseDriver}
+# optimizers = {'scipy': ScipyOptimizer,
+#               'pyoptsparse': pyOptSparseDriver}
+
+
+
+
+class TestSqliteCaseReader(unittest.TestCase):
+
+    def setup_sellar_model(self):
+        self.prob = Problem()
+        self.prob.model = model = SellarDerivatives()
+
+        optimizer = 'pyoptsparse'
+        self.prob.driver = optimizers[optimizer]()
+
+        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                   upper=np.array([10.0, 10.0]))
+        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
+        self.prob.model.add_objective('obj')
+        self.prob.model.add_constraint('con1', upper=0.0)
+        self.prob.model.add_constraint('con2', upper=0.0)
+        self.prob.model.suppress_solver_output = True
+
+        self.prob.driver.options['print_results'] = False
+
+        self.prob.setup(check=False)
+
+
+    def setUp(self):
+        self.dir = mkdtemp()
+        self.filename = os.path.join(self.dir, "sqlite_test")
+        self.recorder = SqliteRecorder(self.filename)
+        self.original_path = os.getcwd()
+        os.chdir(self.dir)
+
+    def tearDown(self):
+        os.chdir(self.original_path)
+
+
+        return # TODO_RECORDERS - remove this
+
+        try:
+            rmtree(self.dir)
+        except OSError as e:
+            # If directory already deleted, keep going
+            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
+                raise e
+
+    def test_format_version(self):
+
+        self.setup_sellar_model()
+
+        self.prob.run_driver()
+
+        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+
+        cr = CaseReader(self.filename)
+        self.assertEqual(cr.format_version, format_version,
+                         msg='format version not read correctly')
+
+    def test_reader_instantiates(self):
+        """ Test that CaseReader returns an SqliteCaseReader. """
+
+        self.setup_sellar_model()
+
+        self.prob.run_driver()
+
+        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+
+        cr = CaseReader(self.filename)
+        self.assertTrue(isinstance(cr, SqliteCaseReader), msg='CaseReader not'
+                        ' returning the correct subclass.')
+
+    def test_basic_sellar(self):
+        """ Tests that the reader returns params correctly. """
+
+        self.setup_sellar_model()
+
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+        self.prob.driver.add_recorder(self.recorder)
+
+        self.prob.run_driver()
+
+        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+
+        cr = CaseReader(self.filename)
+        last_case = cr.get_case(-1)
+
+        np.testing.assert_almost_equal(last_case.desvars['pz.z'], [ 1.9776389,  0.],
+                              err_msg='Case reader gives '
+                                  'incorrect Parameter value'
+                                  ' for {0}'.format('pz.z'))
+        np.testing.assert_almost_equal(last_case.desvars['px.x'], [ 0.0,],
+                              err_msg='Case reader gives '
+                                  'incorrect Parameter value'
+                                  ' for {0}'.format('px.x'))
+
+        # assert_rel_error(self, top['obj'], 3.1833940, 1e-5)
+
+
+
+        print('last_case', last_case)
+        last_case_id = cr.list_cases()[-1]
+        n = cr.num_cases
+
+        self.assertEqual(cr.num_cases, 6)
+
+        print('num cases', n)
+
+
 #
 #
 #     def qqqtest_ConvergeDiverge(self):

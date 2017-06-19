@@ -163,8 +163,7 @@ def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
         db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate",
                        {"iteration_coordinate": iter_coord})
         row_actual = db_cur.fetchone()
-        test.assertTrue(row_actual, 'Solver iterations table is empty. '
-                                    'Should contain at least one record')
+        test.assertTrue(row_actual, 'Solver iterations table does not contain the requested iteration coordinate: "{}"'.format(iter_coord))
 
         counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
             output_blob, residuals_blob = row_actual
@@ -277,11 +276,12 @@ class TestSqliteRecorder(unittest.TestCase):
     def setUp(self):
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
+        print(self.filename)
         self.recorder = SqliteRecorder(self.filename)
         self.eps = 1e-5
 
     def tearDown(self):
-        return
+        return #TODO_RECORDER - needs to be removed
         try:
             rmtree(self.dir)
             pass
@@ -796,6 +796,9 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.model.nonlinear_solver = NonlinearBlockGS()
         self.prob.model.nonlinear_solver.add_recorder(self.recorder)
 
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+
         self.prob.setup(check=False)
 
         t0, t1 = run_driver(self.prob)
@@ -1005,7 +1008,115 @@ class TestSqliteRecorder(unittest.TestCase):
         # TODO_RECORDERS - need to be more thorough
         self.assertSolverIterationDataRecordedBasic()
 
+    def test_record_driver_system_solver(self):
+
+        # Test what happens when all three types are recorded:
+        #    Driver, System, and Solver
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+
+        self.setup_sellar_grouped_model()
+
+        self.prob.driver = pyOptSparseDriver()
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            self.prob.driver.opt_settings['ACC'] = 1e-2  # to speed the test up
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.recorder.options['record_metadata'] = False
+
+        # Add recorders
+        # Driver
+        self.prob.driver.add_recorder(self.recorder)
+        # System
+        pz = self.prob.model.get_subsystem('pz')  # IndepVarComp which is an ExplicitComponent
+        pz.add_recorder(self.recorder)
+        # Solver
+        mda = self.prob.model.get_subsystem('mda')
+        mda.nonlinear_solver.add_recorder(self.recorder)
+
+        # Driver
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+
+        # System
+        self.recorder.options['record_inputs'] = True
+        self.recorder.options['record_outputs'] = True
+        self.recorder.options['record_residuals'] = True
+
+        # Solver
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+
+        self.prob.setup(check=False, mode='rev')
+        t0, t1 = run_driver(self.prob)
+        self.prob.cleanup()
+
+        # Driver recording test
+        coordinate = [0, 'SLSQP', (6, )]
+
+        expected_desvars = {
+                            "pz.z": [1.97763888e+00, 1.17469760e-15],
+                            # "px.x": [-6.29609630e-15, ]
+                            "px.x": [0.0, ]
+        }
+
+        expected_objectives = {"obj_cmp.obj": [3.18339395, ], }
+
+        expected_constraints = {
+                                 "con_cmp1.con1": [0.0, ],
+                                 "con_cmp2.con2": [-20.24472223, ],
+        }
+
+        self.assertIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
+                                           expected_objectives, expected_constraints),), self.eps)
+
+        # System recording test
+        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (1, ),
+                      'pz._solve_nonlinear', (2, )]
+
+        expected_inputs = None
+        expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
+        expected_residuals = {"pz.z": [0.0, 0.0], }
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
+                                                 expected_residuals), ), self.eps)
+
+        # Solver recording test
+
+        # rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|1|mda._solve_nonlinear|6|NonlinearBlockGS|4
+        coordinate = [0, 'SLSQP', (6, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (1, ),
+                      'mda._solve_nonlinear', (6, ), 'NonlinearBlockGS', (4, )]
+
+        expected_abs_error = 3.90594223632e-11
+
+        expected_rel_error = 1.03709322088e-06
+
+        expected_solver_output = {
+            "mda.d2.y2": [3.75527777],
+            "mda.d1.y1": [3.16],
+        }
+
+        expected_solver_residuals = {
+            "mda.d2.y2": [0.0],
+            "mda.d1.y1": [0.0],
+        }
+
+        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
+                                                 expected_rel_error, expected_solver_output,
+                                                 expected_solver_residuals),), self.eps)
+
+
+
     def test_global_counter(self):
+
+        # The case recorder maintains a global counter across all recordings
         if OPT is None:
             raise unittest.SkipTest("pyoptsparse is not installed")
 
@@ -1056,7 +1167,8 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertTrue(counters_driver.isdisjoint(counters_solver))
         self.assertTrue(counters_system.isdisjoint(counters_solver))
 
-    def test_implicit_component(self):
+
+def test_implicit_component(self):
 
         from openmdao.core.tests.test_impl_comp import TestImplCompSimpleLinearize, \
             TestImplCompSimpleJacVec
