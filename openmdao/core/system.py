@@ -18,7 +18,7 @@ from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobi
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 
 from openmdao.utils.general_utils import \
-    determine_adder_scaler, format_as_float_or_array
+    determine_adder_scaler, format_as_float_or_array, warn_deprecation
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -757,20 +757,13 @@ class System(object):
         """
         meta = self._var_allprocs_abs2meta['output']
 
-        if self.comm.size == 1:
-            for abs_name in self._var_allprocs_abs_names['output']:
-                mymeta = meta[abs_name]
-                local_shape = mymeta['shape']
-                mymeta['global_size'] = np.prod(local_shape)
-                mymeta['global_shape'] = local_shape
-            return
-
         # now set global sizes and shapes into metadata for distributed outputs
         sizes = self._var_sizes['output']
         for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
             mymeta = meta[abs_name]
             local_shape = mymeta['shape']
             if not mymeta['distributed']:
+                # not distributed, just use local shape and size
                 mymeta['global_size'] = np.prod(local_shape)
                 mymeta['global_shape'] = local_shape
                 continue
@@ -1006,7 +999,6 @@ class System(object):
                 if src_indices is not None:
                     if not (np.isscalar(ref) and np.isscalar(ref0)):
                         global_shape_out = meta_out['global_shape']
-                        global_size_out = meta_out['global_size']
                         if src_indices.ndim != 1:
                             if len(shape_out) == 1:
                                 src_indices = src_indices.flatten()
@@ -1139,11 +1131,11 @@ class System(object):
             for subsys in self.system_iter():
 
                 try:
-                    if subsys._matrix_free:
+                    if subsys.matrix_free:
                         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
                         raise RuntimeError(msg)
 
-                # Groups don't have `_matrix_free`
+                # Groups don't have `matrix_free`
                 # Note, we could put this attribute on Group, but this would be True for a
                 # default Group, and thus we would need an isinstance on Component, which is the
                 # reason for the try block anyway.
@@ -1546,7 +1538,7 @@ class System(object):
     @nonlinear_solver.setter
     def nonlinear_solver(self, solver):
         """
-        Set this system's nonlinear solver and perform setup.
+        Set this system's nonlinear solver.
         """
         self._nonlinear_solver = solver
 
@@ -1560,8 +1552,44 @@ class System(object):
     @linear_solver.setter
     def linear_solver(self, solver):
         """
-        Set this system's linear solver and perform setup.
+        Set this system's linear solver.
         """
+        self._linear_solver = solver
+
+    @property
+    def nl_solver(self):
+        """
+        Get the nonlinear solver for this system.
+        """
+        warn_deprecation("The 'nl_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
+        return self._nonlinear_solver
+
+    @nl_solver.setter
+    def nl_solver(self, solver):
+        """
+        Set this system's nonlinear solver.
+        """
+        warn_deprecation("The 'nl_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
+        self._nonlinear_solver = solver
+
+    @property
+    def ln_solver(self):
+        """
+        Get the linear solver for this system.
+        """
+        warn_deprecation("The 'ln_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
+        return self._linear_solver
+
+    @ln_solver.setter
+    def ln_solver(self, solver):
+        """
+        Set this system's linear solver.
+        """
+        warn_deprecation("The 'ln_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
         self._linear_solver = solver
 
     def _set_solver_print(self, level=2, depth=1e99, type_='all'):

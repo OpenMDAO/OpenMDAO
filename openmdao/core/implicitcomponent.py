@@ -26,7 +26,7 @@ class ImplicitComponent(Component):
         super(ImplicitComponent, self).__init__(**kwargs)
 
         if overrides_method('apply_linear', self, ImplicitComponent):
-            self._matrix_free = True
+            self.matrix_free = True
 
     def _apply_nonlinear(self):
         """

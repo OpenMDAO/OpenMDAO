@@ -88,6 +88,7 @@ class DistribInputComp(ExplicitComponent):
     def __init__(self, arr_size=11):
         super(DistribInputComp, self).__init__()
         self.arr_size = arr_size
+        self.distributed = True
 
     def compute(self, inputs, outputs):
         if MPI:
@@ -118,6 +119,7 @@ class DistribOverlappingInputComp(ExplicitComponent):
     def __init__(self, arr_size=11):
         super(DistribOverlappingInputComp, self).__init__()
         self.arr_size = arr_size
+        self.distributed = True
 
     def compute(self, inputs, outputs):
         outputs['outvec'][:] = 0
@@ -160,6 +162,8 @@ class DistribInputDistribOutputComp(ExplicitComponent):
     def __init__(self, arr_size=11):
         super(DistribInputDistribOutputComp, self).__init__()
         self.arr_size = arr_size
+        self.distributed = True
+
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
@@ -175,7 +179,7 @@ class DistribInputDistribOutputComp(ExplicitComponent):
 
         self.add_input('invec', np.ones(sizes[rank], float),
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_output('outvec', np.ones(sizes[rank], float), distributed=True)
+        self.add_output('outvec', np.ones(sizes[rank], float))
 
     def get_req_procs(self):
         return (2, 2)
@@ -188,6 +192,7 @@ class DistribNoncontiguousComp(ExplicitComponent):
     def __init__(self, arr_size=11):
         super(DistribNoncontiguousComp, self).__init__()
         self.arr_size = arr_size
+        self.distributed = True
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
@@ -201,7 +206,7 @@ class DistribNoncontiguousComp(ExplicitComponent):
 
         self.add_input('invec', np.ones(len(idxs), float),
                        src_indices=idxs)
-        self.add_output('outvec', np.ones(len(idxs), float), distributed=True)
+        self.add_output('outvec', np.ones(len(idxs), float))
 
     def get_req_procs(self):
         return 2, 2
@@ -213,6 +218,7 @@ class DistribGatherComp(ExplicitComponent):
     def __init__(self, arr_size=11):
         super(DistribGatherComp, self).__init__()
         self.arr_size = arr_size
+        self.distributed = True
 
     def compute(self, inputs, outputs):
         if MPI:
@@ -316,8 +322,9 @@ class MPITests(unittest.TestCase):
 
         class DistribComp(ExplicitComponent):
             def __init__(self, size):
-                self.size = size
                 super(DistribComp, self).__init__()
+                self.size = size
+                self.distributed = True
 
             def compute(self, inputs, outputs):
                 if self.comm.rank == 0:
@@ -336,8 +343,7 @@ class MPITests(unittest.TestCase):
 
                 self.add_input('invec', np.ones(sizes[rank], float),
                                src_indices=np.arange(start, end, dtype=int))
-                self.add_output('outvec', np.ones(sizes[rank], float),
-                                distributed=True)
+                self.add_output('outvec', np.ones(sizes[rank], float))
 
             def get_req_procs(self):
                 # require min of 2 processes, max of 5
