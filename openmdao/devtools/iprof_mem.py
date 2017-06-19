@@ -6,7 +6,7 @@ import atexit
 import argparse
 from collections import defaultdict
 
-from openmdao.devtools.prof_utils import _create_profile_callback, find_qualified_name, func_group, \
+from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualified_name, func_group, \
      _collect_methods
 
 
@@ -48,8 +48,8 @@ def setup(methods=None):
         memstack = []
         callstack = []
         _trace_memory = _create_profile_callback(callstack,  _collect_methods(methods),
-                                                 _trace_mem_call, _trace_mem_ret,
-                                                 (memstack, mem_changes))
+                                                 do_call=_trace_mem_call, do_ret=_trace_mem_ret,
+                                                 context=(memstack, mem_changes))
 
         _qual_cache = {}  # cache of files scanned for qualified names
 
@@ -89,8 +89,9 @@ def profile_py_file():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-g', '--group', action='store', dest='group',
-                        default='openmdao',
-                        help='Determines which group of methods will be tracked.')
+                        default='openmdao_full',
+                        help='Determines which group of methods will be tracked. Options are %s' %
+                             sorted(func_group.keys()))
     parser.add_argument('file', metavar='file', nargs=1,
                         help='Python file to profile.')
 

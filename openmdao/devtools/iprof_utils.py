@@ -96,13 +96,32 @@ func_group = {
     'openmdao': [
         ("*", (System, Jacobian, Matrix, Solver, Driver, Problem)),
     ],
-    'memory': [
-        ("*", (System, Vector, Jacobian, Matrix, Solver, Driver, Problem)),
+    'openmdao_all': [
+        ("*", (System, Vector, Transfer, Jacobian, Matrix, Solver, Driver, Problem)),
     ],
     'setup': [
         ("*setup*", (System, Solver, Driver, Problem)),
     ],
+    'dataflow': [
+        ('*compute*', (System,)),
+        ('*linear*', (System,)),
+        ('*', (Transfer,)),
+    ]
 }
+
+try:
+    from mpi4py import MPI
+    from petsc4py import PETSc
+    from openmdao.vectors.petsc_vector import PETScVector, PETScTransfer
+
+    #TODO: this needs work.  Still lots of MPI calls not covered here...
+    func_group['mpi'] = [
+        ('*', (PETScTransfer,)),
+        ('get_norm', (PETScVector,)),
+        ('_initialize_data', (PETScVector,))
+    ]
+except ImportError:
+    pass
 
 
 def _collect_methods(method_patterns):
@@ -136,7 +155,11 @@ def _collect_methods(method_patterns):
 
     # convert values to tuples so we can use in isinstance call
     for name in matches:
-        matches[name] = tuple(matches[name])
+        lst = matches[name]
+        if len(lst) == 1:
+            matches[name] = lst[0]
+        else:
+            matches[name] = tuple(matches[name])
 
     return matches
 
@@ -150,10 +173,9 @@ def _create_profile_callback(stack, matches, do_call=None, do_ret=None, context=
         if event == 'call':
             if 'self' in frame.f_locals and \
                     isinstance(frame.f_locals['self'], matches[frame.f_code.co_name]):
-                if do_call is not None:
-                    do_call(frame, arg, stack, context)
                 stack.append(frame)
-
+                if do_call is not None:
+                   return do_call(frame, arg, stack, context)
         elif event == 'return' and stack:
             if frame is stack[-1]:
                 if do_ret is not None:

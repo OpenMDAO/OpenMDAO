@@ -7,7 +7,7 @@ import argparse
 from contextlib import contextmanager
 from collections import defaultdict
 
-from openmdao.devtools.prof_utils import _create_profile_callback, find_qualified_name, \
+from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualified_name, \
                                          func_group, _collect_methods
 
 
@@ -31,12 +31,10 @@ def _trace_call(frame, arg, stack, context):
         class_counts[cname].add(id(self))
         sname = "%s#%d" % (self.__class__.__name__, len(class_counts[cname]))
 
-
     fullname = '.'.join((sname, funcname))
     method_counts[fullname] += 1
 
     print('   ' * len(stack), "%s (%d)" % (fullname, method_counts[fullname]))
-
 
 
 def setup(methods=None):
@@ -58,7 +56,8 @@ def setup(methods=None):
         qual_cache = {}
         method_counts = defaultdict(int)
         class_counts = defaultdict(set)
-        _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods), _trace_call,
+        _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods),
+                                                do_call=_trace_call,
                                                 context=(qual_cache, method_counts, class_counts))
 
 
@@ -125,7 +124,8 @@ def trace_py_file():
     parser = argparse.ArgumentParser()
     parser.add_argument('-g', '--group', action='store', dest='group',
                         default='openmdao',
-                        help='Determines which group of methods will be tracked.')
+                        help='Determines which group of methods will be tracked. Default is "openmdao".'
+                              ' Options are: %s' % sorted(func_group.keys()))
     parser.add_argument('file', metavar='file', nargs=1,
                         help='Python file to profile.')
 

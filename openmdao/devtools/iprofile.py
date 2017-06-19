@@ -17,7 +17,7 @@ except ImportError:
     MPI = None
 
 from openmdao.devtools.webview import webview
-from openmdao.devtools.prof_utils import func_group, find_qualified_name, _collect_methods
+from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods
 
 
 def _prof_node(parts):
@@ -393,7 +393,9 @@ def prof_view():
                         help='Title to be displayed above profiling view.')
     parser.add_argument('-g', '--group', action='store', dest='group',
                         default='openmdao',
-                        help='Determines which group of methods will be tracked.')
+                        help='Determines which group of methods will be tracked. Current '
+                             'options are: %s and "openmdao" is the default' %
+                              sorted(func_group.keys()))
     parser.add_argument('files', metavar='file', nargs='+',
                         help='Raw profile data files or a python file.')
 

@@ -4,7 +4,6 @@ import numpy as np
 from petsc4py import PETSc
 
 from six import iteritems, itervalues
-from six.moves import range
 
 from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
 from openmdao.utils.mpi import MPI
