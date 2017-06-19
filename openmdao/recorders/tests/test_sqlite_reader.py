@@ -68,10 +68,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def tearDown(self):
         os.chdir(self.original_path)
-
-
-        return # TODO_RECORDERS - remove this
-
         try:
             rmtree(self.dir)
         except OSError as e:
@@ -85,7 +81,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.prob.run_driver()
 
-        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+        self.prob.cleanup()
 
         cr = CaseReader(self.filename)
         self.assertEqual(cr.format_version, format_version,
@@ -98,7 +94,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.prob.run_driver()
 
-        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+        self.prob.cleanup()
 
         cr = CaseReader(self.filename)
         self.assertTrue(isinstance(cr, SqliteCaseReader), msg='CaseReader not'
@@ -117,7 +113,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.prob.run_driver()
 
-        self.prob.cleanup()  # closes recorders TODO_RECORDER: need to implement a cleanup
+        self.prob.cleanup()
 
         cr = CaseReader(self.filename)
         last_case = cr.get_case(-1)

@@ -2127,14 +2127,6 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
-        # TODO_RECORDERS
-        #   Systems, no matter the type, should be able to save inputs, outputs, and
-        #       residuals (System._vectors['inputs']['nonlinear'], etc.) after _apply_nonlinear and
-        # _solve_nonlinear calls
-
-        # component-level solve_nonlinear and solve_linear recording (wouldn't hurt to also
-        #  make it work generally with any type of system at this point).
-
     def list_states(self, stream=sys.stdout):
         """
         List all states and their values and residuals.

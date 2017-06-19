@@ -276,12 +276,12 @@ class TestSqliteRecorder(unittest.TestCase):
     def setUp(self):
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
-        print(self.filename)
         self.recorder = SqliteRecorder(self.filename)
+        print(self.filename) # TODO_RECORDERS - remove
         self.eps = 1e-5
 
     def tearDown(self):
-        return #TODO_RECORDER - needs to be removed
+        return # TODO_RECORDERS - remove
         try:
             rmtree(self.dir)
             pass
@@ -570,19 +570,27 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        # TODO_RECORDERS - need to check the recording of the d1 also
         coordinate = [0, 'Driver', (1, ), 'root._solve_nonlinear', (0, ),
-                      'obj_cmp._solve_nonlinear', (6, )]
+                      'NonlinearBlockGS', (6, ), 'd1._solve_nonlinear', (6, )]
+        expected_inputs = {
+                            "d1.y2": [12.05848815],
+                            "d1.z": [5.0, 2.0],
+                            "d1.x": [1.0, ],
+                          }
+        expected_outputs = {"d1.y1": [25.58830237, ], }
+        expected_residuals = {"d1.y1": [0.0, ], }
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
+                                                 expected_outputs, expected_residuals),), self.eps)
 
+        coordinate = [0, 'Driver', (1, ), 'root._solve_nonlinear', (0, ),
+                      'NonlinearBlockGS', (6, ), 'obj_cmp._solve_nonlinear', (6, )]
         expected_inputs = {
                             "obj_cmp.z": [5.0, 2.0],
                             "obj_cmp.y1": [25.58830236, ],
                             "obj_cmp.x": [1.0, ],
                             "obj_cmp.y2": [12.05857185, ],
                           }
-
         expected_outputs = {"obj_cmp.obj": [28.58830816, ], }
-
         expected_residuals = {"obj_cmp.obj": [0.0, ], }
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
                                                  expected_outputs, expected_residuals),), self.eps)
