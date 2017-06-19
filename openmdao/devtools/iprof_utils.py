@@ -6,7 +6,6 @@ import ast
 
 from inspect import getmembers
 from fnmatch import fnmatchcase
-from contextlib import contextmanager
 from collections import defaultdict
 
 from openmdao.core.system import System
@@ -16,10 +15,6 @@ from openmdao.solvers.solver import Solver
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.matrix import Matrix
 from openmdao.vectors.vector import Vector, Transfer
-
-# the purpose of this class is to provide an arg to isinstance that won't match anything
-class _NoMatch(object):
-    pass
 
 
 class FunctionFinder(ast.NodeVisitor):
@@ -128,7 +123,7 @@ def _collect_methods(method_patterns):
     """
     Iterate over a dict of method name patterns mapped to classes.  Search
     through the classes for anything that matches and return a dict of
-    exact name matches and their correspoding classes.
+    exact name matches and their corresponding classes.
 
     Parameters
     ----------
@@ -141,17 +136,14 @@ def _collect_methods(method_patterns):
         Dict of method names and tuples of all classes that matched for that method. Default value
         of the dict is a class that matches nothing
     """
-    matches = defaultdict(lambda: _NoMatch)
+    matches = defaultdict(list)
 
     # TODO: update this to also work with stand-alone functions
     for pattern, classes in method_patterns:
         for class_ in classes:
             for name, obj in getmembers(class_):
                 if callable(obj) and (pattern == '*' or fnmatchcase(name, pattern)):
-                    if name in matches:
-                        matches[name].append(class_)
-                    else:
-                        matches[name] = [class_]
+                    matches[name].append(class_)
 
     # convert values to tuples so we can use in isinstance call
     for name in matches:
@@ -171,7 +163,7 @@ def _create_profile_callback(stack, matches, do_call=None, do_ret=None, context=
     """
     def _wrapped(frame, event, arg):
         if event == 'call':
-            if 'self' in frame.f_locals and \
+            if 'self' in frame.f_locals and frame.f_code.co_name in matches and \
                     isinstance(frame.f_locals['self'], matches[frame.f_code.co_name]):
                 stack.append(frame)
                 if do_call is not None:

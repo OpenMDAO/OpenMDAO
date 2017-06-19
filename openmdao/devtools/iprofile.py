@@ -150,7 +150,7 @@ def _instance_profile_callback(frame, event, arg):
     global _call_stack, _inst_data, _matches
 
     if event == 'call':
-        if 'self' in frame.f_locals and  \
+        if 'self' in frame.f_locals and frame.f_code.co_name in _matches and \
                 isinstance(frame.f_locals['self'], _matches[frame.f_code.co_name]):
             _call_stack.append(("%s#%d#%d" % (frame.f_code.co_filename,
                                               frame.f_code.co_firstlineno,
