@@ -99,11 +99,11 @@ class TestExplicitComponent(unittest.TestCase):
         self.assertTrue(issubclass(w[1].category, DeprecationWarning))
         self.assertEqual(str(w[0].message),
                          "In the future, the 'add_input' method must be "
-                         "called from 'initialize_variables' rather than "
+                         "called from 'setup' rather than "
                          "in the '__init__' function.")
         self.assertEqual(str(w[1].message),
                          "In the future, the 'add_output' method must be "
-                         "called from 'initialize_variables' rather than "
+                         "called from 'setup' rather than "
                          "in the '__init__' function.")
 
     def test_setup_bug1(self):
@@ -117,7 +117,7 @@ class TestExplicitComponent(unittest.TestCase):
         class MyComp(NewBase):
             def __init__(self, **kwargs):
                 super(MyComp, self).__init__(**kwargs)
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', val=0.0)
                 self.add_output('y', val=0.0)
 
@@ -139,7 +139,7 @@ class TestExplicitComponent(unittest.TestCase):
 
         class Comp(ExplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
 
                 self.add_input('x', val=3.0)
                 self.add_input('x', val=3.0)
@@ -160,7 +160,7 @@ class TestExplicitComponent(unittest.TestCase):
 
         class Comp(ExplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
 
                 self.add_input('x', val=3.0)
 
@@ -181,7 +181,7 @@ class TestExplicitComponent(unittest.TestCase):
 
         class Comp(ExplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
 
                 self.add_input('x', val=3.0)
 
@@ -204,7 +204,7 @@ class TestExplicitComponent(unittest.TestCase):
 
         class Comp(ExplicitComponent):
 
-            def initialize_variables(self):
+            def setup(self):
 
                 self.add_input('x', val=3.0)
                 self.add_output('y', val=3.0)
@@ -255,7 +255,7 @@ class TestRangePartials(unittest.TestCase):
                 super(RangePartialsComp, self).__init__()
                 self.size = size
 
-            def initialize_variables(self):
+            def setup(self):
                 # verify that both iterable and array types are valid
                 # for val and src_indices arguments to add_input
                 self.add_input('v1', val=range(self.size),
@@ -274,7 +274,7 @@ class TestRangePartials(unittest.TestCase):
                                          lower=range(self.size),
                                          upper=np.ones(self.size))
 
-            def initialize_partials(self):
+            def setup_partials(self):
                 # verify that both iterable and list types are valid
                 # for rows and cols arguments to declare_partials
                 rows = range(self.size)

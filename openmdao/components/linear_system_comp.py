@@ -31,7 +31,7 @@ class LinearSystemComp(ImplicitComponent):
                               values=['dense', 'sparse', 'matrix_free'],
                               desc='the way the derivatives are defined')
 
-    def initialize_variables(self):
+    def setup(self):
         """
         Matrix and RHS are inputs, solution vector is the output.
         """
@@ -46,7 +46,7 @@ class LinearSystemComp(ImplicitComponent):
         self.add_input("b", val=np.ones(size))
         self.add_output("x", shape=size, val=.1)
 
-    def initialize_partials(self):
+    def setup_partials(self):
         """
         Set up the derivatives according to the user specified mode.
         """
@@ -122,7 +122,7 @@ class LinearSystemComp(ImplicitComponent):
 
             J['x', 'x'] = inputs['A']
 
-            # constant, defined int initialize_partials
+            # constant, defined int setup_partials
             # J['x', 'b'] = -np.eye()
 
         elif partial_type == "sparse":
@@ -131,7 +131,7 @@ class LinearSystemComp(ImplicitComponent):
             # J['x', 'A'].set_data(np.tile(x, size))
             J['x', 'x'] = inputs['A']
 
-            # constant, defined int initialize_partials
+            # constant, defined int setup_partials
             # J['x', 'b'] = -np.ones(size)
 
     def _mat_vec_prod(self, inputs, outputs, d_inputs, d_outputs,

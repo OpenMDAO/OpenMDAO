@@ -11,7 +11,7 @@ import warnings
 import numpy as np
 from parameterized import parameterized
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, NLRunOnce
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, NonLinearRunOnce
 from openmdao.devtools.testutil import assert_rel_error
 try:
     from openmdao.parallel_api import PETScVector
@@ -45,7 +45,7 @@ class BranchGroup(Group):
 
 
 class SetOrderGroup(Group):
-    def initialize_subsystems(self):
+    def setup(self):
         self.add_subsystem('C1', ExecComp('y=2.0*x'))
         self.add_subsystem('C2', ExecComp('y=2.0*x'))
         self.add_subsystem('C3', ExecComp('y=2.0*x'))
@@ -61,7 +61,7 @@ class ReportOrderComp(ExplicitComponent):
         super(ReportOrderComp, self).__init__()
         self._order_list = order_list
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', 0.0)
         self.add_output('y', 0.0)
 
@@ -390,7 +390,7 @@ class TestGroup(unittest.TestCase):
 
     def test_double_src_indices(self):
         class MyComp1(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', np.ones(3), src_indices=[0, 1, 2])
                 self.add_output('y', 1.0)
 
@@ -485,7 +485,7 @@ class TestGroup(unittest.TestCase):
 
     def test_promote_src_indices(self):
         class MyComp1(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 # this input will connect to entries 0, 1, and 2 of its source
                 self.add_input('x', np.ones(3), src_indices=[0, 1, 2])
                 self.add_output('y', 1.0)
@@ -494,7 +494,7 @@ class TestGroup(unittest.TestCase):
                 outputs['y'] = np.sum(inputs['x'])*2.0
 
         class MyComp2(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 # this input will connect to entries 3 and 4 of its source
                 self.add_input('x', np.ones(2), src_indices=[3, 4])
                 self.add_output('y', 1.0)
@@ -521,7 +521,7 @@ class TestGroup(unittest.TestCase):
 
     def test_promote_src_indices_nonflat(self):
         class MyComp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 # We want to pull the following 4 values out of the source:
                 # [(0,0), (3,1), (2,1), (1,1)].
                 # Because our input is also non-flat we must arrange the
@@ -554,7 +554,7 @@ class TestGroup(unittest.TestCase):
 
     def test_promote_src_indices_nonflat_to_scalars(self):
         class MyComp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', 1.0, src_indices=[(3,1)], shape=(1,))
                 self.add_output('y', 1.0)
 
@@ -576,7 +576,7 @@ class TestGroup(unittest.TestCase):
 
     def test_promote_src_indices_nonflat_error(self):
         class MyComp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', 1.0, src_indices=[(3,1)])
                 self.add_output('y', 1.0)
 
@@ -610,7 +610,7 @@ class TestGroup(unittest.TestCase):
         src_shape, idxvals = src_info
 
         class MyComp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 if len(tgt_shape) == 1:
                     tshape = None  # don't need to set shape if input is flat
                     sidxs = idxvals
@@ -651,7 +651,7 @@ class TestGroup(unittest.TestCase):
         order_list = []
         prob = Problem()
         model = prob.model
-        model.nl_solver = NLRunOnce()
+        model.nonlinear_solver = NonLinearRunOnce()
         model.add_subsystem('indeps', IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))
@@ -683,7 +683,7 @@ class TestGroup(unittest.TestCase):
         order_list = []
         prob = Problem()
         model = prob.model
-        model.nl_solver = NLRunOnce()
+        model.nonlinear_solver = NonLinearRunOnce()
         model.add_subsystem('indeps', IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))
@@ -802,7 +802,7 @@ class TestConnect(unittest.TestCase):
               "in 'sub' from 'src.z' to 'tgt.x'."
 
         # source and target names can't be checked until setup
-        # because initialize_variables is not called until then
+        # because setup is not called until then
         self.sub.connect('src.z', 'tgt.x', src_indices=[1])
         with assertRaisesRegex(self, NameError, msg):
             self.prob.setup(check=False)
@@ -812,7 +812,7 @@ class TestConnect(unittest.TestCase):
               "in 'sub' from 'src.x' to 'tgt.z'."
 
         # source and target names can't be checked until setup
-        # because initialize_variables is not called until then
+        # because setup is not called until then
         self.sub.connect('src.x', 'tgt.z', src_indices=[1])
         with assertRaisesRegex(self, NameError, msg):
             self.prob.setup(check=False)

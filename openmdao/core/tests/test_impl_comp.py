@@ -13,7 +13,7 @@ from openmdao.devtools.testutil import assert_rel_error
 
 class TestImplCompSimpleCompute(ImplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('a', val=1.)
         self.add_input('b', val=1.)
         self.add_input('c', val=1.)
@@ -198,10 +198,10 @@ class TestImplCompSimple(unittest.TestCase):
         group.connect('pc.c', 'comp2.c')
 
         prob = Problem(model=group)
-        group.nl_solver = NewtonSolver()
-        group.nl_solver.options['solve_subsystems'] = True
-        group.nl_solver.options['max_sub_solves'] = 1
-        group.ln_solver = ScipyIterativeSolver()
+        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver.options['solve_subsystems'] = True
+        group.nonlinear_solver.options['max_sub_solves'] = 1
+        group.linear_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
 
@@ -219,7 +219,7 @@ class TestImplCompSimple(unittest.TestCase):
 
         class ImpWithInitial(TestImplCompSimpleLinearize):
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('a', val=1.)
                 self.add_input('b', val=1.)
                 self.add_input('c', val=1.)
@@ -272,10 +272,10 @@ class TestImplCompSimple(unittest.TestCase):
         model.connect('pb.b', 'comp2.b')
         model.connect('pc.c', 'comp2.c')
 
-        model.nl_solver = NewtonSolver()
-        model.nl_solver.options['solve_subsystems'] = True
-        model.nl_solver.options['max_sub_solves'] = 1
-        model.ln_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 1
+        model.linear_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
 

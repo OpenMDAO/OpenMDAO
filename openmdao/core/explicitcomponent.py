@@ -31,11 +31,11 @@ class ExplicitComponent(Component):
         super(ExplicitComponent, self).__init__(**kwargs)
 
         if overrides_method('compute_jacvec_product', self, ExplicitComponent):
-            self._matrix_free = True
+            self.matrix_free = True
 
     def _setup_partials(self, recurse=True):
         """
-        Call initialize_partials in components.
+        Call setup_partials in components.
 
         Parameters
         ----------
@@ -47,8 +47,8 @@ class ExplicitComponent(Component):
         abs2meta_out = self._var_abs2meta['output']
         abs2prom_out = self._var_abs2prom['output']
 
-        # Note: These declare calls are outside of initialize_partials so that users do not have to
-        # call the super version of initialize_partials. This is still post-initialize_variables.
+        # Note: These declare calls are outside of setup_partials so that users do not have to
+        # call the super version of setup_partials. This is still post-setup.
         other_names = []
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta_out[out_abs]
@@ -68,8 +68,7 @@ class ExplicitComponent(Component):
             other_names.append(out_name)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0,
-                   distributed=False):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0):
         """
         Add an output variable to the component.
 
@@ -115,8 +114,6 @@ class ExplicitComponent(Component):
         var_set : hashable object
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
-        distributed : bool
-            If True, this variable is distributed across multiple processes.
 
         Returns
         -------
@@ -128,7 +125,7 @@ class ExplicitComponent(Component):
 
         if inspect.stack()[1][3] == '__init__':
             warn_deprecation("In the future, the 'add_output' method must be "
-                             "called from 'initialize_variables' rather than "
+                             "called from 'setup' rather than "
                              "in the '__init__' function.")
 
         return super(ExplicitComponent, self).add_output(name, val=val, shape=shape,

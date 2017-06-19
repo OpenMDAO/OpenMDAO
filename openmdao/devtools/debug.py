@@ -15,32 +15,16 @@ def dump_dist_idxs(problem, stream=sys.stdout):  # pragma: no cover
 
     Output looks like this:
 
-    C3.y     26
-    C3.y     25
     C3.y     24
-    C2.y     23
-    C2.y     22
     C2.y     21
-    sub.C3.y 20     20 C3.x
-    sub.C3.y 19     19 C3.x
-    sub.C3.y 18     18 C3.x
-    C1.y     17     17 C2.x
-    P.x      16     16 C2.x
-    P.x      15     15 C2.x
-    P.x      14     14 sub.C3.x
-    C3.y     13     13 sub.C3.x
+    sub.C3.y 18
+    C1.y     17     18 C3.x
+    P.x      14     15 C2.x
     C3.y     12     12 sub.C3.x
     C3.y     11     11 C1.x
-    C2.y     10     10 C3.x
-    C2.y      9      9 C3.x
     C2.y      8      8 C3.x
-    sub.C2.y  7      7 C2.x
-    sub.C2.y  6      6 C2.x
     sub.C2.y  5      5 C2.x
-    C1.y      4      4 sub.C2.x
-    C1.y      3      3 sub.C2.x
-    P.x       2      2 sub.C2.x
-    P.x       1      1 C1.x
+    C1.y      3      2 sub.C2.x
     P.x       0      0 C1.x
 
     Parameters
@@ -62,14 +46,14 @@ def dump_dist_idxs(problem, stream=sys.stdout):  # pragma: no cover
         data = []
         nwid = 0
         iwid = 0
-        for sname, iset in set_IDs[type_].items():
+        for sname in set_IDs[type_]:
             set_total = 0
             for rank in range(g.comm.size):
                 for ivar, vname in enumerate(vnames[type_]):
                     vset = abs2meta[type_][vname]['var_set']
                     if vset == sname:
                         sz = sizes[type_][vset][rank, set_idxs[type_][vname]]
-                        if sz > 0.:
+                        if sz > 0:
                             data.append((vname, str(set_total)))
                         nwid = max(nwid, len(vname))
                         iwid = max(iwid, len(data[-1][1]))
@@ -117,10 +101,10 @@ def tree(system, include_solvers=True, stream=sys.stdout):
         stream.write(indent)
         stream.write("%s %s\n" % (type(s).__name__, s.name))
         if include_solvers:
-            if s.nl_solver is not None:
-                stream.write("%s %s nl_solver\n" % (indent, type(s.nl_solver).__name__))
-            if s.ln_solver is not None:
-                stream.write("%s %s ln_solver\n" % (indent, type(s.ln_solver).__name__))
+            if s.nonlinear_solver is not None:
+                stream.write("%s %s nonlinear_solver\n" % (indent, type(s.nonlinear_solver).__name__))
+            if s.linear_solver is not None:
+                stream.write("%s %s linear_solver\n" % (indent, type(s.linear_solver).__name__))
 
 def max_mem_usage():
     """

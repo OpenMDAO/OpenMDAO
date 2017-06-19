@@ -544,10 +544,38 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     meth = getattr(cls, method_name)
     class_source_code = inspect.getsource(cls)
 
-    rb = RedBaron(class_source_code)
-    def_nodes = rb.findAll("DefNode", name=method_name)
-    def_nodes[0].value.decrease_indentation(8)
-    method_source = def_nodes[0].value.dumps()
+    # Directly manipulating function text to strip header and remove leading whitespace.
+    # Should be faster than redbaron
+    method_source_code = inspect.getsource(meth)
+    meth_lines = method_source_code.split('\n')
+    counter = 0
+    past_header = False
+    new_lines = []
+    for line in meth_lines:
+        if not past_header:
+            n1 = len(line)
+            newline = line.lstrip()
+            n2 = len(newline)
+            tab = n1-n2
+            if counter == 0:
+                first_len = tab
+            elif n1 == 0:
+                continue
+            if tab == first_len:
+                counter += 1
+                newline = line[tab:]
+            else:
+                past_header = True
+        else:
+            newline = line[tab:]
+        new_lines.append(newline)
+
+    method_source = '\n'.join(new_lines[counter:])
+
+    #rb = RedBaron(class_source_code)
+    #def_nodes = rb.find("DefNode", name=method_name)
+    #def_nodes.value.decrease_indentation(8)
+    #method_source = def_nodes.value.dumps()
 
     # Remove docstring from source code
     source_minus_docstrings = remove_docstrings(method_source)
@@ -584,22 +612,23 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     #####################
     # Get all the pieces of code needed to run the unit test method
     module_source_code = inspect.getsource(test_module)
-    lines_before_test_cases = get_lines_before_test_cases(module_source_code)
+    lines_before_test_cases = module_source_code.split('if __name__')[0]
     setup_source_code = get_method_body(inspect.getsource(getattr(cls, 'setUp')))
     teardown_source_code = get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
 
     # If the test method has a skipUnless or skip decorator, we need to convert it to a
     #   raise call
-    skip_predicate_and_message = get_skip_predicate_and_message(class_source_code, method_name)
-    if skip_predicate_and_message:
-        # predicate, message = skip_unless_predicate_and_message
-        predicate, message = skip_predicate_and_message
-        if predicate:
-            raise_skip_test_source_code = 'import unittest\nif not {}: raise unittest.SkipTest("{}")'.format(predicate, message)
-        else:
-            raise_skip_test_source_code = 'import unittest\nraise unittest.SkipTest("{}")'.format(message)
-    else:
-        raise_skip_test_source_code = ""
+    raise_skip_test_source_code = ""
+    if '@unittest.skip' in class_source_code:
+        skip_predicate_and_message = get_skip_predicate_and_message(class_source_code, method_name)
+        if skip_predicate_and_message:
+            # predicate, message = skip_unless_predicate_and_message
+            predicate, message = skip_predicate_and_message
+            if predicate:
+                raise_skip_test_source_code = 'import unittest\nif not {}: raise unittest.SkipTest("{}")'.format(predicate, message)
+            else:
+                raise_skip_test_source_code = 'import unittest\nraise unittest.SkipTest("{}")'.format(message)
+
 
     code_to_run = '\n'.join([lines_before_test_cases,
                             setup_source_code,

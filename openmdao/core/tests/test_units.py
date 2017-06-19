@@ -16,7 +16,7 @@ from openmdao.devtools.testutil import assert_rel_error
 class SpeedComp(ExplicitComponent):
     """Simple speed computation from distance and time with unit conversations."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('distance', val=1.0, units='km')
         self.add_input('time', val=1.0, units='h')
         self.add_output('speed', val=1.0, units='km/h')
@@ -28,7 +28,7 @@ class SpeedComp(ExplicitComponent):
 class SrcComp(ExplicitComponent):
     """Source provides degrees Celsius."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x1', 100.0)
         self.add_output('x2', 100.0, units='degC')
 
@@ -44,7 +44,7 @@ class SrcComp(ExplicitComponent):
 class TgtCompF(ExplicitComponent):
     """Target expressed in degrees F."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x2', 100.0, units='degF')
         self.add_output('x3', 100.0)
 
@@ -60,7 +60,7 @@ class TgtCompF(ExplicitComponent):
 class TgtCompC(ExplicitComponent):
     """Target expressed in degrees Celsius."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x2', 100.0, units='degC')
         self.add_output('x3', 100.0)
 
@@ -76,7 +76,7 @@ class TgtCompC(ExplicitComponent):
 class TgtCompK(ExplicitComponent):
     """Target expressed in degrees Kelvin."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x2', 100.0, units='degK')
         self.add_output('x3', 100.0)
 
@@ -92,7 +92,7 @@ class TgtCompK(ExplicitComponent):
 class TgtCompFMulti(ExplicitComponent):
     """Contains some extra inputs that might trip things up."""
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('_x2', 100.0, units='degF')
         self.add_input('x2', 100.0, units='degF')
         self.add_input('x2_', 100.0, units='degF')
@@ -163,7 +163,7 @@ class TestUnitConversion(unittest.TestCase):
         prob = Problem(model=UnitConvGroup())
 
         prob.model.jacobian = DenseJacobian()
-        prob.model.ln_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver()
         # Check the outputs after running to test the unit conversions
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -280,7 +280,7 @@ class TestUnitConversion(unittest.TestCase):
         class SrcCompa(ExplicitComponent):
             """Source provides degrees Celsius."""
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x1', 100.0)
                 self.add_output('x2', 100.0, units='degC')
 
@@ -300,7 +300,7 @@ class TestUnitConversion(unittest.TestCase):
         class TgtCompFa(ExplicitComponent):
             """Target expressed in degrees F."""
 
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x2', 100.0, units='degF')
                 self.add_output('x3', 100.0)
 
@@ -425,11 +425,11 @@ class TestUnitConversion(unittest.TestCase):
     def test_bad_units(self):
         """Test error handling when invalid units are declared."""
         class Comp1(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x', 0.0, units='junk')
 
         class Comp2(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_output('x', 0.0, units='junk')
 
         with self.assertRaises(Exception) as cm:
@@ -802,7 +802,7 @@ class TestUnitConversion(unittest.TestCase):
     def test_incompatible_connections(self):
 
         class BadComp(ExplicitComponent):
-            def initialize_variables(self):
+            def setup(self):
                 self.add_input('x2', 100.0, units='m')
                 self.add_output('x3', 100.0)
 
@@ -853,11 +853,11 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc1.y', 'sub.cc2.x')
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
-        #root.nl_solver = Newton()
-        #root.ln_solver = ScipyGMRES()
+        #root.nonlinear_solver = Newton()
+        #root.linear_solver = ScipyGMRES()
 
-        #sub.nl_solver = Newton()
-        #sub.ln_solver = DirectSolver()
+        #sub.nonlinear_solver = Newton()
+        #sub.linear_solver = DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('c1.y2')
@@ -872,9 +872,9 @@ class TestUnitConversion(unittest.TestCase):
         ## Make sure we can calculate a good derivative in the presence of pollution
 
         #sub._jacobian_changed = True
-        #sub.ln_solver.rel_inputs = ['sub.cc2.x', 'sub.cc1.x2']
+        #sub.linear_solver.rel_inputs = ['sub.cc2.x', 'sub.cc1.x2']
         #rhs_buf = {None : np.array([3.5, 1.7])}
-        #sol_buf = sub.ln_solver.solve(rhs_buf, sub, mode='fwd')[None]
+        #sol_buf = sub.linear_solver.solve(rhs_buf, sub, mode='fwd')[None]
         #assert_rel_error(self, sol_buf[0], -3.52052052, 1e-3)
         #assert_rel_error(self, sol_buf[1], -2.05205205, 1e-3)
 
@@ -900,13 +900,13 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc1.y', 'sub.cc2.x')
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
-        #root.nl_solver = Newton()
-        #root.nl_solver.options['maxiter'] = 1
-        #root.ln_solver = ScipyGMRES()
-        #root.ln_solver.options['maxiter'] = 1
+        #root.nonlinear_solver = Newton()
+        #root.nonlinear_solver.options['maxiter'] = 1
+        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver.options['maxiter'] = 1
 
-        #sub.nl_solver = Newton()
-        #sub.ln_solver = DirectSolver()
+        #sub.nonlinear_solver = Newton()
+        #sub.linear_solver = DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
@@ -938,14 +938,14 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc1.y', 'sub.cc2.x')
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
-        #root.nl_solver = Newton()
-        #root.nl_solver.options['maxiter'] = 1
-        #root.ln_solver = ScipyGMRES()
-        #root.ln_solver.options['maxiter'] = 1
-        #root.ln_solver.options['mode'] = 'rev'
+        #root.nonlinear_solver = Newton()
+        #root.nonlinear_solver.options['maxiter'] = 1
+        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver.options['maxiter'] = 1
+        #root.linear_solver.options['mode'] = 'rev'
 
-        #sub.nl_solver = Newton()
-        #sub.ln_solver = DirectSolver()
+        #sub.nonlinear_solver = Newton()
+        #sub.linear_solver = DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
@@ -1018,14 +1018,14 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc1.y', 'sub.cc2.x')
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
-        #root.nl_solver = Newton()
-        #root.nl_solver.options['maxiter'] = 1
-        #root.ln_solver = ScipyGMRES()
-        #root.ln_solver.options['maxiter'] = 1
-        #root.ln_solver.options['mode'] = 'rev'
+        #root.nonlinear_solver = Newton()
+        #root.nonlinear_solver.options['maxiter'] = 1
+        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver.options['maxiter'] = 1
+        #root.linear_solver.options['mode'] = 'rev'
 
-        #sub.nl_solver = Newton()
-        #sub.ln_solver = DirectSolver()
+        #sub.nonlinear_solver = Newton()
+        #sub.linear_solver = DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
@@ -1059,13 +1059,13 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc1.y', 'sub.cc2.x')
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
-        #root.nl_solver = Newton()
-        #root.nl_solver.options['maxiter'] = 1
-        #root.ln_solver = ScipyGMRES()
-        #root.ln_solver.options['maxiter'] = 1
+        #root.nonlinear_solver = Newton()
+        #root.nonlinear_solver.options['maxiter'] = 1
+        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver.options['maxiter'] = 1
 
-        #sub.nl_solver = Newton()
-        #sub.ln_solver = ScipyGMRES()
+        #sub.nonlinear_solver = Newton()
+        #sub.linear_solver = ScipyGMRES()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
@@ -1077,7 +1077,7 @@ class TestUnitConversion(unittest.TestCase):
         ## GMRES doesn't cause a successive build-up in the value of an out-of
         ## scope param, but the linear solver doesn't converge. We can test to
         ## make sure it does.
-        #iter_count = sub.ln_solver.iter_count
+        #iter_count = sub.linear_solver.iter_count
         #self.assertTrue(iter_count < 20)
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
 
@@ -1101,14 +1101,14 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc1.y', 'sub.cc2.x')
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
-        #root.nl_solver = Newton()
-        #root.nl_solver.options['maxiter'] = 1
-        #root.ln_solver = ScipyGMRES()
-        #root.ln_solver.options['maxiter'] = 1
+        #root.nonlinear_solver = Newton()
+        #root.nonlinear_solver.options['maxiter'] = 1
+        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver.options['maxiter'] = 1
 
-        #sub.nl_solver = Newton()
-        #sub.ln_solver = ScipyGMRES()
-        #sub.ln_solver.precon = DirectSolver()
+        #sub.nonlinear_solver = Newton()
+        #sub.linear_solver = ScipyGMRES()
+        #sub.linear_solver.precon = DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
@@ -1120,7 +1120,7 @@ class TestUnitConversion(unittest.TestCase):
         ## GMRES doesn't cause a successive build-up in the value of an out-of
         ## scope param, but the linear solver doesn't converge. We can test to
         ## make sure it does.
-        #iter_count = sub.ln_solver.iter_count
+        #iter_count = sub.linear_solver.iter_count
         #self.assertTrue(iter_count < 20)
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
 

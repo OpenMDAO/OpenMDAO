@@ -10,7 +10,7 @@ class Paraboloid(ExplicitComponent):
     Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
     """
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('x', val=0.0)
         self.add_input('y', val=0.0)
 
@@ -38,42 +38,16 @@ class Paraboloid(ExplicitComponent):
         partials['f_xy', 'y'] = 2.0*y + 8.0 + x
 
 
-class ParaboloidMatVec(Paraboloid):
-    """ Use matrix-vector product instead."""
-
-    def compute_partials(self, inputs, outputs, partials):
-        """Analytical derivatives."""
-        pass
-
-    def compute_jacvec_product(self, inputs, outputs, dinputs, dresids, mode):
-        """Returns the product of the incoming vector with the Jacobian."""
-
-        x = inputs['x']
-        y = inputs['y']
-
-        if mode == 'fwd':
-            if 'x' in dinputs:
-                dresids['f_xy'] += (2.0*x - 6.0 + y)*dinputs['x']
-            if 'y' in dinputs:
-                dresids['f_xy'] += (2.0*y + 8.0 + x)*dinputs['y']
-
-        elif mode == 'rev':
-            if 'x' in dinputs:
-                dinputs['x'] += (2.0*x - 6.0 + y)*dresids['f_xy']
-            if 'y' in dinputs:
-                dinputs['y'] += (2.0*y + 8.0 + x)*dresids['f_xy']
-
-
 if __name__ == "__main__":
     from openmdao.core.problem import Problem
     from openmdao.core.group import Group
     from openmdao.core.indepvarcomp import IndepVarComp
 
     model = Group()
-    model.add_subsystem('des_vars', IndepVarComp((
-        ('x', 3.0),
-        ('y', -4.0),
-    )))
+    ivc = IndepVarComp()
+    ivc.add_output('x', 3.0)
+    ivc.add_output('y', -4.0)
+    model.add_subsystem('des_vars', ivc)
     model.add_subsystem('parab_comp', Paraboloid())
 
     model.connect('des_vars.x', 'parab_comp.x')
@@ -81,10 +55,10 @@ if __name__ == "__main__":
 
     prob = Problem(model)
     prob.setup()
-    prob.run()
-    print(prob['parab_comp.f'])
+    prob.run_model()
+    print(prob['parab_comp.f_xy'])
 
     prob['des_vars.x'] = 5.0
     prob['des_vars.y'] = -2.0
-    prob.run()
-    print(prob['parab_comp.f'])
+    prob.run_model()
+    print(prob['parab_comp.f_xy'])

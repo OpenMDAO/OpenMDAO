@@ -10,7 +10,7 @@ from openmdao.devtools.testutil import assert_rel_error
 
 class CompA(ImplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('b')
         self.add_output('a')
 
@@ -41,7 +41,7 @@ class CompA(ImplicitComponent):
 
 class CompB(ImplicitComponent):
 
-    def initialize_variables(self):
+    def setup(self):
         self.add_input('a')
         self.add_output('b')
 
@@ -84,7 +84,7 @@ class Test(unittest.TestCase):
         group = GroupG()
         self.p = Problem(group)
 
-        self.p.model.ln_solver = LinearBlockGS()
+        self.p.model.linear_solver = LinearBlockGS()
         self.p.setup(check=False)
 
         #view_model(self.p, show_browser=False)
