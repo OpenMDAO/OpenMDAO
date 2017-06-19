@@ -63,6 +63,9 @@ def _assertIterationDataRecorded(test, db_cur, expected, tolerance):
                        {"iteration_coordinate": iter_coord})
         row_actual = db_cur.fetchone()
 
+        test.assertTrue(row_actual, 'Driver iterations table does not contain the requested iteration coordinate: "{}"'.format(iter_coord))
+
+
         counter, global_counter, iteration_coordinate, timestamp, success, msg, desvars_blob,\
             responses_blob, objectives_blob, constraints_blob = row_actual
 
@@ -113,6 +116,7 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
                        "iteration_coordinate=:iteration_coordinate",
                        {"iteration_coordinate": iter_coord})
         row_actual = db_cur.fetchone()
+        test.assertTrue(row_actual, 'System iterations table does not contain the requested iteration coordinate: "{}"'.format(iter_coord))
 
         counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
             outputs_blob, residuals_blob = row_actual
@@ -277,11 +281,11 @@ class TestSqliteRecorder(unittest.TestCase):
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)
-        print(self.filename) # TODO_RECORDERS - remove
+        print(self.filename)  # comment out to make filename printout go away. TODO_RECORDERS
         self.eps = 1e-5
 
     def tearDown(self):
-        return # TODO_RECORDERS - remove
+        return  # comment out to allow db file to be removed. TODO_RECORDERS
         try:
             rmtree(self.dir)
             pass
@@ -681,7 +685,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (0, ), 'NLRunOnce', (1, ),
-                      'mda._solve_nonlinear', (0, ), 'mda.d1._solve_nonlinear', (4, )]
+                      'mda._solve_nonlinear', (0, ), 'NonlinearBlockGS', (4,), 'mda.d1._solve_nonlinear', (4, )]
 
         expected_inputs = {
                             "mda.d1.z": [5.0, 2.0],
@@ -719,7 +723,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'NonlinearBlockGS', (7, )]
+        coordinate = [0, 'Driver', (1, ), 'root._solve_nonlinear', (0, ), 'NonlinearBlockGS', (6, )]
 
         expected_abs_error = 1.31880284470753394998e-10
 
@@ -1102,9 +1106,9 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'SLSQP', (6, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (1, ),
                       'mda._solve_nonlinear', (6, ), 'NonlinearBlockGS', (4, )]
 
-        expected_abs_error = 3.90594223632e-11
+        expected_abs_error = 3.905986645236226e-11,
 
-        expected_rel_error = 1.03709322088e-06
+        expected_rel_error = 1.03710514e-06,
 
         expected_solver_output = {
             "mda.d2.y2": [3.75527777],
@@ -1176,8 +1180,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertTrue(counters_system.isdisjoint(counters_solver))
 
 
-def test_implicit_component(self):
-
+    def test_implicit_component(self):
         from openmdao.core.tests.test_impl_comp import TestImplCompSimpleLinearize, \
             TestImplCompSimpleJacVec
         group = Group()

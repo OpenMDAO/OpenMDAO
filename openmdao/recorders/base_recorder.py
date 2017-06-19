@@ -17,7 +17,7 @@ recording_iteration_stack = []
 
 def iter_get_norm_on_call_stack():
     """
-    Check if iter_get_norm is on call stack.
+    Check if iter_get_norm is on call stackp.
 
     Returns
     -------

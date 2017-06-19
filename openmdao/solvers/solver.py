@@ -219,10 +219,7 @@ class Solver(object):
             update_local_meta(metadata, (self._iter_count,))
             self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
 
-
             pop_recording_iteration_stack()
-
-
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or

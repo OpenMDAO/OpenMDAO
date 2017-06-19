@@ -1,18 +1,20 @@
 from __future__ import print_function
 import sqlite3
 import sys
-import numpy as np
 from openmdao.recorders.sqlite_recorder import blob_to_array
 
 indent = 4 * ' '
 
+
 def print_scalar(name, value):
     print(indent, name + ':', value)
+
 
 def print_header(title, sep):
     print(60 * sep)
     print(title)
     print(60 * sep)
+
 
 def print_blob(name, blob):
     print(indent, name + ':')
@@ -24,6 +26,7 @@ def print_blob(name, blob):
     else:
         print(indent, indent, 'None')
     print()
+
 
 def print_counter(idx, counter):
     print(indent, 'idx: {} counter: {}'.format(idx, counter))
@@ -43,10 +46,10 @@ for row in rows:
     idx, counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, objectives_blob, constraints_blob = row
     print_header( 'Coord: {}'.format(iteration_coordinate), '-')
     print_counter(idx, counter)
-    print_blob( 'Desvars', desvars_blob )
-    print_blob( 'Responses', responses_blob )
-    print_blob( 'Objectives', objectives_blob )
-    print_blob( 'Constraints', constraints_blob)
+    print_blob('Desvars', desvars_blob )
+    print_blob('Responses', responses_blob )
+    print_blob('Objectives', objectives_blob )
+    print_blob('Constraints', constraints_blob)
 
 # Print System recordings: inputs, outputs, residuals
 print_header('System Iterations', '=')
@@ -55,11 +58,11 @@ rows = cur.fetchall()
 
 for row in rows:
     idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob , outputs_blob , residuals_blob = row
-    print_header( 'Coord: {}'.format(iteration_coordinate), '-')
+    print_header('Coord: {}'.format(iteration_coordinate), '-')
     print_counter(idx, counter)
-    print_blob( 'Inputs', inputs_blob )
-    print_blob( 'Outputs', outputs_blob )
-    print_blob( 'Residuals', residuals_blob )
+    print_blob('Inputs', inputs_blob )
+    print_blob('Outputs', outputs_blob )
+    print_blob('Residuals', residuals_blob )
 
 # Print Solver recordings: inputs, outputs, residuals
 print_header('Solver Iterations', '=')
@@ -68,11 +71,11 @@ rows = cur.fetchall()
 
 for row in rows:
     idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, outputs_blob, residuals_blob = row
-    print_header( 'Coord: {}'.format(iteration_coordinate), '-')
+    print_header('Coord: {}'.format(iteration_coordinate), '-')
     print_counter(idx, counter)
-    print_scalar( 'abs_err', abs_err )
-    print_scalar( 'rel_err', rel_err )
-    print_blob( 'Outputs', outputs_blob )
-    print_blob( 'Residuals', residuals_blob )
+    print_scalar('abs_err', abs_err )
+    print_scalar('rel_err', rel_err )
+    print_blob('Outputs', outputs_blob )
+    print_blob('Residuals', residuals_blob )
 
 con.close()

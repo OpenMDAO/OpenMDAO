@@ -445,13 +445,12 @@ class SqliteRecorder(BaseRecorder):
         from openmdao.recorders.base_recorder import get_formatted_iteration_coordinate
         iteration_coordinate = get_formatted_iteration_coordinate()
 
-
         self.cursor.execute("INSERT INTO solver_iterations(counter, iteration_coordinate, "
                             "timestamp, success, msg, abs_err, rel_err, solver_output, "
                             "solver_residuals) VALUES(?,?,?,?,?,?,?,?,?)",
                             # (self._counter, format_iteration_coordinate(metadata['coord']),
-                             (self._counter, iteration_coordinate,
-                              metadata['timestamp'],
+                            (self._counter, iteration_coordinate,
+                             metadata['timestamp'],
                              metadata['success'], metadata['msg'],
                              abs_error, rel_error,
                              outputs_blob, residuals_blob))
