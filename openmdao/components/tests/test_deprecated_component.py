@@ -347,8 +347,6 @@ class DepCompTestCase(unittest.TestCase):
         print(stream.getvalue())
         self.assertEqual(sorted(resids), ['comp.y', 'comp.z', 'p1.x'])
 
-        self.assertEqual(states, ['comp.z'])
-
     def test_simple_implicit_self_solve(self):
 
         prob = Problem(Group())

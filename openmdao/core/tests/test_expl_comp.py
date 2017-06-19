@@ -11,7 +11,7 @@ from openmdao.devtools.testutil import assert_rel_error
 
 class RectangleComp(ExplicitComponent):
     """
-    A simple ExplicitComponent that computes the area of a rectangle.
+    A simple Explicit Component that computes the area of a rectangle.
     """
     def setup(self):
         self.add_input('length', val=1.)
