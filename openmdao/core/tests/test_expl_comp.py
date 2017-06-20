@@ -94,15 +94,23 @@ class ExplCompTestCase(unittest.TestCase):
         stream = cStringIO()
         inputs = prob.model.list_inputs(out_stream=stream)
         print(stream.getvalue())
-        self.assertEqual(sorted(inputs),
-                         ['comp2.length', 'comp2.width', 'comp3.length', 'comp3.width'])
+        self.assertEqual(sorted(inputs), [
+            ('comp2.length', [3.]),
+            ('comp2.width',  [2.]),
+            ('comp3.length', [3.]),
+            ('comp3.width',  [2.]),
+        ])
 
         # list explicit outputs
         stream = cStringIO()
         outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
         print(stream.getvalue())
-        self.assertEqual(sorted(outputs),
-                         ['comp1.length', 'comp1.width', 'comp2.area', 'comp3.area'])
+        self.assertEqual(sorted(outputs), [
+            ('comp1.length', [3.]),
+            ('comp1.width',  [2.]),
+            ('comp2.area',   [6.]),
+            ('comp3.area',   [6.]),
+        ])
 
         # list states
         stream = cStringIO()
@@ -114,8 +122,12 @@ class ExplCompTestCase(unittest.TestCase):
         stream = cStringIO()
         resids = prob.model.list_residuals(out_stream=stream)
         print(stream.getvalue())
-        self.assertEqual(sorted(resids),
-                         ['comp1.length', 'comp1.width', 'comp2.area', 'comp3.area'])
+        self.assertEqual(sorted(resids), [
+            ('comp1.length', [0.]),
+            ('comp1.width',  [0.]),
+            ('comp2.area',   [0.]),
+            ('comp3.area',   [0.]),
+        ])
 
 
 if __name__ == '__main__':

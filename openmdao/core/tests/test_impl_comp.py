@@ -128,6 +128,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         prob = Problem(model=group)
         prob.setup(check=False)
 
+        # run model
         prob['comp1.a'] = 1.
         prob['comp1.b'] = -4.
         prob['comp1.c'] = 3.
@@ -152,32 +153,46 @@ class ImplicitCompTestCase(unittest.TestCase):
         inputs = prob.model.list_inputs(out_stream=stream)
         print(stream.getvalue())
         self.assertEqual(sorted(inputs), [
-            'comp2.a', 'comp2.b', 'comp2.c',
-            'comp3.a', 'comp3.b', 'comp3.c'
+            ('comp2.a', [1.]),
+            ('comp2.b', [-4.]),
+            ('comp2.c', [3.]),
+            ('comp3.a', [1.]),
+            ('comp3.b', [-4.]),
+            ('comp3.c', [3.])
         ])
 
         # list explicit outputs
         stream = cStringIO()
         outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
         print(stream.getvalue())
-        self.assertEqual(sorted(outputs), ['comp1.a', 'comp1.b', 'comp1.c'])
+        self.assertEqual(sorted(outputs), [
+            ('comp1.a', [1.]),
+            ('comp1.b', [-4.]),
+            ('comp1.c', [3.])
+        ])
 
         # list states
         stream = cStringIO()
         states = prob.model.list_outputs(explicit=False, out_stream=stream)
         print(stream.getvalue())
-        self.assertEqual(states, ['comp2.x', 'comp3.x'])
+        self.assertEqual(sorted(states), [
+            ('comp2.x', [3.]),
+            ('comp3.x', [3.])
+        ])
 
         # list residuals
         stream = cStringIO()
         resids = prob.model.list_residuals(out_stream=stream)
         print(stream.getvalue())
         self.assertEqual(sorted(resids), [
-            'comp1.a', 'comp1.b', 'comp1.c',
-            'comp2.x', 'comp3.x'
+            ('comp1.a', [0.]),
+            ('comp1.b', [0.]),
+            ('comp1.c', [0.]),
+            ('comp2.x', [0.]),
+            ('comp3.x', [0.])
         ])
 
-    def test_subgroup(self):
+    def test_list_with_subgroup(self):
         group = Group()
 
         comp1 = group.add_subsystem('comp1', IndepVarComp())
@@ -199,6 +214,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         prob = Problem(model=group)
         prob.setup(check=False)
 
+        # run model
         prob['comp1.a'] = 1.
         prob['comp1.b'] = -4.
         prob['comp1.c'] = 3.
@@ -211,31 +227,44 @@ class ImplicitCompTestCase(unittest.TestCase):
         inputs = prob.model.list_inputs(out_stream=stream)
         print(stream.getvalue())
         self.assertEqual(sorted(inputs), [
-            'sub.comp2.a', 'sub.comp2.b', 'sub.comp2.c',
-            'sub.comp3.a', 'sub.comp3.b', 'sub.comp3.c'
+            ('sub.comp2.a', [1.]),
+            ('sub.comp2.b', [-4.]),
+            ('sub.comp2.c', [3.]),
+            ('sub.comp3.a', [1.]),
+            ('sub.comp3.b', [-4.]),
+            ('sub.comp3.c', [3.])
         ])
 
         # list explicit outputs
         stream = cStringIO()
         outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
         print(stream.getvalue())
-        self.assertEqual(sorted(outputs), ['comp1.a', 'comp1.b', 'comp1.c'])
+        self.assertEqual(sorted(outputs), [
+            ('comp1.a', [1.]),
+            ('comp1.b', [-4.]),
+            ('comp1.c', [3.])
+        ])
 
         # list states
         stream = cStringIO()
         states = prob.model.list_outputs(explicit=False, out_stream=stream)
         print(stream.getvalue())
-        self.assertEqual(states, ['sub.comp2.x', 'sub.comp3.x'])
+        self.assertEqual(sorted(states), [
+            ('sub.comp2.x', [3.]),
+            ('sub.comp3.x', [3.])
+        ])
 
         # list residuals
         stream = cStringIO()
         resids = prob.model.list_residuals(out_stream=stream)
         print(stream.getvalue())
         self.assertEqual(sorted(resids), [
-            'comp1.a', 'comp1.b', 'comp1.c',
-            'sub.comp2.x', 'sub.comp3.x'
+            ('comp1.a', [0.]),
+            ('comp1.b', [0.]),
+            ('comp1.c', [0.]),
+            ('sub.comp2.x', [0.]),
+            ('sub.comp3.x', [0.])
         ])
-
 
     def test_guess_nonlinear(self):
 
@@ -350,6 +379,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['comp2.x'], 3.)
+
 
 if __name__ == '__main__':
     unittest.main()

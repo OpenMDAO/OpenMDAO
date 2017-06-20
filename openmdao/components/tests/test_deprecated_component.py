@@ -278,7 +278,6 @@ class DepCompTestCase(unittest.TestCase):
                 assert_rel_error(self, val2['rel error'][2], 0.0, 1e-5)
 
     def test_simple_implicit(self):
-
         prob = Problem(Group())
         prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
         prob.model.add_subsystem('comp', SimpleImplicitComp())
@@ -289,6 +288,7 @@ class DepCompTestCase(unittest.TestCase):
 
         prob.model.connect('p1.x', 'comp.x')
 
+        # fwd mode
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
@@ -299,6 +299,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
+        # rev mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
@@ -327,25 +328,37 @@ class DepCompTestCase(unittest.TestCase):
         stream = cStringIO()
         inputs = prob.model.list_inputs(out_stream=stream)
         print(stream.getvalue())
-        self.assertEqual(sorted(inputs), ['comp.x'])
+        self.assertEqual(sorted(inputs), [('comp.x', [0.5])])
 
         # list explicit outputs
         stream = cStringIO()
-        outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
+        outputs = sorted(prob.model.list_outputs(implicit=False, out_stream=stream))
         print(stream.getvalue())
-        self.assertEqual(sorted(outputs), ['comp.y', 'p1.x'])
+        self.assertEqual(len(outputs), 2)
+        self.assertEqual(outputs[0][0], 'comp.y')
+        assert_rel_error(self, outputs[0][1], 5.8333333, 1e-6)
+        self.assertEqual(outputs[1][0], 'p1.x')
+        assert_rel_error(self, outputs[1][1], 0.5, 1e-6)
 
         # list states
         stream = cStringIO()
         states = prob.model.list_outputs(explicit=False, out_stream=stream)
         print(stream.getvalue())
-        self.assertEqual(states, ['comp.z'])
+        self.assertEqual(len(states), 1)
+        self.assertEqual(states[0][0], 'comp.z')
+        assert_rel_error(self, states[0][1], 2.6666667, 1e-6)
 
         # list residuals
         stream = cStringIO()
-        resids = prob.model.list_residuals(out_stream=stream)
+        resids = sorted(prob.model.list_residuals(out_stream=stream))
         print(stream.getvalue())
-        self.assertEqual(sorted(resids), ['comp.y', 'comp.z', 'p1.x'])
+        self.assertEqual(len(resids), 3)
+        self.assertEqual(resids[0][0], 'comp.y')
+        assert_rel_error(self, resids[0][1], 0., 1e-6)
+        self.assertEqual(resids[1][0], 'comp.z')
+        assert_rel_error(self, resids[1][1], 0., 1e-6)
+        self.assertEqual(resids[2][0], 'p1.x')
+        assert_rel_error(self, resids[2][1], 0., 1e-6)
 
     def test_simple_implicit_self_solve(self):
 
