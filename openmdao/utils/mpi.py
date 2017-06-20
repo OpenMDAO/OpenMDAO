@@ -3,13 +3,8 @@
 import os
 import sys
 import io
-from contextlib import contextmanager
-import traceback
-from inspect import getmembers, ismethod
 import unittest
 
-import numpy
-import six
 from six import PY3
 
 
