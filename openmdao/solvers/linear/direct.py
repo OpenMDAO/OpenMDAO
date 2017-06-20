@@ -172,9 +172,11 @@ class DirectSolver(LinearSolver):
                 x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
                 x_vec.set_data(x_data)
 
-        # TODO_RECORDERS - need to replace None in this with metadata from above
-        metadata = self.metadata = create_local_meta(None, type(self).__name__)
-        update_local_meta(metadata, (self._iter_count,))
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, pop_recording_iteration_stack
+        push_recording_iteration_stack('DirectSolver', 1)
+
         self._rec_mgr.record_iteration(self, metadata)  # no norms
+
+        pop_recording_iteration_stack()
 
         return False, 0., 0.

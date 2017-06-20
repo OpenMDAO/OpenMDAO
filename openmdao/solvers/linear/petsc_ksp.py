@@ -157,11 +157,14 @@ class Monitor(object):
             self._norm0 = norm
         self._norm = norm
 
-        # TODO_RECORDERS - need to replace None in this with metadata from above
-        metadata = self.metadata = create_local_meta(None, type(self).__name__)
-        update_local_meta(metadata, (self._solver._iter_count,))
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, pop_recording_iteration_stack
+
+        push_recording_iteration_stack('PetscKSP', 1)
+
         self._solver._rec_mgr.record_iteration(self._solver, metadata, abs=norm,
                                                rel=norm / self._norm0)
+
+        pop_recording_iteration_stack()
 
         self._solver._mpi_print(counter, norm, norm / self._norm0)
         self._solver._iter_count += 1

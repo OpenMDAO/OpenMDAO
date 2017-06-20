@@ -48,9 +48,14 @@ class LinearRunOnce(LinearBlockGS):
         # Single iteration of GS
         self._iter_execute()
 
-        # TODO_RECORDERS - need to replace None in this with metadata from above
-        metadata = self.metadata = create_local_meta(None, type(self).__name__)
-        update_local_meta(metadata, (self._iter_count,))
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, pop_recording_iteration_stack
+        push_recording_iteration_stack('LinearRunOnce', 1)
+
+        # TODO_RECORDERS - need to pass in parent info instead of None
+        metadata = create_local_meta(None, 'LinearRunOnce')
+        update_local_meta(metadata, (1,))
         self._rec_mgr.record_iteration(self, metadata)  # no norms
+
+        pop_recording_iteration_stack()
 
         return False, 0.0, 0.0

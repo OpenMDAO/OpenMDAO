@@ -213,9 +213,8 @@ class Solver(object):
             self._iter_count += 1
             norm = self._iter_get_norm()
 
-            # TODO_RECORDERS - need to replace None in this with metadata from above
-            #                   or better yet, re-do this entirely
-            metadata = self.metadata = create_local_meta(None, type(self).__name__)
+            # TODO_RECORDERS - need to pass in parent info instead of None
+            metadata = create_local_meta(None, type(self).__name__)
             update_local_meta(metadata, (self._iter_count,))
             self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
 
