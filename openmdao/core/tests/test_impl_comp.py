@@ -11,6 +11,8 @@ from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, Newton
 from openmdao.devtools.testutil import assert_rel_error
 
 
+# Note: The following class definitions are used in feature docs
+
 class QuadraticComp(ImplicitComponent):
     """
     A Simple Implicit Component representing a Quadratic Equation.

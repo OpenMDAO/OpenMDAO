@@ -468,7 +468,6 @@ class TestScipyOptimizer(unittest.TestCase):
 class TestScipyOptimizerFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
-
         prob = Problem()
         model = prob.model = Group()
 
@@ -534,7 +533,6 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
-
     def test_feature_tol(self):
         prob = Problem()
         model = prob.model = Group()
@@ -555,6 +553,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+
 
 if __name__ == "__main__":
     unittest.main()

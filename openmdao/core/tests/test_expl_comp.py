@@ -10,6 +10,8 @@ from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp
 from openmdao.devtools.testutil import assert_rel_error
 
 
+# Note: The following class definitions are used in feature docs
+
 class RectangleComp(ExplicitComponent):
     """
     A simple Explicit Component that computes the area of a rectangle.
