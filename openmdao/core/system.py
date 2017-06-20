@@ -1246,11 +1246,14 @@ class System(object):
 
         maps = {'input': {}, 'output': {}}
         gname = self.name + '.' if self.name else ''
-        found = False
+
+        found = {'any': False, 'input': False, 'output': False}
 
         promotes = self._var_promotes['any']
         if promotes:
             names, patterns, renames = split_list(promotes)
+        else:
+            found['any'] = True
 
         for typ in ('input', 'output'):
             pmap = maps[typ]
@@ -1261,37 +1264,43 @@ class System(object):
                 names, patterns, renames = split_list(self._var_promotes[typ])
             else:
                 names = patterns = renames = ()
+                found[typ] = True
 
             for name in prom_names[typ]:
                 if name in pmap:
                     pass
                 elif name in names:
                     pmap[name] = name
-                    found = True
+                    found[typ] = True
+                    if promotes:
+                        found['any'] = True
                 elif name in renames:
                     pmap[name] = renames[name]
-                    found = True
+                    found[typ] = True
+                    if promotes:
+                        found['any'] = True
                 else:
                     for pattern in patterns:
                         # if name matches, promote that variable to parent
                         if fnmatchcase(name, pattern):
                             pmap[name] = name
-                            found = True
+                            found[typ] = True
+                            if promotes:
+                                found['any'] = True
                             break
                     else:
                         # Default: prepend the parent system's name
                         pmap[name] = gname + name if gname else name
 
-        if not found:
-            for io, lst in self._var_promotes.items():
-                if lst:
-                    if io == 'any':
-                        suffix = ''
-                    else:
-                        suffix = '_%ss' % io
-                    raise RuntimeError("%s: no variables were promoted "
-                                       "based on promotes%s=%s" %
-                                       (self.pathname, suffix, list(lst)))
+        for io, lst in self._var_promotes.items():
+            if lst and not found[io]:
+                if io == 'any':
+                    suffix = ''
+                else:
+                    suffix = '_%ss' % io
+                raise RuntimeError("%s: no variables were promoted "
+                                   "based on promotes%s=%s" %
+                                   (self.pathname, suffix, list(lst)))
 
         return maps
 
