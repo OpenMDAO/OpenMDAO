@@ -52,6 +52,9 @@ class NonLinearRunOnce(NonlinearSolver):
                 subsys._solve_nonlinear()
                 system._check_reconf_update()
 
+        # TODO_RECORDERS - need to pass in parent info instead of None
+        metadata = create_local_meta(None, 'NonLinearRunOnce')
+        update_local_meta(metadata, (1,))
         self._rec_mgr.record_iteration(self, metadata)
 
         print_recording_iteration_stack()

@@ -155,6 +155,9 @@ class ScipyIterativeSolver(LinearSolver):
 
         push_recording_iteration_stack('ScipyIterativeSolver', 1)
 
+        # TODO_RECORDERS - need to pass in parent info instead of None
+        metadata = create_local_meta(None, 'ScipyIterativeSolver')
+        update_local_meta(metadata, (1,))
         self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / self._norm0)
 
         pop_recording_iteration_stack()
