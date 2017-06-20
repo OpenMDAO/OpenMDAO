@@ -2189,15 +2189,15 @@ class System(object):
 
     def _write_inputs(self, comp_type, inputs, out_stream=sys.stdout):
         """
-        Write formatted output values and residuals to out_stream.
+        Write formatted input values to out_stream.
 
         Parameters
         ----------
         comp_type : str, 'Explicit' or 'Implicit'
-            the type of component with the input values
+            the type of component with the input values.
 
-        values : list
-            list of (name, value) tuples
+        inputs : list
+            list of (name, value) tuples.
 
         out_stream : file_like
             Where to send human readable output. Default is sys.stdout.
@@ -2317,10 +2317,10 @@ class System(object):
         Parameters
         ----------
         comp_type : str, 'Explicit' or 'Implicit'
-            the type of component with the output values
+            the type of component with the output values.
 
-        values : list
-            list of (name, value) tuples
+        outputs : list
+            list of (name, value) tuples.
 
         out_stream : file_like
             Where to send human readable output. Default is sys.stdout.
