@@ -325,15 +325,11 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, data['comp'][('z', 'z')]['J_fwd'][0][0], 1.5, 1e-6)
 
         # list inputs
-        stream = cStringIO()
-        inputs = prob.model.list_inputs(out_stream=stream)
-        print(stream.getvalue())
+        inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [('comp.x', [0.5])])
 
         # list explicit outputs
-        stream = cStringIO()
-        outputs = sorted(prob.model.list_outputs(implicit=False, out_stream=stream))
-        print(stream.getvalue())
+        outputs = sorted(prob.model.list_outputs(implicit=False, out_stream=None))
         self.assertEqual(len(outputs), 2)
         self.assertEqual(outputs[0][0], 'comp.y')
         assert_rel_error(self, outputs[0][1], 5.8333333, 1e-6)
@@ -341,17 +337,13 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, outputs[1][1], 0.5, 1e-6)
 
         # list states
-        stream = cStringIO()
-        states = prob.model.list_outputs(explicit=False, out_stream=stream)
-        print(stream.getvalue())
+        states = prob.model.list_outputs(explicit=False, out_stream=None)
         self.assertEqual(len(states), 1)
         self.assertEqual(states[0][0], 'comp.z')
         assert_rel_error(self, states[0][1], 2.6666667, 1e-6)
 
         # list residuals
-        stream = cStringIO()
-        resids = sorted(prob.model.list_residuals(out_stream=stream))
-        print(stream.getvalue())
+        resids = sorted(prob.model.list_residuals(out_stream=None))
         self.assertEqual(len(resids), 3)
         self.assertEqual(resids[0][0], 'comp.y')
         assert_rel_error(self, resids[0][1], 0., 1e-6)
@@ -497,6 +489,7 @@ class DepCompTestCase(unittest.TestCase):
                 assert_rel_error(self, val2['rel error'][0], 0.0, 1e-5)
                 assert_rel_error(self, val2['rel error'][1], 0.0, 1e-5)
                 assert_rel_error(self, val2['rel error'][2], 0.0, 1e-5)
+
 
 if __name__ == "__main__":
     unittest.main()

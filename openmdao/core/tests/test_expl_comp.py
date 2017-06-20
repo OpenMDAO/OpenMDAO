@@ -1,6 +1,7 @@
 """Simple example demonstrating how to implement an explicit component."""
 from __future__ import division
 
+from six import assertRaisesRegex
 from six.moves import cStringIO
 
 import unittest
@@ -70,7 +71,7 @@ class ExplCompTestCase(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-    def test_compute(self):
+    def test_compute_and_list(self):
         prob = Problem(RectangleGroup())
         prob.setup(check=False)
 
@@ -91,9 +92,7 @@ class ExplCompTestCase(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp3.area', 'comp1.width'], [[3.]])
 
         # list inputs
-        stream = cStringIO()
-        inputs = prob.model.list_inputs(out_stream=stream)
-        print(stream.getvalue())
+        inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
             ('comp2.length', [3.]),
             ('comp2.width',  [2.]),
@@ -102,9 +101,7 @@ class ExplCompTestCase(unittest.TestCase):
         ])
 
         # list explicit outputs
-        stream = cStringIO()
-        outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
-        print(stream.getvalue())
+        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('comp1.length', [3.]),
             ('comp1.width',  [2.]),
@@ -113,21 +110,29 @@ class ExplCompTestCase(unittest.TestCase):
         ])
 
         # list states
-        stream = cStringIO()
-        states = prob.model.list_outputs(explicit=False, out_stream=stream)
-        print(stream.getvalue())
+        states = prob.model.list_outputs(explicit=False, out_stream=None)
         self.assertEqual(states, [])
 
         # list residuals
-        stream = cStringIO()
-        resids = prob.model.list_residuals(out_stream=stream)
-        print(stream.getvalue())
+        resids = prob.model.list_residuals(out_stream=None)
         self.assertEqual(sorted(resids), [
             ('comp1.length', [0.]),
             ('comp1.width',  [0.]),
             ('comp2.area',   [0.]),
             ('comp3.area',   [0.]),
         ])
+
+        # list excluding both explicit and implicit components raises error
+        msg = "You have excluded both Explicit and Implicit components."
+
+        with assertRaisesRegex(self, RuntimeError, msg):
+            prob.model.list_inputs(explicit=False, implicit=False)
+
+        with assertRaisesRegex(self, RuntimeError, msg):
+            prob.model.list_outputs(explicit=False, implicit=False)
+
+        with assertRaisesRegex(self, RuntimeError, msg):
+            prob.model.list_residuals(explicit=False, implicit=False)
 
 
 if __name__ == '__main__':

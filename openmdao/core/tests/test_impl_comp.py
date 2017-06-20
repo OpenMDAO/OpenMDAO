@@ -107,7 +107,7 @@ class QuadraticJacVec(QuadraticComp):
 
 class ImplicitCompTestCase(unittest.TestCase):
 
-    def test_compute(self):
+    def test_compute_and_list(self):
         group = Group()
 
         comp1 = group.add_subsystem('comp1', IndepVarComp())
@@ -151,7 +151,6 @@ class ImplicitCompTestCase(unittest.TestCase):
         # list inputs
         stream = cStringIO()
         inputs = prob.model.list_inputs(out_stream=stream)
-        print(stream.getvalue())
         self.assertEqual(sorted(inputs), [
             ('comp2.a', [1.]),
             ('comp2.b', [-4.]),
@@ -160,30 +159,40 @@ class ImplicitCompTestCase(unittest.TestCase):
             ('comp3.b', [-4.]),
             ('comp3.c', [3.])
         ])
+        text = stream.getvalue()
+        self.assertEqual(text.count('comp2.'), 3)
+        self.assertEqual(text.count('comp3.'), 3)
+        self.assertEqual(text.count('value:'), 6)
 
         # list explicit outputs
         stream = cStringIO()
         outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
-        print(stream.getvalue())
         self.assertEqual(sorted(outputs), [
             ('comp1.a', [1.]),
             ('comp1.b', [-4.]),
             ('comp1.c', [3.])
         ])
+        text = stream.getvalue()
+        self.assertEqual(text.count('comp1.'), 3)
+        self.assertEqual(text.count('value:'), 3)
+        self.assertEqual(text.count('residual:'), 3)
 
         # list states
         stream = cStringIO()
         states = prob.model.list_outputs(explicit=False, out_stream=stream)
-        print(stream.getvalue())
         self.assertEqual(sorted(states), [
             ('comp2.x', [3.]),
             ('comp3.x', [3.])
         ])
+        text = stream.getvalue()
+        self.assertEqual(text.count('comp2.x'), 1)
+        self.assertEqual(text.count('comp3.x'), 1)
+        self.assertEqual(text.count('value:'), 2)
+        self.assertEqual(text.count('residual:'), 2)
 
         # list residuals
         stream = cStringIO()
         resids = prob.model.list_residuals(out_stream=stream)
-        print(stream.getvalue())
         self.assertEqual(sorted(resids), [
             ('comp1.a', [0.]),
             ('comp1.b', [0.]),
@@ -191,6 +200,12 @@ class ImplicitCompTestCase(unittest.TestCase):
             ('comp2.x', [0.]),
             ('comp3.x', [0.])
         ])
+        text = stream.getvalue()
+        self.assertEqual(text.count('comp1.'), 3)
+        self.assertEqual(text.count('comp2.x'), 1)
+        self.assertEqual(text.count('comp3.x'), 1)
+        self.assertEqual(text.count('value:'), 5)
+        self.assertEqual(text.count('residual:'), 5)
 
     def test_list_with_subgroup(self):
         group = Group()
@@ -223,9 +238,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['sub.comp2.x'], 3.)
 
         # list inputs
-        stream = cStringIO()
-        inputs = prob.model.list_inputs(out_stream=stream)
-        print(stream.getvalue())
+        inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
             ('sub.comp2.a', [1.]),
             ('sub.comp2.b', [-4.]),
@@ -236,9 +249,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         ])
 
         # list explicit outputs
-        stream = cStringIO()
-        outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
-        print(stream.getvalue())
+        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('comp1.a', [1.]),
             ('comp1.b', [-4.]),
@@ -246,18 +257,14 @@ class ImplicitCompTestCase(unittest.TestCase):
         ])
 
         # list states
-        stream = cStringIO()
-        states = prob.model.list_outputs(explicit=False, out_stream=stream)
-        print(stream.getvalue())
+        states = prob.model.list_outputs(explicit=False, out_stream=None)
         self.assertEqual(sorted(states), [
             ('sub.comp2.x', [3.]),
             ('sub.comp3.x', [3.])
         ])
 
         # list residuals
-        stream = cStringIO()
-        resids = prob.model.list_residuals(out_stream=stream)
-        print(stream.getvalue())
+        resids = prob.model.list_residuals(out_stream=None)
         self.assertEqual(sorted(resids), [
             ('comp1.a', [0.]),
             ('comp1.b', [0.]),
