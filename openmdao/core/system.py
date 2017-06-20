@@ -2389,9 +2389,6 @@ class System(object):
         """
         self.iter_count += 1
 
-        # TODO_RECORDERS - need to pass in parent info instead of None
-        metadata = create_local_meta(None, self.pathname)
-        update_local_meta(metadata, (self.iter_count,))
         # send the calling method name into record_iteration, e.g. 'solve_nonlinear'
         self._rec_mgr.record_iteration(self, metadata, method=inspect.stack()[1][3])
 

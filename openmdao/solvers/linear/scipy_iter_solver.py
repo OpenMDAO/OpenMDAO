@@ -151,10 +151,13 @@ class ScipyIterativeSolver(LinearSolver):
             else:
                 self._norm0 = 1.0
 
-        # TODO_RECORDERS - need to replace None in this with metadata from above
-        metadata = self.metadata = create_local_meta(None, type(self).__name__)
-        update_local_meta(metadata, (self._iter_count,))
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, pop_recording_iteration_stack
+
+        push_recording_iteration_stack('ScipyIterativeSolver', 1)
+
         self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / self._norm0)
+
+        pop_recording_iteration_stack()
 
         self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1
