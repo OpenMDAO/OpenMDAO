@@ -1,4 +1,4 @@
-""" Unit tests for the Pyoptsparse Driver."""
+""" Unit tests for the ScipyOptimizer Driver."""
 
 import unittest
 
@@ -11,7 +11,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
 
-class TesScipyOptimizer(unittest.TestCase):
+class TestScipyOptimizer(unittest.TestCase):
 
     def test_compute_total_derivs_basic_return_array(self):
         # Make sure 'array' return_format works.
@@ -465,10 +465,9 @@ class TesScipyOptimizer(unittest.TestCase):
         assert_rel_error(self, prob['x'], 0.0, 1e-3)
 
 
-class TesScipyOptimizerFeatures(unittest.TestCase):
+class TestScipyOptimizerFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
-
         prob = Problem()
         model = prob.model = Group()
 
@@ -534,7 +533,6 @@ class TesScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
-
     def test_feature_tol(self):
         prob = Problem()
         model = prob.model = Group()
@@ -555,6 +553,7 @@ class TesScipyOptimizerFeatures(unittest.TestCase):
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+
 
 if __name__ == "__main__":
     unittest.main()

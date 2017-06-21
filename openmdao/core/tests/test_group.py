@@ -13,6 +13,7 @@ from parameterized import parameterized
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, NonLinearRunOnce
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 try:
     from openmdao.parallel_api import PETScVector
 except ImportError:
@@ -301,6 +302,25 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['a'], 2)
         self.assertEqual(p['x'], 5)
         self.assertEqual(p['comp2.y'], 10)
+
+    def test_group_promotes2(self):
+
+        class Sellar(Group):
+            def setup(self):
+                dv = self.add_subsystem('des_vars', IndepVarComp(), promotes=['*'])
+                dv.add_output('x', 1.0)
+                dv.add_output('z', np.array([5.0, 2.0]))
+
+                self.add_subsystem('d1', SellarDis2(), promotes_inputs=['y1'], promotes_outputs=['foo'])
+                self.add_subsystem('d2', SellarDis2())
+
+        p = Problem()
+        p.model = Sellar()
+
+        with self.assertRaises(Exception) as err:
+            p.setup(check=False)
+        self.assertEqual(str(err.exception),
+                         "d1: no variables were promoted based on promotes_outputs=['foo']")
 
     def test_group_nested_conn(self):
         """Example of adding subsystems and issuing connections with nested groups."""

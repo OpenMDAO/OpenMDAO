@@ -265,14 +265,14 @@ embed-code
         .. code-block:: python
 
             .. embed-code::
-              openmdao.core.tests.test_expl_comp.TestExplCompSimpleCompute
+              openmdao.core.tests.test_expl_comp.RectangleComp
 
 
         What the above will do is replace the directive and its arg with the class
-        definition for `openmdao.tests.general_problem.GeneralComp` and will look like this:
+        definition for `openmdao.core.tests.test_expl_comp.RectangleComp` and will look like this:
 
         .. embed-code::
-          openmdao.core.tests.test_expl_comp.TestExplCompSimpleCompute
+          openmdao.core.tests.test_expl_comp.RectangleComp
 
         This has the benefit of allowing you to drop entire code blocks into
         a feature doc that illustrate a usage example.
@@ -288,13 +288,13 @@ embed-test
         .. code-block:: python
 
           .. embed-test::
-            openmdao.core.tests.test_expl_comp.TestExplCompSimple.test_simple
+            openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_simple
 
         The output from the above syntax should just look like a normal code block,
         with the test code and the results of the test run (output) reported separately:
 
         .. embed-test::
-          openmdao.core.tests.test_expl_comp.TestExplCompSimple.test_simple
+          openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_simple
 
 
 Tagging

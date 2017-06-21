@@ -121,11 +121,21 @@ Specialized components
    features/special_components/distributed_comps
    features/special_components/metamodel
 
+
+Development Tools
+=================
+
+.. toctree::
+   :maxdepth: 1
+
+   features/devtools/inst_profile
+
+
 Drivers (optimizers and DOE)
-================================
+=============================
 
 Saving your data
-================================
+================
 
 .. toctree::
    :maxdepth: 1
@@ -133,7 +143,7 @@ Saving your data
    features/recording/basic_recording
 
 Visualization
-================================
+=============
 
 ============================
 `Source Documentation`_
