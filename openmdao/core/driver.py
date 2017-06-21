@@ -296,7 +296,7 @@ class Driver(object):
 
                     # Scale response side
                     if oscaler is not None:
-                        val *= oscaler
+                        val[:] = (oscaler * val.T).T
 
                     # Scale design var side
                     if iscaler is not None:
@@ -339,7 +339,7 @@ class Driver(object):
 
                     # Scale response side
                     if oscaler is not None:
-                        val *= oscaler
+                        val[:] = (oscaler * val.T).T
 
                     # Scale design var side
                     if iscaler is not None:
