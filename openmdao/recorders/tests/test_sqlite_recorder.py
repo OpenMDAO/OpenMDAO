@@ -772,23 +772,17 @@ class TestSqliteRecorder(unittest.TestCase):
 
         t0, t1 = run_driver(self.prob)
 
-        #coordinate = [0, 'ArmijoGoldsteinLS', (5,)]
-
         self.prob.cleanup()
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,)]
 
-        expected_abs_error = 2.2716761805680682e-10
-
-        expected_rel_error = 0.5000078197240808
-
+        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (5,)]
+        expected_abs_error = 1.3660184094987926e-11
+        expected_rel_error = 0.03006678031310114
         expected_solver_output = None
-
         expected_solver_residuals = None
 
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
                                                  expected_rel_error, expected_solver_output,
                                                  expected_solver_residuals),), self.eps)
-
 
     def test_record_line_search_bounds_enforce(self):
         self.setup_sellar_model()
@@ -809,8 +803,15 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        # TODO_RECORDERS - should check that we get more than just 1 record as this test does
-        self.assertSolverIterationDataRecordedBasic()
+        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (1,), 'BoundsEnforceLS', (0,)]
+        expected_abs_error = 7.02783609310096e-10
+        expected_rel_error = 8.078674883382422e-07
+        expected_solver_output = None
+        expected_solver_residuals = None
+
+        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
+                                                 expected_rel_error, expected_solver_output,
+                                                 expected_solver_residuals),), self.eps)
 
     def test_record_solver_nonlinear_block_gs(self):
         self.setup_sellar_model()
@@ -828,29 +829,27 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NonlinearBlockGS', (6, )]
-
         expected_abs_error = 1.31880284470753394998e-10
-
         expected_rel_error = 3.6299074030587596e-12
 
+        expected_solver_output = {
+            'px.x': [1.],
+            'pz.z': [5., 2.],
+            'd1.y1': [25.58830237],
+            'd2.y2': [12.05848815],
+            'obj_cmp.obj': [28.58830817],
+            'con_cmp1.con1': [-22.42830237],
+            'con_cmp2.con2': [-11.94151185]
+        }
+
         expected_solver_residuals = {
-            'px.x': [0.],
-            'pz.z': [0.,  0.],
+            'px.x': [-0.],
+            'pz.z': [-0., -0.],
             'd1.y1': [1.31880284e-10],
             'd2.y2': [0.],
             'obj_cmp.obj': [0.],
             'con_cmp1.con1': [0.],
             'con_cmp2.con2': [0.]
-        }
-
-        expected_solver_output = {
-            'px.x': [1.],
-            'pz.z': [5.,  2.],
-            'd1.y1': [ 25.58830237],
-            'd2.y2': [ 12.05848815],
-            'obj_cmp.obj': [ 28.58830817],
-            'con_cmp1.con1': [-22.42830237],
-            'con_cmp2.con2': [-11.94151185]
         }
 
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
@@ -917,7 +916,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         # No norms so no expected norms
         coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NLRunOnce', (1,)]
-
         expected_abs_error = None
         expected_rel_error = None
         expected_solver_residuals = None
@@ -945,29 +943,29 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(self.prob)
 
         # No norms so no expected norms
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,)]
+        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'DirectSolver', (0,)]
 
         expected_abs_error = None
         expected_rel_error = None
 
         expected_solver_output = {
-            "con_cmp1.con1": [-0.00045069],
-            "d1.y1": [ 0.00045069],
-            "con_cmp2.con2": [-0.00225346],
-            "pz.z": [ -2.71050543e-21, 0.00000000e+00],
-            "obj_cmp.obj": [ 0.00045646],
-            "d2.y2": [-0.00225346],
-            "px.x": [0.]
+            'px.x': [0.],
+            'pz.z': [-2.71050543e-21, 0.00000000e+00],
+            'd1.y1': [0.00045069],
+            'd2.y2': [-0.00225346],
+            'obj_cmp.obj': [0.00045646],
+            'con_cmp1.con1': [-0.00045069],
+            'con_cmp2.con2': [-0.00225346]
         }
 
         expected_solver_residuals = {
-            "con_cmp1.con1": [-0.],
-            "d1.y1": [7.10542736e-15],
-            "con_cmp2.con2": [-0.],
-            "pz.z": [-0.0, -0.0],
-            "obj_cmp.obj": [5.75455956e-06],
-            "d2.y2": [-0.00229801],
-            "px.x": [-0.0]
+            'px.x': [0.],
+            'pz.z': [-0., -0.],
+            'd1.y1': [7.10542736e-15],
+            'd2.y2': [-0.00229801],
+            'obj_cmp.obj': [5.75455956e-06],
+            'con_cmp1.con1': [-0.],
+            'con_cmp2.con2': [-0.]
         }
 
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
@@ -990,8 +988,33 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        # TODO_RECORDERS - need to be more thorough
-        self.assertSolverIterationDataRecordedBasic()
+        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'ScipyIterativeSolver', (2,)]
+        expected_abs_error = 8.49738327756984e-13
+        expected_rel_error = 3.180364454577043e-16
+
+        expected_solver_output = {
+            'px.x': [0.],
+            'pz.z': [0., 0.],
+            'd1.y1': [5.41157587e-07],
+            'd2.y2': [-0.41168147],
+            'obj_cmp.obj': [-0.48667678],
+            'con_cmp1.con1': [0.770496],
+            'con_cmp2.con2': [-2.70578793e-06]
+        }
+
+        expected_solver_residuals = {
+            'px.x': [0.],
+            'pz.z': [0., 0.],
+            'd1.y1': [-0.08233575],
+            'd2.y2': [-0.41168152],
+            'obj_cmp.obj': [-0.4866797],
+            'con_cmp1.con1': [0.77049654],
+            'con_cmp2.con2': [0.41167877]
+        }
+
+        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
+                                                 expected_rel_error, expected_solver_output,
+                                                 expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_petsc_ksp(self):
         self.setup_sellar_model()
@@ -1009,8 +1032,33 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        # TODO_RECORDERS - need to be more thorough
+        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'PetscKSP', (3,)]
+        expected_abs_error = 8.367449152693399e-19
+        expected_rel_error = 3.6411633054292593e-16
+
+        expected_solver_output = {
+            'px.x': [0.],
+            'pz.z': [0., 0.],
+            'd1.y1': [-7.86357118e-07],
+            'd2.y2': [0.00177091],
+            'obj_cmp.obj': [0.70719095],
+            'con_cmp1.con1': [-0.70702038],
+            'con_cmp2.con2': [3.93178559e-06]
+        }
+
+        expected_solver_residuals = {
+            'px.x': [0.],
+            'pz.z': [0., 0.],
+            'd1.y1': [0.0003534],
+            'd2.y2': [0.00177099],
+            'obj_cmp.obj': [0.70719175],
+            'con_cmp1.con1': [-0.70702117],
+            'con_cmp2.con2': [-0.00176698]
+        }
         self.assertSolverIterationDataRecordedBasic()
+        # self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
+        #                                          expected_rel_error, expected_solver_output,
+        #                                          expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_block_gs(self):
 
@@ -1030,8 +1078,33 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        # TODO_RECORDERS - need to be more thorough
-        self.assertSolverIterationDataRecordedBasic()
+        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'LinearBlockGS', (6,)]
+        expected_abs_error = 9.109083208861876e-11
+        expected_rel_error = 9.114367543620551e-12
+
+        expected_solver_output = {
+            'px.x': [-0.],
+            'pz.z': [-0., -0.],
+            'd1.y1': [0.00045069],
+            'd2.y2': [-0.00225346],
+            'obj_cmp.obj': [0.00045646],
+            'con_cmp1.con1': [-0.00045069],
+            'con_cmp2.con2': [-0.00225346]
+        }
+
+        expected_solver_residuals = {
+            'px.x': [0.],
+            'pz.z': [0., 0.],
+            'd1.y1': [9.10908321e-11],
+            'd2.y2': [0.],
+            'obj_cmp.obj': [-2.03287907e-20],
+            'con_cmp1.con1': [0.],
+            'con_cmp2.con2': [0.]
+        }
+
+        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
+                                                 expected_rel_error, expected_solver_output,
+                                                 expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_linear_run_once(self):
 
@@ -1051,13 +1124,35 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        # No norms so no expected norms
+        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (9,), 'LinearRunOnce', (1,)]
+        expected_abs_error = None
+        expected_rel_error = None
 
-        # TODO_RECORDERS - need to be more thorough
-        self.assertSolverIterationDataRecordedBasic()
+        expected_solver_output = {
+            'px.x': [-0.],
+            'pz.z': [-0., -0.],
+            'd1.y1': [-4.15366975e-05],
+            'd2.y2': [-4.10568454e-06],
+            'obj_cmp.obj': [-4.15366737e-05],
+            'con_cmp1.con1': [4.15366975e-05],
+            'con_cmp2.con2': [-4.10568454e-06]
+        }
+
+        expected_solver_residuals = {
+            'px.x': [-0.],
+            'pz.z': [0., 0.],
+            'd1.y1': [-4.15366975e-05],
+            'd2.y2': [4.10564051e-06],
+            'obj_cmp.obj': [-4.15366737e-05],
+            'con_cmp1.con1': [-4.15366975e-05],
+            'con_cmp2.con2': [-4.10568454e-06]
+        }
+
+        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
+                                                 expected_rel_error, expected_solver_output,
+                                                 expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_block_jac(self):
-
         # raise unittest.SkipTest("Linear Solver recording not working yet")
         self.setup_sellar_model()
 
@@ -1074,8 +1169,33 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        # TODO_RECORDERS - need to be more thorough
-        self.assertSolverIterationDataRecordedBasic()
+        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'LinearBlockJac', (9,)]
+        expected_abs_error = 9.947388408259769e-11
+        expected_rel_error = 4.330301334141486e-08
+
+        expected_solver_output = {
+            'px.x': [-0.],
+            'pz.z': [-0., -0.],
+            'd1.y1': [4.55485639e-09],
+            'd2.y2': [-2.27783334e-08],
+            'obj_cmp.obj': [-2.28447051e-07],
+            'con_cmp1.con1': [2.28461863e-07],
+            'con_cmp2.con2': [-2.27742837e-08]
+        }
+
+        expected_solver_residuals = {
+            'px.x': [-0.],
+            'pz.z': [0., 0.],
+            'd1.y1': [-2.84055951e-16],
+            'd2.y2': [6.93561782e-12],
+            'obj_cmp.obj': [7.01674811e-11],
+            'con_cmp1.con1': [-7.01674811e-11],
+            'con_cmp2.con2': [1.42027975e-15]
+        }
+
+        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
+                                                 expected_rel_error, expected_solver_output,
+                                                 expected_solver_residuals),), self.eps)
 
     def test_record_driver_system_solver(self):
 

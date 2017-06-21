@@ -48,7 +48,8 @@ class LinearRunOnce(LinearBlockGS):
         # Single iteration of GS
         self._iter_execute()
 
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, pop_recording_iteration_stack
+        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+            pop_recording_iteration_stack
         push_recording_iteration_stack('LinearRunOnce', 1)
 
         # TODO_RECORDERS - need to pass in parent info instead of None

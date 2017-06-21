@@ -95,8 +95,11 @@ class BoundsEnforceLS(NonlinearSolver):
 
         from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
             pop_recording_iteration_stack
-        push_recording_iteration_stack('BoundsEnforceLS', 1)
+        push_recording_iteration_stack('BoundsEnforceLS', self._iter_count)
 
+        # TODO_RECORDERS - need to pass in parent info instead of None
+        metadata = create_local_meta(None, 'BoundsEnforceLS')
+        update_local_meta(metadata, (1,))
         self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
 
         pop_recording_iteration_stack()
@@ -248,9 +251,13 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             norm = self._iter_get_norm()
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
-            from openmdao.recorders.base_recorder import push_recording_iteration_stack, pop_recording_iteration_stack
-            push_recording_iteration_stack('ArmijoGoldsteinLS', 1)
+            from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
+                pop_recording_iteration_stack
+            push_recording_iteration_stack('ArmijoGoldsteinLS', self._iter_count)
 
+            # TODO_RECORDERS - need to pass in parent info instead of None
+            metadata = create_local_meta(None, 'ArmijoGoldsteinLS')
+            update_local_meta(metadata, (1,))
             self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
 
             pop_recording_iteration_stack()
