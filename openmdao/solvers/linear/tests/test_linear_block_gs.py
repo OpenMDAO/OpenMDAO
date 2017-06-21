@@ -130,7 +130,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         comp = model.add_subsystem('comp', SimpleImp())
         model.connect('p.a', 'comp.a')
 
-        comp.ln_solver = self.ln_solver_class()
+        comp.ln_solver = self.linear_solver_class()
 
         prob.model.jacobian = AssembledJacobian()
         prob.setup(check=False, mode='fwd')
