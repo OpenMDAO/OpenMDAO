@@ -5,6 +5,7 @@ from fnmatch import fnmatchcase
 import sys
 import inspect
 from six import StringIO
+from contextlib import contextmanager
 
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.general_utils import warn_deprecation
@@ -99,6 +100,17 @@ def get_formatted_iteration_coordinate():
     formatted_iteration_coordinate = ':'.join(["rank%d" % rank,
                                                separator.join(iteration_coord_list)])
     return formatted_iteration_coordinate
+
+@contextmanager
+def recording(do_record, name, iter_count):
+    if(do_record):
+        recording_iteration_stack.append((name, iter_count))
+    try:
+        yield
+    finally:
+        recording_iteration_stack.pop()
+
+    recording_iteration_stack.pop()
 
 
 class BaseRecorder(object):
