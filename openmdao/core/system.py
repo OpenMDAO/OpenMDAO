@@ -1718,6 +1718,10 @@ class System(object):
         if not isinstance(name, string_types):
             raise TypeError('The name argument should be a string, got {0}'.format(name))
 
+        # Convert ref/ref0 to ndarray/float as necessary
+        ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
+        ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
+
         # determine adder and scaler based on args
         adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
@@ -1740,11 +1744,23 @@ class System(object):
 
         design_vars[name] = dvs = OrderedDict()
 
+        if isinstance(scaler, np.ndarray):
+            if np.all(scaler == 1.0):
+                scaler = None
+        elif scaler == 1.0:
+            scaler = None
+        dvs['scaler'] = scaler
+
+        if isinstance(adder, np.ndarray):
+            if np.all(adder == 0.0):
+                adder = None
+        elif adder == 0.0:
+            adder = None
+        dvs['adder'] = adder
+
         dvs['name'] = name
         dvs['upper'] = upper
         dvs['lower'] = lower
-        dvs['scaler'] = None if scaler == 1.0 else scaler
-        dvs['adder'] = None if adder == 0.0 else adder
         dvs['ref'] = ref
         dvs['ref0'] = ref0
         if indices is not None:
@@ -1813,6 +1829,10 @@ class System(object):
             msg = '{0} \'{1}\' already exists.'.format(typemap[type], name)
             raise RuntimeError(msg.format(name))
 
+        # Convert ref/ref0 to ndarray/float as necessary
+        ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
+        ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
+
         # determine adder and scaler based on args
         adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
@@ -1835,13 +1855,6 @@ class System(object):
         if err:
             msg = "If specified, indices must be a sequence of integers."
             raise ValueError(msg)
-
-        # Currently ref and ref0 must be scalar
-        if ref is not None:
-            ref = float(ref)
-
-        if ref0 is not None:
-            ref0 = float(ref0)
 
         # Convert lower to ndarray/float as necessary
         lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max,
@@ -1872,9 +1885,21 @@ class System(object):
 
         responses[name] = resp = OrderedDict()
 
+        if isinstance(scaler, np.ndarray):
+            if np.all(scaler == 1.0):
+                scaler = None
+        elif scaler == 1.0:
+            scaler = None
+        resp['scaler'] = scaler
+
+        if isinstance(adder, np.ndarray):
+            if np.all(adder == 0.0):
+                adder = None
+        elif adder == 0.0:
+            adder = None
+        resp['adder'] = adder
+
         resp['name'] = name
-        resp['scaler'] = None if scaler == 1.0 else scaler
-        resp['adder'] = None if adder == 0.0 else adder
         resp['ref'] = ref
         resp['ref0'] = ref0
         resp['type'] = type_

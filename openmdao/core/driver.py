@@ -292,21 +292,15 @@ class Driver(object):
                     ometa = self._responses[okey]
 
                     iscaler = imeta['scaler']
-                    iadder = imeta['adder']
                     oscaler = ometa['scaler']
-                    oadder = ometa['adder']
 
                     # Scale response side
-                    if oadder is not None:
-                        val += oadder
                     if oscaler is not None:
                         val *= oscaler
 
                     # Scale design var side
                     if iscaler is not None:
                         val *= 1.0 / iscaler
-                    if iadder is not None:
-                        val -= iadder
 
         elif return_format == 'array':
 
@@ -341,21 +335,15 @@ class Driver(object):
                     ometa = self._responses[okey]
 
                     iscaler = imeta['scaler']
-                    iadder = imeta['adder']
                     oscaler = ometa['scaler']
-                    oadder = ometa['adder']
 
                     # Scale response side
-                    if oadder is not None:
-                        val += oadder
                     if oscaler is not None:
                         val *= oscaler
 
                     # Scale design var side
                     if iscaler is not None:
                         val *= 1.0 / iscaler
-                    if iadder is not None:
-                        val -= iadder
 
                     new_derivs[Jslices[okey], Jslices[ikey]] = val
 
