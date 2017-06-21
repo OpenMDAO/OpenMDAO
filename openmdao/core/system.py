@@ -17,7 +17,7 @@ from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobi
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 
 from openmdao.utils.general_utils import \
-    determine_adder_scaler, format_as_float_or_array
+    determine_adder_scaler, format_as_float_or_array, warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
@@ -1246,11 +1246,14 @@ class System(object):
 
         maps = {'input': {}, 'output': {}}
         gname = self.name + '.' if self.name else ''
-        found = False
+
+        found = {'any': False, 'input': False, 'output': False}
 
         promotes = self._var_promotes['any']
         if promotes:
             names, patterns, renames = split_list(promotes)
+        else:
+            found['any'] = True
 
         for typ in ('input', 'output'):
             pmap = maps[typ]
@@ -1261,37 +1264,43 @@ class System(object):
                 names, patterns, renames = split_list(self._var_promotes[typ])
             else:
                 names = patterns = renames = ()
+                found[typ] = True
 
             for name in prom_names[typ]:
                 if name in pmap:
                     pass
                 elif name in names:
                     pmap[name] = name
-                    found = True
+                    found[typ] = True
+                    if promotes:
+                        found['any'] = True
                 elif name in renames:
                     pmap[name] = renames[name]
-                    found = True
+                    found[typ] = True
+                    if promotes:
+                        found['any'] = True
                 else:
                     for pattern in patterns:
                         # if name matches, promote that variable to parent
                         if fnmatchcase(name, pattern):
                             pmap[name] = name
-                            found = True
+                            found[typ] = True
+                            if promotes:
+                                found['any'] = True
                             break
                     else:
                         # Default: prepend the parent system's name
                         pmap[name] = gname + name if gname else name
 
-        if not found:
-            for io, lst in self._var_promotes.items():
-                if lst:
-                    if io == 'any':
-                        suffix = ''
-                    else:
-                        suffix = '_%ss' % io
-                    raise RuntimeError("%s: no variables were promoted "
-                                       "based on promotes%s=%s" %
-                                       (self.pathname, suffix, list(lst)))
+        for io, lst in self._var_promotes.items():
+            if lst and not found[io]:
+                if io == 'any':
+                    suffix = ''
+                else:
+                    suffix = '_%ss' % io
+                raise RuntimeError("%s: no variables were promoted "
+                                   "based on promotes%s=%s" %
+                                   (self.pathname, suffix, list(lst)))
 
         return maps
 
@@ -1524,7 +1533,7 @@ class System(object):
     @nonlinear_solver.setter
     def nonlinear_solver(self, solver):
         """
-        Set this system's nonlinear solver and perform setup.
+        Set this system's nonlinear solver.
         """
         self._nonlinear_solver = solver
 
@@ -1538,8 +1547,44 @@ class System(object):
     @linear_solver.setter
     def linear_solver(self, solver):
         """
-        Set this system's linear solver and perform setup.
+        Set this system's linear solver.
         """
+        self._linear_solver = solver
+
+    @property
+    def nl_solver(self):
+        """
+        Get the nonlinear solver for this system.
+        """
+        warn_deprecation("The 'nl_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
+        return self._nonlinear_solver
+
+    @nl_solver.setter
+    def nl_solver(self, solver):
+        """
+        Set this system's nonlinear solver.
+        """
+        warn_deprecation("The 'nl_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
+        self._nonlinear_solver = solver
+
+    @property
+    def ln_solver(self):
+        """
+        Get the linear solver for this system.
+        """
+        warn_deprecation("The 'ln_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
+        return self._linear_solver
+
+    @ln_solver.setter
+    def ln_solver(self, solver):
+        """
+        Set this system's linear solver.
+        """
+        warn_deprecation("The 'ln_solver' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
         self._linear_solver = solver
 
     def _set_solver_print(self, level=2, depth=1e99, type_='all'):
@@ -2105,35 +2150,208 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
-    def list_states(self, stream=sys.stdout):
+    def list_inputs(self, explicit=True, implicit=True, out_stream=sys.stdout):
         """
-        List all states and their values and residuals.
+        List inputs.
 
         Parameters
         ----------
-        stream : output stream, optional
-            Stream to write the state info to. Default is sys.stdout.
+        explicit : bool, optional
+            include inputs from explicit components. Default is True.
+
+        implicit : bool, optional
+            include inputs from implicit components. Default is True.
+
+        out_stream : file_like
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        list
+            list of (name, value) of inputs
         """
-        outputs = self._outputs
-        resids = self._residuals
         states = self._list_states()
 
-        pathname = self.pathname
-        if pathname == '':
-            pathname = 'model'
+        expl_inputs = []
+        impl_inputs = []
+        for name, val in iteritems(self._inputs._views):
+            if name in states:
+                impl_inputs.append((name, val))
+            else:
+                expl_inputs.append((name, val))
 
-        if states:
-            stream.write("\nStates in %s:\n\n" % pathname)
-            for uname in states:
-                stream.write("%s\n" % uname)
-                stream.write("Value: ")
-                stream.write(str(outputs._views[uname]))
-                stream.write('\n')
-                stream.write("Residual: ")
-                stream.write(str(resids._views[uname]))
-                stream.write('\n\n')
+        if out_stream:
+            if explicit:
+                self._write_inputs('Explicit', expl_inputs, out_stream)
+            if implicit:
+                self._write_inputs('Implicit', impl_inputs, out_stream)
+
+        if explicit and implicit:
+            return expl_inputs + impl_inputs
+        elif explicit:
+            return expl_inputs
+        elif implicit:
+            return impl_inputs
         else:
-            stream.write("\nNo states in %s.\n" % pathname)
+            raise RuntimeError('You have excluded both Explicit and Implicit components.')
+
+    def _write_inputs(self, comp_type, inputs, out_stream=sys.stdout):
+        """
+        Write formatted input values to out_stream.
+
+        Parameters
+        ----------
+        comp_type : str, 'Explicit' or 'Implicit'
+            the type of component with the input values.
+
+        inputs : list
+            list of (name, value) tuples.
+
+        out_stream : file_like
+            Where to send human readable output. Default is sys.stdout.
+        """
+        if out_stream is None:
+            return
+
+        count = len(inputs)
+
+        pathname = self.pathname if self.pathname else 'model'
+
+        header = "%d Input(s) to %s Components in '%s'\n" % (count, comp_type, pathname)
+        out_stream.write(header)
+
+        if count:
+            out_stream.write("-" * len(header) + "\n")
+            for name, val in inputs:
+                out_stream.write("%s\n" % name)
+                out_stream.write("  value:    " + str(val))
+                out_stream.write('\n\n')
+
+    def list_outputs(self, explicit=True, implicit=True, out_stream=sys.stdout):
+        """
+        List outputs.
+
+        Parameters
+        ----------
+        explicit : bool, optional
+            include outputs from explicit components. Default is True.
+
+        implicit : bool, optional
+            include outputs from implicit components. Default is True.
+
+        out_stream : file_like
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        list
+            list of (name, value) of outputs
+        """
+        states = self._list_states()
+
+        expl_outputs = []
+        impl_outputs = []
+        for name, val in iteritems(self._outputs._views):
+            if name in states:
+                impl_outputs.append((name, val))
+            else:
+                expl_outputs.append((name, val))
+
+        if out_stream:
+            if explicit:
+                self._write_outputs('Explicit', expl_outputs, out_stream)
+            if implicit:
+                self._write_outputs('Implicit', impl_outputs, out_stream)
+
+        if explicit and implicit:
+            return expl_outputs + impl_outputs
+        elif explicit:
+            return expl_outputs
+        elif implicit:
+            return impl_outputs
+        else:
+            raise RuntimeError('You have excluded both Explicit and Implicit components.')
+
+    def list_residuals(self, explicit=True, implicit=True, out_stream=sys.stdout):
+        """
+        List residuals.
+
+        Parameters
+        ----------
+        explicit : bool, optional
+            include outputs from explicit components. Default is True.
+
+        implicit : bool, optional
+            include outputs from implicit components. Default is True.
+
+        out_stream : file_like
+            Where to send human readable output. Default is sys.stdout. Set to None to suppress.
+
+        Returns
+        -------
+        list
+            list of (name, value) of residuals
+        """
+        states = self._list_states()
+
+        expl_resids = []
+        impl_resids = []
+        for name, val in iteritems(self._residuals._views):
+            if name in states:
+                impl_resids.append((name, val))
+            else:
+                expl_resids.append((name, val))
+
+        if out_stream:
+            if explicit:
+                self._write_outputs('Explicit', expl_resids, out_stream)
+            if implicit:
+                self._write_outputs('Implicit', impl_resids, out_stream)
+
+        if explicit and implicit:
+            return expl_resids + impl_resids
+        elif explicit:
+            return expl_resids
+        elif implicit:
+            return impl_resids
+        else:
+            raise RuntimeError('You have excluded both Explicit and Implicit components.')
+
+    def _write_outputs(self, comp_type, outputs, out_stream=sys.stdout):
+        """
+        Write formatted output values and residuals to out_stream.
+
+        Parameters
+        ----------
+        comp_type : str, 'Explicit' or 'Implicit'
+            the type of component with the output values.
+
+        outputs : list
+            list of (name, value) tuples.
+
+        out_stream : file_like
+            Where to send human readable output. Default is sys.stdout.
+        """
+        if out_stream is None:
+            return
+
+        count = len(outputs)
+
+        pathname = self.pathname if self.pathname else 'model'
+
+        header = "%d %s Output(s) in '%s'\n" % (count, comp_type, pathname)
+        out_stream.write(header)
+
+        if count:
+            out_stream.write("-" * len(header) + "\n")
+            for name, _ in outputs:
+                out_stream.write("%s\n" % name)
+                out_stream.write("  value:    " + str(self._outputs._views[name]))
+                out_stream.write('\n')
+                out_stream.write("  residual: " + str(self._residuals._views[name]))
+                out_stream.write('\n\n')
 
     def run_solve_nonlinear(self):
         """
