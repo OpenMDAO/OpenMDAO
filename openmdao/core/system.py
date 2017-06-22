@@ -1247,6 +1247,11 @@ class System(object):
             return names, patterns, renames
 
         def resolve(to_match, io_types, matches, proms):
+            """
+            Determine the mapping of promoted names to the parent scope for a promotion type.
+
+            This is called once for promotes or separately for promotes_inputs and promotes_outputs.
+            """
             if not to_match:
                 for typ in io_types:
                     if gname:
