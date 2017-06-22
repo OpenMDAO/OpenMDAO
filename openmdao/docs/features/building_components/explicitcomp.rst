@@ -22,14 +22,14 @@ The implementation of each method will be illustrated using a simple explicit co
   Information like variable names, sizes, units, and bounds are declared.
 
   .. embed-code::
-      openmdao.core.tests.test_expl_comp.TestExplCompSimpleCompute.setup
+      openmdao.core.tests.test_expl_comp.RectangleComp.setup
 
 - :code:`compute(inputs, outputs)` :
 
   Compute the :code:`outputs` given the :code:`inputs`.
 
   .. embed-code::
-      openmdao.core.tests.test_expl_comp.TestExplCompSimpleCompute.compute
+      openmdao.core.tests.test_expl_comp.RectangleComp.compute
 
 - :code:`compute_partials(inputs, outputs, partials)` :
 
@@ -37,13 +37,13 @@ The implementation of each method will be illustrated using a simple explicit co
   The :code:`outputs` are also provided for convenience.
 
   .. embed-code::
-      openmdao.core.tests.test_expl_comp.TestExplCompSimplePartial.compute_partials
+      openmdao.core.tests.test_expl_comp.RectanglePartial.compute_partials
 
 - :code:`compute_jacvec_product(inputs, outputs, d_inputs, d_outputs, mode)` :
 
   [Optional] Provide the partial derivatives as a matrix-vector product. If :code:`mode` is :code:`'fwd'`, this method must compute :math:`d\_{outputs} = J \cdot d\_{inputs}`, where :math:`J` is the partial derivative Jacobian. If :code:`mode` is :code:`'rev'`, this method must compute :math:`d\_{inputs} = J^T \cdot d\_{outputs}`.
 
   .. embed-code::
-      openmdao.core.tests.test_expl_comp.TestExplCompSimpleJacVec.compute_jacvec_product
+      openmdao.core.tests.test_expl_comp.RectangleJacVec.compute_jacvec_product
 
 Note that the last two are optional because the class can implement one or the other, or neither if the user wants to use the finite-difference or complex-step method.
