@@ -1288,8 +1288,8 @@ class System(object):
 
         if self._var_promotes['input'] or self._var_promotes['output']:
             if self._var_promotes['any']:
-                raise RuntimeError("'promotes' cannot be used at the same time as "
-                                   "'promotes_inputs' or 'promotes_outputs'.")
+                raise RuntimeError("%s: 'promotes' cannot be used at the same time as "
+                                   "'promotes_inputs' or 'promotes_outputs'." % self.pathname)
             if not resolve(self._var_promotes['input'], ('input',), maps, prom_names):
                 error('input')
             if not resolve(self._var_promotes['output'], ('output',), maps, prom_names):

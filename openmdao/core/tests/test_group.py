@@ -931,14 +931,19 @@ class TestConnect(unittest.TestCase):
     def test_mix_promotes_types(self):
         prob = Problem()
         prob.model.add_subsystem('src', ExecComp(['y = 2 * x', 'y2 = 3 * x']), promotes=['x', 'y'], promotes_outputs=['y2'])
-        with assertRaisesRegex(self, RuntimeError, "promotes' cannot be used at the same time as 'promotes_inputs' or 'promotes_outputs'."):
+
+        with self.assertRaises(RuntimeError) as context:
             prob.setup(check=False)
+
+        self.assertEqual(str(context.exception), "src: 'promotes' cannot be used at the same time as 'promotes_inputs' or 'promotes_outputs'.")
 
     def test_mix_promotes_types2(self):
         prob = Problem()
         prob.model.add_subsystem('src', ExecComp(['y = 2 * x', 'y2 = 3 * x2']), promotes=['x', 'y'], promotes_inputs=['x2'])
-        with assertRaisesRegex(self, RuntimeError, "promotes' cannot be used at the same time as 'promotes_inputs' or 'promotes_outputs'."):
+        with self.assertRaises(RuntimeError) as context:
             prob.setup(check=False)
+
+        self.assertEqual(str(context.exception), "src: 'promotes' cannot be used at the same time as 'promotes_inputs' or 'promotes_outputs'.")
 
 if __name__ == "__main__":
     unittest.main()
