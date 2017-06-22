@@ -928,5 +928,17 @@ class TestConnect(unittest.TestCase):
 
         assert_rel_error(self, prob['tgt.z'], 600.)
 
+    def test_mix_promotes_types(self):
+        prob = Problem()
+        prob.model.add_subsystem('src', ExecComp(['y = 2 * x', 'y2 = 3 * x']), promotes=['x', 'y'], promotes_outputs=['y2'])
+        with assertRaisesRegex(self, RuntimeError, "promotes' cannot be used at the same time as 'promotes_inputs' or 'promotes_outputs'."):
+            prob.setup(check=False)
+
+    def test_mix_promotes_types2(self):
+        prob = Problem()
+        prob.model.add_subsystem('src', ExecComp(['y = 2 * x', 'y2 = 3 * x2']), promotes=['x', 'y'], promotes_inputs=['x2'])
+        with assertRaisesRegex(self, RuntimeError, "promotes' cannot be used at the same time as 'promotes_inputs' or 'promotes_outputs'."):
+            prob.setup(check=False)
+
 if __name__ == "__main__":
     unittest.main()

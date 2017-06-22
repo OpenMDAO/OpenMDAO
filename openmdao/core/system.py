@@ -1223,6 +1223,8 @@ class System(object):
             dictionary mapping input/output variable names
             to promoted variable names.
         """
+        gname = self.name + '.' if self.name else ''
+
         def split_list(lst):
             """
             Return names, patterns, and renames found in lst.
@@ -1244,63 +1246,57 @@ class System(object):
                                     (self.pathname, entry))
             return names, patterns, renames
 
-        maps = {'input': {}, 'output': {}}
-        gname = self.name + '.' if self.name else ''
-
-        found = {'any': False, 'input': False, 'output': False}
-
-        promotes = self._var_promotes['any']
-        if promotes:
-            names, patterns, renames = split_list(promotes)
-        else:
-            found['any'] = True
-
-        for typ in ('input', 'output'):
-            pmap = maps[typ]
-
-            if promotes:
-                pass
-            elif self._var_promotes[typ]:
-                names, patterns, renames = split_list(self._var_promotes[typ])
-            else:
-                names = patterns = renames = ()
-                found[typ] = True
-
-            for name in prom_names[typ]:
-                if name in pmap:
-                    pass
-                elif name in names:
-                    pmap[name] = name
-                    found[typ] = True
-                    if promotes:
-                        found['any'] = True
-                elif name in renames:
-                    pmap[name] = renames[name]
-                    found[typ] = True
-                    if promotes:
-                        found['any'] = True
-                else:
-                    for pattern in patterns:
-                        # if name matches, promote that variable to parent
-                        if fnmatchcase(name, pattern):
-                            pmap[name] = name
-                            found[typ] = True
-                            if promotes:
-                                found['any'] = True
-                            break
+        def resolve(to_match, io_types, matches, proms):
+            if not to_match:
+                for typ in io_types:
+                    if gname:
+                        matches[typ] = {name: gname + name for name in proms[typ]}
                     else:
-                        # Default: prepend the parent system's name
-                        pmap[name] = gname + name if gname else name
+                        matches[typ] = {name: name for name in proms[typ]}
+                return True
 
-        for io, lst in self._var_promotes.items():
-            if lst and not found[io]:
-                if io == 'any':
-                    suffix = ''
-                else:
-                    suffix = '_%ss' % io
-                raise RuntimeError("%s: no variables were promoted "
-                                   "based on promotes%s=%s" %
-                                   (self.pathname, suffix, list(lst)))
+            found = False
+            names, patterns, renames = split_list(to_match)
+            for typ in io_types:
+                pmap = matches[typ]
+                for name in proms[typ]:
+                    if name in names:
+                        pmap[name] = name
+                        found = True
+                    elif name in renames:
+                        pmap[name] = renames[name]
+                        found = True
+                    else:
+                        for pattern in patterns:
+                            # if name matches, promote that variable to parent
+                            if pattern == '*' or fnmatchcase(name, pattern):
+                                pmap[name] = name
+                                found = True
+                                break
+                        else:
+                            # Default: prepend the parent system's name
+                            pmap[name] = gname + name if gname else name
+
+            return found
+
+        def error(type_):
+            names = {'any': 'promotes', 'input': 'promotes_inputs', 'output': 'promotes_outputs'}
+            raise RuntimeError("%s: no variables were promoted based on %s=%s" %
+                               (self.pathname, names[type_], list(self._var_promotes[type_])))
+
+        maps = {'input': {}, 'output': {}}
+
+        if self._var_promotes['input'] or self._var_promotes['output']:
+            if self._var_promotes['any']:
+                raise RuntimeError("'promotes' cannot be used at the same time as "
+                                   "'promotes_inputs' or 'promotes_outputs'.")
+            if not resolve(self._var_promotes['input'], ('input',), maps, prom_names):
+                error('input')
+            if not resolve(self._var_promotes['output'], ('output',), maps, prom_names):
+                error('output')
+        else:
+            if not resolve(self._var_promotes['any'], ('input', 'output',), maps, prom_names):
+                error('any')
 
         return maps
 
