@@ -287,9 +287,9 @@ class TestGetSetVariables(unittest.TestCase):
             with assertRaisesRegex(self, KeyError, msg1.format('x')):
                 self.assertEqual(jac['y', 'x'], 5.0)
 
-        model.connect('x', 'g.x')
-
         # -------------------------------------------------------------------
+
+        model.connect('x', 'g.x')
 
         p = Problem(model)
         p.setup(check=False)
@@ -297,7 +297,7 @@ class TestGetSetVariables(unittest.TestCase):
         msg2 = ('The promoted name "{}" is invalid because it is non-unique. '
                 'Access the value from the connected output variable "{}" instead.')
 
-        # inputs
+        # inputs (g.x is connected to x)
         with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
             p['g.x'] = 5.0
         with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
