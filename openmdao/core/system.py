@@ -2248,7 +2248,7 @@ class System(object):
 
         if count:
             out_stream.write("-" * len(header) + "\n")
-            for name, val in inputs:
+            for name, val in sorted(inputs):
                 out_stream.write("%s\n" % name)
                 out_stream.write("  value:    " + str(val))
                 out_stream.write('\n\n')
