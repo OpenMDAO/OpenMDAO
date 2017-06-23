@@ -48,6 +48,17 @@ class CompAddWithIndices(ExplicitComponent):
         self.add_output('y')
 
 
+
+class CompAddWithShapeAndIndices(ExplicitComponent):
+    """Component for tests for declaring shape and array indices."""
+
+    def setup(self):
+        self.add_input('x_a', shape=2, src_indices=(0,1))
+        self.add_input('x_b', shape=(2,), src_indices=(0,1))
+        self.add_input('x_c', shape=(2, 2), src_indices=np.arange(4).reshape((2, 2)))
+        self.add_input('x_d', shape=[2, 2], src_indices=np.arange(4).reshape((2, 2)))
+
+
 class CompAddArrayWithScalar(ExplicitComponent):
     """Component for tests for declaring a scalar val with an array variable."""
 
@@ -121,6 +132,16 @@ class TestAddVar(unittest.TestCase):
         assert_rel_error(self, p['x_c'], np.ones(2))
         assert_rel_error(self, p['x_d'], np.ones(6))
         assert_rel_error(self, p['x_e'], np.ones((3,2)))
+
+    def test_shape_and_indices(self):
+        """Test declaring shape and indices."""
+        p = Problem(model=CompAddWithShapeAndIndices())
+        p.setup()
+
+        assert_rel_error(self, p['x_a'], np.ones(2))
+        assert_rel_error(self, p['x_b'], np.ones(2))
+        assert_rel_error(self, p['x_c'], np.ones((2,2)))
+        assert_rel_error(self, p['x_d'], np.ones((2,2)))
 
     def test_scalar_array(self):
         """Test declaring a scalar val with an array variable."""

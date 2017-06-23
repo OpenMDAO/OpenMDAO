@@ -9,7 +9,7 @@ The ScipyOptimizer driver wraps the optimizers in `scipy.optimize.minimize`. In 
 optimizer to find the minimum of the Paraboloid problem.
 
   .. embed-test::
-      openmdao.drivers.tests.test_scipy_optimizer.TesScipyOptimizerFeatures.test_feature_basic
+      openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizerFeatures.test_feature_basic
 
 Options
 -------
@@ -23,7 +23,7 @@ Options
   gradient-free.
 
   .. embed-test::
-      openmdao.drivers.tests.test_scipy_optimizer.TesScipyOptimizerFeatures.test_feature_optimizer
+      openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizerFeatures.test_feature_optimizer
 
 - maxiter
 
@@ -31,13 +31,13 @@ Options
   is generally a valid option across all of the available options.
 
   .. embed-test::
-      openmdao.drivers.tests.test_scipy_optimizer.TesScipyOptimizerFeatures.test_feature_maxiter
+      openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizerFeatures.test_feature_maxiter
 
 - tol
 
   The "tol" option allows you to specify the tolerance for termination.
 
   .. embed-test::
-      openmdao.drivers.tests.test_scipy_optimizer.TesScipyOptimizerFeatures.test_feature_tol
+      openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizerFeatures.test_feature_tol
 
 .. tags:: Driver, optimization
