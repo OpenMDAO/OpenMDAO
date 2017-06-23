@@ -1243,7 +1243,7 @@ class Group(System):
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
         if self._owns_approx_jac:
-            method = self._approx_schemes.keys()[0]
+            method = list(self._approx_schemes.keys())[0]
             approx = self._approx_schemes[method]
             pro2abs = self._var_allprocs_prom2abs_list
 
