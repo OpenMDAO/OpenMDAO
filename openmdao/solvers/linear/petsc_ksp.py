@@ -13,8 +13,8 @@ except ImportError:
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.record_util import create_local_meta, update_local_meta
-
+from openmdao.utils.record_util import create_local_meta
+from openmdao.recorders.base_recorder import recording
 
 KSP_TYPES = [
     "richardson",
@@ -157,18 +157,10 @@ class Monitor(object):
             self._norm0 = norm
         self._norm = norm
 
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-            pop_recording_iteration_stack
-
-        push_recording_iteration_stack('PetscKSP', self._solver._iter_count)
-
-        # TODO_RECORDERS - need to pass in parent info instead of None
-        metadata = create_local_meta(None, 'PetscKSP')
-        update_local_meta(metadata, (1,))
-        self._solver._rec_mgr.record_iteration(self._solver, metadata, abs=norm,
+        with recording('PetscKSP', self._solver._iter_count):
+            metadata = create_local_meta('PetscKSP')
+            self._solver._rec_mgr.record_iteration(self._solver, metadata, abs=norm,
                                                rel=norm / self._norm0)
-
-        pop_recording_iteration_stack()
 
         self._solver._mpi_print(counter, norm, norm / self._norm0)
         self._solver._iter_count += 1

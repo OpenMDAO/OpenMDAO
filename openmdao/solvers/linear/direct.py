@@ -13,7 +13,7 @@ from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
-from openmdao.utils.record_util import create_local_meta, update_local_meta
+from openmdao.utils.record_util import create_local_meta
 
 
 class DirectSolver(LinearSolver):
@@ -172,14 +172,9 @@ class DirectSolver(LinearSolver):
                 x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
                 x_vec.set_data(x_data)
 
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-            pop_recording_iteration_stack
-        push_recording_iteration_stack('DirectSolver', self._iter_count)
-
-        metadata = create_local_meta(None, 'DirectSolver')
-        update_local_meta(metadata, (1,))
-        self._rec_mgr.record_iteration(self, metadata)  # no norms
-
-        pop_recording_iteration_stack()
+        from openmdao.recorders.base_recorder import recording
+        with recording('DirectSolver', self._solver._iter_count):
+            metadata = create_local_meta('DirectSolver')
+            self._rec_mgr.record_iteration(self, metadata)  # no norms
 
         return False, 0., 0.

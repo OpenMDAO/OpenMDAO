@@ -13,7 +13,7 @@ from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.solvers.solver import Solver, NonlinearSolver
-from openmdao.utils.record_util import format_iteration_coordinate
+from openmdao.recorders.base_recorder import get_formatted_iteration_coordinate
 
 
 def array_to_blob(array):
@@ -235,7 +235,6 @@ class SqliteRecorder(BaseRecorder):
 
         # TODO_RECORDER - needs to put higher in the calling stack so we do not have
         #    to do this in each method
-        from openmdao.recorders.base_recorder import get_formatted_iteration_coordinate
         iteration_coordinate = get_formatted_iteration_coordinate()
 
         self.cursor.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
@@ -347,7 +346,6 @@ class SqliteRecorder(BaseRecorder):
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
-        from openmdao.recorders.base_recorder import get_formatted_iteration_coordinate
         iteration_coordinate = get_formatted_iteration_coordinate()
 
         self.cursor.execute("INSERT INTO system_iterations(counter, iteration_coordinate, "
@@ -442,7 +440,6 @@ class SqliteRecorder(BaseRecorder):
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
-        from openmdao.recorders.base_recorder import get_formatted_iteration_coordinate
         iteration_coordinate = get_formatted_iteration_coordinate()
 
         self.cursor.execute("INSERT INTO solver_iterations(counter, iteration_coordinate, "

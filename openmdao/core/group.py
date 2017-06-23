@@ -1068,15 +1068,11 @@ class Group(System):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-            print_recording_iteration_stack, pop_recording_iteration_stack, \
+        from openmdao.recorders.base_recorder import recording, \
             iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
         do_recording = not iter_get_norm_on_call_stack() and not \
             compute_total_derivs_on_call_stack()
-        if do_recording:
-            name = self.pathname if self.pathname else 'root'
-            push_recording_iteration_stack(name + '._apply_nonlinear', self.iter_count)
-            print_recording_iteration_stack()
+        name = self.pathname if self.pathname else 'root'
 
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
@@ -1084,9 +1080,9 @@ class Group(System):
             subsys._apply_nonlinear()
 
         if do_recording:
-            self.record_iteration()
+            with recording(name + '._apply_nonlinear', self.iter_count):
+                self.record_iteration()
 
-            pop_recording_iteration_stack()
 
     def _solve_nonlinear(self):
         """
@@ -1103,15 +1099,12 @@ class Group(System):
         """
         super(Group, self)._solve_nonlinear()
 
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-            print_recording_iteration_stack, pop_recording_iteration_stack, \
+        from openmdao.recorders.base_recorder import recording, \
             iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
         do_recording = not iter_get_norm_on_call_stack() and not \
             compute_total_derivs_on_call_stack()
-        if do_recording:
-            name = self.pathname if self.pathname else 'root'
-            push_recording_iteration_stack(name + '._solve_nonlinear', self.iter_count)
-            print_recording_iteration_stack()
+        name = self.pathname if self.pathname else 'root'
+        name = name + '._solve_nonlinear'
 
         # Execute guess_nonlinear if specified.
         # We need to call this early enough so that any solver that needs initial guesses has
@@ -1125,8 +1118,9 @@ class Group(System):
         result = self._nonlinear_solver.solve()
 
         if do_recording:
-            self.record_iteration()
-            pop_recording_iteration_stack()
+            #with recording(name + '._solve_nonlinear', self.iter_count):
+            with recording(name, self.iter_count):
+                self.record_iteration()
 
         return result
 
@@ -1147,15 +1141,12 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-            print_recording_iteration_stack, pop_recording_iteration_stack, \
+        from openmdao.recorders.base_recorder import recording, \
             iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
+
         do_recording = not iter_get_norm_on_call_stack() and not \
             compute_total_derivs_on_call_stack()
-        if do_recording:
-            name = self.pathname if self.pathname else 'root'
-            push_recording_iteration_stack(name + '._apply_linear', self.iter_count)
-            print_recording_iteration_stack()
+        name = self.pathname if self.pathname else 'root'
 
         with self.jacobian_context() as J:
             # Use global Jacobian
@@ -1178,9 +1169,8 @@ class Group(System):
                         self._transfer(vec_name, mode)
 
         if do_recording:
-            self.record_iteration()
-
-            pop_recording_iteration_stack()
+            with recording(name + '._apply_linear', self.iter_count):
+                self.record_iteration()
 
     def _solve_linear(self, vec_names, mode):
         """
@@ -1202,21 +1192,17 @@ class Group(System):
         float
             absolute error.
         """
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-            print_recording_iteration_stack, pop_recording_iteration_stack, \
+        from openmdao.recorders.base_recorder import recording, \
             iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
         do_recording = not iter_get_norm_on_call_stack() and not \
             compute_total_derivs_on_call_stack()
-        if do_recording:
-            name = self.pathname if self.pathname else 'root'
-            push_recording_iteration_stack(name + '._solve_linear', self.iter_count)
-            print_recording_iteration_stack()
+        name = self.pathname if self.pathname else 'root'
 
         result = self._linear_solver.solve(vec_names, mode)
 
         if do_recording:
-            self.record_iteration()
-            pop_recording_iteration_stack()
+            with recording(name + '._solve_linear', self.iter_count):
+                self.record_iteration()
 
         return result
 

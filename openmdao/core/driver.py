@@ -3,7 +3,7 @@ import numpy as np
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.utils.record_util import create_local_meta, update_local_meta
+from openmdao.utils.record_util import create_local_meta
 
 from openmdao.utils.options_dictionary import OptionsDictionary
 from six import iteritems
@@ -342,21 +342,14 @@ class Driver(object):
             Failure flag; True if failed to converge, False is successful.
         """
         # Metadata Setup
+        metadata = self.metadata = create_local_meta('Driver')
+
+        from openmdao.recorders.base_recorder import recording
+        with recording('Driver', self.iter_count):
+            failure_flag = self._problem.model._solve_nonlinear()
+            self._rec_mgr.record_iteration(self, metadata)
+
         self.iter_count += 1
-        metadata = self.metadata = create_local_meta(None, 'Driver')
-        update_local_meta(metadata, (self.iter_count,))
-
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-            print_recording_iteration_stack, pop_recording_iteration_stack, \
-            iter_get_norm_on_call_stack
-        push_recording_iteration_stack('Driver', self.iter_count)
-
-        failure_flag = self._problem.model._solve_nonlinear()
-        self._rec_mgr.record_iteration(self, metadata)
-
-        print_recording_iteration_stack()
-        pop_recording_iteration_stack()
-
         return failure_flag
 
     def _compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict',

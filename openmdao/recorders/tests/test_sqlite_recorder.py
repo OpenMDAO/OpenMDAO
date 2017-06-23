@@ -409,7 +409,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (1, )]
+        coordinate = [0, 'Driver', (0, )]
 
         expected_desvars = {
                             "px.x": [1.0, ],
@@ -434,7 +434,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (1, )]
+        coordinate = [0, 'Driver', (0, )]
 
         expected_objectives = {"obj_cmp.obj": [28.58830817, ]}
 
@@ -456,7 +456,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (1, )]
+        coordinate = [0, 'Driver', (0, )]
 
         expected_constraints = {
                             "con_cmp1.con1": [-22.42830237, ],
@@ -506,7 +506,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (4, )]
+        coordinate = [0, 'SLSQP', (3, )]
 
         expected_desvars = {
                             "p1.x": [7.16666666166666666666667, ],
@@ -574,7 +574,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (1, ), 'root._solve_nonlinear', (0, ),
+        coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ),
                       'NonlinearBlockGS', (6, ), 'd1._solve_nonlinear', (6, )]
         expected_inputs = {
                             "d1.y2": [12.05848815],
@@ -640,7 +640,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (4, )]
+        coordinate = [0, 'SLSQP', (3, )]
 
         expected_desvars = {"p1.x": [7.16666666166666666666667, ]}
 
@@ -684,8 +684,9 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (0, ), 'NLRunOnce', (1, ),
+        coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (0, ), 'NLRunOnce', (0, ),
                       'mda._solve_nonlinear', (0, ), 'NonlinearBlockGS', (4,), 'mda.d1._solve_nonlinear', (4, )]
+        # Coord: rank0:SLSQP | 0 | NLRunOnce | 0 | NonlinearBlockGS | 4 | mda.d1._solve_nonlinear | 4
 
         expected_inputs = {
                             "mda.d1.z": [5.0, 2.0],
@@ -723,7 +724,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (1, ), 'root._solve_nonlinear', (0, ), 'NonlinearBlockGS', (6, )]
+        coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ), 'NonlinearBlockGS', (6, )]
 
         expected_abs_error = 1.31880284470753394998e-10
 
@@ -774,7 +775,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (5,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (5,)]
         expected_abs_error = 1.3660184094987926e-11
         expected_rel_error = 0.03006678031310114
         expected_solver_output = None
@@ -803,7 +804,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (1,), 'BoundsEnforceLS', (0,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (1,), 'BoundsEnforceLS', (0,)]
         expected_abs_error = 7.02783609310096e-10
         expected_rel_error = 8.078674883382422e-07
         expected_solver_output = None
@@ -828,7 +829,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NonlinearBlockGS', (6, )]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NonlinearBlockGS', (6, )]
         expected_abs_error = 1.31880284470753394998e-10
         expected_rel_error = 3.6299074030587596e-12
 
@@ -868,7 +869,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NonlinearBlockJac', (9,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NonlinearBlockJac', (9,)]
 
         expected_abs_error = 7.234027587097439e-07
         expected_rel_error = 1.991112651729199e-08
@@ -891,7 +892,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (9,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (9,)]
 
         expected_abs_error = 5.041402548755789e-06
         expected_rel_error = 1.3876088080160474e-07
@@ -915,7 +916,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         # No norms so no expected norms
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NLRunOnce', (1,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NLRunOnce', (0,)]
         expected_abs_error = None
         expected_rel_error = None
         expected_solver_residuals = None
@@ -943,7 +944,7 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(self.prob)
 
         # No norms so no expected norms
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'DirectSolver', (0,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'DirectSolver', (0,)]
 
         expected_abs_error = None
         expected_rel_error = None
@@ -988,7 +989,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'ScipyIterativeSolver', (2,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'ScipyIterativeSolver', (2,)]
         expected_abs_error = 8.49738327756984e-13
         expected_rel_error = 3.180364454577043e-16
 
@@ -1032,7 +1033,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'PetscKSP', (3,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'PetscKSP', (3,)]
         expected_abs_error = 8.367449152693399e-19
         expected_rel_error = 3.6411633054292593e-16
 
@@ -1078,7 +1079,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'LinearBlockGS', (6,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'LinearBlockGS', (6,)]
         expected_abs_error = 9.109083208861876e-11
         expected_rel_error = 9.114367543620551e-12
 
@@ -1124,7 +1125,9 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (9,), 'LinearRunOnce', (1,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (9,), 'LinearRunOnce', (0,)]
+        # Coord: rank0:Driver | 0 | NewtonSolver | 9 | LinearRunOnce | 0
+
         expected_abs_error = None
         expected_rel_error = None
 

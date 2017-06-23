@@ -24,7 +24,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.array_utils import convert_neg
-from openmdao.utils.record_util import create_local_meta, update_local_meta
+from openmdao.utils.record_util import create_local_meta
 
 
 class System(object):
@@ -2599,9 +2599,7 @@ class System(object):
         """
         self.iter_count += 1
 
-        # TODO_RECORDERS - need to pass in parent info instead of None
-        metadata = create_local_meta(None, self.pathname)
-        update_local_meta(metadata, (self.iter_count,))
+        metadata = create_local_meta(self.pathname)
         # send the calling method name into record_iteration, e.g. 'solve_nonlinear'
         self._rec_mgr.record_iteration(self, metadata, method=inspect.stack()[1][3])
 

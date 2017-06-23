@@ -1,6 +1,5 @@
 """Define the LinearRunOnce class."""
-
-from openmdao.utils.record_util import create_local_meta, update_local_meta
+from openmdao.utils.record_util import create_local_meta
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 
 
@@ -48,15 +47,9 @@ class LinearRunOnce(LinearBlockGS):
         # Single iteration of GS
         self._iter_execute()
 
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-            pop_recording_iteration_stack
-        push_recording_iteration_stack('LinearRunOnce', 1)
-
-        # TODO_RECORDERS - need to pass in parent info instead of None
-        metadata = create_local_meta(None, 'LinearRunOnce')
-        update_local_meta(metadata, (1,))
-        self._rec_mgr.record_iteration(self, metadata)  # no norms
-
-        pop_recording_iteration_stack()
+        from openmdao.recorders.base_recorder import recording
+        with recording('LinearRunOnce', 0):
+            metadata = create_local_meta('LinearRunOnce')
+            self._rec_mgr.record_iteration(self, metadata)  # no norms
 
         return False, 0.0, 0.0

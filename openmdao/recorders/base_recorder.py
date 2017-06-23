@@ -48,28 +48,6 @@ def compute_total_derivs_on_call_stack():
             return True
     return False
 
-
-def push_recording_iteration_stack(name, iter_count):
-    """
-    Push onto recording iteration stack.
-
-    Parameters
-    ----------
-    name
-
-    iter_count
-
-    """
-    recording_iteration_stack.append((name, iter_count))
-
-
-def pop_recording_iteration_stack():
-    """
-    Pop from recording iteration stack.
-    """
-    recording_iteration_stack.pop()
-
-
 def print_recording_iteration_stack():
     """
     Print the record iteration stack.
@@ -88,7 +66,7 @@ def get_formatted_iteration_coordinate():
     """
     Format the iteration coordinate into human-readable form.
 
-        'rank0:pyoptsparsedriver|6|root._solve_nonlinear|6|mda._solve_nonlinear|6|mda.d1._solve_nonlinear|45'
+    'rank0:pyoptsparsedriver|6|root._solve_nonlinear|6|mda._solve_nonlinear|6|mda.d1._solve_nonlinear|45'
     """
     separator = '|'
     iteration_coord_list = []
@@ -102,16 +80,35 @@ def get_formatted_iteration_coordinate():
     return formatted_iteration_coordinate
 
 @contextmanager
-def recording(do_record, name, iter_count):
-    if(do_record):
-        recording_iteration_stack.append((name, iter_count))
+def recording(name, iter_count):
+    """
+    Record in a way.
+
+    Parameters:
+    -----------
+    name : str
+        name of the object being recorded.
+    iter_count : int
+        number of current iteration of name.
+    """
+    # Do things before the code inside the recording with block.
+    #do_recording = not iter_get_norm_on_call_stack() or not compute_total_derivs_on_call_stack()
+
+    #if do_recording:
+    recording_iteration_stack.append((name, iter_count))
+
     try:
+        # Run the code in the with block.
         yield
+
     finally:
+        # In case we don't return from the yield gracefully, pop.
+        #if do_recording:
+            # Enable the following line for stack debugging.
+            # print_recording_iteration_stack()
         recording_iteration_stack.pop()
 
-    recording_iteration_stack.pop()
-
+    #
 
 class BaseRecorder(object):
     """

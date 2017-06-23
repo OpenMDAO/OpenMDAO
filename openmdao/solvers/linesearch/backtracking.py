@@ -9,7 +9,7 @@ ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condi
 from math import isnan
 
 import numpy as np
-from openmdao.utils.record_util import create_local_meta, update_local_meta
+from openmdao.utils.record_util import create_local_meta
 from openmdao.solvers.solver import NonlinearSolver
 
 
@@ -93,16 +93,11 @@ class BoundsEnforceLS(NonlinearSolver):
 
         fail = (np.isinf(norm) or np.isnan(norm))
 
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-            pop_recording_iteration_stack
-        push_recording_iteration_stack('BoundsEnforceLS', self._iter_count)
-
-        # TODO_RECORDERS - need to pass in parent info instead of None
-        metadata = create_local_meta(None, 'BoundsEnforceLS')
-        update_local_meta(metadata, (1,))
-        self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
-
-        pop_recording_iteration_stack()
+        from openmdao.recorders.base_recorder import recording
+        with recording('BoundsEnforceLS', self._iter_count):
+            metadata = create_local_meta('BoundsEnforceLS')
+            self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
+        self._iter_count += 1
 
         return fail, norm, norm / norm0
 
@@ -247,20 +242,14 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         # "rise".
         while self._iter_count < maxiter and (norm0 - norm) < c * self.alpha * norm0:
             self._iter_execute()
-            self._iter_count += 1
             norm = self._iter_get_norm()
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
-            from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-                pop_recording_iteration_stack
-            push_recording_iteration_stack('ArmijoGoldsteinLS', self._iter_count)
-
-            # TODO_RECORDERS - need to pass in parent info instead of None
-            metadata = create_local_meta(None, 'ArmijoGoldsteinLS')
-            update_local_meta(metadata, (1,))
-            self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
-
-            pop_recording_iteration_stack()
+            from openmdao.recorders.base_recorder import recording
+            with recording('ArmijoGoldsteinLS', self._iter_count):
+                metadata = create_local_meta('ArmijoGoldsteinLS')
+                self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
+            self._iter_count += 1
 
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))

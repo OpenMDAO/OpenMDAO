@@ -21,7 +21,7 @@ from pyoptsparse import Optimization
 from openmdao.core.driver import Driver
 
 
-from openmdao.utils.record_util import create_local_meta, update_local_meta
+from openmdao.utils.record_util import create_local_meta
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
@@ -192,20 +192,14 @@ class pyOptSparseDriver(Driver):
         self.iter_count = 0
 
         # Metadata Setup
-        self.metadata = create_local_meta(None, self.options['optimizer'])
+        self.metadata = create_local_meta(self.options['optimizer'])
         self.iter_count = 0
-        update_local_meta(self.metadata, (self.iter_count,))
 
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-            print_recording_iteration_stack, pop_recording_iteration_stack, \
-            iter_get_norm_on_call_stack
-        push_recording_iteration_stack(self.options['optimizer'], self.iter_count)
+        from openmdao.recorders.base_recorder import recording
 
-        # Initial Run
-        model._solve_nonlinear()
-
-        print_recording_iteration_stack()
-        pop_recording_iteration_stack()
+        with recording(self.options['optimizer'], self.iter_count):
+            # Initial Run
+            model._solve_nonlinear()
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
@@ -326,14 +320,10 @@ class pyOptSparseDriver(Driver):
             val = dv_dict[name]
             self.set_design_var(name, val)
 
-        from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-            print_recording_iteration_stack, pop_recording_iteration_stack
-        push_recording_iteration_stack(self.options['optimizer'], self.iter_count)
 
-        model._solve_nonlinear()
-
-        print_recording_iteration_stack()
-        pop_recording_iteration_stack()
+        from openmdao.recorders.base_recorder import recording
+        with recording(self.options['optimizer'], self.iter_count):
+            model._solve_nonlinear()
 
         # Save the most recent solution.
         self.pyopt_solution = sol
@@ -380,30 +370,20 @@ class pyOptSparseDriver(Driver):
             for name in self._indep_list:
                 self.set_design_var(name, dv_dict[name])
 
-            # print("Setting DV")
-            # print(dv_dict)
-
             # Execute the model
+            from openmdao.recorders.base_recorder import recording
+            with recording(self.options['optimizer'], self.iter_count):
+
+                model._solve_nonlinear()
+
+                func_dict = self.get_objective_values()
+                func_dict.update(self.get_constraint_values(lintype='nonlinear'))
+
+                # Record after getting obj and constraint to assure they have
+                 # been gathered in MPI.
+                self._rec_mgr.record_iteration(self, metadata)
+
             self.iter_count += 1
-            update_local_meta(metadata, (self.iter_count,))
-
-            from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-                print_recording_iteration_stack, pop_recording_iteration_stack, \
-                iter_get_norm_on_call_stack
-            push_recording_iteration_stack(self.options['optimizer'], self.iter_count)
-
-            model._solve_nonlinear()
-
-            func_dict = self.get_objective_values()
-            func_dict.update(self.get_constraint_values(lintype='nonlinear'))
-
-            # Record after getting obj and constraint to assure they have
-            # been gathered in MPI.
-
-            self._rec_mgr.record_iteration(self, metadata)
-
-            print_recording_iteration_stack()
-            pop_recording_iteration_stack()
 
         except Exception as msg:
             tb = traceback.format_exc()

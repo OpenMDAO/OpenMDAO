@@ -6,7 +6,7 @@ import numpy as np
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.utils.record_util import create_local_meta, update_local_meta
+from openmdao.utils.record_util import create_local_meta
 
 
 class SolverInfo(object):
@@ -203,22 +203,16 @@ class Solver(object):
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
 
-            from openmdao.recorders.base_recorder import push_recording_iteration_stack, \
-                print_recording_iteration_stack, pop_recording_iteration_stack, \
-                iter_get_norm_on_call_stack, recording_iteration_stack
-            push_recording_iteration_stack(type(self).__name__, self._iter_count)
-            print_recording_iteration_stack()
+            from openmdao.recorders.base_recorder import recording
+            with recording(type(self).__name__, self._iter_count):
 
-            self._iter_execute()
-            self._iter_count += 1
-            norm = self._iter_get_norm()
+                self._iter_execute()
+                self._iter_count += 1
+                norm = self._iter_get_norm()
 
-            # TODO_RECORDERS - need to pass in parent info instead of None
-            metadata = create_local_meta(None, type(self).__name__)
-            update_local_meta(metadata, (self._iter_count,))
-            self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
+                metadata = create_local_meta(type(self).__name__)
+                self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
 
-            pop_recording_iteration_stack()
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or
