@@ -11,16 +11,9 @@ from collections import OrderedDict
 import traceback
 
 from six import iteritems
-from six.moves import range
-
-import numpy as np
-import scipy as sp
-
 from pyoptsparse import Optimization
 
 from openmdao.core.driver import Driver
-
-
 from openmdao.utils.record_util import create_local_meta
 
 # names of optimizers that use gradients
@@ -196,7 +189,6 @@ class pyOptSparseDriver(Driver):
         self.iter_count = 0
 
         from openmdao.recorders.base_recorder import recording
-
         with recording(self.options['optimizer'], self.iter_count):
             # Initial Run
             model._solve_nonlinear()
@@ -442,3 +434,6 @@ class pyOptSparseDriver(Driver):
         # print(dv_dict)
         # print(sens_dict)
         return sens_dict, fail
+
+    def get_name(self):
+        return self.options['optimizer']

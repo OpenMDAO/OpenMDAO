@@ -266,7 +266,7 @@ class SqliteRecorder(BaseRecorder):
         """
         if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
                           '_solve_nonlinear']:
-            raise ValueError("method must not be one of: '_apply_linear, "
+            raise ValueError("method must be one of: '_apply_linear, "
                              "_apply_nonlinear, _solve_linear, _solve_nonlinear'")
 
         if 'nonlinear' in method:

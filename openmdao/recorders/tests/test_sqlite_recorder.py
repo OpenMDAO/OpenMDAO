@@ -586,7 +586,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
                                                  expected_outputs, expected_residuals),), self.eps)
 
-        coordinate = [0, 'Driver', (1, ), 'root._solve_nonlinear', (0, ),
+        coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ),
                       'NonlinearBlockGS', (6, ), 'obj_cmp._solve_nonlinear', (6, )]
         expected_inputs = {
                             "obj_cmp.z": [5.0, 2.0],
@@ -699,7 +699,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
                                                  expected_outputs, expected_residuals),), self.eps)
 
-        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (1, ),
+        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
@@ -775,7 +775,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (5,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (4,)]
         expected_abs_error = 1.3660184094987926e-11
         expected_rel_error = 0.03006678031310114
         expected_solver_output = None
@@ -1172,7 +1172,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        coordinate = [0, 'Driver', (1,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'LinearBlockJac', (9,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'LinearBlockJac', (9,)]
         expected_abs_error = 9.947388408259769e-11
         expected_rel_error = 4.330301334141486e-08
 
@@ -1252,7 +1252,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         # Driver recording test
-        coordinate = [0, 'SLSQP', (6, )]
+        coordinate = [0, 'SLSQP', (5, )]
 
         expected_desvars = {
                             "pz.z": [1.97763888e+00, 1.17469760e-15],
@@ -1271,7 +1271,7 @@ class TestSqliteRecorder(unittest.TestCase):
                                            expected_objectives, expected_constraints),), self.eps)
 
         # System recording test
-        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (1, ),
+        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
@@ -1283,7 +1283,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # Solver recording test
 
         # rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|1|mda._solve_nonlinear|6|NonlinearBlockGS|4
-        coordinate = [0, 'SLSQP', (6, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (1, ),
+        coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
                       'mda._solve_nonlinear', (6, ), 'NonlinearBlockGS', (4, )]
 
         expected_abs_error = 3.905986645236226e-11,
@@ -1303,8 +1303,6 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
                                                  expected_rel_error, expected_solver_output,
                                                  expected_solver_residuals),), self.eps)
-
-
 
     def test_global_counter(self):
 
@@ -1385,7 +1383,7 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
-        coordinate = [0, 'Driver', (1, ), 'root._solve_nonlinear', (0, ), 'NLRunOnce', (1, ),
+        coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ), 'NLRunOnce', (0, ),
                       'comp2._solve_nonlinear', (0, )]
 
         expected_inputs = {

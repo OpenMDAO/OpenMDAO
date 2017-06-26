@@ -2597,10 +2597,10 @@ class System(object):
         """
         Record an iteration of the current System.
         """
-
         metadata = create_local_meta(self.pathname)
         # send the calling method name into record_iteration, e.g. 'solve_nonlinear'
-        self._rec_mgr.record_iteration(self, metadata, method=inspect.stack()[1][3])
+        method = inspect.stack()
+        self._rec_mgr.record_iteration(self, metadata, method=inspect.stack()[3][3])
         self.iter_count += 1
 
 def get_current_case():

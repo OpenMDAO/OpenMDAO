@@ -176,21 +176,15 @@ class ExplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        from openmdao.recorders.base_recorder import recording, \
-            iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack() and not \
-            compute_total_derivs_on_call_stack()
+        from openmdao.recorders.base_recorder import recording2
 
-        with self._unscaled_context(
-                outputs=[self._outputs], residuals=[self._residuals]):
-            self._residuals.set_vec(self._outputs)
-            self.compute(self._inputs, self._outputs)
-            self._residuals -= self._outputs
-            self._outputs += self._residuals
-
-        if do_recording:
-            with recording(self.pathname + '._apply_nonlinear', self.iter_count):
-                self.record_iteration()
+        with recording2(self.pathname + '._apply_nonlinear', self.iter_count, self):
+            with self._unscaled_context(
+                    outputs=[self._outputs], residuals=[self._residuals]):
+                self._residuals.set_vec(self._outputs)
+                self.compute(self._inputs, self._outputs)
+                self._residuals -= self._outputs
+                self._outputs += self._residuals
 
     def _solve_nonlinear(self):
         """
@@ -207,20 +201,13 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._solve_nonlinear()
 
-        from openmdao.recorders.base_recorder import recording, \
-            iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
+        from openmdao.recorders.base_recorder import recording2
 
-        do_recording = not iter_get_norm_on_call_stack() and not \
-            compute_total_derivs_on_call_stack()
-
-        with self._unscaled_context(
-                outputs=[self._outputs], residuals=[self._residuals]):
-            self._residuals.set_const(0.0)
-            failed = self.compute(self._inputs, self._outputs)
-
-        if do_recording:
-            with recording(self.pathname + '._solve_nonlinear', self.iter_count):
-                self.record_iteration()
+        with recording2(self.pathname + '._solve_nonlinear', self.iter_count, self):
+            with self._unscaled_context(
+                    outputs=[self._outputs], residuals=[self._residuals]):
+                self._residuals.set_const(0.0)
+                failed = self.compute(self._inputs, self._outputs)
 
         return bool(failed), 0., 0.
 
@@ -241,29 +228,24 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        from openmdao.recorders.base_recorder import recording, \
-            iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack() and not \
-            compute_total_derivs_on_call_stack()
+        from openmdao.recorders.base_recorder import recording2
 
-        for vec_name in vec_names:
-            with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
-                d_inputs, d_outputs, d_residuals = vecs
+        with recording2(self.pathname + '._apply_linear', self.iter_count, self):
+            for vec_name in vec_names:
+                with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
+                    d_inputs, d_outputs, d_residuals = vecs
 
-                # Jacobian and vectors are all scaled, unitless
-                with self.jacobian_context() as J:
-                    J._apply(d_inputs, d_outputs, d_residuals, mode)
+                    # Jacobian and vectors are all scaled, unitless
+                    with self.jacobian_context() as J:
+                        J._apply(d_inputs, d_outputs, d_residuals, mode)
 
-                # Jacobian and vectors are all unscaled, dimensional
-                with self._unscaled_context(
-                        outputs=[self._outputs], residuals=[d_residuals]):
-                    d_residuals *= -1.0
-                    self.compute_jacvec_product(self._inputs, self._outputs,
-                                                d_inputs, d_residuals, mode)
-                    d_residuals *= -1.0
-        if do_recording:
-            with recording(self.pathname + '._apply_linear', self.iter_count):
-                self.record_iteration()
+                    # Jacobian and vectors are all unscaled, dimensional
+                    with self._unscaled_context(
+                            outputs=[self._outputs], residuals=[d_residuals]):
+                        d_residuals *= -1.0
+                        self.compute_jacvec_product(self._inputs, self._outputs,
+                                                    d_inputs, d_residuals, mode)
+                        d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode):
         """
@@ -285,26 +267,18 @@ class ExplicitComponent(Component):
         float
             relative error.
         """
-        from openmdao.recorders.base_recorder import recording,\
-            iter_get_norm_on_call_stack, compute_total_derivs_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack() and not \
-            compute_total_derivs_on_call_stack()
+        from openmdao.recorders.base_recorder import recording2
+        with recording2(self.pathname + '._apply_linear', self.iter_count, self):
+            for vec_name in vec_names:
+                d_outputs = self._vectors['output'][vec_name]
+                d_residuals = self._vectors['residual'][vec_name]
 
-        for vec_name in vec_names:
-            d_outputs = self._vectors['output'][vec_name]
-            d_residuals = self._vectors['residual'][vec_name]
-
-            with self._unscaled_context(
-                    outputs=[d_outputs], residuals=[d_residuals]):
-                if mode == 'fwd':
-                    d_outputs.set_vec(d_residuals)
-                elif mode == 'rev':
-                    d_residuals.set_vec(d_outputs)
-
-        if do_recording:
-            with recording(self.pathname + '._apply_linear', self.iter_count):
-                self.record_iteration()
-
+                with self._unscaled_context(
+                        outputs=[d_outputs], residuals=[d_residuals]):
+                    if mode == 'fwd':
+                        d_outputs.set_vec(d_residuals)
+                    elif mode == 'rev':
+                        d_residuals.set_vec(d_outputs)
         return False, 0., 0.
 
     def _linearize(self, do_nl=False, do_ln=False):

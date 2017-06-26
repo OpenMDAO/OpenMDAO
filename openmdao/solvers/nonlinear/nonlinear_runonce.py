@@ -34,6 +34,7 @@ class NonLinearRunOnce(NonlinearSolver):
         """
         system = self._system
 
+
         from openmdao.recorders.base_recorder import recording
 
         with recording('NLRunOnce', 0):

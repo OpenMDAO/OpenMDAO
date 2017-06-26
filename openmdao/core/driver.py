@@ -341,13 +341,9 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        # Metadata Setup
-        metadata = self.metadata = create_local_meta('Driver')
-
-        from openmdao.recorders.base_recorder import recording
-        with recording('Driver', self.iter_count):
+        from openmdao.recorders.base_recorder import recording2
+        with recording2(self.get_name(), self.iter_count, self):
             failure_flag = self._problem.model._solve_nonlinear()
-            self._rec_mgr.record_iteration(self, metadata)
 
         self.iter_count += 1
         return failure_flag
@@ -488,3 +484,13 @@ class Driver(object):
             max_procs can be None, indicating all available procs can be used.
         """
         return model.get_req_procs()
+
+    def record_iteration(self):
+        """
+        Record an iteration of the current Driver.
+        """
+        metadata = create_local_meta(self.get_name())
+        self._rec_mgr.record_iteration(self, metadata)
+
+    def get_name(self):
+        return "Driver"

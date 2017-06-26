@@ -104,6 +104,37 @@ def recording(name, iter_count):
         # print_recording_iteration_stack()
         recording_iteration_stack.pop()
 
+@contextmanager
+def recording2(name, iter_count, object_requesting_recording):
+    """
+    Record in a way.
+
+    Parameters
+    ----------
+    name : str
+        name of the object being recorded.
+    iter_count : int
+        number of current iteration of name.
+    """
+    # Do things before the code inside the recording with block.
+    recording_iteration_stack.append((name, iter_count))
+
+    try:
+        # Run the code inside the with block.
+        yield
+
+        # Determine if recording is justified, and do it.
+        do_recording = not iter_get_norm_on_call_stack() and not \
+            compute_total_derivs_on_call_stack()
+
+        if do_recording:
+            object_requesting_recording.record_iteration()
+
+    finally:
+        # No matter what happens during the yield, gracefully pop
+        # Enable the following line for stack debugging.
+        # print_recording_iteration_stack()
+        recording_iteration_stack.pop()
 
 class BaseRecorder(object):
     """
