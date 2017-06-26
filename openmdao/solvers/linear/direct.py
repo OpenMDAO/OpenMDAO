@@ -173,7 +173,7 @@ class DirectSolver(LinearSolver):
                 x_vec.set_data(x_data)
 
         from openmdao.recorders.base_recorder import recording
-        with recording('DirectSolver', self._solver._iter_count):
+        with recording('DirectSolver', self._iter_count):
             metadata = create_local_meta('DirectSolver')
             self._rec_mgr.record_iteration(self, metadata)  # no norms
 

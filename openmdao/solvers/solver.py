@@ -213,7 +213,6 @@ class Solver(object):
                 metadata = create_local_meta(type(self).__name__)
                 self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
 
-
             self._mpi_print(self._iter_count, norm, norm / norm0)
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))

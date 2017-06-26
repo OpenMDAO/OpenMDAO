@@ -320,7 +320,6 @@ class pyOptSparseDriver(Driver):
             val = dv_dict[name]
             self.set_design_var(name, val)
 
-
         from openmdao.recorders.base_recorder import recording
         with recording(self.options['optimizer'], self.iter_count):
             model._solve_nonlinear()
@@ -380,7 +379,7 @@ class pyOptSparseDriver(Driver):
                 func_dict.update(self.get_constraint_values(lintype='nonlinear'))
 
                 # Record after getting obj and constraint to assure they have
-                 # been gathered in MPI.
+                # been gathered in MPI.
                 self._rec_mgr.record_iteration(self, metadata)
 
             self.iter_count += 1

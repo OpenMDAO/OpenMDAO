@@ -1083,7 +1083,6 @@ class Group(System):
             with recording(name + '._apply_nonlinear', self.iter_count):
                 self.record_iteration()
 
-
     def _solve_nonlinear(self):
         """
         Compute outputs. The model is assumed to be in a scaled state.
@@ -1118,7 +1117,7 @@ class Group(System):
         result = self._nonlinear_solver.solve()
 
         if do_recording:
-            #with recording(name + '._solve_nonlinear', self.iter_count):
+            # with recording(name + '._solve_nonlinear', self.iter_count):
             with recording(name, self.iter_count):
                 self.record_iteration()
 

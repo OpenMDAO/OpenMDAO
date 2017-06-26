@@ -11,9 +11,6 @@ def create_local_meta(name):
 
     Parameters
     ----------
-    metadata : dict
-        Dictionary containing the metadata passed from the parent level.
-
     name : str
         String to describe the current level of execution.
 
