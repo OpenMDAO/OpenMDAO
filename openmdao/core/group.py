@@ -10,6 +10,7 @@ from six.moves import range
 
 import numpy as np
 
+from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
@@ -1212,7 +1213,8 @@ class Group(System):
             Keyword arguments for controlling the behavior of the approximation.
         """
         self._approx_schemes = OrderedDict()
-        supported_methods = {'fd': FiniteDifference}
+        supported_methods = {'fd': FiniteDifference,
+                             'cs': ComplexStep}
 
         if method not in supported_methods:
             msg = 'Method "{}" is not supported, method must be one of {}'

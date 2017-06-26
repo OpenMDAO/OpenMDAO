@@ -222,6 +222,33 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.01]], 1e-6)
 
 
+class TestGroupComplexStep(unittest.TestCase):
+
+    def test_paraboloid(self):
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.linear_solver = ScipyIterativeSolver()
+        model.approx_total_derivs(method='cs')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        of = ['f_xy']
+        wrt = ['x', 'y']
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+
+        assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
+        assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
+
+        # 1 output x 2 inputs
+        self.assertEqual(len(model._approx_schemes['cs']._exec_list), 2)
+
+
 class ApproxTotalsFeature(unittest.TestCase):
 
     def test_basic(self):

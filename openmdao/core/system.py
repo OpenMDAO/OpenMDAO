@@ -837,7 +837,7 @@ class System(object):
         self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
 
-    def _setup_vectors(self, root_vectors, excl_out, excl_in, resize=False):
+    def _setup_vectors(self, root_vectors, excl_out, excl_in, resize=False, alloc_complex=False):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
@@ -851,10 +851,16 @@ class System(object):
             Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
         resize : bool
             Whether to resize the root vectors - i.e, because this system is initiating a reconf.
+        alloc_complex : bool
+            Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
         self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._excluded_vars_out = excl_out
         self._excluded_vars_in = excl_in
+
+        # Check for complex step to set vectors up appropriately.
+        if 'cs' in self._approx_schemes or alloc_complex:
+            alloc_complex = True
 
         for vec_name in self._vec_names:
             vector_class = root_vectors['output'][vec_name].__class__
@@ -863,14 +869,15 @@ class System(object):
                 type_ = 'output' if key is 'residual' else key
 
                 vectors[key][vec_name] = vector_class(
-                    vec_name, type_, self, root_vectors[key][vec_name], resize=resize)
+                    vec_name, type_, self, root_vectors[key][vec_name], resize=resize,
+                    alloc_complex=alloc_complex)
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
         self._residuals = vectors['residual']['nonlinear']
 
         for subsys in self._subsystems_myproc:
-            subsys._setup_vectors(root_vectors, excl_out, excl_in)
+            subsys._setup_vectors(root_vectors, excl_out, excl_in, alloc_complex=alloc_complex)
 
     def _setup_bounds(self, root_lower, root_upper, resize=False):
         """

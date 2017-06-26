@@ -9,6 +9,23 @@ from openmdao.utils.general_utils import ensure_compatible
 from openmdao.utils.name_maps import name2abs_name
 
 
+class VectorInfo(object):
+    """
+    Communal object for storing some global information in the vectors.
+
+    Attributes
+    ----------
+    _under_complex_step : bool
+        When this is True, the vectors operate with complex numbers.
+    """
+
+    def __init__(self):
+        """
+        Initialize.
+        """
+        self._under_complex_step = False
+
+
 class Vector(object):
     """
     Base Vector class.
@@ -45,9 +62,13 @@ class Vector(object):
         by varset name.
     _indices : list
         List of indices mapping the varset-grouped data to the global vector.
+    _vector_info : <VectorInfo>
+        Object to store some global info, such as complex step state.
     """
 
-    def __init__(self, name, typ, system, root_vector=None, resize=False):
+    _vector_info = VectorInfo()
+
+    def __init__(self, name, typ, system, root_vector=None, resize=False, alloc_complex=False):
         """
         Initialize all attributes.
 
@@ -63,6 +84,8 @@ class Vector(object):
             Pointer to the vector owned by the root system.
         resize : bool
             If true, resize the root vector.
+        alloc_complex : bool
+            Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
         self._name = name
         self._typ = typ
