@@ -504,12 +504,12 @@ class Vector(object):
         Print the names and values of all variables in this vector, one per line.
         """
         abs2prom = self._system._var_abs2prom[self._typ]
-        print('-' * 30)
+        print('-' * 35)
         print('   Vector %s, type %s' % (self._name, self._typ))
         for abs_name, view in iteritems(self._views):
             prom_name = abs2prom[abs_name]
             print(' ' * 3, prom_name, view)
-        print('-' * 30)
+        print('-' * 35)
         print()
 
 
