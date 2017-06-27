@@ -486,7 +486,12 @@ class System(object):
                 else:
 
                     # Check for complex step to set vectors up appropriately.
+                    # If any subsystem needs complex step, then we need to allocate it everywhere.
                     alloc_complex = 'cs' in self._approx_schemes
+                    for sub in self._subsystems_allprocs:
+                        if alloc_complex:
+                            break
+                        alloc_complex = 'cs' in sub._approx_schemes
 
                     root_vectors[key][vec_name] = vector_class(vec_name, type_, self,
                                                                alloc_complex=alloc_complex)

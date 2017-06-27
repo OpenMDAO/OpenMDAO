@@ -12,6 +12,7 @@ from scipy.sparse import issparse
 from copy import deepcopy
 from collections import OrderedDict, Iterable
 
+from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
@@ -524,11 +525,12 @@ class Component(System):
             May also contain a glob pattern.
         method : str
             The type of approximation that should be used. Valid options include:
-                - 'fd': Finite Difference
+                - 'fd': Finite Difference, 'cs': Complex Step
         **kwargs : dict
             Keyword arguments for controlling the behavior of the approximation.
         """
-        supported_methods = {'fd': FiniteDifference}
+        supported_methods = {'fd': FiniteDifference,
+                             'cs': ComplexStep}
 
         if method not in supported_methods:
             msg = 'Method "{}" is not supported, method must be one of {}'
