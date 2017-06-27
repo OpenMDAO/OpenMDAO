@@ -722,10 +722,16 @@ class Problem(object):
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.
         if approx:
 
-            # Initialization based on driver (or user) -requested "of" and "wrt".
-            if not model._owns_approx_of or model._owns_approx_of != of \
-               or model._owns_approx_wrt != wrt:
+            # Re-initialize so that it is clean.
+            if model._approx_schemes:
+                method = list(model._approx_schemes.keys())[0]
+                model.approx_total_derivs(method=method)
+            else:
                 model.approx_total_derivs(method='fd')
+
+            # Initialization based on driver (or user) -requested "of" and "wrt".
+            if not model._owns_approx_jac or model._owns_approx_of != set(of) \
+               or model._owns_approx_wrt != set(wrt):
                 model._owns_approx_of = set(of)
                 model._owns_approx_wrt = set(wrt)
                 model._setup_jacobians(recurse=False)

@@ -484,7 +484,12 @@ class System(object):
                 if not initial:
                     root_vectors[key][vec_name] = self._vectors[key][vec_name]._root_vector
                 else:
-                    root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
+
+                    # Check for complex step to set vectors up appropriately.
+                    alloc_complex = 'cs' in self._approx_schemes
+
+                    root_vectors[key][vec_name] = vector_class(vec_name, type_, self,
+                                                               alloc_complex=alloc_complex)
 
         if not initial:
             excl_out = self._excluded_vars_out

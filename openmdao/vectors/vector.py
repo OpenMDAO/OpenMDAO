@@ -57,6 +57,8 @@ class Vector(object):
         Set of variables that are relevant in the current context.
     _root_vector : Vector
         Pointer to the vector owned by the root system.
+    _alloc_complex : Bool
+        If True, then space for the imaginary part is also allocated.
     _data : {}
         Dict of the actual allocated data (depends on implementation), keyed
         by varset name.
@@ -103,6 +105,13 @@ class Vector(object):
         self._root_vector = None
         self._data = {}
         self._indices = {}
+
+        # Support for Complex Step
+        self._imag_data = {}
+        self._imag_views = {}
+        self._imag_views_flat = {}
+        self._alloc_complex = alloc_complex
+
         if root_vector is None:
             self._root_vector = self
         else:
@@ -149,8 +158,8 @@ class Vector(object):
         <Vector>
             instance of the clone; the data is copied.
         """
-        vec = self.__class__(self._name, self._typ, self._system,
-                             self._root_vector)
+        vec = self.__class__(self._name, self._typ, self._system, self._root_vector,
+                             alloc_complex=self._alloc_complex)
         vec._clone_data()
         if initialize_views:
             vec._initialize_views()
@@ -272,6 +281,8 @@ class Vector(object):
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
+            if self._vector_info._under_complex_step:
+                return self._views[abs_name] + 1j* self._imag_views[abs_name]
             return self._views[abs_name]
         else:
             msg = 'Variable name "{}" not found.'
@@ -291,7 +302,11 @@ class Vector(object):
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
             value, shape = ensure_compatible(name, value, self._views[abs_name].shape)
-            self._views[abs_name][:] = value
+            if self._vector_info._under_complex_step:
+                self._views[abs_name][:] = value.real
+                self._imag_views[abs_name][:] = value.imag
+            else:
+                self._views[abs_name][:] = value
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))

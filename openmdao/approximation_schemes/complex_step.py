@@ -10,45 +10,10 @@ from openmdao.approximation_schemes.approximation_scheme import ApproximationSch
 from openmdao.utils.name_maps import abs_key2rel_key
 
 
-CSForm = namedtuple('CSForm', ['deltas', 'coeffs', 'current_coeff'])
-
 DEFAULT_CS_OPTIONS = {
     'step': 1e-6,
     'form': 'forward',
 }
-
-DEFAULT_ORDER = {
-    'forward': 1,
-    'backward': 1,
-}
-
-FD_COEFFS = {
-    'forward': CSForm(deltas=np.array([1.0]),
-                      coeffs=np.array([1.0]),
-                      current_coeff=-1.0),
-    'backward': CSForm(deltas=np.array([-1.0]),
-                       coeffs=np.array([-1.0]),
-                       current_coeff=1.0),
-}
-
-
-def _generate_cs_coeff(form):
-    """
-    Create a CSForm namedtuple containing the deltas, coefficients, and current coefficient.
-
-    Parameters
-    ----------
-    form : str
-        Requested form of FD (e.g. 'forward', 'central', 'backward').
-
-    Returns
-    -------
-    CSForm
-        namedtuple containing the 'deltas', 'coeffs', and 'current_coeff'. These deltas and
-        coefficients need to be scaled by the step size.
-    """
-    cs_form = FD_COEFFS.get(form)
-    return cs_form
 
 
 class ComplexStep(ApproximationScheme):
@@ -149,23 +114,20 @@ class ComplexStep(ApproximationScheme):
         else:
             raise ValueError('deriv_type must be one of "total" or "partial"')
 
+        # Turn on complex step.
+        system._inputs._vector_info._under_complex_step = True
+
         for key, approximations in groupby(self._exec_list, self._key_fun):
             # groupby (along with this key function) will group all 'of's that have the same wrt and
             # step size.
-            wrt, form, step = key
-
-            cs_form = _generate_cs_coeff(form)
-
-            deltas = cs_form.deltas * step
-            coeffs = cs_form.coeffs / step
-            current_coeff = cs_form.current_coeff / step
+            wrt, form, delta = key
+            if form == 'reverse':
+                delta *= -1.0
 
             if wrt in system._var_abs2meta['input']:
                 in_size = np.prod(system._var_abs2meta['input'][wrt]['shape'])
             elif wrt in system._var_abs2meta['output']:
                 in_size = np.prod(system._var_abs2meta['output'][wrt]['shape'])
-
-            result = system._outputs._clone(True)
 
             outputs = []
 
@@ -178,27 +140,25 @@ class ComplexStep(ApproximationScheme):
                 outputs.append((of, np.zeros((out_size, in_size))))
 
             for idx in range(in_size):
-                if current_coeff:
-                    result.set_vec(current_vec)
-                    result *= current_coeff
-                else:
-                    result.set_const(0.)
-
                 # Run the Finite Difference
-                for delta, coeff in zip(deltas, coeffs):
-                    input_delta = [(wrt, idx, delta)]
-                    result.add_scal_vec(coeff, self._run_point_complex(system, input_delta, deriv_type))
-
-                if deriv_type == 'total':
-                    # Sign difference between output and resids
-                    result *= -1.0
+                input_delta = [(wrt, idx, delta)]
+                result = self._run_point_complex(system, input_delta, deriv_type)
 
                 for of, subjac in outputs:
-                    subjac[:, idx] = result._views_flat[of]
+                    fact = 1.0/delta
+                    if deriv_type == 'total':
+                        # Sign difference between output and resids
+                        fact = -fact
+
+                    subjac[:, idx] = result._imag_views_flat[of]*fact
 
             for of, subjac in outputs:
                 rel_key = abs_key2rel_key(system, (of, wrt))
                 jac[rel_key] = subjac
+
+        # Turn off complex step.
+        system._inputs._vector_info._under_complex_step = False
+
 
     def _run_point_complex(self, system, input_deltas, deriv_type='partial'):
         """
@@ -232,10 +192,10 @@ class ComplexStep(ApproximationScheme):
         outputs = system._outputs
 
         for in_name, idxs, delta in input_deltas:
-            if in_name in outputs._views_flat:
-                outputs._views_flat[in_name][idxs] += delta
+            if in_name in outputs._imag_views_flat:
+                outputs._imag_views_flat[in_name][idxs] += delta
             else:
-                inputs._views_flat[in_name][idxs] += delta
+                inputs._imag_views_flat[in_name][idxs] += delta
 
         # TODO: Grab only results of interest
         cache = results_vec._clone()
@@ -245,9 +205,9 @@ class ComplexStep(ApproximationScheme):
         results_vec.set_vec(cache)
 
         for in_name, idxs, delta in input_deltas:
-            if in_name in outputs._views_flat:
-                outputs._views_flat[in_name][idxs] -= delta
+            if in_name in outputs._imag_views_flat:
+                outputs._imag_views_flat[in_name][idxs] -= delta
             else:
-                inputs._views_flat[in_name][idxs] -= delta
+                inputs._imag_views_flat[in_name][idxs] -= delta
 
         return results

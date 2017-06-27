@@ -224,8 +224,12 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
 class TestGroupComplexStep(unittest.TestCase):
 
+    def tearDown(self):
+        # Global stuff seems to not get cleaned up if test fails.
+        self.prob.model._outputs._vector_info._under_complex_step = False
+
     def test_paraboloid(self):
-        prob = Problem()
+        prob = self.prob = Problem()
         model = prob.model = Group()
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
@@ -247,6 +251,36 @@ class TestGroupComplexStep(unittest.TestCase):
 
         # 1 output x 2 inputs
         self.assertEqual(len(model._approx_schemes['cs']._exec_list), 2)
+
+    def test_paraboloid_subbed(self):
+        prob = self.prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        sub = model.add_subsystem('sub', Group(), promotes=['x', 'y', 'f_xy'])
+        sub.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.linear_solver = ScipyIterativeSolver()
+        sub.approx_total_derivs(method='cs')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        of = ['f_xy']
+        wrt = ['x', 'y']
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+
+        assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
+        assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
+
+        Jfd = sub.jacobian._subjacs
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.x'], [[6.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[-8.0]], 1e-6)
+
+        # 1 output x 2 inputs
+        sub = model.get_subsystem('sub')
+        self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 2)
 
 
 class ApproxTotalsFeature(unittest.TestCase):
