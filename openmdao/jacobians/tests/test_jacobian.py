@@ -30,7 +30,6 @@ class MyExplicitComp(ExplicitComponent):
         self.add_input('y', val=np.zeros(2))
         self.add_output('f', val=np.zeros(2))
 
-    def setup_partials(self):
         val = self._jac_type(np.array([[1., 1.], [1., 1.]]))
         if isinstance(val, list):
             self.declare_partials('f', ['x','y'], rows=val[1], cols=val[2], val=val[0])
@@ -78,7 +77,6 @@ class MyExplicitComp2(ExplicitComponent):
         self.add_input('z', val=0.0)
         self.add_output('f', val=0.0)
 
-    def setup_partials(self):
         val = self._jac_type(np.array([[7.]]))
         if isinstance(val, list):
             self.declare_partials('f', 'z', rows=val[1], cols=val[2], val=val[0])
@@ -471,7 +469,7 @@ class TestJacobian(unittest.TestCase):
             def setup(self):
                 self.add_input('x', val=1.0, shape=2)
                 self.add_output('y', val=1.0, shape=2)
-            def setup_partials(self):
+
                 self.val = 2 * np.ones(2)
                 self.rows = np.arange(2)
                 self.cols = np.arange(2)

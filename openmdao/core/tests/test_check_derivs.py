@@ -209,7 +209,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_output('flow:T', val=284., units="degR", desc="Temperature")
                 self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
 
-            def setup_partials(self):
+                # Finite difference everything
                 self.approx_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
@@ -314,7 +314,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                     self.add_input(self.i_var, self.val, units=self.units)
                     self.add_output(self.o_var, self.val, units=self.units)
 
-            def setup_partials(self):
                 row_col = np.arange(self.size)
                 self.declare_partials(of=self.o_var, wrt=self.i_var,
                                       val=1, rows=row_col, cols=row_col)
