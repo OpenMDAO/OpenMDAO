@@ -34,13 +34,11 @@ class ImplicitComponent(Component):
         """
         super(ImplicitComponent, self)._apply_nonlinear()
 
-        with self._unscaled_context(
-                outputs=[self._outputs], residuals=[self._residuals]):
-            self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
+        from openmdao.recorders.base_recorder import Recording
 
-        from openmdao.recorders.base_recorder import recording
-        with recording(self.pathname + '._apply_nonlinear', self.iter_count):
-            self.record_iteration()
+        with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+            with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
+                self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
     def _solve_nonlinear(self):
         """

@@ -341,8 +341,9 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        from openmdao.recorders.base_recorder import recording2
-        with recording2(self.get_name(), self.iter_count, self):
+        from openmdao.recorders.base_recorder import Recording
+        with Recording(self.get_name(), self.iter_count, self) as rec:
+
             failure_flag = self._problem.model._solve_nonlinear()
 
         self.iter_count += 1

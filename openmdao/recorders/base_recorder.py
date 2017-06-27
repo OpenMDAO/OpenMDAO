@@ -123,7 +123,7 @@ def recording2(name, iter_count, object_requesting_recording):
         # Run the code inside the with block.
         yield
 
-        # Determine if recording is justified, and do it.
+        # Determine if recording is justified.
         do_recording = not iter_get_norm_on_call_stack() and not \
             compute_total_derivs_on_call_stack()
 
@@ -135,6 +135,39 @@ def recording2(name, iter_count, object_requesting_recording):
         # Enable the following line for stack debugging.
         # print_recording_iteration_stack()
         recording_iteration_stack.pop()
+
+class Recording(object):
+    """
+    Some docstring here.
+    """
+    def __init__(self, name, iter_count, object_requesting_recording):
+        self.name = name
+        self.iter_count = iter_count
+        self.object_requesting_recording = object_requesting_recording
+        self.norm0 = 1
+        self.norm = 0
+        self.method = ''
+
+    def __enter__(self):
+        # Do things before the code inside the recording with block.
+        recording_iteration_stack.append((self.name, self.iter_count))
+        return self
+
+    def __exit__(self, *args):
+        # Determine if recording is justified.
+        do_recording = not iter_get_norm_on_call_stack() and not \
+            compute_total_derivs_on_call_stack()
+
+        if do_recording:
+            if isinstance(self.object_requesting_recording, Solver):
+                abs = self.norm
+                rel = self.norm / self.norm0
+                self.object_requesting_recording.record_iteration(abs=abs, rel=rel)
+            else:
+                self.object_requesting_recording.record_iteration()
+
+        recording_iteration_stack.pop()
+
 
 class BaseRecorder(object):
     """
