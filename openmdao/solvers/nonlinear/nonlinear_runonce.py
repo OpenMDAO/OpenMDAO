@@ -4,7 +4,6 @@ Define the NonLinearRunOnce class.
 This is a simple nonlinear solver that just runs the system once.
 """
 from openmdao.solvers.solver import NonlinearSolver
-from openmdao.recorders.base_recorder import Recording
 
 class NonLinearRunOnce(NonlinearSolver):
     """
@@ -30,7 +29,8 @@ class NonLinearRunOnce(NonlinearSolver):
         """
         system = self._system
 
-        with Recording('NLRunOnce', 0, self):
+        from openmdao.recorders.base_recorder import Recording
+        with Recording('NLRunOnce', 0, self) as rec:
             # If this is a parallel group, transfer all at once then run each subsystem.
             if len(system._subsystems_myproc) != len(system._subsystems_allprocs):
                 system._transfer('nonlinear', 'fwd')
@@ -43,5 +43,7 @@ class NonLinearRunOnce(NonlinearSolver):
                     system._transfer('nonlinear', 'fwd', isub)
                     subsys._solve_nonlinear()
                     system._check_reconf_update()
+            rec.abs = 0.0
+            rec.rel = 0.0
 
         return False, 0.0, 0.0

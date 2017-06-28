@@ -144,8 +144,10 @@ class Recording(object):
         self.name = name
         self.iter_count = iter_count
         self.object_requesting_recording = object_requesting_recording
-        self.norm0 = 1
+        self.norm0 = 0
         self.norm = 0
+        self.abs = 0
+        self.rel = 0
         self.method = ''
 
     def __enter__(self):
@@ -160,9 +162,15 @@ class Recording(object):
 
         if do_recording:
             if isinstance(self.object_requesting_recording, Solver):
-                abs = self.norm
-                rel = self.norm / self.norm0
-                self.object_requesting_recording.record_iteration(abs=abs, rel=rel)
+                # abs = self.norm
+                # rel = self.norm / self.norm0
+
+                # if self.norm0:
+                #     rel = self.norm / self.norm0
+                # else:
+                #     rel = 1.0
+                self.object_requesting_recording.record_iteration(abs=self.abs, rel=self.rel)
+                # self.object_requesting_recording.record_iteration(abs=abs, rel=rel)
             else:
                 self.object_requesting_recording.record_iteration()
 

@@ -951,7 +951,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_solver_output = {
             'px.x': [0.],
-            'pz.z': [-2.71050543e-21, 0.00000000e+00],
+            'pz.z': [-8.67361738e-20, 0.00000000e+00],
             'd1.y1': [0.00045069],
             'd2.y2': [-0.00225346],
             'obj_cmp.obj': [0.00045646],
@@ -990,7 +990,7 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(self.prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'ScipyIterativeSolver', (2,)]
-        expected_abs_error = 8.49738327756984e-13
+        expected_abs_error = 1.01212656366e-12
         expected_rel_error = 3.180364454577043e-16
 
         expected_solver_output = {
@@ -1286,7 +1286,7 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
                       'mda._solve_nonlinear', (6, ), 'NonlinearBlockGS', (4, )]
 
-        expected_abs_error = 3.905986645236226e-11,
+        expected_abs_error = 3.90603105e-11,
 
         expected_rel_error = 1.03710514e-06,
 

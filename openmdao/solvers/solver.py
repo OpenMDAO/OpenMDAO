@@ -214,6 +214,8 @@ class Solver(object):
                 # into the class.
                 rec.norm = norm
                 rec.norm0 = norm0
+                rec.abs = norm
+                rec.rel = norm/ norm0
 
             if norm0 == 0: norm0 = 1
             self._mpi_print(self._iter_count, norm, norm / norm0)
