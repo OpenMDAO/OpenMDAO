@@ -26,8 +26,8 @@ The step size can be any non-zero number, but should be positive (one can change
 .. embed-test::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_fd_options
 
-Approximating Total Derivatives
-===============================
+Approximating Semi-Total Derivatives
+====================================
 
 There are also times where it makes more sense to approximate the derivatives for an entire group in one shot. You can turn on
 the approximation by calling `approx_total_derivs` on any `Group`.
@@ -37,7 +37,7 @@ the approximation by calling `approx_total_derivs` on any `Group`.
 
 The default method is finite difference, and OpenMDAO
 automatically figures out what derivatives are needed to populate the Jacobian. When total derivative approximation is turned
-on in a group, all linear solves or derivative computation that are intiated above that Group's level are approximated, and
+on in a group, all linear solves or derivative computations that are intiated above that Group's level are approximated for this group, and
 for those calculations, the Group looks like a Component with an approximated Jacobian. However, the Jacobian contains total
 derivatives rather than partial derivatives, so any implicit states that are contained within the group will not have their
 partials exposed for convergence by solvers that are higher in the hierarchy. If you want to finite difference a Group that
