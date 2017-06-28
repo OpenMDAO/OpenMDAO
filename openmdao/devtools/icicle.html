@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  margin: auto;
+  position: relative;
+}
+
+rect {
+  stroke: #fff;
+}
+
+/*
+we're hiding the $parent nodes, which are the ones that contain
+whatever time is required to make all of the children + $parent to
+add up to actual time recorded for the parent.  They're hidden because
+they would do nothing but confuse users, but they must exist in order for
+the child blocks to have correct visual proportions relative to each other
+using d3.partition.
+*/
+.hiderect {
+    visibility: hidden;
+}
+
+#tooltip {
+  position: absolute;
+  text-align: left;
+  padding: 4px;
+  font: 14px sans-serif;
+  background: lightgray;
+  border: 3px;
+  border-radius: 8px;
+  pointer-events: none;
+  -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+  -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.funcpath {
+    font-weight: bold;
+}
+
+.tottime {
+    font-weight: bold;
+}
+
+.totcalls {
+    font-weight: bold;
+}
+
+.loctime {
+    font-weight: bold;
+}
+
+.loccalls {
+    font-weight: bold;
+}
+
+.pctparent {
+    font-weight: bold;
+}
+
+.pcttotal {
+    font-weight: bold;
+}
+
+.totpcttotal {
+    font-weight: bold;
+}
+
+p {
+    line-height: .2em;
+}
+
+td {
+    text-align: left;
+}
+
+h1 {
+    text-align: center;
+}
+
+</style>
+</head>
+<body>
+    <header><h1>$title</h1></header>
+<script type="text/javascript" src="http://d3js.org/d3.v4.js"></script>
+<script>
+
+var width = 960,
+    height = 500;
+
+var x = d3.scaleLinear()
+    .range([0, width]);
+
+var y = d3.scaleLinear()
+    .range([0, height]);
+
+var color = d3.scaleOrdinal()
+    .range(d3.schemeCategory20c);
+
+var svg;
+
+var root_table = $call_graph_data;
+
+var prec = d3.precisionFixed(0.05);
+var formatTime = d3.format(".3g");
+var formatPct = d3.format("." + prec + "%");
+var formatCalls = d3.format(",d");
+
+var last_d = null;
+var rect;
+var tooltip;
+
+window.onresize = resize;
+
+function resize() {
+    width = window.innerWidth;
+
+    svg.attr("width", width);
+    x = d3.scaleLinear()
+        .range([0, width]);
+
+    if (last_d !== null) {
+        x.domain([last_d.x0, last_d.x1]);
+        y.domain([last_d.y0, 1]).range([last_d.y0 ? 20 : 0, height]);
+    }
+
+    rect.attr("x", function(d) { return x(d.x0); })
+        .attr("y", function(d) { return y(d.y0); })
+        .attr("width", function(d) { return x(d.x1) - x(d.x0); })
+        .attr("height", function(d) { return y(d.y1) - y(d.y0); });
+}
+
+window.onload = function() {
+
+    tooltip = d3.selectAll("#tooltip")
+        .style("display", "none");
+
+    svg = d3.select("body").append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    var funcpath = d3.select(".funcpath");
+    var loctime = d3.select(".loctime");
+    var loccalls = d3.select(".loccalls");
+    var tottime = d3.select(".tottime");
+    var totcalls = d3.select(".totcalls");
+    var pctparent = d3.select(".pctparent");
+    var pcttotal = d3.select(".pcttotal");
+    var totpcttotal = d3.select(".totpcttotal")
+
+    var stratify = d3.stratify()
+        .id(function(d) { return d.name; })
+        .parentId(function(d) { return d.name.substring(0, d.name.lastIndexOf("@")); });
+
+    var root = stratify(root_table)
+        .sum(function(d) { return d.time; })
+        .sort(function(a,b) { return b.value - a.value; });
+
+    var partition = d3.partition()
+        .padding(0);
+
+    partition(root);
+
+    rect = d3.select("svg").selectAll("rect")
+        .data(root.descendants())
+        .enter().append("rect")
+        .attr("x", function(d) { return x(d.x0); })
+        .attr("y", function(d) { return y(d.y0); })
+        .attr("width", function(d) { return x(d.x1) - x(d.x0); })
+        .attr("height", function(d) { return y(d.y1) - y(d.y0); })
+        .classed("hiderect", function(d) { return d.data.short_name === "$parent"; });
+
+    var crect = rect.select(function(d) {
+            return d.data.short_name === "$parent" ? null : this;
+        })
+        .attr("fill", function(d) {
+            return color((d.children ? d : d.parent).id);
+        })
+        .on("click", click)
+        .on("mouseover", function(d) {
+            crect.attr("fill", function(dd) {
+                if (d.data.short_name === dd.data.short_name) {
+                    return "magenta";
+                }
+                else {
+                    return color((dd.children ? dd : dd.parent).id);
+                }
+            });
+             funcpath.text(d.data.short_name);
+             loctime.text(formatTime(d.value));
+             tottime.text(formatTime(d.data.tot_time));
+             loccalls.text(formatCalls(d.data.count));
+             totcalls.text(formatCalls(d.data.tot_count));
+             pctparent.text(formatPct(d.data.pct_parent));
+             pcttotal.text(formatPct(d.data.pct_total));
+             totpcttotal.text(formatPct(d.data.tot_pct_total));
+             return tooltip.style("display", "inline");
+         })
+        .on("mouseout", function(d) {
+            crect.attr("fill", function(d) {
+                return color((d.children ? d : d.parent).id);
+            });
+             return tooltip.style("display", "none");
+        })
+        .on("mousemove", function(d) {
+            var newx;
+            var clientWidthO2 = tooltip.nodes()[0].clientWidth/2;
+            if (d3.event.layerX < clientWidthO2) {
+                newx = 0;
+            }
+            else if (d3.event.layerX > window.innerWidth-clientWidthO2) {
+                newx = window.innerWidth-tooltip.nodes()[0].clientWidth;
+            }
+            else {
+                newx = d3.event.layerX-clientWidthO2;
+            }
+            return tooltip
+                .style("left", (newx) + "px")
+                .style("top", (d3.event.pageY + 20) + "px");
+        });
+
+    resize();
+};
+
+function click(d) {
+  last_d = d;
+  x.domain([d.x0, d.x1]);
+  y.domain([d.y0, 1]).range([d.y0 ? 20 : 0, height]);
+
+  rect.transition()
+      .duration(750)
+      .attr("x", function(d) { return x(d.x0); })
+      .attr("y", function(d) { return y(d.y0); })
+      .attr("width", function(d) { return x(d.x1) - x(d.x0); })
+      .attr("height", function(d) { return y(d.y1) - y(d.y0); });
+}
+
+</script>
+
+<div id="tooltip">
+    <table>
+        <tr><td>Function:</td><td class=funcpath></td></tr>
+    </table>
+    <table>
+        <tr><td>Local time:</td><td class=loctime></td><td>Local calls:</td> <td class=loccalls></td><td>Pct parent:</td> <td class=pctparent></td></tr>
+        <tr><td>Total time:</td><td class=tottime></td> <td>Total calls:</td> <td class=totcalls></td><td>Pct total:</td> <td class=pcttotal></td><td>Total Pct total:</td> <td class=totpcttotal></td></tr>
+    </table>
+</div>
+</body>
+</html>
