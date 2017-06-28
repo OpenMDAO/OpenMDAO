@@ -962,7 +962,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_solver_residuals = {
             'px.x': [0.],
             'pz.z': [-0., -0.],
-            'd1.y1': [7.10542736e-15],
+            'd1.y1': [0.0],
             'd2.y2': [-0.00229801],
             'obj_cmp.obj': [5.75455956e-06],
             'con_cmp1.con1': [-0.],
@@ -990,13 +990,13 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(self.prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'ScipyIterativeSolver', (2,)]
-        expected_abs_error = 1.01212656366e-12
-        expected_rel_error = 3.180364454577043e-16
+        expected_abs_error = 0.0
+        expected_rel_error = 0.0
 
         expected_solver_output = {
             'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [5.41157587e-07],
+            'd1.y1': [0.0],
             'd2.y2': [-0.41168147],
             'obj_cmp.obj': [-0.48667678],
             'con_cmp1.con1': [0.770496],
@@ -1255,8 +1255,7 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'SLSQP', (5, )]
 
         expected_desvars = {
-                            "pz.z": [1.97763888e+00, 1.17469760e-15],
-                            # "px.x": [-6.29609630e-15, ]
+                            "pz.z": [1.97763888e+00, 0.0],
                             "px.x": [0.0, ]
         }
 
@@ -1286,9 +1285,9 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
                       'mda._solve_nonlinear', (6, ), 'NonlinearBlockGS', (4, )]
 
-        expected_abs_error = 3.90603105e-11,
+        expected_abs_error = 0.0,
 
-        expected_rel_error = 1.03710514e-06,
+        expected_rel_error = 0.0,
 
         expected_solver_output = {
             "mda.d2.y2": [3.75527777],
