@@ -2628,6 +2628,7 @@ class System(object):
         self._rec_mgr.record_iteration(self, metadata, method=inspect.stack()[3][3])
         self.iter_count += 1
 
+
 def get_current_case():
     """
     Get information about the currently running test case.

@@ -951,7 +951,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_solver_output = {
             'px.x': [0.],
-            'pz.z': [-8.67361738e-20, 0.00000000e+00],
+            'pz.z': [0.0, 0.00000000e+00],
             'd1.y1': [0.00045069],
             'd2.y2': [-0.00225346],
             'obj_cmp.obj': [0.00045646],

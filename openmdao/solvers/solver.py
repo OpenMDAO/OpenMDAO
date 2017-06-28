@@ -7,6 +7,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.record_util import create_local_meta
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class SolverInfo(object):
@@ -201,8 +202,6 @@ class Solver(object):
         norm0, norm = self._iter_initialize()
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
-        from openmdao.recorders.base_recorder import Recording
-
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
             with Recording(type(self).__name__, self._iter_count, self) as rec:
@@ -215,9 +214,10 @@ class Solver(object):
                 rec.norm = norm
                 rec.norm0 = norm0
                 rec.abs = norm
-                rec.rel = norm/ norm0
+                rec.rel = norm / norm0
 
-            if norm0 == 0: norm0 = 1
+            if norm0 == 0:
+                norm0 = 1
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
         fail = (np.isinf(norm) or np.isnan(norm) or (norm > atol and norm / norm0 > rtol))
@@ -313,6 +313,7 @@ class Solver(object):
         """
         metadata = create_local_meta(self.SOLVER)
         self._rec_mgr.record_iteration(self, metadata, **kwargs)
+
 
 class NonlinearSolver(Solver):
     """

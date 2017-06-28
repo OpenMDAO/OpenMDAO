@@ -15,6 +15,7 @@ from pyoptsparse import Optimization
 
 from openmdao.core.driver import Driver
 from openmdao.utils.record_util import create_local_meta
+from openmdao.recorders.recording_iteration_stack import Recording
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
@@ -188,10 +189,11 @@ class pyOptSparseDriver(Driver):
         self.metadata = create_local_meta(self.options['optimizer'])
         self.iter_count = 0
 
-        from openmdao.recorders.base_recorder import recording
-        with recording(self.options['optimizer'], self.iter_count):
+        with Recording(self.options['optimizer'], self.iter_count, self) as rec:
             # Initial Run
             model._solve_nonlinear()
+            rec.abs = 0.0
+            rec.rel = 0.0
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
@@ -312,9 +314,10 @@ class pyOptSparseDriver(Driver):
             val = dv_dict[name]
             self.set_design_var(name, val)
 
-        from openmdao.recorders.base_recorder import recording
-        with recording(self.options['optimizer'], self.iter_count):
+        with Recording(self.options['optimizer'], self.iter_count, self) as rec:
             model._solve_nonlinear()
+            rec.abs = 0.0
+            rec.rel = 0.0
 
         # Save the most recent solution.
         self.pyopt_solution = sol
@@ -362,8 +365,7 @@ class pyOptSparseDriver(Driver):
                 self.set_design_var(name, dv_dict[name])
 
             # Execute the model
-            from openmdao.recorders.base_recorder import recording
-            with recording(self.options['optimizer'], self.iter_count):
+            with Recording(self.options['optimizer'], self.iter_count, self) as rec:
 
                 model._solve_nonlinear()
 
@@ -372,8 +374,8 @@ class pyOptSparseDriver(Driver):
 
                 # Record after getting obj and constraint to assure they have
                 # been gathered in MPI.
-                self._rec_mgr.record_iteration(self, metadata)
-
+                rec.abs = 0.0
+                rec.rel = 0.0
             self.iter_count += 1
 
         except Exception as msg:
@@ -435,5 +437,8 @@ class pyOptSparseDriver(Driver):
         # print(sens_dict)
         return sens_dict, fail
 
-    def get_name(self):
+    def _get_name(self):
+        """
+        Get name of current driver.
+        """
         return self.options['optimizer']

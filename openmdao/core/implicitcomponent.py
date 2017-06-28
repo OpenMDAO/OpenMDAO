@@ -7,6 +7,7 @@ from six import itervalues
 
 from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class ImplicitComponent(Component):
@@ -34,8 +35,6 @@ class ImplicitComponent(Component):
         """
         super(ImplicitComponent, self)._apply_nonlinear()
 
-        from openmdao.recorders.base_recorder import Recording
-
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
                 self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
@@ -56,24 +55,15 @@ class ImplicitComponent(Component):
         # Reconfigure if needed.
         super(ImplicitComponent, self)._solve_nonlinear()
 
-        from openmdao.recorders.base_recorder import recording, iter_get_norm_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack()
-
         if self._nonlinear_solver is not None:
-            result = self._nonlinear_solver.solve()
-            if do_recording:
-                with recording(self.pathname + '._solve_nonlinear', self.iter_count):
-                    self.record_iteration()
+            with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
+                result = self._nonlinear_solver.solve()
             return result
 
         else:
             with self._unscaled_context(outputs=[self._outputs]):
-                result = self.solve_nonlinear(self._inputs, self._outputs)
-
-            if do_recording:
-                with recording(self.pathname + '._solve_nonlinear', self.iter_count):
-                    self.record_iteration()
-
+                with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
+                    result = self.solve_nonlinear(self._inputs, self._outputs)
             if result is None:
                 return False, 0., 0.
             elif type(result) is bool:
@@ -98,8 +88,6 @@ class ImplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        from openmdao.recorders.base_recorder import recording, iter_get_norm_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack()
         for vec_name in vec_names:
             with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
@@ -111,11 +99,9 @@ class ImplicitComponent(Component):
                 # Jacobian and vectors are all unscaled, dimensional
                 with self._unscaled_context(
                         outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
-                    self.apply_linear(self._inputs, self._outputs,
-                                      d_inputs, d_outputs, d_residuals, mode)
-        if do_recording:
-            with recording(self.pathname + '._apply_linear', self.iter_count):
-                self.record_iteration()
+                    with Recording(self.pathname + '._apply_linear', self.iter_count, self):
+                        self.apply_linear(self._inputs, self._outputs,
+                                          d_inputs, d_outputs, d_residuals, mode)
 
     def _solve_linear(self, vec_names, mode):
         """
@@ -137,13 +123,9 @@ class ImplicitComponent(Component):
         float
             relative error.
         """
-        from openmdao.recorders.base_recorder import recording, iter_get_norm_on_call_stack
-        do_recording = not iter_get_norm_on_call_stack()
-
         if self._linear_solver is not None:
-            result = self._linear_solver.solve(vec_names, mode)
-            if do_recording:
-                self.record_iteration()
+            with Recording(self.pathname + '._solve_linear', self.iter_count, self):
+                result = self._linear_solver.solve(vec_names, mode)
 
             return result
 
@@ -155,9 +137,9 @@ class ImplicitComponent(Component):
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
-                with self._unscaled_context(
-                        outputs=[d_outputs], residuals=[d_residuals]):
-                    result = self.solve_linear(d_outputs, d_residuals, mode)
+                with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+                    with Recording(self.pathname + '._solve_linear', self.iter_count, self):
+                        result = self.solve_linear(d_outputs, d_residuals, mode)
 
                 if result is None:
                     result = False, 0., 0.
@@ -167,10 +149,6 @@ class ImplicitComponent(Component):
                 failed = failed or result[0]
                 abs_errors.append(result[1])
                 rel_errors.append(result[2])
-
-            if do_recording:
-                with recording(self.pathname + '._solve_linear', self.iter_count):
-                    self.record_iteration()
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 

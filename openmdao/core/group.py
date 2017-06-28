@@ -17,6 +17,7 @@ from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
 from openmdao.utils.array_utils import convert_neg
 from openmdao.proc_allocators.proc_allocator import ProcAllocationError
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class Group(System):
@@ -1068,15 +1069,13 @@ class Group(System):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        from openmdao.recorders.base_recorder import recording2
         name = self.pathname if self.pathname else 'root'
 
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
-        with recording2(name + '._apply_nonlinear', self.iter_count, self):
+        with Recording(name + '._apply_nonlinear', self.iter_count, self):
             for subsys in self._subsystems_myproc:
                 subsys._apply_nonlinear()
-
 
     def _solve_nonlinear(self):
         """
@@ -1093,7 +1092,6 @@ class Group(System):
         """
         super(Group, self)._solve_nonlinear()
 
-        from openmdao.recorders.base_recorder import recording2
         name = self.pathname if self.pathname else 'root'
 
         # Execute guess_nonlinear if specified.
@@ -1105,7 +1103,7 @@ class Group(System):
                 with sub._unscaled_context(outputs=[sub._outputs], residuals=[sub._residuals]):
                     sub.guess_nonlinear(sub._inputs, sub._outputs, sub._residuals)
 
-        with recording2(name + '._solve_nonlinear', self.iter_count, self):
+        with Recording(name + '._solve_nonlinear', self.iter_count, self):
             result = self._nonlinear_solver.solve()
 
         return result
@@ -1127,11 +1125,9 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        from openmdao.recorders.base_recorder import recording2
-
         name = self.pathname if self.pathname else 'root'
 
-        with recording2(name + '._apply_linear', self.iter_count, self):
+        with Recording(name + '._apply_linear', self.iter_count, self):
             with self.jacobian_context() as J:
                 # Use global Jacobian
                 if self._owns_assembled_jac or self._views_assembled_jac:
@@ -1172,10 +1168,9 @@ class Group(System):
         float
             absolute error.
         """
-        from openmdao.recorders.base_recorder import recording2
         name = self.pathname if self.pathname else 'root'
 
-        with recording2(name + '._solve_linear', self.iter_count, self):
+        with Recording(name + '._solve_linear', self.iter_count, self):
             result = self._linear_solver.solve(vec_names, mode)
 
         return result

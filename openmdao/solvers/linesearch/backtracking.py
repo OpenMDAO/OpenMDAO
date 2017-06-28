@@ -7,7 +7,7 @@ ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condi
 """
 import numpy as np
 from openmdao.solvers.solver import NonlinearSolver
-from openmdao.recorders.base_recorder import Recording
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class BoundsEnforceLS(NonlinearSolver):

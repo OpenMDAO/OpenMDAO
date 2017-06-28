@@ -341,8 +341,8 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        from openmdao.recorders.base_recorder import Recording
-        with Recording(self.get_name(), self.iter_count, self) as rec:
+        from openmdao.recorders.recording_iteration_stack import Recording
+        with Recording(self._get_name(), self.iter_count, self) as rec:
 
             failure_flag = self._problem.model._solve_nonlinear()
 
@@ -479,8 +479,11 @@ class Driver(object):
         """
         Record an iteration of the current Driver.
         """
-        metadata = create_local_meta(self.get_name())
+        metadata = create_local_meta(self._get_name())
         self._rec_mgr.record_iteration(self, metadata)
 
-    def get_name(self):
+    def _get_name(self):
+        """
+        Get name of current Driver.
+        """
         return "Driver"

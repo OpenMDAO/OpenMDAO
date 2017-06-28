@@ -12,6 +12,7 @@ from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class ExplicitComponent(Component):
@@ -176,9 +177,7 @@ class ExplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        from openmdao.recorders.base_recorder import recording2
-
-        with recording2(self.pathname + '._apply_nonlinear', self.iter_count, self):
+        with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
             with self._unscaled_context(
                     outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_vec(self._outputs)
@@ -201,14 +200,11 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._solve_nonlinear()
 
-        from openmdao.recorders.base_recorder import recording2
-
-        with recording2(self.pathname + '._solve_nonlinear', self.iter_count, self):
+        with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self) as rec:
             with self._unscaled_context(
                     outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_const(0.0)
                 failed = self.compute(self._inputs, self._outputs)
-
         return bool(failed), 0., 0.
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
@@ -228,9 +224,7 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        from openmdao.recorders.base_recorder import recording2
-
-        with recording2(self.pathname + '._apply_linear', self.iter_count, self):
+        with Recording(self.pathname + '._apply_linear', self.iter_count, self):
             for vec_name in vec_names:
                 with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                     d_inputs, d_outputs, d_residuals = vecs
@@ -267,8 +261,7 @@ class ExplicitComponent(Component):
         float
             relative error.
         """
-        from openmdao.recorders.base_recorder import recording2
-        with recording2(self.pathname + '._apply_linear', self.iter_count, self):
+        with Recording(self.pathname + '._apply_linear', self.iter_count, self):
             for vec_name in vec_names:
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]

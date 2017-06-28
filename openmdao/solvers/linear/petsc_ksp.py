@@ -151,7 +151,7 @@ class Monitor(object):
         norm : float
             the norm.
         """
-        from openmdao.recorders.base_recorder import Recording
+        from openmdao.recorders.recording_iteration_stack import Recording
         with Recording('PetscKSP', self._solver._iter_count, self._solver) as rec:
             if counter == 0 and norm != 0.0:
                 self._norm0 = norm

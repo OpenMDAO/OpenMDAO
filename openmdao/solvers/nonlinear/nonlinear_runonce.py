@@ -5,6 +5,7 @@ This is a simple nonlinear solver that just runs the system once.
 """
 from openmdao.solvers.solver import NonlinearSolver
 
+
 class NonLinearRunOnce(NonlinearSolver):
     """
     Simple solver that runs the containing system once.
@@ -29,7 +30,7 @@ class NonLinearRunOnce(NonlinearSolver):
         """
         system = self._system
 
-        from openmdao.recorders.base_recorder import Recording
+        from openmdao.recorders.recording_iteration_stack import Recording
         with Recording('NLRunOnce', 0, self) as rec:
             # If this is a parallel group, transfer all at once then run each subsystem.
             if len(system._subsystems_myproc) != len(system._subsystems_allprocs):

@@ -1,5 +1,6 @@
 """Define the LinearRunOnce class."""
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class LinearRunOnce(LinearBlockGS):
@@ -29,13 +30,12 @@ class LinearRunOnce(LinearBlockGS):
         float
             Error at the first iteration.
         """
-        from openmdao.recorders.base_recorder import recording2
-        with recording2('LinearRunOnce', 0, self):
+        with Recording('LinearRunOnce', 0, self) as rec:
             self._vec_names = vec_names
             self._mode = mode
             system = self._system
 
-            # Preprocessing
+            # Pre-processing
             self._rhs_vecs = {}
             if self._mode == 'fwd':
                 b_vecs = system._vectors['residual']
@@ -47,5 +47,8 @@ class LinearRunOnce(LinearBlockGS):
 
             # Single iteration of GS
             self._iter_execute()
+
+            rec.abs = 0.0
+            rec.rel = 0.0
 
         return False, 0.0, 0.0
