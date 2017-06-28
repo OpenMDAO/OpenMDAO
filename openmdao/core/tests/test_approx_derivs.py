@@ -68,6 +68,41 @@ class TestGroupFiniteDifference(unittest.TestCase):
         sub = model.get_subsystem('sub')
         self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 2)
 
+    def test_paraboloid_subbed_in_setup(self):
+        class MyModel(Group):
+
+            def setup(self):
+                self.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+                self.approx_total_derivs()
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        sub = model.add_subsystem('sub', MyModel(), promotes=['x', 'y', 'f_xy'])
+
+        model.linear_solver = ScipyIterativeSolver()
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        of = ['f_xy']
+        wrt = ['x', 'y']
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+
+        assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
+        assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
+
+        Jfd = sub.jacobian._subjacs
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.x'], [[6.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[-8.0]], 1e-6)
+
+        # 1 output x 2 inputs
+        sub = model.get_subsystem('sub')
+        self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 2)
+
     def test_paraboloid_subbed_with_connections(self):
         prob = Problem()
         model = prob.model = Group()
