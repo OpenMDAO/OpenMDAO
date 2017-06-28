@@ -6,9 +6,10 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem
+from openmdao.api import Problem, IndepVarComp, Group, ExplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 
 
 class TestDriver(unittest.TestCase):
@@ -107,6 +108,84 @@ class TestDriver(unittest.TestCase):
                                                    return_format='dict')
         assert_rel_error(self, base[('con1', 'z')][0], derivs['con_cmp1.con1']['pz.z'][0], 1e-5)
         assert_rel_error(self, base[('obj', 'z')][0]*2.0, derivs['obj_cmp.obj']['pz.z'][0], 1e-5)
+
+    def test_vector_scaled_derivs(self):
+
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+        comp = model.add_subsystem('comp', DoubleArrayComp())
+        model.connect('px.x', 'comp.x1')
+
+        model.add_design_var('px.x', ref=np.array([2.0, 3.0]), ref0=np.array([0.5, 1.5]))
+        model.add_objective('comp.y1', ref=np.array([[7.0, 11.0]]), ref0=np.array([5.2, 6.3]))
+        model.add_constraint('comp.y2', lower=0.0, upper=1.0, ref=np.array([[2.0, 4.0]]), ref0=np.array([1.2, 2.3]))
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        derivs = prob.driver._compute_total_derivs(of=['comp.y1'], wrt=['px.x'],
+                                                   return_format='dict')
+
+        oscale = np.array([1.0/(7.0-5.2), 1.0/(11.0-6.3)])
+        iscale = np.array([2.0-0.5, 3.0-1.5])
+        J = comp.JJ[0:2, 0:2]
+
+        # doing this manually so that I don't inadvertantly make an error in the vector math in both the code and test.
+        J[0, 0] *= oscale[0]*iscale[0]
+        J[0, 1] *= oscale[0]*iscale[1]
+        J[1, 0] *= oscale[1]*iscale[0]
+        J[1, 1] *= oscale[1]*iscale[1]
+        assert_rel_error(self, J, derivs['comp.y1']['px.x'], 1.0e-3)
+
+        obj = prob.driver.get_objective_values()
+        obj_base = np.array([ (prob['comp.y1'][0]-5.2)/(7.0-5.2), (prob['comp.y1'][1]-6.3)/(11.0-6.3) ])
+        assert_rel_error(self, obj['comp.y1'], obj_base, 1.0e-3)
+
+        con = prob.driver.get_constraint_values()
+        con_base = np.array([ (prob['comp.y2'][0]-1.2)/(2.0-1.2), (prob['comp.y2'][1]-2.3)/(4.0-2.3) ])
+        assert_rel_error(self, con['comp.y2'], con_base, 1.0e-3)
+
+    def test_vector_scaled_derivs_diff_sizes(self):
+
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+        comp = model.add_subsystem('comp', NonSquareArrayComp())
+        model.connect('px.x', 'comp.x1')
+
+        model.add_design_var('px.x', ref=np.array([2.0, 3.0]), ref0=np.array([0.5, 1.5]))
+        model.add_objective('comp.y1', ref=np.array([[7.0, 11.0, 2.0]]), ref0=np.array([5.2, 6.3, 1.2]))
+        model.add_constraint('comp.y2', lower=0.0, upper=1.0, ref=np.array([[2.0]]), ref0=np.array([1.2]))
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        derivs = prob.driver._compute_total_derivs(of=['comp.y1'], wrt=['px.x'],
+                                                   return_format='dict')
+
+        oscale = np.array([1.0/(7.0-5.2), 1.0/(11.0-6.3), 1.0/(2.0-1.2)])
+        iscale = np.array([2.0-0.5, 3.0-1.5])
+        J = comp.JJ[0:3, 0:2]
+
+        # doing this manually so that I don't inadvertantly make an error in the vector math in both the code and test.
+        J[0, 0] *= oscale[0]*iscale[0]
+        J[0, 1] *= oscale[0]*iscale[1]
+        J[1, 0] *= oscale[1]*iscale[0]
+        J[1, 1] *= oscale[1]*iscale[1]
+        J[2, 0] *= oscale[2]*iscale[0]
+        J[2, 1] *= oscale[2]*iscale[1]
+        assert_rel_error(self, J, derivs['comp.y1']['px.x'], 1.0e-3)
+
+        obj = prob.driver.get_objective_values()
+        obj_base = np.array([ (prob['comp.y1'][0]-5.2)/(7.0-5.2), (prob['comp.y1'][1]-6.3)/(11.0-6.3), (prob['comp.y1'][2]-1.2)/(2.0-1.2) ])
+        assert_rel_error(self, obj['comp.y1'], obj_base, 1.0e-3)
+
+        con = prob.driver.get_constraint_values()
+        con_base = np.array([ (prob['comp.y2'][0]-1.2)/(2.0-1.2)])
+        assert_rel_error(self, con['comp.y2'], con_base, 1.0e-3)
 
 if __name__ == "__main__":
     unittest.main()
