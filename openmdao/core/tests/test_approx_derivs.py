@@ -177,7 +177,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         class TestImplCompArrayDense(TestImplCompArray):
 
-            def setup_partials(self):
+            def setup(self):
+                super(TestImplCompArrayDense, self).setup()
                 self.approx_partials('*', '*')
 
         prob = Problem()
@@ -431,7 +432,8 @@ class TestComponentComplexStep(unittest.TestCase):
 
         class TestImplCompArrayDense(TestImplCompArray):
 
-            def setup_partials(self):
+            def setup(self):
+                super(TestImplCompArrayDense, self).setup()
                 self.approx_partials('*', '*', method='cs')
 
         prob = self.prob = Problem()
