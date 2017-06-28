@@ -312,18 +312,19 @@ class Driver(object):
             osize = 0
             isize = 0
             do_wrt = True
-            Jslices = {}
+            islices = {}
+            oslices = {}
             for okey, oval in iteritems(derivs):
                 if do_wrt:
                     for ikey, val in iteritems(oval):
                         istart = isize
                         isize += val.shape[1]
-                        Jslices[ikey] = slice(istart, isize)
+                        islices[ikey] = slice(istart, isize)
 
                 do_wrt = False
                 ostart = osize
                 osize += oval[ikey].shape[0]
-                Jslices[okey] = slice(ostart, osize)
+                oslices[okey] = slice(ostart, osize)
 
             new_derivs = np.zeros((osize, isize))
 
@@ -345,7 +346,7 @@ class Driver(object):
                     if iscaler is not None:
                         val *= 1.0 / iscaler
 
-                    new_derivs[Jslices[okey], Jslices[ikey]] = val
+                    new_derivs[oslices[okey], islices[ikey]] = val
 
             derivs = new_derivs
 
