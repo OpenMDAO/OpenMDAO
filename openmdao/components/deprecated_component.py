@@ -75,11 +75,11 @@ class Component(BaseComponent):
             else:
                 val = 1.0
 
-            self.declare_partials(out_name, out_name, rows=arange, cols=arange, val=val)
+            self._declare_partials(out_name, out_name, rows=arange, cols=arange, val=val)
 
             for other_name in other_names:
-                self.declare_partials(out_name, other_name, dependent=False)
-                self.declare_partials(other_name, out_name, dependent=False)
+                self._declare_partials(out_name, other_name, dependent=False)
+                self._declare_partials(other_name, out_name, dependent=False)
             other_names.append(out_name)
 
     def add_param(self, name, val=1.0, **kwargs):

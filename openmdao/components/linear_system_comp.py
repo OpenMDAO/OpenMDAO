@@ -46,10 +46,8 @@ class LinearSystemComp(ImplicitComponent):
         self.add_input("b", val=np.ones(size))
         self.add_output("x", shape=size, val=.1)
 
-    def setup_partials(self):
-        """
-        Set up the derivatives according to the user specified mode.
-        """
+        # Set up the derivatives according to the user specified mode.
+
         partial_type = self.metadata['partial_type']
 
         size = self.metadata['size']
@@ -122,7 +120,7 @@ class LinearSystemComp(ImplicitComponent):
 
             J['x', 'x'] = inputs['A']
 
-            # constant, defined int setup_partials
+            # constant, defined int setup
             # J['x', 'b'] = -np.eye()
 
         elif partial_type == "sparse":
@@ -131,7 +129,7 @@ class LinearSystemComp(ImplicitComponent):
             # J['x', 'A'].set_data(np.tile(x, size))
             J['x', 'x'] = inputs['A']
 
-            # constant, defined int setup_partials
+            # constant, defined int setup
             # J['x', 'b'] = -np.ones(size)
 
     def _mat_vec_prod(self, inputs, outputs, d_inputs, d_outputs,
