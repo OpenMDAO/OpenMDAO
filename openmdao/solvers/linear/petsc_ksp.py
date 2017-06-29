@@ -3,8 +3,6 @@
 from __future__ import division, print_function
 import numpy as np
 
-from six.moves import range
-
 try:
     import petsc4py
     from petsc4py import PETSc
@@ -13,8 +11,7 @@ except ImportError:
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.record_util import create_local_meta
-from openmdao.recorders.base_recorder import recording
+from openmdao.recorders.recording_iteration_stack import Recording
 
 KSP_TYPES = [
     "richardson",
@@ -153,14 +150,12 @@ class Monitor(object):
         norm : float
             the norm.
         """
-        if counter == 0 and norm != 0.0:
-            self._norm0 = norm
-        self._norm = norm
-
-        with recording('PetscKSP', self._solver._iter_count):
-            metadata = create_local_meta('PetscKSP')
-            self._solver._rec_mgr.record_iteration(self._solver, metadata, abs=norm,
-                                                   rel=norm / self._norm0)
+        with Recording('PetscKSP', self._solver._iter_count, self._solver) as rec:
+            if counter == 0 and norm != 0.0:
+                self._norm0 = norm
+            self._norm = norm
+            rec.abs = self._norm
+            rec.rel = self._norm / self._norm0
 
         self._solver._mpi_print(counter, norm, norm / self._norm0)
         self._solver._iter_count += 1

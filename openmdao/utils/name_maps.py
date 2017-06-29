@@ -115,8 +115,13 @@ def prom_name2abs_name(system, prom_name, type_):
         if len(abs_list) == 1:
             return abs_list[0]
         else:
-            msg = 'The promoted name "{}" is invalid because it is non-unique.'
-            raise KeyError(msg.format(prom_name))
+            # looks like an aliased input, which must be set via the connected output
+            src_name = system._conn_global_abs_in2out.get(abs_list[0])
+            if src_name and src_name in system._var_abs2prom['output']:
+                src_name = system._var_abs2prom['output'][src_name]  # use promoted name
+            raise KeyError('The promoted name "{}" is invalid because it is non-unique. '
+                           'Access the value from the connected output variable{} instead.'
+                           .format(prom_name, ' "%s"' % src_name if src_name else ''))
     else:
         return None
 
@@ -173,8 +178,6 @@ def prom_key2abs_key(system, prom_key):
     (str, str) or None
         Absolute name pair of sub-Jacobian or None is prom_key is invalid.
     """
-    prom2abs_list = system._var_allprocs_prom2abs_list
-
     abs_name0 = prom_name2abs_name(system, prom_key[0], 'output')
 
     abs_name1in = prom_name2abs_name(system, prom_key[1], 'input')

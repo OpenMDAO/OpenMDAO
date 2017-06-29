@@ -13,7 +13,7 @@ from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
-from openmdao.utils.record_util import create_local_meta
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class DirectSolver(LinearSolver):
@@ -139,42 +139,42 @@ class DirectSolver(LinearSolver):
 
         system = self._system
 
-        for vec_name in self._vec_names:
-            self._vec_name = vec_name
-            d_residuals = system._vectors['residual'][vec_name]
-            d_outputs = system._vectors['output'][vec_name]
+        with Recording('DirectSolver', 0, self) as rec:
+            for vec_name in self._vec_names:
+                self._vec_name = vec_name
+                d_residuals = system._vectors['residual'][vec_name]
+                d_outputs = system._vectors['output'][vec_name]
 
-            # assign x and b vectors based on mode
-            if self._mode == 'fwd':
-                x_vec = d_outputs
-                b_vec = d_residuals
-                trans_lu = 0
-                trans_splu = 'N'
-            elif self._mode == 'rev':
-                x_vec = d_residuals
-                b_vec = d_outputs
-                trans_lu = 1
-                trans_splu = 'T'
+                # assign x and b vectors based on mode
+                if self._mode == 'fwd':
+                    x_vec = d_outputs
+                    b_vec = d_residuals
+                    trans_lu = 0
+                    trans_splu = 'N'
+                elif self._mode == 'rev':
+                    x_vec = d_residuals
+                    b_vec = d_outputs
+                    trans_lu = 1
+                    trans_splu = 'T'
 
-            # AssembledJacobians are unscaled.
-            if system._owns_assembled_jac or system._views_assembled_jac:
-                with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+                # AssembledJacobians are unscaled.
+                if system._owns_assembled_jac or system._views_assembled_jac:
+                    with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+                        b_data = b_vec.get_data()
+                        if (isinstance(system._jacobian._int_mtx,
+                                       (COOMatrix, CSRMatrix, CSCMatrix))):
+                            x_data = self._lu.solve(b_data, trans_splu)
+                        else:
+                            x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
+                        x_vec.set_data(x_data)
+
+                # MVP-generated jacobians are scaled.
+                else:
                     b_data = b_vec.get_data()
-                    if (isinstance(system._jacobian._int_mtx, (COOMatrix, CSRMatrix, CSCMatrix))):
-                        x_data = self._lu.solve(b_data, trans_splu)
-                    else:
-                        x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
+                    x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
                     x_vec.set_data(x_data)
 
-            # MVP-generated jacobians are scaled.
-            else:
-                b_data = b_vec.get_data()
-                x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
-                x_vec.set_data(x_data)
-
-        from openmdao.recorders.base_recorder import recording
-        with recording('DirectSolver', self._iter_count):
-            metadata = create_local_meta('DirectSolver')
-            self._rec_mgr.record_iteration(self, metadata)  # no norms
+                rec.abs = 0.0
+                rec.rel = 0.0
 
         return False, 0., 0.

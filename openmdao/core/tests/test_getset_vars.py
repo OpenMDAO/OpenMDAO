@@ -21,7 +21,7 @@ class TestGetSetVariables(unittest.TestCase):
         model = Group()
         model.add_subsystem('g', g)
 
-        p = Problem(model=model)
+        p = Problem(model)
         p.setup(check=False)
 
         # -------------------------------------------------------------------
@@ -70,7 +70,7 @@ class TestGetSetVariables(unittest.TestCase):
         model = Group()
         model.add_subsystem('g', g, promotes=['*'])
 
-        p = Problem(model=model)
+        p = Problem(model)
         p.setup(check=False)
 
         # -------------------------------------------------------------------
@@ -118,10 +118,10 @@ class TestGetSetVariables(unittest.TestCase):
         g = Group()
         g.add_subsystem('c', c)
 
-        root = Group()
-        root.add_subsystem('g', g)
+        model = Group()
+        model.add_subsystem('g', g)
 
-        p = Problem(model=root)
+        p = Problem(model)
         p.setup(check=False)
 
         # -------------------------------------------------------------------
@@ -199,22 +199,23 @@ class TestGetSetVariables(unittest.TestCase):
         g.add_subsystem('c2', c2, promotes=['*'])
         g.add_subsystem('c3', c3, promotes=['*'])
 
-        root = Group()
-        root.add_subsystem('g', g, promotes=['*'])
+        model = Group()
+        model.add_subsystem('g', g, promotes=['*'])
 
-        p = Problem(model=root)
+        p = Problem(model)
         p.setup(check=False)
 
         # -------------------------------------------------------------------
 
         msg1 = 'Variable name "{}" not found.'
-        msg2 = 'The promoted name "{}" is invalid because it is non-unique.'
+        msg2 = ('The promoted name "{}" is invalid because it is non-unique. '
+                'Access the value from the connected output variable "{}" instead.')
         inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
-        with assertRaisesRegex(self, KeyError, msg2.format('x')):
+        with assertRaisesRegex(self, KeyError, msg2.format('x', 'x')):
             inputs['x'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg2.format('x')):
+        with assertRaisesRegex(self, KeyError, msg2.format('x', 'x')):
             self.assertEqual(inputs['x'], 5.0)
         with assertRaisesRegex(self, KeyError, msg1.format('g.c2.x')):
             inputs['g.c2.x'] = 5.0
@@ -228,13 +229,12 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(outputs['g.c2.y'], 5.0)
 
         msg1 = 'Variable name pair \("{}", "{}"\) not found.'
-        msg2 = 'The promoted name "{}" is invalid because it is non-unique.'
         with g.jacobian_context() as jac:
 
             # d(outputs)/d(inputs)
-            with assertRaisesRegex(self, KeyError, msg2.format('x')):
+            with assertRaisesRegex(self, KeyError, msg2.format('x', 'x')):
                 jac['y', 'x'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg2.format('x')):
+            with assertRaisesRegex(self, KeyError, msg2.format('x', 'x')):
                 self.assertEqual(jac['y', 'x'], 5.0)
             with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
                 jac['g.c2.y', 'g.c2.x'] = 5.0
@@ -246,6 +246,71 @@ class TestGetSetVariables(unittest.TestCase):
                 jac['g.c2.y', 'g.c2.y'] = 5.0
             with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
                 self.assertEqual(jac['g.c2.y', 'g.c2.y'], 5.0)
+
+
+    def test_nested_promotion_errors(self):
+        """
+        Tests for error-handling for promoted input variable names.
+        """
+        c1 = IndepVarComp('x')
+        c2 = ExecComp('y=2*x')
+        c3 = ExecComp('z=3*x')
+
+        g = Group()
+        g.add_subsystem('c2', c2, promotes=['*'])
+        g.add_subsystem('c3', c3, promotes=['*'])
+
+        model = Group()
+        model.add_subsystem('c1', c1, promotes=['*'])
+        model.add_subsystem('g', g)
+
+        p = Problem(model)
+        p.setup(check=False)
+
+        # -------------------------------------------------------------------
+
+        msg1 = ('The promoted name "{}" is invalid because it is non-unique. '
+                'Access the value from the connected output variable instead.')
+
+        # inputs (g.x is not connected)
+        with assertRaisesRegex(self, KeyError, msg1.format('g.x')):
+            p['g.x'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg1.format('g.x')):
+            self.assertEqual(p['g.x'], 5.0)
+
+        with g.jacobian_context() as jac:
+
+            # d(outputs)/d(inputs)
+            with assertRaisesRegex(self, KeyError, msg1.format('x')):
+                jac['y', 'x'] = 5.0
+
+            with assertRaisesRegex(self, KeyError, msg1.format('x')):
+                self.assertEqual(jac['y', 'x'], 5.0)
+
+        # -------------------------------------------------------------------
+
+        model.connect('x', 'g.x')
+
+        p = Problem(model)
+        p.setup(check=False)
+
+        msg2 = ('The promoted name "{}" is invalid because it is non-unique. '
+                'Access the value from the connected output variable "{}" instead.')
+
+        # inputs (g.x is connected to x)
+        with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
+            p['g.x'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
+            self.assertEqual(p['g.x'], 5.0)
+
+        with g.jacobian_context() as jac:
+
+            # d(outputs)/d(inputs)
+            with assertRaisesRegex(self, KeyError, msg1.format('x')):
+                jac['y', 'x'] = 5.0
+
+            with assertRaisesRegex(self, KeyError, msg1.format('x')):
+                self.assertEqual(jac['y', 'x'], 5.0)
 
 
 if __name__ == '__main__':

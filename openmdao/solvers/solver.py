@@ -7,6 +7,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.record_util import create_local_meta
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class SolverInfo(object):
@@ -200,22 +201,24 @@ class Solver(object):
         self._iter_count = 0
         norm0, norm = self._iter_initialize()
         self._mpi_print(self._iter_count, norm, norm / norm0)
+
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
-
-            from openmdao.recorders.base_recorder import recording
-            with recording(type(self).__name__, self._iter_count):
-
+            with Recording(type(self).__name__, self._iter_count, self) as rec:
                 self._iter_execute()
                 self._iter_count += 1
                 norm = self._iter_get_norm()
+                # With solvers, we want to record the norm AFTER the call, but the call needs to
+                # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
+                # into the class.
+                rec.abs = norm
+                rec.rel = norm / norm0
 
-                metadata = create_local_meta(type(self).__name__)
-                self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
-
+            if norm0 == 0:
+                norm0 = 1
             self._mpi_print(self._iter_count, norm, norm / norm0)
-        fail = (np.isinf(norm) or np.isnan(norm) or
-                (norm > atol and norm / norm0 > rtol))
+
+        fail = (np.isinf(norm) or np.isnan(norm) or (norm > atol and norm / norm0 > rtol))
 
         if fail:
             if iprint > -1:
@@ -301,6 +304,18 @@ class Solver(object):
             String representation of the solver.
         """
         return self.SOLVER
+
+    def record_iteration(self, **kwargs):
+        """
+        Record an iteration of the current Solver.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Keyword arguments (used for abs and rel error).
+        """
+        metadata = create_local_meta(self.SOLVER)
+        self._rec_mgr.record_iteration(self, metadata, **kwargs)
 
 
 class NonlinearSolver(Solver):

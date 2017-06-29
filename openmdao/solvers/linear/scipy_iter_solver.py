@@ -7,7 +7,7 @@ from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.record_util import create_local_meta
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class ScipyIterativeSolver(LinearSolver):
@@ -145,16 +145,12 @@ class ScipyIterativeSolver(LinearSolver):
             the current residual vector.
         """
         norm = np.linalg.norm(res)
-        if self._iter_count == 0:
-            if norm != 0.0:
-                self._norm0 = norm
-            else:
-                self._norm0 = 1.0
-
-        from openmdao.recorders.base_recorder import recording
-        with recording('ScipyIterativeSolver', self._iter_count):
-            metadata = create_local_meta('ScipyIterativeSolver')
-            self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / self._norm0)
+        with Recording('ScipyIterativeSolver', self._iter_count, self):
+            if self._iter_count == 0:
+                if norm != 0.0:
+                    self._norm0 = norm
+                else:
+                    self._norm0 = 1.0
 
         self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1

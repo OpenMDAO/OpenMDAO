@@ -5,12 +5,9 @@ BoundsEnforceLS - Only checks bounds and enforces them by one of three methods.
 ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condition.
 
 """
-
-from math import isnan
-
 import numpy as np
-from openmdao.utils.record_util import create_local_meta
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class BoundsEnforceLS(NonlinearSolver):
@@ -80,25 +77,25 @@ class BoundsEnforceLS(NonlinearSolver):
             norm0 = 1.0
 
         u += du
+        with Recording('BoundsEnforceLS', self._iter_count, self) as rec:
+            if self.options['bound_enforcement'] == 'vector':
+                u._enforce_bounds_vector(du, 1.0, system._lower_bounds, system._upper_bounds)
+            elif self.options['bound_enforcement'] == 'scalar':
+                u._enforce_bounds_scalar(du, 1.0, system._lower_bounds, system._upper_bounds)
+            elif self.options['bound_enforcement'] == 'wall':
+                u._enforce_bounds_wall(du, 1.0, system._lower_bounds, system._upper_bounds)
 
-        if self.options['bound_enforcement'] == 'vector':
-            u._enforce_bounds_vector(du, 1.0, system._lower_bounds, system._upper_bounds)
-        elif self.options['bound_enforcement'] == 'scalar':
-            u._enforce_bounds_scalar(du, 1.0, system._lower_bounds, system._upper_bounds)
-        elif self.options['bound_enforcement'] == 'wall':
-            u._enforce_bounds_wall(du, 1.0, system._lower_bounds, system._upper_bounds)
+            norm = self._iter_get_norm()
+            # With solvers, we want to record the norm AFTER
+            # the call, but the call needs to
+            # be wrapped in the with for stack purposes,
+            # so we locally assign  norm & norm0 into the class.
+            rec.abs = norm
+            rec.rel = norm / norm0
 
-        norm = self._iter_get_norm()
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         fail = (np.isinf(norm) or np.isnan(norm))
-
-        from openmdao.recorders.base_recorder import recording
-        with recording('BoundsEnforceLS', self._iter_count):
-            metadata = create_local_meta('BoundsEnforceLS')
-            self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
-        self._iter_count += 1
-
         return fail, norm, norm / norm0
 
 
@@ -241,14 +238,15 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         # take us to zero, and our "runs" are the same, and we can just compare the
         # "rise".
         while self._iter_count < maxiter and (norm0 - norm) < c * self.alpha * norm0:
-            self._iter_execute()
-            norm = self._iter_get_norm()
+            with Recording('ArmijoGoldsteinLS', self._iter_count, self) as rec:
+                self._iter_execute()
+                norm = self._iter_get_norm()
+                # With solvers, we want to report the norm AFTER
+                # the iter_execute call, but the i_e call needs to
+                # be wrapped in the with for stack purposes.
+                rec.abs = norm
+                rec.rel = norm / norm0
             self._mpi_print(self._iter_count, norm, norm / norm0)
-
-            from openmdao.recorders.base_recorder import recording
-            with recording('ArmijoGoldsteinLS', self._iter_count):
-                metadata = create_local_meta('ArmijoGoldsteinLS')
-                self._rec_mgr.record_iteration(self, metadata, abs=norm, rel=norm / norm0)
             self._iter_count += 1
 
         fail = (np.isinf(norm) or np.isnan(norm) or

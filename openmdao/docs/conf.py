@@ -3,21 +3,17 @@
 # containing dir.
 import sys
 import os
-#import pkgutil
-#import inspect
-#import re
 import textwrap
 #from numpydoc.docscrape_sphinx import SphinxDocString
 from numpydoc.docscrape import NumpyDocString, Reader
-import openmdao
 from mock import Mock
 from openmdao.docs.config_params import MOCK_MODULES, IGNORE_LIST
 from openmdao.docs._utils.patch import do_monkeypatch
 
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
-#start off running the monkeypatch to keep options/parameters
-#usable in docstring for autodoc.
+# start off running the monkeypatch to keep options/parameters
+# usable in docstring for autodoc.
 def __init__(self, docstring, config={}):
     """
     init

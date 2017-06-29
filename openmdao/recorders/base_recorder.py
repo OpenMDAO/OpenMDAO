@@ -3,9 +3,7 @@ Class definition for BaseRecorder, the base class for all recorders.
 """
 from fnmatch import fnmatchcase
 import sys
-import inspect
 from six import StringIO
-from contextlib import contextmanager
 
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.general_utils import warn_deprecation
@@ -13,128 +11,6 @@ from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver, NonlinearSolver
 
-recording_iteration_stack = []
-
-
-def iter_get_norm_on_call_stack():
-    """
-    Check if iter_get_norm is on call stack.
-
-    Returns
-    -------
-        True if iter_get_norm on stack.
-
-        False if iter_get_norm not on stack.
-
-    """
-    for s in inspect.stack():
-        if s[3] == '_iter_get_norm':
-            return True
-    return False
-
-
-def compute_total_derivs_on_call_stack():
-    """
-    Check if compute_total_derivs is on call stack.
-
-    Returns
-    -------
-        True if compute_total_derivs is on stack.
-
-        False if compute_total_derivs is not on stack.
-    """
-    for s in inspect.stack():
-        if s[3] == '_compute_total_derivs':
-            return True
-    return False
-
-
-def print_recording_iteration_stack():
-    """
-    Print the record iteration stack.
-
-    Used for debugging.
-    """
-    print()
-    for name, iter_count in reversed(recording_iteration_stack):
-        print('^^^', name, iter_count)
-    print(60 * '^')
-
-
-def get_formatted_iteration_coordinate():
-    """
-    Format the iteration coordinate into human-readable form.
-
-    'rank0:pyoptsparsedriver|6|root._solve_nonlinear|6|mda._solve_nonlinear|6|mda.d1._solve_nonlinear|45'
-    """
-    separator = '|'
-    iteration_coord_list = []
-
-    for name, iter_count in recording_iteration_stack:
-        iteration_coord_list.append('{}{}{}'.format(name, separator, iter_count))
-
-    rank = 0  # TODO_RECORDER - needs to be updated when we go parallel
-    formatted_iteration_coordinate = ':'.join(["rank%d" % rank,
-                                               separator.join(iteration_coord_list)])
-    return formatted_iteration_coordinate
-
-
-@contextmanager
-def recording(name, iter_count):
-    """
-    Record in a way.
-
-    Parameters
-    ----------
-    name : str
-        name of the object being recorded.
-    iter_count : int
-        number of current iteration of name.
-    """
-    # Do things before the code inside the recording with block.
-    recording_iteration_stack.append((name, iter_count))
-
-    try:
-        # Run the code in the with block.
-        yield
-
-    finally:
-        # No matter what happens during the yield, gracefully pop
-        # Enable the following line for stack debugging.
-        # print_recording_iteration_stack()
-        recording_iteration_stack.pop()
-
-@contextmanager
-def recording2(name, iter_count, object_requesting_recording):
-    """
-    Record in a way.
-
-    Parameters
-    ----------
-    name : str
-        name of the object being recorded.
-    iter_count : int
-        number of current iteration of name.
-    """
-    # Do things before the code inside the recording with block.
-    recording_iteration_stack.append((name, iter_count))
-
-    try:
-        # Run the code inside the with block.
-        yield
-
-        # Determine if recording is justified, and do it.
-        do_recording = not iter_get_norm_on_call_stack() and not \
-            compute_total_derivs_on_call_stack()
-
-        if do_recording:
-            object_requesting_recording.record_iteration()
-
-    finally:
-        # No matter what happens during the yield, gracefully pop
-        # Enable the following line for stack debugging.
-        # print_recording_iteration_stack()
-        recording_iteration_stack.pop()
 
 class BaseRecorder(object):
     """

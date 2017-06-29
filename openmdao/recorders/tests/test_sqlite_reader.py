@@ -135,7 +135,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         last_case_id = cr.list_cases()[-1]
         n = cr.num_cases
 
-        self.assertEqual(cr.num_cases, 6)
+        self.assertEqual(cr.num_cases, 8)
 
         print('num cases', n)
 

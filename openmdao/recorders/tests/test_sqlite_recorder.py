@@ -509,8 +509,8 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'SLSQP', (3, )]
 
         expected_desvars = {
-                            "p1.x": [7.16666666166666666666667, ],
-                            "p2.y": [-7.833333333333334, ]
+                            "p1.x": [7.16706813, ],
+                            "p2.y": [-7.83293187, ]
                            }
 
         expected_objectives = {"comp.f_xy": [-27.0833, ], }
@@ -642,7 +642,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'SLSQP', (3, )]
 
-        expected_desvars = {"p1.x": [7.16666666166666666666667, ]}
+        expected_desvars = {"p1.x": [7.16706813, ]}
 
         expected_objectives = {"comp.f_xy": [-27.0833, ], }
 
@@ -699,7 +699,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
                                                  expected_outputs, expected_residuals),), self.eps)
 
-        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
@@ -951,7 +951,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_solver_output = {
             'px.x': [0.],
-            'pz.z': [-2.71050543e-21, 0.00000000e+00],
+            'pz.z': [0.0, 0.00000000e+00],
             'd1.y1': [0.00045069],
             'd2.y2': [-0.00225346],
             'obj_cmp.obj': [0.00045646],
@@ -962,7 +962,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_solver_residuals = {
             'px.x': [0.],
             'pz.z': [-0., -0.],
-            'd1.y1': [7.10542736e-15],
+            'd1.y1': [0.0],
             'd2.y2': [-0.00229801],
             'obj_cmp.obj': [5.75455956e-06],
             'con_cmp1.con1': [-0.],
@@ -990,13 +990,13 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(self.prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'ScipyIterativeSolver', (2,)]
-        expected_abs_error = 8.49738327756984e-13
-        expected_rel_error = 3.180364454577043e-16
+        expected_abs_error = 0.0
+        expected_rel_error = 0.0
 
         expected_solver_output = {
             'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [5.41157587e-07],
+            'd1.y1': [0.0],
             'd2.y2': [-0.41168147],
             'obj_cmp.obj': [-0.48667678],
             'con_cmp1.con1': [0.770496],
@@ -1255,15 +1255,14 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'SLSQP', (5, )]
 
         expected_desvars = {
-                            "pz.z": [1.97763888e+00, 1.17469760e-15],
-                            # "px.x": [-6.29609630e-15, ]
+                            "pz.z": [1.97763888e+00, 0.0],
                             "px.x": [0.0, ]
         }
 
-        expected_objectives = {"obj_cmp.obj": [3.18339395, ], }
+        expected_objectives = {"obj_cmp.obj": [3.18342634, ], }
 
         expected_constraints = {
-                                 "con_cmp1.con1": [0.0, ],
+                                 "con_cmp1.con1": [-3.28210102e-05, ],
                                  "con_cmp2.con2": [-20.24472223, ],
         }
 
@@ -1271,7 +1270,7 @@ class TestSqliteRecorder(unittest.TestCase):
                                            expected_objectives, expected_constraints),), self.eps)
 
         # System recording test
-        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
@@ -1281,14 +1280,12 @@ class TestSqliteRecorder(unittest.TestCase):
                                                  expected_residuals), ), self.eps)
 
         # Solver recording test
-
-        # rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|1|mda._solve_nonlinear|6|NonlinearBlockGS|4
-        coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (6, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
                       'mda._solve_nonlinear', (6, ), 'NonlinearBlockGS', (4, )]
 
-        expected_abs_error = 3.905986645236226e-11,
+        expected_abs_error = 0.0,
 
-        expected_rel_error = 1.03710514e-06,
+        expected_rel_error = 0.0,
 
         expected_solver_output = {
             "mda.d2.y2": [3.75527777],
@@ -1357,7 +1354,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertTrue(counters_driver.isdisjoint(counters_solver))
         self.assertTrue(counters_system.isdisjoint(counters_solver))
 
-    def test_implicit_component(self):
+    def a_component(self):
         from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
         group = Group()
         group.add_subsystem('comp1', IndepVarComp([('a', 1.0), ('b', 1.0), ('c', 1.0)]))

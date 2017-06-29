@@ -13,7 +13,7 @@ from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.solvers.solver import Solver, NonlinearSolver
-from openmdao.recorders.base_recorder import get_formatted_iteration_coordinate
+from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 
 
 def array_to_blob(array):

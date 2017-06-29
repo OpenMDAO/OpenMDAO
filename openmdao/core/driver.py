@@ -2,10 +2,11 @@
 import numpy as np
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.record_util import create_local_meta
-
 from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.recorders.recording_iteration_stack import Recording
+
 from six import iteritems
 
 
@@ -341,8 +342,7 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        from openmdao.recorders.base_recorder import recording2
-        with recording2(self.get_name(), self.iter_count, self):
+        with Recording(self._get_name(), self.iter_count, self) as rec:
             failure_flag = self._problem.model._solve_nonlinear()
 
         self.iter_count += 1
@@ -389,21 +389,15 @@ class Driver(object):
                     ometa = self._responses[okey]
 
                     iscaler = imeta['scaler']
-                    iadder = imeta['adder']
                     oscaler = ometa['scaler']
-                    oadder = ometa['adder']
 
                     # Scale response side
-                    if oadder is not None:
-                        val += oadder
                     if oscaler is not None:
-                        val *= oscaler
+                        val[:] = (oscaler * val.T).T
 
                     # Scale design var side
                     if iscaler is not None:
                         val *= 1.0 / iscaler
-                    if iadder is not None:
-                        val -= iadder
 
         elif return_format == 'array':
 
@@ -415,18 +409,19 @@ class Driver(object):
             osize = 0
             isize = 0
             do_wrt = True
-            Jslices = {}
+            islices = {}
+            oslices = {}
             for okey, oval in iteritems(derivs):
                 if do_wrt:
                     for ikey, val in iteritems(oval):
                         istart = isize
                         isize += val.shape[1]
-                        Jslices[ikey] = slice(istart, isize)
+                        islices[ikey] = slice(istart, isize)
 
                 do_wrt = False
                 ostart = osize
                 osize += oval[ikey].shape[0]
-                Jslices[okey] = slice(ostart, osize)
+                oslices[okey] = slice(ostart, osize)
 
             new_derivs = np.zeros((osize, isize))
 
@@ -438,23 +433,17 @@ class Driver(object):
                     ometa = self._responses[okey]
 
                     iscaler = imeta['scaler']
-                    iadder = imeta['adder']
                     oscaler = ometa['scaler']
-                    oadder = ometa['adder']
 
                     # Scale response side
-                    if oadder is not None:
-                        val += oadder
                     if oscaler is not None:
-                        val *= oscaler
+                        val[:] = (oscaler * val.T).T
 
                     # Scale design var side
                     if iscaler is not None:
                         val *= 1.0 / iscaler
-                    if iadder is not None:
-                        val -= iadder
 
-                    new_derivs[Jslices[okey], Jslices[ikey]] = val
+                    new_derivs[oslices[okey], islices[ikey]] = val
 
             derivs = new_derivs
 
@@ -489,8 +478,16 @@ class Driver(object):
         """
         Record an iteration of the current Driver.
         """
-        metadata = create_local_meta(self.get_name())
+        metadata = create_local_meta(self._get_name())
         self._rec_mgr.record_iteration(self, metadata)
 
-    def get_name(self):
+    def _get_name(self):
+        """
+        Get name of current Driver.
+
+        Returns
+        -------
+        str
+            Name of current Driver.
+        """
         return "Driver"
