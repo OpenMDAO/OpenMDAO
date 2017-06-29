@@ -90,8 +90,6 @@ class BoundsEnforceLS(NonlinearSolver):
             # the call, but the call needs to
             # be wrapped in the with for stack purposes,
             # so we locally assign  norm & norm0 into the class.
-            rec.norm = norm
-            rec.norm0 = norm0
             rec.abs = norm
             rec.rel = norm / norm0
 
@@ -246,8 +244,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                 # With solvers, we want to report the norm AFTER
                 # the iter_execute call, but the i_e call needs to
                 # be wrapped in the with for stack purposes.
-                # rec.norm = norm
-                # rec.norm0 = norm0
                 rec.abs = norm
                 rec.rel = norm / norm0
             self._mpi_print(self._iter_count, norm, norm / norm0)

@@ -366,7 +366,6 @@ class pyOptSparseDriver(Driver):
 
             # Execute the model
             with Recording(self.options['optimizer'], self.iter_count, self) as rec:
-
                 model._solve_nonlinear()
 
                 func_dict = self.get_objective_values()

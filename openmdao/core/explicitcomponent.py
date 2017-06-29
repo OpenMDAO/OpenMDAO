@@ -200,7 +200,7 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._solve_nonlinear()
 
-        with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self) as rec:
+        with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
             with self._unscaled_context(
                     outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_const(0.0)
@@ -261,7 +261,7 @@ class ExplicitComponent(Component):
         float
             relative error.
         """
-        with Recording(self.pathname + '._apply_linear', self.iter_count, self):
+        with Recording(self.pathname + '._solve_linear', self.iter_count, self):
             for vec_name in vec_names:
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]

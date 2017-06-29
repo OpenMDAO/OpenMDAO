@@ -30,21 +30,21 @@ class LinearRunOnce(LinearBlockGS):
         float
             Error at the first iteration.
         """
+        self._vec_names = vec_names
+        self._mode = mode
+        system = self._system
+
+        # Pre-processing
+        self._rhs_vecs = {}
+        if self._mode == 'fwd':
+            b_vecs = system._vectors['residual']
+        else:  # rev
+            b_vecs = system._vectors['output']
+
+        for vec_name in self._vec_names:
+            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+
         with Recording('LinearRunOnce', 0, self) as rec:
-            self._vec_names = vec_names
-            self._mode = mode
-            system = self._system
-
-            # Pre-processing
-            self._rhs_vecs = {}
-            if self._mode == 'fwd':
-                b_vecs = system._vectors['residual']
-            else:  # rev
-                b_vecs = system._vectors['output']
-
-            for vec_name in self._vec_names:
-                self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
-
             # Single iteration of GS
             self._iter_execute()
 

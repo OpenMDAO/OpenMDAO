@@ -13,7 +13,7 @@ from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
-from openmdao.utils.record_util import create_local_meta
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class DirectSolver(LinearSolver):
@@ -139,7 +139,6 @@ class DirectSolver(LinearSolver):
 
         system = self._system
 
-        from openmdao.recorders.recording_iteration_stack import Recording
         with Recording('DirectSolver', 0, self) as rec:
             for vec_name in self._vec_names:
                 self._vec_name = vec_name

@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class NewtonSolver(NonlinearSolver):
@@ -162,7 +163,6 @@ class NewtonSolver(NonlinearSolver):
             for isub, subsys in enumerate(system._subsystems_allprocs):
                 system._transfer('nonlinear', 'fwd', isub)
 
-                from openmdao.recorders.recording_iteration_stack import Recording
                 with Recording('Newton', self._iter_count, self) as rec:
                     if subsys in system._subsystems_myproc:
                         subsys._solve_nonlinear()

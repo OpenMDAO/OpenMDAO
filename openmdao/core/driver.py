@@ -2,10 +2,11 @@
 import numpy as np
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.record_util import create_local_meta
-
 from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.recorders.recording_iteration_stack import Recording
+
 from six import iteritems
 
 
@@ -341,9 +342,7 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        from openmdao.recorders.recording_iteration_stack import Recording
         with Recording(self._get_name(), self.iter_count, self) as rec:
-
             failure_flag = self._problem.model._solve_nonlinear()
 
         self.iter_count += 1

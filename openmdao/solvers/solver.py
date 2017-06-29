@@ -211,8 +211,6 @@ class Solver(object):
                 # With solvers, we want to record the norm AFTER the call, but the call needs to
                 # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
                 # into the class.
-                rec.norm = norm
-                rec.norm0 = norm0
                 rec.abs = norm
                 rec.rel = norm / norm0
 
