@@ -308,6 +308,11 @@ class Solver(object):
     def record_iteration(self, **kwargs):
         """
         Record an iteration of the current Solver.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Keyword arguments (used for abs and rel error).
         """
         metadata = create_local_meta(self.SOLVER)
         self._rec_mgr.record_iteration(self, metadata, **kwargs)

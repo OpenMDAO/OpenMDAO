@@ -187,7 +187,6 @@ class pyOptSparseDriver(Driver):
 
         # Metadata Setup
         self.metadata = create_local_meta(self.options['optimizer'])
-        self.iter_count = 0
 
         with Recording(self.options['optimizer'], self.iter_count, self) as rec:
             # Initial Run
@@ -195,6 +194,7 @@ class pyOptSparseDriver(Driver):
             rec.abs = 0.0
             rec.rel = 0.0
 
+        self.iter_count += 1
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
         # Add all design variables
@@ -318,6 +318,8 @@ class pyOptSparseDriver(Driver):
             model._solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
+
+        self.iter_count += 1
 
         # Save the most recent solution.
         self.pyopt_solution = sol

@@ -119,4 +119,3 @@ class Recording(object):
         #         # print_recording_iteration_stack()
 
         recording_iteration_stack.pop()
-

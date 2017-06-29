@@ -484,5 +484,10 @@ class Driver(object):
     def _get_name(self):
         """
         Get name of current Driver.
+
+        Returns
+        -------
+        str
+            Name of current Driver.
         """
         return "Driver"
