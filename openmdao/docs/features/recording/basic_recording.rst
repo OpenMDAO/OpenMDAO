@@ -89,7 +89,8 @@ A recorder can be attached to more than one object.  Also, more than one recorde
 A More Comprehensive Example
 ++++++++++++++++++++++++++++
 
-.. code-block::
+.. code-block:: console
+
     def test_simple_driver_recording(self):
         if OPT is None:
             raise unittest.SkipTest("pyoptsparse is not installed")
