@@ -1354,7 +1354,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertTrue(counters_driver.isdisjoint(counters_solver))
         self.assertTrue(counters_system.isdisjoint(counters_solver))
 
-    def a_component(self):
+    def test_implicit_component(self):
         from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
         group = Group()
         group.add_subsystem('comp1', IndepVarComp([('a', 1.0), ('b', 1.0), ('c', 1.0)]))
