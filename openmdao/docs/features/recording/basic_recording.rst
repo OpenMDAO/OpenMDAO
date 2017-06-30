@@ -17,7 +17,8 @@ SqliteRecorder exists), and name the output file that you would like to write to
 
 Setting Recording Options
 +++++++++++++++++++++++++
-Once you have instantiated a recorder or recorders, There are many options that can be set in recorders, which will
+
+Once you have instantiated a recorder or recorders, there are many options that can be set in recorders, which will
 change the amount of information retained by the recorders.
 
 A basic example of how to set an option:
@@ -46,8 +47,6 @@ System Recording Options
         Tells recorder whether to record the inputs of a System.
     options['record_residuals'] :  bool(False)
         Tells recorder whether to record the residuals of a System.
-    options['record_derivatives'] :  bool(False)
-        Tells recorder whether to record the derivatives of a System.
 
 Driver Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -68,7 +67,7 @@ Solver Recording Options
         Tells recorder whether to record the relative error of a Solver.
     options['record_solver_output'] :  bool(False)
         Tells recorder whether to record the output of a Solver.
-    options['record_solver_derivatives'] :  bool(False)
+    options['record_solver_residuals'] :  bool(False)
         Tells recorder whether to record the derivatives of a Solver.
 
 
@@ -90,6 +89,57 @@ A recorder can be attached to more than one object.  Also, more than one recorde
 A More Comprehensive Example
 ++++++++++++++++++++++++++++
 
-.. embed-test::
-    openmdao.recorders.tests.test_sqlite_recorder.TestSqliteRecorder.test_simple_driver_recording
+.. code-block::
+    def test_simple_driver_recording(self):
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        model.suppress_solver_output = True
+
+        prob.driver = pyOptSparseDriver()
+
+        prob.driver.add_recorder(self.recorder)
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+        prob.setup(check=False)
+
+        t0, t1 = run_driver(prob)
+
+        prob.cleanup()
+
+        coordinate = [0, 'SLSQP', (3, )]
+
+        expected_desvars = {
+                            "p1.x": [7.16706813, ],
+                            "p2.y": [-7.83293187, ]
+                           }
+
+        expected_objectives = {"comp.f_xy": [-27.0833, ], }
+
+        expected_constraints = {"con.c": [-15.0, ], }
+
+        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
+                                           expected_objectives, expected_constraints),), self.eps)
 
