@@ -61,7 +61,7 @@ def get_formatted_iteration_coordinate():
     for name, iter_count in recording_iteration_stack:
         iteration_coord_list.append('{}{}{}'.format(name, separator, iter_count))
 
-    rank = 0  # TODO_RECORDER - needs to be updated when we go parallel
+    rank = 0  # TODO_PARALLEL needs to be updated when we go parallel
     formatted_iteration_coordinate = ':'.join(["rank%d" % rank,
                                                separator.join(iteration_coord_list)])
     return formatted_iteration_coordinate
@@ -116,6 +116,6 @@ class Recording(object):
                 self.object_requesting_recording.record_iteration()
 
         # Enable the following line for stack debugging.
-        #         # print_recording_iteration_stack()
+        # print_recording_iteration_stack()
 
         recording_iteration_stack.pop()

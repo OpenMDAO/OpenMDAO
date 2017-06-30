@@ -118,8 +118,6 @@ class SqliteRecorder(BaseRecorder):
             self.record_iteration_system(object_requesting_recording, metadata, kwargs['method'])
 
         elif isinstance(object_requesting_recording, Solver):
-            # self.record_iteration_solver(object_requesting_recording, metadata, kwargs['abs'],
-            #                              kwargs['rel'])
             self.record_iteration_solver(object_requesting_recording, metadata, **kwargs)
         else:
             raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
@@ -233,14 +231,11 @@ class SqliteRecorder(BaseRecorder):
         objectives_blob = array_to_blob(objectives_array)
         constraints_blob = array_to_blob(constraints_array)
 
-        # TODO_RECORDER - needs to put higher in the calling stack so we do not have
-        #    to do this in each method
         iteration_coordinate = get_formatted_iteration_coordinate()
 
         self.cursor.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
                             "timestamp, success, msg, desvars , responses , objectives , "
                             "constraints ) VALUES(?,?,?,?,?,?,?,?,?)",
-                            # (self._counter, format_iteration_coordinate(metadata['coord']),
                             (self._counter, iteration_coordinate,
                              metadata['timestamp'], metadata['success'],
                              metadata['msg'], desvars_blob,
@@ -445,7 +440,6 @@ class SqliteRecorder(BaseRecorder):
         self.cursor.execute("INSERT INTO solver_iterations(counter, iteration_coordinate, "
                             "timestamp, success, msg, abs_err, rel_err, solver_output, "
                             "solver_residuals) VALUES(?,?,?,?,?,?,?,?,?)",
-                            # (self._counter, format_iteration_coordinate(metadata['coord']),
                             (self._counter, iteration_coordinate,
                              metadata['timestamp'],
                              metadata['success'], metadata['msg'],

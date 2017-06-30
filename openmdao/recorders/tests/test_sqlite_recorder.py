@@ -281,11 +281,11 @@ class TestSqliteRecorder(unittest.TestCase):
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)
-        print(self.filename)  # comment out to make filename printout go away. TODO_RECORDERS
+        # print(self.filename)  # comment out to make filename printout go away.
         self.eps = 1e-5
 
     def tearDown(self):
-        return  # comment out to allow db file to be removed. TODO_RECORDERS
+        # return  # comment out to allow db file to be removed. TODO_RECORDERS
         try:
             rmtree(self.dir)
             pass

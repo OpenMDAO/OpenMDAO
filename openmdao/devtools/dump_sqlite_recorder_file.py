@@ -32,7 +32,6 @@ def print_counter(idx, counter):
     print(indent, 'idx: {} counter: {}'.format(idx, counter))
 
 filename = sys.argv[1]
-# filename = '/var/folders/l3/9j86k5gn6cx0_p25kdplxgpw1l9vkk/T/tmp1XvURO/sqlite_test'
 
 con = sqlite3.connect(filename)
 cur = con.cursor()
