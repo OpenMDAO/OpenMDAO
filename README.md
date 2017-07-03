@@ -2,11 +2,18 @@
 This is the PRE-ALPHA version of OpenMDAO 2.0
 (we have codenamed it 'blue').
 
-IMPORTANT NOTE:
+Important Note:
+---------------
+
 While the API is MOSTLY stable, we reserve the right to change things as needed.
 Production runs should still be done in 1.7.x for now.
 
-INSTALLATION INSTRUCTIONS:
+We will be making very frequent updates to this code. If you’re going to try it,
+make sure you pull these updates often
+
+Installation Instructions:
+--------------------------
+
 Use git to clone the repository:
 
 `git clone http://github.com/OpenMDAO/blue`
@@ -17,7 +24,8 @@ Use pip to install openmdao locally:
 `pip install -e .`
 
 
-DOCUMENTATION BUILDING INSTRUCTIONS:
+Documentation Building Instructions:
+------------------------------------
 
 `cd openmdao/docs`
 `make all`

@@ -1,16 +1,16 @@
-BUILDING AND VIEWING OPENMDAO DOCUMENTATION:
+Building and Viewing OpenMDAO Documentation:
 --------------------------------------------
 
-BUILDING
---------
+Building Docs
+-------------
 
 From the blue/openmdao/docs level, type:
 
 `make all`
 
 
-VIEWING
--------
+Viewing Docs
+------------
 
 After the build completes, to view docs, either:
 
