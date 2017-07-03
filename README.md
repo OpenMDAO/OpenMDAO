@@ -19,7 +19,7 @@ Use pip to install openmdao locally:
 DOCUMENTATION BUILDING INSTRUCTIONS:
 
 `cd openmdao/docs`
-`make html`
+`make all`
 
 This will build the docs into openmdao/docs/_build/html.
 To view the docs in your browser:
