@@ -13,6 +13,7 @@ Use git to clone the repository:
 
 Use pip to install openmdao locally:
 
+`cd blue/openmdao`
 `pip install -e .`
 
 
