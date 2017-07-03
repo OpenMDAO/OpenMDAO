@@ -21,6 +21,7 @@ Use git to clone the repository:
 Use pip to install openmdao locally:
 
 `cd blue/openmdao`
+
 `pip install -e .`
 
 
@@ -28,6 +29,7 @@ Documentation Building Instructions:
 ------------------------------------
 
 `cd openmdao/docs`
+
 `make all`
 
 This will build the docs into openmdao/docs/_build/html.
