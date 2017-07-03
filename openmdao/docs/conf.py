@@ -3,13 +3,8 @@
 # containing dir.
 import sys
 import os
-#import pkgutil
-#import inspect
-#import re
 import textwrap
-#from numpydoc.docscrape_sphinx import SphinxDocString
 from numpydoc.docscrape import NumpyDocString, Reader
-import openmdao
 from mock import Mock
 from openmdao.docs.config_params import MOCK_MODULES, IGNORE_LIST
 from openmdao.docs._utils.patch import do_monkeypatch
@@ -88,7 +83,7 @@ extensions = [
     'show_unittest_examples',
     'embed_code',
     'embed_test',
-    'link_class_from_docstring',
+    # 'link_class_from_docstring',
     'tags'
 ]
 
