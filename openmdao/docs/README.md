@@ -2,7 +2,7 @@ BUILDING AND VIEWING OPENMDAO DOCUMENTATION:
 --------------------------------------------
 
 BUILDING
-++++++++
+--------
 
 From the blue/openmdao/docs level, type:
 
@@ -10,7 +10,7 @@ From the blue/openmdao/docs level, type:
 
 
 VIEWING
-+++++++
+-------
 
 After the build completes, to view docs, either:
 
