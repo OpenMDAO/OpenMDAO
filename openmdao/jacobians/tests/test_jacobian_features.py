@@ -42,7 +42,16 @@ class SimpleComp(ExplicitComponent):
 
 
 class SimpleCompDependence(SimpleComp):
-    def setup_partials(self):
+    def setup(self):
+        self.add_input('x', shape=1)
+        self.add_input('y1', shape=2)
+        self.add_input('y2', shape=2)
+        self.add_input('y3', shape=2)
+        self.add_input('z', shape=(2, 2))
+
+        self.add_output('f', shape=1)
+        self.add_output('g', shape=(2, 2))
+
         self.declare_partials('f', 'y1', dependent=False)
         self.declare_partials('f', 'y2', dependent=False)
         self.declare_partials('f', 'y3', dependent=False)
@@ -50,7 +59,16 @@ class SimpleCompDependence(SimpleComp):
 
 
 class SimpleCompGlob(SimpleComp):
-    def setup_partials(self):
+    def setup(self):
+        self.add_input('x', shape=1)
+        self.add_input('y1', shape=2)
+        self.add_input('y2', shape=2)
+        self.add_input('y3', shape=2)
+        self.add_input('z', shape=(2, 2))
+
+        self.add_output('f', shape=1)
+        self.add_output('g', shape=(2, 2))
+
         # This matches y1, y2, and y3.
         self.declare_partials('f', 'y*', dependent=False)
 
@@ -69,7 +87,8 @@ class SimpleCompConst(ExplicitComponent):
         self.add_output('f', shape=1)
         self.add_output('g', shape=(2, 2))
 
-    def setup_partials(self):
+        # Declare derivatives
+
         self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
         self.declare_partials('g', 'z', dependent=False)
 
@@ -86,12 +105,15 @@ class SimpleCompConst(ExplicitComponent):
     def compute_partials(self, inputs, outputs, partials):
         pass
 
+
 class SimpleCompFD(SimpleComp):
     def __init__(self, **kwargs):
         super(SimpleCompFD, self).__init__()
         self.kwargs = kwargs
 
-    def setup_partials(self):
+    def setup(self):
+        super(SimpleCompFD, self).setup()
+
         self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
         self.declare_partials('g', 'z', dependent=False)
 
@@ -106,7 +128,9 @@ class SimpleCompMixedFD(SimpleComp):
         super(SimpleCompMixedFD, self).__init__()
         self.kwargs = kwargs
 
-    def setup_partials(self):
+    def setup(self):
+        super(SimpleCompMixedFD, self).setup()
+
         self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
         self.declare_partials('g', 'z', dependent=False)
 
@@ -128,7 +152,9 @@ class SimpleCompKwarg(SimpleComp):
         self.partial_kwargs = partial_kwargs
         super(SimpleCompKwarg, self).__init__()
 
-    def setup_partials(self):
+    def setup(self):
+        super(SimpleCompKwarg, self).setup()
+
         self.declare_partials(**self.partial_kwargs)
 
     def compute_partials(self, inputs, outputs, partials):
@@ -329,7 +355,6 @@ class TestJacobianFeatures(unittest.TestCase):
                 self.add_output('flow:T', val=284., units="degR", desc="Temperature")
                 self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
 
-            def setup_partials(self):
                 self.approx_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
@@ -437,7 +462,6 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('x', shape=(4,))
                 self.add_output('f', shape=(2,))
 
-            def setup_partials(self):
                 self.declare_partials(of='f', wrt='x', rows=[0,1,1,1], cols=[0,1,2,3])
 
             def compute_partials(self, inputs, outputs, partials):
@@ -477,7 +501,6 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('x', shape=(4,))
                 self.add_output('f', shape=(2,))
 
-            def setup_partials(self):
                 self.declare_partials(of='f', wrt='x', rows=[0, 1, 1, 1], cols=[0, 1, 2, 3])
 
             def compute_partials(self, inputs, outputs, partials):
@@ -507,7 +530,6 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('y', shape=(2,))
                 self.add_output('f', shape=(2,))
 
-            def setup_partials(self):
                 self.declare_partials(of='f', wrt='x', rows=[0,1,1,1], cols=[0,1,2,3],
                                       val=[1. , 2., 3., 4.])
                 self.declare_partials(of='f', wrt='y', val=sp.sparse.eye(2, format='csc'))
@@ -542,7 +564,6 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('y2', shape=(2,))
                 self.add_output('f', shape=(2,))
 
-            def setup_partials(self):
                 self.approx_partials('f', 'y*')
                 self.approx_partials('f', 'x')
 
@@ -577,13 +598,13 @@ class TestJacobianForDocs(unittest.TestCase):
 
     def test_fd_options(self):
         class FDPartialComp(ExplicitComponent):
+
             def setup(self):
                 self.add_input('x', shape=(4,))
                 self.add_input('y', shape=(2,))
                 self.add_input('y2', shape=(2,))
                 self.add_output('f', shape=(2,))
 
-            def setup_partials(self):
                 self.approx_partials('f', 'y*', method='fd', form='backward', step=1e-6)
                 self.approx_partials('f', 'x', method='fd', form='central', step=1e-4)
 
