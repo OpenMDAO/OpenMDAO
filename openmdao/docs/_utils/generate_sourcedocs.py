@@ -94,6 +94,7 @@ OpenMDAO User Source Documentation
         'jacobians',
         'matrices',
         'solvers',
+        'surrogate_models',
         'proc_allocators',
         'utils',
         'vectors',
