@@ -94,6 +94,9 @@ OpenMDAO User Source Documentation
         'jacobians',
         'matrices',
         'solvers',
+        'solvers.linear',
+        'solvers.nonlinear',
+        'solvers.linesearch',
         'proc_allocators',
         'utils',
         'vectors',
@@ -123,7 +126,7 @@ OpenMDAO User Source Documentation
         package_name = "openmdao." + package
 
         # the sub_listing is going into each package dir and listing what's in it
-        for sub_listing in sorted(os.listdir(os.path.join("..", package))):
+        for sub_listing in sorted(os.listdir(os.path.join("..", package.replace('.','/')))):
             # don't want to catalog files twice, nor use init files nor test dir
             if (os.path.isdir(sub_listing) and sub_listing != "tests") or \
                (sub_listing.endswith(".py") and not sub_listing.startswith('_')):
