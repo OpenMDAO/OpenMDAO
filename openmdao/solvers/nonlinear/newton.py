@@ -61,7 +61,7 @@ class NewtonSolver(NonlinearSolver):
     @property
     def line_search(self):
         """
-        Return the curren linesearch object.
+        Return the current linesearch object.
         """
         warn_deprecation("The 'line_search' attribute provides backwards compatibility "
                          "with OpenMDAO 1.x ; use 'linesearch' instead.")
