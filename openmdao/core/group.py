@@ -1269,7 +1269,7 @@ class Group(System):
                 # Weed out inputs connected to anything inside our system unless the source is an
                 # indepvarcomp.
                 else:
-                    compname = '.'.join(src.split('.')[:-1])
+                    compname = src.rsplit('.', 1)[0]
                     comp = self.get_subsystem(compname)
                     if isinstance(comp, IndepVarComp):
                         wrt.add(src)
