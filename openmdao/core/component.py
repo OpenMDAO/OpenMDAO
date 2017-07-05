@@ -47,6 +47,10 @@ class Component(System):
         determine the list of absolute names.
     _static_var_rel_names : dict
         Static version of above - stores names of variables added outside of setup.
+    _declared_partials : list
+        Cached storage of user-declared partials.
+    _approximated_partials : list
+        Cached storage of user-declared approximations.
     """
 
     def __init__(self, **kwargs):
@@ -70,21 +74,12 @@ class Component(System):
         self._static_var_rel_names = {'input': [], 'output': []}
         self._static_var_rel2data_io = {}
 
+        self._declared_partials = []
+        self._approximated_partials = []
+
     def setup(self):
         """
         Declare inputs and outputs.
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata
-        """
-        pass
-
-    def setup_partials(self):
-        """
-        Declare Jacobian structure/approximations.
 
         Available attributes:
             name
@@ -239,7 +234,7 @@ class Component(System):
 
     def _setup_partials(self, recurse=True):
         """
-        Call setup_partials in components.
+        Process all partials and approximations that the user declared.
 
         Parameters
         ----------
@@ -248,7 +243,11 @@ class Component(System):
         """
         super(Component, self)._setup_partials()
 
-        self.setup_partials()
+        for of, wrt, dependent, rows, cols, val in self._declared_partials:
+            self._declare_partials(of, wrt, dependent=dependent, rows=rows, cols=cols, val=val)
+
+        for of, wrt, method, kwargs in self._approximated_partials:
+            self._approx_partials(of, wrt, method=method, **kwargs)
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
                   desc='', var_set=0):
@@ -537,6 +536,27 @@ class Component(System):
         if method not in self._approx_schemes:
             self._approx_schemes[method] = supported_methods[method]()
 
+        self._approximated_partials.append((of, wrt, method, kwargs))
+
+    def _approx_partials(self, of, wrt, method='fd', **kwargs):
+        """
+        Inform the framework that the specified derivatives are to be approximated.
+
+        Parameters
+        ----------
+        of : str or list of str
+            The name of the residual(s) that derivatives are being computed for.
+            May also contain a glob pattern.
+        wrt : str or list of str
+            The name of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+        method : str
+            The type of approximation that should be used. Valid options include:
+                - 'fd': Finite Difference
+        **kwargs : dict
+            Keyword arguments for controlling the behavior of the approximation.
+        """
         pattern_matches = self._find_partial_matches(of, wrt)
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
@@ -560,7 +580,7 @@ class Component(System):
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):
         """
-        Store subjacobian metadata for later use.
+        Declare information about this component's subjacobians.
 
         Parameters
         ----------
@@ -592,6 +612,38 @@ class Component(System):
         if (rows is None) ^ (cols is None):
             raise ValueError('If one of rows/cols is specified, then both must be specified')
 
+        self._declared_partials.append((of, wrt, dependent, rows, cols, val))
+
+    def _declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None):
+        """
+        Store subjacobian metadata for later use.
+
+        Parameters
+        ----------
+        of : str or list of str
+            The name of the residual(s) that derivatives are being computed for.
+            May also contain a glob pattern.
+        wrt : str or list of str
+            The name of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+        dependent : bool(True)
+            If False, specifies no dependence between the output(s) and the
+            input(s). This is only necessary in the case of a sparse global
+            jacobian, because if 'dependent=False' is not specified and
+            set_subjac_info is not called for a given pair, then a dense
+            matrix of zeros will be allocated in the sparse global jacobian
+            for that pair.  In the case of a dense global jacobian it doesn't
+            matter because the space for a dense subjac will always be
+            allocated for every pair.
+        rows : ndarray of int or None
+            Row indices for each nonzero entry.  For sparse subjacobians only.
+        cols : ndarray of int or None
+            Column indices for each nonzero entry.  For sparse subjacobians only.
+        val : float or ndarray of float or scipy.sparse
+            Value of subjacobian.  If rows and cols are not None, this will
+            contain the values found at each (row, col) location in the subjac.
+        """
         if val is not None and not issparse(val):
             val = np.atleast_1d(val)
             # np.promote_types  will choose the smallest dtype that can contain both arguments
