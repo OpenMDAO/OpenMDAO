@@ -220,7 +220,10 @@ class FiniteDifference(ApproximationScheme):
                     result.add_scal_vec(coeff, self._run_point(system, input_delta, deriv_type))
 
                 if deriv_type == 'total':
-                    # Sign difference between output and resids
+                    # Sign difference between output and resids. This arises from the definitions
+                    # in the unified derivatives equations.
+                    # For ExplicitComponent: resid = output(n-1) - output(n)
+                    # so dresid/d* = - doutput/d*
                     result *= -1.0
 
                 for of, subjac in outputs:
