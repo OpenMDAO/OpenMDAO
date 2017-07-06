@@ -127,7 +127,7 @@ class System(object):
     _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
         Same as above, but by var_set name.
     #
-    _vec_names : [str, ...]
+    _rhs_names : [str, ...]
         List of names of the vectors (i.e., the right-hand sides).
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
@@ -244,7 +244,7 @@ class System(object):
         self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
         self._ext_sizes_byset = {'input': {}, 'output': {}}
 
-        self._vec_names = ['nonlinear', 'linear']
+        self._rhs_names = ['nonlinear', 'linear']
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._excluded_vars_out = set()
         self._excluded_vars_in = set()
@@ -464,7 +464,7 @@ class System(object):
 
         for key in ['input', 'output', 'residual']:
             type_ = 'output' if key is 'residual' else key
-            for vec_name in self._vec_names:
+            for vec_name in self._rhs_names:
                 if not initial:
                     root_vectors[key][vec_name] = self._vectors[key][vec_name]._root_vector
                 else:
@@ -474,8 +474,8 @@ class System(object):
             excl_out = self._excluded_vars_out
             excl_in = self._excluded_vars_in
         else:
-            excl_out = {vec_name: set() for vec_name in self._vec_names}
-            excl_in = {vec_name: set() for vec_name in self._vec_names}
+            excl_out = {vec_name: set() for vec_name in self._rhs_names}
+            excl_in = {vec_name: set() for vec_name in self._rhs_names}
 
         return root_vectors, excl_out, excl_in
 
@@ -535,7 +535,7 @@ class System(object):
             vec_key, coeff_key = key
             type_ = 'output' if vec_key == 'residual' else vec_key
 
-            for vec_name in self._vec_names:
+            for vec_name in self._rhs_names:
                 if not initial:
                     root_vectors[key][vec_name] = self._scaling_vecs[key][vec_name]._root_vector
                 else:
@@ -840,7 +840,7 @@ class System(object):
         self._excluded_vars_out = excl_out
         self._excluded_vars_in = excl_in
 
-        for vec_name in self._vec_names:
+        for vec_name in self._rhs_names:
             vector_class = root_vectors['output'][vec_name].__class__
 
             for key in ['input', 'output', 'residual']:
@@ -923,7 +923,7 @@ class System(object):
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
 
-        for vec_name in self._vec_names:
+        for vec_name in self._rhs_names:
             vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
 
             for key in vecs:
@@ -1678,7 +1678,8 @@ class System(object):
                     yield sub
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
-                       ref0=None, indices=None, adder=None, scaler=None):
+                       ref0=None, indices=None, adder=None, scaler=None,
+                       rhs_group=None):
         r"""
         Add a design variable to this system.
 
@@ -1704,6 +1705,9 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
+        rhs_group : string
+            If specified, this design var will be grouped for parallel derivative
+            calculations with other variables sharing the same rhs_group.
 
         Notes
         -----
@@ -1768,10 +1772,11 @@ class System(object):
             dvs['size'] = len(indices)
             indices = np.atleast_1d(indices)
         dvs['indices'] = indices
+        dvs['rhs_group'] = rhs_group
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
-                     adder=None, scaler=None, linear=False):
+                     adder=None, scaler=None, linear=False, rhs_group=None):
         r"""
         Add a response variable to this system.
 
@@ -1805,6 +1810,9 @@ class System(object):
             is second in precedence.
         linear : bool
             Set to True if constraint is linear. Default is False.
+        rhs_group : string
+            If specified, this design var will be grouped for parallel derivative
+            calculations with other variables sharing the same rhs_group.
 
         Notes
         -----
@@ -1914,16 +1922,16 @@ class System(object):
                 resp['size'] = len(indices)
                 indices = np.atleast_1d(indices)
             resp['indices'] = indices
-
         else:  # 'obj'
             if index is not None:
                 resp['size'] = 1
                 index = np.array([index], dtype=int)
             resp['indices'] = index
+        resp['rhs_group'] = rhs_group
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
-                       indices=None, linear=False):
+                       indices=None, linear=False, rhs_group=None):
         r"""
         Add a constraint variable to this system.
 
@@ -1953,6 +1961,9 @@ class System(object):
             negative integers.
         linear : bool
             Set to True if constraint is linear. Default is False.
+        rhs_group : string
+            If specified, this design var will be grouped for parallel derivative
+            calculations with other variables sharing the same rhs_group.
 
         Notes
         -----
@@ -1962,10 +1973,11 @@ class System(object):
         """
         self.add_response(name=name, type_='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
-                          ref0=ref0, indices=indices, linear=linear)
+                          ref0=ref0, indices=indices, linear=linear,
+                          rhs_group=rhs_group)
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
-                      adder=None, scaler=None):
+                      adder=None, scaler=None, rhs_group=None):
         r"""
         Add a response variable to this system.
 
@@ -1987,6 +1999,9 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
+        rhs_group : string
+            If specified, this design var will be grouped for parallel derivative
+            calculations with other variables sharing the same rhs_group.
 
         Notes
         -----
@@ -2016,7 +2031,7 @@ class System(object):
         if index is not None and not isinstance(index, int):
             raise TypeError('If specified, index must be an int.')
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
-                          ref=ref, ref0=ref0, index=index)
+                          ref=ref, ref0=ref0, index=index, rhs_group=rhs_group)
 
     def get_design_vars(self, recurse=True):
         """
@@ -2399,7 +2414,7 @@ class System(object):
 
         return result
 
-    def run_apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
+    def run_apply_linear(self, rhs_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product.
 
@@ -2407,7 +2422,7 @@ class System(object):
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        rhs_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -2419,9 +2434,9 @@ class System(object):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(vec_names, mode, scope_out, scope_in)
+            self._apply_linear(rhs_names, mode, scope_out, scope_in)
 
-    def run_solve_linear(self, vec_names, mode):
+    def run_solve_linear(self, rhs_names, mode):
         """
         Apply inverse jac product.
 
@@ -2429,7 +2444,7 @@ class System(object):
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        rhs_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -2444,7 +2459,7 @@ class System(object):
             absolute error.
         """
         with self._scaled_context_all():
-            result = self._solve_linear(vec_names, mode)
+            result = self._solve_linear(rhs_names, mode)
 
         return result
 
@@ -2500,13 +2515,13 @@ class System(object):
         """
         pass
 
-    def _apply_linear(self, vec_names, mode, var_inds=None):
+    def _apply_linear(self, rhs_names, mode, var_inds=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        rhs_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -2516,13 +2531,13 @@ class System(object):
         """
         pass
 
-    def _solve_linear(self, vec_names, mode):
+    def _solve_linear(self, rhs_names, mode):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        rhs_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.

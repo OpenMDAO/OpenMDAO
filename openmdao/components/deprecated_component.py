@@ -178,13 +178,13 @@ class Component(BaseComponent):
             self._scale_vec(self._outputs, 'output', 'norm')
             self._scale_vec(self._residuals, 'residual', 'norm')
 
-    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, rhs_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product.
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        rhs_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -195,7 +195,7 @@ class Component(BaseComponent):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        for vec_name in vec_names:
+        for vec_name in rhs_names:
             with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
@@ -217,13 +217,13 @@ class Component(BaseComponent):
                         for name in d_inputs:
                             d_inputs[name] *= -1.0
 
-    def _solve_linear(self, vec_names, mode):
+    def _solve_linear(self, rhs_names, mode):
         """
         Apply inverse jac product.
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        rhs_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -238,9 +238,9 @@ class Component(BaseComponent):
             absolute error.
         """
         if self._linear_solver is not None:
-            return self._linear_solver(vec_names, mode)
+            return self._linear_solver(rhs_names, mode)
         else:
-            for vec_name in vec_names:
+            for vec_name in rhs_names:
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
@@ -249,9 +249,9 @@ class Component(BaseComponent):
 
             self.solve_linear(self._vectors['output'],
                               self._vectors['residual'],
-                              vec_names, mode)
+                              rhs_names, mode)
 
-            for vec_name in vec_names:
+            for vec_name in rhs_names:
 
                 # skip for pure explicit components.
                 if len(self._state_names) > 0:
@@ -370,7 +370,7 @@ class Component(BaseComponent):
         """
         pass
 
-    def solve_linear(self, d_unknowns_dict, d_residuals_dict, vec_names, mode):
+    def solve_linear(self, d_unknowns_dict, d_residuals_dict, rhs_names, mode):
         r"""
         Apply inverse jac product.
 
@@ -385,7 +385,7 @@ class Component(BaseComponent):
             unscaled, dimensional quantities read via d_unknowns[key]
         d_residuals_dict : dict of <Vector>
             unscaled, dimensional quantities read via d_residuals[key]
-        vec_names : [str, ...]
+        rhs_names : [str, ...]
             list of right-hand-side vector names to perform solve linear on.
         mode : str
             either 'fwd' or 'rev'

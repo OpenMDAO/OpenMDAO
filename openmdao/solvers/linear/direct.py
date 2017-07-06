@@ -113,13 +113,13 @@ class DirectSolver(LinearSolver):
         # put new value in out_vec
         b_vec.get_data(out_vec)
 
-    def solve(self, vec_names, mode):
+    def solve(self, rhs_names, mode):
         """
         Run the solver.
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        rhs_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -133,12 +133,12 @@ class DirectSolver(LinearSolver):
         float
             relative error.
         """
-        self._vec_names = vec_names
+        self._rhs_names = rhs_names
         self._mode = mode
 
         system = self._system
 
-        for vec_name in self._vec_names:
+        for vec_name in self._rhs_names:
             self._vec_name = vec_name
             d_residuals = system._vectors['residual'][vec_name]
             d_outputs = system._vectors['output'][vec_name]

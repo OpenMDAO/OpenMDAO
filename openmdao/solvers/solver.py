@@ -37,7 +37,7 @@ class Solver(object):
         Pointer to the owning system.
     _depth : int
         How many subsolvers deep this solver is (0 means not a subsolver).
-    _vec_names : [str, ...]
+    _rhs_names : [str, ...]
         List of right-hand-side (RHS) vector names.
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
@@ -66,7 +66,7 @@ class Solver(object):
         """
         self._system = None
         self._depth = 0
-        self._vec_names = None
+        self._rhs_names = None
         self._mode = 'fwd'
         self._iter_count = 0
 
@@ -329,13 +329,13 @@ class LinearSolver(Solver):
     Base class for linear solvers.
     """
 
-    def solve(self, vec_names, mode):
+    def solve(self, rhs_names, mode):
         """
         Run the solver.
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        rhs_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -349,7 +349,7 @@ class LinearSolver(Solver):
         float
             error at the first iteration.
         """
-        self._vec_names = vec_names
+        self._rhs_names = rhs_names
         self._mode = mode
         return self._run_iterator()
 
@@ -372,7 +372,7 @@ class LinearSolver(Solver):
         else:  # rev
             b_vecs = system._vectors['output']
 
-        for vec_name in self._vec_names:
+        for vec_name in self._rhs_names:
             self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
 
         if self.options['maxiter'] > 1:
@@ -393,7 +393,7 @@ class LinearSolver(Solver):
         """
         system = self._system
         scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
+        system._apply_linear(self._rhs_names, self._mode, scope_out, scope_in)
 
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
@@ -401,7 +401,7 @@ class LinearSolver(Solver):
             b_vecs = system._vectors['output']
 
         norm = 0
-        for vec_name in self._vec_names:
+        for vec_name in self._rhs_names:
             b_vec = b_vecs[vec_name]
             b_vec -= self._rhs_vecs[vec_name]
             norm += b_vec.get_norm()**2

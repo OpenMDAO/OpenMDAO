@@ -3,6 +3,7 @@ OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
 from __future__ import print_function
+import sys
 from collections import OrderedDict
 import traceback
 
@@ -385,8 +386,8 @@ class ScipyOptimizer(Driver):
 
             # Exceptions seem to be swallowed by the C code, so this
             # should give the user more info than the dreaded "segfault"
-            print("Exception: %s" % str(msg))
-            print(70 * "=", tb, 70 * "=")
+            print("Exception: %s" % str(msg), file=sys.stderr)
+            print(70 * "=", tb, 70 * "=", file=sys.stderr)
 
         # print("Gradients calculated")
         # print(x_new)

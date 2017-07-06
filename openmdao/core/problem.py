@@ -724,124 +724,140 @@ class Problem(object):
             input_vois = self.driver._responses
             output_vois = self.driver._designvars
 
-        # TODO : Parallel adjoint setup loop goes here.
-        # NOTE : Until we support it, we will just limit ourselves to the
-        # 'linear' vector.
-        vecname = 'linear'
-        dinputs = input_vec[vecname]
-        doutputs = output_vec[vecname]
-
-        # If Forward mode, solve linear system for each 'wrt'
-        # If Adjoint mode, solve linear system for each 'of'
-        for icount, input_names in enumerate(input_list):
-            for iname_count, input_name in enumerate(input_names):
-                # Dictionary access returns a scaler for 1d input, and we
-                # need a vector for clean code, so use _views_flat.
-                flat_view = dinputs._views_flat[input_name]
-                in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
-                in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
-                start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
-                end = np.sum(model._var_sizes['output'][:iproc + 1, in_var_idx])
-
-                in_idxs = None
-                if input_name in input_vois:
-                    in_voi_meta = input_vois[input_name]
-                    if 'indices' in in_voi_meta:
-                        in_idxs = in_voi_meta['indices']
-
-                distrib = in_var_meta['distributed']
-                if in_idxs is not None:
-                    irange = in_idxs
-                    loc_size = len(in_idxs)
-                    dup = False
+        voi_lists = defaultdict(list)
+        v2rhs_group = {}
+        for input_names in input_list:
+            for name in input_names:
+                if name in input_vois:
+                    grp = input_vois[name]['rhs_group']
                 else:
-                    irange = range(in_var_meta['global_size'])
-                    loc_size = end - start
-                    dup = not distrib
+                    grp = None
+                if grp is None:
+                    if name in voi_lists:
+                        raise RuntimeError("Variable name '%s' matches an rhs_group name." %
+                                           name)
+                    voi_lists[name].append(name)
+                    v2rhs_group[name] = 'linear'
+                else:
+                    voi_lists[grp].append(name)
+                    v2rhs_group[name] = grp
 
-                loc_idx = -1
-                for idx in irange:
+        for rhs_name, vois in iteritems(voi_lists):
+            vecname = v2rhs_group[rhs_name]
+            dinputs = input_vec[vecname]
+            doutputs = output_vec[vecname]
 
-                    # Maybe we don't need to clean up so much at the beginning,
-                    # since we clean this every time.
-                    dinputs.set_const(0.0)
+            # If Forward mode, solve linear system for each 'wrt'
+            # If Adjoint mode, solve linear system for each 'of'
+            for icount, input_names in enumerate(input_list):
+                for iname_count, input_name in enumerate(input_names):
+                    # Dictionary access returns a scaler for 1d input, and we
+                    # need a vector for clean code, so use _views_flat.
+                    flat_view = dinputs._views_flat[input_name]
+                    in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
+                    in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
+                    start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
+                    end = np.sum(model._var_sizes['output'][:iproc + 1, in_var_idx])
 
-                    # the 'store' flag is here so that we properly initialize
-                    # totals to zeros instead of None in those cases when none
-                    # of the specified indices are within the range of interest
-                    # for this proc.
-                    if idx < 0:
-                        idx += end
-                    if start <= idx < end:
-                        flat_view[idx - start] = 1.0
-                        store = True
+                    in_idxs = None
+                    if input_name in input_vois:
+                        in_voi_meta = input_vois[input_name]
+                        if 'indices' in in_voi_meta:
+                            in_idxs = in_voi_meta['indices']
+
+                    distrib = in_var_meta['distributed']
+                    if in_idxs is not None:
+                        irange = in_idxs
+                        loc_size = len(in_idxs)
+                        dup = False
                     else:
-                        store = dup
+                        irange = range(in_var_meta['global_size'])
+                        loc_size = end - start
+                        dup = not distrib
 
-                    if store:
-                        loc_idx += 1
+                    loc_idx = -1
+                    for idx in irange:
 
-                    model._solve_linear([vecname], mode)
+                        # Maybe we don't need to clean up so much at the beginning,
+                        # since we clean this every time.
+                        dinputs.set_const(0.0)
 
-                    # Pull out the answers and pack into our data structure.
-                    for ocount, output_names in enumerate(output_list):
-                        for oname_count, output_name in enumerate(output_names):
-                            out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
-                            deriv_val = doutputs._views_flat[output_name]
-                            out_idxs = None
-                            if output_name in output_vois:
-                                out_voi_meta = output_vois[output_name]
-                                if 'indices' in out_voi_meta:
-                                    out_idxs = out_voi_meta['indices']
+                        # the 'store' flag is here so that we properly initialize
+                        # totals to zeros instead of None in those cases when none
+                        # of the specified indices are within the range of interest
+                        # for this proc.
+                        if idx < 0:
+                            idx += end
+                        if start <= idx < end:
+                            flat_view[idx - start] = 1.0
+                            store = True
+                        else:
+                            store = dup
 
-                            if out_idxs is not None:
-                                deriv_val = deriv_val[out_idxs]
-                            len_val = len(deriv_val)
+                        if store:
+                            loc_idx += 1
 
-                            if dup and nproc > 1:
-                                self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
-                                    model._var_sizes['output'][:, out_var_idx])[0][0]))
+                        model._solve_linear([vecname], mode)
 
-                            if return_format == 'flat_dict':
-                                if fwd:
-                                    key = (old_output_list[ocount][oname_count],
-                                           old_input_list[icount][iname_count])
+                        # Pull out the answers and pack into our data structure.
+                        for ocount, output_names in enumerate(output_list):
+                            for oname_count, output_name in enumerate(output_names):
+                                out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                                deriv_val = doutputs._views_flat[output_name]
+                                out_idxs = None
+                                if output_name in output_vois:
+                                    out_voi_meta = output_vois[output_name]
+                                    if 'indices' in out_voi_meta:
+                                        out_idxs = out_voi_meta['indices']
 
-                                    if totals[key] is None:
-                                        totals[key] = np.zeros((len_val, loc_size))
-                                    if store:
-                                        totals[key][:, loc_idx] = deriv_val
+                                if out_idxs is not None:
+                                    deriv_val = deriv_val[out_idxs]
+                                len_val = len(deriv_val)
+
+                                if dup and nproc > 1:
+                                    self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
+                                        model._var_sizes['output'][:, out_var_idx])[0][0]))
+
+                                if return_format == 'flat_dict':
+                                    if fwd:
+                                        key = (old_output_list[ocount][oname_count],
+                                               old_input_list[icount][iname_count])
+
+                                        if totals[key] is None:
+                                            totals[key] = np.zeros((len_val, loc_size))
+                                        if store:
+                                            totals[key][:, loc_idx] = deriv_val
+
+                                    else:
+                                        key = (old_input_list[icount][iname_count],
+                                               old_output_list[ocount][oname_count])
+
+                                        if totals[key] is None:
+                                            totals[key] = np.zeros((loc_size, len_val))
+                                        if store:
+                                            totals[key][loc_idx, :] = deriv_val
+
+                                elif return_format == 'dict':
+                                    if fwd:
+                                        okey = old_output_list[ocount][oname_count]
+                                        ikey = old_input_list[icount][iname_count]
+
+                                        if totals[okey][ikey] is None:
+                                            totals[okey][ikey] = np.zeros((len_val, loc_size))
+                                        if store:
+                                            totals[okey][ikey][:, loc_idx] = deriv_val
+
+                                    else:
+                                        okey = old_input_list[icount][iname_count]
+                                        ikey = old_output_list[ocount][oname_count]
+
+                                        if totals[okey][ikey] is None:
+                                            totals[okey][ikey] = np.zeros((loc_size, len_val))
+                                        if store:
+                                            totals[okey][ikey][loc_idx, :] = deriv_val
 
                                 else:
-                                    key = (old_input_list[icount][iname_count],
-                                           old_output_list[ocount][oname_count])
-
-                                    if totals[key] is None:
-                                        totals[key] = np.zeros((loc_size, len_val))
-                                    if store:
-                                        totals[key][loc_idx, :] = deriv_val
-
-                            elif return_format == 'dict':
-                                if fwd:
-                                    okey = old_output_list[ocount][oname_count]
-                                    ikey = old_input_list[icount][iname_count]
-
-                                    if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.zeros((len_val, loc_size))
-                                    if store:
-                                        totals[okey][ikey][:, loc_idx] = deriv_val
-
-                                else:
-                                    okey = old_input_list[icount][iname_count]
-                                    ikey = old_output_list[ocount][oname_count]
-
-                                    if totals[okey][ikey] is None:
-                                        totals[okey][ikey] = np.zeros((loc_size, len_val))
-                                    if store:
-                                        totals[okey][ikey][loc_idx, :] = deriv_val
-
-                            else:
-                                raise RuntimeError("unsupported return format")
+                                    raise RuntimeError("unsupported return format")
 
         return totals
 

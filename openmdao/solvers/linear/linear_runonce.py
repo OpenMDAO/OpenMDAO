@@ -12,13 +12,13 @@ class LinearRunOnce(LinearBlockGS):
 
     SOLVER = 'LN: RUNONCE'
 
-    def solve(self, vec_names, mode):
+    def solve(self, rhs_names, mode):
         """
         Run the solver.
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        rhs_names : [str, ...]
             List of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -30,7 +30,7 @@ class LinearRunOnce(LinearBlockGS):
         float
             Error at the first iteration.
         """
-        self._vec_names = vec_names
+        self._rhs_names = rhs_names
         self._mode = mode
         system = self._system
 
@@ -41,7 +41,7 @@ class LinearRunOnce(LinearBlockGS):
         else:  # rev
             b_vecs = system._vectors['output']
 
-        for vec_name in self._vec_names:
+        for vec_name in self._rhs_names:
             self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
 
         # Single iteration of GS

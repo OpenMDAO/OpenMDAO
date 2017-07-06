@@ -65,13 +65,13 @@ class ImplicitComponent(Component):
             else:
                 return result
 
-    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, rhs_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        rhs_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -82,7 +82,7 @@ class ImplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        for vec_name in vec_names:
+        for vec_name in rhs_names:
             with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
@@ -96,13 +96,13 @@ class ImplicitComponent(Component):
                     self.apply_linear(self._inputs, self._outputs,
                                       d_inputs, d_outputs, d_residuals, mode)
 
-    def _solve_linear(self, vec_names, mode):
+    def _solve_linear(self, rhs_names, mode):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        rhs_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -117,12 +117,12 @@ class ImplicitComponent(Component):
             relative error.
         """
         if self._linear_solver is not None:
-            return self._linear_solver.solve(vec_names, mode)
+            return self._linear_solver.solve(rhs_names, mode)
         else:
             failed = False
             abs_errors = []
             rel_errors = []
-            for vec_name in vec_names:
+            for vec_name in rhs_names:
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
