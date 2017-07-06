@@ -4,7 +4,8 @@ Specifying Partial Derivatives
 If you know additional information about the structure of partial derivatives in your component,
 say if an output does not depend on a particular input, you can use the :code:`declare_partials()`
 method to inform the framework. This will allow the framework to be more efficient in terms of
-memory and computation (especially if using a sparse :code:`AssembledJacobian`).
+memory and computation (especially if using a sparse :code:`AssembledJacobian`). This information
+should be delcared in the `setup` method of your component.
 
 .. automethod:: openmdao.core.component.Component.declare_partials
     :noindex:
@@ -15,12 +16,12 @@ Usage
 1. Specifying that a variable does not depend on another.
 
 .. embed-code::
-    openmdao.jacobians.tests.test_jacobian_features.SimpleCompDependence.setup_partials
+    openmdao.jacobians.tests.test_jacobian_features.SimpleCompDependence.setup
 
 2. Specifying variables using glob patterns (see https://docs.python.org/3.6/library/fnmatch.html).
 
 .. embed-code::
-    openmdao.jacobians.tests.test_jacobian_features.SimpleCompGlob.setup_partials
+    openmdao.jacobians.tests.test_jacobian_features.SimpleCompGlob.setup
 
 3. Using the :code:`val` argument to set a constant partial derivative. Note that if the :code:`val` arugment is used,
 then the partial derivative does not need to be calculated in :code:`compute_partials`.

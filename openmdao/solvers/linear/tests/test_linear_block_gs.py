@@ -130,7 +130,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         comp = model.add_subsystem('comp', SimpleImp())
         model.connect('p.a', 'comp.a')
 
-        comp.ln_solver = self.linear_solver_class()
+        comp.linear_solver = self.linear_solver_class()
 
         prob.model.jacobian = AssembledJacobian()
         prob.setup(check=False, mode='fwd')
@@ -141,6 +141,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         self.assertEqual(str(context.exception),
                          "A block linear solver 'LN: LNBGS' is being used with"
                          " an AssembledJacobian in system 'comp'")
+
 
 class TestBGSSolverFeature(unittest.TestCase):
 

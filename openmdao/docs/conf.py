@@ -3,13 +3,8 @@
 # containing dir.
 import sys
 import os
-#import pkgutil
-#import inspect
-#import re
 import textwrap
-#from numpydoc.docscrape_sphinx import SphinxDocString
 from numpydoc.docscrape import NumpyDocString, Reader
-import openmdao
 from mock import Mock
 from openmdao.docs.config_params import MOCK_MODULES, IGNORE_LIST
 from openmdao.docs._utils.patch import do_monkeypatch

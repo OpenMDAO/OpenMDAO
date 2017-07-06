@@ -41,7 +41,7 @@ def _redirect_streams(to_fd):
 
 def use_proc_files():
     """
-    Cause stdout/err from each MPI process to be written to <rank>.out.
+    Cause stdout/err from each MPI process to be written to [rank].out.
     """
     if MPI is not None:
         rank = MPI.COMM_WORLD.rank

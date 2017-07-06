@@ -274,7 +274,6 @@ class TestRangePartials(unittest.TestCase):
                                          lower=range(self.size),
                                          upper=np.ones(self.size))
 
-            def setup_partials(self):
                 # verify that both iterable and list types are valid
                 # for rows and cols arguments to declare_partials
                 rows = range(self.size)

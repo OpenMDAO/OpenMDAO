@@ -9,6 +9,7 @@ from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 
 
 class TestScipyOptimizer(unittest.TestCase):
@@ -46,6 +47,38 @@ class TestScipyOptimizer(unittest.TestCase):
 
         assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
+
+    def test_compute_total_derivs_return_array_non_square(self):
+
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+        comp = model.add_subsystem('comp', NonSquareArrayComp())
+        model.connect('px.x', 'comp.x1')
+
+        model.add_design_var('px.x')
+        model.add_objective('px.x')
+        model.add_constraint('comp.y1')
+        model.add_constraint('comp.y2')
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        derivs = prob.driver._compute_total_derivs(of=['comp.y1'], wrt=['px.x'],
+                                                   return_format='array')
+
+        J = comp.JJ[0:3, 0:2]
+        assert_rel_error(self, J, derivs, 1.0e-3)
+
+        # Support for a name to be in 'of' and 'wrt'
+
+        derivs = prob.driver._compute_total_derivs(of=['comp.y2', 'px.x', 'comp.y1'], wrt=['px.x'],
+                                                   return_format='array')
+
+        assert_rel_error(self, J, derivs[3:, :], 1.0e-3)
+        assert_rel_error(self, comp.JJ[3:4, 0:2], derivs[0:1, :], 1.0e-3)
+        assert_rel_error(self, np.eye(2), derivs[1:3, :], 1.0e-3)
 
     def test_simple_paraboloid_unconstrained(self):
 
