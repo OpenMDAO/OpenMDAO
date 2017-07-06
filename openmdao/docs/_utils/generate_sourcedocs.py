@@ -99,7 +99,6 @@ OpenMDAO User Source Documentation
         'solvers.nonlinear',
         'solvers.linesearch',
         'proc_allocators',
-        'utils',
         'vectors',
     ]
 
