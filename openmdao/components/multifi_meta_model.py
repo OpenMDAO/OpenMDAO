@@ -33,18 +33,18 @@ class MultiFiMetaModel(MetaModel):
     Generalize MetaModel to be able to train surrogates with multi-fidelity training inputs.
 
     For a given number of levels of fidelity **nfi** (given at initialization)
-    the corresponding training input variables *train:<invar>_fi<2..nfi>* and
-    *train:<outvar>_fi<2..nfi>* are automatically created
-    besides the given *train:<invar>* and *train:<outvar>* variables.
+    the corresponding training input variables *train:[invar]_fi[2..nfi]* and
+    *train:[outvar]_fi[2..nfi]* are automatically created
+    besides the given *train:[invar]* and *train:[outvar]* variables.
     Note the index starts at 2, the index 1 is omitted considering
-    the simple name *<var>* is equivalent to *<var>_fi1* which is intended
+    the simple name *var* is equivalent to *var_fi1* which is intended
     to be the data of highest fidelity.
 
     The surrogate models are trained with a list of (m samples, n dim)
     ndarrays built from the various training input data. By convention,
     the fidelities are intended to be ordered from highest to lowest fidelity.
     Obviously for a given level of fidelity corresponding lists
-    *train:<var>_fi<n>* have to be of the same size.
+    *train:[var]_fi[n]* have to be of the same size.
 
     Thus given the initialization::
 

@@ -59,15 +59,18 @@ setup(name='openmdao',
           'openmdao': ['*/tests/*.py', '*/*/tests/*.py', '*/*/*/tests/*.py']
       },
       install_requires=[
-        'six', 'numpydoc', #'numpy>=1.9.2',
+        'six', 'numpydoc', # 'numpy>=1.9.2',
         'scipy',
         'sqlitedict',
         'pycodestyle', 'pydocstyle',
         'testflo',
         'parameterized',
         'networkx',
+        'sphinx',
+        'redbaron',
+        'mock'
       ],
-      #scripts=['bin/om-pylint.sh']
+      # scripts=['bin/om-pylint.sh']
       entry_points="""
       [console_scripts]
       wingproj=openmdao.devtools.wingproj:run_wing

@@ -1,8 +1,5 @@
 from docutils import nodes
-from docutils.parsers.rst import directives
 from sphinx.util.compat import Directive
-from subprocess import call
-import os
 from openmdao.docs._utils.docutil import get_test_source_code_for_feature
 
 
