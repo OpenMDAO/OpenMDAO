@@ -9,7 +9,8 @@ The LinearBlockGS uses Block Gauss Seidel to solve the linear system. The Linear
 residual is below a tolerance, or the maximum number of iterations has been exceeded. As such,
 it is generally usable for any system topology, and can handle cycles and implicit states
 alike. It is not always the best solver to choose, however, and is known to diverge or plateau
-on some problems. In such a case, you may need to use a solver such as :ref:`ScipyIterativeSolver <usr_openmdao.solvers.scipy.py>`.
+on some problems. In such a case, you may need to use a solver such as
+:ref:`ScipyIterativeSolver <usr_openmdao.solvers.linear.scipy_iter_solver.py>`.
 
 The LinearBlockGS solver is a block solver, so you can specify different linear solvers in the subsystems and they
 will be utilized to solve the subsystem linear problem.
