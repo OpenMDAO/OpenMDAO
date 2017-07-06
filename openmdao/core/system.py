@@ -160,12 +160,22 @@ class System(object):
     _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
     #
+    _approx_schemes : OrderedDict
+        A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
     _jacobian_changed : bool
         If True, the jacobian has changed since the last call to setup.
     _owns_assembled_jac : bool
         If True, we are owners of the AssembledJacobian in self._jacobian.
+    _owns_approx_jac : bool
+        If True, this system approximated its Jacobian
+    _owns_approx_jac_meta : dict
+        Stores approximation metadata (e.g., step_size) from calls to approx_total_derivs
+    _owns_approx_wrt : set or None
+        Overrides aproximation inputs.
+    _owns_approx_of : set or None
+        Overrides aproximation outputs.
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
@@ -272,8 +282,14 @@ class System(object):
         self._jacobian = DictionaryJacobian()
         self._jacobian._system = self
         self._jacobian_changed = True
+        self._approx_schemes = OrderedDict()
         self._owns_assembled_jac = False
         self._subjacs_info = {}
+
+        self._owns_approx_jac = False
+        self._owns_approx_jac_meta = {}
+        self._owns_approx_wrt = None
+        self._owns_approx_of = None
 
         self._design_vars = {}
         self._responses = {}

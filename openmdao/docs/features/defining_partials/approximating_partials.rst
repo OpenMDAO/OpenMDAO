@@ -25,3 +25,34 @@ The step size can be any non-zero number, but should be positive (one can change
 
 .. embed-test::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_fd_options
+
+Approximating Semi-Total Derivatives
+====================================
+
+There are also times where it makes more sense to approximate the derivatives for an entire group in one shot. You can turn on
+the approximation by calling `approx_total_derivs` on any `Group`.
+
+.. automethod:: openmdao.core.group.Group.approx_total_derivs
+    :noindex:
+
+The default method is for approximating semi-total derivatives is the finite difference method. When you call the `approx_total_derivs` method on a group, OpenMDAO will
+generate an approximate Jacobian for the entire group during the linearization step before derivatives are calculated. OpenMDAO automatically figures out
+which inputs and output pairs are needed in this Jacobian. When `solve_linear` is called from any system that contains this system, the approximated Jacobian
+is used for the derivatives in this system.
+
+The derivatives approximated in this matter are total derivatives of outputs of the group with respect to inputs. If any components in the group contain
+implicit states, then you must have an appropriate solver (such as NewtonSolver) inside the group to solve the implicit relationships.
+
+Here is a classic example of where you might use an approximation like finite difference. In this example, we could just
+approximate the partials on components CompOne and CompTwo separately. However, CompTwo has a vector input that is 25 wide,
+so it would require 25 separate executions under finite difference. If we instead approximate the total derivatives on the
+whole group, we only have one input, so just one extra execution.
+
+.. embed-test::
+    openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_basic
+
+The same arguments are used for both partial and total derivative approximation specifications. Here we set the finite difference
+step size, the form to central differences, and the step_calc to relative instead of absolute.
+
+.. embed-test::
+    openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_arguments
