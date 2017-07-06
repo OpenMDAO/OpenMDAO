@@ -488,7 +488,7 @@ class System(object):
                     # Check for complex step to set vectors up appropriately.
                     # If any subsystem needs complex step, then we need to allocate it everywhere.
                     alloc_complex = 'cs' in self._approx_schemes
-                    for sub in self._subsystems_allprocs:
+                    for sub in self.system_iter(include_self=True, recurse=True):
                         if alloc_complex:
                             break
                         alloc_complex = 'cs' in sub._approx_schemes
