@@ -39,7 +39,6 @@ single:
 clean:
 	rm -rf $(BUILDDIR)/*
 	rm -rf _srcdocs/usr
-	#rm -rf _srcdocs/dev
 	rm -rf tags
 	rm -rf tmp
 	rm -f feature_docs_unit_test_db.sqlite
@@ -54,9 +53,7 @@ redbaron:
 
 all: mock redbaron
 	# Cleaning up previously-generated files before docbuild
-	# rm -rf $(BUILDDIR)/*
 	rm -rf _srcdocs/usr
-	#rm -rf _srcdocs/dev
 
 	# Running things before docbuild
 	python _utils/preprocess_tags.py
@@ -66,17 +63,9 @@ all: mock redbaron
 	#       dev docs get built into tmp/moved into _build later
 	#       to avoid race to create dirs.
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr"
-	#$(SPHINXBUILD) -b html -d tmp/doctrees  . tmp/html -t "dev"
-
-	# Making dirs in which to move things, moving things (parallel build prob)
-	#mkdir $(BUILDDIR)/html/_srcdocs/dev
-	#mkdir $(BUILDDIR)/doctrees/_srcdocs/dev
-	#cp -R tmp/html/_srcdocs/dev $(BUILDDIR)/html/_srcdocs
-	#cp -R tmp/doctrees/_srcdocs/dev $(BUILDDIR)/doctrees/_srcdocs
 
 	# post-game clean-up
 	rm feature_docs_unit_test_db.sqlite
-	#rm -rf tmp
 
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
@@ -85,32 +74,32 @@ html: all
 
 help:
 	@echo "Please use 'make <target>' where <target> is one of"
-	@echo "  html-update to remake a file based on a single rst file changing."
-	@echo "  single     to remake a file based on its dependecy (e.g. code-embed) changing, not its rst file"
-	@echo "  html       to make standalone HTML files"
-	@echo "  dirhtml    to make HTML files named index.html in directories"
-	@echo "  singlehtml to make a single large HTML file"
-	@echo "  pickle     to make pickle files"
-	@echo "  json       to make JSON files"
-	@echo "  htmlhelp   to make HTML files and a HTML help project"
-	@echo "  qthelp     to make HTML files and a qthelp project"
-	@echo "  applehelp  to make an Apple Help Book"
-	@echo "  devhelp    to make HTML files and a Devhelp project"
-	@echo "  epub       to make an epub"
-	@echo "  latex      to make LaTeX files, you can set PAPER=a4 or PAPER=letter"
-	@echo "  latexpdf   to make LaTeX files and run them through pdflatex"
-	@echo "  latexpdfja to make LaTeX files and run them through platex/dvipdfmx"
-	@echo "  text       to make text files"
-	@echo "  man        to make manual pages"
-	@echo "  texinfo    to make Texinfo files"
-	@echo "  info       to make Texinfo files and run them through makeinfo"
-	@echo "  gettext    to make PO message catalogs"
-	@echo "  changes    to make an overview of all changed/added/deprecated items"
-	@echo "  xml        to make Docutils-native XML files"
-	@echo "  pseudoxml  to make pseudoxml-XML files for display purposes"
-	@echo "  linkcheck  to check all external links for integrity"
-	@echo "  doctest    to run all doctests embedded in the documentation (if enabled)"
-	@echo "  coverage   to run coverage check of the documentation (if enabled)"
+	@echo "  html        to make standalone HTML files"
+	@echo "  html-update to make only files that have been changed"
+	@echo "  single      to re-make of one html file to refresh dependency changes"
+	@echo "  dirhtml     to make HTML files named index.html in directories"
+	@echo "  singlehtml  to make a single large HTML file"
+	@echo "  pickle      to make pickle files"
+	@echo "  json        to make JSON files"
+	@echo "  htmlhelp    to make HTML files and a HTML help project"
+	@echo "  qthelp      to make HTML files and a qthelp project"
+	@echo "  applehelp   to make an Apple Help Book"
+	@echo "  devhelp     to make HTML files and a Devhelp project"
+	@echo "  epub        to make an epub"
+	@echo "  latex       to make LaTeX files, you can set PAPER=a4 or PAPER=letter"
+	@echo "  latexpdf    to make LaTeX files and run them through pdflatex"
+	@echo "  latexpdfja  to make LaTeX files and run them through platex/dvipdfmx"
+	@echo "  text        to make text files"
+	@echo "  man         to make manual pages"
+	@echo "  texinfo     to make Texinfo files"
+	@echo "  info        to make Texinfo files and run them through makeinfo"
+	@echo "  gettext     to make PO message catalogs"
+	@echo "  changes     to make an overview of all changed/added/deprecated items"
+	@echo "  xml         to make Docutils-native XML files"
+	@echo "  pseudoxml   to make pseudoxml-XML files for display purposes"
+	@echo "  linkcheck   to check all external links for integrity"
+	@echo "  doctest     to run all doctests embedded in the documentation (if enabled)"
+	@echo "  coverage    to run coverage check of the documentation (if enabled)"
 
 dirhtml:
 	$(SPHINXBUILD) -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml

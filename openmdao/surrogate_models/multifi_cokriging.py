@@ -1,14 +1,14 @@
 """
 Integrates the Multi-Fidelity Co-Kriging method described in [LeGratiet2013].
 
-(Author: Remi Vauclin <vauclin.remi@gmail.com>)
+(Author: Remi Vauclin vauclin.remi@gmail.com)
 
 This code was implemented using the package scikit-learn as basis.
-(Author: Vincent Dubourg <vincent.dubourg@gmail.com>)
+(Author: Vincent Dubourg, vincent.dubourg@gmail.com)
 
 OpenMDAO adaptation. Regression and correlation functions were directly copied
 from scikit-learn package here to avoid scikit-learn dependency.
-(Author: Remi Lafage <remi.lafage@onera.fr>)
+(Author: Remi Lafage, remi.lafage@onera.fr)
 
 ISAE/DMSM - ONERA/DCPS
 """
@@ -263,7 +263,7 @@ class MultiFiCoKriging(object):
         Notes
         -----
         Implementation is based on the Package Scikit-Learn
-        (Author: Vincent Dubourg <vincent.dubourg@gmail.com>) which translates
+        (Author: Vincent Dubourg, vincent.dubourg@gmail.com) which translates
         the DACE Matlab toolbox, see [NLNS2002]_.
 
 

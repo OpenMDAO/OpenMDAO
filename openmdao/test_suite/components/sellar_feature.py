@@ -33,10 +33,7 @@ class SellarDis1(ExplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0)
 
-    def setup_partials(self):
-        """
-        Finite difference all partials.
-        """
+        # Finite difference all partials.
         self.approx_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -67,10 +64,7 @@ class SellarDis2(ExplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0)
 
-    def setup_partials(self):
-        """
-        Finite difference all partials.
-        """
+        # Finite difference all partials.
         self.approx_partials('*', '*')
 
     def compute(self, inputs, outputs):

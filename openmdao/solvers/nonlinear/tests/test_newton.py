@@ -1,7 +1,7 @@
 """Test the Newton nonlinear solver. """
 
 import unittest
-
+import warnings
 import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
@@ -14,6 +14,9 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarNoDerivatives, SellarDerivatives, SellarStateConnection, StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
 
+from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS
+from openmdao.test_suite.components.implicit_newton_linesearch \
+    import ImplCompTwoStates, ImplCompTwoStatesArrays
 
 class TestNewton(unittest.TestCase):
 
@@ -77,6 +80,48 @@ class TestNewton(unittest.TestCase):
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
+
+    def test_line_search_deprecated(self):
+        top = Problem()
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
+        top.model.add_subsystem('comp', ImplCompTwoStates())
+        top.model.connect('px.x', 'comp.x')
+
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = ScipyIterativeSolver()
+
+        msg = "The 'line_search' attribute provides backwards compatibility with OpenMDAO 1.x ; use 'linesearch' instead."
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            top.model.nonlinear_solver.line_search = ArmijoGoldsteinLS(bound_enforcement='vector')
+            self.assertEqual(str(w[-1].message), msg)
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            ls = top.model.nonlinear_solver.line_search
+            self.assertEqual(str(w[-1].message), msg)
+
+        ls.options['maxiter'] = 10
+        ls.options['alpha'] = 1.0
+
+        top.setup(check=False)
+
+        # Test lower bound: should go to the lower bound and stall
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.0
+        top['comp.z'] = 1.6
+        top.run_model()
+        assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
+
+        # Test upper bound: should go to the upper bound and stall
+        top['px.x'] = 0.5
+        top['comp.y'] = 0.0
+        top['comp.z'] = 2.4
+        top.run_model()
+        assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
+
 
     def test_sellar_analysis_error(self):
         # Make sure analysis error is raised.

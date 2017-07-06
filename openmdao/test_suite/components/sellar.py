@@ -55,7 +55,10 @@ class SellarDis1(ExplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0, units=units, ref=ref)
 
-    def setup_partials(self):
+        self._turn_on_fd()
+
+    def _turn_on_fd(self):
+        # Finite difference everything
         self.approx_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -79,7 +82,8 @@ class SellarDis1withDerivatives(SellarDis1):
     Component containing Discipline 1 -- derivatives version.
     """
 
-    def setup_partials(self):
+    def _turn_on_fd(self):
+        # Finite difference nothing
         pass
 
     def compute_partials(self, inputs, outputs, partials):
@@ -122,7 +126,10 @@ class SellarDis2(ExplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0, units=units, ref=ref)
 
-    def setup_partials(self):
+        self._turn_on_fd()
+
+    def _turn_on_fd(self):
+        # Finite difference everything
         self.approx_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -151,7 +158,8 @@ class SellarDis2withDerivatives(SellarDis2):
     Component containing Discipline 2 -- derivatives version.
     """
 
-    def setup_partials(self):
+    def _turn_on_fd(self):
+        # Finite difference nothing
         pass
 
     def compute_partials(self, inputs, outputs, J):

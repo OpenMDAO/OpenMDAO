@@ -4,7 +4,6 @@
 import sys
 import os
 import textwrap
-#from numpydoc.docscrape_sphinx import SphinxDocString
 from numpydoc.docscrape import NumpyDocString, Reader
 from mock import Mock
 from openmdao.docs.config_params import MOCK_MODULES, IGNORE_LIST
@@ -127,18 +126,13 @@ language = None
 
 # exclude_patterns is a list of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-if tags.has("usr") or tags.has("dev"):
+if tags.has("usr"):
     from openmdao.docs._utils.generate_sourcedocs import generate_docs
     if tags.has("usr"):
         exclude_patterns = ['_build', '_srcdocs/dev']
         absp = os.path.join('.', '_srcdocs', 'usr')
         sys.path.insert(0, os.path.abspath(absp))
         generate_docs("usr")
-    if tags.has("dev"):
-        exclude_patterns = ['_build', '_srcdocs/usr']
-        absp = os.path.join('.', '_srcdocs', 'dev')
-        sys.path.insert(0, os.path.abspath(absp))
-        generate_docs("dev")
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -151,7 +145,6 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 html_theme = '_theme'
-# html_theme = 'sphinxdoc'
 
 # Add any paths that contain custom themes here, relative to this directory.
 html_theme_path = ['.']
