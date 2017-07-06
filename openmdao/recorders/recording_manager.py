@@ -44,8 +44,8 @@ class RecordingManager(object):
         """
         Add a recorder for recording.
 
-        Args
-        ----
+        Parameters
+        ----------
         recorder : <BaseRecorder>
            Recorder instance to be added to the manager.
         """

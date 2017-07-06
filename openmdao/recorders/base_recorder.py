@@ -114,8 +114,8 @@ class BaseRecorder(object):
         """
         Prepare for a new run and calculate inclusion lists.
 
-        Args
-        ----
+        Parameters
+        ----------
         object_requesting_recording :
             Object to which this recorder is attached.
         """
@@ -253,8 +253,8 @@ class BaseRecorder(object):
         """
         Write the metadata of the given object.
 
-        Args
-        ----
+        Parameters
+        ----------
         object_requesting_recording :
             System, Solver, Driver in need of recording.
         """
@@ -264,8 +264,8 @@ class BaseRecorder(object):
         """
         Write the provided data.
 
-        Args
-        ----
+        Parameters
+        ----------
         inputs : dict
             Dictionary containing inputs.
 
