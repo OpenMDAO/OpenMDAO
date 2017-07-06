@@ -145,7 +145,7 @@ class ComplexStep(ApproximationScheme):
                 result = self._run_point_complex(system, input_delta, deriv_type)
 
                 for of, subjac in outputs:
-                    fact = 1.0/delta
+                    fact = 1.0 / delta
                     if deriv_type == 'total':
                         # Sign difference between output and resids
                         fact = -fact

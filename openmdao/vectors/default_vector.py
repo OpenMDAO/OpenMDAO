@@ -365,8 +365,8 @@ class DefaultVector(Vector):
             for key in self._data:
                 r_data = self._data[key]
                 i_data = self._imag_data[key]
-                r_data = r_val*r_data + i_val*i_data
-                i_data = r_val*i_data + i_val*r_data
+                r_data = r_val * r_data + i_val * i_data
+                i_data = r_val * i_data + i_val * r_data
         else:
             for data in itervalues(self._data):
                 data *= val
@@ -387,9 +387,9 @@ class DefaultVector(Vector):
             r_val = np.real(val)
             i_val = np.imag(val)
             for set_name, data in iteritems(self._data):
-                data += r_val * vec._data[set_name] + i_val*vec._imag_data[set_name]
+                data += r_val * vec._data[set_name] + i_val * vec._imag_data[set_name]
             for set_name, data in iteritems(self._imag_data):
-                data += i_val * vec._data[set_name] + r_val*vec._imag_data[set_name]
+                data += i_val * vec._data[set_name] + r_val * vec._imag_data[set_name]
         else:
             for set_name, data in iteritems(self._data):
                 data += val * vec._data[set_name]
