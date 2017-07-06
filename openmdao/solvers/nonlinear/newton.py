@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class NewtonSolver(NonlinearSolver):
@@ -56,6 +57,24 @@ class NewtonSolver(NonlinearSolver):
         # We only need to call linearize on the linear solver
         # if its not shared with the parent group.
         self._linear_solver_from_parent = True
+
+    @property
+    def line_search(self):
+        """
+        Return the current linesearch object.
+        """
+        warn_deprecation("The 'line_search' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'linesearch' instead.")
+        return self.linesearch
+
+    @line_search.setter
+    def line_search(self, solver):
+        """
+        Set the linesearch solver.
+        """
+        warn_deprecation("The 'line_search' attribute provides backwards compatibility "
+                         "with OpenMDAO 1.x ; use 'linesearch' instead.")
+        self.linesearch = solver
 
     def _declare_options(self):
         """

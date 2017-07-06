@@ -85,7 +85,7 @@ Solvers (nonlinear and linear)
    features/solvers/nonlinear_block_jac
    features/solvers/newton
    features/solvers/linear_runonce
-   features/solvers/direct
+   features/solvers/direct_solver
    features/solvers/linear_block_gs
    features/solvers/scipy_iter_solver
    features/solvers/petsc_ksp
