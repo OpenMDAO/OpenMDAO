@@ -734,7 +734,8 @@ class Problem(object):
                or model._owns_approx_wrt != set(wrt):
                 model._owns_approx_of = set(of)
                 model._owns_approx_wrt = set(wrt)
-                model._setup_jacobians(recurse=False)
+
+            model._setup_jacobians(recurse=False)
 
             model._linearize()
             approx_jac = model._jacobian._subjacs

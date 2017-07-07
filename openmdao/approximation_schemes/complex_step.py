@@ -150,7 +150,7 @@ class ComplexStep(ApproximationScheme):
                         # Sign difference between output and resids
                         fact = -fact
 
-                    subjac[:, idx] = result._imag_views_flat[of]*fact
+                    subjac[:, idx] = result._imag_views_flat[of] * fact
 
             for of, subjac in outputs:
                 rel_key = abs_key2rel_key(system, (of, wrt))
@@ -159,10 +159,9 @@ class ComplexStep(ApproximationScheme):
         # Turn off complex step.
         system._inputs._vector_info._under_complex_step = False
 
-
     def _run_point_complex(self, system, input_deltas, deriv_type='partial'):
         """
-        Perturbs the system inputs with a complex step, runs, and returns the results.
+        Perturb the system inputs with a complex step, runs, and returns the results.
 
         Parameters
         ----------

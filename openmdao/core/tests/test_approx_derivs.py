@@ -1,15 +1,19 @@
 """ Testing for group finite differencing."""
 
 import unittest
+import itertools
+from parameterized import parameterized
 
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, ExecComp, NewtonSolver, \
-     ExplicitComponent
+     ExplicitComponent, PETScVector, DefaultVector, NonlinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
+from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 
 
 class TestGroupFiniteDifference(unittest.TestCase):
@@ -257,15 +261,109 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'x'], [[-5.99]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.01]], 1e-6)
 
+    def test_unit_conv_group(self):
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
+        sub1 = prob.model.add_subsystem('sub1', Group())
+        sub2 = prob.model.add_subsystem('sub2', Group())
+
+        sub1.add_subsystem('src', SrcComp())
+        sub2.add_subsystem('tgtF', TgtCompF())
+        sub2.add_subsystem('tgtC', TgtCompC())
+        sub2.add_subsystem('tgtK', TgtCompK())
+
+        prob.model.connect('x1', 'sub1.src.x1')
+        prob.model.connect('sub1.src.x2', 'sub2.tgtF.x2')
+        prob.model.connect('sub1.src.x2', 'sub2.tgtC.x2')
+        prob.model.connect('sub1.src.x2', 'sub2.tgtK.x2')
+
+        sub2.approx_total_derivs(method='fd')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['sub1.src.x2'], 100.0, 1e-6)
+        assert_rel_error(self, prob['sub2.tgtF.x3'], 212.0, 1e-6)
+        assert_rel_error(self, prob['sub2.tgtC.x3'], 100.0, 1e-6)
+        assert_rel_error(self, prob['sub2.tgtK.x3'], 373.15, 1e-6)
+
+        wrt = ['x1']
+        of = ['sub2.tgtF.x3', 'sub2.tgtC.x3', 'sub2.tgtK.x3']
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+
+        assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+
+        # Check the total derivatives in reverse mode
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+
+        assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+
+    def test_sellar(self):
+        # Basic sellar test.
+
+        prob = self.prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        nlbgs = prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        model.approx_total_derivs(method='fd', step=1e-5)
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
+
+def title(txt):
+    """ Provide nice title for parameterized testing."""
+    return str(txt).split('.')[-1].replace("'", '').replace('>', '')
+
 
 class TestGroupComplexStep(unittest.TestCase):
+
+    def setUp(self):
+        self.prob = Problem()
 
     def tearDown(self):
         # Global stuff seems to not get cleaned up if test fails.
         self.prob.model._outputs._vector_info._under_complex_step = False
 
-    def test_paraboloid(self):
-        prob = self.prob = Problem()
+    @parameterized.expand(itertools.product(
+        [DefaultVector, PETScVector],
+        ), testcase_func_name=lambda f, n, p: 'test_paraboloid_'+'_'.join(title(a) for a in p.args)
+    )
+    def test_paraboloid(self, vec_class):
+        prob = self.prob
         model = prob.model = Group()
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
@@ -274,7 +372,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = ScipyIterativeSolver()
         model.approx_total_derivs(method='cs')
 
-        prob.setup(check=False, mode='fwd')
+        prob.setup(check=False, vector_class=vec_class, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -288,8 +386,12 @@ class TestGroupComplexStep(unittest.TestCase):
         # 1 output x 2 inputs
         self.assertEqual(len(model._approx_schemes['cs']._exec_list), 2)
 
-    def test_paraboloid_subbed(self):
-        prob = self.prob = Problem()
+    @parameterized.expand(itertools.product(
+        [DefaultVector, PETScVector],
+        ), testcase_func_name=lambda f, n, p: 'test_paraboloid_subbed_'+'_'.join(title(a) for a in p.args)
+    )
+    def test_paraboloid_subbed(self, vec_class):
+        prob = self.prob
         model = prob.model = Group()
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
@@ -299,7 +401,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = ScipyIterativeSolver()
         sub.approx_total_derivs(method='cs')
 
-        prob.setup(check=False, mode='fwd')
+        prob.setup(check=False, vector_class=vec_class, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -318,8 +420,12 @@ class TestGroupComplexStep(unittest.TestCase):
         sub = model.get_subsystem('sub')
         self.assertEqual(len(sub._approx_schemes['cs']._exec_list), 2)
 
-    def test_paraboloid_subbed_with_connections(self):
-        prob = self.prob = Problem()
+    @parameterized.expand(itertools.product(
+        [DefaultVector, PETScVector],
+        ), testcase_func_name=lambda f, n, p: 'test_paraboloid_subbed_with_connections_'+'_'.join(title(a) for a in p.args)
+    )
+    def test_paraboloid_subbed_with_connections(self, vec_class):
+        prob = self.prob
         model = prob.model = Group()
         model.add_subsystem('p1', IndepVarComp('x', 0.0))
         model.add_subsystem('p2', IndepVarComp('y', 0.0))
@@ -336,7 +442,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = ScipyIterativeSolver()
         sub.approx_total_derivs(method='cs')
 
-        prob.setup(check=False, mode='fwd')
+        prob.setup(check=False, vector_class=vec_class, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -355,7 +461,11 @@ class TestGroupComplexStep(unittest.TestCase):
         sub = model.get_subsystem('sub')
         self.assertEqual(len(sub._approx_schemes['cs']._exec_list), 6)
 
-    def test_arrray_comp(self):
+    @parameterized.expand(itertools.product(
+        [DefaultVector, PETScVector],
+        ), testcase_func_name=lambda f, n, p: 'test_arrray_comp_'+'_'.join(title(a) for a in p.args)
+    )
+    def test_arrray_comp(self, vec_class):
 
         class DoubleArrayFD(DoubleArrayComp):
 
@@ -365,7 +475,7 @@ class TestGroupComplexStep(unittest.TestCase):
                 """
                 pass
 
-        prob = self.prob = Problem()
+        prob = self.prob
         model = prob.model = Group()
 
         model.add_subsystem('p1', IndepVarComp('x1', val=np.ones(2)))
@@ -377,7 +487,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = ScipyIterativeSolver()
         model.approx_total_derivs(method='cs')
 
-        prob.setup(check=False)
+        prob.setup(check=False, vector_class=vec_class)
         prob.run_model()
         model.run_linearize()
 
@@ -387,39 +497,95 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, Jfd['comp.y2', 'p1.x1'], -comp.JJ[2:4, 0:2], 1e-6)
         assert_rel_error(self, Jfd['comp.y2', 'p2.x2'], -comp.JJ[2:4, 2:4], 1e-6)
 
-    def test_around_newton(self):
-        # For a group that is set to FD that has a Newton solver, make sure it doesn't
-        # try to FD itself while solving.
+    @parameterized.expand(itertools.product(
+        [DefaultVector, PETScVector],
+        ), testcase_func_name=lambda f, n, p: 'test_unit_conv_group_'+'_'.join(title(a) for a in p.args)
+    )
+    def test_unit_conv_group(self, vec_class):
 
-        class TestImplCompArrayDenseNoSolve(TestImplCompArrayDense):
-            def solve_nonlinear(self, inputs, outputs):
-                """ Disable local solve."""
-                pass
+        prob = self.prob
+        prob.model = Group()
+        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
+        sub1 = prob.model.add_subsystem('sub1', Group())
+        sub2 = prob.model.add_subsystem('sub2', Group())
 
+        sub1.add_subsystem('src', SrcComp())
+        sub2.add_subsystem('tgtF', TgtCompF())
+        sub2.add_subsystem('tgtC', TgtCompC())
+        sub2.add_subsystem('tgtK', TgtCompK())
 
-        prob = self.prob = Problem()
+        prob.model.connect('x1', 'sub1.src.x1')
+        prob.model.connect('sub1.src.x2', 'sub2.tgtF.x2')
+        prob.model.connect('sub1.src.x2', 'sub2.tgtC.x2')
+        prob.model.connect('sub1.src.x2', 'sub2.tgtK.x2')
+
+        sub2.approx_total_derivs(method='cs')
+
+        prob.setup(check=False, vector_class=vec_class)
+        prob.run_model()
+
+        assert_rel_error(self, prob['sub1.src.x2'], 100.0, 1e-6)
+        assert_rel_error(self, prob['sub2.tgtF.x3'], 212.0, 1e-6)
+        assert_rel_error(self, prob['sub2.tgtC.x3'], 100.0, 1e-6)
+        assert_rel_error(self, prob['sub2.tgtK.x3'], 373.15, 1e-6)
+
+        wrt = ['x1']
+        of = ['sub2.tgtF.x3', 'sub2.tgtC.x3', 'sub2.tgtK.x3']
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+
+        assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+
+        # Check the total derivatives in reverse mode
+        prob.setup(check=False, vector_class=vec_class, mode='rev')
+        prob.run_model()
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+
+        assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+
+    @parameterized.expand(itertools.product(
+        [DefaultVector, PETScVector],
+        ), testcase_func_name=lambda f, n, p: 'test_sellar_'+'_'.join(title(a) for a in p.args)
+    )
+    def test_sellar(self, vec_class):
+        # Basic sellar test.
+
+        prob = self.prob
         model = prob.model = Group()
 
-        model.add_subsystem('p_rhs', IndepVarComp('rhs', val=np.array([2, 4])))
-        comp = model.add_subsystem('comp', TestImplCompArrayDenseNoSolve())
-        model.connect('p_rhs.rhs', 'comp.rhs')
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
-        model.approx_total_derivs(method='cs')
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        prob.setup(check=False)
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        nlbgs = prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        model.approx_total_derivs(method='cs', step=1.0e-1)
+
+        prob.setup(check=False, vector_class=vec_class)
+        prob.set_solver_print(level=0)
         prob.run_model()
-        model.approx_total_derivs()
-        assert_rel_error(self, prob['comp.x'], [1.97959184, 4.02040816], 1e-5)
 
-        model.run_linearize()
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
-        of = ['comp.x']
-        wrt = ['p_rhs.rhs']
-        Jfd = prob.compute_total_derivs(of=of, wrt=wrt)
+        wrt = ['z']
+        of = ['obj']
 
-        assert_rel_error(self, Jfd['comp.x', 'p_rhs.rhs'], [[1.01020408, -0.01020408], [-0.01020408,  1.01020408]], 1e-5)
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
 
 class TestComponentComplexStep(unittest.TestCase):

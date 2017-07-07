@@ -66,6 +66,14 @@ class Vector(object):
         List of indices mapping the varset-grouped data to the global vector.
     _vector_info : <VectorInfo>
         Object to store some global info, such as complex step state.
+    _imag_views : dict
+        Dictionary mapping absolute variable names to the ndarray views for the imaginary part.
+    _imag_views_flat : dict
+        Dictionary mapping absolute variable names to the flattened ndarray views for the imaginary
+        part.
+    _imag_data : {}
+        Dict of the actual allocated data (depends on implementation) for the imaginary part, keyed
+        by varset name.
     """
 
     _vector_info = VectorInfo()
@@ -282,7 +290,7 @@ class Vector(object):
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
             if self._vector_info._under_complex_step:
-                return self._views[abs_name] + 1j* self._imag_views[abs_name]
+                return self._views[abs_name] + 1j * self._imag_views[abs_name]
             return self._views[abs_name]
         else:
             msg = 'Variable name "{}" not found.'

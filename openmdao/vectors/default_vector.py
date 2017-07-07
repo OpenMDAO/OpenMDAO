@@ -62,6 +62,7 @@ class DefaultTransfer(Transfer):
                     out_vec._data[out_set_name][out_inds[key]]
 
                 # Imaginary transfer
+                # (for CS, so only need in fwd)
                 if in_vec._vector_info._under_complex_step:
                     in_vec._imag_data[in_set_name][in_inds[key]] = \
                         out_vec._imag_data[out_set_name][out_inds[key]]
@@ -429,9 +430,9 @@ class DefaultVector(Vector):
         """
         for set_name, data in iteritems(self._data):
             data[:] = vec._data[set_name]
-        #if self._vector_info._under_complex_step:
-        #    for set_name, data in iteritems(self._imag_data):
-        #        data[:] = vec._imag_data[set_name]
+        # if self._vector_info._under_complex_step:
+        #     for set_name, data in iteritems(self._imag_data):
+        #         data[:] = vec._imag_data[set_name]
 
     def set_const(self, val):
         """
