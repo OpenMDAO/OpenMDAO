@@ -571,6 +571,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         nlbgs = prob.model.nonlinear_solver = NonlinearBlockGS()
 
+        # Had to make this step larger so that solver would reconverge adequately.
         model.approx_total_derivs(method='cs', step=1.0e-1)
 
         prob.setup(check=False, vector_class=vec_class)
