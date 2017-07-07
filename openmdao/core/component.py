@@ -199,7 +199,7 @@ class Component(System):
         iproc = self.comm.rank
         nproc = self.comm.size
 
-        set2iset = self._var_set2iset
+        set2iset = self._var_set2iset.
 
         # Initialize empty arrays
         for type_ in ['input', 'output']:

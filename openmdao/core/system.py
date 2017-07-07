@@ -2064,23 +2064,23 @@ class System(object):
 
         # Size them all
         vec = self._outputs._views_flat
+        iproc = self.comm.rank
         for name, data in iteritems(out):
             if 'size' not in data:
-                # Depending on where the designvar was added, the name in the
-                # vectors might be relative instead of absolute. Lucky we have
-                # both.
-                if name in vec:
-                    data['size'] = vec[name].size
-                else:
-                    data['size'] = vec[out[name]['name']].size
+                data['size'] = self._var_sizes['output'][iproc, self._var_allprocs_abs2idx['output'][name]]
+                # # Depending on where the designvar was added, the name in the
+                # # vectors might be relative instead of absolute. Lucky we have
+                # # both.
+                # if name in vec:
+                #     data['size'] = vec[name].size
+                # else:
+                #     data['size'] = vec[out[name]['name']].size
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                subsys_design_vars = subsys.get_design_vars(recurse=recurse)
-                for key in subsys_design_vars:
-                    out[key] = subsys_design_vars[key]
+                out.update(subsys.get_design_vars(recurse=recurse))
+
             if self.comm.size > 1 and self._subsystems_allprocs:
-                iproc = self.comm.rank
                 for rank, all_out in enumerate(self.comm.allgather(out)):
                     if rank != iproc:
                         out.update(all_out)
@@ -2124,9 +2124,7 @@ class System(object):
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                subsys_responses = subsys.get_responses(recurse=recurse)
-                for key in subsys_responses:
-                    out[key] = subsys_responses[key]
+                out.update(subsys.get_responses(recurse=recurse))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 iproc = self.comm.rank
