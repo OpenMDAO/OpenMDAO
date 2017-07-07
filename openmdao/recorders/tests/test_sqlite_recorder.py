@@ -206,26 +206,6 @@ def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
         return
 
 
-def _assertSolverIterationDataRecordedBasic(test, db_cur):
-    """
-        Just make sure something was recorded for the solver
-    """
-    db_cur.execute("SELECT * FROM solver_iterations")
-    row_actual = db_cur.fetchone()
-    test.assertTrue(row_actual, 'Solver iterations table is empty. '
-                                'Should contain at least one record')
-
-
-def _assertSystemIterationDataRecordedBasic(test, db_cur):
-    """
-        Just make sure something was recorded for the solver
-    """
-    db_cur.execute("SELECT * FROM system_iterations")
-    row_actual = db_cur.fetchone()
-    test.assertTrue(row_actual, 'System iterations table is empty. '
-                                'Should contain at least one record')
-
-
 def _assertMetadataRecorded(test, db_cur):
 
     db_cur.execute("SELECT format_version FROM metadata")
@@ -310,24 +290,6 @@ class TestSqliteRecorder(unittest.TestCase):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
         _assertSolverIterationDataRecorded(self, cur, expected, tolerance)
-        con.close()
-
-    def assertSolverIterationDataRecordedBasic(self):
-        """
-        Just want to make sure something was recorded
-        """
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        _assertSolverIterationDataRecordedBasic(self, cur)
-        con.close()
-
-    def assertSystemIterationDataRecordedBasic(self):
-        """
-        Just want to make sure something was recorded
-        """
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        _assertSystemIterationDataRecordedBasic(self, cur)
         con.close()
 
     def assertMetadataRecorded(self):
@@ -1034,8 +996,8 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(self.prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'PetscKSP', (3,)]
-        expected_abs_error = 8.367449152693399e-19
-        expected_rel_error = 3.6411633054292593e-16
+        expected_abs_error = 0.0
+        expected_rel_error = 0.0
 
         expected_solver_output = {
             'px.x': [0.],
@@ -1050,16 +1012,15 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_solver_residuals = {
             'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [0.0003534],
+            'd1.y1': [0.00035339623935061308],
             'd2.y2': [0.00177099],
             'obj_cmp.obj': [0.70719175],
             'con_cmp1.con1': [-0.70702117],
             'con_cmp2.con2': [-0.00176698]
         }
-        self.assertSolverIterationDataRecordedBasic()
-        # self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-        #                                          expected_rel_error, expected_solver_output,
-        #                                          expected_solver_residuals),), self.eps)
+        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
+                                                 expected_rel_error, expected_solver_output,
+                                                 expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_block_gs(self):
 
@@ -1126,8 +1087,6 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(self.prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (9,), 'LinearRunOnce', (0,)]
-        # Coord: rank0:Driver | 0 | NewtonSolver | 9 | LinearRunOnce | 0
-
         expected_abs_error = None
         expected_rel_error = None
 
