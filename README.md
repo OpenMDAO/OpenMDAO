@@ -12,7 +12,7 @@ We will be making very frequent updates to this code. If you’re going to try i
 make sure you pull these updates often
 
 Features of OpenMDAO 1.7.x Not Yet in 2.x
-----------------------------------------
+-----------------------------------------
 
 Be aware that this is a PRE-ALPHA. 
 Not all the features of 1.7.x exist in blue yet. 
