@@ -13,7 +13,6 @@ from openmdao.test_suite.components.sellar import SellarDerivatives
 
 # TODO_RECORDERS - clean this up !
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS, ScipyIterativeSolver
-# from openmdao.core.problem import Problem, Group, IndepVarComp
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
 from openmdao.recorders.case_reader import CaseReader
 
@@ -193,6 +192,12 @@ class TestSqliteCaseReader(unittest.TestCase):
         # Test values from one case, the last case
         last_case = cr.driver_cases.get_case(-1)
 
+        # Test to see if the access by case keys works:
+        seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
+        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.desvars['pz.z'], [ 1.9776389,  0.],
+                              err_msg='Case reader gives '
+                                  'incorrect Parameter value'
+                                  ' for {0}'.format('pz.z'))
         np.testing.assert_almost_equal(last_case.desvars['pz.z'], [ 1.9776389,  0.],
                               err_msg='Case reader gives '
                                   'incorrect Parameter value'
@@ -206,6 +211,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         case_keys = cr.driver_cases.list_cases()
         for i, iter_coord in enumerate(case_keys):
             self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
+
+
+
 
     def test_reading_system_cases(self):
 
