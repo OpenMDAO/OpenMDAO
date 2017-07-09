@@ -715,7 +715,6 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_rel_error'] = True
         self.recorder.options['record_solver_output'] = True
         self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nonlinear_solver = NonlinearBlockGS()
         self.prob.model._nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
