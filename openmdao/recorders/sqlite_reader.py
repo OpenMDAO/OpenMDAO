@@ -5,13 +5,16 @@ from __future__ import print_function, absolute_import
 
 import sqlite3
 
-from openmdao.recorders.base_case_reader import BaseCaseReader
-from openmdao.recorders.case import Case
+from six.moves import cPickle as pickle
+
+from openmdao.recorders.base_case_reader_new import BaseCaseReaderNew
+from openmdao.recorders.case_new import DriverCase, SystemCase, SolverCase
+from openmdao.recorders.cases import BaseCases
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import is_valid_sqlite3_db
 
 
-class SqliteCaseReader(BaseCaseReader):
+class SqliteCaseReaderNew(BaseCaseReaderNew):
     """
     A CaseReader specific to files created with SqliteRecorder.
 
@@ -25,7 +28,7 @@ class SqliteCaseReader(BaseCaseReader):
         """
         Initialize.
         """
-        super(SqliteCaseReader, self).__init__(filename)
+        super(SqliteCaseReaderNew, self).__init__(filename)
 
         if filename is not None:
             if not is_valid_sqlite3_db(filename):
@@ -40,8 +43,6 @@ class SqliteCaseReader(BaseCaseReader):
         con.close()
 
         self._load()
-
-        self.num_cases = len(self._case_keys)
 
     def _load(self):
         """
@@ -59,20 +60,60 @@ class SqliteCaseReader(BaseCaseReader):
         format_version : int
             The version of the format assumed when loading the file.
         """
+
+        self.driver_cases = DriverCases(self.filename)
+        self.system_cases = SystemCases(self.filename)
+        self.solver_cases = SolverCases(self.filename)
+
         if self.format_version in (1,):
             with sqlite3.connect(self.filename) as con:
+
+                # Read in iterations from Drivers, Systems, and Solvers
                 cur = con.cursor()
                 cur.execute("SELECT iteration_coordinate FROM driver_iterations")
                 rows = cur.fetchall()
+                self.driver_cases._case_keys = [coord[0] for coord in rows]
+                self.driver_cases.num_cases = len(self.driver_cases._case_keys)
+
+                cur.execute("SELECT iteration_coordinate FROM system_iterations")
+                rows = cur.fetchall()
+                self.system_cases._case_keys = [coord[0] for coord in rows]
+                self.system_cases.num_cases = len(self.system_cases._case_keys)
+
+                cur.execute("SELECT iteration_coordinate FROM solver_iterations")
+                rows = cur.fetchall()
+                self.solver_cases._case_keys = [coord[0] for coord in rows]
+                self.solver_cases.num_cases = len(self.solver_cases._case_keys)
+
+                # Read in metadata for Drivers, Systems, and Solvers
+                cur.execute("SELECT model_viewer_data FROM driver_metadata")
+                for row in cur:
+                    self.driver_metadata = pickle.loads(str(row[0]))
+
+                cur.execute("SELECT id, scaling_factors FROM system_metadata")
+                for row in cur:
+                    id = row[0]
+                    scaling_factors = pickle.loads(str(row[1]))
+                    self.system_metadata[id] = scaling_factors
+
+                cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
+                for row in cur:
+                    id = row[0]
+                    solver_options = pickle.loads(str(row[1]))
+                    solver_class = row[2]
+                    self.solver_metadata[id] = {
+                                                'solver_options': solver_options,
+                                                'solver_class': solver_class,
+                                                }
             con.close()
-
-            self._case_keys = [coord[0] for coord in rows]
-            # returns something like this [(u'rank0:SLSQP|1',), (u'rank0:SLSQP|2',),
-            #          (u'rank0:SLSQP|3',), (u'rank0:SLSQP|4',)]
-
         else:
             raise ValueError('SQliteCaseReader encountered an unhandled '
                              'format version: {0}'.format(self.format_version))
+
+
+class DriverCases(BaseCases):
+    """
+    """
 
     def get_case(self, case_id):
         """
@@ -85,16 +126,11 @@ class SqliteCaseReader(BaseCaseReader):
 
         Returns
         -------
-            An instance of Case populated with data from the
+            An instance of a Driver Case populated with data from the
             specified case/iteration.
         """
-        if isinstance(case_id, int):
-            # If case_id is an integer, assume the user
-            # wants a case as an index
-            iteration_coordinate = self._case_keys[case_id]  # handles negative indices for example
-        else:
-            # Otherwise assume we were given the case string identifier
-            iteration_coordinate = case_id
+
+        iteration_coordinate = self.get_iteration_coordinate(case_id)
 
         with sqlite3.connect(self.filename) as con:
             cur = con.cursor()
@@ -106,18 +142,107 @@ class SqliteCaseReader(BaseCaseReader):
         con.close()
 
         idx, counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, \
-            objectives_blob, constraints_blob = row
+        objectives_blob, constraints_blob = row
 
         desvars_array = blob_to_array(desvars_blob)
         responses_array = blob_to_array(responses_blob)
         objectives_array = blob_to_array(objectives_blob)
         constraints_array = blob_to_array(constraints_blob)
 
-        case = Case(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                    desvars_array, responses_array, objectives_array, constraints_array)
-
-        # returns something like this
-        # [(1, u'rank0:Driver|1', 1491860346.232551, 1, u'', array([([5.0, 2.0],)],
-        #     dtype=[('design_var.pz.z', '<f8', (2,))]))]
+        case = DriverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
+                          desvars_array, responses_array, objectives_array, constraints_array)
 
         return case
+
+
+class SystemCases(BaseCases):
+    """
+    """
+
+    def get_case(self, case_id):
+        """
+        Get a case from the database.
+
+        Parameters
+        ----------
+        case_id : int or str
+            The integer index or string-identifier of the case to be retrieved.
+
+        Returns
+        -------
+            An instance of a System Case populated with data from the
+            specified case/iteration.
+        """
+
+        iteration_coordinate = self.get_iteration_coordinate(case_id)
+
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM system_iterations WHERE "
+                        "iteration_coordinate=:iteration_coordinate",
+                        {"iteration_coordinate": iteration_coordinate})
+            # Initialize the Case object from the iterations data
+            row = cur.fetchone()
+        con.close()
+
+        # inputs , outputs , residuals
+        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob, outputs_blob, \
+            residuals_blob = row
+
+        inputs_array = blob_to_array(inputs_blob)
+        outputs_array = blob_to_array(outputs_blob)
+        residuals_array = blob_to_array(residuals_blob)
+
+        case = SystemCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
+                          inputs_array, outputs_array, residuals_array)
+
+        return case
+
+
+class SolverCases(BaseCases):
+    """
+    """
+
+    def get_case(self, case_id):
+        """
+        Get a case from the database.
+
+        Parameters
+        ----------
+        case_id : int or str
+            The integer index or string-identifier of the case to be retrieved.
+
+        Returns
+        -------
+            An instance of a Driver Case populated with data from the
+            specified case/iteration.
+        """
+
+        iteration_coordinate = self.get_iteration_coordinate(case_id)
+
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM solver_iterations WHERE "
+                        "iteration_coordinate=:iteration_coordinate",
+                        {"iteration_coordinate": iteration_coordinate})
+            # Initialize the Case object from the iterations data
+            row = cur.fetchone()
+        con.close()
+
+        idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
+            output_blob, residuals_blob = row
+
+        output_array = blob_to_array(output_blob)
+        residuals_array = blob_to_array(residuals_blob)
+
+        case = SolverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
+                          abs_err, rel_err, output_array, residuals_array)
+
+        return case
+
+
+
+
+
+
+
