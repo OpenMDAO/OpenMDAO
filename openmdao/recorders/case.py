@@ -61,13 +61,3 @@ class Case(object):
         self.responses = responses_array[0] if responses_array else None
         self.objectives = objectives_array[0] if objectives_array else None
         self.constraints = constraints_array[0] if constraints_array else None
-
-    # def __getitem__(self, item):
-    #     """ Access an unknown of the given name.
-    #
-    #     This is intended to be a convenient shorthand for case.unknowns[item].
-    #     """
-    #     if self.unknowns is None:
-    #         raise ValueError('No unknowns are available'
-    #                          ' in file {0}'.format(self.filename))
-    #     return self.unknowns[item]
