@@ -144,3 +144,12 @@ A More Comprehensive Example
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
                                            expected_objectives, expected_constraints),), self.eps)
 
+Reading Recorded Data
++++++++++++++++++++++
+
+A class is provided to read the data from a case recorder file.
+
+.. code-block:: console
+
+    self.my_recorder = SqliteRecorder("filename")
+

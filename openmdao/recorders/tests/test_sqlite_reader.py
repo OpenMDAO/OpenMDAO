@@ -15,9 +15,9 @@ from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS, ScipyIterativeSolver
 # from openmdao.core.problem import Problem, Group, IndepVarComp
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
-from openmdao.recorders.case_reader_new import CaseReaderNew
+from openmdao.recorders.case_reader import CaseReader
 
-from openmdao.recorders.sqlite_reader_new import SqliteCaseReaderNew
+from openmdao.recorders.sqlite_reader import SqliteCaseReader
 
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
     SellarDis2withDerivatives
@@ -48,7 +48,7 @@ if OPTIMIZER:
 # optimizers = {'scipy': ScipyOptimizer, }
 optimizers = {'pyoptsparse': pyOptSparseDriver}
 
-class TestSqliteCaseReaderNew(unittest.TestCase):
+class TestSqliteCaseReader(unittest.TestCase):
 
     def setup_sellar_model_with_optimization(self):
         self.prob = Problem()
@@ -143,7 +143,7 @@ class TestSqliteCaseReaderNew(unittest.TestCase):
             tmp.close()
 
         with self.assertRaises(IOError):
-            _ = CaseReaderNew(filepath)
+            _ = CaseReader(filepath)
 
     def test_format_version(self):
 
@@ -152,7 +152,7 @@ class TestSqliteCaseReaderNew(unittest.TestCase):
         self.prob.run_driver()
         self.prob.cleanup()
 
-        cr = CaseReaderNew(self.filename)
+        cr = CaseReader(self.filename)
         self.assertEqual(cr.format_version, format_version,
                          msg='format version not read correctly')
 
@@ -164,8 +164,8 @@ class TestSqliteCaseReaderNew(unittest.TestCase):
         self.prob.run_driver()
         self.prob.cleanup()
 
-        cr = CaseReaderNew(self.filename)
-        self.assertTrue(isinstance(cr, SqliteCaseReaderNew), msg='CaseReader not'
+        cr = CaseReader(self.filename)
+        self.assertTrue(isinstance(cr, SqliteCaseReader), msg='CaseReader not'
                         ' returning the correct subclass.')
 
     def test_reading_driver_cases(self):
@@ -183,7 +183,7 @@ class TestSqliteCaseReaderNew(unittest.TestCase):
         self.prob.run_driver()
         self.prob.cleanup()
 
-        cr = CaseReaderNew(self.filename)
+        cr = CaseReader(self.filename)
 
         # Test to see if we got the correct number of cases
         self.assertEqual(cr.driver_cases.num_cases, 8)
@@ -227,7 +227,7 @@ class TestSqliteCaseReaderNew(unittest.TestCase):
         self.prob.run_driver()
         self.prob.cleanup()
 
-        cr = CaseReaderNew(self.filename)
+        cr = CaseReader(self.filename)
 
         # Test to see if we got the correct number of cases
         self.assertEqual(cr.driver_cases.num_cases, 0)
@@ -272,7 +272,7 @@ class TestSqliteCaseReaderNew(unittest.TestCase):
         self.prob.run_driver()
         self.prob.cleanup()
 
-        cr = CaseReaderNew(self.filename)
+        cr = CaseReader(self.filename)
 
         # Test to see if we got the correct number of cases
         self.assertEqual(cr.driver_cases.num_cases, 0)
@@ -311,7 +311,7 @@ class TestSqliteCaseReaderNew(unittest.TestCase):
         self.prob.run_driver()
         self.prob.cleanup()
 
-        cr = CaseReaderNew(self.filename)
+        cr = CaseReader(self.filename)
 
         self.assertEqual(len(cr.driver_metadata['connections_list']),11)
         self.assertEqual(len(cr.driver_metadata['tree']),4)
@@ -351,7 +351,7 @@ class TestSqliteCaseReaderNew(unittest.TestCase):
 
         self.prob.cleanup()
 
-        cr = CaseReaderNew(self.filename)
+        cr = CaseReader(self.filename)
 
         self.assertEqual(
                 sorted(cr.system_metadata.keys()),
@@ -380,7 +380,7 @@ class TestSqliteCaseReaderNew(unittest.TestCase):
         self.prob.run_driver()
         self.prob.cleanup()
 
-        cr = CaseReaderNew(self.filename)
+        cr = CaseReader(self.filename)
 
         self.assertEqual(
                 sorted(cr.solver_metadata.keys()),

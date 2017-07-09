@@ -4,7 +4,7 @@ Docstring.
 from abc import ABCMeta, abstractmethod
 
 
-class BaseCaseReaderNew(object):
+class BaseCaseReader(object):
     """
     Abstract base class of all CaseReader implementations.
 

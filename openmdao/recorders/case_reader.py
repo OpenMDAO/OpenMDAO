@@ -2,11 +2,10 @@
 CaseReader class definition.
 """
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
-from openmdao.recorders.sqlite_reader_new import SqliteCaseReaderNew
 # from openmdao.recorders.hdf5_reader import HDF5CaseReader
 
 
-def CaseReaderNew(filename):
+def CaseReader(filename):
     """
     Return a CaseReader for the given file.
 
@@ -22,7 +21,7 @@ def CaseReaderNew(filename):
     contents of the given file.
     """
     try:
-        reader = SqliteCaseReaderNew(filename)
+        reader = SqliteCaseReader(filename)
         return reader
     except IOError:
         # filename not a valid Sqlite database file

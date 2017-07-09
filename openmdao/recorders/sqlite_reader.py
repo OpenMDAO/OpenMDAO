@@ -7,14 +7,14 @@ import sqlite3
 
 from six.moves import cPickle as pickle
 
-from openmdao.recorders.base_case_reader_new import BaseCaseReaderNew
-from openmdao.recorders.case_new import DriverCase, SystemCase, SolverCase
+from openmdao.recorders.base_case_reader import BaseCaseReader
+from openmdao.recorders.case import DriverCase, SystemCase, SolverCase
 from openmdao.recorders.cases import BaseCases
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import is_valid_sqlite3_db
 
 
-class SqliteCaseReaderNew(BaseCaseReaderNew):
+class SqliteCaseReader(BaseCaseReader):
     """
     A CaseReader specific to files created with SqliteRecorder.
 
@@ -28,7 +28,7 @@ class SqliteCaseReaderNew(BaseCaseReaderNew):
         """
         Initialize.
         """
-        super(SqliteCaseReaderNew, self).__init__(filename)
+        super(SqliteCaseReader, self).__init__(filename)
 
         if filename is not None:
             if not is_valid_sqlite3_db(filename):
