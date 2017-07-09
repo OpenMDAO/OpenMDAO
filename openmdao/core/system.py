@@ -638,7 +638,9 @@ class System(object):
             self.set_initial_values()
 
         self._rec_mgr.startup(self)
-        self._rec_mgr.record_metadata(self)
+        for sub in self.system_iter(recurse=True, include_self=True):
+            sub._rec_mgr.record_metadata(sub)
+
 
     def _setup_procs(self, pathname, comm):
         """
