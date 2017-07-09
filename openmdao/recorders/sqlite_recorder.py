@@ -480,8 +480,7 @@ class SqliteRecorder(BaseRecorder):
                                          pickle.HIGHEST_PROTOCOL)
 
         self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
-                         "VALUES(?,:model_viewer_data)", (driver_class,
-                                                          sqlite3.Binary(model_viewer_data)))
+                         "VALUES(?,?)", (driver_class, sqlite3.Binary(model_viewer_data)))
 
     def record_metadata_system(self, object_requesting_recording):
         """
@@ -495,9 +494,11 @@ class SqliteRecorder(BaseRecorder):
         scaling_factors = pickle.dumps(object_requesting_recording._scaling_vecs,
                                        pickle.HIGHEST_PROTOCOL)
 
+        path = object_requesting_recording.pathname
+        if not path:
+            path = 'root'
         self.con.execute("INSERT INTO system_metadata(id, scaling_factors) VALUES(?,?)",
-                         (object_requesting_recording.pathname,
-                          sqlite3.Binary(scaling_factors)))
+                         (path, sqlite3.Binary(scaling_factors)))
 
     def record_metadata_solver(self, object_requesting_recording):
         """
@@ -510,13 +511,15 @@ class SqliteRecorder(BaseRecorder):
         """
         path = object_requesting_recording._system.pathname
         solver_class = type(object_requesting_recording).__name__
-        id = "%s.%s".format(path, solver_class)
+        if not path:
+            path = 'root'
+        id = "{}.{}".format(path, solver_class)
 
         solver_options = pickle.dumps(object_requesting_recording.options,
                                       pickle.HIGHEST_PROTOCOL)
         self.con.execute(
             "INSERT INTO solver_metadata(id, solver_options, solver_class) "
-            "VALUES(?, :solver_options,?)", (id, sqlite3.Binary(solver_options), solver_class))
+            "VALUES(?,?,?)", (id, sqlite3.Binary(solver_options), solver_class))
 
     def close(self):
         """
