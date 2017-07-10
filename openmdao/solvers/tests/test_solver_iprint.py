@@ -309,9 +309,6 @@ class MPITests(unittest.TestCase):
     N_PROCS = 2
 
     def test_hierarchy_iprint(self):
-        if os.environ.get('USE_PROC_FILES'):
-            raise unittest.SkipTest('Cannot check output because USE_PROC_FILES is set.')
-
         prob = Problem()
         model = prob.model
 
@@ -343,9 +340,10 @@ class MPITests(unittest.TestCase):
 
         prob.setup(vector_class=PETScVector, check=False)
 
-        # stdout will only have solver convergence messages on proc 0
+        # if USE_PROC_FILES is not set, solver convergence messages
+        # should only appear on proc 0
         output = run_model(prob)
-        if self.comm.rank == 0:
+        if self.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
             self.assertTrue(output.count('\nNL: Newton Converged') == 1)
         else:
             self.assertTrue(output.count('\nNL: Newton Converged') == 0)
