@@ -326,6 +326,10 @@ class DefaultVector(Vector):
         """
         for set_name, data in iteritems(self._data):
             data += vec._data[set_name]
+
+        if self._vector_info._under_complex_step and vec._alloc_complex:
+            for set_name, data in iteritems(self._imag_data):
+                data += vec._imag_data[set_name]
         return self
 
     def __isub__(self, vec):
@@ -344,6 +348,9 @@ class DefaultVector(Vector):
         """
         for set_name, data in iteritems(self._data):
             data -= vec._data[set_name]
+        if self._vector_info._under_complex_step and vec._alloc_complex:
+            for set_name, data in iteritems(self._imag_data):
+                data -= vec._imag_data[set_name]
         return self
 
     def __imul__(self, val):
@@ -430,9 +437,6 @@ class DefaultVector(Vector):
         """
         for set_name, data in iteritems(self._data):
             data[:] = vec._data[set_name]
-        # if self._vector_info._under_complex_step:
-        #     for set_name, data in iteritems(self._imag_data):
-        #         data[:] = vec._imag_data[set_name]
 
     def set_const(self, val):
         """

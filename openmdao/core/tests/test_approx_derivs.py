@@ -622,6 +622,50 @@ class TestComponentComplexStep(unittest.TestCase):
         assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
         assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)
 
+    def test_vector_methods(self):
+
+        class KenComp(ExplicitComponent):
+
+            def setup(self):
+
+                self.add_input('x1', np.array([[7.0, 3.0], [2.4, 3.33]]))
+                self.add_output('y1', np.zeros((2, 2)))
+
+                self.approx_partials('*', '*', method='cs')
+
+            def compute(self, inputs, outputs):
+
+                x1 = inputs['x1']
+
+                outputs['y1'] = x1
+
+                outputs['y1'][0][0] += 14.0
+                outputs['y1'][0][1] *= 3.0
+                outputs['y1'][1][0] -= 6.67
+                outputs['y1'][1][1] /= 2.34
+
+                pass #outputs['y1'] *= 1.0
+
+
+        prob = self.prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', val=np.array([[7.0, 3.0], [2.4, 3.33]])))
+        model.add_subsystem('comp', KenComp())
+        model.connect('px.x', 'comp.x1')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        of = ['comp.y1']
+        wrt = ['px.x']
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+
+        assert_rel_error(self, derivs['comp.y1', 'px.x'][0][0], 1.0, 1e-6)
+        assert_rel_error(self, derivs['comp.y1', 'px.x'][1][1], 3.0, 1e-6)
+        assert_rel_error(self, derivs['comp.y1', 'px.x'][2][2], 1.0, 1e-6)
+        assert_rel_error(self, derivs['comp.y1', 'px.x'][3][3], 1.0/2.34, 1e-6)
+
 
 class ApproxTotalsFeature(unittest.TestCase):
 
