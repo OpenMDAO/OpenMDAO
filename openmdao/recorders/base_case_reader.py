@@ -35,32 +35,11 @@ class BaseCaseReader(object):
         """
         self.format_version = None
         self.filename = filename
-        self.parameters = None
-        self.unknowns = None
-        self._case_keys = ()
-        self.num_cases = 0
+        self.driver_cases = None
+        self.system_cases = None
+        self.solver_cases = None
 
-    @abstractmethod
-    def get_case(self, case_id):
-        """
-        Get cases.
+        self.driver_metadata = {}
+        self.system_metadata = {}
+        self.solver_metadata = {}
 
-        Parameters
-        ----------
-        case_id : str or int
-            If int, the index of the case to be read in the case iterations.
-            If given as a string, it is the identifier of the case.
-
-        Returns
-        -------
-        Case
-            The case from the recorded file with the given identifier or index.
-
-        """
-        pass
-
-    def list_cases(self):
-        """
-        Return a tuple of the case string identifiers available in this instance of the CaseReader.
-        """
-        return self._case_keys

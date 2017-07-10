@@ -25,4 +25,4 @@ def CaseReader(filename):
         return reader
     except IOError:
         # filename not a valid Sqlite database file
-        pass
+        raise IOError('Unable to load cases from file {0}'.format(filename))
