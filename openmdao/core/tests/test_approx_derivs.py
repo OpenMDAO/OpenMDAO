@@ -12,6 +12,7 @@ from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+from openmdao.test_suite.components.sellar_feature import SellarNoDerivativesCS
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 
@@ -671,6 +672,52 @@ class ApproxTotalsFeature(unittest.TestCase):
         assert_rel_error(self, derivs['z', 'x'], [[300.0]], 1e-6)
         self.assertEqual(comp2._exec_count, 3)
 
+    def test_basic_cs(self):
+
+        class CompOne(ExplicitComponent):
+
+                def setup(self):
+                    self.add_input('x', val=0.0)
+                    self.add_output('y', val=np.zeros(25))
+                    self._exec_count = 0
+
+                def compute(self, inputs, outputs):
+                    x = inputs['x']
+                    outputs['y'] = np.arange(25) * x
+                    self._exec_count += 1
+
+
+        class CompTwo(ExplicitComponent):
+
+                def setup(self):
+                    self.add_input('y', val=np.zeros(25))
+                    self.add_output('z', val=0.0)
+                    self._exec_count = 0
+
+                def compute(self, inputs, outputs):
+                    y = inputs['y']
+                    outputs['z'] = np.sum(y)
+                    self._exec_count += 1
+
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
+        comp2 = model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
+
+        model.linear_solver = ScipyIterativeSolver()
+        model.approx_total_derivs(method='cs')
+
+        prob.setup()
+        prob.run_model()
+
+        of = ['z']
+        wrt = ['x']
+        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+
+        assert_rel_error(self, derivs['z', 'x'], [[300.0]], 1e-6)
+
     def test_arguments(self):
 
         class CompOne(ExplicitComponent):
@@ -716,6 +763,21 @@ class ApproxTotalsFeature(unittest.TestCase):
         derivs = prob.compute_total_derivs(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['z', 'x'], [[300.0]], 1e-6)
+
+    def test_sellarCS(self):
+        # Just tests Newton on Sellar with FD derivs.
+
+        prob = Problem()
+        prob.model = SellarNoDerivativesCS()
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        # Make sure we aren't iterating like crazy
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
 
 if __name__ == "__main__":
     unittest.main()

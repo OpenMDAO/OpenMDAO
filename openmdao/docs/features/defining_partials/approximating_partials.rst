@@ -26,6 +26,27 @@ The step size can be any non-zero number, but should be positive (one can change
 .. embed-test::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_fd_options
 
+Complex Step
+------------
+
+If you have a pure python component (or an external code that can support complex inputs and outputs) then you can also choose to use
+complex step to calculate the Jacobian of that component. This will give more accurate derivatives that are insensitive to the step size.
+Like finite difference, complex step runs your component using the apply_nonlinear or solve_nonlinear functions, but it applies a step
+in the complex direction. You can activate it using the :code:`approx_partials` method inside :code:`setup`. In many cases, this will
+require no other changes to your code, as long as all of the calculation in your solve_nonlinear and apply_nonlinear support complex
+numbers. During a complex step, the incoming inputs vector will return a complex number when a variable is being stepped.
+Likewise, the outputs and residuals vectors will accept complex values. If you are allocating temporary numpy arrays, remember to
+conditionally set their dtype based on the dtype in the outputs vector.
+
+Here is how to turn on complex step for all input/output pairs in the Sellar problem:
+
+.. embed-code::
+    openmdao.test_suite.components.sellar_feature.SellarDis1CS
+
+.. embed-code::
+    openmdao.test_suite.components.sellar_feature.SellarDis2CS
+
+
 Approximating Semi-Total Derivatives
 ====================================
 
@@ -56,3 +77,22 @@ step size, the form to central differences, and the step_calc to relative instea
 
 .. embed-test::
     openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_arguments
+
+Complex Step
+------------
+
+You can also complex step your model or group, though there are some important restrictions.
+
+**All components must support complex calculations in solve_nonlinear:**
+  Under complex step, a component’s inputs are complex, all stages of the calculation will operate on complex inputs to produce
+  complex outputs, and the final value placed into outputs is complex. Most Python functions already support complex numbers, so pure
+  Python components will generally satisfy this requirement. Take care with functions like abs, which effectively squelches the complex
+  part of the argument.
+
+**Solvers like Newton that require gradients are not supported:**
+  Complex stepping a model causes it to run with complex inputs. When there is a nonlinear solver at some level, the solver must be
+  able to converge. Some solvers such as NonlinearBlockGS can handle this. However, the Newton solver must linearize and initiate a
+  gradient solve about a complex point. This is not possible to do at present (though we are working on some ideas to make this work.)
+
+.. embed-test::
+    openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_basic_cs
