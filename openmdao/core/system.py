@@ -641,7 +641,6 @@ class System(object):
         for sub in self.system_iter(recurse=True, include_self=True):
             sub._rec_mgr.record_metadata(sub)
 
-
     def _setup_procs(self, pathname, comm):
         """
         Distribute processors and assign pathnames.

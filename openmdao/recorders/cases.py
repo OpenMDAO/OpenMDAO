@@ -29,7 +29,7 @@ class BaseCases(object):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self,filename):
+    def __init__(self, filename):
         """
         Initialize.
         """
@@ -56,14 +56,27 @@ class BaseCases(object):
         """
         pass
 
-
     def list_cases(self):
         """
         Return a tuple of the case string identifiers available in this instance of the CaseReader.
+
+        Returns
+        -------
+        case_keys : tuple
+            The case string identifiers.
         """
         return self._case_keys
 
     def get_iteration_coordinate(self, case_id):
+        """
+        Return the iteration coordinate .
+
+        Returns
+        -------
+        iteration_coordinate : str
+            The iteration coordinate.
+
+        """
         if isinstance(case_id, int):
             # If case_id is an integer, assume the user
             # wants a case as an index
@@ -73,6 +86,3 @@ class BaseCases(object):
             iteration_coordinate = case_id
 
         return iteration_coordinate
-
-
-

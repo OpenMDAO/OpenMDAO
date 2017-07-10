@@ -147,9 +147,10 @@ A More Comprehensive Example
 Reading Recorded Data
 +++++++++++++++++++++
 
-A class, `CaseReader`, is provided to read the data from a case recorder file. It will work for any kind of case recorder file in OpenMDAO. Currently,
-OpenMDAO only has a Sqlite case recorder file, but in the future will also have an HDF5 case recorder file. `CaseReader` should work for either kind of
-file as it abstracts away the underlying file format.
+A class, `CaseReader`, is provided to read the data from a case recorder file. It will work for any kind of case
+recorder file in OpenMDAO. Currently, OpenMDAO only has a Sqlite case recorder file, but in the future will also have
+an HDF5 case recorder file. `CaseReader` should work for either kind of file as it abstracts away the underlying file
+format.
 
 Here is some simple code showing how to use the `CaseReader` class.
 
@@ -175,7 +176,7 @@ Assume that a recorder was attached to the `Driver` for the `Problem`. Then, to 
 
     print('Number of driver cases recorded =', cr.driver_cases.num_cases )
 
-You can get a list of the case id's using the `list_cases` method:
+You can get a list of the case IDs using the `list_cases` method:
 
 .. code-block:: console
 

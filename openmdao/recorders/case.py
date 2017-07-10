@@ -2,6 +2,7 @@
 A Case class.
 """
 
+
 class Case(object):
     """
     Case wraps the data from a single iteration of a recording to make it more easily accessible.
@@ -43,7 +44,7 @@ class Case(object):
         float or dict.
     """
 
-    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg ):
+    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg):
         """
         Initialize.
         """
@@ -54,6 +55,7 @@ class Case(object):
         self.timestamp = timestamp
         self.success = success
         self.msg = msg
+
 
 class DriverCase(Case):
     """
@@ -96,16 +98,19 @@ class DriverCase(Case):
         float or dict.
     """
 
-    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, desvars, responses, objectives, constraints ):
+    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, desvars,
+                 responses, objectives, constraints):
         """
         Initialize.
         """
-        super(DriverCase, self).__init__(filename, counter, iteration_coordinate, timestamp, success, msg )
+        super(DriverCase, self).__init__(filename, counter, iteration_coordinate,
+                                         timestamp, success, msg)
 
         self.desvars = desvars[0] if desvars.dtype.names else None
         self.responses = responses[0] if responses.dtype.names else None
         self.objectives = objectives[0] if objectives.dtype.names else None
         self.constraints = constraints[0] if constraints.dtype.names else None
+
 
 class SystemCase(Case):
     """
@@ -148,11 +153,13 @@ class SystemCase(Case):
         float or dict.
     """
 
-    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, inputs , outputs , residuals ):
+    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, inputs,
+                 outputs, residuals):
         """
         Initialize.
         """
-        super(SystemCase, self).__init__(filename, counter, iteration_coordinate, timestamp, success, msg)
+        super(SystemCase, self).__init__(filename, counter, iteration_coordinate,
+                                         timestamp, success, msg)
 
         self.inputs = inputs[0] if inputs.dtype.names else None
         self.outputs = outputs[0] if outputs.dtype.names else None
@@ -201,11 +208,12 @@ class SolverCase(Case):
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg,
-                    abs_err, rel_err, outputs, residuals ):
+                 abs_err, rel_err, outputs, residuals):
         """
         Initialize.
         """
-        super(SolverCase, self).__init__(filename, counter, iteration_coordinate, timestamp, success, msg)
+        super(SolverCase, self).__init__(filename, counter, iteration_coordinate, timestamp,
+                                         success, msg)
 
         self.abs_err = abs_err
         self.rel_err = rel_err

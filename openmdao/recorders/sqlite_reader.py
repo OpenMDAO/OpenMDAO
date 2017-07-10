@@ -60,7 +60,6 @@ class SqliteCaseReader(BaseCaseReader):
         format_version : int
             The version of the format assumed when loading the file.
         """
-
         self.driver_cases = DriverCases(self.filename)
         self.system_cases = SystemCases(self.filename)
         self.solver_cases = SolverCases(self.filename)
@@ -102,9 +101,9 @@ class SqliteCaseReader(BaseCaseReader):
                     solver_options = pickle.loads(str(row[1]))
                     solver_class = row[2]
                     self.solver_metadata[id] = {
-                                                'solver_options': solver_options,
-                                                'solver_class': solver_class,
-                                                }
+                        'solver_options': solver_options,
+                        'solver_class': solver_class,
+                    }
             con.close()
         else:
             raise ValueError('SQliteCaseReader encountered an unhandled '
@@ -113,6 +112,7 @@ class SqliteCaseReader(BaseCaseReader):
 
 class DriverCases(BaseCases):
     """
+    Case specific to the entries that might be recorded in a Driver iteration.
     """
 
     def get_case(self, case_id):
@@ -129,7 +129,6 @@ class DriverCases(BaseCases):
             An instance of a Driver Case populated with data from the
             specified case/iteration.
         """
-
         iteration_coordinate = self.get_iteration_coordinate(case_id)
 
         with sqlite3.connect(self.filename) as con:
@@ -142,7 +141,7 @@ class DriverCases(BaseCases):
         con.close()
 
         idx, counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, \
-        objectives_blob, constraints_blob = row
+            objectives_blob, constraints_blob = row
 
         desvars_array = blob_to_array(desvars_blob)
         responses_array = blob_to_array(responses_blob)
@@ -157,6 +156,7 @@ class DriverCases(BaseCases):
 
 class SystemCases(BaseCases):
     """
+    Case specific to the entries that might be recorded in a System iteration.
     """
 
     def get_case(self, case_id):
@@ -173,7 +173,6 @@ class SystemCases(BaseCases):
             An instance of a System Case populated with data from the
             specified case/iteration.
         """
-
         iteration_coordinate = self.get_iteration_coordinate(case_id)
 
         with sqlite3.connect(self.filename) as con:
@@ -201,6 +200,7 @@ class SystemCases(BaseCases):
 
 class SolverCases(BaseCases):
     """
+    Case specific to the entries that might be recorded in a Solver iteration.
     """
 
     def get_case(self, case_id):
@@ -217,7 +217,6 @@ class SolverCases(BaseCases):
             An instance of a Driver Case populated with data from the
             specified case/iteration.
         """
-
         iteration_coordinate = self.get_iteration_coordinate(case_id)
 
         with sqlite3.connect(self.filename) as con:
@@ -239,10 +238,3 @@ class SolverCases(BaseCases):
                           abs_err, rel_err, output_array, residuals_array)
 
         return case
-
-
-
-
-
-
-

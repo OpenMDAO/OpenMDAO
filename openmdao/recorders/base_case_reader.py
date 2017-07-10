@@ -1,7 +1,7 @@
 """
 Docstring.
 """
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 
 
 class BaseCaseReader(object):
@@ -42,4 +42,3 @@ class BaseCaseReader(object):
         self.driver_metadata = {}
         self.system_metadata = {}
         self.solver_metadata = {}
-
